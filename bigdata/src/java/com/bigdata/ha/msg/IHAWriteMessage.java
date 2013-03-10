@@ -23,6 +23,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.ha.msg;
 
+import java.util.UUID;
+
 import com.bigdata.journal.StoreTypeEnum;
 
 /**
@@ -33,6 +35,9 @@ import com.bigdata.journal.StoreTypeEnum;
  */
 public interface IHAWriteMessage extends IHAWriteMessageBase {
 
+    /** The {@link UUID} of the store to which this message belongs. */
+    UUID getUUID();
+    
     /** The commit counter associated with this message */
     long getCommitCounter();
 

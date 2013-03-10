@@ -24,6 +24,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.ha.msg;
 
 import java.io.IOException;
+import java.util.UUID;
 
 import junit.framework.TestCase;
 
@@ -39,6 +40,7 @@ public class TestHAWriteMessage extends TestCase {
     public void testSerialization() throws IOException, ClassNotFoundException {
 
         final IHAWriteMessage msg1 = new HAWriteMessage(
+                UUID.randomUUID(),// store UUID
                 12L,// commitCounter
                 13L,// commitTime
                 14L,// sequence

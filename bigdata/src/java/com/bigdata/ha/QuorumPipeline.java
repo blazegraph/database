@@ -29,6 +29,7 @@ package com.bigdata.ha;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.UUID;
 import java.util.concurrent.Future;
 
 import com.bigdata.ha.halog.HALogWriter;
@@ -136,6 +137,11 @@ public interface QuorumPipeline<S extends HAPipelineGlue> {
      */
     long getLastCommitCounter();
 
+    /**
+     * The {@link UUID} of the backing store.
+     */
+    UUID getStoreUUID();
+    
     /**
      * Log the {@link IHAWriteMessage} and the associated data (if necessary).
      * The log file for the current write set will be deleted if the quorum is

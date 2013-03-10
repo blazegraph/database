@@ -676,6 +676,11 @@ public class HABackupManager {
             }
 
             @Override
+            public UUID getStoreUUID() {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
             public long getLastCommitTime() {
                 // TODO Auto-generated method stub
                 return 0;

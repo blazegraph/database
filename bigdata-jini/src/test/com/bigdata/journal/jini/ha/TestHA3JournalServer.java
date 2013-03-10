@@ -28,23 +28,15 @@ package com.bigdata.journal.jini.ha;
 
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.util.LinkedList;
-import java.util.List;
 import java.util.UUID;
-import java.util.concurrent.Callable;
-import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.halog.HALogWriter;
 import com.bigdata.ha.msg.HARootBlockRequest;
-import com.bigdata.journal.jini.ha.HAJournalServer.AdministrableHAGlueService;
-import com.bigdata.quorum.AsynchronousQuorumCloseException;
 import com.bigdata.quorum.Quorum;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
 
@@ -239,22 +231,9 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
      */
     public void testStartABCSimultaneous() throws Exception {
 
-        final HAGlue serverA, serverB, serverC;
-        {
-            final List<Callable<HAGlue>> tasks = new LinkedList<Callable<HAGlue>>();
-            
-            tasks.add(new StartATask(false/*restart*/));
-            tasks.add(new StartBTask(false/*restart*/));
-            tasks.add(new StartCTask(false/*restart*/));
+        final ABC abc = new ABC(); // simultaneous start.
 
-            // Start all servers in parallel. Wait up to a timeout.
-            final List<Future<HAGlue>> futures = executorService.invokeAll(
-                    tasks, 30/* timeout */, TimeUnit.SECONDS);
-
-            serverA = futures.get(0).get();
-            serverB = futures.get(1).get();
-            serverC = futures.get(2).get();
-        }
+        final HAGlue serverA = abc.serverA, serverB = abc.serverB, serverC = abc.serverC;
 
         // Verify quorum is FULLY met.
         final long token = awaitFullyMetQuorum();

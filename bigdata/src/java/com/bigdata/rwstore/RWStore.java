@@ -44,6 +44,7 @@ import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -412,6 +413,14 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 //	private boolean m_preserveSession = false;
 //	private boolean m_readOnly;
 
+	/**
+	 * The UUID of the backing store.
+	 * 
+	 * @see #initfromRootBlock(IRootBlockView)
+	 * @see IRawStore#getUUID()
+	 */
+	private UUID m_storeUUID;
+	
 	/**
 	 * lists of total alloc blocks.
 	 * 
@@ -785,7 +794,14 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 		try {
             if (m_rb.getNextOffset() == 0) { // if zero then new file
             	setAllocations(fileMetadata);
-            	
+    
+            /*
+             * FIXME Martyn, the code paths here are crazy complicated.
+             * defaultInit() is also invoked from initFromRootBlock().
+             * Simplify this. BBT
+             */
+            	m_storeUUID = m_rb.getUUID();
+
             	defaultInit();
             	
         		m_maxFixedAlloc = m_allocSizes[m_allocSizes.length-1]*64;
@@ -1128,6 +1144,8 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 		// m_rb = m_fmv.getRootBlock();
 		assert(m_rb != null);
 
+		m_storeUUID = m_rb.getUUID();
+		
 		if (m_rb.getNextOffset() == 0) {
 
 		    defaultInit();
@@ -5321,9 +5339,9 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 
         final int chk = ChecksumUtility.threadChk.get().checksum(b);
         
-        final IHAWriteMessage msg = new HAWriteMessage(-1L/* commitCounter */,
-                -1L/* commitTime */, sequence, nbytes, chk, StoreTypeEnum.RW,
-                quorumToken, fileExtent, offset/* firstOffset */);
+        final IHAWriteMessage msg = new HAWriteMessage(m_storeUUID,
+                -1L/* commitCounter */, -1L/* commitTime */, sequence, nbytes,
+                chk, StoreTypeEnum.RW, quorumToken, fileExtent, offset/* firstOffset */);
 
         final Future<Void> remoteWriteFuture = quorumMember.replicate(req, msg,
                 clientBuffer);

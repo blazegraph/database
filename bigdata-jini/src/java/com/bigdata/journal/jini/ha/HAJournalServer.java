@@ -1559,20 +1559,36 @@ public class HAJournalServer extends AbstractServer {
                  * on the journal and a few other things in place. This does not
                  * exactly correspond to the pre-conditions on RunMet. It is
                  * more like the post-conditions on pipelineSetup().
+                 * 
+                 * Note: We MUST NOT install the local root blocks unless both
+                 * this service and the leader at at commitCounter ZERO(0L).
                  */
+                awaitJournalToken(token);
                 {
 
-                    // The current root block.
-                    final IRootBlockView rb = journal.getRootBlockView();
+                    /*
+                     * The current root block on the leader (We want to get some
+                     * immutatable metadata from the leader's root block).
+                     */
+                    final IRootBlockView rb = leader.getRootBlock(
+                            new HARootBlockRequest(null/* storeUUID */))
+                            .getRootBlock();// journal.getRootBlockView();
 
                     // Use timestamp.
                     final long createTime = System.currentTimeMillis();
 
                     // New root blocks for a (logically) empty Journal.
-                    final RootBlockUtility rbu = new RootBlockUtility(journal
-                            .getBufferStrategy().getBufferMode(),
-                            rb.getOffsetBits(), createTime, token, rb.getUUID());
+                    final RootBlockUtility rbu = new RootBlockUtility(//
+                            journal.getBufferStrategy().getBufferMode(), //
+                            rb.getOffsetBits(),  // from leader.
+                            createTime, //
+                            token, //
+                            rb.getUUID() // storeUUID from leader.
+                            );
 
+                    // Verify that the quorum remains met on this token.
+                    getQuorum().assertQuorum(token);
+                    
                     /*
                      * Install both root blocks.
                      * 
@@ -1609,6 +1625,9 @@ public class HAJournalServer extends AbstractServer {
                     remoteFuture.cancel(true/* mayInterruptIfRunning */);
                     
                 }
+                
+                // Verify that the quorum remains met on this token.
+                getQuorum().assertQuorum(token);
                 
                 // Caught up on the backing store as of that copy.
                 installRootBlocks(resp.getRootBlock0(), resp.getRootBlock1());
@@ -2234,13 +2253,18 @@ public class HAJournalServer extends AbstractServer {
         protected void handleReplicatedWrite(final IHASyncRequest req,
                 final IHAWriteMessage msg, final ByteBuffer data)
                 throws Exception {
-            if (journal.getQuorumToken() == Quorum.NO_QUORUM && req == null) {
+            if (req == null //&& journal.getQuorumToken() == Quorum.NO_QUORUM
+                    && journal.getRootBlockView().getCommitCounter() == 0L
+                    && (msg.getUUID() != null && !journal.getUUID().equals(msg.getUUID()))) {
                 /*
                  * This is a live write (part of the current write set).
-                 * However, we do not yet have the quorum token yet and hence do
-                 * not even recognize that a quorum is met so there is
-                 * absolutely nothing that we can do with this write at this
-                 * time.
+                 * However, our root blocks have not yet been updated to reflect
+                 * the leader's root blocks. In this case, if we attempt to
+                 * setup the pipeline before the root blocks
+                 * have been installed, then we risk a distributed deadlock
+                 * where the leader can be waiting for this service to handle
+                 * the replicated write in WriteCacheService.flush() as invoked from commitNow()
+                 * during a commit, but this service is waiting on the 
                  * 
                  * Note: Deadlocks had been observed before this fast path was
                  * added. This occurred when the leader was attempting to commit
@@ -2251,6 +2275,11 @@ public class HAJournalServer extends AbstractServer {
                  * discover whether or not the KB has been created.
                  * 
                  * @see TestHA3JournalServer#testABCStartSimultaneous
+//                 * 
+//                 * FIXME MUST GUARANTEE INSTALL OF ROOT BLOCKS FROM LEADER IN
+//                 * RESYNC IF COMMIT COUNTER IS ZERO and MUST NOT call
+//                 * pipelineSetup() unless we are already in a state where we are
+//                 * ready to handle either a live write or a historical write.
                  */
                 return;
             }
@@ -2952,11 +2981,15 @@ public class HAJournalServer extends AbstractServer {
                     Thread.sleep(sleepMillis/* ms */);
                     continue;
                 }
-                if (isFollower(token)) {// if (awaitRootBlocks) {
+                if (isFollower(token)) {// if (awaitRootBlocks) { 
                     final IRootBlockView rbSelf = journal.getRootBlockView();
-                    if (rbSelf.getCommitCounter() == 0) {
+                    if (rbSelf.getCommitCounter() == 0L) {
                         /*
                          * Only wait if this is an empty Journal.
+                         * 
+                         * Note: We MUST NOT install the local root blocks
+                         * unless both this service and the leader at at
+                         * commitCounter ZERO(0L).
                          */
                         if (leader == null) {
                             /*
@@ -2970,6 +3003,10 @@ public class HAJournalServer extends AbstractServer {
                                     .getRootBlock();
                         }
                         if (!rbSelf.getUUID().equals(rbLeader.getUUID())) {
+                            /*
+                             * Wait if the leader's root block has not yet been
+                             * installed.
+                             */
                             Thread.sleep(sleepMillis/* ms */);
                             continue;
                         }

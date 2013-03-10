@@ -93,10 +93,10 @@ public class TestRawTransfers extends TestCase {
 				transfer.limit(sze);
 				src.readRaw(position, transfer);
 				
-				final IHAWriteMessage msg = new HAWriteMessage(-1, -1,
-			            sequence++, sze, -1/*chk*/,
-			            mode.getStoreType(), -1 /*quorumToken*/,
-			            extent, position);
+                final IHAWriteMessage msg = new HAWriteMessage(
+                        journal1.getUUID(), -1, -1, sequence++, sze,
+                        -1/* chk */, mode.getStoreType(), -1 /* quorumToken */,
+                        extent, position);
 				
 				dst.writeRawBuffer(req, msg, transfer);
 

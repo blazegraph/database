@@ -112,6 +112,13 @@ abstract public class QuorumServiceBase<S extends HAGlue, L extends AbstractJour
             }
             
             @Override
+            public UUID getStoreUUID() {
+
+                return QuorumServiceBase.this.getStoreUUID();
+                
+            }
+        
+            @Override
             public long getLastCommitTime() {
 
                 return QuorumServiceBase.this.getLastCommitTime();
@@ -322,6 +329,15 @@ abstract public class QuorumServiceBase<S extends HAGlue, L extends AbstractJour
 
     }
 
+    @Override
+    final public UUID getStoreUUID() {
+
+        final L localService = getLocalService();
+
+        return localService.getRootBlockView().getUUID();
+        
+    }
+    
     @Override
     final public long getLastCommitTime() {
 

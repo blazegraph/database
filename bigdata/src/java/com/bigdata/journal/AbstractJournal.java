@@ -331,10 +331,17 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 	 */
 	private final IBufferStrategy _bufferStrategy;
 
-	/**
-	 * A description of the journal as a resource.
-	 */
-	private final JournalMetadata journalMetadata;
+    /**
+     * A description of the journal as a resource.
+     * <p>
+     * Note: For HA, this is updated if new root blocks are installed onto the
+     * journal. This is necessary since that operation changes the {@link UUID}
+     * of the backing store, which is one of the things reported by the
+     * {@link JournalMetadata} class.
+     * 
+     * @see #installRootBlocks(IRootBlockView, IRootBlockView)
+     */
+	private final AtomicReference<JournalMetadata> journalMetadata = new AtomicReference<JournalMetadata>();
 
 	/*
      * 
@@ -1237,7 +1244,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
              */
 			
 			// Save resource description (sets value returned by getUUID()).
-			this.journalMetadata = new JournalMetadata(this);
+            this.journalMetadata.set(new JournalMetadata(this));
 
 			// new or reload from the store root block.
 			this._commitRecord = _getCommitRecord();
@@ -2170,13 +2177,13 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
 	final public UUID getUUID() {
 
-		return journalMetadata.getUUID();
+		return journalMetadata.get().getUUID();
 
 	}
 
 	final public IResourceMetadata getResourceMetadata() {
 
-		return journalMetadata;
+		return journalMetadata.get();
 
 	}
 
@@ -4926,7 +4933,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                 // This quorum member.
                 final QuorumService<HAGlue> localService = quorum.getClient();
 
-                if (_rootBlock.getCommitCounter() == 0
+                if (_rootBlock.getCommitCounter() == 0L
                         && localService.isFollower(quorumToken)) {
 
                     /*
@@ -4945,10 +4952,26 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                         throw new RuntimeException(e);
                     }
 
-                    // Installs the root blocks and does a local abort.
-                    localService.installRootBlocks(
-                            tmp.asRootBlock(true/* rootBlock0 */),
-                            tmp.asRootBlock(false/* rootBlock0 */));
+                    if (tmp.getCommitCounter() == 0L) {
+
+                        /*
+                         * Installs the root blocks and does a local abort.
+                         * 
+                         * Note: This code path is only taken when both the
+                         * leader and the follower are at commitCounter==0L.
+                         * This prevents us from accidentally laying down on a
+                         * follower the root blocks corresponding to a leader
+                         * that already has committed write sets.
+                         */
+                        localService.installRootBlocks(
+                                tmp.asRootBlock(true/* rootBlock0 */),
+                                tmp.asRootBlock(false/* rootBlock0 */));
+                    } else {
+                        
+                        // Still need to do that local abort.
+                        doLocalAbort();
+                        
+                    }
 
                 } else {
 
@@ -5019,6 +5042,12 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 //        final IRootBlockView rootBlock1 = new RootBlockView(
 //                false/* rootBlock0 */, rootBlock0.asReadOnlyBuffer(), checker);
 
+        final WriteLock lock = _fieldReadWriteLock.writeLock();
+
+        lock.lock();
+
+        try {
+            
         // Check the root blocks before we install them.
         {
             if (!_rootBlock.getStoreType().equals(rootBlock0.getStoreType())) {
@@ -5040,6 +5069,9 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
         // Choose the "current" root block.
         _rootBlock = RootBlockUtility.chooseRootBlock(rootBlock0, rootBlock1);
+
+        // Save resource description (sets value returned by getUUID()).
+        journalMetadata.set(new JournalMetadata(this));
 
         haLog.warn("Installed new root blocks: rootBlock0=" + rootBlock0
                 + ", rootBlock1=" + rootBlock1);
@@ -5069,6 +5101,12 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
          */
 
         doLocalAbort();
+        
+        } finally {
+            
+            lock.unlock();
+            
+        }
     
     }
 

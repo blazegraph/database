@@ -145,7 +145,9 @@ public class TestAltHALogWriter extends TestCase {
 
 		final ByteBuffer data = randomData(2000);
 
-		IHAWriteMessage msg = new HAWriteMessage(rbv.getCommitCounter(), rbv
+        final UUID storeUUID = UUID.randomUUID();
+
+        final IHAWriteMessage msg = new HAWriteMessage(storeUUID, rbv.getCommitCounter(), rbv
 				.getFirstCommitTime(), sequence, data.limit(), checker
 				.checksum(data), rbv.getStoreType(), rbv.getQuorumToken(),
 				1000, 0);
@@ -183,7 +185,9 @@ public class TestAltHALogWriter extends TestCase {
 
 		final ByteBuffer data = randomData(2000);
 
-		IHAWriteMessage msg = new HAWriteMessage(rbv.getCommitCounter(), rbv
+        final UUID storeUUID = UUID.randomUUID();
+
+		final IHAWriteMessage msg = new HAWriteMessage(storeUUID, rbv.getCommitCounter(), rbv
 				.getFirstCommitTime(), sequence, data.limit(), checker
 				.checksum(data), rbv.getStoreType(), rbv.getQuorumToken(),
 				1000, 0);
@@ -235,7 +239,9 @@ public class TestAltHALogWriter extends TestCase {
 
 		final ByteBuffer data = randomData(2000);
 
-		IHAWriteMessage msg = new HAWriteMessage(rbv.getCommitCounter(), rbv
+        final UUID storeUUID = UUID.randomUUID();
+
+        final IHAWriteMessage msg = new HAWriteMessage(storeUUID, rbv.getCommitCounter(), rbv
 				.getFirstCommitTime(), sequence, data.limit(), checker
 				.checksum(data), rbv.getStoreType(), rbv.getQuorumToken(),
 				1000, 0);
@@ -246,7 +252,8 @@ public class TestAltHALogWriter extends TestCase {
 		manager.disable();
 		
 		try {
-			IHAWriteMessage msg2 = new HAWriteMessage(rbv.getCommitCounter(), rbv
+
+		    final IHAWriteMessage msg2 = new HAWriteMessage(storeUUID, rbv.getCommitCounter(), rbv
 					.getFirstCommitTime(), sequence+1, data.limit(), checker
 					.checksum(data), rbv.getStoreType(), rbv.getQuorumToken(),
 					1000, 0);
@@ -285,13 +292,14 @@ public class TestAltHALogWriter extends TestCase {
 
 		@Override
 		public void run() {
+            final UUID storeUUID = UUID.randomUUID();
 			try {
 				for (int i = 0; i < count; i++) {
 					// add delay to write thread to test read thread waiting for
 					// data
 					Thread.sleep(1);
 					data.limit(200 + r.nextInt(1800));
-					IHAWriteMessage msg = new HAWriteMessage(rbv
+					final IHAWriteMessage msg = new HAWriteMessage(storeUUID, rbv
 							.getCommitCounter(), rbv.getLastCommitTime(),
 							sequence++, data.limit(), checker.checksum(data),
 							rbv.getStoreType(), rbv.getQuorumToken(), 1000, 0);
