@@ -48,6 +48,7 @@ import com.bigdata.quorum.MockQuorumFixture.MockQuorum;
 import com.bigdata.quorum.QuorumActor;
 import com.bigdata.rwstore.RWWriteCacheService;
 import com.bigdata.util.ChecksumUtility;
+import com.bigdata.util.InnerCause;
 
 /**
  * Test suite for the {@link WriteCacheService} using scattered writes on a
@@ -334,6 +335,14 @@ public class TestRWWriteCacheService extends TestCase3 {
                 writeCache.write(v.addr, v.buf.asReadOnlyBuffer(), checker
                         .checksum(v.buf));
             } catch (Throwable t) {
+                /**
+                 * FIXME This test is broken both here and at the following
+                 * flush().
+                 * 
+                 * @see https://sourceforge.net/apps/trac/bigdata/ticket/651
+                 *      (RWS test failure)
+                 */
+//                if(!InnerCause.isInnerCause(t, AssertionError.class)) {
                 if (!(t instanceof AssertionError)) {
                     fail("Expecting " + AssertionError.class.getName()
                             + ", not " + t, t);

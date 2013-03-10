@@ -160,6 +160,24 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> extends
             .getLogger(QuorumPipelineImpl.class);
 
     /**
+     * The timeouts for a sleep before the next retry. These timeouts are
+     * designed to allow some asynchronous processes to reconnect the
+     * {@link HASendService} and the {@link HAReceiveService}s in write pipeline
+     * such that a retransmit can succeed after a service has left the pipeline.
+     * Depending on the nature of the error (i.e., a transient network problem
+     * versus a pipeline reorganization), this can involve a number of zookeeper
+     * events. Hence the sleep latency is backed off through this array of
+     * values.
+     * 
+     * TODO We do not want to induce too much latency here. It would be nice if
+     * we automatically retried after each relevant quorum event that might cure
+     * the problem as well as after a timeout. This would require a Condition
+     * that we await with a timeout and signaling the Condition if there are any
+     * relevant events (probably once we handle them locally).
+     */
+    static protected final int RETRY_SLEEP[] = new int[] { 100, 200, 200, 500, 500, 1000 };
+
+    /**
      * The {@link QuorumMember}.
      */
     protected final QuorumMember<S> member;
@@ -772,21 +790,6 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> extends
          */
         private final long quorumToken;
 
-        /**
-         * The #of times the leader in a highly available quorum will attempt to
-         * retransmit the current write cache block if there is an error when
-         * sending that write cache block to the downstream node.
-         */
-        static protected final int RETRY_COUNT = 3;
-
-        /**
-         * The timeout for a sleep before the next retry. This timeout is designed
-         * to allow some asynchronous processes to reconnect the
-         * {@link HASendService} and the {@link HAReceiveService}s in write pipeline
-         * such that a retransmit can succeed after a service has left the pipeline.
-         */
-        static protected final int RETRY_SLEEP = 50;
-
         public RobustReplicateTask(final IHASyncRequest req,
                 final IHAWriteMessage msg, final ByteBuffer b) {
             
@@ -860,8 +863,9 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> extends
 
                     // Rethrow the original exception.
                     throw new RuntimeException(
-                            "Giving up. Could not send after " + RETRY_COUNT
-                                    + " attempts : " + t, t);
+                            "Giving up. Could not send after "
+                                    + RETRY_SLEEP.length + " attempts : " + t,
+                            t);
 
                 }
                 
@@ -957,10 +961,10 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> extends
             int tryCount = 1;
 
             // now try some more times.
-            for (; tryCount < RETRY_COUNT; tryCount++) {
+            for (; tryCount < RETRY_SLEEP.length; tryCount++) {
 
                 // Sleep before each retry (including the first).
-                Thread.sleep(RETRY_SLEEP/* ms */);
+                Thread.sleep(RETRY_SLEEP[tryCount-1]/* ms */);
 
                 try {
 

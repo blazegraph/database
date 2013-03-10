@@ -23,19 +23,14 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.journal;
 
-import java.io.ByteArrayOutputStream;
-import java.io.DataOutputStream;
-import java.io.EOFException;
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.Channel;
 import java.nio.channels.FileChannel;
 import java.security.DigestException;
 import java.security.MessageDigest;
-import java.util.ArrayList;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.Future;
@@ -68,8 +63,6 @@ import com.bigdata.io.writecache.WriteCache;
 import com.bigdata.io.writecache.WriteCacheCounters;
 import com.bigdata.io.writecache.WriteCacheService;
 import com.bigdata.quorum.Quorum;
-import com.bigdata.rawstore.IAllocationContext;
-import com.bigdata.rawstore.IPSOutputStream;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.util.ChecksumError;
 import com.bigdata.util.ChecksumUtility;
@@ -2559,9 +2552,9 @@ public class WORMStrategy extends AbstractBufferStrategy implements
 
         final int chk = ChecksumUtility.threadChk.get().checksum(b);
         
-        final IHAWriteMessage msg = new HAWriteMessage(-1L/* commitCounter */,
-                -1L/* commitTime */, sequence, nbytes, chk, StoreTypeEnum.WORM,
-                quorumToken, fileExtent, offset/* firstOffset */);
+        final IHAWriteMessage msg = new HAWriteMessage(storeUUID,
+                -1L/* commitCounter */, -1L/* commitTime */, sequence, nbytes,
+                chk, StoreTypeEnum.WORM, quorumToken, fileExtent, offset/* firstOffset */);
 
         final Future<Void> remoteWriteFuture = quorumMember.replicate(req, msg,
                 clientBuffer);

@@ -1389,7 +1389,9 @@ abstract public class WriteCacheService implements IWriteCache {
 
                 assert quorumMember != null : "Not quorum member?";
 
-                final IHAWriteMessage msg = cache.newHAWriteMessage(quorumToken,//
+                final IHAWriteMessage msg = cache.newHAWriteMessage(//
+                        quorumMember.getStoreUUID(),//
+                        quorumToken,//
                         quorumMember.getLastCommitCounter(),//
                         quorumMember.getLastCommitTime(),//
                         thisSequence,//

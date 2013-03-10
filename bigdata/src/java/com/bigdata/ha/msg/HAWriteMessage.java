@@ -30,6 +30,7 @@ package com.bigdata.ha.msg;
 import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
+import java.util.UUID;
 
 import com.bigdata.journal.StoreTypeEnum;
 
@@ -48,6 +49,9 @@ public class HAWriteMessage extends HAWriteMessageBase implements
      */
     private static final long serialVersionUID = -2673171474897401979L;
 
+    /** The {@link UUID} of the store to which this message belongs. */
+    private UUID uuid;
+    
     /** The most recent commit counter associated with this message */
     private long commitCounter;
 
@@ -68,6 +72,11 @@ public class HAWriteMessage extends HAWriteMessageBase implements
 
     /** The file offset at which the data will be written (WORM only). */
     private long firstOffset;
+
+    @Override
+    public UUID getUUID() {
+        return uuid;
+    }
 
     /* (non-Javadoc)
      * @see com.bigdata.journal.ha.IHAWriteMessage#getCommitCounter()
@@ -130,6 +139,7 @@ public class HAWriteMessage extends HAWriteMessageBase implements
         return getClass().getName() //
                 + "{size=" + getSize() //
                 + ",chksum=" + getChk() //
+                + ",uuid="+getUUID() // 
                 + ",commitCounter=" + commitCounter //
                 + ",commitTime=" + lastCommitTime //
                 + ",sequence=" + sequence //
@@ -148,6 +158,12 @@ public class HAWriteMessage extends HAWriteMessageBase implements
     }
 
     /**
+     * @param uuid
+     *            The {@link UUID} associated with the backing store on the
+     *            leader. This can be used to decide whether the message is for
+     *            a given store, or (conversly) whether the receiver has already
+     *            setup its root blocks based on the leader (and hence has the
+     *            correct {@link UUID} for its local store).
      * @param commitCounter
      *            The commit counter for the current root block for the write
      *            set which is being replicated by this message.
@@ -171,15 +187,21 @@ public class HAWriteMessage extends HAWriteMessageBase implements
      * @param firstOffset
      *            The file offset at which the data will be written (WORM only).
      */
-    public HAWriteMessage(final long commitCounter, final long commitTime,
-            final long sequence, final int sze, final int chk,
-            final StoreTypeEnum storeType, final long quorumToken,
-            final long fileExtent, final long firstOffset) {
+    public HAWriteMessage(final UUID uuid, final long commitCounter,
+            final long commitTime, final long sequence, final int sze,
+            final int chk, final StoreTypeEnum storeType,
+            final long quorumToken, final long fileExtent,
+            final long firstOffset) {
 
         super(sze, chk);
 
+        if (uuid == null)
+            throw new IllegalArgumentException();
+        
         if (storeType == null)
             throw new IllegalArgumentException();
+        
+        this.uuid = uuid;
         
         this.commitCounter = commitCounter;
         
@@ -197,8 +219,21 @@ public class HAWriteMessage extends HAWriteMessageBase implements
         
     }
 
+    /**
+     * The initial version.
+     */
     private static final byte VERSION0 = 0x0;
 
+    /**
+     * Adds the {@link #uuid} field.
+     */
+    private static final byte VERSION1 = 0x1;
+
+    /**
+     * The current version.
+     */
+    private static final byte currentVersion = VERSION1;
+    
     @Override
     public boolean equals(final Object obj) {
 
@@ -213,7 +248,8 @@ public class HAWriteMessage extends HAWriteMessageBase implements
         
         final IHAWriteMessage other = (IHAWriteMessage) obj;
 
-        return commitCounter == other.getCommitCounter()
+        return ((uuid == null && other.getUUID() == null) || uuid.equals(other.getUUID()))
+                && commitCounter == other.getCommitCounter()
                 && lastCommitTime == other.getLastCommitTime() //
                 && sequence == other.getSequence()
                 && storeType == other.getStoreType()
@@ -230,7 +266,14 @@ public class HAWriteMessage extends HAWriteMessageBase implements
 		final byte version = in.readByte();
 		switch (version) {
 		case VERSION0:
+		    uuid = null; // Note: not available.
 			break;
+        case VERSION1:
+            uuid = new UUID(//
+                    in.readLong(), // MSB
+                    in.readLong() // LSB
+            );
+            break;
 		default:
 			throw new IOException("Unknown version: " + version);
 		}
@@ -245,7 +288,11 @@ public class HAWriteMessage extends HAWriteMessageBase implements
 
 	public void writeExternal(final ObjectOutput out) throws IOException {
 		super.writeExternal(out);
-		out.write(VERSION0);
+		out.write(currentVersion);
+        if (currentVersion >= VERSION1) {
+            out.writeLong(uuid.getMostSignificantBits());
+            out.writeLong(uuid.getLeastSignificantBits());
+        }
 		out.writeByte(storeType.getType());
 		out.writeLong(commitCounter);
 		out.writeLong(lastCommitTime);

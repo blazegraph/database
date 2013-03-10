@@ -38,6 +38,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ConcurrentSkipListMap;
@@ -1532,6 +1533,7 @@ abstract public class WriteCache implements IWriteCache {
      * @return cache A {@link WriteCache} to be replicated.
      */
     final IHAWriteMessage newHAWriteMessage(//
+            final UUID storeUUID,
             final long quorumToken,
             final long lastCommitCounter,//
             final long lastCommitTime,//
@@ -1539,7 +1541,8 @@ abstract public class WriteCache implements IWriteCache {
             final ByteBuffer tmp
             ) {
 
-        return new HAWriteMessage(
+        return new HAWriteMessage(//
+                storeUUID,//
                 lastCommitCounter,//
                 lastCommitTime,//
                 sequence, //

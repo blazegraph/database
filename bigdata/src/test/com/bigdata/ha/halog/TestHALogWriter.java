@@ -114,7 +114,9 @@ public class TestHALogWriter extends TestCase {
 
 		final ByteBuffer data = randomData(2000);
 
-		IHAWriteMessage msg = new HAWriteMessage(rbv.getCommitCounter(), rbv
+		final UUID storeUUID = UUID.randomUUID();
+		
+		IHAWriteMessage msg = new HAWriteMessage(storeUUID, rbv.getCommitCounter(), rbv
 				.getFirstCommitTime(), sequence, data.limit(), checker
 				.checksum(data), rbv.getStoreType(), rbv.getQuorumToken(),
 				1000, 0);
@@ -153,7 +155,9 @@ public class TestHALogWriter extends TestCase {
 
 		final ByteBuffer data = randomData(2000);
 
-		IHAWriteMessage msg = new HAWriteMessage(rbv.getCommitCounter(), rbv
+		final UUID storeUUID = UUID.randomUUID();
+
+		final IHAWriteMessage msg = new HAWriteMessage(storeUUID, rbv.getCommitCounter(), rbv
 				.getFirstCommitTime(), sequence, data.limit(), checker
 				.checksum(data), rbv.getStoreType(), rbv.getQuorumToken(),
 				1000, 0);
@@ -206,11 +210,12 @@ public class TestHALogWriter extends TestCase {
 		
 		@Override
 		public void run() {
+	        final UUID storeUUID = UUID.randomUUID();
 			try {
 				for (int i = 0; i < count; i++) {
 					// add delay to write thread to test read thread waiting for data
 					Thread.sleep(10);
-					IHAWriteMessage msg = new HAWriteMessage(rbv
+					final IHAWriteMessage msg = new HAWriteMessage(storeUUID, rbv
 							.getCommitCounter(), rbv.getLastCommitTime(),
 							sequence++, data.limit(), checker
 									.checksum(data), rbv.getStoreType(),

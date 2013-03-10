@@ -341,6 +341,11 @@ public class TestWORMWriteCacheService extends TestCase3 {
                 }
 
                 @Override
+                public UUID getStoreUUID() {
+                    return MyMockQuorumMember.this.getStoreUUID();
+                }
+
+                @Override
                 public long getLastCommitTime() {
 
                     return MyMockQuorumMember.this.getLastCommitTime();
@@ -435,6 +440,13 @@ public class TestWORMWriteCacheService extends TestCase3 {
         }
 
         @Override
+        public UUID getStoreUUID() {
+        
+            return storeUUID;
+            
+        }
+
+        @Override
         public long getLastCommitTime() {
 
             return lastCommitTime;
@@ -448,6 +460,7 @@ public class TestWORMWriteCacheService extends TestCase3 {
             
         }
 
+        private UUID storeUUID = UUID.randomUUID();
         private long lastCommitCounter = 0;
         private long lastCommitTime = 0;
         
