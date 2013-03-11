@@ -490,88 +490,88 @@ public class TestHA2JournalServer extends AbstractHA3JournalServerTestCase {
         
     }
 
-    /**
-     * TODO 2 services start. Quorum meets. Write enough data to force a file
-     * extension then abort(). Restart services. The quorum should meet. Write
-     * enough data to force a file extension and then commit. The services
-     * should not report a problem with the file extends. [verify that the files
-     * were extended.]
-     * 
-     * TODO We need to send enough data to extend the file and enough we need a
-     * means to interrupt the data load. I.e., open a stream and start sending
-     * data. Maybe the INSERT DATA WITH POST using a streaming post? We would
-     * have one task to send the data and another to monitor the file extent
-     * (via RMI). When the file extension was observed we would then interrupt
-     * the task sending the data, which should lead to the abort() we want to
-     * observe.
-     * 
-     * @throws Exception
-     */
-    public void testStartAB_writeExtendAbort_writeExtendCommit()
-            throws Exception {
-     
-//        HAGlue serverA = startA();
-//        HAGlue serverB = startB();
+//    /**
+//     * TODO 2 services start. Quorum meets. Write enough data to force a file
+//     * extension then abort(). Restart services. The quorum should meet. Write
+//     * enough data to force a file extension and then commit. The services
+//     * should not report a problem with the file extends. [verify that the files
+//     * were extended.]
+//     * 
+//     * TODO We need to send enough data to extend the file and enough we need a
+//     * means to interrupt the data load. I.e., open a stream and start sending
+//     * data. Maybe the INSERT DATA WITH POST using a streaming post? We would
+//     * have one task to send the data and another to monitor the file extent
+//     * (via RMI). When the file extension was observed we would then interrupt
+//     * the task sending the data, which should lead to the abort() we want to
+//     * observe.
+//     * 
+//     * @throws Exception
+//     */
+//    public void testStartAB_writeExtendAbort_writeExtendCommit()
+//            throws Exception {
+//     
+////        HAGlue serverA = startA();
+////        HAGlue serverB = startB();
+////
+////        final long token1 = quorum.awaitQuorum(awaitQuorumTimeout,
+////                TimeUnit.MILLISECONDS);
+////
+////        doNSSStatusRequest(serverA);
+////        doNSSStatusRequest(serverB);
+////
+////        // Wait until KB exists.
+////        awaitKBExists(serverA);
+////
+////        // Verify binary equality on the journal files.
+////        assertDigestsEquals(new HAGlue[] { serverA, serverB });
+////
+////        // TODO Get the file length.
+////        final long extent1 = 0L;
+////        
+////        /*
+////         * LOAD data on leader, but cancel the operation once the file has
+////         * been extended. 
+////         */
+////        {
+////            
+////            final HAGlue leader = quorum.getClient().getLeader(token1);            
+////
+////            final StringBuilder sb = new StringBuilder();
+////            sb.append("DROP ALL;\n");
+////            sb.append("LOAD <file:/Users/bryan/Documents/workspace/BIGDATA_RELEASE_1_2_0/data-2.nq.gz>;\n");
+////            
+////            final String updateStr = sb.toString();
+////            
+////            // Verify quorum is still valid.
+////            quorum.assertQuorum(token1);
+////
+////            getRemoteRepository(leader).prepareUpdate(updateStr).evaluate();
+////            
+////            // TODO Get the file length.
+////            final long extent2 = 0L;
+////
+////            // Verify file was extended.
+////            assertTrue(extent2 > extent1);
+////
+////        }
 //
-//        final long token1 = quorum.awaitQuorum(awaitQuorumTimeout,
-//                TimeUnit.MILLISECONDS);
-//
-//        doNSSStatusRequest(serverA);
-//        doNSSStatusRequest(serverB);
-//
-//        // Wait until KB exists.
-//        awaitKBExists(serverA);
-//
-//        // Verify binary equality on the journal files.
-//        assertDigestsEquals(new HAGlue[] { serverA, serverB });
-//
-//        // TODO Get the file length.
-//        final long extent1 = 0L;
+//        fail("write test");
 //        
-//        /*
-//         * LOAD data on leader, but cancel the operation once the file has
-//         * been extended. 
-//         */
-//        {
-//            
-//            final HAGlue leader = quorum.getClient().getLeader(token1);            
+//    }
 //
-//            final StringBuilder sb = new StringBuilder();
-//            sb.append("DROP ALL;\n");
-//            sb.append("LOAD <file:/Users/bryan/Documents/workspace/BIGDATA_RELEASE_1_2_0/data-2.nq.gz>;\n");
-//            
-//            final String updateStr = sb.toString();
-//            
-//            // Verify quorum is still valid.
-//            quorum.assertQuorum(token1);
-//
-//            getRemoteRepository(leader).prepareUpdate(updateStr).evaluate();
-//            
-//            // TODO Get the file length.
-//            final long extent2 = 0L;
-//
-//            // Verify file was extended.
-//            assertTrue(extent2 > extent1);
-//
-//        }
-
-        fail("write test");
-        
-    }
-
-    /**
-    * TODO 2 services start. Quorum meets. Write data onto leader. WHILE
-    * WRITING, force follower to leave the qourum (e.g., bounce the zk client
-    * on the follower) and then verify that an abort was performed. Further, on
-    * the follower this needs to be a low level abort (_abort()). Also, since
-    * there are only 2 services the quorum will break and the leader should
-    * also do a low level _abort(). Quorum should meet after both services do
-    * the _abort() since they should both vote the same lastCommitTime.
-    */
-    public void testStartAB_followerLeaveDuringWrite() {
-        
-        fail("write test");
-        
-    }
+//    /**
+//    * TODO 2 services start. Quorum meets. Write data onto leader. WHILE
+//    * WRITING, force follower to leave the qourum (e.g., bounce the zk client
+//    * on the follower) and then verify that an abort was performed. Further, on
+//    * the follower this needs to be a low level abort (_abort()). Also, since
+//    * there are only 2 services the quorum will break and the leader should
+//    * also do a low level _abort(). Quorum should meet after both services do
+//    * the _abort() since they should both vote the same lastCommitTime.
+//    */
+//    public void testStartAB_followerLeaveDuringWrite() {
+//        
+//        fail("write test");
+//        
+//    }
     
 }

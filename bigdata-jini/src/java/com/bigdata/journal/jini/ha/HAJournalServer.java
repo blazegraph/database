@@ -1218,12 +1218,14 @@ public class HAJournalServer extends AbstractServer {
 
                     final long token = getQuorum().token();
 
-                    if (isJoinedMember(token)) // not joined.
-                        throw new IllegalStateException("Service not joined.");
+                    if (isJoinedMember(token))  {
+                        // Service already joined.
+                        throw new IllegalStateException("Service joined.");
+                    }
 
                     if (getQuorum().getCastVote(getServiceId()) != null) {
-                        // no vote cast.
-                        throw new IllegalStateException("No cast vote.");
+                        // Vote already cast.
+                        throw new IllegalStateException("Vote already cast.");
                     }
 
                     if (journal.getHALogWriter().isOpen())

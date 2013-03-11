@@ -44,14 +44,6 @@ import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
  * Test suites for an {@link HAJournalServer} quorum with a replication factor
  * of THREE (3) and a fully met {@link Quorum}.
  * 
- * FIXME (***) We need unit tests where we fail (shutdown) the service in at the head
- * of the pipeline (the leader), the 2nd position, and the last position. We
- * need to make sure that the quorum remains (when failing a follower) and that
- * it re-meets (when failing a leader). We also need to extend these tests to
- * verify that the service that was failed can be restarted. And we need to have
- * versions of these tests that bounce the service rather than shutting it down
- * and then restarting it.
- * 
  * TODO In order to guarantee that the LOAD operation does not terminate before
  * we are resynchronized, we either need to LOAD a sufficiently large file or we
  * need to stream data to the leader. I think we should go with a large file. We
@@ -525,7 +517,7 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
      */
 	public void testStartAB_C_MultiTransactionResync() throws Exception {
 
-		fail("TEST FAILS");
+//		fail("TEST FAILS");
 		
 		// Start 2 services.
 		final HAGlue serverA = startA();
@@ -698,7 +690,7 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
      */
 	public void testStartAB_C_LiveResync() throws Exception {
 
-		fail("TEST FAILS");
+//		fail("TEST FAILS");
 		
 		// Start 2 services.
 		final HAGlue serverA = startA();
@@ -775,9 +767,10 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
 			public void run() {
 					final StringBuilder sb = new StringBuilder();
 					sb.append("DROP ALL;\n");
-					sb.append("LOAD <file:/bigdata/ha/data-0.nq>;\n");
-					sb.append("LOAD <file:/bigdata/ha/data-1.nq>;\n");
-					sb.append("LOAD <file:/bigdata/ha/data-2.nq>;\n");
+		            sb.append("LOAD <" + getFoafFileUrl("data-0.nq.gz") + ">;\n");
+		            sb.append("LOAD <" + getFoafFileUrl("data-1.nq.gz") + ">;\n");
+		            sb.append("LOAD <" + getFoafFileUrl("data-2.nq.gz") + ">;\n");
+		            sb.append("LOAD <" + getFoafFileUrl("data-3.nq.gz") + ">;\n");
 					sb.append("INSERT {?x rdfs:label ?y . } WHERE {?x foaf:name ?y };\n");
 					sb.append("PREFIX dc: <http://purl.org/dc/elements/1.1/>\n");
 					sb.append("INSERT DATA\n");
@@ -1471,10 +1464,71 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
         assertLogCount(logsC, 1);
         
         // Now shutdown all servers
-        // FIXME: shutting down A first triggers other problems, see test_fullQuorumRestart
         shutdownB();
         shutdownC();
         shutdownA();
+        
+        // and check that there are no logs
+        assertLogCount(logsA, 0);
+        assertLogCount(logsB, 0);
+        assertLogCount(logsC, 0);
+        
+        // startup AB
+        startA();
+        startB();
+        
+        awaitMetQuorum();
+        
+        // and check that there are open logs
+        assertLogCount(logsA, 1);
+        assertLogCount(logsB, 1);
+        
+        // add C
+        startC();
+        
+        awaitFullyMetQuorum();
+        
+        // and check again for ABC
+        assertLogCount(logsA, 1);
+        assertLogCount(logsB, 1);
+        assertLogCount(logsC, 1);
+    }
+
+    /**
+     * Variant where A is shutdown first.
+     */
+    public void testStartABC_halogRestart2() throws Exception {
+        // Start 3 services, with delay to ensure clean starts
+        startA();
+        Thread.sleep(1000); // ensure A will be leader
+        startB();
+        startC();
+        
+        awaitFullyMetQuorum();
+        
+        // setup log directories
+        final File serviceDir = new File("benchmark/CI-HAJournal-1");
+        final File logsA = new File(serviceDir, "A/HALog");
+        final File logsB = new File(serviceDir, "B/HALog");
+        final File logsC = new File(serviceDir, "C/HALog");
+        
+        // committed log files not purged prior to fully met commit
+        assertLogCount(logsA, 2);
+        assertLogCount(logsB, 2);
+        assertLogCount(logsC, 2);
+
+        // Run through transaction
+        simpleTransaction();
+        
+        // again check that only open log files remaining
+        assertLogCount(logsA, 1);
+        assertLogCount(logsB, 1);
+        assertLogCount(logsC, 1);
+        
+        // Now shutdown all servers
+        shutdownA();
+        shutdownB();
+        shutdownC();
         
         // and check that there are no logs
         assertLogCount(logsA, 0);
@@ -1754,9 +1808,10 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
                 
                     final StringBuilder sb = new StringBuilder();
                     sb.append("DROP ALL;\n");
-                    sb.append("LOAD <file:/bigdata/ha/data-0.nq>;\n");
-                    sb.append("LOAD <file:/bigdata/ha/data-1.nq>;\n");
-                    sb.append("LOAD <file:/bigdata/ha/data-2.nq>;\n");
+                    sb.append("LOAD <" + getFoafFileUrl("data-0.nq.gz") + ">;\n");
+                    sb.append("LOAD <" + getFoafFileUrl("data-1.nq.gz") + ">;\n");
+                    sb.append("LOAD <" + getFoafFileUrl("data-2.nq.gz") + ">;\n");
+                    sb.append("LOAD <" + getFoafFileUrl("data-3.nq.gz") + ">;\n");
                     sb.append("INSERT {?x rdfs:label ?y . } WHERE {?x foaf:name ?y };\n");
                     sb.append("PREFIX dc: <http://purl.org/dc/elements/1.1/>\n");
                     sb.append("INSERT DATA\n");
@@ -1794,23 +1849,23 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
         Thread.sleep(100);
 
         // token must remain unchanged to indicate same quorum
-        assertTrue(token == awaitMetQuorum());
+        assertEquals(token, awaitMetQuorum());
         
         
         startC();
         // return to quorum
-        assertTrue(token == awaitFullyMetQuorum());
+        assertEquals(token, awaitFullyMetQuorum());
         
         // Now remove first follower
         shutdownB();
         Thread.sleep(100);
         
         // token must remain unchanged to indicate same quorum
-        assertTrue(token == awaitMetQuorum());
+        assertEquals(token, awaitMetQuorum());
         
         startB();
         // and return to quorum
-        assertTrue(token == awaitFullyMetQuorum());
+        assertEquals(token, awaitFullyMetQuorum());
         
         // wait for load to finish or just exit?
         final boolean waitForLoad = true;
@@ -1845,9 +1900,10 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
                 
                     final StringBuilder sb = new StringBuilder();
                     sb.append("DROP ALL;\n");
-                    sb.append("LOAD <file:/bigdata/ha/data-0.nq>;\n");
-                    sb.append("LOAD <file:/bigdata/ha/data-1.nq>;\n");
-                    sb.append("LOAD <file:/bigdata/ha/data-2.nq>;\n");
+                    sb.append("LOAD <" + getFoafFileUrl("data-0.nq.gz") + ">;\n");
+                    sb.append("LOAD <" + getFoafFileUrl("data-1.nq.gz") + ">;\n");
+                    sb.append("LOAD <" + getFoafFileUrl("data-2.nq.gz") + ">;\n");
+                    sb.append("LOAD <" + getFoafFileUrl("data-3.nq.gz") + ">;\n");
                     sb.append("INSERT {?x rdfs:label ?y . } WHERE {?x foaf:name ?y };\n");
                     sb.append("PREFIX dc: <http://purl.org/dc/elements/1.1/>\n");
                     sb.append("INSERT DATA\n");
@@ -1885,11 +1941,11 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
         Thread.sleep(100);
 
         // token must remain unchanged to indicate same quorum
-        assertTrue(token == awaitMetQuorum());
+        assertEquals(token, awaitMetQuorum());
         
         startB();
         // return to quorum
-        assertTrue(token == awaitFullyMetQuorum());
+        assertEquals(token, awaitFullyMetQuorum());
 
         // wait for load to finish or just exit?
         final boolean waitForLoad = true;
