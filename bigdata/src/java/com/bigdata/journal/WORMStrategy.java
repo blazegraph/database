@@ -254,8 +254,11 @@ public class WORMStrategy extends AbstractBufferStrategy implements
     /**
      * The {@link UUID} which identifies the journal (this is the same for each
      * replicated journal is a quorum, so it is really a logical store UUID).
+     * <p>
+     * Note: This can not be final since it is potentially changed (in HA) when
+     * we install new root blocks onto a store.
      */
-    private final UUID storeUUID;
+    private final AtomicReference<UUID> storeUUIDRef = new AtomicReference<UUID>();
     
     @Override
     public boolean useChecksums() {
@@ -902,7 +905,7 @@ public class WORMStrategy extends AbstractBufferStrategy implements
 
         this.useChecksums = fileMetadata.useChecksums;
 
-        this.storeUUID = fileMetadata.rootBlock.getUUID();
+        this.storeUUIDRef.set(fileMetadata.rootBlock.getUUID());
         
         // initialize striped performance counters for this store.
         this.storeCounters.set(new StoreCounters(10/* batchSize */));
@@ -1365,7 +1368,7 @@ public class WORMStrategy extends AbstractBufferStrategy implements
                     try {
                         // Read on another node in the quorum.
                         final byte[] a = ((QuorumRead<?>) quorum.getMember())
-                                .readFromQuorum(storeUUID, addr);
+                                .readFromQuorum(storeUUIDRef.get(), addr);
                         return ByteBuffer.wrap(a);
                     } catch (Throwable t) {
                         throw new RuntimeException("While handling: " + e, t);
@@ -2552,7 +2555,7 @@ public class WORMStrategy extends AbstractBufferStrategy implements
 
         final int chk = ChecksumUtility.threadChk.get().checksum(b);
         
-        final IHAWriteMessage msg = new HAWriteMessage(storeUUID,
+        final IHAWriteMessage msg = new HAWriteMessage(storeUUIDRef.get(),
                 -1L/* commitCounter */, -1L/* commitTime */, sequence, nbytes,
                 chk, StoreTypeEnum.WORM, quorumToken, fileExtent, offset/* firstOffset */);
 
@@ -2574,9 +2577,14 @@ public class WORMStrategy extends AbstractBufferStrategy implements
     @Override
     public void resetFromHARootBlock(final IRootBlockView rootBlock) {
 
-    	final long rbNextOffset = rootBlock.getNextOffset();
+        final long rbNextOffset = rootBlock.getNextOffset();
+        
         nextOffset.set(rbNextOffset);
+        
         commitOffset.set(rbNextOffset);
+
+        // Note: Potentially updated (if root blocks were reinstalled).
+        storeUUIDRef.set(rootBlock.getUUID());
         
     }
 

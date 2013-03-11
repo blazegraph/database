@@ -64,10 +64,11 @@ public interface IHistoryManager {
     public long saveDeferrals();
     
     /**
-     * Called prior to commit, so check whether storage can be freed and then
-     * whether the deferred header needs to be saved.
-     * <p>
-     * Note: The caller MUST be holding the {@link #m_allocationLock}.
+     * This method is invoked during the commit protocol and gives the backing
+     * store an opportunity to check whether storage associated with deferred
+     * frees can now be released. The backing store needs to reply the deferred
+     * free blocks for the commit points that will be released, mark those
+     * addresses as free, and free the logged delete blocks.
      * 
      * @return number of addresses freed
      * 
