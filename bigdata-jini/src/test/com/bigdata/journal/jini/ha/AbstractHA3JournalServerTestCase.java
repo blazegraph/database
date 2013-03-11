@@ -1858,4 +1858,35 @@ public class AbstractHA3JournalServerTestCase extends
 
     }
 
+    /**
+     * Commits update transaction after awaiting quorum
+     */
+    protected void simpleTransaction() throws IOException, Exception {
+        final long token = quorum.awaitQuorum(awaitQuorumTimeout,
+                TimeUnit.MILLISECONDS);
+
+        /*
+         * Now go through a commit point with a fully met quorum. The HALog
+         * files should be purged at that commit point.
+         */
+
+        final StringBuilder sb = new StringBuilder();
+        sb.append("DROP ALL;\n");
+        sb.append("PREFIX dc: <http://purl.org/dc/elements/1.1/>\n");
+        sb.append("INSERT DATA {\n");
+        sb.append("  <http://example/book1> dc:title \"A new book\" ;\n");
+        sb.append("  dc:creator \"A.N.Other\" .\n");
+        sb.append("}\n");
+        
+        final String updateStr = sb.toString();
+        
+        final HAGlue leader = quorum.getClient().getLeader(token);
+        
+        // Verify quorum is still valid.
+        quorum.assertQuorum(token);
+
+        getRemoteRepository(leader).prepareUpdate(updateStr).evaluate();
+            
+     }
+
 }

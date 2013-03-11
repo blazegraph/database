@@ -63,14 +63,7 @@ public class TestHA2JournalServer extends AbstractHA3JournalServerTestCase {
      * 
      * This is a series of basic tests of an HA quorum consisting of 2 services.
      * It is a degenerate case of an HA3 quorum that is slightly easier to test
-     * since the 3rd service is not present. The test suite needs to be run for
-     * both the DiskRW and DiskWORM modes since the modes have different
-     * integrations and each integration must be tested.
-     * 
-     * TODO 2 service start. Quorum meets. Write data and commit. Verify can
-     * restart either service and quorum meets at the new commit point. Verify
-     * can bounce either service and quorum meets at the new commit point. [This
-     * is a varient of the series of unit tests 
+     * since the 3rd service is not present.
      */
 
     /**

@@ -56,14 +56,10 @@ import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
  * during a service shutdown or bounce and hence the service must synchronize
  * when it comes back up).
  * 
- * FIXME We need unit tests that focus on rebuild (disaster recovery).
- * 
  * TODO We can do an explicit service restart or we can tell a service to bounce
  * its zk connection. Both will force a service leave and pipeline leave. The
  * shutdown/restart tests service restart while the zk bounce tests the impact
  * of a GC causing a timeout or a cured network partition.
- * 
- * TODO Tests to make sure that bouncing services rejoin and resync.
  * 
  * FIXME ---- HA3 RESYNC TESTS ----
  * 
@@ -1735,35 +1731,212 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
         }
     }
 
+
     /**
-     * Commits update transaction after awaiting quorum
+     * This sequence of transitions ensures that a quorum, once redundantly met
+     * does not break when any follower leaves
+     * 
+     * @throws Exception
      */
-    private void simpleTransaction() throws IOException, Exception {
-        final long token = quorum.awaitQuorum(awaitQuorumTimeout,
-                TimeUnit.MILLISECONDS);
+    public void testABC_RemainsMet() throws Exception {
+        // enforce join order
+        startA();
+        Thread.sleep(500); // FIXME Write Condition for the pipeline order. Sleep is not guaranteed.
+        startB();
+        Thread.sleep(500);
+        startC();
 
-        /*
-         * Now go through a commit point with a fully met quorum. The HALog
-         * files should be purged at that commit point.
-         */
+        final long token = awaitFullyMetQuorum();
+        
+        // shutdown C, the final follower
+        shutdownC();
+        Thread.sleep(500);
 
-        final StringBuilder sb = new StringBuilder();
-        sb.append("DROP ALL;\n");
-        sb.append("PREFIX dc: <http://purl.org/dc/elements/1.1/>\n");
-        sb.append("INSERT DATA {\n");
-        sb.append("  <http://example/book1> dc:title \"A new book\" ;\n");
-        sb.append("  dc:creator \"A.N.Other\" .\n");
-        sb.append("}\n");
+        // token must remain unchanged to indicate same quorum
+        assertTrue(token == awaitMetQuorum());
         
-        final String updateStr = sb.toString();
+        startC();
+        // return to quorum
+        assertTrue(token == awaitFullyMetQuorum());
         
-        final HAGlue leader = quorum.getClient().getLeader(token);
+        // Now remove first follower
+        shutdownB();
+        Thread.sleep(500);
         
-        // Verify quorum is still valid.
-        quorum.assertQuorum(token);
-
-        getRemoteRepository(leader).prepareUpdate(updateStr).evaluate();
-            
+        // token must remain unchanged to indicate same quorum
+        assertTrue(token == awaitMetQuorum());
+        
+        startB();
+        // and return to quorum
+        assertTrue(token == awaitFullyMetQuorum());
      }
+
+    /**
+     * Similar to RemainsMet but with long liveLoad
+     * 
+     * @throws Exception
+     */
+    public void testABC_LiveLoadRemainsMet() throws Exception {
+        // enforce join order
+        startA();
+        Thread.sleep(500);
+        startB();
+        Thread.sleep(500);
+        startC();
+
+        
+        final long token = awaitFullyMetQuorum();
+        
+        // start concurrent task loads that continue until fully met
+        final AtomicBoolean spin = new AtomicBoolean(false);
+        final Thread loadThread = new Thread() {
+            public void run() {
+                
+                    final StringBuilder sb = new StringBuilder();
+                    sb.append("DROP ALL;\n");
+                    sb.append("LOAD <file:/bigdata/ha/data-0.nq>;\n");
+                    sb.append("LOAD <file:/bigdata/ha/data-1.nq>;\n");
+                    sb.append("LOAD <file:/bigdata/ha/data-2.nq>;\n");
+                    sb.append("INSERT {?x rdfs:label ?y . } WHERE {?x foaf:name ?y };\n");
+                    sb.append("PREFIX dc: <http://purl.org/dc/elements/1.1/>\n");
+                    sb.append("INSERT DATA\n");
+                    sb.append("{\n");
+                    sb.append("  <http://example/book1> dc:title \"A new book\" ;\n");
+                    sb.append("    dc:creator \"A.N.Other\" .\n");
+                    sb.append("}\n");
+
+                    final String updateStr = sb.toString();
+
+                    final HAGlue leader = quorum.getClient().getLeader(token);
+
+                    // Verify quorum is still valid.
+                    quorum.assertQuorum(token);
+
+                    try {
+                        getRemoteRepository(leader).prepareUpdate(updateStr)
+                                .evaluate();
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                        
+                        fail("Probably unexpected on run ", e);
+                    } finally {             
+                        spin.set(true);
+                    }
+            }
+        };
+        loadThread.start();
+        
+        // allow load head start
+        Thread.sleep(300);
+
+        // shutdown C, the final follower
+        shutdownC();
+        Thread.sleep(100);
+
+        // token must remain unchanged to indicate same quorum
+        assertTrue(token == awaitMetQuorum());
+        
+        
+        startC();
+        // return to quorum
+        assertTrue(token == awaitFullyMetQuorum());
+        
+        // Now remove first follower
+        shutdownB();
+        Thread.sleep(100);
+        
+        // token must remain unchanged to indicate same quorum
+        assertTrue(token == awaitMetQuorum());
+        
+        startB();
+        // and return to quorum
+        assertTrue(token == awaitFullyMetQuorum());
+        
+        // wait for load to finish or just exit?
+        final boolean waitForLoad = true;
+        while (waitForLoad && !spin.get()) {
+            Thread.sleep(50);
+        }
+
+
+     }
+
+    /**
+     * Similar to LiveLoadRemainsMet but removes first follower first to
+     * trigger pipeline re-org
+     * 
+     * @throws Exception
+     */
+    public void testABC_LiveLoadRemainsMet2() throws Exception {
+        // enforce join order
+        startA();
+        Thread.sleep(500);
+        startB();
+        Thread.sleep(500);
+        startC();
+
+        final long token = awaitFullyMetQuorum();
+        
+        // start concurrent task loads that continue until fully met
+        final AtomicBoolean spin = new AtomicBoolean(false);
+        final Thread loadThread = new Thread() {
+            public void run() {
+//                    System.err.println("starting load");
+                
+                    final StringBuilder sb = new StringBuilder();
+                    sb.append("DROP ALL;\n");
+                    sb.append("LOAD <file:/bigdata/ha/data-0.nq>;\n");
+                    sb.append("LOAD <file:/bigdata/ha/data-1.nq>;\n");
+                    sb.append("LOAD <file:/bigdata/ha/data-2.nq>;\n");
+                    sb.append("INSERT {?x rdfs:label ?y . } WHERE {?x foaf:name ?y };\n");
+                    sb.append("PREFIX dc: <http://purl.org/dc/elements/1.1/>\n");
+                    sb.append("INSERT DATA\n");
+                    sb.append("{\n");
+                    sb.append("  <http://example/book1> dc:title \"A new book\" ;\n");
+                    sb.append("    dc:creator \"A.N.Other\" .\n");
+                    sb.append("}\n");
+
+                    final String updateStr = sb.toString();
+
+                    final HAGlue leader = quorum.getClient().getLeader(token);
+
+                    // Verify quorum is still valid.
+                    quorum.assertQuorum(token);
+
+                    try {
+                        getRemoteRepository(leader).prepareUpdate(updateStr)
+                                .evaluate();
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                        
+                        fail("Probably unexpected on run ", e);
+                    } finally {             
+                        spin.set(true);
+                    }
+            }
+        };
+        loadThread.start();
+        
+        // allow load head start
+        Thread.sleep(300);
+
+        // shutdown B, the first follower
+        shutdownB();
+        Thread.sleep(100);
+
+        // token must remain unchanged to indicate same quorum
+        assertTrue(token == awaitMetQuorum());
+        
+        startB();
+        // return to quorum
+        assertTrue(token == awaitFullyMetQuorum());
+
+        // wait for load to finish or just exit?
+        final boolean waitForLoad = true;
+        while (waitForLoad && !spin.get()) {
+            Thread.sleep(50);
+        }
+
+    }
 
 }
