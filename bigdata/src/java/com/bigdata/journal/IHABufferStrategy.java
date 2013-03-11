@@ -31,6 +31,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.security.DigestException;
 import java.security.MessageDigest;
+import java.util.UUID;
 import java.util.concurrent.Future;
 
 import com.bigdata.ha.msg.HARebuildRequest;
@@ -135,6 +136,11 @@ public interface IHABufferStrategy extends IBufferStrategy {
     /**
      * Called from {@link AbstractJournal} commit2Phase to ensure is able to
      * read committed data that has been streamed directly to the backing store.
+     * <p>
+     * Note: This method is used when the root blocks of the leader are installed
+     * onto a follower.  This can change the {@link UUID} for the backing store file.
+     * The {@link IHABufferStrategy} implementation MUST update any cached value for
+     * that {@link UUID}.
      */
     void resetFromHARootBlock(final IRootBlockView rootBlock);
 
