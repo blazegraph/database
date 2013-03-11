@@ -52,51 +52,11 @@ import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
  * versions of these tests that bounce the service rather than shutting it down
  * and then restarting it.
  * 
- * FIXME (***) We need unit tests that focus on resynchronization (writes were missed
- * during a service shutdown or bounce and hence the service must synchronize
- * when it comes back up).
- * 
- * TODO We can do an explicit service restart or we can tell a service to bounce
- * its zk connection. Both will force a service leave and pipeline leave. The
- * shutdown/restart tests service restart while the zk bounce tests the impact
- * of a GC causing a timeout or a cured network partition.
- * 
- * FIXME ---- HA3 RESYNC TESTS ----
- * 
- * TODO We need to verify that the HALog files are generated, that they are
- * identical, that they are retained while the quorum is not fully met, and that
- * they are removed when we go through a 2-phase commit with a fully met quorum.
- * 
- * TODO 2 services start in known order and the quourm meets. Write one or more
- * write sets on the leader and commit for each write set (the KB create is one
- * write set, a LOAD would be a second write set giving us 2 commit points).
- * Start 3rd service. The third service should resynchronize each historical
- * commit point from the HALog files on the leader and then join the met quorum.
- * Note: For this test, the leader is not receiving writes during the
- * resynchronization protocol.
- * 
- * Once the quorum is fully met, verify that all journals are 100% equals on the
- * disk. Note: The HALog files will not be purged since we only do that at a
- * fully met quorum commit, and while the 3rd service joined the quourm the
- * fully met quorum has not yet gone through a commit. (It is possible to delete
- * the logs when the quorum becomes fully met, rather than only when we go
- * through a fully met commit. The current behavior is more paranoid.)
- * 
- * TODO 2 services start in known order. The quorum meets. Begin a long running
- * LOAD on the leader. While that LOAD is running, start the 3rd service. The
- * service should resynchronize the historical commit points and "catch up" to
- * the live writes on the current write set and then join the quourm. The quorum
- * should be fully met when the LOAD is done and the HALog files should be
- * purged.
- * 
- * Note: In order to guarantee that the LOAD operation does not terminate before
+ * TODO In order to guarantee that the LOAD operation does not terminate before
  * we are resynchronized, we either need to LOAD a sufficiently large file or we
- * need to stream data to the leader. I think we should go with a large file.
- * 
- * TODO Verify that resync is chosen over rebuild when the HA Logs have been
- * purged at some point in the past but all necessary HALog files remain for the
- * resync operation (possible fence post - I have observed a rebuild operation
- * initiated when a resync was possible).
+ * need to stream data to the leader. I think we should go with a large file. We
+ * should also verify that the LOAD is still running when the 3rd service joins
+ * with the met quorum.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */

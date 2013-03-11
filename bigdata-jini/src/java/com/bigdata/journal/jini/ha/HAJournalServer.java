@@ -2275,11 +2275,6 @@ public class HAJournalServer extends AbstractServer {
                  * discover whether or not the KB has been created.
                  * 
                  * @see TestHA3JournalServer#testABCStartSimultaneous
-//                 * 
-//                 * FIXME MUST GUARANTEE INSTALL OF ROOT BLOCKS FROM LEADER IN
-//                 * RESYNC IF COMMIT COUNTER IS ZERO and MUST NOT call
-//                 * pipelineSetup() unless we are already in a state where we are
-//                 * ready to handle either a live write or a historical write.
                  */
                 return;
             }
