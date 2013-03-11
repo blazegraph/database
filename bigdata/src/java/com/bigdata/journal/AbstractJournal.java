@@ -4937,26 +4937,29 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                 // This quorum member.
                 final QuorumService<HAGlue> localService = quorum.getClient();
 
+                boolean installedRBs = false;
+                
                 if (_rootBlock.getCommitCounter() == 0L
                         && localService.isFollower(quorumToken)) {
 
                     /*
                      * Take the root blocks from the quorum leader and use them.
                      */
+                    
                     // Remote interface for the quorum leader.
                     final HAGlue leader = localService.getLeader(quorumToken);
 
                     log.info("Fetching root block from leader.");
-                    final IRootBlockView tmp;
+                    final IRootBlockView leaderRB;
                     try {
-                        tmp = leader.getRootBlock(
+                        leaderRB = leader.getRootBlock(
                                 new HARootBlockRequest(null/* storeUUID */))
                                 .getRootBlock();
                     } catch (IOException e) {
                         throw new RuntimeException(e);
                     }
 
-                    if (tmp.getCommitCounter() == 0L) {
+                    if (leaderRB.getCommitCounter() == 0L) {
 
                         /*
                          * Installs the root blocks and does a local abort.
@@ -4968,22 +4971,30 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                          * that already has committed write sets.
                          */
                         localService.installRootBlocks(
-                                tmp.asRootBlock(true/* rootBlock0 */),
-                                tmp.asRootBlock(false/* rootBlock0 */));
-                    } else {
-                        
-                        // Still need to do that local abort.
-                        doLocalAbort();
-                        
+                                leaderRB.asRootBlock(true/* rootBlock0 */),
+                                leaderRB.asRootBlock(false/* rootBlock0 */));
+
+                        installedRBs = true;
+
                     }
 
-                } else {
-
-                    // The leader also needs to do a local abort.
-                    doLocalAbort();
-                    
                 }
 
+                if (!installedRBs) {
+
+                    /*
+                     * If we install the RBs, the a local abort was already
+                     * done. Otherwise we need to do one now (this covers the
+                     * case when setQuorumToken() is called on the leader as
+                     * well as cases where the service is either not a follower
+                     * or is a follower, but the leader is not at
+                     * commitCounter==0L, etc.
+                     */
+                    
+                    doLocalAbort();
+
+                }
+                
             } else {
 
                 throw new AssertionError();
