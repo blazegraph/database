@@ -224,6 +224,18 @@ public interface Quorum<S extends Remote, C extends QuorumClient<S>> {
     Long getCastVote(final UUID serviceId);
     
     /**
+     * Search for the vote for the service.
+     * 
+     * @param serviceId
+     *            The service identifier.
+     * 
+     * @return The lastCommitTime for which the service has cast its vote -or-
+     *         <code>null</code> if the service is not participating in a
+     *         consensus.
+     */
+    Long getCastVoteIfConsensus(final UUID serviceId);
+    
+    /**
      * Return the identifiers for the member services joined with this quorum.
      * If the quorum was met at the moment the request was processed, then the
      * first element of the array was the quorum leader as of that moment and

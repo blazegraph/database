@@ -896,21 +896,7 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
         }
     }
 
-    /*
-     * Helper methods.
-     */
-
-    /**
-     * Search for the vote for the service.
-     * 
-     * @param serviceId
-     *            The service identifier.
-     * 
-     * @return The lastCommitTime for which the service has cast its vote -or-
-     *         <code>null</code> if the service is not participating in a
-     *         consensus.
-     */
-    private Long getCastVoteIfConsensus(final UUID serviceId) {
+    public Long getCastVoteIfConsensus(final UUID serviceId) {
         lock.lock();
         try {
             final Iterator<Map.Entry<Long, LinkedHashSet<UUID>>> itr = votes
@@ -931,6 +917,10 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
             lock.unlock();
         }
     }
+
+    /*
+     * Helper methods.
+     */
 
 //    /**
 //     * Search for the vote for the service.
