@@ -1029,28 +1029,33 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
     }
 
     final public UUID getLeaderId() {
+        UUID leaderId = null;
+        final long tmp;
         lock.lock();
         try {
             /*
-             * Note: [token] is VOLATILE so it can change while we are holding
+             * Note: [token] is VOLATILE, so it can change while we are holding
              * the lock. Therefore, we have to explicitly guard against this.
              */
-            final long tmp = token();
+            tmp = token; // value of token on entry.
             if (token == NO_QUORUM) {
+                // No quorum, no leader.
                 return null;
             }
             final UUID[] joined = getJoined();
-            assertQuorum(tmp); // ensure quorum still met.
-            if (joined == null)
-                throw new AssertionError();
-            final UUID leaderId = joined[0];
-            assertQuorum(tmp); // ensure quorum still met.
-            if (leaderId == null)
-                throw new AssertionError();
-            return leaderId;
+            if (joined.length > 0) {
+                // Set IFF available.
+                leaderId = joined[0];
+            }
         } finally {
             lock.unlock();
         }
+        if (token != tmp) {
+            // token concurrently changed.
+            return null;
+        }
+        // token remained valid, return whatever we have.
+        return leaderId;
     }
 
     final public long token() {
@@ -1881,9 +1886,18 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
             doSetToken(newValue);
             guard(new Guard() {
                 public void run() throws InterruptedException {
+//                    log.fatal("LOOP: ENTER: newValue=" + newValue
+//                            + ", lastValidToken=" + lastValidToken + ", token="
+//                            + token, new RuntimeException("THREAD TRACE"));
                     while (lastValidToken == oldValue && client != null) {
                         quorumChange.await();
+//                        log.fatal("LOOP: AWOKE: newValue=" + newValue
+//                                + ", lastValidToken=" + lastValidToken
+//                                + ", token=" + token);
                     }
+//                    log.fatal("LOOP: EXIT: newValue=" + newValue
+//                            + ", lastValidToken=" + lastValidToken + ", token="
+//                            + token);
                 }
             });
             if (client == null)
@@ -2502,7 +2516,30 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
                                             log.info("Electing leader: "
                                                     + AbstractQuorum.this
                                                             .toString());
-                                        actor.setToken(lastValidToken + 1);
+                                        doAction(new Runnable() {
+                                            /*
+                                             * Note: This needs to be submitted
+                                             * as an action since we will
+                                             * otherwise be in the zk event
+                                             * thread and be unable to observe
+                                             * the effect of the action that we
+                                             * take.
+                                             * 
+                                             * This was observed for the
+                                             * following HA3 test. A was unable
+                                             * to observe the new token value
+                                             * when it invoked setToken() from
+                                             * the current thread rather than by
+                                             * submitting the setToken() method
+                                             * in a runnable as we do here.
+                                             * 
+                                             * See TestHA3JournalServer.
+                                             * testStartABC_RebuildWithPipelineReorganisation
+                                             */
+                                            public void run() {
+                                                actor.setToken(lastValidToken + 1);
+                                            }
+                                        });
                                     }
                                 }
                             }

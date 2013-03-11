@@ -1074,8 +1074,8 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
         
         // Now restart A, B & C
     	final HAGlue serverC = startC();
-    	// Ensure that C starts first
-    	Thread.sleep(100);
+    	// Ensure that C gets into the pipeline before we start A/B.
+    	Thread.sleep(1000);
     	
     	final HAGlue serverA = startA();
     	final HAGlue serverB = startB();
@@ -1634,11 +1634,9 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
         shutdownB();
         shutdownC();
         
-        if (false) { // DEBUG to check logs in shutdown process
-	        // startup AB
-	        startA();
-	        startB();  // need to see log of shutdown problem
-        }
+        // startup AB
+        startA();
+        startB(); // need to see log of shutdown problem
         
         awaitMetQuorum();
         
@@ -1706,8 +1704,10 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
     		}
     		
     		
-    		// FIXME: The order of the destroy IS significant since a reorganisation
-    		//	on shutdown is another specific problem right now
+        /*
+         * Note: The order of the destroy IS significant since a
+         * reorganisation on shutdown is another specific problem right now.
+         */
     		destroyC();
     		destroyA();
     		destroyB();
