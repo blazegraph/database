@@ -2846,30 +2846,15 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
                     + m_contexts.size());
     }
 
-    /**
-     * Called prior to commit, so check whether storage can be freed and then
-     * whether the deferredheader needs to be saved.
-     * <p>
-     * Note: The caller MUST be holding the {@link #m_allocationLock}.
-     * <p>
-     * Note: This method is package private in order to expose it to the unit
-     * tests.
-     * 
-     * returns number of addresses freed
-     */
-    public /* public */int checkDeferredFrees(//final boolean freeNowIsIgnored,
-            final AbstractJournal journal) {
-//        return 0;
-//        // Note: Invoked from unit test w/o the lock...
-//        if (!m_allocationLock.isHeldByCurrentThread())
-//            throw new IllegalMonitorStateException();
+    public int checkDeferredFrees(final AbstractJournal journal) {
         
         if (journal == null)
             return 0;
 
-        /**
-         * Since this is now called direct from the AbstractJournal commit
-         * method we must take the allocation lock.
+        /*
+         * Note: since this is now called directly from the AbstractJournal
+         * commit method (and is part of a public API) we must take the
+         * allocation lock.
          * 
          * This may have adverse effects wrt concurrency deadlock issues, but
          * none have been noticed so far.

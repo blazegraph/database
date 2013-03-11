@@ -142,6 +142,7 @@ import com.bigdata.rawstore.WormAddressManager;
 import com.bigdata.relation.locator.IResourceLocator;
 import com.bigdata.resources.ResourceManager;
 import com.bigdata.rwstore.IAllocationManager;
+import com.bigdata.rwstore.IHistoryManager;
 import com.bigdata.rwstore.IRWStrategy;
 import com.bigdata.rwstore.sector.MemStrategy;
 import com.bigdata.rwstore.sector.MemoryManager;
@@ -2856,21 +2857,24 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                     .wrap(CommitRecordSerializer.INSTANCE
                             .serialize(commitRecord)));
 
-			/*
-			 * Before flushing the commitRecordIndex we need to check for
-			 * deferred frees that will prune the index.
-			 * 
-			 * Do this BEFORE adding new commit record which will otherwise
-			 * be immediately removed if no history is retained
-			 */
-			if (_bufferStrategy instanceof IRWStrategy) {
-				((IRWStrategy) _bufferStrategy).checkDeferredFrees(this);
-			}
-			
-			/*
-			 * Add the commit record to an index so that we can recover
-			 * historical states efficiently.
-			 */
+            /*
+             * Before flushing the commitRecordIndex we need to check for
+             * deferred frees that will prune the index.
+             * 
+             * This is responsible for recycling the deferred frees (RWS).
+             * 
+             * Do this BEFORE adding the new commit record since that commit
+             * record will otherwise be immediately removed if no history is
+             * retained.
+             */
+            if (_bufferStrategy instanceof IHistoryManager) {
+                ((IHistoryManager) _bufferStrategy).checkDeferredFrees(this);
+            }
+
+            /*
+             * Add the commit record to an index so that we can recover
+             * historical states efficiently.
+             */
 			_commitRecordIndex.add(commitRecordAddr, commitRecord);
 			
             /*
