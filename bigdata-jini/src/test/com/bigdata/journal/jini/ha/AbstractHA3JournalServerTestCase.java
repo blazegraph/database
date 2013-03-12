@@ -189,7 +189,7 @@ public class AbstractHA3JournalServerTestCase extends
      * The {@link Remote} interfaces for these services (if started and
      * successfully discovered).
      */
-    private HAGlue serverA = null, serverB = null, serverC = null;
+    protected HAGlue serverA = null, serverB = null, serverC = null;
 
     /**
      * {@link UUID}s for the {@link HAJournalServer}s.
@@ -226,9 +226,6 @@ public class AbstractHA3JournalServerTestCase extends
      * The zpath of the logical service.
      */
     private String logicalServiceZPath = null;
-    
-    /** Quorum client used to monitor (or act on) the logical service quorum. */
-    protected Quorum<HAGlue, QuorumClient<HAGlue>> quorum = null;
     
     @Override
     protected void setUp() throws Exception {
@@ -316,6 +313,45 @@ public class AbstractHA3JournalServerTestCase extends
 
         }
 
+        destroyAll();
+                
+        if (serviceDiscoveryManager != null) {
+            serviceDiscoveryManager.terminate();
+            serviceDiscoveryManager = null;
+        }
+
+        if (lookupDiscoveryManager != null) {
+            lookupDiscoveryManager.terminate();
+            lookupDiscoveryManager = null;
+        }
+
+        if (discoveryClient != null) {
+            discoveryClient.terminate();
+            discoveryClient = null;
+        }
+
+        if (quorum != null) {
+            quorum.terminate();
+            quorum = null;
+        }
+
+        if (zka != null) {
+            final String zroot = logicalServiceZPath;
+            final ZooKeeper zookeeper = zka.getZookeeper();
+            destroyZNodes(zroot, zookeeper);
+            zka.close();
+            zka = null;
+        }
+
+        logicalServiceId = null;
+        logicalServiceZPath = null;
+        serverAId = serverBId = serverCId = null;
+
+        super.tearDown();
+
+    }
+
+    protected void destroyAll() throws AsynchronousQuorumCloseException, InterruptedException, TimeoutException {
         /**
          * The most reliable tear down is in reverse pipeline order.
          * 
@@ -364,45 +400,19 @@ public class AbstractHA3JournalServerTestCase extends
         serviceListenerB = null;
         serverC = null;
         serviceListenerC = null;
-
-        
-        if (serviceDiscoveryManager != null) {
-            serviceDiscoveryManager.terminate();
-            serviceDiscoveryManager = null;
-        }
-
-        if (lookupDiscoveryManager != null) {
-            lookupDiscoveryManager.terminate();
-            lookupDiscoveryManager = null;
-        }
-
-        if (discoveryClient != null) {
-            discoveryClient.terminate();
-            discoveryClient = null;
-        }
-
-        if (quorum != null) {
-            quorum.terminate();
-            quorum = null;
-        }
-
-        if (zka != null) {
-            final String zroot = logicalServiceZPath;
-            final ZooKeeper zookeeper = zka.getZookeeper();
-            destroyZNodes(zroot, zookeeper);
-            zka.close();
-            zka = null;
-        }
-
-        logicalServiceId = null;
-        logicalServiceZPath = null;
-        serverAId = serverBId = serverCId = null;
-
-        super.tearDown();
-
+    	
     }
 
-    /**
+    protected void startSequenceABC() throws Exception {
+    	startA();
+    	awaitPipeline(new HAGlue[] {serverA});
+    	startB();
+    	awaitPipeline(new HAGlue[] {serverA, serverB});
+    	startC();
+    	awaitPipeline(new HAGlue[] {serverA, serverB, serverC});
+    }
+    
+   /**
      * Clear out everything in zookeeper for the specified zpath.
      */
     private void destroyZNodes(final String zpath, final ZooKeeper zookeeper) {
