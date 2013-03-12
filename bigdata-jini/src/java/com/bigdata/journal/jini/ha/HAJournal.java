@@ -92,6 +92,7 @@ import com.bigdata.journal.Journal;
 import com.bigdata.journal.ValidationError;
 import com.bigdata.journal.WORMStrategy;
 import com.bigdata.journal.WriteExecutorService;
+import com.bigdata.journal.jini.ha.HAJournalServer.HAQuorumService;
 import com.bigdata.quorum.AsynchronousQuorumCloseException;
 import com.bigdata.quorum.Quorum;
 import com.bigdata.quorum.zk.ZKQuorumImpl;
@@ -572,7 +573,7 @@ public class HAJournal extends Journal {
         protected HAGlueService(final UUID serviceId) {
 
             super(serviceId, writePipelineAddr);
-
+            
         }
 
         /*
@@ -1310,6 +1311,37 @@ public class HAJournal extends Journal {
                     }
 
                 }
+            }
+
+        }
+
+        @Override
+        public Future<Void> enterErrorState() {
+
+            final FutureTask<Void> ft = new FutureTaskMon<Void>(
+                    new EnterErrorStateTask(), null/* result */);
+
+            ft.run();
+
+            return getProxy(ft);
+
+        }
+
+        private class EnterErrorStateTask implements Runnable {
+
+            public void run() {
+
+                @SuppressWarnings("unchecked")
+                final HAQuorumService<HAGlue, HAJournal> service = (HAQuorumService<HAGlue, HAJournal>) getQuorum()
+                        .getClient();
+
+                // Note: Local method call on AbstractJournal.
+                final UUID serviceId = getServiceId();
+
+                haLog.warn("ENTERING ERROR STATE: " + serviceId);
+
+                service.enterErrorState();
+
             }
 
         }

@@ -647,7 +647,8 @@ public class HAJournalServer extends AbstractServer {
      * Concrete {@link QuorumServiceBase} implementation for the
      * {@link HAJournal}.
      */
-    static private class HAQuorumService<S extends HAGlue, L extends HAJournal>
+    // Note: Exposed to HAJournal.enterErrorState()
+    static /*private*/ class HAQuorumService<S extends HAGlue, L extends HAJournal>
             extends QuorumServiceBase<S, L> {
 
         private final L journal;
@@ -841,6 +842,12 @@ public class HAJournalServer extends AbstractServer {
             }
             
         } // RunStateCallable
+
+        void enterErrorState() {
+
+            enterRunState(new ErrorTask());
+
+        }
         
         /**
          * Change the run state.
