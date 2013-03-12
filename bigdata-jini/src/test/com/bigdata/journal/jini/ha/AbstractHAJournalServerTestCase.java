@@ -102,9 +102,6 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
      */
     protected ExecutorService executorService = null;
 
-    /** Quorum client used to monitor (or act on) the logical service quorum. */
-    protected Quorum<HAGlue, QuorumClient<HAGlue>> quorum = null;
-    
     /**
      * Used to talk to the {@link NanoSparqlServer}.
      */
@@ -399,87 +396,6 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
             public void run() {
                 try {
                     repo.size();
-                } catch (Exception e) {
-                    // KB does not exist.
-                    fail();
-                }
-            }
-
-        }, 5, TimeUnit.SECONDS);
-        
-    }
-    
-    protected UUID[] getServices(final HAGlue[] members) throws IOException {
-        final UUID[] services = new UUID[members.length];
-        for (int m = 0; m < members.length; m++) {
-        	services[m] = members[m].getServiceId();
-        }
-        
-    	return services;
-    }
-    
-    /**
-     * Waits for pipeline in expected order
-     * 
-     * @param members
-     * @throws IOException
-     */
-    protected void awaitPipeline(final HAGlue[] members) throws IOException {
-        
-        final UUID[] services = getServices(members);
-        
-        assertCondition(new Runnable() {
-            public void run() {
-                try {
-                    assertEquals(services, quorum.getPipeline());
-                } catch (Exception e) {
-                    // KB does not exist.
-                    fail();
-                }
-            }
-
-        }, 5, TimeUnit.SECONDS);
-        
-    }
-    
-    /**
-     * Waits for joined in expected order
-     * 
-     * @param members
-     * @throws IOException
-     */
-    protected void awaitJoined(final HAGlue[] members) throws IOException {
-        
-        final UUID[] services = getServices(members);
-        
-        assertCondition(new Runnable() {
-            public void run() {
-                try {
-                    assertEquals(services, quorum.getJoined());
-                } catch (Exception e) {
-                    // KB does not exist.
-                    fail();
-                }
-            }
-
-        }, 5, TimeUnit.SECONDS);
-        
-    }
-    
-    /**
-     * Waits for members in expected order
-     * 
-     * @param members
-     * @throws IOException
-     */
-    protected void awaitMembers(final HAGlue[] members) throws IOException {
-        
-        final UUID[] services = getServices(members);
-        
-        assertCondition(new Runnable() {
-            public void run() {
-                try {
-                    assertEquals(services, quorum.getMembers());
                 } catch (Exception e) {
                     // KB does not exist.
                     fail();

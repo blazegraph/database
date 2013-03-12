@@ -663,8 +663,7 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
 
 			log.info("Should be safe to test digests now");
 
-			// Cannot predict last commit counter or whether even logs will
-			// remain
+		// Cannot predict last commit counter or whether even logs will remain
 			// assertHALogDigestsEquals(1L/* firstCommitCounter */,
 			// lastCommitCounter2,
 			// new HAGlue[] { serverA, serverB, serverC });
@@ -772,9 +771,10 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
 			public void run() {
 					final StringBuilder sb = new StringBuilder();
 					sb.append("DROP ALL;\n");
-					sb.append("LOAD <file:/bigdata/ha/data-0.nq>;\n");
-					sb.append("LOAD <file:/bigdata/ha/data-1.nq>;\n");
-					sb.append("LOAD <file:/bigdata/ha/data-2.nq>;\n");
+		            sb.append("LOAD <" + getFoafFileUrl("data-0.nq.gz") + ">;\n");
+		            sb.append("LOAD <" + getFoafFileUrl("data-1.nq.gz") + ">;\n");
+		            sb.append("LOAD <" + getFoafFileUrl("data-2.nq.gz") + ">;\n");
+		            sb.append("LOAD <" + getFoafFileUrl("data-3.nq.gz") + ">;\n");
 					sb.append("INSERT {?x rdfs:label ?y . } WHERE {?x foaf:name ?y };\n");
 					sb.append("PREFIX dc: <http://purl.org/dc/elements/1.1/>\n");
 					sb.append("INSERT DATA\n");
@@ -1104,15 +1104,14 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
      * @throws Exception 
      */
     public void testABC_Restore() throws Exception {
-       startSequenceABC();
+       final HAGlue[] servers = startSequenceABC();
 
         // Wait for a quorum meet.
         final long token = quorum.awaitQuorum(awaitQuorumTimeout,
                 TimeUnit.MILLISECONDS);
 
-        // Verify KB exists.es miserables oscar 2013
-        
-        awaitKBExists(serverA);
+        // Verify KB exists        
+        awaitKBExists(servers[0]);
 
     
         /*
@@ -1261,34 +1260,34 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
      * 
      * @throws Exception 
      */
-    public void testQuorumBreaksABC_failLeader() throws Exception {
-    	
-        // Start 3 services
-       startSequenceABC();
+	public void testQuorumBreaksABC_failLeader() throws Exception {
 
-        // Wait for a quorum meet.
-        final long token = quorum.awaitQuorum(awaitQuorumTimeout,
-                TimeUnit.MILLISECONDS);
+		// Start 3 services
+		final HAGlue[] servers = startSequenceABC();
 
-        // Verify KB exists.
-        awaitKBExists(serverA);
-    	   	
-        assertTrue(serverA.equals(quorum.getClient().getLeader(token)));
-        
-        // Now fail leader!       
-        shutdownA();
-        
-        // Now check that quorum meets
-        
-        final long token2 = awaitMetQuorum();
-        
-        // with new  token
-        assertTrue(token != token2);
-        
-        // and new leader
-        final HAGlue leader = quorum.getClient().getLeader(token2);
-        assertTrue(leader.equals(serverB) || leader.equals(serverC));
-    }
+		// Wait for a quorum meet.
+		final long token = quorum.awaitQuorum(awaitQuorumTimeout,
+				TimeUnit.MILLISECONDS);
+
+		// Verify KB exists.
+		awaitKBExists(servers[0]);
+
+		assertEquals(servers[0], quorum.getClient().getLeader(token));
+
+		// Now fail leader!
+		shutdownA();
+
+		// Now check that quorum meets
+
+		final long token2 = awaitMetQuorum();
+
+		// with new token
+		assertTrue(token != token2);
+
+		// and new leader
+		final HAGlue leader = quorum.getClient().getLeader(token2);
+		assertTrue(leader.equals(servers[1]) || leader.equals(servers[2]));
+	}
     
     /**
      * Tests that halog files are generated and identical, and that
@@ -1312,8 +1311,8 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
         final File logsA = new File(serviceDir, "A/HALog");
         final File logsB = new File(serviceDir, "B/HALog");
         
-        assertTrue(logsA.listFiles().length == 2);
-        assertTrue(logsB.listFiles().length == 2);
+        assertEquals(logsA.listFiles().length, 2);
+        assertEquals(logsB.listFiles().length, 2);
         
         // Test ends here!!
         
@@ -1348,8 +1347,8 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
         final File logsB = new File(serviceDir, "B/HALog");
         
         // There should be 3 halog files from 2 commit points and newly open
-        assertTrue(logsA.listFiles().length == 3);
-        assertTrue(logsB.listFiles().length == 3);
+        assertEquals(logsA.listFiles().length, 3);
+        assertEquals(logsB.listFiles().length, 3);
         
         // now just restart to help teardown
         startC();
@@ -1361,9 +1360,9 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
 
         // all committed logs should be removed with only open log remaining
         final File logsC = new File(serviceDir, "C/HALog");
-        assertTrue(logsA.listFiles().length == 1);
-        assertTrue(logsB.listFiles().length == 1);
-        assertTrue(logsC.listFiles().length == 1);
+        assertEquals(logsA.listFiles().length, 1);
+        assertEquals(logsB.listFiles().length, 1);
+        assertEquals(logsC.listFiles().length, 1);
 }
     
     /**
@@ -1447,10 +1446,71 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
         assertLogCount(logsC, 1);
         
         // Now shutdown all servers
-        // FIXME: shutting down A first triggers other problems, see test_fullQuorumRestart
         shutdownB();
         shutdownC();
         shutdownA();
+        
+        // and check that there are no logs
+        assertLogCount(logsA, 0);
+        assertLogCount(logsB, 0);
+        assertLogCount(logsC, 0);
+        
+        // startup AB
+        startA();
+        startB();
+        
+        awaitMetQuorum();
+        
+        // and check that there are open logs
+        assertLogCount(logsA, 1);
+        assertLogCount(logsB, 1);
+        
+        // add C
+        startC();
+        
+        awaitFullyMetQuorum();
+        
+        // and check again for ABC
+        assertLogCount(logsA, 1);
+        assertLogCount(logsB, 1);
+        assertLogCount(logsC, 1);
+    }
+    
+    /**
+     * Variant where A is shutdown first.
+     */
+    public void testStartABC_halogRestart2() throws Exception {
+        // Start 3 services, with delay to ensure clean starts
+        startA();
+        Thread.sleep(1000); // ensure A will be leader
+        startB();
+        startC();
+        
+        awaitFullyMetQuorum();
+        
+        // setup log directories
+        final File serviceDir = new File("benchmark/CI-HAJournal-1");
+        final File logsA = new File(serviceDir, "A/HALog");
+        final File logsB = new File(serviceDir, "B/HALog");
+        final File logsC = new File(serviceDir, "C/HALog");
+        
+        // committed log files not purged prior to fully met commit
+        assertLogCount(logsA, 2);
+        assertLogCount(logsB, 2);
+        assertLogCount(logsC, 2);
+
+        // Run through transaction
+        simpleTransaction();
+        
+        // again check that only open log files remaining
+        assertLogCount(logsA, 1);
+        assertLogCount(logsB, 1);
+        assertLogCount(logsC, 1);
+        
+        // Now shutdown all servers
+        shutdownA();
+        shutdownB();
+        shutdownC();
         
         // and check that there are no logs
         assertLogCount(logsA, 0);
@@ -1608,9 +1668,9 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
         
         awaitMetQuorum();
         
-        assertTrue(quorum.getJoined().length == 2);
-        assertTrue(quorum.getPipeline().length == 2);
-        assertTrue(quorum.getMembers().length == 2);
+        assertEquals(quorum.getJoined().length, 2);
+        assertEquals(quorum.getPipeline().length, 2);
+        assertEquals(quorum.getMembers().length, 2);
         
         // add C
         startC();
@@ -1650,35 +1710,35 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
      */
     public void testABC_RemainsMet() throws Exception {
 		// enforce join order
-    	startSequenceABC();
+		final HAGlue[] servers = startSequenceABC();
 
 		final long token = awaitFullyMetQuorum();
 		
 		// shutdown C, the final follower
 		shutdownC();
-		awaitPipeline(new HAGlue[] {serverA, serverB});
+		awaitPipeline(new HAGlue[] {servers[0], servers[1]});
 
 		// token must remain unchanged to indicate same quorum
-		assertTrue(token == awaitMetQuorum());
+		assertEquals(token, awaitMetQuorum());
 		
-		startC();
+		servers[2] = startC();
 		// return to quorum
-		awaitPipeline(new HAGlue[] {serverA, serverB, serverC});
+		awaitPipeline(new HAGlue[] {servers[0], servers[1], servers[2]});
 		
 		// token remains unchanged		
-		assertTrue(token == awaitFullyMetQuorum());
+		assertEquals(token, awaitFullyMetQuorum());
 		
 		// Now remove first follower
 		shutdownB();
-		awaitPipeline(new HAGlue[] {serverA, serverC});
+		awaitPipeline(new HAGlue[] {servers[0], servers[2]});
 		
 		// token must remain unchanged to indicate same quorum
-		assertTrue(token == awaitMetQuorum());
+		assertEquals(token, awaitMetQuorum());
 		
-		startB();
-		awaitPipeline(new HAGlue[] {serverA, serverC, serverB});
+		servers[1] = startB();
+		awaitPipeline(new HAGlue[] {servers[0], servers[2], servers[1]});
 		// and return to quorum
-		assertTrue(token == awaitFullyMetQuorum());
+		assertEquals(token, awaitFullyMetQuorum());
      }
 
     /**
@@ -1688,7 +1748,7 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
      */
     public void testABC_LiveLoadRemainsMet() throws Exception {
 		// enforce join order
-    	startSequenceABC();
+		final HAGlue[] servers = startSequenceABC();
 		
 		final long token = awaitFullyMetQuorum();
 		
@@ -1699,9 +1759,10 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
 				
 					final StringBuilder sb = new StringBuilder();
 					sb.append("DROP ALL;\n");
-					sb.append("LOAD <file:/bigdata/ha/data-0.nq>;\n");
-					sb.append("LOAD <file:/bigdata/ha/data-1.nq>;\n");
-					sb.append("LOAD <file:/bigdata/ha/data-2.nq>;\n");
+                    sb.append("LOAD <" + getFoafFileUrl("data-0.nq.gz") + ">;\n");
+                    sb.append("LOAD <" + getFoafFileUrl("data-1.nq.gz") + ">;\n");
+                    sb.append("LOAD <" + getFoafFileUrl("data-2.nq.gz") + ">;\n");
+                    sb.append("LOAD <" + getFoafFileUrl("data-3.nq.gz") + ">;\n");
 					sb.append("INSERT {?x rdfs:label ?y . } WHERE {?x foaf:name ?y };\n");
 					sb.append("PREFIX dc: <http://purl.org/dc/elements/1.1/>\n");
 					sb.append("INSERT DATA\n");
@@ -1736,28 +1797,28 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
 
 		// shutdown C, the final follower
 		shutdownC();
-		awaitPipeline(new HAGlue[] {serverA, serverB});
+		awaitPipeline(new HAGlue[] {servers[0], servers[1]});
 
 		// token must remain unchanged to indicate same quorum
-		assertTrue(token == awaitMetQuorum());
+		assertEquals(token, awaitMetQuorum());
 		
 		
-		startC();
+		servers[2] = startC();
 		// return to quorum
-		awaitPipeline(new HAGlue[] {serverA, serverB, serverC});
-		assertTrue(token == awaitFullyMetQuorum());
+		awaitPipeline(new HAGlue[] {servers[0], servers[1], servers[2]});
+		assertEquals(token, awaitFullyMetQuorum());
 		
 		// Now remove first follower
 		shutdownB();
-		awaitPipeline(new HAGlue[] {serverA, serverC});
+		awaitPipeline(new HAGlue[] {servers[0], servers[2]});
 		
 		// token must remain unchanged to indicate same quorum
-		assertTrue(token == awaitMetQuorum());
+		assertEquals(token, awaitMetQuorum());
 		
-		startB();
+		servers[1] = startB();
 		// and return to quorum
-		awaitPipeline(new HAGlue[] {serverA, serverC, serverB});
-		assertTrue(token == awaitFullyMetQuorum());
+		awaitPipeline(new HAGlue[] {servers[0], servers[2], servers[1]});
+		assertEquals(token, awaitFullyMetQuorum());
 		
 		// wait for load to finish or just exit?
 		final boolean waitForLoad = true;
@@ -1776,7 +1837,7 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
      */
     public void testABC_LiveLoadRemainsMet2() throws Exception {
 		// enforce join order
-		startSequenceABC();
+		final HAGlue[] servers = startSequenceABC();
 
 		final long token = awaitFullyMetQuorum();
 		
@@ -1788,9 +1849,10 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
 				
 					final StringBuilder sb = new StringBuilder();
 					sb.append("DROP ALL;\n");
-					sb.append("LOAD <file:/bigdata/ha/data-0.nq>;\n");
-					sb.append("LOAD <file:/bigdata/ha/data-1.nq>;\n");
-					sb.append("LOAD <file:/bigdata/ha/data-2.nq>;\n");
+                    sb.append("LOAD <" + getFoafFileUrl("data-0.nq.gz") + ">;\n");
+                    sb.append("LOAD <" + getFoafFileUrl("data-1.nq.gz") + ">;\n");
+                    sb.append("LOAD <" + getFoafFileUrl("data-2.nq.gz") + ">;\n");
+                    sb.append("LOAD <" + getFoafFileUrl("data-3.nq.gz") + ">;\n");
 					sb.append("INSERT {?x rdfs:label ?y . } WHERE {?x foaf:name ?y };\n");
 					sb.append("PREFIX dc: <http://purl.org/dc/elements/1.1/>\n");
 					sb.append("INSERT DATA\n");
@@ -1825,15 +1887,15 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
 
 		// shutdown B, the first follower
 		shutdownB();
-		awaitPipeline(new HAGlue[] {serverA, serverC});
+		awaitPipeline(new HAGlue[] {servers[0], servers[2]});
 
 		// token must remain unchanged to indicate same quorum
-		assertTrue(token == awaitMetQuorum());
+		assertEquals(token, awaitMetQuorum());
 		
-		startB();
+		servers[1] = startB();
 		// return to quorum
-		awaitPipeline(new HAGlue[] {serverA, serverC, serverB});
-		assertTrue(token == awaitFullyMetQuorum());
+		awaitPipeline(new HAGlue[] {servers[0], servers[2], servers[1]});
+		assertEquals(token, awaitFullyMetQuorum());
 
 		// wait for load to finish or just exit?
 		final boolean waitForLoad = true;

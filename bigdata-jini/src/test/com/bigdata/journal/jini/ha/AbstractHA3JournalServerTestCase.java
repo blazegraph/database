@@ -98,6 +98,9 @@ import com.bigdata.zookeeper.ZooKeeperAccessor;
 public class AbstractHA3JournalServerTestCase extends
         AbstractHAJournalServerTestCase implements DiscoveryListener {
 
+    /** Quorum client used to monitor (or act on) the logical service quorum. */
+    protected Quorum<HAGlue, QuorumClient<HAGlue>> quorum = null;
+    
     public AbstractHA3JournalServerTestCase() {
     }
 
@@ -189,7 +192,7 @@ public class AbstractHA3JournalServerTestCase extends
      * The {@link Remote} interfaces for these services (if started and
      * successfully discovered).
      */
-    protected HAGlue serverA = null, serverB = null, serverC = null;
+    private HAGlue serverA = null, serverB = null, serverC = null;
 
     /**
      * {@link UUID}s for the {@link HAJournalServer}s.
@@ -403,13 +406,96 @@ public class AbstractHA3JournalServerTestCase extends
     	
     }
 
-    protected void startSequenceABC() throws Exception {
+    protected UUID[] getServices(final HAGlue[] members) throws IOException {
+        final UUID[] services = new UUID[members.length];
+        for (int m = 0; m < members.length; m++) {
+        	services[m] = members[m].getServiceId();
+        }
+        
+    	return services;
+    }
+    
+    /**
+     * Waits for pipeline in expected order
+     * 
+     * @param members
+     * @throws IOException
+     */
+    protected void awaitPipeline(final HAGlue[] members) throws IOException {
+        
+        final UUID[] services = getServices(members);
+        
+        assertCondition(new Runnable() {
+            public void run() {
+                try {
+                    assertEquals(services, quorum.getPipeline());
+                } catch (Exception e) {
+                    // KB does not exist.
+                    fail();
+                }
+            }
+
+        }, 5, TimeUnit.SECONDS);
+        
+    }
+    
+    /**
+     * Waits for joined in expected order
+     * 
+     * @param members
+     * @throws IOException
+     */
+    protected void awaitJoined(final HAGlue[] members) throws IOException {
+        
+        final UUID[] services = getServices(members);
+        
+        assertCondition(new Runnable() {
+            public void run() {
+                try {
+                    assertEquals(services, quorum.getJoined());
+                } catch (Exception e) {
+                    // KB does not exist.
+                    fail();
+                }
+            }
+
+        }, 5, TimeUnit.SECONDS);
+        
+    }
+    
+    /**
+     * Waits for members in expected order
+     * 
+     * @param members
+     * @throws IOException
+     */
+    protected void awaitMembers(final HAGlue[] members) throws IOException {
+        
+        final UUID[] services = getServices(members);
+        
+        assertCondition(new Runnable() {
+            public void run() {
+                try {
+                    assertEquals(services, quorum.getMembers());
+                } catch (Exception e) {
+                    // KB does not exist.
+                    fail();
+                }
+            }
+
+        }, 5, TimeUnit.SECONDS);
+        
+    }
+    
+    protected HAGlue[] startSequenceABC() throws Exception {
     	startA();
     	awaitPipeline(new HAGlue[] {serverA});
     	startB();
     	awaitPipeline(new HAGlue[] {serverA, serverB});
     	startC();
     	awaitPipeline(new HAGlue[] {serverA, serverB, serverC});
+    	
+    	return new HAGlue[] {serverA, serverB, serverC};
     }
     
    /**
