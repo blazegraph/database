@@ -30,8 +30,10 @@ import java.security.DigestException;
 import java.security.NoSuchAlgorithmException;
 import java.util.UUID;
 import java.util.concurrent.Future;
+import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeoutException;
 
+import com.bigdata.concurrent.FutureTaskMon;
 import com.bigdata.ha.msg.IHA2PhaseAbortMessage;
 import com.bigdata.ha.msg.IHA2PhaseCommitMessage;
 import com.bigdata.ha.msg.IHA2PhasePrepareMessage;
@@ -73,46 +75,61 @@ public class HAGlueDelegate implements HAGlue {
         
     }
 
+    @Override
     public Future<Void> bounceZookeeperConnection() throws IOException {
         return delegate.bounceZookeeperConnection();
     }
 
+    @Override
+    public Future<Void> enterErrorState() throws IOException {
+        return delegate.enterErrorState();
+    }
+
+    @Override
     public UUID getServiceId() throws IOException {
         return delegate.getServiceId();
     }
 
+    @Override
     public Future<Boolean> prepare2Phase(IHA2PhasePrepareMessage msg)
             throws IOException {
         return delegate.prepare2Phase(msg);
     }
 
+    @Override
     public Future<IHAReadResponse> readFromDisk(
             IHAReadRequest readMessage) throws IOException {
         return delegate.readFromDisk(readMessage);
     }
 
+    @Override
     public InetSocketAddress getWritePipelineAddr() throws IOException {
         return delegate.getWritePipelineAddr();
     }
 
+    @Override
     public IHARootBlockResponse getRootBlock(IHARootBlockRequest msg) throws IOException {
         return delegate.getRootBlock(msg);
     }
 
+    @Override
     public Future<Void> moveToEndOfPipeline() throws IOException {
         return delegate.moveToEndOfPipeline();
     }
 
+    @Override
     public Future<Void> commit2Phase(IHA2PhaseCommitMessage commitMessage)
             throws IOException {
         return delegate.commit2Phase(commitMessage);
     }
 
+    @Override
     public Future<Void> abort2Phase(IHA2PhaseAbortMessage abortMessage)
             throws IOException {
         return delegate.abort2Phase(abortMessage);
     }
 
+    @Override
     public Future<Void> receiveAndReplicate(final IHASyncRequest req,
             final IHAWriteMessage msg) throws IOException {
         return delegate.receiveAndReplicate(req, msg);
