@@ -371,7 +371,7 @@ public class AbstractHA3JournalServerTestCase extends
         	if (leader.equals(serverA))
         		leaderListener = serviceListenerA;
         	else if (leader.equals(serverB))
-        		leaderListener = serviceListenerA;
+        		leaderListener = serviceListenerB;
         	else if (leader.equals(serverC))
         		leaderListener = serviceListenerC;
         	else 
