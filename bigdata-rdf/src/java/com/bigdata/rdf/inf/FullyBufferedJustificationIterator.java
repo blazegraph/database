@@ -97,9 +97,9 @@ public class FullyBufferedJustificationIterator implements IJustificationIterato
 
         final long rangeCount = ndx.rangeCount(fromKey, toKey);
 
-        if (rangeCount > 1000000) {
+        if (rangeCount > 5000000) {
 
-            // Limit at 1M.
+            // Limit at 5M.  See https://sourceforge.net/apps/trac/bigdata/ticket/606 (Array Limits in Truth Maintenance)
             
             throw new RuntimeException(
                     "Too many justifications to materialize: " + rangeCount);
