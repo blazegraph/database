@@ -382,27 +382,25 @@ public class AbstractHA3JournalServerTestCase extends
         }
         
         if (serverA != null && !serverA.equals(leader)) {
-            safeDestroy(serverA, serviceListenerA);
+            destroyA();
         }
 
         if (serverB != null && !serverB.equals(leader)) {
-            safeDestroy(serverB, serviceListenerB);
+            destroyB();
         }
 
         if (serverC != null && !serverC.equals(leader)) {
-            safeDestroy(serverC, serviceListenerC);
+            destroyC();
         }
         
+        // Destroy leader last
         if (leader != null) {
             safeDestroy(leader, leaderListener);
+            
+            serverA = serverB = serverC = null;
+            serviceListenerA = serviceListenerC =serviceListenerB = null;
         }
 
-        serverA = null;
-        serviceListenerA = null;
-        serverB = null;
-        serviceListenerB = null;
-        serverC = null;
-        serviceListenerC = null;
     	
     }
 
@@ -496,6 +494,25 @@ public class AbstractHA3JournalServerTestCase extends
     	awaitPipeline(new HAGlue[] {serverA, serverB, serverC});
     	
     	return new HAGlue[] {serverA, serverB, serverC};
+    }
+    
+    /*
+     * Utility methods to access service HALog file directories
+     */
+    protected File getServiceDir() {
+    	return new File("benchmark/CI-HAJournal-1");
+    }
+    
+    protected File getHALogDirA() {
+    	return new File(getServiceDir(),"A/HALog");
+    }
+    
+    protected File getHALogDirB() {
+    	return new File(getServiceDir(),"B/HALog");
+    }
+    
+    protected File getHALogDirC() {
+    	return new File(getServiceDir(),"C/HALog");
     }
     
    /**
@@ -596,14 +613,20 @@ public class AbstractHA3JournalServerTestCase extends
     
     protected void destroyA() {
     	safeDestroy(serverA, serviceListenerA);
+    	serverA = null;
+    	serviceListenerA = null;
     }
 
     protected void destroyB() {
     	safeDestroy(serverB, serviceListenerB);
+    	serverB = null;
+    	serviceListenerB = null;
     }
 
     protected void destroyC() {
     	safeDestroy(serverC, serviceListenerC);
+    	serverC = null;
+    	serviceListenerC = null;
     }
 
     protected void shutdownA() throws IOException {
@@ -1891,7 +1914,7 @@ public class AbstractHA3JournalServerTestCase extends
     }
 
     /**
-     * Helper class for simultaneous start of 3 HA services.
+     * Helper class for simultaneous/seqeunced start of 3 HA services.
      */
     protected class ABC {
         
@@ -1900,30 +1923,41 @@ public class AbstractHA3JournalServerTestCase extends
          */
         final HAGlue serverA, serverB, serverC;
 
-        /**
-         * Simultaneous start of 3 HA services (this happens in the ctor).
-         * 
-         * @throws InterruptedException
-         * @throws ExecutionException
-         */
-        public ABC() throws InterruptedException, ExecutionException {
+		/**
+		 * Start of 3 HA services (this happens in the ctor).
+		 * 
+		 * @param sequential
+		 *           True if the startup should be sequential or false
+		 *           if services should start concurrently.
+		 * @throws Exception
+		 */
+        public ABC(final boolean sequential) throws Exception {
+        	if (sequential) {
+        		final HAGlue[] services = startSequenceABC();
+        		
+                serverA = services[0];
 
-            final List<Callable<HAGlue>> tasks = new LinkedList<Callable<HAGlue>>();
+                serverB = services[1];
 
-            tasks.add(new StartATask(false/* restart */));
-            tasks.add(new StartBTask(false/* restart */));
-            tasks.add(new StartCTask(false/* restart */));
+                serverC = services[2];
+        	} else {
+                final List<Callable<HAGlue>> tasks = new LinkedList<Callable<HAGlue>>();
 
-            // Start all servers in parallel. Wait up to a timeout.
-            final List<Future<HAGlue>> futures = executorService.invokeAll(
-                    tasks, 30/* timeout */, TimeUnit.SECONDS);
+                tasks.add(new StartATask(false/* restart */));
+                tasks.add(new StartBTask(false/* restart */));
+                tasks.add(new StartCTask(false/* restart */));
 
-            serverA = futures.get(0).get();
+                // Start all servers in parallel. Wait up to a timeout.
+                final List<Future<HAGlue>> futures = executorService.invokeAll(
+                        tasks, 30/* timeout */, TimeUnit.SECONDS);
 
-            serverB = futures.get(1).get();
+                serverA = futures.get(0).get();
 
-            serverC = futures.get(2).get();
+                serverB = futures.get(1).get();
 
+                serverC = futures.get(2).get();
+
+        	}
         }
 
         public void shutdownAll() throws InterruptedException,
