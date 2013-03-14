@@ -2497,7 +2497,7 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
                                      * Elect the leader.
                                      */
                                     final UUID[] pipeline = getPipeline();
-                                    if (pipeline.length >= 0
+                                    if (pipeline.length > 0
                                             && pipeline[0].equals(clientId)) {
                                         /*
                                          * The pipeline is well organized, so
