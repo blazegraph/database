@@ -166,7 +166,7 @@ abstract public class WriteCache implements IWriteCache {
      * @throws IllegalStateException
      *             if the {@link WriteCache} is closed.
      */
-    private ByteBuffer acquire() throws InterruptedException, IllegalStateException {
+    ByteBuffer acquire() throws InterruptedException, IllegalStateException {
 
         final Lock readLock = lock.readLock();
 
@@ -209,7 +209,7 @@ abstract public class WriteCache implements IWriteCache {
     /**
      * Release the read lock on an acquired {@link ByteBuffer}.
      */
-    private void release() {
+    void release() {
 
         lock.readLock().unlock();
 
@@ -308,7 +308,7 @@ abstract public class WriteCache implements IWriteCache {
         
         /**
          * When a record is used as a read cache then the readCount is
-         * maintained as a metric on its access. ÊThis could be used to
+         * maintained as a metric on its access. ï¿½This could be used to
          * determine eviction/compaction.
          * <p>
          * Note: volatile to guarantee visibility of updates. Might do better
