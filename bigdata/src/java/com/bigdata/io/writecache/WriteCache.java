@@ -166,7 +166,7 @@ abstract public class WriteCache implements IWriteCache {
      * @throws IllegalStateException
      *             if the {@link WriteCache} is closed.
      */
-    ByteBuffer acquire() throws InterruptedException, IllegalStateException {
+    private ByteBuffer acquire() throws InterruptedException, IllegalStateException {
 
         final Lock readLock = lock.readLock();
 
@@ -209,7 +209,7 @@ abstract public class WriteCache implements IWriteCache {
     /**
      * Release the read lock on an acquired {@link ByteBuffer}.
      */
-    void release() {
+    private void release() {
 
         lock.readLock().unlock();
 

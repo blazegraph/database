@@ -3757,19 +3757,19 @@ abstract public class WriteCacheService implements IWriteCache {
                 }
                 cache.transferLock.lock();
                 try {
-                    /**
-                     * Note: The tests below require us to take the read lock on
-                     * the WriteCache before we test the serviceMap again in
-                     * order to guard against a concurrent reset() of the
-                     * WriteCache.
-                     * 
-                     * @see <a href=
-                     *      "https://sourceforge.net/apps/trac/bigdata/ticket/654"
-                     *      Rare AssertionError in WriteCache.clearAddrMap()
-                     *      </a>
-                     */
-                    cache.acquire();
-                    try {
+//                    /**
+//                     * Note: The tests below require us to take the read lock on
+//                     * the WriteCache before we test the serviceMap again in
+//                     * order to guard against a concurrent reset() of the
+//                     * WriteCache.
+//                     * 
+//                     * @see <a href=
+//                     *      "https://sourceforge.net/apps/trac/bigdata/ticket/654"
+//                     *      Rare AssertionError in WriteCache.clearAddrMap()
+//                     *      </a>
+//                     */
+//                    cache.acquire();
+//                    try {
                     final WriteCache cache2 = serviceMap.get(offset);
                     if (cache2 != cache) {
                         /*
@@ -3785,17 +3785,26 @@ abstract public class WriteCacheService implements IWriteCache {
                     
                     // Remove entry from the recordMap.
                     final WriteCache oldValue = serviceMap.remove(offset);
+                    if (oldValue == null) {
+                        /**
+                         * Note: The [WriteCache.transferLock] protects the
+                         * WriteCache against a concurrent transfer of a record
+                         * in WriteCache.transferTo(). However,
+                         * WriteCache.resetWith() does NOT take the
+                         * transferLock. Therefore, it is possible (and valid)
+                         * for the [recordMap] entry to be cleared to [null] for
+                         * this record by a concurrent resetWith() call.
+                         * 
+                         * @see <a href=
+                         *      "https://sourceforge.net/apps/trac/bigdata/ticket/654"
+                         *      Rare AssertionError in WriteCache.clearAddrMap()
+                         *      </a>
+                         */
+                        continue;
+                    }
 					if (oldValue != cache) {
 						/*
 						 * Concurrent modification!
-						 * 
-						 * Note: The [WriteCache.transferLock] protects the
-						 * WriteCache against a concurrent transfer of a record
-						 * in WriteCache.transferTo(). However,
-						 * WriteCache.resetWith() does NOT take the
-						 * transferLock. Therefore, it is possible (and valid)
-						 * for the [recordMap] entry to be cleared to [null] for
-						 * this record by a concurrent resetWith() call.
 						 */
 						throw new AssertionError("oldValue=" + oldValue
 						+ ", cache=" + cache + ", offset=" + offset
@@ -3812,9 +3821,9 @@ abstract public class WriteCacheService implements IWriteCache {
                         debugAddrs(offset, 0, 'F');
                         return true;
                     }
-                    } finally {
-                        cache.release();
-                    }
+//                    } finally {
+//                        cache.release();
+//                    }
                 } finally {
                     cache.transferLock.unlock();
                 }
