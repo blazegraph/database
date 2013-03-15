@@ -64,6 +64,7 @@ public class TestAll extends TestCase {
 
         suite.addTest(com.bigdata.ha.msg.TestAll.suite());
         
+        // Note: This was disabled in the dev branch.  Use HA Version when merging.
         suite.addTest(com.bigdata.ha.halog.TestAll.suite());
         
 //        if (s_includeHA)
