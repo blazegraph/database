@@ -83,7 +83,6 @@ import com.bigdata.ha.msg.IHASendStoreResponse;
 import com.bigdata.ha.msg.IHASyncRequest;
 import com.bigdata.ha.msg.IHAWriteMessage;
 import com.bigdata.io.DirectBufferPool;
-import com.bigdata.io.FileChannelUtility;
 import com.bigdata.io.IBufferAccess;
 import com.bigdata.io.writecache.WriteCache;
 import com.bigdata.journal.BufferMode;
@@ -106,7 +105,6 @@ import com.bigdata.service.proxy.ClientFuture;
 import com.bigdata.service.proxy.RemoteFuture;
 import com.bigdata.service.proxy.RemoteFutureImpl;
 import com.bigdata.service.proxy.ThickFuture;
-import com.sun.xml.internal.bind.v2.runtime.unmarshaller.LocatorEx.Snapshot;
 
 /**
  * A {@link Journal} that that participates in a write replication pipeline. The
@@ -543,8 +541,8 @@ public class HAJournal extends Journal {
      * @param file
      *            Where to write the snapshot.
      * 
-     * @return The {@link Future} of the task that is taking the
-     *         {@link Snapshot}. The {@link Future} will evaluate to the closing
+     * @return The {@link Future} of the task that is taking the snapshot. The
+     *         {@link Future} will evaluate to the closing
      *         {@link IRootBlockView} on the snapshot.
      * 
      * @throws IOException
