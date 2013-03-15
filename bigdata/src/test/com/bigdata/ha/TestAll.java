@@ -64,7 +64,8 @@ public class TestAll extends TestCase {
 
         suite.addTest(com.bigdata.ha.msg.TestAll.suite());
         
-        suite.addTest(com.bigdata.ha.halog.TestAll.suite());
+        // Note: Disabling HALog tests in the dev branch.
+//        suite.addTest(com.bigdata.ha.halog.TestAll.suite());
         
 //        if (s_includeHA)
         	suite.addTest(com.bigdata.ha.pipeline.TestAll.suite());
