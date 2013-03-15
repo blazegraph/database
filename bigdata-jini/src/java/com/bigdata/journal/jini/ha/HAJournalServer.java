@@ -35,7 +35,6 @@ import java.rmi.RemoteException;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
@@ -43,6 +42,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
 
@@ -55,7 +55,6 @@ import net.jini.core.lookup.ServiceRegistrar;
 import org.apache.log4j.Logger;
 import org.apache.log4j.MDC;
 import org.apache.zookeeper.CreateMode;
-import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.KeeperException.NodeExistsException;
 import org.apache.zookeeper.data.ACL;
 import org.eclipse.jetty.server.Server;
@@ -83,7 +82,6 @@ import com.bigdata.ha.msg.IHAWriteMessage;
 import com.bigdata.ha.msg.IHAWriteSetStateResponse;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.IBufferAccess;
-import com.bigdata.io.SerializerUtil;
 import com.bigdata.io.writecache.WriteCache;
 import com.bigdata.jini.start.config.ZookeeperClientConfig;
 import com.bigdata.jini.util.JiniUtil;
@@ -91,17 +89,16 @@ import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.IHABufferStrategy;
 import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.RootBlockUtility;
+import com.bigdata.journal.WORMStrategy;
 import com.bigdata.quorum.Quorum;
 import com.bigdata.quorum.QuorumEvent;
 import com.bigdata.quorum.QuorumException;
 import com.bigdata.quorum.QuorumListener;
-import com.bigdata.quorum.zk.QuorumBackupState;
-import com.bigdata.quorum.zk.ZKQuorum;
 import com.bigdata.quorum.zk.ZKQuorumImpl;
 import com.bigdata.rdf.sail.webapp.ConfigParams;
 import com.bigdata.rdf.sail.webapp.NanoSparqlServer;
+import com.bigdata.rwstore.RWStore;
 import com.bigdata.service.jini.FakeLifeCycle;
-import com.bigdata.service.jini.JiniClient;
 import com.bigdata.service.jini.RemoteAdministrable;
 import com.bigdata.service.jini.RemoteDestroyAdmin;
 import com.bigdata.util.InnerCause;
@@ -165,6 +162,120 @@ public class HAJournalServer extends AbstractServer {
          */
         String LOGICAL_SERVICE_ID = "logicalServiceId";
         
+        /**
+         * The timeout in milliseconds that the leader will await the followers
+         * to prepare for a 2-phase commit.
+         * <p>
+         * Note: The timeout must be set with a realistic expectation concerning
+         * the possibility of garbage collection. A long GC pause could
+         * otherwise cause the 2-phase commit to fail. With this in mind, a
+         * reasonable timeout is on the order of 10 seconds.
+         */
+        String HA_PREPARE_TIMEOUT = "haPrepareTimeout";
+
+        long DEFAULT_HA_PREPARE_TIMEOUT = 10000; // milliseconds.
+        
+        long MIN_HA_PREPARE_TIMEOUT = 100; // milliseconds.
+        
+        /**
+         * The property whose value is the name of the directory in which write
+         * ahead log files will be created to support resynchronization services
+         * trying to join an HA quorum (default {@value #DEFAULT_HA_LOG_DIR}).
+         * <p>
+         * The directory should not contain any other files. It will be
+         * populated with files whose names correspond to commit counters. The
+         * commit counter is recorded in the root block at each commit. It is
+         * used to identify the write set for a given commit. A log file is
+         * written for each commit point. Each log files is normally deleted at
+         * the commit. However, if the quorum is not fully met at the commit,
+         * then the log files not be deleted. Instead, they will be used to
+         * resynchronize the other quorum members.
+         * <p>
+         * The log file name includes the value of the commit counter for the
+         * commit point that will be achieved when that log file is applied to a
+         * journal whose current commit point is [commitCounter-1]. The commit
+         * counter for a new journal (without any commit points) is ZERO (0).
+         * This the first log file will be labeled with the value ONE (1). The
+         * commit counter is written out with leading zeros in the log file name
+         * so the natural sort order of the log files should correspond to the
+         * ascending commit order.
+         * <p>
+         * The log files are a sequence of zero or more {@link IHAWriteMessage}
+         * objects. For the {@link RWStore}, each {@link IHAWriteMessage} is
+         * followed by the data from the corresponding {@link WriteCache} block.
+         * For the {@link WORMStrategy}, the {@link WriteCache} block is omitted
+         * since this data can be trivially reconstructed from the backing file.
+         * When the quorum prepares for a commit, the proposed root block is
+         * written onto the end of the log file.
+         * <p>
+         * The log files are deleted once the quorum is fully met (k out of k
+         * nodes have met in the quorum). It is possible for a quorum to form
+         * with only <code>(k+1)/2</code> nodes. When this happens, the nodes in
+         * the quorum will all write log files into the {@link #HA_LOG_DIR}.
+         * Those files will remain until the other nodes in the quorum
+         * synchronize and join the quorum. Once the quorum is fully met, the
+         * files in the log directory will be deleted.
+         * <p>
+         * If some or all log files are not present, then any node that is not
+         * synchronized with the quorum must be rebuilt from scratch rather than
+         * by incrementally applying logged write sets until it catches up and
+         * can join the quorum.
+         * 
+         * @see IRootBlockView#getCommitCounter()
+         */
+        String HA_LOG_DIR = "haLogDir";
+        
+        /**
+         * Note: The default is relative to the effective value of the
+         * {@link AbstractServer.ConfigurationOptions#SERVICE_DIR}.
+         */
+        String DEFAULT_HA_LOG_DIR = "HALog";
+
+        /**
+         * The name of the directory in which periodic snapshots of the journal
+         * will be written. Each snapshot is a full copy of the journal.
+         * Snapshots are compressed and therefore may be much more compact than
+         * the original journal. A snapshot, together with incremental HALog
+         * files, may be used to regenerate a journal file for a specific commit
+         * point.
+         */
+        String SNAPSHOT_DIR = "snapshotDir";
+
+        /**
+         * Note: The default is relative to the effective value of the
+         * {@link AbstractServer.ConfigurationOptions#SERVICE_DIR}.
+         */
+        String DEFAULT_SNAPSHOT_DIR = "snapshot";
+
+        /**
+         * The policy that specifies when a new snapshot will be taken. The
+         * decision to take a snapshot is a local decision and the snapshot is
+         * assumed to be written to local disk. However, offsite replication of
+         * the {@link #SNAPSHOT_DIR} and {@link #HA_LOG_DIR} is STRONGLY
+         * recommended.
+         * <p>
+         * Each snapshot is a full backup of the journal. Incremental backups
+         * (HALog files) are created for each transaction. Older snapshots and
+         * HALog files will be removed once automatically.
+         * 
+         * @see ISnapshotPolicy
+         */
+        String SNAPSHOT_POLICY = "snapshotPolicy";
+
+        ISnapshotPolicy DEFAULT_SNAPSHOT_POLICY = new DefaultSnapshotPolicy();
+
+        /**
+         * The policy identifies the first commit point whose backups MUST NOT
+         * be released. The policy may be based on the age of the commit point,
+         * the number of intervening commit points, etc. A policy that always
+         * returns ZERO (0) will never release any backups.
+         * 
+         * @see IRestorePolicy
+         */
+        String RESTORE_POLICY = "restorePolicy";
+
+        IRestorePolicy DEFAULT_RESTORE_POLICY = new DefaultRestorePolicy();
+
     }
     
     /**
@@ -277,8 +388,7 @@ public class HAJournalServer extends AbstractServer {
     }
 
     @Override
-    protected HAGlue newService(final Configuration config)
-            throws Exception {
+    protected HAGlue newService(final Configuration config) throws Exception {
 
         /*
          * Verify discovery of at least one ServiceRegistrar.
@@ -352,22 +462,6 @@ public class HAJournalServer extends AbstractServer {
 
         {
 
-            // The address at which this service exposes its write pipeline.
-            final InetSocketAddress writePipelineAddr = (InetSocketAddress) config
-                    .getEntry(ConfigurationOptions.COMPONENT,
-                            ConfigurationOptions.WRITE_PIPELINE_ADDR,
-                            InetSocketAddress.class);
-
-            /*
-             * Configuration properties for this HAJournal.
-             */
-            final Properties properties = JiniClient.getProperties(
-                    HAJournal.class.getName(), config);
-
-            // Force the writePipelineAddr into the Properties.
-            properties.put(HAJournal.Options.WRITE_PIPELINE_ADDR,
-                    writePipelineAddr);
-
             /*
              * Zookeeper quorum.
              */
@@ -422,7 +516,7 @@ public class HAJournalServer extends AbstractServer {
             }
 
             // The HAJournal.
-            this.journal = new HAJournal(properties, quorum);
+            this.journal = new HAJournal(this, config, quorum);
             
         }
 
@@ -2764,34 +2858,10 @@ public class HAJournalServer extends AbstractServer {
         /**
          * {@inheritDoc}
          * <p>
-         * Destroys the HA log files in the HA log directory.
-         * 
-         * TODO BACKUP: This already parses the closing commit counter out of
-         * the HALog filename. To support backup, we MUST NOT delete an HALog
-         * file that is being retained by the backup retention policy. This will
-         * be coordinated through zookeeper.
-         * 
-         * <pre>
-         * logicalServiceZPath/backedUp {inc=CC;full=CC}
-         * </pre>
-         * 
-         * where
-         * <dl>
-         * <dt>inc</dt>
-         * <dd>The commitCounter of the last incremental backup that was
-         * captured</dd>
-         * <dt>full</dt>
-         * <dd>The commitCounter of the last full backup that was captured.</dd>
-         * </dl>
-         * 
-         * IF this znode exists, then backups are being captured. When backups
-         * are being captured, then HALog files may only be removed once they
-         * have been captured by a backup. The znode is automatically created by
-         * the backup utility. If you destroy the znode, it will no longer
-         * assume that backups are being captured until the next time you run
-         * the backup utility.
-         * 
-         * @see HABackupManager
+         * Deletes HA log files and snapshots that are no longer retained by the
+         * {@link IRestorePolicy}.
+         * <p>
+         * Note: The current HALog file is NOT deleted by this method.
          */
         @Override
         public void purgeHALogs() {
@@ -2800,116 +2870,125 @@ public class HAJournalServer extends AbstractServer {
 
             try {
 
-                final QuorumBackupState backupState;
-                {
-                    QuorumBackupState tmp = null;
-                    try {
-                        final String zpath = server.logicalServiceZPath + "/"
-                                + ZKQuorum.QUORUM + "/"
-                                + ZKQuorum.QUORUM_BACKUP;
-                        tmp = (QuorumBackupState) SerializerUtil
-                                .deserialize(server.zka
-                                        .getZookeeper()
-                                        .getData(zpath, false/* watch */, null/* stat */));
-                    } catch (KeeperException.NoNodeException ex) {
-                        // ignore.
-                    } catch (KeeperException e) {
-                        // log @ error and ignore.
-                        log.error(e);
-                    } catch (InterruptedException e) {
-                        // Propagate interrupt.
-                        Thread.currentThread().interrupt();
-                        return;
-                    }
-                    backupState = tmp;
-                }
-                
-                /*
-                 * List the HALog files for this service.
-                 */
-                final File[] logFiles;
-                {
+                // We need to retain the backups for this commit point.
+                final long earliestRestorableCommitPoint = journal
+                        .getSnapshotManager().getRestorePolicy()
+                        .getEarliestRestorableCommitPoint(journal);
 
-                    final File currentLogFile = journal.getHALogWriter()
-                            .getFile();
+                if (earliestRestorableCommitPoint == Long.MAX_VALUE) {
 
-                    final String currentLogFileName = currentLogFile == null ? null
-                            : currentLogFile.getName();
+                    // Do not retain HALogs (other than the current one).
+                    deleteHALogs(Long.MAX_VALUE);
+                    
+                } else {
 
-                    final File logDir = journal.getHALogDir();
+                    // Release HALogs no longer required by the restore policy.
+                    final long earliestRetainedSnapshotLastCommitCounter = deleteSnapshots(earliestRestorableCommitPoint);
 
-                    logFiles = logDir.listFiles(new FilenameFilter() {
-
-                        /**
-                         * Return <code>true</code> iff the file is an HALog
-                         * file that should be deleted.
-                         * 
-                         * @param name
-                         *            The name of that HALog file (encodes the
-                         *            commitCounter).
-                         */
-                        @Override
-                        public boolean accept(final File dir, final String name) {
-
-                            if (!name.endsWith(IHALogReader.HA_LOG_EXT)) {
-                                // Not an HALog file.
-                                return false;
-                            }
-
-                            // filter out the current log file
-                            if (currentLogFile != null
-                                    && name.equals(currentLogFileName)) {
-                                /*
-                                 * The caller requested that we NOT purge the
-                                 * current HALog, and this is it.
-                                 */
-                                return false;
-                            }
-
-                            // Strip off the filename extension.
-                            final String logFileBaseName = name.substring(0,
-                                    IHALogReader.HA_LOG_EXT.length());
-
-                            // Closing commitCounter for HALog file.
-                            final long logCommitCounter = Long
-                                    .parseLong(logFileBaseName);
-
-                            if (backupState != null) {
-                                /*
-                                 * Backups are being made.
-                                 * 
-                                 * When backups are being made, we DO NOT delete
-                                 * HALog files for commit points GT this
-                                 * commitCounter.
-                                 */
-                                if (logCommitCounter > backupState.inc()) {
-                                    /*
-                                     * Backups are being made and this HALog
-                                     * file has not been backed up yet.
-                                     */
-                                    return false;
-                                }
-                            }
-
-                            // This HALog file MAY be deleted.
-                            return true;
-                            
-                        }
-                    });
+                    deleteHALogs(earliestRetainedSnapshotLastCommitCounter);
                     
                 }
 
-                int ndeleted = 0;
-                long totalBytes = 0L;
+            } finally {
 
-                for (File logFile : logFiles) {
+                logLock.unlock();
 
-                    // #of bytes in that HALog file.
-                    final long len = logFile.length();
+            }
 
-                    if (!logFile.delete()) {
+        }
 
-                        haLog.warn("COULD NOT DELETE FILE: " + logFile);
+        /**
+         * Delete snapshots that are no longer required.
+         * <p>
+         * Note: If ZERO (0) is passed into this method, then no snapshots will
+         * be deleted.
+         * 
+         * @param earliestRestorableCommitPoint
+         *            The earliest commit point that we need to be able to
+         *            restore from local backups.
+         * 
+         * @return The commitCounter of the earliest retained snapshot.
+         */
+        private long deleteSnapshots(final long earliestRestorableCommitPoint) {
+            /*
+             * List the snapshot files for this service.
+             */
+            final File[] files;
+            // Set to the commit counter of the earliest retained snapshot.
+            final AtomicLong earliestRetainedSnapshotCommitCounter = new AtomicLong(Long.MAX_VALUE);
+            final SnapshotManager snapshotManager = journal
+                    .getSnapshotManager();
+            {
+
+                final File snapshotDir = snapshotManager.getSnapshotDir();
+
+                files = snapshotDir.listFiles(new FilenameFilter() {
+
+                    /**
+                     * Return <code>true</code> iff the file is an snapshot file
+                     * that should be deleted.
+                     * 
+                     * @param name
+                     *            The name of that file (encodes the
+                     *            commitCounter).
+                     */
+                    @Override
+                    public boolean accept(final File dir, final String name) {
+
+                        if (!name.endsWith(SnapshotManager.SNAPSHOT_EXT)) {
+                            // Not an snapshot file.
+                            return false;
+                        }
+
+                        // Strip off the filename extension.
+                        final String fileBaseName = name.substring(0,
+                                SnapshotManager.SNAPSHOT_EXT.length());
+
+                        // Closing commitCounter for snapshot file.
+                        final long commitCounter = Long.parseLong(fileBaseName);
+
+                        if (commitCounter >= earliestRestorableCommitPoint) {
+                            /*
+                             * We need to retain this snapshot.
+                             */
+                            if (commitCounter < earliestRetainedSnapshotCommitCounter
+                                    .get()) {
+                                // Update the earliest retained snapshot.
+                                earliestRetainedSnapshotCommitCounter
+                                        .set(commitCounter);
+                            }
+                            return false;
+                        }
+
+                        // This snapshot MAY be deleted.
+                        return true;
+
+                    }
+                });
+
+            }
+
+            int ndeleted = 0;
+            long totalBytes = 0L;
+
+            if (files.length == 0) {
+
+                /*
+                 * Note: If there are no snapshots then we MUST retain ALL HALog
+                 * files.
+                 */
+                earliestRetainedSnapshotCommitCounter.set(0L);
+                
+            } else {
+
+                for (File file : files) {
+
+                    // #of bytes in that file.
+                    final long len = file.length();
+
+                    if (snapshotManager.removeSnapshot(file)) {
+
+                        haLog.warn("COULD NOT DELETE FILE: " + file);
 
                         continue;
 
@@ -2920,18 +2999,123 @@ public class HAJournalServer extends AbstractServer {
                     totalBytes += len;
 
                 }
+                
+            }
 
-                haLog.info("PURGED LOGS: ndeleted=" + ndeleted
-                        + ", totalBytes=" + totalBytes);
+            haLog.info("PURGED SNAPSHOTS: ndeleted=" + ndeleted
+                    + ", totalBytes=" + totalBytes
+                    + ", earliestRestorableCommitPoint="
+                    + earliestRestorableCommitPoint
+                    + ", earliestRetainedSnapshotCommitCounter="
+                    + earliestRetainedSnapshotCommitCounter.get());
 
-            } finally {
+            return earliestRetainedSnapshotCommitCounter.get();
 
-                logLock.unlock();
+        }
+        
+        /**
+         * Delete HALogs that are no longer required.
+         * 
+         * @param earliestRetainedSnapshotCommitCounter
+         *            The commit counter on the current root block of the
+         *            earliest retained snapshot. We need to retain any HALogs
+         *            that are GTE this commit counter since they will be
+         *            applied to that snapshot.
+         */
+        private void deleteHALogs(final long earliestRetainedSnapshotCommitCounter) {
+            /*
+             * List the HALog files for this service.
+             */
+            final File[] logFiles;
+            {
+
+                final File currentLogFile = journal.getHALogWriter()
+                        .getFile();
+
+                final String currentLogFileName = currentLogFile == null ? null
+                        : currentLogFile.getName();
+
+                final File logDir = journal.getHALogDir();
+
+                logFiles = logDir.listFiles(new FilenameFilter() {
+
+                    /**
+                     * Return <code>true</code> iff the file is an HALog
+                     * file that should be deleted.
+                     * 
+                     * @param name
+                     *            The name of that HALog file (encodes the
+                     *            commitCounter).
+                     */
+                    @Override
+                    public boolean accept(final File dir, final String name) {
+
+                        if (!name.endsWith(IHALogReader.HA_LOG_EXT)) {
+                            // Not an HALog file.
+                            return false;
+                        }
+
+                        // filter out the current log file
+                        if (currentLogFile != null
+                                && name.equals(currentLogFileName)) {
+                            /*
+                             * The caller requested that we NOT purge the
+                             * current HALog, and this is it.
+                             */
+                            return false;
+                        }
+
+                        // Strip off the filename extension.
+                        final String logFileBaseName = name.substring(0,
+                                IHALogReader.HA_LOG_EXT.length());
+
+                        // Closing commitCounter for HALog file.
+                        final long logCommitCounter = Long
+                                .parseLong(logFileBaseName);
+
+                        if (logCommitCounter >= earliestRetainedSnapshotCommitCounter) {
+                            /*
+                             * We need to retain this log file.
+                             */
+                            return false;
+                        }
+
+                        // This HALog file MAY be deleted.
+                        return true;
+
+                    }
+                });
+                
+            }
+
+            int ndeleted = 0;
+            long totalBytes = 0L;
+
+            for (File logFile : logFiles) {
+
+                // #of bytes in that HALog file.
+                final long len = logFile.length();
+
+                if (!logFile.delete()) {
+
+                    haLog.warn("COULD NOT DELETE FILE: " + logFile);
+
+                    continue;
+
+                }
+
+                ndeleted++;
+
+                totalBytes += len;
 
             }
 
-        }
+            haLog.info("PURGED LOGS: ndeleted=" + ndeleted + ", totalBytes="
+                    + totalBytes + ", earliestRetainedSnapshotCommitCounter="
+                    + earliestRetainedSnapshotCommitCounter);
 
+        }
+        
         @Override
         public void installRootBlocks(final IRootBlockView rootBlock0,
                 final IRootBlockView rootBlock1) {

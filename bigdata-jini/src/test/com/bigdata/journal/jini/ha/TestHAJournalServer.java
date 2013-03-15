@@ -50,7 +50,8 @@ public class TestHAJournalServer extends AbstractHA3JournalServerTestCase {
     }
 
     /**
-     * One service starts, quorum does not meet (replication factor is 3).
+     * One service starts, quorum does not meet (replication factor is 3). This
+     * also serves to verify the <code>HAJournal-A.config</code> file.
      */
     public void testStartA() throws Exception {
         
@@ -69,9 +70,109 @@ public class TestHAJournalServer extends AbstractHA3JournalServerTestCase {
         }
         
         doNSSStatusRequest(serverA);
+
+        assertTrue(getHAJournalFileA().exists());
+        assertTrue(getHALogDirA().exists());
+        assertTrue(getSnapshotDirA().exists());
+        
+//        serverA.enterErrorState().get();
+//        
+//        Thread.sleep(10000/*ms*/);
         
     }
 
+    /**
+     * Verify Server B will start - this helps to proof the configuration
+     * files.
+     */
+    public void testStartB() throws Exception {
+        
+        final HAGlue serverB = startB();
+        
+        try {
+
+            quorum.awaitQuorum(awaitQuorumTimeout, TimeUnit.MILLISECONDS);
+            
+            fail("Not expecting quorum meet");
+
+        } catch (TimeoutException ex) {
+        
+            // ignore.
+            
+        }
+        
+        doNSSStatusRequest(serverB);
+
+        assertTrue(getHAJournalFileB().exists());
+        assertTrue(getHALogDirB().exists());
+        assertTrue(getSnapshotDirB().exists());
+        
+    }
+
+    /**
+     * Verify Server C will start - this helps to proof the configuration
+     * files.
+     */
+    public void testStartC() throws Exception {
+        
+        final HAGlue serverC = startC();
+        
+        try {
+
+            quorum.awaitQuorum(awaitQuorumTimeout, TimeUnit.MILLISECONDS);
+            
+            fail("Not expecting quorum meet");
+
+        } catch (TimeoutException ex) {
+        
+            // ignore.
+            
+        }
+        
+        doNSSStatusRequest(serverC);
+
+        assertTrue(getHAJournalFileC().exists());
+        assertTrue(getHALogDirC().exists());
+        assertTrue(getSnapshotDirC().exists());
+        
+    }
+
+    /**
+     * Verify that the various bits of state are removed from the file system
+     * when the service is destroyed.
+     * 
+     * @throws Exception
+     */
+    public void testStartA_Destroy() throws Exception {
+        
+        final HAGlue serverA = startA();
+        
+        try {
+
+            quorum.awaitQuorum(awaitQuorumTimeout, TimeUnit.MILLISECONDS);
+            
+            fail("Not expecting quorum meet");
+
+        } catch (TimeoutException ex) {
+        
+            // ignore.
+            
+        }
+        
+        doNSSStatusRequest(serverA);
+
+        assertTrue(getHAJournalFileA().exists());
+        assertTrue(getHALogDirA().exists());
+        assertTrue(getSnapshotDirA().exists());
+
+        destroyA();
+
+        assertFalse(getHAJournalFileA().exists());
+        assertFalse(getHALogDirA().exists());
+        assertFalse(getSnapshotDirA().exists());
+
+    }
+    
     /**
      * One service starts, quorum does not meet (replication factor is 3).
      * Shutdown and restart the service. Verify that it comes back up with the

@@ -27,6 +27,7 @@ import java.io.File;
 import java.io.FileFilter;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.RandomAccessFile;
 import java.io.Serializable;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
@@ -49,6 +50,7 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
 import net.jini.config.Configuration;
+import net.jini.config.ConfigurationException;
 import net.jini.export.Exporter;
 import net.jini.jeri.BasicILFactory;
 import net.jini.jeri.BasicJeriExporter;
@@ -81,6 +83,7 @@ import com.bigdata.ha.msg.IHASendStoreResponse;
 import com.bigdata.ha.msg.IHASyncRequest;
 import com.bigdata.ha.msg.IHAWriteMessage;
 import com.bigdata.io.DirectBufferPool;
+import com.bigdata.io.FileChannelUtility;
 import com.bigdata.io.IBufferAccess;
 import com.bigdata.io.writecache.WriteCache;
 import com.bigdata.journal.BufferMode;
@@ -89,19 +92,21 @@ import com.bigdata.journal.IHABufferStrategy;
 import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
+import com.bigdata.journal.RootBlockUtility;
 import com.bigdata.journal.ValidationError;
-import com.bigdata.journal.WORMStrategy;
 import com.bigdata.journal.WriteExecutorService;
 import com.bigdata.journal.jini.ha.HAJournalServer.HAQuorumService;
 import com.bigdata.quorum.AsynchronousQuorumCloseException;
 import com.bigdata.quorum.Quorum;
+import com.bigdata.quorum.QuorumException;
 import com.bigdata.quorum.zk.ZKQuorumImpl;
-import com.bigdata.rwstore.RWStore;
 import com.bigdata.service.AbstractTransactionService;
+import com.bigdata.service.jini.JiniClient;
 import com.bigdata.service.proxy.ClientFuture;
 import com.bigdata.service.proxy.RemoteFuture;
 import com.bigdata.service.proxy.RemoteFutureImpl;
 import com.bigdata.service.proxy.ThickFuture;
+import com.sun.xml.internal.bind.v2.runtime.unmarshaller.LocatorEx.Snapshot;
 
 /**
  * A {@link Journal} that that participates in a write replication pipeline. The
@@ -141,90 +146,32 @@ public class HAJournal extends Journal {
 
     public interface Options extends Journal.Options {
         
-        /**
-         * The address at which this journal exposes its write pipeline
-         * interface (a socket level interface for receiving write cache blocks
-         * from another service in the met quorum).
-         */
-        String WRITE_PIPELINE_ADDR = HAJournal.class.getName()
-                + ".writePipelineAddr";
-
 //        /**
-//         * The address at which this journal exposes its resynchronization
+//         * The address at which this journal exposes its write pipeline
 //         * interface (a socket level interface for receiving write cache blocks
 //         * from another service in the met quorum).
 //         */
-//        String RESYNCH_ADDR = HAJournal.class.getName() + ".resyncAddr";
-
-        /**
-         * The timeout in milliseconds that the leader will await the followers
-         * to prepare for a 2-phase commit.
-         * <p>
-         * Note: The timeout must be set with a realistic expectation concerning
-         * the possibility of garbage collection. A long GC pause could
-         * otherwise cause the 2-phase commit to fail. With this in mind, a
-         * reasonable timeout is on the order of 10 seconds.
-         */
-        String HA_PREPARE_TIMEOUT = HAJournal.class.getName() + ".HAPrepareTimeout";
-
-        String DEFAULT_HA_PREPARE_TIMEOUT = "10000"; // milliseconds.
-        
-        long HA_MIN_PREPARE_TIMEOUT = 100; // milliseconds.
-        
-        /**
-         * The property whose value is the name of the directory in which write
-         * ahead log files will be created to support resynchronization services
-         * trying to join an HA quorum (default {@value #DEFAULT_HA_LOG_DIR}).
-         * <p>
-         * The directory should not contain any other files. It will be
-         * populated with files whose names correspond to commit counters. The
-         * commit counter is recorded in the root block at each commit. It is
-         * used to identify the write set for a given commit. A log file is
-         * written for each commit point. Each log files is normally deleted at
-         * the commit. However, if the quorum is not fully met at the commit,
-         * then the log files not be deleted. Instead, they will be used to
-         * resynchronize the other quorum members.
-         * <p>
-         * The log file name includes the value of the commit counter for the
-         * commit point that will be achieved when that log file is applied to a
-         * journal whose current commit point is [commitCounter-1]. The commit
-         * counter for a new journal (without any commit points) is ZERO (0).
-         * This the first log file will be labeled with the value ONE (1). The
-         * commit counter is written out with leading zeros in the log file name
-         * so the natural sort order of the log files should correspond to the
-         * ascending commit order.
-         * <p>
-         * The log files are a sequence of zero or more {@link IHAWriteMessage}
-         * objects. For the {@link RWStore}, each {@link IHAWriteMessage} is
-         * followed by the data from the corresponding {@link WriteCache} block.
-         * For the {@link WORMStrategy}, the {@link WriteCache} block is omitted
-         * since this data can be trivially reconstructed from the backing file.
-         * When the quorum prepares for a commit, the proposed root block is
-         * written onto the end of the log file.
-         * <p>
-         * The log files are deleted once the quorum is fully met (k out of k
-         * nodes have met in the quorum). It is possible for a quorum to form
-         * with only <code>(k+1)/2</code> nodes. When this happens, the nodes in
-         * the quorum will all write log files into the {@link #HA_LOG_DIR}.
-         * Those files will remain until the other nodes in the quorum
-         * synchronize and join the quorum. Once the quorum is fully met, the
-         * files in the log directory will be deleted.
-         * <p>
-         * If some or all log files are not present, then any node that is not
-         * synchronized with the quorum must be rebuilt from scratch rather than
-         * by incrementally applying logged write sets until it catches up and
-         * can join the quorum.
-         * 
-         * @see IRootBlockView#getCommitCounter()
-         */
-        String HA_LOG_DIR = HAJournal.class.getName() + ".haLogDir";
-        
-        String DEFAULT_HA_LOG_DIR = "HALog";
-        
+//        String WRITE_PIPELINE_ADDR = HAJournal.class.getName()
+//                + ".writePipelineAddr";
+//        /**
+//         * The timeout in milliseconds that the leader will await the followers
+//         * to prepare for a 2-phase commit.
+//         * <p>
+//         * Note: The timeout must be set with a realistic expectation concerning
+//         * the possibility of garbage collection. A long GC pause could
+//         * otherwise cause the 2-phase commit to fail. With this in mind, a
+//         * reasonable timeout is on the order of 10 seconds.
+//         */
+//        String HA_PREPARE_TIMEOUT = HAJournal.class.getName() + ".HAPrepareTimeout";
+//
+//        String DEFAULT_HA_PREPARE_TIMEOUT = "10000"; // milliseconds.
+//        
+//        long HA_MIN_PREPARE_TIMEOUT = 100; // milliseconds.
+//        
     }
     
     /**
-     * @see Options#WRITE_PIPELINE_ADDR
+     * @see HAJournalServer.ConfigurationOptions#WRITE_PIPELINE_ADDR
      */
     private final InetSocketAddress writePipelineAddr;
 
@@ -234,7 +181,7 @@ public class HAJournal extends Journal {
     private final long haPrepareTimeout;
     
     /**
-     * @see Options#HA_LOG_DIR
+     * @see HAJournalServer.ConfigurationOptions#HA_LOG_DIR
      */
     private final File haLogDir;
     
@@ -242,7 +189,7 @@ public class HAJournal extends Journal {
      * Write ahead log for replicated writes used to resynchronize services that
      * are not in the met quorum.
      * 
-     * @see Options#HA_LOG_DIR
+     * @see HAJournalServer.ConfigurationOptions#HA_LOG_DIR
      * @see HALogWriter
      */
     private final HALogWriter haLogWriter;
@@ -266,6 +213,11 @@ public class HAJournal extends Journal {
      *      IHAWriteMessage, ByteBuffer)
      */
     volatile IHAWriteMessage lastLiveHAWriteMessage = null;
+
+    /**
+     * Manager for journal snapshots.
+     */
+    private final SnapshotManager snapshotManager;
     
     /**
      * The {@link HALogWriter} for this {@link HAJournal} and never
@@ -288,44 +240,102 @@ public class HAJournal extends Journal {
         return (IHABufferStrategy) super.getBufferStrategy();
         
     }
-    
-    public HAJournal(final Properties properties) {
 
-        this(properties, null);
+    /**
+     * 
+     * @param config
+     * @param quorum
+     * 
+     * @throws ConfigurationException
+     * @throws IOException 
+     */
+    public HAJournal(final HAJournalServer server, final Configuration config,
+            final Quorum<HAGlue, QuorumService<HAGlue>> quorum)
+            throws ConfigurationException, IOException {
+     
+        /*
+         * Note: Pulls out the Properties object for the HAJournal from the
+         * HAJournal component in the Configuration.
+         */
         
+        this(//
+                server, //
+                config, //
+                JiniClient.getProperties(HAJournal.class.getName(), config),//
+                quorum //
+        );
+
     }
 
-    public HAJournal(final Properties properties,
-            final Quorum<HAGlue, QuorumService<HAGlue>> quorum) {
+    private HAJournal(final HAJournalServer server, final Configuration config,
+            final Properties properties,
+            final Quorum<HAGlue, QuorumService<HAGlue>> quorum)
+            throws ConfigurationException, IOException {
+
+        /*
+         * Note: This checks properties BEFORE passing them up since we do not
+         * want to create the Journal file if the properties are invalid.
+         */
 
         super(checkProperties(properties), quorum);
 
-        /*
-         * Note: We need this so pass it through to the HAGlue class below.
-         * Otherwise this service does not know where to setup its write
-         * replication pipeline listener.
-         */
-        
-        writePipelineAddr = (InetSocketAddress) properties
-                .get(Options.WRITE_PIPELINE_ADDR);
+        {
 
-        haPrepareTimeout = Long.valueOf(properties.getProperty(
-                Options.HA_PREPARE_TIMEOUT, Options.DEFAULT_HA_PREPARE_TIMEOUT));
-
-        final String logDirStr = properties.getProperty(Options.HA_LOG_DIR,
-                Options.DEFAULT_HA_LOG_DIR);
-
-        haLogDir = new File(logDirStr);
-
-        if (!haLogDir.exists()) {
-
-            // Create the directory.
-            haLogDir.mkdirs();
+            // The address at which this service exposes its write pipeline.
+            writePipelineAddr = (InetSocketAddress) config.getEntry(
+                    HAJournalServer.ConfigurationOptions.COMPONENT,
+                    HAJournalServer.ConfigurationOptions.WRITE_PIPELINE_ADDR,
+                    InetSocketAddress.class);
 
         }
 
-        // Set up the HA log writer.
-        haLogWriter = new HALogWriter(haLogDir);
+        {
+            haPrepareTimeout = (Long) config
+                    .getEntry(
+                            HAJournalServer.ConfigurationOptions.COMPONENT,
+                            HAJournalServer.ConfigurationOptions.HA_PREPARE_TIMEOUT,
+                            Long.TYPE,
+                            HAJournalServer.ConfigurationOptions.DEFAULT_HA_PREPARE_TIMEOUT);
+
+            if (haPrepareTimeout < HAJournalServer.ConfigurationOptions.MIN_HA_PREPARE_TIMEOUT) {
+                throw new ConfigurationException(
+                        HAJournalServer.ConfigurationOptions.HA_PREPARE_TIMEOUT
+                                + "="
+                                + haPrepareTimeout
+                                + " : must be GTE "
+                                + HAJournalServer.ConfigurationOptions.MIN_HA_PREPARE_TIMEOUT);
+            }
+
+        }
+        
+        // Note: This is the effective service directory.
+        final File serviceDir = server.getServiceDir(); 
+
+        {
+
+            haLogDir = (File) config
+                    .getEntry(
+                            HAJournalServer.ConfigurationOptions.COMPONENT,
+                            HAJournalServer.ConfigurationOptions.HA_LOG_DIR,
+                            File.class,//
+                            new File(
+                                    serviceDir,
+                                    HAJournalServer.ConfigurationOptions.DEFAULT_HA_LOG_DIR)//
+                    );
+
+            if (!haLogDir.exists()) {
+
+                // Create the directory.
+                haLogDir.mkdirs();
+
+            }
+
+            // Set up the HA log writer.
+            haLogWriter = new HALogWriter(haLogDir);
+
+        }
+
+        snapshotManager = new SnapshotManager(server, this, config);
 
     }
 
@@ -382,23 +392,6 @@ public class HAJournal extends Journal {
             throw new IllegalArgumentException(Options.WRITE_CACHE_ENABLED
                     + " : must be true.");
 
-        if (properties.get(Options.WRITE_PIPELINE_ADDR) == null) {
-
-            throw new RuntimeException(Options.WRITE_PIPELINE_ADDR
-                    + " : required property not found.");
-        
-        }
-
-        final long prepareTimeout = Long.valueOf(properties
-                .getProperty(Options.HA_PREPARE_TIMEOUT,
-                        Options.DEFAULT_HA_PREPARE_TIMEOUT));
-
-        if (prepareTimeout < Options.HA_MIN_PREPARE_TIMEOUT) {
-            throw new RuntimeException(Options.HA_PREPARE_TIMEOUT + "="
-                    + prepareTimeout + " : must be GTE "
-                    + Options.HA_MIN_PREPARE_TIMEOUT);
-        }
-        
         return properties;
 
     }
@@ -435,19 +428,25 @@ public class HAJournal extends Journal {
     }
     
     @Override
-    public final File getHALogDir() {
-
-        return haLogDir;
-        
-    }
-
-    @Override
     public final long getHAPrepareTimeout() {
 
         return haPrepareTimeout;
         
     }
 
+    @Override
+    public final File getHALogDir() {
+
+        return haLogDir;
+        
+    }
+
+    public SnapshotManager getSnapshotManager() {
+        
+        return snapshotManager;
+        
+    }
+    
     /**
      * {@inheritDoc}
      * <p>
@@ -475,7 +474,7 @@ public class HAJournal extends Journal {
     public void deleteResources() {
 
         super.deleteResources();
-    
+ 
         recursiveDelete(getHALogDir(), new FileFilter() {
 
             @Override
@@ -485,6 +484,20 @@ public class HAJournal extends Journal {
                     return true;
                 
                 return f.getName().endsWith(IHALogReader.HA_LOG_EXT);
+            }
+
+        });
+        
+        recursiveDelete(getSnapshotManager().getSnapshotDir(),
+                new FileFilter() {
+
+            @Override
+            public boolean accept(File f) {
+        
+                if (f.isDirectory())
+                    return true;
+                
+                return f.getName().endsWith(SnapshotManager.SNAPSHOT_EXT);
             }
 
         });
@@ -524,6 +537,214 @@ public class HAJournal extends Journal {
 
     }
 
+    /**
+     * Take a snapshot.
+     * 
+     * @param file
+     *            Where to write the snapshot.
+     * 
+     * @return The {@link Future} of the task that is taking the
+     *         {@link Snapshot}. The {@link Future} will evaluate to the closing
+     *         {@link IRootBlockView} on the snapshot.
+     * 
+     * @throws IOException
+     * @throws ExecutionException
+     * @throws InterruptedException
+     */
+    Future<IRootBlockView> takeSnapshotNow() throws Exception {
+
+        final FutureTask<IRootBlockView> ft = new FutureTaskMon<IRootBlockView>(
+                new SnapshotTask());
+
+        // Run task.
+        getExecutorService().submit(ft);
+
+        return ft;
+
+    }
+
+    /**
+     * Take a snapshot.
+     */
+    private class SnapshotTask implements Callable<IRootBlockView> {
+
+        public SnapshotTask() {
+        }
+        
+        public IRootBlockView call() throws Exception {
+            
+            // The quorum token (must remain valid through this operation).
+            final long token = getQuorumToken();
+            
+            if (!getQuorum().getClient().isJoinedMember(token)) {
+
+                throw new QuorumException("Service not joined with met quorum");
+
+            }
+
+            // Grab a read lock.
+            final long txId = newTx(ITx.READ_COMMITTED);
+
+            /*
+             * Get both root blocks (atomically).
+             * 
+             * Note: This is done AFTER we take the read-lock and BEFORE we
+             * copy the data from the backing store. These root blocks MUST
+             * be consistent for the leader's backing store because we are
+             * not recycling allocations (since the read lock has pinned
+             * them). The journal MIGHT go through a concurrent commit
+             * before we obtain these root blocks, but they are still valid
+             * for the data on the disk because of the read-lock.
+             */
+            final IRootBlockView[] rootBlocks = getRootBlocks();
+
+            final IRootBlockView currentRootBlock = RootBlockUtility
+                    .chooseRootBlock(rootBlocks[0], rootBlocks[1]);
+
+            // TODO It is a problem if this file exists and is not (logically)
+            // empty.
+            final File file = getSnapshotManager().getSnapshotFile(
+                    currentRootBlock.getCommitCounter());
+
+            // FIXME Modify to use GZip on outputStream.
+            IBufferAccess buf = null;
+            RandomAccessFile raf = null;
+            try {
+
+                try {
+                    // Acquire a buffer.
+                    buf = DirectBufferPool.INSTANCE.acquire();
+                } catch (InterruptedException ex) {
+                    // Wrap and re-throw.
+                    throw new IOException(ex);
+                }
+
+                raf = new RandomAccessFile(file, "rw");
+                
+                // The backing ByteBuffer.
+                final ByteBuffer b = buf.buffer();
+
+                // The capacity of that buffer (typically 1MB).
+                final int bufferCapacity = b.capacity();
+
+                // The size of the root blocks (which we skip).
+                final int headerSize = FileMetadata.headerSize0;
+
+                /*
+                 * The size of the file at the moment we begin. We will not
+                 * replicate data on new extensions of the file. Those data will
+                 * be captured by HALog files that are replayed by the service
+                 * that is doing the rebuild.
+                 */
+                final long fileExtent = getBufferStrategy().getExtent();
+
+                // The #of bytes to be transmitted.
+                final long totalBytes = fileExtent - headerSize;
+                
+                // The #of bytes remaining.
+                long remaining = totalBytes;
+                
+                // The offset from which data is retrieved.
+                long offset = headerSize;
+                
+                long sequence = 0L;
+                
+                if (haLog.isInfoEnabled())
+                    haLog.info("Writing snapshot: file=" + file + ", nbytes="
+                            + totalBytes);
+
+                while (remaining > 0) {
+
+                    int nbytes = (int) Math.min((long) bufferCapacity,
+                            remaining);
+                    
+                    if (sequence == 0L && nbytes == bufferCapacity
+                            && remaining > bufferCapacity) {
+                        
+                        /*
+                         * Adjust the first block so the remainder will be
+                         * aligned on the bufferCapacity boundaries (IO
+                         * efficiency).
+                         */
+                        nbytes -= headerSize;
+
+                    }
+
+                    if (haLog.isDebugEnabled())
+                        haLog.debug("Sending block: sequence=" + sequence
+                                + ", offset=" + offset + ", nbytes=" + nbytes);
+
+                    if(true) {
+                        /*
+                         * FIXME We have to actually read the block off of the
+                         * backing store and then write it onto the file
+                         * channel.
+                         * 
+                         * FIXME Make sure to write out empty root blocks first.
+                         * 
+                         * FIXME Skip over the root blocks before writing the
+                         * data blocks.
+                         * 
+                         * FIXME Write the root blocks afterwards, ideally with
+                         * the checksum of the data blocks.
+                         * 
+                         * FIXME Add compression.
+                         */
+                        throw new UnsupportedOperationException();
+                    }
+                    
+//                    FileChannelUtility.writeAll(opener, data, pos);
+//                    
+//                    final Future<?> snd = getBufferStrategy().sendRawBuffer(req, sequence,
+//                            quorumToken, fileExtent, offset, nbytes, b);
+//                    
+//                    snd.get(); // wait for data sent!
+
+                    remaining -= nbytes;
+                    
+                    offset += nbytes;
+
+                    sequence++;
+                    
+                }
+
+                if (haLog.isInfoEnabled())
+                    haLog.info("Sent store file: #blocks=" + sequence
+                            + ", #bytes=" + (fileExtent - headerSize));
+
+                // Done.
+                return currentRootBlock;
+
+            } finally {
+                
+                if (buf != null) {
+                    try {
+                        // Release the direct buffer.
+                        buf.release();
+                    } catch (InterruptedException e) {
+                        haLog.warn(e);
+                    }
+                }
+                
+                if (raf != null) {
+
+                    try {
+                        raf.close();
+                    } finally {
+                       // ignore.
+                    }
+                    
+                }
+                
+                // Release the read lock.
+                abort(txId);
+
+            }
+
+        }
+
+    } // class SendStoreTask
+    
     /**
      * {@inheritDoc}
      * <p>
@@ -973,12 +1194,12 @@ public class HAJournal extends Journal {
         /**
          * {@inheritDoc}
          * 
-         * TODO HA BACKUP: This method relies on the unisolated semaphore. That
-         * provides a sufficient guarantee for updates that original through the
-         * NSS since all such updates will eventually require the unisolated
-         * connection to execute. However, if we support multiple concurrent
-         * unisolated connections distinct KBs per the ticket below, then we
-         * will need to have a different global write lock - perhaps via the
+         * TODO This method relies on the unisolated semaphore. That provides a
+         * sufficient guarantee for updates that original through the NSS since
+         * all such updates will eventually require the unisolated connection to
+         * execute. However, if we support multiple concurrent unisolated
+         * connections distinct KBs per the ticket below, then we will need to
+         * have a different global write lock - perhaps via the
          * {@link WriteExecutorService}.
          * 
          * @see https://sourceforge.net/apps/trac/bigdata/ticket/566 (

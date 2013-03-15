@@ -502,7 +502,19 @@ public class AbstractHA3JournalServerTestCase extends
     protected File getServiceDir() {
     	return new File("benchmark/CI-HAJournal-1");
     }
-    
+
+    protected File getHAJournalFileA() {
+        return new File(getServiceDir(),"A/bigdata-ha.jnl");
+    }
+
+    protected File getHAJournalFileB() {
+        return new File(getServiceDir(),"B/bigdata-ha.jnl");
+    }
+
+    protected File getHAJournalFileC() {
+        return new File(getServiceDir(),"C/bigdata-ha.jnl");
+    }
+
     protected File getHALogDirA() {
     	return new File(getServiceDir(),"A/HALog");
     }
@@ -513,6 +525,18 @@ public class AbstractHA3JournalServerTestCase extends
     
     protected File getHALogDirC() {
     	return new File(getServiceDir(),"C/HALog");
+    }
+    
+    protected File getSnapshotDirA() {
+        return new File(getServiceDir(),"A/snapshot");
+    }
+    
+    protected File getSnapshotDirB() {
+        return new File(getServiceDir(),"B/snapshot");
+    }
+    
+    protected File getSnapshotDirC() {
+        return new File(getServiceDir(),"C/snapshot");
     }
     
    /**
