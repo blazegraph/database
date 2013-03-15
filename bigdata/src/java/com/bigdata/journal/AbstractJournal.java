@@ -5233,6 +5233,40 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 	}
 
     /**
+     * Return both root blocks (atomically - used by HA).
+     * <p>
+     * Note: This takes a lock to ensure that the root blocks are consistent
+     * with a commit point on the backing store.
+     */
+    protected IRootBlockView[] getRootBlocks() {
+
+        final Lock lock = _fieldReadWriteLock.readLock();
+        
+        lock.lock();
+
+        try {
+
+            final ChecksumUtility checker = ChecksumUtility.getCHK();
+            
+            final IRootBlockView rb0 = new RootBlockView(
+                    true/* rootBlock0 */, getBufferStrategy()
+                            .readRootBlock(true/* rootBlock0 */), checker);
+            
+            final IRootBlockView rb1 = new RootBlockView(
+                    false/* rootBlock0 */, getBufferStrategy()
+                            .readRootBlock(false/* rootBlock0 */), checker);
+            
+            return new IRootBlockView[] { rb0, rb1 };
+            
+        } finally {
+            
+            lock.unlock();
+            
+        }
+
+    }
+
+    /**
      * Implementation hooks into the various low-level operations required to
      * support HA for the journal.
      */
@@ -5997,40 +6031,6 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
             return new HARootBlockResponse(
                     AbstractJournal.this.getRootBlockView());
-
-        }
-
-        /**
-         * Return both root blocks (atomically).
-         * <p>
-         * Note: This takes a lock to ensure that the root blocks are consistent
-         * with a commit point on the backing store.
-         */
-        protected IRootBlockView[] getRootBlocks() {
-
-            final Lock lock = _fieldReadWriteLock.readLock();
-            
-            lock.lock();
-
-            try {
-
-                final ChecksumUtility checker = ChecksumUtility.getCHK();
-                
-                final IRootBlockView rb0 = new RootBlockView(
-                        true/* rootBlock0 */, getBufferStrategy()
-                                .readRootBlock(true/* rootBlock0 */), checker);
-                
-                final IRootBlockView rb1 = new RootBlockView(
-                        false/* rootBlock0 */, getBufferStrategy()
-                                .readRootBlock(false/* rootBlock0 */), checker);
-                
-                return new IRootBlockView[] { rb0, rb1 };
-                
-            } finally {
-                
-                lock.unlock();
-                
-            }
 
         }
 
