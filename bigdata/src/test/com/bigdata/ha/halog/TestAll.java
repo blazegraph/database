@@ -31,6 +31,8 @@ import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
 
+import com.bigdata.ha.althalog.TestAltHALogWriter;
+
 /**
  * Runs all tests for all journal implementations.
  * 
@@ -63,6 +65,8 @@ public class TestAll extends TestCase {
 
         // Test of HALogWriter and HALogReader.
         suite.addTestSuite(TestHALogWriter.class);
+
+        suite.addTestSuite(TestAltHALogWriter.class);
 
         return suite;
 
