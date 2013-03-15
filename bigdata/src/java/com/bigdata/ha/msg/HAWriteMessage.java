@@ -293,10 +293,13 @@ public class HAWriteMessage extends HAWriteMessageBase implements
 
 	public void writeExternal(final ObjectOutput out) throws IOException {
 		super.writeExternal(out);
-		out.write(currentVersion);
-        if (currentVersion >= VERSION1) {
+        if (currentVersion >= VERSION1 && uuid != null) {
+            out.write(currentVersion);
             out.writeLong(uuid.getMostSignificantBits());
             out.writeLong(uuid.getLeastSignificantBits());
+        } else {
+            // Note: Replay of an older log message.
+            out.write(VERSION0);
         }
 		out.writeByte(storeType.getType());
 		out.writeLong(commitCounter);
