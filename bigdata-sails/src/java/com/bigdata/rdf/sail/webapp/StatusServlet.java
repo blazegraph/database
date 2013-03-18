@@ -147,6 +147,13 @@ public class StatusServlet extends BigdataRDFServlet {
     static final String CANCEL_QUERY = "cancelQuery";
     
     /**
+     * Request a snapshot of the journal (HA only). The snapshot will be written
+     * into the configured directory on the server. If a snapshot is already
+     * being taken then this is a NOP.
+     */
+    static final String SNAPSHOT = "snapshot";
+
+    /**
      * Handles CANCEL requests (terminate a running query).
      */
     @Override
@@ -398,7 +405,7 @@ public class StatusServlet extends BigdataRDFServlet {
                             .isHighlyAvailable()) {
 
                 new HAStatusServletUtil(getIndexManager())
-                        .showQuorum(req, resp, current);
+                        .doGet(req, resp, current);
 
             }
             

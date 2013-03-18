@@ -311,6 +311,7 @@ public class HAJournal extends Journal {
 
         {
 
+            // Note: Default is relative to the serviceDir.
             haLogDir = (File) config
                     .getEntry(
                             HAJournalServer.ConfigurationOptions.COMPONENT,
@@ -549,7 +550,7 @@ public class HAJournal extends Journal {
      * @throws ExecutionException
      * @throws InterruptedException
      */
-    Future<IRootBlockView> takeSnapshotNow() throws Exception {
+    Future<IRootBlockView> takeSnapshotNow() {
 
         final FutureTask<IRootBlockView> ft = new FutureTaskMon<IRootBlockView>(
                 new SnapshotTask());
@@ -563,6 +564,11 @@ public class HAJournal extends Journal {
 
     /**
      * Take a snapshot.
+     * 
+     * TODO If possible, move this code to the {@link SnapshotManager} class.
+     * Both the {@link SnapshotManager} and the {@link HARestore} classes could
+     * be moved into the {@link Journal} package (and the {@link HARestore}
+     * class renamed since it would then be usable without the HAJournalServer).
      */
     private class SnapshotTask implements Callable<IRootBlockView> {
 
@@ -575,6 +581,14 @@ public class HAJournal extends Journal {
             final long token = getQuorumToken();
             
             if (!getQuorum().getClient().isJoinedMember(token)) {
+
+                /*
+                 * Note: The service must be joined with a met quorum to take a
+                 * snapshot. This is necessary in order to ensure that the
+                 * snapshots are copies of a journal state that the quorum
+                 * agrees on, otherwise we could later attempt to restore from
+                 * an invalid state.
+                 */
 
                 throw new QuorumException("Service not joined with met quorum");
 
@@ -599,12 +613,12 @@ public class HAJournal extends Journal {
             final IRootBlockView currentRootBlock = RootBlockUtility
                     .chooseRootBlock(rootBlocks[0], rootBlocks[1]);
 
-            // TODO It is a problem if this file exists and is not (logically)
-            // empty.
+            // TODO SNAPSHOT: It is a problem if this file exists and is not
+            // (logically) empty.
             final File file = getSnapshotManager().getSnapshotFile(
                     currentRootBlock.getCommitCounter());
 
-            // FIXME Modify to use GZip on outputStream.
+            // FIXME SNAPSHOT: Modify to use GZip on outputStream.
             IBufferAccess buf = null;
             RandomAccessFile raf = null;
             try {
@@ -672,21 +686,31 @@ public class HAJournal extends Journal {
                         haLog.debug("Sending block: sequence=" + sequence
                                 + ", offset=" + offset + ", nbytes=" + nbytes);
 
+                    if (!getQuorum().getClient().isJoinedMember(token)) {
+                        /*
+                         * Abort the snapshot if the service leaves the quorum
+                         * or if the quorum breaks.
+                         */
+                        throw new QuorumException(
+                                "Snapshot aborted: service not joined with met quorum.");
+                    }
+                    
                     if(true) {
                         /*
-                         * FIXME We have to actually read the block off of the
-                         * backing store and then write it onto the file
-                         * channel.
+                         * FIXME SNAPSHOT: We have to actually read the block
+                         * off of the backing store and then write it onto the
+                         * file channel.
                          * 
-                         * FIXME Make sure to write out empty root blocks first.
+                         * FIXME SNAPSHOT: Make sure to write out empty root
+                         * blocks first.
                          * 
-                         * FIXME Skip over the root blocks before writing the
-                         * data blocks.
+                         * FIXME SNAPSHOT: Skip over the root blocks before
+                         * writing the data blocks.
                          * 
-                         * FIXME Write the root blocks afterwards, ideally with
-                         * the checksum of the data blocks.
+                         * FIXME SNAPSHOT: Write the root blocks afterwards,
+                         * ideally with the checksum of the data blocks.
                          * 
-                         * FIXME Add compression.
+                         * FIXME SNAPSHOT: Add compression.
                          */
                         throw new UnsupportedOperationException();
                     }
@@ -706,6 +730,16 @@ public class HAJournal extends Journal {
                     
                 }
 
+                /*
+                 * FIXME SNAPSHOT: Lay down the root blocks.
+                 */
+                
+                if (!getQuorum().getClient().isJoinedMember(token)) {
+                    // Verify before putting down the root blocks.
+                    throw new QuorumException(
+                            "Snapshot aborted: service not joined with met quorum.");
+                }
+                
                 if (haLog.isInfoEnabled())
                     haLog.info("Sent store file: #blocks=" + sequence
                             + ", #bytes=" + (fileExtent - headerSize));

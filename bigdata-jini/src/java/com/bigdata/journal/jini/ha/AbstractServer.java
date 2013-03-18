@@ -1836,8 +1836,13 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
 
         if (runState.compareAndSet(RunState.Start, RunState.Running)) {
 
-            System.out.println("Service is running: class="
-                    + getClass().getName() + ", name=" + getServiceName());
+            {
+                final String msg = "Service is running: class="
+                        + getClass().getName() + ", name=" + getServiceName();
+                System.out.println(msg);
+                if (log.isInfoEnabled())
+                    log.info(msg);
+            }
 
             /*
              * Wait until the server is terminated.

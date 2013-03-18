@@ -36,8 +36,9 @@ import org.apache.zookeeper.KeeperException;
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.QuorumService;
 import com.bigdata.ha.halog.IHALogReader;
-import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.IIndexManager;
+import com.bigdata.journal.jini.ha.HAJournal;
+import com.bigdata.journal.jini.ha.SnapshotManager;
 import com.bigdata.quorum.zk.ZKQuorumImpl;
 import com.bigdata.zookeeper.DumpZookeeper;
 
@@ -76,14 +77,14 @@ public class HAStatusServletUtil {
      * 
      * @throws IOException
      */
-    public void showQuorum(final HttpServletRequest req,
+    public void doGet(final HttpServletRequest req,
             final HttpServletResponse resp, final XMLBuilder.Node current)
             throws IOException {
 
-        if (!(indexManager instanceof AbstractJournal))
+        if (!(indexManager instanceof HAJournal))
             return;
 
-        final AbstractJournal journal = (AbstractJournal) indexManager;
+        final HAJournal journal = (HAJournal) indexManager;
 
         final ZKQuorumImpl<HAGlue, QuorumService<HAGlue>> quorum = (ZKQuorumImpl<HAGlue, QuorumService<HAGlue>>) journal
                 .getQuorum();
@@ -135,8 +136,8 @@ public class HAStatusServletUtil {
             {
                 final File file = journal.getFile();
                 if (file != null) {
-                    p.text("DataDir: path=" + file.getParent())
-                            .node("br").close();
+                    p.text("journal: file=" + file + ", nbytes="
+                            + journal.size()).node("br").close();
                 }
             }
 
@@ -163,6 +164,71 @@ public class HAStatusServletUtil {
                         + nbytes + ", path=" + haLogDir).node("br")
                         .close();
             }
+
+            /*
+             * Report #of files and bytes in the snapshot directory.
+             */
+            {
+                final File snapshotDir = ((HAJournal) journal)
+                        .getSnapshotManager().getSnapshotDir();
+                final File[] a = snapshotDir.listFiles(new FilenameFilter() {
+                    @Override
+                    public boolean accept(File dir, String name) {
+                        return name.endsWith(SnapshotManager.SNAPSHOT_EXT);
+                    }
+                });
+                int nfiles = 0;
+                long nbytes = 0L;
+                for (File file : a) {
+                    nbytes += file.length();
+                    nfiles++;
+                }
+                p.text("SnapshotDir: nfiles=" + nfiles + ", nbytes=" + nbytes
+                        + ", path=" + snapshotDir).node("br").close();
+            }
+
+            /*
+             * If requested, conditional start a snapshot.
+             */
+            {
+                final String val = req.getParameter(StatusServlet.SNAPSHOT);
+
+                if (val != null) {
+
+                    /*
+                     * Attempt to interpret the parameter as a percentage
+                     * (expressed as an integer).
+                     * 
+                     * Note: The default threshold will trigger a snapshot
+                     * regardless of the size of the journal and the #of HALog
+                     * files. A non-default value of 100 will trigger the
+                     * snapshot if the HALog files occupy as much space on the
+                     * disk as the Journal. Other values may be used as
+                     * appropriate.
+                     */
+                    int percentLogSize = 0;
+                    try {
+                        percentLogSize = Integer.parseInt(val);
+                    } catch (NumberFormatException ex) {
+                        // ignore.
+                    }
+
+                    ((HAJournal) journal).getSnapshotManager().takeSnapshot(
+                            percentLogSize);
+
+                }
+                
+             }
+            
+            /*
+             * Report if a snapshot is currently running.
+             */
+            if (journal.getSnapshotManager().getSnapshotFuture() != null) {
+
+                p.text("Snapshot running.").node("br").close();
+                
+            }
+            
             p.close();
 
             current.node("pre", quorum.toString());

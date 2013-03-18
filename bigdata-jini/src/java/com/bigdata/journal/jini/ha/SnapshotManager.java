@@ -1,3 +1,26 @@
+/**
+
+Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
+
+Contact:
+     SYSTAP, LLC
+     4501 Tower Road
+     Greensboro, NC 27410
+     licenses@bigdata.com
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; version 2 of the License.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+*/
 package com.bigdata.journal.jini.ha;
 
 import java.io.File;
@@ -7,6 +30,9 @@ import java.io.RandomAccessFile;
 import java.nio.channels.FileChannel;
 import java.util.Formatter;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 import net.jini.config.Configuration;
 import net.jini.config.ConfigurationException;
@@ -64,6 +90,18 @@ public class SnapshotManager {
      * index MUST be synchronized on its object monitor.
      */
     private final CommitTimeIndex snapshotIndex;
+
+    /**
+     * Lock used to guard the decision to take a snapshot.
+     */
+    private final Lock lock = new ReentrantLock();
+
+    /**
+     * The {@link Future} of the current snapshot (if any).
+     * <p>
+     * This field is guarded by the {@link #lock}.
+     */
+    private Future<IRootBlockView> snapshotFuture = null;
     
     /**
      * Return the {@link ISnapshotPolicy}.
@@ -114,6 +152,7 @@ public class SnapshotManager {
         // Note: This is the effective service directory.
         final File serviceDir = server.getServiceDir(); 
 
+        // Note: Default is relative to the serviceDir.
         snapshotDir = (File) config
                 .getEntry(
                         HAJournalServer.ConfigurationOptions.COMPONENT,
@@ -309,36 +348,93 @@ public class SnapshotManager {
         return true;
 
     }
-    
+
+    /**
+     * Return the {@link Future} of the current snapshot operation (if any).
+     * 
+     * @return The {@link Future} of the current snapshot operation -or-
+     *         <code>null</code> if there is no snapshot operation running.
+     */
+    public Future<IRootBlockView> getSnapshotFuture() {
+
+        lock.lock();
+
+        try {
+
+            if (snapshotFuture != null) {
+
+                if (!snapshotFuture.isDone()) {
+
+                    // Still running.
+                    return snapshotFuture;
+
+                }
+
+                snapshotFuture = null;
+
+            }
+
+            return snapshotFuture;
+
+        } finally {
+
+            lock.unlock();
+
+        }
+
+    }
+
     /**
      * Take a new snapshot. This is a NOP if a snapshot is already being made.
+     * 
+     * @return The {@link Future} if a snapshot is already being made -or- if a
+     *         snapshot was started by the request and <code>null</code> if no
+     *         snapshot will be taken in response to this request.
      * 
      * @throws Exception
      * @throws ExecutionException
      * @throws InterruptedException
      */
-    // TODO Could return Future. More useful.
-    public boolean takeSnapshot(final int percentLogSize)
-            throws InterruptedException, ExecutionException, Exception {
+    public Future<IRootBlockView> takeSnapshot(final int percentLogSize) {
 
-        /*
-         * FIXME If already running, then return immediately. Use lock, etc.
-         * 
-         * FIXME lock should also cause purge of snapshots to be deleted if we
-         * are in the middle of making a decision about whether or not to make a
-         * new snapshot.
-         */
+        lock.lock();
+        
+        try {
 
-        if (!isReadyToSnapshot(percentLogSize)) {
+            if (snapshotFuture != null) {
 
-            return false;
+                if (!snapshotFuture.isDone()) {
+
+                    // Still running.
+                    return snapshotFuture;
+
+                }
+
+                snapshotFuture = null;
+
+            }
+
+            /*
+             * FIXME lock should also cause purge of snapshots to be deleted if
+             * we are in the middle of making a decision about whether or not to
+             * make a new snapshot.
+             */
+
+            if (!isReadyToSnapshot(percentLogSize)) {
+
+                // Pre-conditions are not met.
+                return null;
+
+            }
+
+            // Take the snapshot, return Future but save a reference.
+            return snapshotFuture = journal.takeSnapshotNow();
+
+        } finally {
+
+            lock.unlock();
 
         }
-
-        // Take the snapshot. Wait for the Future.
-        journal.takeSnapshotNow().get();
-        
-        return true;
 
     }
 
@@ -415,9 +511,26 @@ public class SnapshotManager {
      * snapshot. If the size(halogs) as a percentage of the size(journal) is LTE
      * the given [percentLogSize], then we return [false] to indicate that no
      * snapshot should be taken.
+     * <p>
+     * Note: The service must be joined with a met quorum to take a snapshot.
+     * This is checked here and also in HAJournal when we take the snapshot.
+     * This is necessary in order to ensure that the snapshots are copies of a
+     * journal state that the quorum agrees on, otherwise we could later attempt
+     * to restore from an invalid state.
      */
     private boolean isReadyToSnapshot(final int percentLogSize) {
 
+        final long token = journal.getQuorum().token();
+        
+        if (!journal.getQuorum().getClient().isJoinedMember(token)) {
+
+            haLog.warn("Service not joined with met quorum.");
+            
+            // This service is not joined with a met quorum.
+            return false;
+            
+        }
+        
         final long snapshotCommitCounter = getMostRecentSnapshotCommitCounter();
 
         /*

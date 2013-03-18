@@ -25,9 +25,12 @@ package com.bigdata.journal.jini.ha;
 
 import java.lang.ref.WeakReference;
 import java.util.Calendar;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.log4j.Logger;
+
+import com.bigdata.journal.IRootBlockView;
 
 /**
  * Policy schedules a snapshot at the same time each day. A threshold is used to
@@ -113,10 +116,23 @@ public class DefaultSnapshotPolicy implements ISnapshotPolicy {
 
                 final HAJournal jnl = ref.get();
 
-                if (jnl == null)
-                    return;
+                if (jnl == null) {
 
-                jnl.getSnapshotManager().takeSnapshot(percentLogSize);
+                    // Journal reference has been cleared.
+                    return;
+                    
+                }
+
+                // Conditionally start a snapshot.
+                final Future<IRootBlockView> f = jnl.getSnapshotManager()
+                        .takeSnapshot(percentLogSize);
+
+                if (f != null) {
+
+                    // Wait for the snapshot to complete.
+                    f.get();
+
+                }
 
             } catch (Throwable t) {
                 

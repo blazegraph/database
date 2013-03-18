@@ -5135,7 +5135,32 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
     }
     
     /**
+     * Local commit protocol (HA, offline).
+     * <p>
+     * Note: This is used to support RESTORE by replay of HALog files when
+     * the HAJournalServer is offline.
+     * 
+     * TODO This method should be protected.  If we move the HARestore class
+     * into this package, then it can be changed from public to protected or
+     * package private.
+     */
+    final public void doLocalCommit(final IRootBlockView rootBlock) {
+     
+        doLocalCommit(null/* localService */, rootBlock);
+        
+    }
+
+    /**
      * Local commit protocol (HA).
+     * 
+     * @param localService
+     *            For HA modes only. When non-<code>null</code>, this is used to
+     *            identify whether the service is the leader. When the service
+     *            is not the leader, we need to do some additional work to
+     *            maintain the {@link IRWStrategy} allocators in synch at each
+     *            commit point.
+     * @param rootBlock
+     *            The new root block.
      */
     protected void doLocalCommit(final QuorumService<HAGlue> localService,
             final IRootBlockView rootBlock) {
@@ -5155,8 +5180,8 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
             // set the new root block.
             _rootBlock = rootBlock;
 
-            final boolean leader = localService.isLeader(rootBlock
-                    .getQuorumToken());
+            final boolean leader = localService == null ? false : localService
+                    .isLeader(rootBlock.getQuorumToken());
 
             if (!leader) {
 
@@ -5167,7 +5192,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                  * be updating the allocators.
                  */
 
-                if (haLog.isInfoEnabled())
+                if (haLog.isInfoEnabled() && localService != null)
                     haLog.info("Reset from root block: serviceUUID="
                             + localService.getServiceId());
 

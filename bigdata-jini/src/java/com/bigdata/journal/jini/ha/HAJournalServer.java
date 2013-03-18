@@ -3291,8 +3291,12 @@ public class HAJournalServer extends AbstractServer {
             serviceURL = new URL("http", hostAddr, actualPort, ""/* file */)
                     .toExternalForm();
 
-            System.out.println("logicalServiceZPath: " + logicalServiceZPath);
-            System.out.println("serviceURL: " + serviceURL);
+            final String msg = "logicalServiceZPath: " + logicalServiceZPath
+                    + "\n" + "serviceURL: " + serviceURL;
+            
+            System.out.println(msg);
+            if (log.isInfoEnabled())
+                log.info(msg);
 
         }
 
