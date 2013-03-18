@@ -29,6 +29,7 @@ import java.rmi.Remote;
 import java.security.DigestException;
 import java.security.NoSuchAlgorithmException;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import com.bigdata.ha.msg.IHADigestRequest;
@@ -41,6 +42,8 @@ import com.bigdata.ha.msg.IHARootBlockResponse;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.ITransactionService;
 import com.bigdata.journal.Journal;
+import com.bigdata.quorum.AsynchronousQuorumCloseException;
+import com.bigdata.quorum.QuorumException;
 import com.bigdata.service.IService;
 
 /**
@@ -89,6 +92,29 @@ public interface HAGlue extends HAGlueBase, HAPipelineGlue, HAReadGlue,
      */
     public Future<Void> enterErrorState() throws IOException;
     
+    /**
+     * Await the service being ready to partitipate in an HA quorum. The
+     * preconditions include:
+     * <ol>
+     * <li>receiving notice of the quorum token via
+     * {@link #setQuorumToken(long)}</li>
+     * <li>The service is joined with the met quorum for that token</li>
+     * <li>If the service is a follower and it's local root blocks were at
+     * <code>commitCounter:=0</code>, then the root blocks from the leader have
+     * been installed on the follower.</li>
+     * <ol>
+     * 
+     * @param timeout
+     *            The timeout to await this condition.
+     * @param units
+     *            The units for that timeout.
+     *            
+     * @return the quorum token for which the service became HA ready.
+     */
+    public long awaitHAReady(long timeout, TimeUnit unit) throws IOException,
+            InterruptedException, TimeoutException, QuorumException,
+            AsynchronousQuorumCloseException;
+
     /*
      * Synchronization.
      * 

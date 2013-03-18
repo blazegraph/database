@@ -154,6 +154,13 @@ public class StatusServlet extends BigdataRDFServlet {
     static final String SNAPSHOT = "snapshot";
 
     /**
+     * Special HA status request designed for clients that poll to determine the
+     * status of an HAJournalServer. This option is exclusive of other
+     * parameters.
+     */
+    static final String HA = "HA";
+
+    /**
      * Handles CANCEL requests (terminate a running query).
      */
     @Override
@@ -286,6 +293,15 @@ public class StatusServlet extends BigdataRDFServlet {
     protected void doGet(final HttpServletRequest req,
             final HttpServletResponse resp) throws IOException {
 
+        if (req.getParameter(HA) != null
+                && getIndexManager() instanceof AbstractJournal
+                && ((AbstractJournal) getIndexManager()).isHighlyAvailable()) {
+
+            new HAStatusServletUtil(getIndexManager()).doHAStatus(req, resp);
+
+            return;
+        }
+        
         // IRunningQuery objects currently running on the query controller.
         final boolean showQueries = req.getParameter(SHOW_QUERIES) != null;
 

@@ -27,6 +27,8 @@ import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -39,6 +41,8 @@ import com.bigdata.ha.halog.IHALogReader;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.jini.ha.HAJournal;
 import com.bigdata.journal.jini.ha.SnapshotManager;
+import com.bigdata.quorum.AsynchronousQuorumCloseException;
+import com.bigdata.quorum.Quorum;
 import com.bigdata.quorum.zk.ZKQuorumImpl;
 import com.bigdata.zookeeper.DumpZookeeper;
 
@@ -378,5 +382,71 @@ public class HAStatusServletUtil {
         return -1;
 
     }
-    
+
+    /**
+     * Special reporting request for HA status.
+     * 
+     * @param req
+     * @param resp
+     * @throws TimeoutException
+     * @throws InterruptedException
+     * @throws AsynchronousQuorumCloseException
+     * @throws IOException
+     */
+    public void doHAStatus(HttpServletRequest req, HttpServletResponse resp)
+            throws IOException {
+
+        if (!(indexManager instanceof HAJournal))
+            return;
+
+        final HAJournal journal = (HAJournal) indexManager;
+
+        final ZKQuorumImpl<HAGlue, QuorumService<HAGlue>> quorum = (ZKQuorumImpl<HAGlue, QuorumService<HAGlue>>) journal
+                .getQuorum();
+
+//        // The current token.
+//        final long quorumToken = quorum.token();
+//
+//        // The last valid token.
+//        final long lastValidToken = quorum.lastValidToken();
+//
+//        final int njoined = quorum.getJoined().length;
+
+        final QuorumService<HAGlue> quorumService = quorum.getClient();
+
+        // check, but do not wait.
+        long haReadyToken = Quorum.NO_QUORUM;
+        try {
+            haReadyToken = journal.awaitHAReady(0/* timeout */,
+                    TimeUnit.NANOSECONDS/* units */);
+        } catch (TimeoutException ex) {
+            // ignore.
+        } catch (AsynchronousQuorumCloseException e) {
+            // ignore.
+        } catch (InterruptedException e) {
+            // propagate the interrupt.
+            Thread.currentThread().interrupt();
+        }
+        
+        final String content;
+        if (haReadyToken != Quorum.NO_QUORUM) {
+            if (quorumService.isLeader(haReadyToken)) {
+                content = "Leader";
+            } else if (quorumService.isFollower(haReadyToken)) {
+                content = "Follower";
+            } else {
+                content = "NotReady";
+            }
+        } else {
+            content = "NotReady";
+        }
+        // TODO Alternatively "max-age=1" for max-age in seconds.
+        resp.addHeader("Cache-Control", "no-cache");
+        BigdataRDFServlet.buildResponse(resp, BigdataRDFServlet.HTTP_OK,
+                BigdataRDFServlet.MIME_TEXT_PLAIN, content);
+
+        return;
+
+    }
+
 }
