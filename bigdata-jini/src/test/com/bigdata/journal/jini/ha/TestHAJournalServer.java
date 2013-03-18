@@ -36,7 +36,8 @@ import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.msg.HADigestRequest;
 
 /**
- * Life cycle and related tests for a single remote {@link HAJournalServer}.
+ * Life cycle and related tests for a single remote {@link HAJournalServer} out
+ * of a quorum of 3. The quorum will not meet for these unit tests.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
