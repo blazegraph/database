@@ -703,6 +703,17 @@ public class HAJournal extends Journal {
 
                     log.error("Could not rename " + tmp + " as " + file);
 
+                } else {
+                    
+                    // Add to the set of known snapshots.
+                    getSnapshotManager().addSnapshot(file);
+                    
+                    /*
+                     * FIXME This is where we need to see whether or not we can
+                     * release an earlier snapshot and the intervening HALog
+                     * files.
+                     */
+                    
                 }
 
             } else {
