@@ -4851,6 +4851,9 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
         
         final long oldValue = quorumToken;
 
+        if (haLog.isInfoEnabled())
+            haLog.info("oldValue=" + oldValue + ", newToken=" + newValue);
+
         if (oldValue == newValue) {
          
             // No change.
@@ -4858,9 +4861,6 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
             
         }
         
-        if (haLog.isInfoEnabled())
-            haLog.info("oldValue=" + oldValue + ", newToken=" + newValue);
-
         final boolean didBreak;
         final boolean didMeet;
 
@@ -5018,6 +5018,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
                 }
                 
+                log.warn("SIGNAL READY TOKEN: " + haReadyToken);
                 // signal HAReady condition.
                 haReadyCondition.signalAll();
                 
@@ -5105,10 +5106,11 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
             // remaining = nanos - (now - begin) [aka elapsed]
             remaining = nanos - (System.nanoTime() - begin);
             long t = Quorum.NO_QUORUM;
-            while (((t = haReadyToken) != Quorum.NO_QUORUM)
+            while (((t = haReadyToken) == Quorum.NO_QUORUM)
                     && getQuorum().getClient() != null && remaining > 0) {
                 if (!haReadyCondition.await(remaining, TimeUnit.NANOSECONDS))
                     throw new TimeoutException();
+                
                 remaining = nanos - (System.nanoTime() - begin);
             }
             final QuorumService<?> client = getQuorum().getClient();
