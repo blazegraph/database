@@ -71,13 +71,20 @@ public class FileMetadata {
 	/**
 	 * Magic value for journal (the root blocks have their own magic value).
 	 */
-	final int MAGIC = 0xe6b4c275;
+	public static final int MAGIC = 0xe6b4c275;
 
 	/**
-	 * Journal version number (version 1). @todo What relation is there between
-	 * this and version info in the root blocks?
+	 * The original journal version number (version 1).
 	 */
-	final int VERSION1 = 0x1;
+	public static final int VERSION1 = 0x1;
+
+	/**
+     * The current journal version number.
+     * <p>
+     * Note: This could be used to create major versioning changes of the file
+     * structure. There is only one version to date.
+     */
+	public static final int CURRENT_VERSION = VERSION1;
 
 	/**
 	 * The file that was opened.
@@ -706,7 +713,7 @@ public class FileMetadata {
 
 			magic = MAGIC;
 
-			version = VERSION1;
+			version = CURRENT_VERSION;
 
 			if (!temporary) {
 
@@ -722,7 +729,7 @@ public class FileMetadata {
 				 */
 				raf.seek(0);
 				raf.writeInt(MAGIC);
-				raf.writeInt(VERSION1);
+				raf.writeInt(version);
 
 			}
 
