@@ -26,8 +26,9 @@ package com.bigdata.journal.jini.ha;
 import java.io.File;
 import java.io.FileFilter;
 import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.RandomAccessFile;
+import java.io.OutputStream;
 import java.io.Serializable;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
@@ -48,6 +49,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.zip.GZIPOutputStream;
 
 import net.jini.config.Configuration;
 import net.jini.config.ConfigurationException;
@@ -59,6 +61,7 @@ import net.jini.jeri.tcp.TcpServerEndpoint;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.btree.BytesUtil;
 import com.bigdata.concurrent.FutureTaskMon;
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.QuorumService;
@@ -573,6 +576,7 @@ public class HAJournal extends Journal {
     private class SnapshotTask implements Callable<IRootBlockView> {
 
         public SnapshotTask() {
+            
         }
         
         public IRootBlockView call() throws Exception {
@@ -613,165 +617,100 @@ public class HAJournal extends Journal {
             final IRootBlockView currentRootBlock = RootBlockUtility
                     .chooseRootBlock(rootBlocks[0], rootBlocks[1]);
 
-            // TODO SNAPSHOT: It is a problem if this file exists and is not
-            // (logically) empty.
             final File file = getSnapshotManager().getSnapshotFile(
                     currentRootBlock.getCommitCounter());
 
-            // FIXME SNAPSHOT: Modify to use GZip on outputStream.
-            IBufferAccess buf = null;
-            RandomAccessFile raf = null;
+            if (file.exists() && file.length() != 0L) {
+
+                /*
+                 * Snapshot exists and is not (logically) empty.
+                 * 
+                 * TODO Make sure that we do not attempt to re-generate a
+                 * snapshot if we already have one for the same commit point. If
+                 * somebody wants to generate a new one for that commit point,
+                 * they need to remove the old one first.
+                 */
+                
+                throw new IOException("File exists: " + file);
+                
+            }
+
+            /*
+             * Create a temporary file. We will write the snapshot here. The
+             * file will be renamed onto the target file name iff the snapshot
+             * is successfully written.
+             */
+            final File tmp = File.createTempFile("snapshot", ".tmp",
+                    file.getParentFile());
+
+            OutputStream os = null;
+            boolean success = false;
             try {
 
-                try {
-                    // Acquire a buffer.
-                    buf = DirectBufferPool.INSTANCE.acquire();
-                } catch (InterruptedException ex) {
-                    // Wrap and re-throw.
-                    throw new IOException(ex);
+                os = new GZIPOutputStream(new FileOutputStream(tmp));
+
+                // root block 0
+                os.write(BytesUtil.toArray(rootBlocks[0].asReadOnlyBuffer()));
+
+                // root block 1
+                os.write(BytesUtil.toArray(rootBlocks[1].asReadOnlyBuffer()));
+
+                // and the data.
+                ((IHABufferStrategy) getBufferStrategy()).writeOnStream(os,
+                        getQuorum(), token);
+
+                // flush the output stream.
+                os.flush();
+
+                // done.
+                success = true;
+                
+            } finally {
+                
+                // Release the read lock.
+                abort(txId);
+
+                if (os != null) {
+                    try {
+                        os.close();
+                    } finally {
+                       // ignore.
+                    }
                 }
-
-                raf = new RandomAccessFile(file, "rw");
                 
-                // The backing ByteBuffer.
-                final ByteBuffer b = buf.buffer();
+            }
 
-                // The capacity of that buffer (typically 1MB).
-                final int bufferCapacity = b.capacity();
+            /*
+             * Either rename the temporary file onto the target filename or
+             * delete the tempoary file. The snapshot is not considered to
+             * be valid until it is found under the appropriate name.
+             */
+            if (success) {
 
-                // The size of the root blocks (which we skip).
-                final int headerSize = FileMetadata.headerSize0;
-
-                /*
-                 * The size of the file at the moment we begin. We will not
-                 * replicate data on new extensions of the file. Those data will
-                 * be captured by HALog files that are replayed by the service
-                 * that is doing the rebuild.
-                 */
-                final long fileExtent = getBufferStrategy().getExtent();
-
-                // The #of bytes to be transmitted.
-                final long totalBytes = fileExtent - headerSize;
-                
-                // The #of bytes remaining.
-                long remaining = totalBytes;
-                
-                // The offset from which data is retrieved.
-                long offset = headerSize;
-                
-                long sequence = 0L;
-                
-                if (haLog.isInfoEnabled())
-                    haLog.info("Writing snapshot: file=" + file + ", nbytes="
-                            + totalBytes);
-
-                while (remaining > 0) {
-
-                    int nbytes = (int) Math.min((long) bufferCapacity,
-                            remaining);
-                    
-                    if (sequence == 0L && nbytes == bufferCapacity
-                            && remaining > bufferCapacity) {
-                        
-                        /*
-                         * Adjust the first block so the remainder will be
-                         * aligned on the bufferCapacity boundaries (IO
-                         * efficiency).
-                         */
-                        nbytes -= headerSize;
-
-                    }
-
-                    if (haLog.isDebugEnabled())
-                        haLog.debug("Sending block: sequence=" + sequence
-                                + ", offset=" + offset + ", nbytes=" + nbytes);
-
-                    if (!getQuorum().getClient().isJoinedMember(token)) {
-                        /*
-                         * Abort the snapshot if the service leaves the quorum
-                         * or if the quorum breaks.
-                         */
-                        throw new QuorumException(
-                                "Snapshot aborted: service not joined with met quorum.");
-                    }
-                    
-                    if(true) {
-                        /*
-                         * FIXME SNAPSHOT: We have to actually read the block
-                         * off of the backing store and then write it onto the
-                         * file channel.
-                         * 
-                         * FIXME SNAPSHOT: Make sure to write out empty root
-                         * blocks first.
-                         * 
-                         * FIXME SNAPSHOT: Skip over the root blocks before
-                         * writing the data blocks.
-                         * 
-                         * FIXME SNAPSHOT: Write the root blocks afterwards,
-                         * ideally with the checksum of the data blocks.
-                         * 
-                         * FIXME SNAPSHOT: Add compression.
-                         */
-                        throw new UnsupportedOperationException();
-                    }
-                    
-//                    FileChannelUtility.writeAll(opener, data, pos);
-//                    
-//                    final Future<?> snd = getBufferStrategy().sendRawBuffer(req, sequence,
-//                            quorumToken, fileExtent, offset, nbytes, b);
-//                    
-//                    snd.get(); // wait for data sent!
-
-                    remaining -= nbytes;
-                    
-                    offset += nbytes;
-
-                    sequence++;
-                    
-                }
-
-                /*
-                 * FIXME SNAPSHOT: Lay down the root blocks.
-                 */
-                
                 if (!getQuorum().getClient().isJoinedMember(token)) {
                     // Verify before putting down the root blocks.
                     throw new QuorumException(
                             "Snapshot aborted: service not joined with met quorum.");
                 }
                 
-                if (haLog.isInfoEnabled())
-                    haLog.info("Sent store file: #blocks=" + sequence
-                            + ", #bytes=" + (fileExtent - headerSize));
+                if (!tmp.renameTo(file)) {
 
-                // Done.
-                return currentRootBlock;
+                    log.error("Could not rename " + tmp + " as " + file);
 
-            } finally {
-                
-                if (buf != null) {
-                    try {
-                        // Release the direct buffer.
-                        buf.release();
-                    } catch (InterruptedException e) {
-                        haLog.warn(e);
-                    }
                 }
-                
-                if (raf != null) {
 
-                    try {
-                        raf.close();
-                    } finally {
-                       // ignore.
-                    }
+            } else {
+
+                if (!tmp.delete()) {
+
+                    log.warn("Could not delete temporary file: " + tmp);
                     
                 }
-                
-                // Release the read lock.
-                abort(txId);
 
             }
+            
+            // Done.
+            return currentRootBlock;
 
         }
 

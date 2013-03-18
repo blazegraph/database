@@ -28,12 +28,15 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.journal;
 
 import java.io.IOException;
+import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.security.DigestException;
 import java.security.MessageDigest;
 import java.util.UUID;
 import java.util.concurrent.Future;
 
+import com.bigdata.ha.HAGlue;
+import com.bigdata.ha.QuorumService;
 import com.bigdata.ha.msg.HARebuildRequest;
 import com.bigdata.ha.msg.IHALogRequest;
 import com.bigdata.ha.msg.IHARebuildRequest;
@@ -42,6 +45,7 @@ import com.bigdata.io.IBufferAccess;
 import com.bigdata.io.writecache.WriteCache;
 import com.bigdata.io.writecache.WriteCacheService;
 import com.bigdata.quorum.Quorum;
+import com.bigdata.quorum.QuorumException;
 
 /**
  * A highly available {@link IBufferStrategy}.
@@ -208,16 +212,34 @@ public interface IHABufferStrategy extends IBufferStrategy {
 	void writeRawBuffer(HARebuildRequest req, IHAWriteMessage msg,
 			ByteBuffer transfer) throws IOException;
 
-//	/**
-//	 * Sets strategy to be ready to rebuild store
-//	 * @param req
-//	 */
-//	void prepareForRebuild(HARebuildRequest req);
-//
-//	/**
-//	 * Informs strategy to reload from rebuilt store
-//	 * @param req
-//	 */
-//	void completeRebuild(HARebuildRequest req, IRootBlockView rbv);
+    /**
+     * Write a consistent snapshot of the committed state of the backing store.
+     * This method writes all data starting after the root blocks. The caller is
+     * responsible for putting down the root blocks themselves.
+     * <p>
+     * Note: The caller is able to obtain both root blocks atomically, while the
+     * strategy may not be aware of the root blocks or may not be able to
+     * coordinate their atomic capture.
+     * <p>
+     * Note: The caller must ensure that the resulting snapshot will be
+     * consistent either by ensuring that no writes occur or by taking a
+     * read-lock that will prevent overwrites of committed state during this
+     * operation.
+     * 
+     * @param os
+     *            Where to write the data.
+     * @param quorum
+     *            The {@link Quorum}.
+     * @param token
+     *            The token that must remain valid during this operation.
+     * 
+     * @throws IOException
+     * @throws QuorumException
+     *             if the service is not joined with the met quorum for that
+     *             token at any point during the operation.
+     */
+    void writeOnStream(OutputStream os,
+            Quorum<HAGlue, QuorumService<HAGlue>> quorum, long token)
+            throws IOException, QuorumException;
 
 }

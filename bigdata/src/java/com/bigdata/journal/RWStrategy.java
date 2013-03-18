@@ -27,6 +27,7 @@ package com.bigdata.journal;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.security.DigestException;
@@ -38,7 +39,9 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.cache.ConcurrentWeakValueCache;
 import com.bigdata.counters.CounterSet;
+import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.QuorumRead;
+import com.bigdata.ha.QuorumService;
 import com.bigdata.ha.msg.HARebuildRequest;
 import com.bigdata.ha.msg.IHALogRequest;
 import com.bigdata.ha.msg.IHARebuildRequest;
@@ -46,6 +49,7 @@ import com.bigdata.ha.msg.IHAWriteMessage;
 import com.bigdata.io.IBufferAccess;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.quorum.Quorum;
+import com.bigdata.quorum.QuorumException;
 import com.bigdata.rawstore.AbstractRawStore;
 import com.bigdata.rawstore.IAddressManager;
 import com.bigdata.rawstore.IAllocationContext;
@@ -667,6 +671,15 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy,
         return m_store.sendRawBuffer(req, /* commitCounter, commitTime, */
                 sequence, quorumToken, fileExtent, offset, nbytes, b);
         
+    }
+    
+    @Override
+    public void writeOnStream(final OutputStream os,
+            final Quorum<HAGlue, QuorumService<HAGlue>> quorum, final long token)
+            throws IOException, QuorumException {
+
+        m_store.writeOnStream(os, quorum, token);
+
     }
 
     @Override

@@ -1,7 +1,6 @@
 package com.bigdata.rwstore;
 
 import com.bigdata.journal.IBufferStrategy;
-import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.RWStrategy;
 import com.bigdata.rawstore.IAllocationManagerStore;
 import com.bigdata.rwstore.sector.MemStrategy;
