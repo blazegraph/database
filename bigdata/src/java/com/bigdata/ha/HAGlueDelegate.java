@@ -30,10 +30,9 @@ import java.security.DigestException;
 import java.security.NoSuchAlgorithmException;
 import java.util.UUID;
 import java.util.concurrent.Future;
-import java.util.concurrent.FutureTask;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
-import com.bigdata.concurrent.FutureTaskMon;
 import com.bigdata.ha.msg.IHA2PhaseAbortMessage;
 import com.bigdata.ha.msg.IHA2PhaseCommitMessage;
 import com.bigdata.ha.msg.IHA2PhasePrepareMessage;
@@ -56,6 +55,8 @@ import com.bigdata.ha.msg.IHAWriteMessage;
 import com.bigdata.ha.msg.IHAWriteSetStateRequest;
 import com.bigdata.ha.msg.IHAWriteSetStateResponse;
 import com.bigdata.journal.ValidationError;
+import com.bigdata.quorum.AsynchronousQuorumCloseException;
+import com.bigdata.quorum.QuorumException;
 
 /**
  * Delegation pattern.
@@ -245,6 +246,13 @@ public class HAGlueDelegate implements HAGlue {
     public IHAWriteSetStateResponse getHAWriteSetState(
             IHAWriteSetStateRequest req) throws IOException {
         return delegate.getHAWriteSetState(req);
+    }
+
+    @Override
+    public long awaitHAReady(long timeout, TimeUnit unit) throws IOException,
+            InterruptedException, QuorumException,
+            AsynchronousQuorumCloseException, TimeoutException {
+        return delegate.awaitHAReady(timeout, unit);
     }
 
 }

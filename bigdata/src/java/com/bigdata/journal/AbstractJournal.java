@@ -58,6 +58,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock.ReadLock;
@@ -130,8 +131,10 @@ import com.bigdata.journal.Name2Addr.Entry;
 import com.bigdata.journal.jini.ha.HAJournal;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.JournalMetadata;
+import com.bigdata.quorum.AsynchronousQuorumCloseException;
 import com.bigdata.quorum.Quorum;
 import com.bigdata.quorum.QuorumActor;
+import com.bigdata.quorum.QuorumException;
 import com.bigdata.quorum.QuorumMember;
 import com.bigdata.rawstore.IAllocationContext;
 import com.bigdata.rawstore.IAllocationManagerStore;
@@ -4930,6 +4933,11 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                  * we have to wait until we observe that to cast a new vote.
                  */
                 
+                haReadyToken = Quorum.NO_QUORUM;
+
+                // signal HAReady condition.
+                haReadyCondition.signalAll();
+                
             } else if (didMeet) {
 
                 quorumToken = newValue;
@@ -4938,45 +4946,60 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                 final QuorumService<HAGlue> localService = quorum.getClient();
 
                 boolean installedRBs = false;
-                
-                if (_rootBlock.getCommitCounter() == 0L
-                        && localService.isFollower(quorumToken)) {
 
-                    /*
-                     * Take the root blocks from the quorum leader and use them.
-                     */
-                    
-                    // Remote interface for the quorum leader.
-                    final HAGlue leader = localService.getLeader(quorumToken);
+                if (localService.isFollower(quorumToken)) {
 
-                    log.info("Fetching root block from leader.");
-                    final IRootBlockView leaderRB;
-                    try {
-                        leaderRB = leader.getRootBlock(
-                                new HARootBlockRequest(null/* storeUUID */))
-                                .getRootBlock();
-                    } catch (IOException e) {
-                        throw new RuntimeException(e);
-                    }
-
-                    if (leaderRB.getCommitCounter() == 0L) {
-
+                    if (_rootBlock.getCommitCounter() == 0L) {
+                        
                         /*
-                         * Installs the root blocks and does a local abort.
-                         * 
-                         * Note: This code path is only taken when both the
-                         * leader and the follower are at commitCounter==0L.
-                         * This prevents us from accidentally laying down on a
-                         * follower the root blocks corresponding to a leader
-                         * that already has committed write sets.
+                         * Take the root blocks from the quorum leader and use
+                         * them.
                          */
-                        localService.installRootBlocks(
-                                leaderRB.asRootBlock(true/* rootBlock0 */),
-                                leaderRB.asRootBlock(false/* rootBlock0 */));
 
-                        installedRBs = true;
+                        // Remote interface for the quorum leader.
+                        final HAGlue leader = localService
+                                .getLeader(quorumToken);
+
+                        log.info("Fetching root block from leader.");
+                        final IRootBlockView leaderRB;
+                        try {
+                            leaderRB = leader
+                                    .getRootBlock(
+                                            new HARootBlockRequest(null/* storeUUID */))
+                                    .getRootBlock();
+                        } catch (IOException e) {
+                            throw new RuntimeException(e);
+                        }
+
+                        if (leaderRB.getCommitCounter() == 0L) {
+
+                            /*
+                             * Installs the root blocks and does a local abort.
+                             * 
+                             * Note: This code path is only taken when both the
+                             * leader and the follower are at commitCounter==0L.
+                             * This prevents us from accidentally laying down on
+                             * a follower the root blocks corresponding to a
+                             * leader that already has committed write sets.
+                             */
+                            localService
+                                    .installRootBlocks(
+                                            leaderRB.asRootBlock(true/* rootBlock0 */),
+                                            leaderRB.asRootBlock(false/* rootBlock0 */));
+
+                            installedRBs = true;
+
+                        }
 
                     }
+
+                    // ready as follower.
+                    haReadyToken = newValue;
+
+                } else if (localService.isLeader(quorumToken)) {
+
+                    // ready as leader.
+                    haReadyToken = newValue;
 
                 }
 
@@ -4995,6 +5018,9 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
                 }
                 
+                // signal HAReady condition.
+                haReadyCondition.signalAll();
+                
             } else {
 
                 throw new AssertionError();
@@ -5007,6 +5033,96 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
             
         }
 
+    }
+    private final Condition haReadyCondition = _fieldReadWriteLock.writeLock().newCondition();
+    private volatile long haReadyToken = Quorum.NO_QUORUM;
+    
+    /**
+     * Await the service being ready to partitipate in an HA quorum. The
+     * preconditions include:
+     * <ol>
+     * <li>receiving notice of the quorum token via
+     * {@link #setQuorumToken(long)}</li>
+     * <li>The service is joined with the met quorum for that token</li>
+     * <li>If the service is a follower and it's local root blocks were at
+     * <code>commitCounter:=0</code>, then the root blocks from the leader have
+     * been installed on the follower.</li>
+     * <ol>
+     * 
+     * @return the quorum token for which the service became HA ready.
+     */
+    final public long awaitHAReady() throws InterruptedException,
+            AsynchronousQuorumCloseException, QuorumException {
+        final WriteLock lock = _fieldReadWriteLock.writeLock();
+        lock.lock();
+        try {
+            long t = Quorum.NO_QUORUM;
+            while (((t = haReadyToken) != Quorum.NO_QUORUM)
+                    && getQuorum().getClient() != null) {
+                haReadyCondition.await();
+            }
+            final QuorumService<?> client = getQuorum().getClient();
+            if (client == null)
+                throw new AsynchronousQuorumCloseException();
+           if (!client.isJoinedMember(t)) {
+                throw new QuorumException();
+            }
+            return t;
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    /**
+     * Await the service being ready to partitipate in an HA quorum. The
+     * preconditions include:
+     * <ol>
+     * <li>receiving notice of the quorum token via
+     * {@link #setQuorumToken(long)}</li>
+     * <li>The service is joined with the met quorum for that token</li>
+     * <li>If the service is a follower and it's local root blocks were at
+     * <code>commitCounter:=0</code>, then the root blocks from the leader have
+     * been installed on the follower.</li>
+     * <ol>
+     * 
+     * @param timeout
+     *            The timeout to await this condition.
+     * @param units
+     *            The units for that timeout.
+     *            
+     * @return the quorum token for which the service became HA ready.
+     */
+    final public long awaitHAReady(final long timeout, final TimeUnit units)
+            throws InterruptedException, TimeoutException,
+            AsynchronousQuorumCloseException {
+        final WriteLock lock = _fieldReadWriteLock.writeLock();
+        final long begin = System.nanoTime();
+        final long nanos = units.toNanos(timeout);
+        long remaining = nanos;
+        if (!lock.tryLock(remaining, TimeUnit.NANOSECONDS))
+            throw new TimeoutException();
+        try {
+            // remaining = nanos - (now - begin) [aka elapsed]
+            remaining = nanos - (System.nanoTime() - begin);
+            long t = Quorum.NO_QUORUM;
+            while (((t = haReadyToken) != Quorum.NO_QUORUM)
+                    && getQuorum().getClient() != null && remaining > 0) {
+                if (!haReadyCondition.await(remaining, TimeUnit.NANOSECONDS))
+                    throw new TimeoutException();
+                remaining = nanos - (System.nanoTime() - begin);
+            }
+            final QuorumService<?> client = getQuorum().getClient();
+            if (client == null)
+                throw new AsynchronousQuorumCloseException();
+            if (remaining <= 0)
+                throw new TimeoutException();
+            if (!client.isJoinedMember(t)) {
+                throw new QuorumException();
+            }
+            return t;
+        } finally {
+            lock.unlock();
+        }
     }
 
     /**
@@ -5349,6 +5465,15 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
             throw new UnsupportedOperationException();
             
+        }
+
+        @Override
+        public long awaitHAReady(final long timeout, final TimeUnit units)
+                throws AsynchronousQuorumCloseException, InterruptedException,
+                TimeoutException {
+
+            return AbstractJournal.this.awaitHAReady(timeout, units);
+
         }
 
         @Override
