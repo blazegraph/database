@@ -415,9 +415,8 @@ public class SnapshotManager {
             }
 
             /*
-             * FIXME lock should also cause purge of snapshots to be deleted if
-             * we are in the middle of making a decision about whether or not to
-             * make a new snapshot.
+             * FIXME Handle remove of historical snapshots when they are no
+             * longer required.
              */
 
             if (!isReadyToSnapshot(percentLogSize)) {
@@ -533,6 +532,16 @@ public class SnapshotManager {
         
         final long snapshotCommitCounter = getMostRecentSnapshotCommitCounter();
 
+        if (journal.getRootBlockView().getCommitCounter() == snapshotCommitCounter) {
+
+            /*
+             * We already have a snapshot for the most recent commit point on
+             * the journal.
+             */
+            return false;
+            
+        }
+        
         /*
          * List the HALog files for this service.
          */

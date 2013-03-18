@@ -625,10 +625,16 @@ public class HAJournal extends Journal {
                 /*
                  * Snapshot exists and is not (logically) empty.
                  * 
-                 * TODO Make sure that we do not attempt to re-generate a
+                 * Note: The SnapshotManager will not recommend taking a
+                 * snapshot if a snapshot already exists for the current commit
+                 * point since there is no committed delta that can be captured
+                 * by the snapshot.
+                 * 
+                 * This code makes sure that we do not attempt to overwrite a
                  * snapshot if we already have one for the same commit point. If
-                 * somebody wants to generate a new one for that commit point,
-                 * they need to remove the old one first.
+                 * you want to re-generate a snapshot for the same commit point
+                 * (e.g., because the existing one is corrupt) then you MUST
+                 * remove the pre-existing snapshot first.
                  */
                 
                 throw new IOException("File exists: " + file);
