@@ -23,16 +23,18 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.journal.jini.ha;
 
+import java.io.DataInputStream;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FilenameFilter;
 import java.io.IOException;
-import java.io.RandomAccessFile;
-import java.nio.channels.FileChannel;
+import java.nio.ByteBuffer;
 import java.util.Formatter;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.zip.GZIPInputStream;
 
 import net.jini.config.Configuration;
 import net.jini.config.ConfigurationException;
@@ -42,10 +44,11 @@ import org.apache.log4j.Logger;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.ha.halog.IHALogReader;
-import com.bigdata.io.IReopenChannel;
-import com.bigdata.io.NOPReopener;
+import com.bigdata.journal.FileMetadata;
 import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.RootBlockUtility;
+import com.bigdata.journal.RootBlockView;
+import com.bigdata.util.ChecksumUtility;
 
 /**
  * Class to manage the snapshot files.
@@ -256,26 +259,46 @@ public class SnapshotManager {
     static IRootBlockView getRootBlockForSnapshot(final File file)
             throws IOException {
 
-        final RandomAccessFile raf = new RandomAccessFile(file, "r");
+        final byte[] b0 = new byte[RootBlockView.SIZEOF_ROOT_BLOCK];
+        final byte[] b1 = new byte[RootBlockView.SIZEOF_ROOT_BLOCK];
+        
+        final DataInputStream is = new DataInputStream(new GZIPInputStream(
+                new FileInputStream(file), FileMetadata.headerSize0));
 
         try {
 
-            final IReopenChannel<FileChannel> opener = new NOPReopener(
-                    raf.getChannel());
+            final int magic = is.readInt();
 
-            final RootBlockUtility util = new RootBlockUtility(opener, file,
-                    true/* validateChecksum */, false/* alternateRootBlock */,
-                    false/* ignoreBadRootBlock */);
+            if (magic != FileMetadata.MAGIC)
+                throw new IOException("Bad journal magic: expected="
+                        + FileMetadata.MAGIC + ", actual=" + magic);
+            
+            final int version = is.readInt();
+            
+            if (version != FileMetadata.CURRENT_VERSION)
+                throw new RuntimeException("Bad journal version: expected="
+                        + FileMetadata.CURRENT_VERSION + ", actual=" + version);
 
-            final IRootBlockView currentRootBlock = util.chooseRootBlock();
-
-            return currentRootBlock;
+            // read root blocks.
+            is.readFully(b0);
+            is.readFully(b1);
 
         } finally {
 
-            raf.close();
+            is.close();
 
         }
+
+        final IRootBlockView rb0 = new RootBlockView(true, ByteBuffer.wrap(b0),
+                ChecksumUtility.getCHK());
+
+        final IRootBlockView rb1 = new RootBlockView(true, ByteBuffer.wrap(b1),
+                ChecksumUtility.getCHK());
+
+        final IRootBlockView currentRootBlock = RootBlockUtility
+                .chooseRootBlock(rb0, rb1);
+
+        return currentRootBlock;
 
     }
 

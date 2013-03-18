@@ -23,6 +23,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.journal.jini.ha;
 
+import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileFilter;
 import java.io.FileNotFoundException;
@@ -655,13 +656,24 @@ public class HAJournal extends Journal {
 
                 os = new GZIPOutputStream(new FileOutputStream(tmp));
 
-                // root block 0
-                os.write(BytesUtil.toArray(rootBlocks[0].asReadOnlyBuffer()));
+                // Write out the file header.
+                {
+                    final DataOutputStream os2 = new DataOutputStream(os);
+                    try {
+                        os2.writeInt(FileMetadata.MAGIC);
+                        os2.writeInt(FileMetadata.CURRENT_VERSION);
+                        os2.flush();
+                    } finally {
+                        os2.close();
+                    }
+                }
 
-                // root block 1
+                // write out the root blocks.
+                
+                os.write(BytesUtil.toArray(rootBlocks[0].asReadOnlyBuffer()));
                 os.write(BytesUtil.toArray(rootBlocks[1].asReadOnlyBuffer()));
 
-                // and the data.
+                // write out the file data.
                 ((IHABufferStrategy) getBufferStrategy()).writeOnStream(os,
                         getQuorum(), token);
 
