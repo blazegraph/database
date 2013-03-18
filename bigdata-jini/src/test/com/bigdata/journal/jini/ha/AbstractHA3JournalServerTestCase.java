@@ -82,6 +82,7 @@ import com.bigdata.quorum.Quorum;
 import com.bigdata.quorum.QuorumClient;
 import com.bigdata.quorum.QuorumException;
 import com.bigdata.quorum.zk.ZKQuorumImpl;
+import com.bigdata.rdf.sail.webapp.client.HttpException;
 import com.bigdata.service.jini.JiniClientConfig;
 import com.bigdata.service.jini.RemoteDestroyAdmin;
 import com.bigdata.util.InnerCause;
@@ -2019,27 +2020,43 @@ public class AbstractHA3JournalServerTestCase extends
         final long token = quorum.awaitQuorum(awaitQuorumTimeout,
                 TimeUnit.MILLISECONDS);
 
+        
         /*
          * Now go through a commit point with a fully met quorum. The HALog
          * files should be purged at that commit point.
          */
-
-        final StringBuilder sb = new StringBuilder();
-        sb.append("DROP ALL;\n");
-        sb.append("PREFIX dc: <http://purl.org/dc/elements/1.1/>\n");
-        sb.append("INSERT DATA {\n");
-        sb.append("  <http://example/book1> dc:title \"A new book\" ;\n");
-        sb.append("  dc:creator \"A.N.Other\" .\n");
-        sb.append("}\n");
-        
-        final String updateStr = sb.toString();
-        
-        final HAGlue leader = quorum.getClient().getLeader(token);
-        
-        // Verify quorum is still valid.
-        quorum.assertQuorum(token);
-
-        getRemoteRepository(leader).prepareUpdate(updateStr).evaluate();
+        int retryCount = 5;
+        while (true) {
+	        final StringBuilder sb = new StringBuilder();
+	        sb.append("DROP ALL;\n");
+	        sb.append("PREFIX dc: <http://purl.org/dc/elements/1.1/>\n");
+	        sb.append("INSERT DATA {\n");
+	        sb.append("  <http://example/book1> dc:title \"A new book\" ;\n");
+	        sb.append("  dc:creator \"A.N.Other\" .\n");
+	        sb.append("}\n");
+	        
+	        final String updateStr = sb.toString();
+	        
+	        final HAGlue leader = quorum.getClient().getLeader(token);
+	        
+	        // By awaiting for fully ready, should avoid any 404 errors for leader
+	        //	not being correctly setup
+	        leader.awaitHAReady(awaitQuorumTimeout, TimeUnit.MILLISECONDS);
+	        
+	        // Verify quorum is still valid.
+	        quorum.assertQuorum(token);
+	
+	        try {
+	        	getRemoteRepository(leader).prepareUpdate(updateStr).evaluate();
+	        	break;
+	        } catch (HttpException httpe) {
+	        	log.warn("HTTP Error: " + httpe.getStatusCode());
+	        	if (httpe.getStatusCode() == 404 && --retryCount > 0)
+	        		continue;
+	        	
+	        	throw httpe;
+	        }
+        }
             
      }
 
