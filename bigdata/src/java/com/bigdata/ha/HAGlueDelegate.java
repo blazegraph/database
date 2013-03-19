@@ -50,6 +50,8 @@ import com.bigdata.ha.msg.IHARebuildRequest;
 import com.bigdata.ha.msg.IHARootBlockRequest;
 import com.bigdata.ha.msg.IHARootBlockResponse;
 import com.bigdata.ha.msg.IHASendStoreResponse;
+import com.bigdata.ha.msg.IHASnapshotRequest;
+import com.bigdata.ha.msg.IHASnapshotResponse;
 import com.bigdata.ha.msg.IHASyncRequest;
 import com.bigdata.ha.msg.IHAWriteMessage;
 import com.bigdata.ha.msg.IHAWriteSetStateRequest;
@@ -244,15 +246,21 @@ public class HAGlueDelegate implements HAGlue {
 
     @Override
     public IHAWriteSetStateResponse getHAWriteSetState(
-            IHAWriteSetStateRequest req) throws IOException {
+            final IHAWriteSetStateRequest req) throws IOException {
         return delegate.getHAWriteSetState(req);
     }
 
     @Override
-    public long awaitHAReady(long timeout, TimeUnit unit) throws IOException,
-            InterruptedException, QuorumException,
+    public long awaitHAReady(final long timeout, final TimeUnit unit)
+            throws IOException, InterruptedException, QuorumException,
             AsynchronousQuorumCloseException, TimeoutException {
         return delegate.awaitHAReady(timeout, unit);
+    }
+
+    @Override
+    public Future<IHASnapshotResponse> takeSnapshot(final IHASnapshotRequest req)
+            throws IOException {
+        return delegate.takeSnapshot(req);
     }
 
 }

@@ -118,6 +118,8 @@ import com.bigdata.ha.msg.IHARebuildRequest;
 import com.bigdata.ha.msg.IHARootBlockRequest;
 import com.bigdata.ha.msg.IHARootBlockResponse;
 import com.bigdata.ha.msg.IHASendStoreResponse;
+import com.bigdata.ha.msg.IHASnapshotRequest;
+import com.bigdata.ha.msg.IHASnapshotResponse;
 import com.bigdata.ha.msg.IHASyncRequest;
 import com.bigdata.ha.msg.IHAWriteMessage;
 import com.bigdata.ha.msg.IHAWriteSetStateRequest;
@@ -5503,6 +5505,14 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
         }
 
+        @Override
+        public Future<IHASnapshotResponse> takeSnapshot(
+                final IHASnapshotRequest req) throws IOException {
+
+            throw new UnsupportedOperationException();
+
+        }
+        
         /**
          * Return a proxy object for a {@link Future} suitable for use in an RMI
          * environment (the default implementation returns its argument).
