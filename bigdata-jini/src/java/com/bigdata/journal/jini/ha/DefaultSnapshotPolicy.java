@@ -30,7 +30,8 @@ import java.util.concurrent.TimeUnit;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.journal.IRootBlockView;
+import com.bigdata.ha.msg.HASnapshotRequest;
+import com.bigdata.ha.msg.IHASnapshotResponse;
 
 /**
  * Policy schedules a snapshot at the same time each day. A threshold is used to
@@ -124,8 +125,8 @@ public class DefaultSnapshotPolicy implements ISnapshotPolicy {
                 }
 
                 // Conditionally start a snapshot.
-                final Future<IRootBlockView> f = jnl.getSnapshotManager()
-                        .takeSnapshot(percentLogSize);
+                final Future<IHASnapshotResponse> f = jnl.getSnapshotManager()
+                        .takeSnapshot(new HASnapshotRequest(percentLogSize));
 
                 if (f != null) {
 

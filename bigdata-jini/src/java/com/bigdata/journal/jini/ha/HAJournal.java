@@ -23,13 +23,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.journal.jini.ha;
 
-import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileFilter;
 import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.OutputStream;
 import java.io.Serializable;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
@@ -50,7 +47,6 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
-import java.util.zip.GZIPOutputStream;
 
 import net.jini.config.Configuration;
 import net.jini.config.ConfigurationException;
@@ -62,7 +58,6 @@ import net.jini.jeri.tcp.TcpServerEndpoint;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.btree.BytesUtil;
 import com.bigdata.concurrent.FutureTaskMon;
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.QuorumService;
@@ -84,6 +79,8 @@ import com.bigdata.ha.msg.IHALogRootBlocksRequest;
 import com.bigdata.ha.msg.IHALogRootBlocksResponse;
 import com.bigdata.ha.msg.IHARebuildRequest;
 import com.bigdata.ha.msg.IHASendStoreResponse;
+import com.bigdata.ha.msg.IHASnapshotRequest;
+import com.bigdata.ha.msg.IHASnapshotResponse;
 import com.bigdata.ha.msg.IHASyncRequest;
 import com.bigdata.ha.msg.IHAWriteMessage;
 import com.bigdata.io.DirectBufferPool;
@@ -95,13 +92,11 @@ import com.bigdata.journal.IHABufferStrategy;
 import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
-import com.bigdata.journal.RootBlockUtility;
 import com.bigdata.journal.ValidationError;
 import com.bigdata.journal.WriteExecutorService;
 import com.bigdata.journal.jini.ha.HAJournalServer.HAQuorumService;
 import com.bigdata.quorum.AsynchronousQuorumCloseException;
 import com.bigdata.quorum.Quorum;
-import com.bigdata.quorum.QuorumException;
 import com.bigdata.quorum.zk.ZKQuorumImpl;
 import com.bigdata.service.AbstractTransactionService;
 import com.bigdata.service.jini.JiniClient;
@@ -541,210 +536,16 @@ public class HAJournal extends Journal {
     }
 
     /**
-     * Take a snapshot.
-     * 
-     * @param file
-     *            Where to write the snapshot.
-     * 
-     * @return The {@link Future} of the task that is taking the snapshot. The
-     *         {@link Future} will evaluate to the closing
-     *         {@link IRootBlockView} on the snapshot.
-     * 
-     * @throws IOException
-     * @throws ExecutionException
-     * @throws InterruptedException
+     * {@inheritDoc}
+     * <p>
+     * Extended to expose this method to the {@link SnapshotManger}.
      */
-    Future<IRootBlockView> takeSnapshotNow() {
-
-        final FutureTask<IRootBlockView> ft = new FutureTaskMon<IRootBlockView>(
-                new SnapshotTask());
-
-        // Run task.
-        getExecutorService().submit(ft);
-
-        return ft;
-
-    }
-
-    /**
-     * Take a snapshot.
-     * 
-     * TODO If possible, move this code to the {@link SnapshotManager} class.
-     * Both the {@link SnapshotManager} and the {@link HARestore} classes could
-     * be moved into the {@link Journal} package (and the {@link HARestore}
-     * class renamed since it would then be usable without the HAJournalServer).
-     */
-    private class SnapshotTask implements Callable<IRootBlockView> {
-
-        public SnapshotTask() {
-            
-        }
+    @Override
+    public IRootBlockView[] getRootBlocks() {
         
-        public IRootBlockView call() throws Exception {
-            
-            // The quorum token (must remain valid through this operation).
-            final long token = getQuorumToken();
-            
-            if (!getQuorum().getClient().isJoinedMember(token)) {
-
-                /*
-                 * Note: The service must be joined with a met quorum to take a
-                 * snapshot. This is necessary in order to ensure that the
-                 * snapshots are copies of a journal state that the quorum
-                 * agrees on, otherwise we could later attempt to restore from
-                 * an invalid state.
-                 */
-
-                throw new QuorumException("Service not joined with met quorum");
-
-            }
-
-            // Grab a read lock.
-            final long txId = newTx(ITx.READ_COMMITTED);
-
-            /*
-             * Get both root blocks (atomically).
-             * 
-             * Note: This is done AFTER we take the read-lock and BEFORE we
-             * copy the data from the backing store. These root blocks MUST
-             * be consistent for the leader's backing store because we are
-             * not recycling allocations (since the read lock has pinned
-             * them). The journal MIGHT go through a concurrent commit
-             * before we obtain these root blocks, but they are still valid
-             * for the data on the disk because of the read-lock.
-             */
-            final IRootBlockView[] rootBlocks = getRootBlocks();
-
-            final IRootBlockView currentRootBlock = RootBlockUtility
-                    .chooseRootBlock(rootBlocks[0], rootBlocks[1]);
-
-            final File file = getSnapshotManager().getSnapshotFile(
-                    currentRootBlock.getCommitCounter());
-
-            if (file.exists() && file.length() != 0L) {
-
-                /*
-                 * Snapshot exists and is not (logically) empty.
-                 * 
-                 * Note: The SnapshotManager will not recommend taking a
-                 * snapshot if a snapshot already exists for the current commit
-                 * point since there is no committed delta that can be captured
-                 * by the snapshot.
-                 * 
-                 * This code makes sure that we do not attempt to overwrite a
-                 * snapshot if we already have one for the same commit point. If
-                 * you want to re-generate a snapshot for the same commit point
-                 * (e.g., because the existing one is corrupt) then you MUST
-                 * remove the pre-existing snapshot first.
-                 */
-                
-                throw new IOException("File exists: " + file);
-                
-            }
-
-            /*
-             * Create a temporary file. We will write the snapshot here. The
-             * file will be renamed onto the target file name iff the snapshot
-             * is successfully written.
-             */
-            final File tmp = File.createTempFile("snapshot", ".tmp",
-                    file.getParentFile());
-
-            OutputStream os = null;
-            boolean success = false;
-            try {
-
-                os = new GZIPOutputStream(new FileOutputStream(tmp));
-
-                // Write out the file header.
-                {
-                    final DataOutputStream os2 = new DataOutputStream(os);
-                    try {
-                        os2.writeInt(FileMetadata.MAGIC);
-                        os2.writeInt(FileMetadata.CURRENT_VERSION);
-                        os2.flush();
-                    } finally {
-                        os2.close();
-                    }
-                }
-
-                // write out the root blocks.
-                
-                os.write(BytesUtil.toArray(rootBlocks[0].asReadOnlyBuffer()));
-                os.write(BytesUtil.toArray(rootBlocks[1].asReadOnlyBuffer()));
-
-                // write out the file data.
-                ((IHABufferStrategy) getBufferStrategy()).writeOnStream(os,
-                        getQuorum(), token);
-
-                // flush the output stream.
-                os.flush();
-
-                // done.
-                success = true;
-                
-            } finally {
-                
-                // Release the read lock.
-                abort(txId);
-
-                if (os != null) {
-                    try {
-                        os.close();
-                    } finally {
-                       // ignore.
-                    }
-                }
-                
-            }
-
-            /*
-             * Either rename the temporary file onto the target filename or
-             * delete the tempoary file. The snapshot is not considered to
-             * be valid until it is found under the appropriate name.
-             */
-            if (success) {
-
-                if (!getQuorum().getClient().isJoinedMember(token)) {
-                    // Verify before putting down the root blocks.
-                    throw new QuorumException(
-                            "Snapshot aborted: service not joined with met quorum.");
-                }
-                
-                if (!tmp.renameTo(file)) {
-
-                    log.error("Could not rename " + tmp + " as " + file);
-
-                } else {
-                    
-                    // Add to the set of known snapshots.
-                    getSnapshotManager().addSnapshot(file);
-                    
-                    /*
-                     * FIXME This is where we need to see whether or not we can
-                     * release an earlier snapshot and the intervening HALog
-                     * files.
-                     */
-                    
-                }
-
-            } else {
-
-                if (!tmp.delete()) {
-
-                    log.warn("Could not delete temporary file: " + tmp);
-                    
-                }
-
-            }
-            
-            // Done.
-            return currentRootBlock;
-
-        }
-
-    } // class SendStoreTask
-    
+        return super.getRootBlocks();
+        
+    }
     /**
      * {@inheritDoc}
      * <p>
@@ -806,10 +607,10 @@ public class HAJournal extends Journal {
          * Note: If the quorum breaks, the service which was the leader will
          * invalidate all open transactions. This is handled in AbstractJournal.
          * 
-         * FIXME We should really pair the quorum token with the transaction
-         * identifier in order to guarantee that the quorum token does not
-         * change (e.g., that the quorum does not break) across the scope of the
-         * transaction. That will require either changing the
+         * FIXME HA TXS: We should really pair the quorum token with the
+         * transaction identifier in order to guarantee that the quorum token
+         * does not change (e.g., that the quorum does not break) across the
+         * scope of the transaction. That will require either changing the
          * ITransactionService API and/or defining an HA variant of that API.
          */
         
@@ -1201,6 +1002,10 @@ public class HAJournal extends Journal {
          * connections distinct KBs per the ticket below, then we will need to
          * have a different global write lock - perhaps via the
          * {@link WriteExecutorService}.
+         * <p>
+         * In fact, we could deprecate this method. It is no longer necessary to
+         * support backups since we can now take snapshots without suspending
+         * writers.
          * 
          * @see https://sourceforge.net/apps/trac/bigdata/ticket/566 (
          *      Concurrent unisolated operations against multiple KBs on the
@@ -1487,6 +1292,17 @@ public class HAJournal extends Journal {
 
             }
             
+        }
+        
+        @Override
+        public Future<IHASnapshotResponse> takeSnapshot(
+                final IHASnapshotRequest req) throws IOException {
+
+            final Future<IHASnapshotResponse> ft = getSnapshotManager()
+                    .takeSnapshot(req);
+
+            return ft == null ? null : getProxy(ft, true/* async */);
+
         }
         
         @Override

@@ -74,6 +74,7 @@ import com.bigdata.jini.start.config.ServiceConfiguration;
 import com.bigdata.jini.start.config.ServiceConfiguration.AbstractServiceStarter;
 import com.bigdata.jini.start.config.ZookeeperClientConfig;
 import com.bigdata.jini.start.process.ProcessHelper;
+import com.bigdata.jini.util.ConfigMath;
 import com.bigdata.jini.util.JiniUtil;
 import com.bigdata.journal.jini.ha.HAJournalServer.ConfigurationOptions;
 import com.bigdata.quorum.AbstractQuorumClient;
@@ -89,6 +90,7 @@ import com.bigdata.util.InnerCause;
 import com.bigdata.zookeeper.DumpZookeeper;
 import com.bigdata.zookeeper.ZooHelper;
 import com.bigdata.zookeeper.ZooKeeperAccessor;
+import com.sun.jini.config.ConfigUtil;
 
 /**
  * Class layers in support to start and stop the {@link HAJournalServer}
@@ -190,6 +192,21 @@ public class AbstractHA3JournalServerTestCase extends
     }
 
     /**
+     * Return any overrides to be specified together with the basic
+     * {@link Configuration}.  Each override is the fully qualified name
+     * of a {@link Configuration} parameter together with its value. For
+     * example:
+     * <pre>
+     * com.bigdata.journal.jini.ha.HAJournalServer.snapshotPolicy=new NoSnapshotPolicy();
+     * </pre>
+     */
+    protected String[] getOverrides() {
+        
+        return new String[]{};
+        
+    }
+    
+    /**
      * The {@link Remote} interfaces for these services (if started and
      * successfully discovered).
      */
@@ -215,7 +232,7 @@ public class AbstractHA3JournalServerTestCase extends
     private ServiceDiscoveryManager serviceDiscoveryManager = null;
 
     private HAJournalDiscoveryClient discoveryClient = null;
-
+    
     /**
      * The {@link ZooKeeperAccessor} used by the {@link #quorum}.
      */
@@ -500,44 +517,51 @@ public class AbstractHA3JournalServerTestCase extends
     /*
      * Utility methods to access service HALog file directories
      */
-    protected File getServiceDir() {
-    	return new File("benchmark/CI-HAJournal-1");
+    
+    /**
+     * The directory that is the parent of each {@link HAJournalServer}'s
+     * individual service directory.
+     */
+    protected File getTestDir() {
+
+        return new File("benchmark/CI-HAJournal-1");
+        
     }
 
     protected File getHAJournalFileA() {
-        return new File(getServiceDir(),"A/bigdata-ha.jnl");
+        return new File(getTestDir(), "A/bigdata-ha.jnl");
     }
 
     protected File getHAJournalFileB() {
-        return new File(getServiceDir(),"B/bigdata-ha.jnl");
+        return new File(getTestDir(), "B/bigdata-ha.jnl");
     }
 
     protected File getHAJournalFileC() {
-        return new File(getServiceDir(),"C/bigdata-ha.jnl");
+        return new File(getTestDir(), "C/bigdata-ha.jnl");
     }
 
     protected File getHALogDirA() {
-    	return new File(getServiceDir(),"A/HALog");
+        return new File(getTestDir(), "A/HALog");
     }
-    
+
     protected File getHALogDirB() {
-    	return new File(getServiceDir(),"B/HALog");
+        return new File(getTestDir(), "B/HALog");
     }
-    
+
     protected File getHALogDirC() {
-    	return new File(getServiceDir(),"C/HALog");
+        return new File(getTestDir(), "C/HALog");
     }
-    
+
     protected File getSnapshotDirA() {
-        return new File(getServiceDir(),"A/snapshot");
+        return new File(getTestDir(), "A/snapshot");
     }
-    
+
     protected File getSnapshotDirB() {
-        return new File(getServiceDir(),"B/snapshot");
+        return new File(getTestDir(), "B/snapshot");
     }
-    
+
     protected File getSnapshotDirC() {
-        return new File(getServiceDir(),"C/snapshot");
+        return new File(getTestDir(), "C/snapshot");
     }
     
    /**
@@ -1240,12 +1264,22 @@ public class AbstractHA3JournalServerTestCase extends
         /*
          * Read jini configuration.
          */
-        final Configuration config = ConfigurationProvider
-                .getInstance(new String[] { configFile });
+        
+        // Overrides for this test.
+        final String[] overrides = getOverrides();
+
+        // Config file + overrides from perspective of this JVM.
+        final String[] ourArgs = ConfigMath.concat(new String[] { configFile },
+                overrides);
+
+        // Config file + overrides from perspective of the child process.
+        final String[] childArgs = ConfigMath.concat(
+                new String[] { installedConfigFileName }, overrides);
+
+        final Configuration config = ConfigurationProvider.getInstance(ourArgs);
         
         final ServiceConfiguration serviceConfig = new HAJournalServerConfiguration(
-                name, config, serviceId, serviceDir,
-                new String[] { installedConfigFileName });
+                name, config, serviceId, serviceDir, childArgs);
 
         final AbstractServiceStarter<?> serviceStarter = serviceConfig
                 .newServiceStarter(serviceListener);

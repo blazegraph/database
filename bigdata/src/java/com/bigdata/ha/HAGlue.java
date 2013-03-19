@@ -39,6 +39,8 @@ import com.bigdata.ha.msg.IHALogDigestRequest;
 import com.bigdata.ha.msg.IHALogDigestResponse;
 import com.bigdata.ha.msg.IHARootBlockRequest;
 import com.bigdata.ha.msg.IHARootBlockResponse;
+import com.bigdata.ha.msg.IHASnapshotRequest;
+import com.bigdata.ha.msg.IHASnapshotResponse;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.ITransactionService;
 import com.bigdata.journal.Journal;
@@ -203,5 +205,18 @@ public interface HAGlue extends HAGlueBase, HAPipelineGlue, HAReadGlue,
      */
     Future<Void> globalWriteLock(IHAGlobalWriteLockRequest req)
             throws IOException, TimeoutException, InterruptedException;
+
+    /**
+     * Request that the service take a snapshot. If there is already a snapshot
+     * in progress, then the {@link Future} for that request will be returned.
+     * 
+     * @param req
+     *            The request.
+     * 
+     * @return A {@link Future} for the snapshot -or- <code>null</code> if no
+     *         snapshot is running and none will be taken for that request.
+     */
+    Future<IHASnapshotResponse> takeSnapshot(IHASnapshotRequest req)
+            throws IOException;
 
 }

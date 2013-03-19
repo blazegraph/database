@@ -34,8 +34,6 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import junit.framework.AssertionFailedError;
-
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.halog.HALogWriter;
 import com.bigdata.ha.msg.HARootBlockRequest;
@@ -51,6 +49,11 @@ import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
  * need to stream data to the leader. I think we should go with a large file. We
  * should also verify that the LOAD is still running when the 3rd service joins
  * with the met quorum.
+ * 
+ * TODO Do we have any guards against rolling back a service in RESYNC if the
+ * other services are more than 2 commit points before it? We probably should
+ * not automatically roll it back to the other services in this case, but that
+ * could also reduce the ergonomics of the HA3 configuration.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
@@ -1145,7 +1148,7 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
         shutdownA();
         
         // copy log files from A to C
-        final File serviceDir = getServiceDir();
+        final File serviceDir = getTestDir();
         copyFiles(new File(serviceDir, "A/HALog"), new File(serviceDir, "C/HALog"));
                       
         startC();
@@ -1333,42 +1336,42 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
      * 
      * @throws Exception 
      */
-	public void testStartAB_C_halog() throws Exception {
+    public void testStartAB_C_halog() throws Exception {
 		doStartAB_C_halog();
 	}
 	
 	private void doStartAB_C_halog() throws Exception {
-		// Start 2 services
-		startA();
-		startB();
+        // Start 2 services
+        startA();
+        startB();
+        
+        // Run through transaction
+        simpleTransaction();
+        
+        // check that logfiles exist
+        final File logsA = getHALogDirA();
+        final File logsB = getHALogDirB();
+        
+        // There should be 3 halog files from 2 commit points and newly open
+        assertEquals(logsA.listFiles().length, 3);
+        assertEquals(logsB.listFiles().length, 3);
+        
+        // now just restart to help teardown
+        startC();
+        
+        awaitFullyMetQuorum();
+        
+        // Run through another transaction
+        simpleTransaction();
 
-		// Run through transaction
-		simpleTransaction();
-
-		// check that logfiles exist
-		final File logsA = getHALogDirA();
-		final File logsB = getHALogDirB();
-
-		// There should be 3 halog files from 2 commit points and newly open
-		assertEquals(logsA.listFiles().length, 3);
-		assertEquals(logsB.listFiles().length, 3);
-
-		// now just restart to help teardown
-		startC();
-
-		awaitFullyMetQuorum();
-
-		// Run through another transaction
-		simpleTransaction();
-
-		// all committed logs should be removed with only open log remaining
-		final File logsC = getHALogDirC();
-		assertEquals(logsA.listFiles().length, 1);
-		assertEquals(logsB.listFiles().length, 1);
-		assertEquals(logsC.listFiles().length, 1);
-	}
-	
-	/**
+        // all committed logs should be removed with only open log remaining
+        final File logsC = getHALogDirC();
+        assertEquals(logsA.listFiles().length, 1);
+        assertEquals(logsB.listFiles().length, 1);
+        assertEquals(logsC.listFiles().length, 1);
+}
+    
+    /**
 	 * Sandbox stress test, must be disabled before commit for CI runs
 	 * @throws Exception
 	 */
@@ -1782,6 +1785,27 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
      * Similar to RemainsMet but with long liveLoad
      * 
      * @throws Exception
+     * 
+     *             FIXME This test needs to be broken down into the following
+     *             tests:
+     *             <p>
+     *             (1) Can C join A+B when A+B are observing a sequence of short
+     *             loads. (This might be covered already by the
+     *             multi-transaction sync test above, but conceptually success
+     *             on this question needs to be answered independently of the
+     *             ability of C to join during a sustained load since these
+     *             correspond to very different code paths in HAJournalServer).
+     *             <p>
+     *             (2) Can C join A+B during a sustained load and does the load
+     *             complete successfully? There are some known problems with
+     *             respect to HALogWriter and opportunities for deadlock that
+     *             might cause problems here. There are also code paths in
+     *             HAJournalServer that need to be explicitly tested for this.
+     *             <p>
+     *             (3) Can C join A+B during a sustained load and does the load
+     *             continue to completion if we then fail B? This causes a
+     *             pipeline reordering from A+B+C to A+C during the load, and
+     *             should be broken out as a distinct test for this capability.
      */
     public void testABC_LiveLoadRemainsMet() throws Exception {
 		// enforce join order
@@ -1799,7 +1823,7 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
                     sb.append("LOAD <" + getFoafFileUrl("data-0.nq.gz") + ">;\n");
                     sb.append("LOAD <" + getFoafFileUrl("data-1.nq.gz") + ">;\n");
                     sb.append("LOAD <" + getFoafFileUrl("data-2.nq.gz") + ">;\n");
-                    sb.append("LOAD <" + getFoafFileUrl("data-3.nq.gz") + ">;\n");
+//                    sb.append("LOAD <" + getFoafFileUrl("data-3.nq.gz") + ">;\n");
 					sb.append("INSERT {?x rdfs:label ?y . } WHERE {?x foaf:name ?y };\n");
 					sb.append("PREFIX dc: <http://purl.org/dc/elements/1.1/>\n");
 					sb.append("INSERT DATA\n");
@@ -1843,6 +1867,7 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
 		final HAGlue serverC2 = startC();
 		// return to quorum
 		awaitPipeline(new HAGlue[] {startup.serverA, startup.serverB, serverC2});
+		//assertEquals(token, awaitFullyMetQuorum());
 		
 		while (true) {
 			final long ntoken;
@@ -1868,21 +1893,7 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
 		final HAGlue serverB2 = startB();
 		// and return to quorum
 		awaitPipeline(new HAGlue[] {startup.serverA, serverC2, serverB2});
-		
-		while (true) {
-			final long ntoken;
-			try {
-				ntoken = awaitFullyMetQuorum();				
-			} catch (RuntimeException re) {
-				if (spin.get())
-					fail("Load Complete but quorum not fully met");
-				
-				continue;
-			}
-			assertEquals(token, ntoken);
-			break;
-		}
-		
+		assertEquals(token, awaitFullyMetQuorum());
 		
 		// wait for load to finish or just exit?
 		final boolean waitForLoad = true;

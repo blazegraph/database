@@ -24,30 +24,41 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.journal.jini.ha;
 
 import java.io.DataInputStream;
+import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.FilenameFilter;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Formatter;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
+import java.util.concurrent.FutureTask;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.zip.GZIPInputStream;
+import java.util.zip.GZIPOutputStream;
 
 import net.jini.config.Configuration;
 import net.jini.config.ConfigurationException;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.btree.IRangeQuery;
-import com.bigdata.btree.ITupleIterator;
+import com.bigdata.btree.BytesUtil;
+import com.bigdata.concurrent.FutureTaskMon;
 import com.bigdata.ha.halog.IHALogReader;
+import com.bigdata.ha.msg.HASnapshotResponse;
+import com.bigdata.ha.msg.IHASnapshotRequest;
+import com.bigdata.ha.msg.IHASnapshotResponse;
 import com.bigdata.journal.FileMetadata;
+import com.bigdata.journal.IHABufferStrategy;
 import com.bigdata.journal.IRootBlockView;
+import com.bigdata.journal.ITx;
 import com.bigdata.journal.RootBlockUtility;
 import com.bigdata.journal.RootBlockView;
+import com.bigdata.quorum.QuorumException;
 import com.bigdata.util.ChecksumUtility;
 
 /**
@@ -67,9 +78,19 @@ public class SnapshotManager {
     /**
      * The file extension for journal snapshots.
      */
-    public final static String SNAPSHOT_EXT = ".snap";
-    
-    private HAJournal journal;
+    public final static String SNAPSHOT_EXT = ".jnl.zip";
+
+    /**
+     * The prefix for the temporary files used to generate snapshots.
+     */
+    public final static String SNAPSHOT_TMP_PREFIX = "snapshot";
+
+    /**
+     * The suffix for the temporary files used to generate snapshots.
+     */
+    public final static String SNAPSHOT_TMP_SUFFIX = ".tmp";
+
+    private final HAJournal journal;
     
     /**
      * @see HAJournalServer.ConfigurationOptions#SNAPSHOT_DIR
@@ -104,7 +125,7 @@ public class SnapshotManager {
      * <p>
      * This field is guarded by the {@link #lock}.
      */
-    private Future<IRootBlockView> snapshotFuture = null;
+    private Future<IHASnapshotResponse> snapshotFuture = null;
     
     /**
      * Return the {@link ISnapshotPolicy}.
@@ -200,6 +221,53 @@ public class SnapshotManager {
     private void populateSnapshotIndex() throws IOException {
 
         /*
+         * Delete any temporary files that were left lying around in the
+         * snapshot directory.
+         */
+        {
+            final File[] files;
+
+            final File snapshotDir = getSnapshotDir();
+            
+            files = snapshotDir.listFiles(new FilenameFilter() {
+
+                /**
+                 * Return <code>true</code> iff the file is an HALog file that
+                 * should be deleted.
+                 * 
+                 * @param name
+                 *            The name of that HALog file (encodes the
+                 *            commitCounter).
+                 */
+                @Override
+                public boolean accept(final File dir, final String name) {
+
+                    if (name.startsWith(SNAPSHOT_TMP_PREFIX)
+                            && name.endsWith(SNAPSHOT_TMP_SUFFIX)) {
+
+                        // One of our temporary files.
+                        return true;
+                        
+                    }
+
+                    return false;
+
+                }
+            });
+
+            for(File file : files) {
+                
+                if(!file.delete()) {
+
+                    log.warn("Could not delete temporary file: "+file);
+                    
+                }
+                
+            }
+            
+        }
+
+        /*
          * List the snapshot files for this service.
          */
         final File[] files;
@@ -209,14 +277,6 @@ public class SnapshotManager {
 
             files = snapshotDir.listFiles(new FilenameFilter() {
 
-                /**
-                 * Return <code>true</code> iff the file is an HALog file
-                 * that should be deleted.
-                 * 
-                 * @param name
-                 *            The name of that HALog file (encodes the
-                 *            commitCounter).
-                 */
                 @Override
                 public boolean accept(final File dir, final String name) {
 
@@ -247,16 +307,12 @@ public class SnapshotManager {
      * Read the current root block out of the snapshot.
      * 
      * @param file
-     * @return
-     * @throws IOException
+     *            the file.
+     * @return The current root block from that file.
      * 
-     *             FIXME DETECT EMPTY SNAPSHOTS!!!! (root blocks are as if for
-     *             an empty journal) EMPTY SNAPSHOTS SHOULD BE REMOVED ON
-     *             STARTUP AND ARE NOT VALID AND SHOULD NOT BE USED WHEN
-     *             CHECKING FOR THE PREVIOUS SNAPSHOT, etc.  VERIFY THE
-     *             ROOT BLOCK BEFORE RELYING ON A SNAPSHOT.
+     * @throws IOException
      */
-    static IRootBlockView getRootBlockForSnapshot(final File file)
+    static public IRootBlockView getRootBlockForSnapshot(final File file)
             throws IOException {
 
         final byte[] b0 = new byte[RootBlockView.SIZEOF_ROOT_BLOCK];
@@ -272,11 +328,11 @@ public class SnapshotManager {
             if (magic != FileMetadata.MAGIC)
                 throw new IOException("Bad journal magic: expected="
                         + FileMetadata.MAGIC + ", actual=" + magic);
-            
+
             final int version = is.readInt();
-            
+
             if (version != FileMetadata.CURRENT_VERSION)
-                throw new RuntimeException("Bad journal version: expected="
+                throw new IOException("Bad journal version: expected="
                         + FileMetadata.CURRENT_VERSION + ", actual=" + version);
 
             // read root blocks.
@@ -304,6 +360,21 @@ public class SnapshotManager {
 
     void addSnapshot(final File file) throws IOException {
 
+        /*
+         * Validate the snapshot.
+         * 
+         * TODO If the root blocks are bad, then this will throw an
+         * IOException and that will prevent the startup of the
+         * HAJournalServer. However, if we start up the server with a known
+         * bad snapshot *and* the snapshot is the earliest snapshot, then we
+         * can not restore commit points which depend on that earliest
+         * snapshot.
+         * 
+         * TODO A similar problem exists if any of the HALog files GTE the
+         * earliest snapshot are missing, have bad root blocks, etc. We will
+         * not be able to restore the commit point associated with that
+         * HALog file unless it also happens to correspond to a snapshot.
+         */
         final IRootBlockView currentRootBlock = getRootBlockForSnapshot(file);
 
         synchronized (snapshotIndex) {
@@ -350,7 +421,7 @@ public class SnapshotManager {
                         + commitTime
                         + ", snapshot="
                         + currentRootBlock
-                        + ",indexRootBlock=" + tmp);
+                        + ", indexRootBlock=" + tmp);
 
                 return false;
 
@@ -378,7 +449,7 @@ public class SnapshotManager {
      * @return The {@link Future} of the current snapshot operation -or-
      *         <code>null</code> if there is no snapshot operation running.
      */
-    public Future<IRootBlockView> getSnapshotFuture() {
+    public Future<IHASnapshotResponse> getSnapshotFuture() {
 
         lock.lock();
 
@@ -418,8 +489,11 @@ public class SnapshotManager {
      * @throws ExecutionException
      * @throws InterruptedException
      */
-    public Future<IRootBlockView> takeSnapshot(final int percentLogSize) {
+    public Future<IHASnapshotResponse> takeSnapshot(final IHASnapshotRequest req) {
 
+        if (req == null)
+            throw new IllegalArgumentException();
+        
         lock.lock();
         
         try {
@@ -442,7 +516,7 @@ public class SnapshotManager {
              * longer required.
              */
 
-            if (!isReadyToSnapshot(percentLogSize)) {
+            if (!isReadyToSnapshot(req)) {
 
                 // Pre-conditions are not met.
                 return null;
@@ -450,7 +524,7 @@ public class SnapshotManager {
             }
 
             // Take the snapshot, return Future but save a reference.
-            return snapshotFuture = journal.takeSnapshotNow();
+            return snapshotFuture = takeSnapshotNow();
 
         } finally {
 
@@ -464,9 +538,28 @@ public class SnapshotManager {
      * Return the snapshot {@link File} associated with the commitCounter.
      * 
      * @param commitCounter
-     * @return
+     *            The commit counter for the current root block on the journal.
+     *            
+     * @return The name of the corresponding snapshot file.
      */
     public File getSnapshotFile(final long commitCounter) {
+        
+        return getSnapshotFile(snapshotDir, commitCounter);
+        
+    }
+
+    /**
+     * Return the snapshot {@link File} associated with the commitCounter.
+     * 
+     * @param snapshotDir
+     *            The directory in which the snapshot files are stored.
+     * @param commitCounter
+     *            The commit counter for the current root block on the journal.
+     * 
+     * @return The name of the corresponding snapshot file.
+     */
+    public static File getSnapshotFile(final File snapshotDir,
+            final long commitCounter) {
 
         /*
          * Format the name of the file.
@@ -495,39 +588,6 @@ public class SnapshotManager {
     }
 
     /**
-     * Find the commit counter for the most recent snapshot (if any).
-     * 
-     * @return That commit counter -or- ZERO (0L) if there are no snapshots.
-     */
-    private long getMostRecentSnapshotCommitCounter() {
-        
-        final long snapshotCommitCounter;
-        synchronized (snapshotIndex) {
-
-            final ITupleIterator<IRootBlockView> itr = snapshotIndex
-                    .rangeIterator(null/* fromKey */, null/* toKey */,
-                            1/* capacity */, IRangeQuery.DEFAULT
-                                    | IRangeQuery.REVERSE/* flags */, null/* filter */);
-
-            if (itr.hasNext()) {
-
-                final IRootBlockView rootBlock = itr.next().getObject();
-
-                snapshotCommitCounter = rootBlock.getCommitCounter();
-
-            } else {
-
-                snapshotCommitCounter = 0L;
-
-            }
-
-        }
-
-        return snapshotCommitCounter;
-        
-    }
-    
-    /**
      * Find the commit counter for the most recent snapshot (if any). Count up
      * the bytes on the disk for the HALog files GTE the commitCounter of that
      * snapshot. If the size(halogs) as a percentage of the size(journal) is LTE
@@ -540,8 +600,11 @@ public class SnapshotManager {
      * journal state that the quorum agrees on, otherwise we could later attempt
      * to restore from an invalid state.
      */
-    private boolean isReadyToSnapshot(final int percentLogSize) {
+    private boolean isReadyToSnapshot(final IHASnapshotRequest req) {
 
+        if(req == null)
+            throw new IllegalArgumentException();
+        
         final long token = journal.getQuorum().token();
         
         if (!journal.getQuorum().getClient().isJoinedMember(token)) {
@@ -553,7 +616,7 @@ public class SnapshotManager {
             
         }
         
-        final long snapshotCommitCounter = getMostRecentSnapshotCommitCounter();
+        final long snapshotCommitCounter = snapshotIndex.getMostRecentSnapshotCommitCounter();
 
         if (journal.getRootBlockView().getCommitCounter() == snapshotCommitCounter) {
 
@@ -651,17 +714,20 @@ public class SnapshotManager {
         
         final long journalSize = journal.size();
 
-        final double percent = ((double) totalBytes) / ((double) journalSize);
-       
-        final boolean takeSnapshot = (percent > percentLogSize);
+        // size(HALogs)/size(journal) as percentage.
+        final int actualPercentLogSize = (int) (100 * (((double) totalBytes) / ((double) journalSize)));
+
+        final int thresholdPercentLogSize = req.getPercentLogSize();
+
+        final boolean takeSnapshot = (actualPercentLogSize >= thresholdPercentLogSize);
 
         if (haLog.isInfoEnabled()) {
 
             haLog.info("There are " + files.length
                     + " HALog files since the last snapshot occupying "
                     + totalBytes + " bytes.  The journal is currently "
-                    + journalSize + " bytes.  The HALogs are " + percent
-                    + " of the journal on the disk.  A new snapshot should "
+                    + journalSize + " bytes.  The HALogs are " + actualPercentLogSize
+                    + " of the journal on the disk.  A new snapshot should"
                     + (takeSnapshot ? "" : " not") + " be taken");
 
         }
@@ -669,5 +735,219 @@ public class SnapshotManager {
         return takeSnapshot;
 
     }
+
+    /**
+     * Take a snapshot.
+     * 
+     * @return The {@link Future} of the task that is taking the snapshot. The
+     *         {@link Future} will evaluate to {@link IHASnapshotResponse}
+     *         containing the closing {@link IRootBlockView} on the snapshot.
+     * 
+     * @throws IOException
+     * @throws ExecutionException
+     * @throws InterruptedException
+     */
+    Future<IHASnapshotResponse> takeSnapshotNow() {
+
+        final FutureTask<IHASnapshotResponse> ft = new FutureTaskMon<IHASnapshotResponse>(
+                new SnapshotTask(this));
+
+        // Run task.
+        journal.getExecutorService().submit(ft);
+
+        return ft;
+
+    }
+
+    /**
+     * Take a snapshot.
+     */
+    static private class SnapshotTask implements Callable<IHASnapshotResponse> {
+
+        private final SnapshotManager snapshotManager;
+        private final HAJournal journal;
+
+        public SnapshotTask(final SnapshotManager snapshotManager) {
+
+            if (snapshotManager == null)
+                throw new IllegalArgumentException();
+
+            this.snapshotManager = snapshotManager;
+
+            this.journal = snapshotManager.journal;
+
+        }
+
+        public IHASnapshotResponse call() throws Exception {
+
+            // The quorum token (must remain valid through this operation).
+            final long token = journal.getQuorumToken();
+
+            if (!journal.getQuorum().getClient().isJoinedMember(token)) {
+
+                /*
+                 * Note: The service must be joined with a met quorum to take a
+                 * snapshot. This is necessary in order to ensure that the
+                 * snapshots are copies of a journal state that the quorum
+                 * agrees on, otherwise we could later attempt to restore from
+                 * an invalid state.
+                 */
+
+                throw new QuorumException("Service not joined with met quorum");
+
+            }
+
+            // Grab a read lock.
+            final long txId = journal.newTx(ITx.READ_COMMITTED);
+
+            /*
+             * Get both root blocks (atomically).
+             * 
+             * Note: This is done AFTER we take the read-lock and BEFORE we copy
+             * the data from the backing store. These root blocks MUST be
+             * consistent for the leader's backing store because we are not
+             * recycling allocations (since the read lock has pinned them). The
+             * journal MIGHT go through a concurrent commit before we obtain
+             * these root blocks, but they are still valid for the data on the
+             * disk because of the read-lock.
+             */
+            final IRootBlockView[] rootBlocks = journal.getRootBlocks();
+
+            final IRootBlockView currentRootBlock = RootBlockUtility
+                    .chooseRootBlock(rootBlocks[0], rootBlocks[1]);
+
+            final File file = snapshotManager.getSnapshotFile(currentRootBlock
+                    .getCommitCounter());
+
+            if (file.exists() && file.length() != 0L) {
+
+                /*
+                 * Snapshot exists and is not (logically) empty.
+                 * 
+                 * Note: The SnapshotManager will not recommend taking a
+                 * snapshot if a snapshot already exists for the current commit
+                 * point since there is no committed delta that can be captured
+                 * by the snapshot.
+                 * 
+                 * This code makes sure that we do not attempt to overwrite a
+                 * snapshot if we already have one for the same commit point. If
+                 * you want to re-generate a snapshot for the same commit point
+                 * (e.g., because the existing one is corrupt) then you MUST
+                 * remove the pre-existing snapshot first.
+                 */
+
+                throw new IOException("File exists: " + file);
+
+            }
+
+            /*
+             * Create a temporary file. We will write the snapshot here. The
+             * file will be renamed onto the target file name iff the snapshot
+             * is successfully written.
+             */
+            final File tmp = File.createTempFile(
+                    SnapshotManager.SNAPSHOT_TMP_PREFIX,
+                    SnapshotManager.SNAPSHOT_TMP_SUFFIX, file.getParentFile());
+
+            DataOutputStream os = null;
+            boolean success = false;
+            try {
+
+                os = new DataOutputStream(new GZIPOutputStream(
+                        new FileOutputStream(tmp)));
+
+                // Write out the file header.
+                os.writeInt(FileMetadata.MAGIC);
+                os.writeInt(FileMetadata.CURRENT_VERSION);
+
+                // write out the root blocks.
+                os.write(BytesUtil.toArray(rootBlocks[0].asReadOnlyBuffer()));
+                os.write(BytesUtil.toArray(rootBlocks[1].asReadOnlyBuffer()));
+
+                // write out the file data.
+                ((IHABufferStrategy) journal.getBufferStrategy())
+                        .writeOnStream(os, journal.getQuorum(), token);
+
+                // flush the output stream.
+                os.flush();
+
+                // done.
+                success = true;
+            } catch (Throwable t) {
+                /*
+                 * Log @ ERROR and launder throwable.
+                 */
+                log.error(t, t);
+                if (t instanceof Exception)
+                    throw (Exception) t;
+                else
+                    throw new RuntimeException(t);
+            } finally {
+
+                // Release the read lock.
+                journal.abort(txId);
+
+                if (os != null) {
+                    try {
+                        os.close();
+                    } finally {
+                        // ignore.
+                    }
+                }
+
+                /*
+                 * Either rename the temporary file onto the target filename or
+                 * delete the tempoary file. The snapshot is not considered to
+                 * be valid until it is found under the appropriate name.
+                 */
+                if (success) {
+
+                    if (!journal.getQuorum().getClient().isJoinedMember(token)) {
+                        // Verify before putting down the root blocks.
+                        throw new QuorumException(
+                                "Snapshot aborted: service not joined with met quorum.");
+                    }
+
+                    if (!tmp.renameTo(file)) {
+
+                        log.error("Could not rename " + tmp + " as " + file);
+
+                    } else {
+
+                        // Add to the set of known snapshots.
+                        snapshotManager.addSnapshot(file);
+
+                        if (haLog.isInfoEnabled())
+                            haLog.info("Captured snapshot: " + file
+                                    + ", commitCounter="
+                                    + currentRootBlock.getCommitCounter()
+                                    + ", length=" + file.length());
+
+                        /*
+                         * FIXME SNAPSHOTS: This is where we need to see whether
+                         * or not we can release an earlier snapshot and the
+                         * intervening HALog files.
+                         */
+
+                    }
+
+                } else {
+
+                    if (!tmp.delete()) {
+
+                        log.warn("Could not delete temporary file: " + tmp);
+
+                    }
+
+                }
+
+            }
+
+            // Done.
+            return new HASnapshotResponse(currentRootBlock);
+
+        }
+
+    } // class SendStoreTask
 
 }

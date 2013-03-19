@@ -33,7 +33,9 @@ import com.bigdata.btree.BTree;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.Checkpoint;
 import com.bigdata.btree.DefaultTupleSerializer;
+import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
+import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.keys.ASCIIKeyBuilderFactory;
 import com.bigdata.btree.keys.IKeyBuilder;
@@ -290,6 +292,41 @@ public class CommitTimeIndex extends BTree {
     }
     
     /**
+     * Find the commit counter for the most recent snapshot (if any).
+     * 
+     * @return That commit counter -or- ZERO (0L) if there are no snapshots.
+     */
+    public long getMostRecentSnapshotCommitCounter() {
+        
+        final long snapshotCommitCounter;
+        synchronized (this) {
+
+            final ITupleIterator<IRootBlockView> itr = 
+                    rangeIterator(null/* fromKey */, null/* toKey */,
+                            1/* capacity */, IRangeQuery.DEFAULT
+                                    | IRangeQuery.REVERSE/* flags */, null/* filter */);
+
+            if (itr.hasNext()) {
+
+                final ITuple<IRootBlockView> t = itr.next();
+                
+                final IRootBlockView rootBlock = t.getObject();
+
+                snapshotCommitCounter = rootBlock.getCommitCounter();
+
+            } else {
+
+                snapshotCommitCounter = 0L;
+
+            }
+
+        }
+
+        return snapshotCommitCounter;
+        
+    }
+    
+    /**
      * Encapsulates key and value formation.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -327,11 +364,25 @@ public class CommitTimeIndex extends BTree {
          * Decodes the key as a commit time.
          */
         @Override
-        public Long deserializeKey(ITuple tuple) {
+        public Long deserializeKey(final ITuple tuple) {
 
             return KeyBuilder
                     .decodeLong(tuple.getKeyBuffer().array(), 0/* offset */);
 
+        }
+
+        /**
+         * De-serializes an object from the {@link ITuple#getValue() value} stored
+         * in the tuple (ignores the key stored in the tuple).
+         */
+        public IRootBlockView deserialize(final ITuple tuple) {
+
+            if (tuple == null)
+                throw new IllegalArgumentException();
+
+            return (IRootBlockView) new RootBlockView(false/* rootBlock0 */,
+                    ByteBuffer.wrap(tuple.getValue()), ChecksumUtility.getCHK());
+            
         }
 
         /**

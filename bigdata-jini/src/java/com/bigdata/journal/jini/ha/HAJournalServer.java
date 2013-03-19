@@ -2826,7 +2826,7 @@ public class HAJournalServer extends AbstractServer {
 
                 final HALogWriter logWriter = journal.getHALogWriter();
 
-                if (false && !isJoinedService) {//FIXME logRootBlock()
+                if (!isJoinedService) {//FIXME logRootBlock()
 
                     /*
                      * NOTE: Unless we are joined with the met quorum we will be

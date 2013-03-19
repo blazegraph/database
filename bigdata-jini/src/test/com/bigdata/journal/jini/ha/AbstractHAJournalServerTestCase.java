@@ -31,7 +31,6 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.security.DigestException;
 import java.security.NoSuchAlgorithmException;
-import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -54,8 +53,6 @@ import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.msg.HADigestRequest;
 import com.bigdata.ha.msg.HALogDigestRequest;
 import com.bigdata.io.TestCase3;
-import com.bigdata.quorum.Quorum;
-import com.bigdata.quorum.QuorumClient;
 import com.bigdata.rdf.sail.TestConcurrentKBCreate;
 import com.bigdata.rdf.sail.webapp.NanoSparqlServer;
 import com.bigdata.rdf.sail.webapp.client.ConnectOptions;
@@ -232,9 +229,6 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
 
     void doNSSStatusRequest(final HAGlue haGlue) throws Exception {
 
-        // The port that is exposing the NSS.
-        final int NSSPort = haGlue.getNSSPort();
-        
         // Client for talking to the NSS.
         final HttpClient httpClient = new DefaultHttpClient(ccm);
 
@@ -248,8 +242,9 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
          * only running one HAJournalServer here.
          */
         {
+
             // The NSS service URL (NOT the SPARQL end point).
-            final String serviceURL = "http://localhost:" + NSSPort;
+            final String serviceURL = getNanoSparqlServerURL(haGlue);
 
             final ConnectOptions opts = new ConnectOptions(serviceURL
                     + "/status");
@@ -273,7 +268,25 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
         }
 
     }
-    
+
+    /**
+     * Return the {@link NanoSparqlServer} end point (NOT the SPARQL end point)
+     * for the specified remote service.
+     * 
+     * @param haGlue
+     *            The remove service.
+     * 
+     * @return The {@link NanoSparqlServer} end point.
+     * 
+     * @throws IOException
+     */
+    protected String getNanoSparqlServerURL(final HAGlue haGlue)
+            throws IOException {
+
+        return "http://localhost:" + haGlue.getNSSPort();
+
+    }
+
     /**
      * Return a {@link RemoteRepository} for talking to the
      * {@link NanoSparqlServer} instance associated with an {@link HAGlue}
@@ -284,8 +297,8 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
     protected RemoteRepository getRemoteRepository(final HAGlue haGlue)
             throws IOException {
 
-        final String sparqlEndpointURL = "http://localhost:"
-                + haGlue.getNSSPort() + "/sparql";
+        final String sparqlEndpointURL = getNanoSparqlServerURL(haGlue)
+                + "/sparql";
 
         // Client for talking to the NSS.
         final HttpClient httpClient = new DefaultHttpClient(ccm);
@@ -572,9 +585,7 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
      *            The data set.
      * @return The name that can be used with a SPARQL UPDATE "LOAD" operation.
      */
-    protected String getFoafFileUrl(String string) {
-
-        //sb.append("LOAD <file:/Users/bryan/Documents/workspace/BIGDATA_RELEASE_1_2_0/data-1.nq.gz>;\n");
+    protected String getFoafFileUrl(final String string) {
 
         /*
          * Note: The file path needs to be absolute since the HAJournalServer

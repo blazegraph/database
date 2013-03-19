@@ -38,6 +38,7 @@ import org.apache.zookeeper.KeeperException;
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.QuorumService;
 import com.bigdata.ha.halog.IHALogReader;
+import com.bigdata.ha.msg.HASnapshotRequest;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.jini.ha.HAJournal;
 import com.bigdata.journal.jini.ha.SnapshotManager;
@@ -218,7 +219,7 @@ public class HAStatusServletUtil {
                     }
 
                     ((HAJournal) journal).getSnapshotManager().takeSnapshot(
-                            percentLogSize);
+                            new HASnapshotRequest(percentLogSize));
 
                 }
                 
