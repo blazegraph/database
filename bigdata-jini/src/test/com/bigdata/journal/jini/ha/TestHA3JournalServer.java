@@ -1874,8 +1874,17 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
 			try {
 				ntoken = awaitFullyMetQuorum();				
 			} catch (RuntimeException re) {
-				if (spin.get())
+				if (spin.get()) {
+                    /*
+                     * Note: This strongly implies that the HALogWriter has
+                     * failed to notice the condition where the live HALog has
+                     * been closed out in such a manner as to permit the service
+                     * (C) that is trying to resych to recognize that the live
+                     * log was closed and that it can now go through the local
+                     * commit for that live log.
+                     */
 					fail("Load Complete but quorum not fully met");
+				}
 				
 				continue;
 			}
