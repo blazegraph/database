@@ -1331,36 +1331,57 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
      * 
      * @throws Exception 
      */
-    public void testStartAB_C_halog() throws Exception {
-        // Start 2 services
-        startA();
-        startB();
-        
-        // Run through transaction
-        simpleTransaction();
-        
-        // check that logfiles exist
-        final File logsA = getHALogDirA();
-        final File logsB = getHALogDirB();
-        
-        // There should be 3 halog files from 2 commit points and newly open
-        assertEquals(logsA.listFiles().length, 3);
-        assertEquals(logsB.listFiles().length, 3);
-        
-        // now just restart to help teardown
-        startC();
-        
-        awaitFullyMetQuorum();
-        
-        // Run through another transaction
-        simpleTransaction();
+	public void testStartAB_C_halog() throws Exception {
+		doStartAB_C_halog();
+	}
+	
+	private void doStartAB_C_halog() throws Exception {
+		// Start 2 services
+		startA();
+		startB();
 
-        // all committed logs should be removed with only open log remaining
-        final File logsC = getHALogDirC();
-        assertEquals(logsA.listFiles().length, 1);
-        assertEquals(logsB.listFiles().length, 1);
-        assertEquals(logsC.listFiles().length, 1);
-}
+		// Run through transaction
+		simpleTransaction();
+
+		// check that logfiles exist
+		final File logsA = getHALogDirA();
+		final File logsB = getHALogDirB();
+
+		// There should be 3 halog files from 2 commit points and newly open
+		assertEquals(logsA.listFiles().length, 3);
+		assertEquals(logsB.listFiles().length, 3);
+
+		// now just restart to help teardown
+		startC();
+
+		awaitFullyMetQuorum();
+
+		// Run through another transaction
+		simpleTransaction();
+
+		// all committed logs should be removed with only open log remaining
+		final File logsC = getHALogDirC();
+		assertEquals(logsA.listFiles().length, 1);
+		assertEquals(logsB.listFiles().length, 1);
+		assertEquals(logsC.listFiles().length, 1);
+	}
+	
+	/**
+	 * Sandbox stress test, must be disabled before commit for CI runs
+	 * @throws Exception
+	 */
+	public void _testSANDBOXStressStartAB_C_halog() throws Exception {
+		for (int i = 0; i < 20; i++) {
+			try {
+				doStartAB_C_halog();
+			} catch (Exception e) {
+				throw new Exception("Failed on run: " + i, e);
+			} finally {
+				destroyAll();
+			}
+		}
+	}
+
     
     /**
      * Tests that halog files are generated and removed after each commit
@@ -1676,7 +1697,7 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
      * to repeatedly start an initial ABC service.
      * @throws Exception
      */
-    public void _testStressABC_Restart() throws Exception { // disable from standard test runs
+    public void _testSANDBOXStressABC_Restart() throws Exception { // disable from standard test runs
     	for (int i = 1; i <= 20; i++) {
     		try {
         		final ABC startup = new ABC(true/*sequential*/);
@@ -1699,7 +1720,7 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
      * We have experienced inconsistencies on test startups, this test just attempts
      * to repeatedly start an initial ABC service.
      */
-    public void _testStressABCStartSimultaneous() throws Exception { // disable from std test runs
+    public void _testSANDBOXStressABCStartSimultaneous() throws Exception { // disable from std test runs
         for (int i = 1; i <= 20; i++) {
             ABC tmp = null;
             try {
