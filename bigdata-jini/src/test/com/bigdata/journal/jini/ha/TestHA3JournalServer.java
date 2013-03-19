@@ -34,6 +34,8 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import junit.framework.AssertionFailedError;
+
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.halog.HALogWriter;
 import com.bigdata.ha.msg.HARootBlockRequest;
@@ -1841,7 +1843,20 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
 		final HAGlue serverC2 = startC();
 		// return to quorum
 		awaitPipeline(new HAGlue[] {startup.serverA, startup.serverB, serverC2});
-		assertEquals(token, awaitFullyMetQuorum());
+		
+		while (true) {
+			final long ntoken;
+			try {
+				ntoken = awaitFullyMetQuorum();				
+			} catch (RuntimeException re) {
+				if (spin.get())
+					fail("Load Complete but quorum not fully met");
+				
+				continue;
+			}
+			assertEquals(token, ntoken);
+			break;
+		}
 		
 		// Now remove first follower
 		shutdownB();
@@ -1853,7 +1868,21 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
 		final HAGlue serverB2 = startB();
 		// and return to quorum
 		awaitPipeline(new HAGlue[] {startup.serverA, serverC2, serverB2});
-		assertEquals(token, awaitFullyMetQuorum());
+		
+		while (true) {
+			final long ntoken;
+			try {
+				ntoken = awaitFullyMetQuorum();				
+			} catch (RuntimeException re) {
+				if (spin.get())
+					fail("Load Complete but quorum not fully met");
+				
+				continue;
+			}
+			assertEquals(token, ntoken);
+			break;
+		}
+		
 		
 		// wait for load to finish or just exit?
 		final boolean waitForLoad = true;
