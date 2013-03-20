@@ -853,8 +853,8 @@ public class HALogFile {
             // The backing ByteBuffer.
             final ByteBuffer b = buf.buffer();
 
-            // A byte[] with the same capacity as that ByteBuffer.
-            final byte[] a = new byte[b.capacity()];
+//            // A byte[] with the same capacity as that ByteBuffer.
+//            final byte[] a = new byte[b.capacity()];
 
             // The capacity of that buffer (typically 1MB).
             final int bufferCapacity = b.capacity();
@@ -893,14 +893,19 @@ public class HALogFile {
                 // read block
                 FileChannelUtility.readAll(reopener, b, offset);
 
-                // Copy data into our byte[].
-                final byte[] c = BytesUtil.toArray(b, false/* forceCopy */, a);
+//                // Copy data into our byte[].
+//                final byte[] c = BytesUtil.toArray(b, false/* forceCopy */, a);
 
                 // update digest
-                digest.digest(c, 0/* off */, nbytes/* len */);
+//                digest.update(c, 0/* off */, nbytes/* len */);
+                digest.update(b);
 
+                offset += nbytes;
+                
                 remaining -= nbytes;
 
+                sequence++;
+                
             }
 
             if (log.isInfoEnabled())

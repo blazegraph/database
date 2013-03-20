@@ -179,7 +179,8 @@ public interface IHABufferStrategy extends IBufferStrategy {
     Object snapshotAllocators();
 
     /**
-     * Compute the digest.
+     * Compute the digest of the entire backing store (including the magic, file
+     * version, root blocks, etc).
      * <p>
      * Note: The digest is not reliable unless you either use a snapshot or
      * suspend writes (on the quorum) while it is computed.

@@ -154,6 +154,15 @@ public class StatusServlet extends BigdataRDFServlet {
     static final String SNAPSHOT = "snapshot";
 
     /**
+     * Request to generate the digest for the journals, HALog files, and
+     * snapshot files. This is only a debugging tool. In particular, the digests
+     * on the journal are only valid if there are no concurrent writes on the
+     * journal and the journal has been through either a commit or an abort
+     * protocol.
+     */
+    static final String DIGESTS = "digests";
+
+    /**
      * Special HA status request designed for clients that poll to determine the
      * status of an HAJournalServer. This option is exclusive of other
      * parameters.

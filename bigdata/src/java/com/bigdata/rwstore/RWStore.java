@@ -6045,8 +6045,8 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
             // The backing ByteBuffer.
             final ByteBuffer b = buf.buffer();
 
-            // A byte[] with the same capacity as that ByteBuffer.
-            final byte[] a = new byte[b.capacity()];
+//            // A byte[] with the same capacity as that ByteBuffer.
+//            final byte[] a = new byte[b.capacity()];
             
             // The capacity of that buffer (typically 1MB).
             final int bufferCapacity = b.capacity();
@@ -6061,7 +6061,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
             long remaining = totalBytes;
 
             // The offset of the current block.
-            long offset = FileMetadata.headerSize0; // 0L;
+            long offset = 0L;
 
             // The block sequence.
             long sequence = 0L;
@@ -6085,14 +6085,17 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
                 // read block
                 readRaw(/*nbytes,*/ offset, b);
 
-                // Copy data into our byte[].
-                final byte[] c = BytesUtil.toArray(b, false/* forceCopy */, a);
+//                // Copy data into our byte[].
+//                final byte[] c = BytesUtil.toArray(b, false/* forceCopy */, a);
 
                 // update digest
-                digest.digest(c, 0/* off */, nbytes/* len */);
+                //digest.update(c, 0/* off */, nbytes/* len */);
+                digest.update(b);
 
                 remaining -= nbytes;
 
+                offset += nbytes;
+                
                 sequence++;
 
             }

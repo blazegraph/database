@@ -50,6 +50,8 @@ import com.bigdata.ha.msg.IHARebuildRequest;
 import com.bigdata.ha.msg.IHARootBlockRequest;
 import com.bigdata.ha.msg.IHARootBlockResponse;
 import com.bigdata.ha.msg.IHASendStoreResponse;
+import com.bigdata.ha.msg.IHASnapshotDigestRequest;
+import com.bigdata.ha.msg.IHASnapshotDigestResponse;
 import com.bigdata.ha.msg.IHASnapshotRequest;
 import com.bigdata.ha.msg.IHASnapshotResponse;
 import com.bigdata.ha.msg.IHASyncRequest;
@@ -236,6 +238,13 @@ public class HAGlueDelegate implements HAGlue {
     public IHALogDigestResponse computeHALogDigest(final IHALogDigestRequest req)
             throws IOException, NoSuchAlgorithmException, DigestException {
         return delegate.computeHALogDigest(req);
+    }
+
+    @Override
+    public IHASnapshotDigestResponse computeHASnapshotDigest(
+            final IHASnapshotDigestRequest req) throws IOException,
+            NoSuchAlgorithmException, DigestException {
+        return delegate.computeHASnapshotDigest(req);
     }
 
     @Override
