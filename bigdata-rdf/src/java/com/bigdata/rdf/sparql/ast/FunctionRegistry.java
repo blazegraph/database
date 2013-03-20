@@ -1442,28 +1442,6 @@ public class FunctionRegistry {
 
             }
 
-            if (args.length == 2) {
-
-                /*
-                 * "foo IN(bar)" is SameTerm(foo,bar) if bar is a URI, otherwise CompareBOp.
-                 */
-
-//            	final IValueExpression<? extends IV> val = AST2BOpUtility.toVE(globals, args[1]);
-            	
-//                final IValueExpression ret = SameTermFactory.INSTANCE.create(
-//                        globals, scalarValues, args);
-            	
-            	// compare factory is smart enough to optimize for SameTerm when necessary
-            	final IValueExpression ret = new CompareFactory(CompareOp.EQ).create(
-                      globals, scalarValues, args);
-
-                if (not)
-                    return new NotBOp(ret);
-
-                return ret;
-
-            }
-
             final boolean allowLiterals;
             if (scalarValues != null && scalarValues.containsKey(Annotations.ALLOW_LITERALS)) {
             	
@@ -1475,6 +1453,45 @@ public class FunctionRegistry {
             	
             }
             
+            if (args.length == 2) {
+
+                /*
+                 * "foo IN(bar)" is SameTerm(foo,bar) if bar is a URI, otherwise CompareBOp.
+                 */
+
+//            	final IValueExpression<? extends IV> val = AST2BOpUtility.toVE(globals, args[1]);
+            	
+//                final IValueExpression ret = SameTermFactory.INSTANCE.create(
+//                        globals, scalarValues, args);
+            	
+                /*
+                 * MP: Changed this to check for allowLiterals.  When we are allowing
+                 * literals, chances are we want to bypass the CompareOp logic
+                 * for literal comparison.
+                 */
+            	if (allowLiterals) {
+            		
+                	final IValueExpression ret = SameTermFactory.INSTANCE.create(
+                            globals, scalarValues, args);
+
+                      if (not)
+                          return new NotBOp(ret);
+
+                      return ret;
+            		
+            	}
+                
+            	// compare factory is smart enough to optimize for SameTerm when necessary
+            	final IValueExpression ret = new CompareFactory(CompareOp.EQ).create(
+                      globals, scalarValues, args);
+
+                if (not)
+                    return new NotBOp(ret);
+
+                return ret;
+
+            }
+
             try {
 
                 /*
