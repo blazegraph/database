@@ -39,6 +39,7 @@ import org.slf4j.LoggerFactory;
 import com.bigdata.rdf.internal.XSD;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
 import com.bigdata.rdf.sail.webapp.TestSparqlUpdate;
+import com.bigdata.rdf.sail.webapp.client.IPreparedTupleQuery;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
 
 /**
@@ -2030,7 +2031,52 @@ public abstract class SPARQLUpdateTest extends TestCase {
 
     }
     
-	//@Test
+    /**
+     * This test is based on a forum post. This post provided an example of an
+     * issue with Unicode case-folding in the REGEX operator and a means to
+     * encode the Unicode characters to avoid doubt about which characters were
+     * transmitted and receieved.
+     * 
+     * @throws Exception 
+     * 
+     * @see <a href=
+     *      "https://sourceforge.net/projects/bigdata/forums/forum/676946/topic/7073971"
+     *      >Forum post on the REGEX Unicode case-folding issue</a>
+     *      
+     * @see <a href="http://sourceforge.net/apps/trac/bigdata/ticket/655">
+     *      SPARQL REGEX operator does not perform case-folding correctly for
+     *      Unicode data</a>
+     */
+    public void testUnicodeCleanAndRegex() throws Exception {
+
+        /*
+         * If I work around this problem by switching the unencoded Unicode
+         * characters into SPARQL escape sequences like this:
+         */
+
+        // Insert statement:
+        final String updateStr = "PREFIX ns: <http://example.org/ns#>\n"
+                + "INSERT DATA { GRAPH ns:graph { ns:auml ns:label \"\u00C4\", \"\u00E4\" } }\n";
+
+        con.prepareUpdate(QueryLanguage.SPARQL, updateStr).execute();
+
+        // Test query:
+        final String queryStr = "PREFIX ns: <http://example.org/ns#>\n"
+                + "SELECT * { GRAPH ns:graph { ?s ?p ?o FILTER(regex(?o, \"\u00E4\", \"i\")) } }";
+
+        assertEquals(2L, countSolutions(queryStr));
+
+        /*
+         * Then I still get only one result for the query, the triple with 'Š'
+         * which is \u00E4. But if I now add the 'u' flag to the regex, I get
+         * both triples as result, so this seems to be a viable workaround.
+         * Always setting the UNICODE_CASE flag sounds like a good idea, and in
+         * fact, Jena ARQ seems to do that when given the 'i' flag:
+         */
+        
+    }
+
+    //@Test
 	public void testLoad()
 		throws Exception
 	{
