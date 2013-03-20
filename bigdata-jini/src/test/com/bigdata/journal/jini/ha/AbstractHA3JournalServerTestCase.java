@@ -83,14 +83,13 @@ import com.bigdata.quorum.Quorum;
 import com.bigdata.quorum.QuorumClient;
 import com.bigdata.quorum.QuorumException;
 import com.bigdata.quorum.zk.ZKQuorumImpl;
-import com.bigdata.rdf.sail.webapp.client.HttpException;
+import com.bigdata.rdf.sail.webapp.client.HAStatusEnum;
 import com.bigdata.service.jini.JiniClientConfig;
 import com.bigdata.service.jini.RemoteDestroyAdmin;
 import com.bigdata.util.InnerCause;
 import com.bigdata.zookeeper.DumpZookeeper;
 import com.bigdata.zookeeper.ZooHelper;
 import com.bigdata.zookeeper.ZooKeeperAccessor;
-import com.sun.jini.config.ConfigUtil;
 
 /**
  * Class layers in support to start and stop the {@link HAJournalServer}
@@ -116,11 +115,6 @@ public class AbstractHA3JournalServerTestCase extends
      * is a cache miss (default {@value #DEFAULT_CACHE_MISS_TIMEOUT}).
      */
     static final protected long cacheMissTimeout = 2000;
-    
-    /**
-     * The timeout used to await quorum meet or break.
-     */
-    protected final static long awaitQuorumTimeout = 5000;
     
     /**
      * Implementation listens for the death of the child process and can be used
@@ -2048,49 +2042,34 @@ public class AbstractHA3JournalServerTestCase extends
     }
 
     /**
-     * Commits update transaction after awaiting quorum
+     * Commits update transaction after awaiting quorum.
      */
     protected void simpleTransaction() throws IOException, Exception {
+
+        // Await quorum meet.
         final long token = quorum.awaitQuorum(awaitQuorumTimeout,
                 TimeUnit.MILLISECONDS);
 
-        
-        /*
-         * Now go through a commit point with a fully met quorum. The HALog
-         * files should be purged at that commit point.
-         */
-        int retryCount = 5;
-        while (true) {
-	        final StringBuilder sb = new StringBuilder();
-	        sb.append("DROP ALL;\n");
-	        sb.append("PREFIX dc: <http://purl.org/dc/elements/1.1/>\n");
-	        sb.append("INSERT DATA {\n");
-	        sb.append("  <http://example/book1> dc:title \"A new book\" ;\n");
-	        sb.append("  dc:creator \"A.N.Other\" .\n");
-	        sb.append("}\n");
-	        
-	        final String updateStr = sb.toString();
-	        
-	        final HAGlue leader = quorum.getClient().getLeader(token);
-	        
-	        // By awaiting for fully ready, should avoid any 404 errors for leader
-	        //	not being correctly setup
-	        leader.awaitHAReady(awaitQuorumTimeout, TimeUnit.MILLISECONDS);
-	        
-	        // Verify quorum is still valid.
-	        quorum.assertQuorum(token);
-	
-	        try {
-	        	getRemoteRepository(leader).prepareUpdate(updateStr).evaluate();
-	        	break;
-	        } catch (HttpException httpe) {
-	        	log.warn("HTTP Error: " + httpe.getStatusCode());
-	        	if (httpe.getStatusCode() == 404 && --retryCount > 0)
-	        		continue;
-	        	
-	        	throw httpe;
-	        }
-        }
+        // Figure out which service is the leader.
+        final HAGlue leader = quorum.getClient().getLeader(token);
+
+        // Wait until that service is ready to act as the leader.
+        assertEquals(HAStatusEnum.Leader, awaitNSSAndHAReady(leader));
+
+        final StringBuilder sb = new StringBuilder();
+        sb.append("DROP ALL;\n");
+        sb.append("PREFIX dc: <http://purl.org/dc/elements/1.1/>\n");
+        sb.append("INSERT DATA {\n");
+        sb.append("  <http://example/book1> dc:title \"A new book\" ;\n");
+        sb.append("  dc:creator \"A.N.Other\" .\n");
+        sb.append("}\n");
+
+        final String updateStr = sb.toString();
+
+        // Verify quorum is still valid.
+        quorum.assertQuorum(token);
+
+        getRemoteRepository(leader).prepareUpdate(updateStr).evaluate();
             
      }
 

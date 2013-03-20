@@ -57,6 +57,8 @@ import com.bigdata.rdf.sail.TestConcurrentKBCreate;
 import com.bigdata.rdf.sail.webapp.NanoSparqlServer;
 import com.bigdata.rdf.sail.webapp.client.ConnectOptions;
 import com.bigdata.rdf.sail.webapp.client.DefaultClientConnectionManagerFactory;
+import com.bigdata.rdf.sail.webapp.client.HAStatusEnum;
+import com.bigdata.rdf.sail.webapp.client.HttpException;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
 import com.bigdata.util.InnerCause;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
@@ -94,6 +96,11 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
      */
     static final protected String TGT_PATH = "benchmark/CI-HAJournal-1/";
 
+    /**
+     * The timeout used to await quorum meet or break.
+     */
+    protected final static long awaitQuorumTimeout = 5000;
+    
     /**
      * A service used to run tasks for some tests.
      */
@@ -227,43 +234,127 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
         }
     }
 
-    void doNSSStatusRequest(final HAGlue haGlue) throws Exception {
+    /**
+     * Check the NSS API by issuing a "GET .../status" request.
+     * <p>
+     * Note: The NSS server will not allow reads or writes until the
+     * quorum meets.
+     */
+    protected void doNSSStatusRequest(final HAGlue haGlue) throws Exception {
 
         // Client for talking to the NSS.
         final HttpClient httpClient = new DefaultHttpClient(ccm);
 
+        // The NSS service URL (NOT the SPARQL end point).
+        final String serviceURL = getNanoSparqlServerURL(haGlue);
+
+        final ConnectOptions opts = new ConnectOptions(serviceURL + "/status");
+
+        opts.method = "GET";
+
+        try {
+            final HttpResponse response;
+
+            RemoteRepository.checkResponseCode(response = doConnect(httpClient,
+                    opts));
+
+            EntityUtils.consume(response.getEntity());
+
+        } catch (IOException ex) {
+
+            log.error(ex, ex);
+
+            throw ex;
+
+        }
+
+    }
+
+    /**
+     * The zookeeper events corresponding to quorum state changes are delivered
+     * in the zk event thread. In response to those events the services need to
+     * queue tasks to handle the events. Thus, there can be a lag between when
+     * we notice a quorum state change and when a service has actually responded
+     * to that state change.
+     * <p>
+     * This method is designed to ensure that the service has noticed some
+     * internal state changes which mean that it is ready to participate in a
+     * met quorum (as a leader or follower) and further that the service's NSS
+     * end point is running (the start of the NSS is also asynchronous.)
+     * @throws Exception 
+     */
+    protected HAStatusEnum awaitNSSAndHAReady(final HAGlue haGlue)
+            throws Exception {
         /*
-         * Check the NSS API. It should be up.
-         * 
-         * Note: The NSS server will not allow reads or writes until the
-         * quorum meets.
-         * 
-         * Note: The quorum will not meet for this unit test since we are
-         * only running one HAJournalServer here.
+         * Wait for the service to report that it is ready as a leader or
+         * follower.
          */
-        {
-
-            // The NSS service URL (NOT the SPARQL end point).
-            final String serviceURL = getNanoSparqlServerURL(haGlue);
-
-            final ConnectOptions opts = new ConnectOptions(serviceURL
-                    + "/status");
-
-            opts.method = "GET";
-
+        haGlue.awaitHAReady(awaitQuorumTimeout, TimeUnit.MILLISECONDS);
+        /*
+         * Wait for the NSS to report the status of the service (this verifies
+         * that the NSS interface is running).
+         */
+        int retryCount = 5;
+        while (true) {
             try {
-                final HttpResponse response;
-
-                RemoteRepository.checkResponseCode(response = doConnect(
-                        httpClient, opts));
-                
-                EntityUtils.consume(response.getEntity());
-                
-            } catch (IOException ex) {
-                
-                log.error(ex, ex);
-                
+                final HAStatusEnum s = getNSSHAStatus(haGlue);
+                switch (s) {
+                case NotReady:
+                    continue;
+                }
+                return s;
+            } catch (HttpException httpe) {
+                log.warn("HTTP Error: " + httpe.getStatusCode());
+                if (httpe.getStatusCode() == 404 && --retryCount > 0) {
+                    Thread.sleep(200/* ms */);
+                    continue;
+                }
+                throw httpe;
             }
+        }
+    }
+
+    /**
+     * Issue HTTP request to a service to request its HA status.
+     * 
+     * @param haGlue
+     *            The service.
+     * 
+     * @throws Exception
+     * @throws IOException
+     *             This can include a 404 if the REST API is not yet up or has
+     *             been shutdown.
+     */
+    protected HAStatusEnum getNSSHAStatus(final HAGlue haGlue)
+            throws Exception, IOException {
+
+        // Client for talking to the NSS.
+        final HttpClient httpClient = new DefaultHttpClient(ccm);
+
+        // The NSS service URL (NOT the SPARQL end point).
+        final String serviceURL = getNanoSparqlServerURL(haGlue);
+
+        final ConnectOptions opts = new ConnectOptions(serviceURL
+                + "/status?HA");
+
+        opts.method = "GET";
+
+        try {
+
+            final HttpResponse response;
+
+            RemoteRepository.checkResponseCode(response = doConnect(httpClient,
+                    opts));
+
+            final String s = EntityUtils.toString(response.getEntity());
+
+            return HAStatusEnum.valueOf(s);
+
+        } catch (IOException ex) {
+
+            log.error(ex, ex);
+
+            throw ex;
 
         }
 

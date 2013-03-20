@@ -35,6 +35,7 @@ import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.msg.HARootBlockRequest;
 import com.bigdata.journal.IRootBlockView;
 import com.bigdata.quorum.Quorum;
+import com.bigdata.rdf.sail.webapp.client.HAStatusEnum;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
 
 /**
@@ -78,10 +79,25 @@ public class TestHA2JournalServer extends AbstractHA3JournalServerTestCase {
         final HAGlue serverA = startA();
         final HAGlue serverB = startB();
         
-        awaitMetQuorum();
+        final long token = awaitMetQuorum();
 
+        // Service is met in role around a quorum.
+        assertEquals(token,
+                serverA.awaitHAReady(awaitQuorumTimeout, TimeUnit.MILLISECONDS));
+
+        // Service is met in role around a quorum.
+        assertEquals(token,
+                serverB.awaitHAReady(awaitQuorumTimeout, TimeUnit.MILLISECONDS));
+
+        // Verify can access the REST API "status" page.
         doNSSStatusRequest(serverA);
         doNSSStatusRequest(serverB);
+
+        // Verify that service self-reports role via the REST API.
+        assertEquals(HAStatusEnum.Leader, getNSSHAStatus(serverA));
+
+        // Verify that service self-reports role via the REST API.
+        assertEquals(HAStatusEnum.Follower, getNSSHAStatus(serverB));
 
         // Wait until KB exists.
         awaitKBExists(serverA);
@@ -143,6 +159,12 @@ public class TestHA2JournalServer extends AbstractHA3JournalServerTestCase {
         // Wait until KB exists.
         awaitKBExists(serverA);
 
+        // Await [A] up and running as leader.
+        assertEquals(HAStatusEnum.Leader, awaitNSSAndHAReady(serverA));
+
+        // Await [B] up and running as follower.
+        assertEquals(HAStatusEnum.Follower, awaitNSSAndHAReady(serverB));
+        
         // Verify binary equality on the journal files.
         assertDigestsEquals(new HAGlue[] { serverA, serverB });
 
@@ -234,6 +256,12 @@ public class TestHA2JournalServer extends AbstractHA3JournalServerTestCase {
 
         // Wait until KB exists.
         awaitKBExists(serverA);
+
+        // Await [A] up and running as leader.
+        assertEquals(HAStatusEnum.Leader, awaitNSSAndHAReady(serverA));
+
+        // Await [B] up and running as follower.
+        assertEquals(HAStatusEnum.Follower, awaitNSSAndHAReady(serverB));
 
         // Verify binary equality on the journal files.
         assertDigestsEquals(new HAGlue[] { serverA, serverB });

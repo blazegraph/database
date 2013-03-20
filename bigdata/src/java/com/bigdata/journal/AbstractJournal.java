@@ -4907,7 +4907,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
          * Both a meet and a break require an exclusive write lock.
          */
         final WriteLock lock = _fieldReadWriteLock.writeLock();
-
+        
         lock.lock();
 
         try {
@@ -4935,13 +4935,14 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                  * we have to wait until we observe that to cast a new vote.
                  */
                 
-                haReadyToken = Quorum.NO_QUORUM;
+                haReadyToken = Quorum.NO_QUORUM; // volatile write.
 
-                // signal HAReady condition.
-                haReadyCondition.signalAll();
+                haReadyCondition.signalAll(); // signal ALL.
                 
             } else if (didMeet) {
 
+                final long tmp;
+                
                 quorumToken = newValue;
 
                 // This quorum member.
@@ -4996,13 +4997,18 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                     }
 
                     // ready as follower.
-                    haReadyToken = newValue;
+                    tmp = newValue;
 
                 } else if (localService.isLeader(quorumToken)) {
 
                     // ready as leader.
-                    haReadyToken = newValue;
+                    tmp = newValue;
 
+                } else {
+
+                    // Not ready.
+                    tmp = Quorum.NO_QUORUM;
+                    
                 }
 
                 if (!installedRBs) {
@@ -5020,9 +5026,9 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
                 }
                 
-                log.warn("SIGNAL READY TOKEN: " + haReadyToken);
-                // signal HAReady condition.
-                haReadyCondition.signalAll();
+                this.haReadyToken = tmp; // volatile write.
+
+                haReadyCondition.signalAll(); // signal ALL.
                 
             } else {
 
@@ -5129,6 +5135,25 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
         }
     }
 
+    /**
+     * Returns the current value of the <code>haReadyToken</code>
+     * (non-blocking).
+     */
+    final public long getHAReady() {
+
+        /*
+         * Note: In order for this operation to be non-blocking and still ensure
+         * proper visibility of the [haReadyToken], the token MUST be volatile,
+         * the setQuorumToken() method MUST NOT change the value of the
+         * [haReadyToken] until all internal actions have been taken. That is,
+         * until it is willing to do haReadyCondition.signalAll() and release
+         * the lock guarding that Condition.
+         */
+
+        return haReadyToken;
+        
+    }
+    
     /**
      * Install identical root blocks on the journal. This is used for a few
      * different conditions in HA.

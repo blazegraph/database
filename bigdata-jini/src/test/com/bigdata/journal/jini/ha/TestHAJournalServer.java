@@ -34,6 +34,8 @@ import net.jini.core.lookup.ServiceID;
 
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.msg.HADigestRequest;
+import com.bigdata.quorum.Quorum;
+import com.bigdata.rdf.sail.webapp.client.HAStatusEnum;
 
 /**
  * Life cycle and related tests for a single remote {@link HAJournalServer} out
@@ -69,9 +71,20 @@ public class TestHAJournalServer extends AbstractHA3JournalServerTestCase {
             // ignore.
             
         }
-        
+
+        // Service is not met in any role around a quorum.
+        try {
+            serverA.awaitHAReady(awaitQuorumTimeout, TimeUnit.MILLISECONDS);
+        } catch (TimeoutException ex) {
+            // Ignore expected exception.
+        }
+
+        // Verify can access the REST API "status" page.
         doNSSStatusRequest(serverA);
 
+        // Verify that service self-reports as NotReady via the REST API.
+        assertEquals(HAStatusEnum.NotReady, getNSSHAStatus(serverA));
+        
         assertTrue(getHAJournalFileA().exists());
         assertTrue(getHALogDirA().exists());
         assertTrue(getSnapshotDirA().exists());
@@ -283,121 +296,5 @@ public class TestHAJournalServer extends AbstractHA3JournalServerTestCase {
         }
 
     }
-
-//    /**
-//     * Create and destroy an {@link HAJournalServer}.
-//     * 
-//     * @throws Exception 
-//     */
-//    public void test_createDestroyOneServer() throws Exception {
-//
-//        HAJournalServer serverA = null;
-//
-//        try {
-//
-//            /*
-//             * Start the HAJournalServer.
-//             * 
-//             * Note: Make sure that we do not do this with a server instance that
-//             * could have existing data (or simply that pre-exists)?
-//             * 
-//             * Note: if we run these in the same JVM then they MUST have
-//             * distinct zookeeper sessions!
-//             */
-//
-//            final HAJournalServer tmp = serverA = new HAJournalServer(
-//                    new String[] { SRC_PATH + "HAJournal-A.config" },
-//                    new FakeLifeCycle());
-//
-//            final FutureTask<Void> ft1 = new FutureTask<Void>(new Callable<Void>() {
-//                
-//                public Void call() throws Exception {
-//                
-//                    try {
-//
-//                        // Start server.
-//                        tmp.run();
-//
-//                        // Server is down.
-//                        return null;
-//                        
-//                    } catch (Throwable t) {
-//
-//                        log.error(t, t);
-//                        
-//                        throw new RuntimeException(t);
-//                        
-//                    }
-//                }
-//            });
-//
-//            // Run task
-//            executorService.execute(ft1);
-//
-//            /*
-//             * Wait for the service to start.
-//             */
-//            assertCondition(new Runnable() {
-//                public void run() {
-//                    switch (tmp.getRunState()) {
-//                    case Start:
-//                        fail(); // wait until the service starts.
-//                    }
-//                }
-//            });
-//            
-//            // Should be running.
-//            assertEquals(RunState.Running, tmp.getRunState());
-//
-//            // The Remote interface for (A).
-//            final HAGlue remoteA = (HAGlue) serverA.getProxy();
-//
-//            doNSSStatusRequest(remoteA);
-//            
-//            // Destroy the service using its remote interface.
-//            ((RemoteDestroyAdmin)remoteA).destroy();
-//            
-//            /*
-//             * Wait until the server acknowledges that it is shutting down.
-//             */
-//            assertCondition(new Runnable() {
-//                public void run() {
-//                    switch (tmp.getRunState()) {
-//                    case Shutdown:
-//                    case ShuttingDown:
-//                        return;
-//                    }
-//                    fail();
-//                }
-//            });
-//         
-//            // Wait for future/error.
-//            ft1.get(5000, TimeUnit.MILLISECONDS);
-//
-////            // Wait until shutdown.
-////            assertCondition(new Runnable() {
-////                public void run() {
-////                    switch (tmp.getRunState()) {
-////                    case Shutdown:
-////                        return;
-////                    }
-////                    fail();
-////                }
-////            });
-//
-//            // Should be stopped.
-//            assertEquals(RunState.Shutdown, tmp.getRunState());
-//
-//        } finally {
-//
-//            if (serverA != null) {
-//
-//                serverA.shutdownNow(true/*destroy*/);
-//                
-//            }
-//            
-//        }
-//
-//    }
 
 }

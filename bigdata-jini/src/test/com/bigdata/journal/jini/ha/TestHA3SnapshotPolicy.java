@@ -548,6 +548,8 @@ public class TestHA3SnapshotPolicy extends AbstractHA3JournalServerTestCase {
      *            The service.
      *            
      * @throws Exception
+     * 
+     * TODO Add percentLogSize query parameter option.
      */
     private void doSnapshotRequest(final HAGlue haGlue) throws Exception {
 
@@ -574,7 +576,9 @@ public class TestHA3SnapshotPolicy extends AbstractHA3JournalServerTestCase {
         } catch (IOException ex) {
 
             log.error(ex, ex);
-
+            
+            throw ex;
+            
         }
 
     }
