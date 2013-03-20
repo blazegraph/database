@@ -32,9 +32,6 @@ import java.util.UUID;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.zip.GZIPInputStream;
-
-import net.jini.config.Configuration;
 
 import org.apache.http.HttpResponse;
 import org.apache.http.client.HttpClient;
@@ -49,22 +46,14 @@ import com.bigdata.journal.IHABufferStrategy;
 import com.bigdata.journal.IRootBlockView;
 import com.bigdata.quorum.Quorum;
 import com.bigdata.rdf.sail.webapp.client.ConnectOptions;
+import com.bigdata.rdf.sail.webapp.client.HAStatusEnum;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
 
 /**
  * Test suites for an {@link HAJournalServer} quorum with a replication factor
  * of THREE (3) and a fully met {@link Quorum}.
  * 
- * TODO Verify that the snapshot is consistent in the data with the Journal.
- * This could be done using a digest comparison of the journal and a digest
- * computed from a {@link GZIPInputStream} reading from the snapshot. [The same
- * approach could also work for snapshots under sustained writes if we modify
- * the journal digest logic to only pay attention to the committed allocations.]
- * 
- * TODO Verify snapshot is refused for service that is not joined with the met
- * quorum.
- * 
- * TODO HARestore test suite: Verify that the snapshot may be unziped and halogs
+ * FIXME HARestore test suite: Verify that the snapshot may be unziped and halogs
  * applied by the {@link HARestore} utility in order to obtain a journal
  * corresponding to a specific commit point.
  * <p>
@@ -74,7 +63,7 @@ import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
  * TODO Verify will not take snapshot if size on disk of HALog files since the
  * last snapshot is LT some percentage.
  * 
- * TODO Verify release of old snapshot(s) and HALog(s) when a new snapshot is
+ * FIXME Verify release of old snapshot(s) and HALog(s) when a new snapshot is
  * taken in accordence with the {@link IRestorePolicy}.
  * <p>
  * Make sure that we never release the most current snapshot or HALogs required
@@ -97,26 +86,57 @@ public class TestHA3SnapshotPolicy extends AbstractHA3JournalServerTestCase {
         super(name);
     }
  
+//    /**
+//     * {@inheritDoc}
+//     * <p>
+//     * Note: This overrides some {@link Configuration} values for the
+//     * {@link HAJournalServer} in order to establish conditions suitable for
+//     * testing the {@link ISnapshotPolicy} and {@link IRestorePolicy}.
+//     */
+//    @Override
+//    protected String[] getOverrides() {
+//        
+//        return new String[]{
+//                "com.bigdata.journal.jini.ha.HAJournalServer.snapshotPolicy=new com.bigdata.journal.jini.ha.DefaultSnapshotPolicy()"
+//        };
+//        
+//    }
+
     /**
-     * {@inheritDoc}
-     * <p>
-     * Note: This overrides some {@link Configuration} values for the
-     * {@link HAJournalServer} in order to establish conditions suitable for
-     * testing the {@link ISnapshotPolicy} and {@link IRestorePolicy}.
+     * Start A. Verify that we can not take a snapshot since it is not joined
+     * with the met quorum.
      */
-    @Override
-    protected String[] getOverrides() {
+    public void testA_snapshot_refused_since_not_met() throws Exception {
+
+        // Start A.
+        final HAGlue serverA = startA();
+
+        // Verify the REST API is up and service is not ready.
+        // TODO Might have to retry this if 404 observed.
+        assertEquals(HAStatusEnum.NotReady, getNSSHAStatus(serverA));
         
-        return new String[]{
-                "com.bigdata.journal.jini.ha.HAJournalServer.snapshotPolicy=new com.bigdata.journal.jini.ha.DefaultSnapshotPolicy()"
-        };
+        // Request a snapshot.
+        final Future<IHASnapshotResponse> ft = serverA
+                .takeSnapshot(new HASnapshotRequest(0/* percentLogSize */));
+
+        if(ft == null) {
         
+            // Ok. No snapshot will be taken.
+            return;
+
+        }
+
+        ft.cancel(true/* mayInterruptIfRunning */);
+        
+        fail("Not expecting a future since service is not joined with a met quorum.");
+
     }
 
     /**
      * Start two services. The quorum meets. Take a snapshot. Verify that the
      * snapshot appears within a resonable period of time and that it is for
-     * <code>commitCounter:=1</code> (just the KB create).
+     * <code>commitCounter:=1</code> (just the KB create). Verify that the
+     * digest of the snapshot agrees with the digest of the journal.
      */
     public void testAB_snapshot() throws Exception {
 
@@ -132,7 +152,7 @@ public class TestHA3SnapshotPolicy extends AbstractHA3JournalServerTestCase {
         awaitKBExists(serverA);
 
         final HAGlue leader = quorum.getClient().getLeader(token);
-
+        assertEquals(serverA, leader); // A is the leader.
         {
 
             // Verify quorum is still valid.
@@ -161,12 +181,17 @@ public class TestHA3SnapshotPolicy extends AbstractHA3JournalServerTestCase {
 
             final IRootBlockView snapshotRB = ft.get().getRootBlock();
 
+            final long commitCounter = 1L;
+            
             // Verify snapshot is for the expected commit point.
-            assertEquals(1L, snapshotRB.getCommitCounter());
+            assertEquals(commitCounter, snapshotRB.getCommitCounter());
 
             // Snapshot directory contains the desired filename.
             assertEquals(new String[] { "00000000000000000001"
                     + SnapshotManager.SNAPSHOT_EXT }, getSnapshotDirA().list());
+
+            // Verify digest of snapshot agrees with digest of journal.
+            assertSnapshotDigestEquals(leader, commitCounter);
 
         }
 
@@ -176,7 +201,8 @@ public class TestHA3SnapshotPolicy extends AbstractHA3JournalServerTestCase {
      * Start two services. The quorum meets. Take a snapshot using B (NOT the
      * leader). Verify that the snapshot appears within a resonable period of
      * time and that it is for <code>commitCounter:=1</code> (just the KB
-     * create).
+     * create). Verify that the digest of the snapshot agrees with the digest of
+     * the journal.
      */
     public void testAB_snapshotB() throws Exception {
 
@@ -225,8 +251,10 @@ public class TestHA3SnapshotPolicy extends AbstractHA3JournalServerTestCase {
 
             final IRootBlockView snapshotRB = ft.get().getRootBlock();
 
+            final long commitCounter = 1L;
+            
             // Verify snapshot is for the expected commit point.
-            assertEquals(1L, snapshotRB.getCommitCounter());
+            assertEquals(commitCounter, snapshotRB.getCommitCounter());
 
             // Snapshot directory remains empty on A.
             assertEquals(0, getSnapshotDirA().list().length);
@@ -234,6 +262,9 @@ public class TestHA3SnapshotPolicy extends AbstractHA3JournalServerTestCase {
             // Snapshot directory contains the desired filename on B.
             assertEquals(new String[] { "00000000000000000001"
                     + SnapshotManager.SNAPSHOT_EXT }, getSnapshotDirB().list());
+
+            // Verify digest of snapshot agrees with digest of journal.
+            assertSnapshotDigestEquals(serverB, commitCounter);
 
         }
 
@@ -289,12 +320,17 @@ public class TestHA3SnapshotPolicy extends AbstractHA3JournalServerTestCase {
 
             final IRootBlockView snapshotRB = ft.get().getRootBlock();
 
+            final long commitCounter = 1L;
+            
             // Verify snapshot is for the expected commit point.
-            assertEquals(1L, snapshotRB.getCommitCounter());
+            assertEquals(commitCounter, snapshotRB.getCommitCounter());
 
             // Snapshot directory contains the desired filename.
             assertEquals(new String[] { "00000000000000000001"
                     + SnapshotManager.SNAPSHOT_EXT }, getSnapshotDirA().list());
+
+            // Verify digest of snapshot agrees with digest of journal.
+            assertSnapshotDigestEquals(leader, commitCounter);
 
         }
 
@@ -367,7 +403,10 @@ public class TestHA3SnapshotPolicy extends AbstractHA3JournalServerTestCase {
 
             doSnapshotRequest(leader);
 
-            // Get the Future. Should still be there, but if not then will be null.
+            /*
+             * Get the Future. Should still be there, but if not then will be
+             * null (it which case the snapshot is already done).
+             */
             final Future<IHASnapshotResponse> ft = leader
                     .takeSnapshot(new HASnapshotRequest(1000/* percentLogSize */));
 
@@ -394,6 +433,8 @@ public class TestHA3SnapshotPolicy extends AbstractHA3JournalServerTestCase {
             // Snapshot directory contains the desired filename.
             assertEquals(new String[] { "00000000000000000001"
                     + SnapshotManager.SNAPSHOT_EXT }, getSnapshotDirA().list());
+
+            assertSnapshotDigestEquals(leader, 1L/* commitCounter */);
 
         }
 
@@ -528,14 +569,19 @@ public class TestHA3SnapshotPolicy extends AbstractHA3JournalServerTestCase {
 
             final IRootBlockView snapshotRB = ft.get().getRootBlock();
 
+            final long commitCounter = 2L;
+            
             // Verify snapshot is for the expected commit point.
-            assertEquals(2L, snapshotRB.getCommitCounter());
+            assertEquals(commitCounter, snapshotRB.getCommitCounter());
 
             // Snapshot directory contains the desired filename.
             assertEquals(
                     new String[] { SnapshotManager.getSnapshotFile(
                             getSnapshotDirA(), 2L).getName() },
                     getSnapshotDirA().list());
+
+            // Verify digest of snapshot agrees with digest of journal.
+            assertSnapshotDigestEquals(leader, commitCounter);
 
         }
 

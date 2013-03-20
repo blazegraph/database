@@ -29,8 +29,10 @@ package com.bigdata.journal.jini.ha;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.math.BigInteger;
 import java.security.DigestException;
 import java.security.NoSuchAlgorithmException;
+import java.util.Arrays;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -52,6 +54,8 @@ import com.bigdata.btree.BytesUtil;
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.msg.HADigestRequest;
 import com.bigdata.ha.msg.HALogDigestRequest;
+import com.bigdata.ha.msg.HARootBlockRequest;
+import com.bigdata.ha.msg.HASnapshotDigestRequest;
 import com.bigdata.io.TestCase3;
 import com.bigdata.rdf.sail.TestConcurrentKBCreate;
 import com.bigdata.rdf.sail.webapp.NanoSparqlServer;
@@ -669,6 +673,69 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
 
     }
 
+    /**
+     * Verify the the digest of the journal is equal to the digest of the
+     * indicated snapshot on the specified service.
+     * <p>
+     * Note: This can only succeed if the journal is at the specififed commit
+     * point. If there are concurrent writes on the journal, then it's digest
+     * will no longer be consistent with the snapshot.
+     * 
+     * @param service
+     *            The service.
+     * @param commitCounter
+     *            The commit counter for the snapshot.
+     * 
+     * @throws NoSuchAlgorithmException
+     * @throws DigestException
+     * @throws IOException
+     */
+    protected void assertSnapshotDigestEquals(final HAGlue service,
+            final long commitCounter) throws NoSuchAlgorithmException,
+            DigestException, IOException {
+
+        final long commitCounterBefore = service
+                .getRootBlock(new HARootBlockRequest(null/* storeUUID */))
+                .getRootBlock().getCommitCounter();
+        
+        // Verify the journal is at the desired commit point.
+        assertEquals(commitCounter, commitCounterBefore);
+        
+        final byte[] journalDigest = service.computeDigest(
+                new HADigestRequest(null/* storeUUID */)).getDigest();
+
+        final long commitCounterAfter = service
+                .getRootBlock(new HARootBlockRequest(null/* storeUUID */))
+                .getRootBlock().getCommitCounter();
+
+        // Verify the journal is still at the desired commit point.
+        assertEquals(commitCounter, commitCounterAfter);
+
+        final byte[] snapshotDigest = service.computeHASnapshotDigest(
+                new HASnapshotDigestRequest(commitCounter)).getDigest();
+
+        if (!BytesUtil.bytesEqual(journalDigest, snapshotDigest)) {
+
+            /*
+             * Note: Provides base 16 rendering as per normal md5 runs.
+             */
+
+            final String journalStr = new BigInteger(1, journalDigest)
+                    .toString(16);
+            
+            final String snapshotStr = new BigInteger(1, snapshotDigest)
+                    .toString(16);
+
+            fail("journal=" + journalStr + ", snapshot=" + snapshotStr);
+
+//            fail("journal=" + Arrays.toString(journalDigest) + ", snapshot="
+//                    + Arrays.toString(snapshotDigest) + " for commitCounter="
+//                    + commitCounter + " on service=" + service);
+
+        }
+        
+    }
+    
     /**
      * Return the name of the foaf data set.
      * 

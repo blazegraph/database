@@ -118,6 +118,8 @@ import com.bigdata.ha.msg.IHARebuildRequest;
 import com.bigdata.ha.msg.IHARootBlockRequest;
 import com.bigdata.ha.msg.IHARootBlockResponse;
 import com.bigdata.ha.msg.IHASendStoreResponse;
+import com.bigdata.ha.msg.IHASnapshotDigestRequest;
+import com.bigdata.ha.msg.IHASnapshotDigestResponse;
 import com.bigdata.ha.msg.IHASnapshotRequest;
 import com.bigdata.ha.msg.IHASnapshotResponse;
 import com.bigdata.ha.msg.IHASyncRequest;
@@ -5518,6 +5520,15 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                 final IHALogDigestRequest req) throws IOException,
                 NoSuchAlgorithmException, DigestException {
 
+            throw new UnsupportedOperationException();
+
+        }
+
+        @Override
+        public IHASnapshotDigestResponse computeHASnapshotDigest(
+                final IHASnapshotDigestRequest req) throws IOException,
+                NoSuchAlgorithmException, DigestException {
+        
             throw new UnsupportedOperationException();
 
         }

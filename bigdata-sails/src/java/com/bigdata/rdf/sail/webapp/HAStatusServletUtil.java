@@ -26,6 +26,11 @@ import java.io.File;
 import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.math.BigInteger;
+import java.security.DigestException;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 
@@ -36,9 +41,12 @@ import org.apache.zookeeper.KeeperException;
 
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.QuorumService;
+import com.bigdata.ha.halog.HALogReader;
 import com.bigdata.ha.halog.IHALogReader;
 import com.bigdata.ha.msg.HASnapshotRequest;
 import com.bigdata.journal.IIndexManager;
+import com.bigdata.journal.IRootBlockView;
+import com.bigdata.journal.RootBlockView;
 import com.bigdata.journal.jini.ha.HAJournal;
 import com.bigdata.journal.jini.ha.SnapshotManager;
 import com.bigdata.quorum.AsynchronousQuorumCloseException;
@@ -104,6 +112,8 @@ public class HAStatusServletUtil {
 
         final QuorumService<HAGlue> quorumService = quorum.getClient();
 
+        final boolean digests = req.getParameter(StatusServlet.DIGESTS) != null;
+        
         current.node("h1", "High Availability");
 
         // The quorum state.
@@ -144,8 +154,25 @@ public class HAStatusServletUtil {
             {
                 final File file = journal.getFile();
                 if (file != null) {
+                    String digestStr = null;
+                    if (digests) {
+                        try {
+                            final MessageDigest digest = MessageDigest
+                                    .getInstance("MD5");
+                            journal.getBufferStrategy().computeDigest(
+                                    null/* snapshot */, digest);
+                            digestStr = new BigInteger(1, digest.digest())
+                                    .toString(16);
+                        } catch (NoSuchAlgorithmException ex) {
+                            // ignore
+                        } catch (DigestException ex) {
+                            // ignore
+                        }
+                    }
                     p.text("HAJournal: file=" + file + ", nbytes="
-                            + journal.size()).node("br").close();
+                            + journal.size()
+                            + (digestStr == null ? "" : ", md5=" + digestStr))
+                            .node("br").close();
                 }
             }
 
@@ -168,16 +195,54 @@ public class HAStatusServletUtil {
                     nbytes += file.length();
                     nfiles++;
                 }
-                p.text("HALogDir: nfiles=" + nfiles + ", nbytes="
-                        + nbytes + ", path=" + haLogDir).node("br")
-                        .close();
+                p.text("HALogDir: nfiles=" + nfiles + ", nbytes=" + nbytes
+                        + ", path=" + haLogDir).node("br").close();
+                if (digests) {
+                    /*
+                     * List each HALog file together with its digest.
+                     * 
+                     * FIXME We need to request the live log differently and use
+                     * the lock for it. That makes printing the HALog digests
+                     * here potentially probemantic if there are outstanding
+                     * writes.
+                     */
+                    for (File file : a) {
+                        String digestStr = null;
+                        final IHALogReader r = new HALogReader(file);
+                        try {
+                            if (digests && !r.isEmpty()) {
+                                try {
+                                    final MessageDigest digest = MessageDigest
+                                            .getInstance("MD5");
+                                    r.computeDigest(digest);
+                                    digestStr = new BigInteger(1,
+                                            digest.digest()).toString(16);
+                                } catch (NoSuchAlgorithmException ex) {
+                                    // ignore
+                                } catch (DigestException ex) {
+                                    // ignore
+                                }
+                            }
+                        } finally {
+                            r.close();
+                        }
+                        p.text("HALogFile: closingCommitCounter="
+                                + r.getClosingRootBlock().getCommitCounter()
+                                + ", file="
+                                + file
+                                + ", nbytes="
+                                + nbytes
+                                + (digestStr == null ? "" : ", md5="
+                                        + digestStr)).node("br").close();
+                    }
+                }
             }
 
             /*
              * Report #of files and bytes in the snapshot directory.
              */
             {
-                final File snapshotDir = ((HAJournal) journal)
+                final File snapshotDir = journal
                         .getSnapshotManager().getSnapshotDir();
                 final File[] a = snapshotDir.listFiles(new FilenameFilter() {
                     @Override
@@ -193,6 +258,44 @@ public class HAStatusServletUtil {
                 }
                 p.text("SnapshotDir: nfiles=" + nfiles + ", nbytes=" + nbytes
                         + ", path=" + snapshotDir).node("br").close();
+                
+                if (true) {
+
+                    /*
+                     * List the available snapshots.
+                     */
+                    final List<IRootBlockView> snapshots = journal
+                            .getSnapshotManager().getSnapshots();
+
+                    for (IRootBlockView rb : snapshots) {
+
+                        String digestStr = null;
+                        if (digests) {
+                            try {
+                                final MessageDigest digest = MessageDigest
+                                        .getInstance("MD5");
+                                journal.getSnapshotManager().getDigest(
+                                        rb.getCommitCounter(), digest);
+                                digestStr = new BigInteger(1, digest.digest())
+                                        .toString(16);
+                            } catch (NoSuchAlgorithmException ex) {
+                                // ignore
+                            } catch (DigestException ex) {
+                                // ignore
+                            }
+                        }
+
+                        p.text("SnapshotFile: commitTime="
+                                + RootBlockView.toString(rb.getLastCommitTime())
+                                + ", commitCounter="
+                                + rb.getCommitCounter()
+                                + (digestStr == null ? "" : ", md5="
+                                        + digestStr)).node("br").close();
+
+                    }
+                    
+                }
+                
             }
 
             /*

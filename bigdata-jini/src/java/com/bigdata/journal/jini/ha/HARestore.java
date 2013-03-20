@@ -50,8 +50,6 @@ import com.bigdata.journal.Options;
  * it forward to a specific commit point.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * 
- *         FIXME HARestore : write test suite.
  */
 public class HARestore {
 

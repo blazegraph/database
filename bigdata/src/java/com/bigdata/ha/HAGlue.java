@@ -39,6 +39,8 @@ import com.bigdata.ha.msg.IHALogDigestRequest;
 import com.bigdata.ha.msg.IHALogDigestResponse;
 import com.bigdata.ha.msg.IHARootBlockRequest;
 import com.bigdata.ha.msg.IHARootBlockResponse;
+import com.bigdata.ha.msg.IHASnapshotDigestRequest;
+import com.bigdata.ha.msg.IHASnapshotDigestResponse;
 import com.bigdata.ha.msg.IHASnapshotRequest;
 import com.bigdata.ha.msg.IHASnapshotResponse;
 import com.bigdata.journal.AbstractJournal;
@@ -152,8 +154,8 @@ public interface HAGlue extends HAGlueBase, HAPipelineGlue, HAReadGlue,
     RunState getRunState() throws IOException;
 
     /**
-     * Compute the digest of the backing store - <strong>THIS METHOD IS ONLY FOR
-     * DIAGNOSTIC PURPOSES.</strong>
+     * Compute the digest of the entire backing store - <strong>THIS METHOD IS
+     * ONLY FOR DIAGNOSTIC PURPOSES.</strong>
      * <p>
      * The digest is useless if there are concurrent writes since it can not be
      * meaningfully compared with the digest of another store unless both stores
@@ -163,8 +165,8 @@ public interface HAGlue extends HAGlueBase, HAPipelineGlue, HAReadGlue,
             NoSuchAlgorithmException, DigestException;
 
     /**
-     * Compute the digest of a HALog file - <strong>THIS METHOD IS ONLY FOR
-     * DIAGNOSTIC PURPOSES.</strong>
+     * Compute the digest of the entire HALog file - <strong>THIS METHOD IS ONLY
+     * FOR DIAGNOSTIC PURPOSES.</strong>
      * <p>
      * The digest is useless if there are concurrent writes since it can not be
      * meaningfully compared with the digest of another store unless both stores
@@ -175,6 +177,18 @@ public interface HAGlue extends HAGlueBase, HAPipelineGlue, HAReadGlue,
      */
     IHALogDigestResponse computeHALogDigest(IHALogDigestRequest req) throws IOException,
             NoSuchAlgorithmException, DigestException;
+
+    /**
+     * Compute the digest of the entire snapshot file - <strong>THIS METHOD IS
+     * ONLY FOR DIAGNOSTIC PURPOSES.</strong> This digest is computed for the
+     * compressed data so it may be compared directly with the digest of the
+     * backing store from which the snapshot was obtained.
+     * 
+     * @throws FileNotFoundException
+     *             if no snapshot exists for that commit point.
+     */
+    IHASnapshotDigestResponse computeHASnapshotDigest(IHASnapshotDigestRequest req)
+            throws IOException, NoSuchAlgorithmException, DigestException;
 
     /**
      * Obtain a global write lock on the leader. The lock only blocks writers.

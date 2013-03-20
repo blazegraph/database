@@ -958,12 +958,36 @@ public class RootBlockView implements IRootBlockView {
     }
 
     private static final String toString(final DateFormat df, final long t) {
-     
+
         return Long.toString(t)
                 + (t != 0L ? " [" + df.format(new Date(t)) + "]" : "");
-        
+
     }
-    
+
+    private static DateFormat getDateFormat() {
+
+        final DateFormat df = DateFormat.getDateTimeInstance(
+                DateFormat.FULL/* dateStyle */, DateFormat.FULL/* timeStyle */);
+
+        return df;
+
+    }
+
+    /**
+     * Format a commit time as the raw milliseconds since the epoch value plus a
+     * fully expressed date and time.
+     * 
+     * @param t
+     *            The commit time.
+     * 
+     * @return The date and time strong.
+     */
+    public static String toString(final long t) {
+
+        return toString(getDateFormat(), t);
+
+    }
+
     public long getMetaBitsAddr() {
         if (getVersion() < VERSION1) {
             // Always WORM store before VERSION1

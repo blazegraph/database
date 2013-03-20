@@ -301,6 +301,7 @@ public class CommitTimeIndex extends BTree {
         final long snapshotCommitCounter;
         synchronized (this) {
 
+            @SuppressWarnings("unchecked")
             final ITupleIterator<IRootBlockView> itr = 
                     rangeIterator(null/* fromKey */, null/* toKey */,
                             1/* capacity */, IRangeQuery.DEFAULT

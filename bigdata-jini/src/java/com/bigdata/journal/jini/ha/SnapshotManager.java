@@ -27,11 +27,17 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.FilenameFilter;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.ByteBuffer;
+import java.security.DigestException;
+import java.security.MessageDigest;
 import java.util.Formatter;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -47,6 +53,8 @@ import net.jini.config.ConfigurationException;
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.BytesUtil;
+import com.bigdata.btree.ITuple;
+import com.bigdata.btree.ITupleIterator;
 import com.bigdata.concurrent.FutureTaskMon;
 import com.bigdata.ha.halog.IHALogReader;
 import com.bigdata.ha.msg.HASnapshotResponse;
@@ -59,6 +67,7 @@ import com.bigdata.journal.ITx;
 import com.bigdata.journal.RootBlockUtility;
 import com.bigdata.journal.RootBlockView;
 import com.bigdata.quorum.QuorumException;
+import com.bigdata.rawstore.Bytes;
 import com.bigdata.util.ChecksumUtility;
 
 /**
@@ -78,7 +87,7 @@ public class SnapshotManager {
     /**
      * The file extension for journal snapshots.
      */
-    public final static String SNAPSHOT_EXT = ".jnl.zip";
+    public final static String SNAPSHOT_EXT = ".jnl.gz";
 
     /**
      * The prefix for the temporary files used to generate snapshots.
@@ -112,6 +121,12 @@ public class SnapshotManager {
      * populated when the {@link HAJournal} starts from the file system and
      * maintained as snapshots are taken or destroyed. All operations on this
      * index MUST be synchronized on its object monitor.
+     * <p>
+     * Note: This index is not strictly necessary. We can also visit the files
+     * in the file system. However, the index makes it much faster to locate a
+     * specific snapshot based on a commit time and provides low latency access
+     * to the {@link IRootBlockView} for that snapshot (faster than opening the
+     * snapshot file on the disk).
      */
     private final CommitTimeIndex snapshotIndex;
 
@@ -155,17 +170,17 @@ public class SnapshotManager {
         
     }
     
-    /**
-     * An in memory index over the last commit time of each snapshot. This is
-     * populated when the {@link HAJournal} starts from the file system and
-     * maintained as snapshots are taken or destroyed. All operations on this
-     * index MUST be synchronized on its object monitor.
-     */
-    CommitTimeIndex getSnapshotIndex() {
-
-        return snapshotIndex;
-        
-    }
+//    /**
+//     * An in memory index over the last commit time of each snapshot. This is
+//     * populated when the {@link HAJournal} starts from the file system and
+//     * maintained as snapshots are taken or destroyed. All operations on this
+//     * index MUST be synchronized on its object monitor.
+//     */
+//    private CommitTimeIndex getSnapshotIndex() {
+//
+//        return snapshotIndex;
+//        
+//    }
 
     public SnapshotManager(final HAJournalServer server,
             final HAJournal journal, final Configuration config)
@@ -443,6 +458,69 @@ public class SnapshotManager {
 
     }
 
+    /**
+     * Find the commit counter for the most recent snapshot (if any).
+     * 
+     * @return That commit counter -or- ZERO (0L) if there are no snapshots.
+     */
+    public long getMostRecentSnapshotCommitCounter() {
+        
+        return snapshotIndex.getMostRecentSnapshotCommitCounter();
+        
+    }
+    
+    /**
+     * Return the {@link IRootBlock} identifying the snapshot having the largest
+     * commitTime that is less than or equal to the given value.
+     * 
+     * @param timestamp
+     *            The given timestamp.
+     * 
+     * @return The {@link IRootBlockView} of the identified snapshot -or-
+     *         <code>null</code> iff there are no snapshots in the index that
+     *         satisify the probe.
+     * 
+     * @throws IllegalArgumentException
+     *             if <i>timestamp</i> is less than or equals to ZERO (0L).
+     */
+    public IRootBlockView find(final long timestamp) {
+        
+        return snapshotIndex.find(timestamp);
+        
+    }
+    
+    /**
+     * Return a list of all known snapshots. The list consists of the
+     * {@link IRootBlockView} for each snapshot. The list will be in order of
+     * increasing <code>commitTime</code>. This should also correspond to
+     * increasing <code>commitCounter</code>.
+     * 
+     * @return A list of the {@link IRootBlockView} for the known snapshots.
+     */
+    public List<IRootBlockView> getSnapshots() {
+
+        final List<IRootBlockView> l = new LinkedList<IRootBlockView>();
+        
+        synchronized (snapshotIndex) {
+
+            @SuppressWarnings("unchecked")
+            final ITupleIterator<IRootBlockView> itr = snapshotIndex.rangeIterator();
+
+            while(itr.hasNext()) {
+
+                final ITuple<IRootBlockView> t = itr.next();
+
+                final IRootBlockView rootBlock = t.getObject();
+
+                l.add(rootBlock);
+
+            }
+
+        }
+
+        return l;
+    }
+    
     /**
      * Return the {@link Future} of the current snapshot operation (if any).
      * 
@@ -949,5 +1027,74 @@ public class SnapshotManager {
         }
 
     } // class SendStoreTask
+
+    
+    /**
+     * Compute the digest of a snapshot file.
+     * <p>
+     * Note: The digest is only computed for the data beyond the file header.
+     * This is for consistency with
+     * {@link IHABufferStrategy#computeDigest(Object, MessageDigest)}
+     * 
+     * @param commitCounter
+     * @param digest
+     * @throws IOException
+     * @throws FileNotFoundException
+     * @throws DigestException
+     * 
+     *             TODO We should pin the snapshot if we are reading it to
+     *             compute its digest.
+     */
+    public void getDigest(final long commitCounter, final MessageDigest digest)
+            throws FileNotFoundException, IOException, DigestException {
+
+        final File file = getSnapshotFile(commitCounter);
+
+        // Note: Throws FileNotFoundException.
+        final GZIPInputStream is = new GZIPInputStream(
+                new FileInputStream(file));
+
+        try {
+
+            if (log.isInfoEnabled())
+                log.info("Computing digest: " + file);
+
+            computeDigest(is, digest);
+
+        } finally {
+
+            is.close();
+
+        }
+
+    }
+
+    private static void computeDigest(final InputStream is,
+            final MessageDigest digest) throws DigestException, IOException {
+
+        // The capacity of that buffer.
+        final int bufferCapacity = Bytes.kilobyte32 * 4;
+
+        // A byte[] with the same capacity as that ByteBuffer.
+        final byte[] a = new byte[bufferCapacity];
+
+        while (true) {
+
+            // Read as much as we can.
+            final int nread = is.read(a, 0/* off */, a.length);
+
+            if (nread == -1) {
+
+                // End of stream.
+                return;
+
+            }
+
+            // update digest
+            digest.update(a, 0/* off */, nread/* len */);
+
+        }
+
+    }
 
 }

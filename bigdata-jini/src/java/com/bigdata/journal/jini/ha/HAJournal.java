@@ -69,6 +69,7 @@ import com.bigdata.ha.msg.HADigestResponse;
 import com.bigdata.ha.msg.HALogDigestResponse;
 import com.bigdata.ha.msg.HALogRootBlocksResponse;
 import com.bigdata.ha.msg.HASendStoreResponse;
+import com.bigdata.ha.msg.HASnapshotDigestResponse;
 import com.bigdata.ha.msg.IHADigestRequest;
 import com.bigdata.ha.msg.IHADigestResponse;
 import com.bigdata.ha.msg.IHAGlobalWriteLockRequest;
@@ -79,6 +80,8 @@ import com.bigdata.ha.msg.IHALogRootBlocksRequest;
 import com.bigdata.ha.msg.IHALogRootBlocksResponse;
 import com.bigdata.ha.msg.IHARebuildRequest;
 import com.bigdata.ha.msg.IHASendStoreResponse;
+import com.bigdata.ha.msg.IHASnapshotDigestRequest;
+import com.bigdata.ha.msg.IHASnapshotDigestResponse;
 import com.bigdata.ha.msg.IHASnapshotRequest;
 import com.bigdata.ha.msg.IHASnapshotResponse;
 import com.bigdata.ha.msg.IHASyncRequest;
@@ -990,6 +993,32 @@ public class HAJournal extends Journal {
             return new HALogDigestResponse(req.getCommitCounter(),
                     digest.digest());
 
+        }
+
+        @Override
+        public IHASnapshotDigestResponse computeHASnapshotDigest(
+                final IHASnapshotDigestRequest req) throws IOException,
+                NoSuchAlgorithmException, DigestException {
+
+            if (haLog.isDebugEnabled())
+                haLog.debug("req=" + req);
+
+            // The commit counter of the desired closing root block.
+            final long commitCounter = req.getCommitCounter();
+
+            final MessageDigest digest = MessageDigest.getInstance("MD5");
+
+            /*
+             * Compute digest for snapshot for that commit point.
+             * 
+             * Note: throws FileNotFoundException if no snapshot for that commit
+             * point.
+             */
+            getSnapshotManager().getDigest(commitCounter, digest);
+
+            return new HASnapshotDigestResponse(req.getCommitCounter(),
+                    digest.digest());
+            
         }
 
         /**

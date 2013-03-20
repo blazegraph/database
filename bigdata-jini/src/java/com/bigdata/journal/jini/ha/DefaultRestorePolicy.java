@@ -75,8 +75,7 @@ public class DefaultRestorePolicy implements IRestorePolicy {
         
         final long then = now - millis;
 
-        final IRootBlockView rootBlock = jnl.getSnapshotManager()
-                .getSnapshotIndex().find(then);
+        final IRootBlockView rootBlock = jnl.getSnapshotManager().find(then);
 
         if (rootBlock == null) {
 

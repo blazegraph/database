@@ -1507,7 +1507,7 @@ public class HAJournalServer extends AbstractServer {
                  */
                 while (true) {
 
-                    long commitCounter = journal.getRootBlockView()
+                    final long commitCounter = journal.getRootBlockView()
                             .getCommitCounter();
 
                     try {
@@ -1515,6 +1515,28 @@ public class HAJournalServer extends AbstractServer {
                         final IHALogReader r = journal.getHALogWriter()
                                 .getReader(commitCounter + 1);
 
+                        if (r.isEmpty()) {
+                            
+                            /*
+                             * There is an empty HALog file. We can not apply it
+                             * since it has no data. This ends our restore
+                             * procedure.
+                             */
+                            
+                            break;
+
+                        }
+                        
+                        if (r.getOpeningRootBlock().getCommitCounter() != commitCounter) {
+                            // Sanity check
+                            throw new AssertionError();
+                        }
+
+                        if (r.getClosingRootBlock().getCommitCounter() != commitCounter + 1) {
+                            // Sanity check
+                            throw new AssertionError();
+                        }
+                        
                         applyHALog(r);
 
                         doLocalCommit(r.getClosingRootBlock());
