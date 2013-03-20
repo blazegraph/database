@@ -1236,7 +1236,7 @@ public class DataLoader {
              * Close the database against itself.
              * 
              * Note: if there are already computed entailments in the database
-             * ANY any explicit statements have been deleted then the caller
+             * AND any explicit statements have been deleted then the caller
              * needs to first delete all entailments from the database.
              */
 
