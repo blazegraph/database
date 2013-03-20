@@ -30,6 +30,8 @@ import java.math.BigInteger;
 import java.security.DigestException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.Arrays;
+import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
@@ -189,14 +191,16 @@ public class HAStatusServletUtil {
                                         .endsWith(IHALogReader.HA_LOG_EXT);
                             }
                         });
-                int nfiles = 0;
-                long nbytes = 0L;
-                for (File file : a) {
-                    nbytes += file.length();
-                    nfiles++;
+                {
+                    int nfiles = 0;
+                    long nbytes = 0L;
+                    for (File file : a) {
+                        nbytes += file.length();
+                        nfiles++;
+                    }
+                    p.text("HALogDir: nfiles=" + nfiles + ", nbytes=" + nbytes
+                            + ", path=" + haLogDir).node("br").close();
                 }
-                p.text("HALogDir: nfiles=" + nfiles + ", nbytes=" + nbytes
-                        + ", path=" + haLogDir).node("br").close();
                 if (digests) {
                     /*
                      * List each HALog file together with its digest.
@@ -206,7 +210,11 @@ public class HAStatusServletUtil {
                      * here potentially probemantic if there are outstanding
                      * writes.
                      */
+                    // Note: sort to order by increasing commit counter.
+                    Arrays.sort(a, 0/* fromIndex */, a.length,
+                            new FilenameComparator());
                     for (File file : a) {
+                        final long nbytes = file.length();
                         String digestStr = null;
                         final IHALogReader r = new HALogReader(file);
                         try {
@@ -267,6 +275,7 @@ public class HAStatusServletUtil {
                     final List<IRootBlockView> snapshots = journal
                             .getSnapshotManager().getSnapshots();
 
+                    // Note: list is ordered by increasing commitTime.
                     for (IRootBlockView rb : snapshots) {
 
                         String digestStr = null;
@@ -579,4 +588,19 @@ public class HAStatusServletUtil {
 
     }
 
+    /**
+     * Impose a lexical ordering on the file names. This is used for the HALog
+     * and snapshot file names. The main component of those file names is the
+     * commit counter, so this places the files into order by commit counter.
+     */
+    private static class FilenameComparator implements Comparator<File> {
+
+        @Override
+        public int compare(File o1, File o2) {
+            
+            return o1.getName().compareTo(o2.getName());
+        }
+        
+    }
+    
 }

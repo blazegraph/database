@@ -34,6 +34,7 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import com.bigdata.concurrent.TimeoutException;
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.halog.HALogWriter;
 import com.bigdata.ha.msg.HARootBlockRequest;
@@ -1869,8 +1870,12 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
 		awaitPipeline(new HAGlue[] {startup.serverA, startup.serverB, serverC2});
 		//assertEquals(token, awaitFullyMetQuorum());
 		
-		while (true) {
-			final long ntoken;
+        final long begin = System.currentTimeMillis();
+        final long timeout = begin + TimeUnit.SECONDS.toMillis(320);
+        while (true) {
+            if (System.currentTimeMillis() > timeout)
+                throw new TimeoutException();
+            final long ntoken;
 			try {
 				ntoken = awaitFullyMetQuorum();				
 			} catch (RuntimeException re) {
