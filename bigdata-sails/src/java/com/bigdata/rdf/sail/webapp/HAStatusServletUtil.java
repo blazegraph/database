@@ -27,7 +27,6 @@ import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.UUID;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import javax.servlet.http.HttpServletRequest;
@@ -45,6 +44,7 @@ import com.bigdata.journal.jini.ha.SnapshotManager;
 import com.bigdata.quorum.AsynchronousQuorumCloseException;
 import com.bigdata.quorum.Quorum;
 import com.bigdata.quorum.zk.ZKQuorumImpl;
+import com.bigdata.rdf.sail.webapp.client.HAStatusEnum;
 import com.bigdata.zookeeper.DumpZookeeper;
 
 /**
@@ -123,6 +123,9 @@ public class HAStatusServletUtil {
             p.text("logicalServiceId=" + quorumService.getLogicalServiceId())
                     .node("br").close();
 
+            // Note: This is the *local* value of getHAStatus(). 
+            p.text("HAStatus: " + getHAStatus(journal)).node("br").close();
+            
             /*
              * Report on the Service.
              */
@@ -141,7 +144,7 @@ public class HAStatusServletUtil {
             {
                 final File file = journal.getFile();
                 if (file != null) {
-                    p.text("journal: file=" + file + ", nbytes="
+                    p.text("HAJournal: file=" + file + ", nbytes="
                             + journal.size()).node("br").close();
                 }
             }
@@ -385,6 +388,65 @@ public class HAStatusServletUtil {
     }
 
     /**
+     * Return the {@link HAStatusEnum} for <em>this</em> {@link HAJournal}.
+     * 
+     * @param journal
+     *            The {@link HAJournal}.
+     *            
+     * @return The {@link HAStatusEnum}.
+     */
+    public HAStatusEnum getHAStatus(final HAJournal journal) {
+
+        final ZKQuorumImpl<HAGlue, QuorumService<HAGlue>> quorum = (ZKQuorumImpl<HAGlue, QuorumService<HAGlue>>) journal
+                .getQuorum();
+
+        final QuorumService<HAGlue> quorumService = quorum.getClient();
+
+        // check, but do not wait.
+        final long haReadyToken = journal.getHAReady();
+
+        final HAStatusEnum status;
+        
+        if (haReadyToken == Quorum.NO_QUORUM) {
+        
+            // Quorum is not met (as percieved by the HAJournal).
+            status = HAStatusEnum.NotReady;
+            
+        } else {
+            
+            if (quorumService.isLeader(haReadyToken)) {
+            
+                // Service is leader.
+                status = HAStatusEnum.Leader;
+                
+            } else if (quorumService.isFollower(haReadyToken)) {
+                
+                // Service is follower.
+                status = HAStatusEnum.Follower;
+                
+            } else {
+                
+                /*
+                 * awaitHAReady() should only return successfully (and hence
+                 * haReadyToken should only be a valid token) if the service was
+                 * elected as either a leader or a follower. However, it is
+                 * possible for the service to have concurrently left the met
+                 * quorum, in which case the if/then/else pattern will fall
+                 * through to this code path.
+                 */
+                
+                // Quorum is not met (as percieved by the HAJournal).
+                status = HAStatusEnum.NotReady;
+                
+            }
+            
+        }
+
+        return status;
+
+    }
+    
+    /**
      * Special reporting request for HA status.
      * 
      * @param req
@@ -402,49 +464,13 @@ public class HAStatusServletUtil {
 
         final HAJournal journal = (HAJournal) indexManager;
 
-        final ZKQuorumImpl<HAGlue, QuorumService<HAGlue>> quorum = (ZKQuorumImpl<HAGlue, QuorumService<HAGlue>>) journal
-                .getQuorum();
-
-//        // The current token.
-//        final long quorumToken = quorum.token();
-//
-//        // The last valid token.
-//        final long lastValidToken = quorum.lastValidToken();
-//
-//        final int njoined = quorum.getJoined().length;
-
-        final QuorumService<HAGlue> quorumService = quorum.getClient();
-
-        // check, but do not wait.
-        long haReadyToken = Quorum.NO_QUORUM;
-        try {
-            haReadyToken = journal.awaitHAReady(0/* timeout */,
-                    TimeUnit.NANOSECONDS/* units */);
-        } catch (TimeoutException ex) {
-            // ignore.
-        } catch (AsynchronousQuorumCloseException e) {
-            // ignore.
-        } catch (InterruptedException e) {
-            // propagate the interrupt.
-            Thread.currentThread().interrupt();
-        }
+        final HAStatusEnum status = getHAStatus(journal);
         
-        final String content;
-        if (haReadyToken != Quorum.NO_QUORUM) {
-            if (quorumService.isLeader(haReadyToken)) {
-                content = "Leader";
-            } else if (quorumService.isFollower(haReadyToken)) {
-                content = "Follower";
-            } else {
-                content = "NotReady";
-            }
-        } else {
-            content = "NotReady";
-        }
         // TODO Alternatively "max-age=1" for max-age in seconds.
         resp.addHeader("Cache-Control", "no-cache");
+
         BigdataRDFServlet.buildResponse(resp, BigdataRDFServlet.HTTP_OK,
-                BigdataRDFServlet.MIME_TEXT_PLAIN, content);
+                BigdataRDFServlet.MIME_TEXT_PLAIN, status.name());
 
         return;
 
