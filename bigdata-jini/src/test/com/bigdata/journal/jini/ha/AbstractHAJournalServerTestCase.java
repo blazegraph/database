@@ -582,9 +582,9 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
      * Thus, the commit counter is ONE (1) for the first closing commit point.
      * 
      * @param firstCommitCounter
-     *            The first commit point to be verified.
+     *            The first commit point to be verified (inclusive lower bound).
      * @param lastCommitCounter
-     *            The last commit point to be verified.
+     *            The last commit point to be verified (inclusive upper bound).
      * @param services
      *            The set of services whose HALog files will be tested.
      * 
@@ -741,6 +741,26 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
 
         }
         
+    }
+
+    /**
+     * Assert that the remote server is at the specified commit point.
+     * 
+     * @param expected
+     *            The expected commit point.
+     * @param haGlue
+     *            The remote server interface.
+     * 
+     * @throws IOException
+     */
+    protected void assertCommitCounter(final long expected, final HAGlue haGlue)
+            throws IOException {
+
+        assertEquals(
+                expected,
+                haGlue.getRootBlock(new HARootBlockRequest(null/* storeUUID */))
+                        .getRootBlock().getCommitCounter());
+
     }
     
     /**

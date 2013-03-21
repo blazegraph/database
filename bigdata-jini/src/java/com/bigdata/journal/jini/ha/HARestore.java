@@ -114,6 +114,7 @@ public class HARestore {
          */
         int nfound = 0;
         long totalBytes = 0L;
+        IRootBlockView lastRootBlock = null;
         for (long cc = initialRootBlock.getCommitCounter();; cc++) {
 
             if (haltingCommitCounter != Long.MAX_VALUE
@@ -187,6 +188,8 @@ public class HARestore {
 
                     journal.doLocalCommit(logReader.getClosingRootBlock());
 
+                    lastRootBlock = logReader.getClosingRootBlock();
+                    
                 }
 
             } finally {
@@ -197,6 +200,25 @@ public class HARestore {
 
         } // next commit point
 
+        if (lastRootBlock != null) {
+
+            /*
+             * 
+             * FIXME For some reason, we need to close and reopen the journal
+             * before it can be used. This problem is documented in the test
+             * suite. It does not effect use through main() but it is a problem
+             * for progammatic reuse. 
+             * 
+             * The commented out code immediately below is NOT sufficient.
+             */
+            
+//            (((IHABufferStrategy) journal.getBufferStrategy()))
+//                    .resetFromHARootBlock(lastRootBlock);
+//
+//            journal.abort();
+            
+        }
+        
         if (haLog.isInfoEnabled())
             haLog.info("HALogDir: nfound="
                     + nfound
