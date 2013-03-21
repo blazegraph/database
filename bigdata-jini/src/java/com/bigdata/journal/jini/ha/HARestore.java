@@ -330,7 +330,7 @@ public class HARestore {
     /**
      * Apply HALog file(s) to the journal. Each HALog file represents a single
      * native transaction on the database and will advance the journal by one
-     * commit point. The journal will go through local commit protocol as each
+     * commit point. The journal will go through a local commit protocol as each
      * HALog is applied. HALogs will be applied starting with the first commit
      * point GT the current commit point on the journal. You may optionally
      * specify a stopping criteria, e.g., the last commit point that you wish to
@@ -357,6 +357,7 @@ public class HARestore {
      *            </dl>
      * 
      * @return <code>0</code> iff the operation was fully successful.
+     * @throws IOException 
      * 
      * @throws Exception
      *             if the {@link UUID}s or other critical metadata of the
@@ -365,7 +366,7 @@ public class HARestore {
      *             if an error occcur when reading an HALog or writing on the
      *             journal.
      */
-    public static void main(final String[] args) {
+    public static void main(final String[] args) throws IOException {
 
         if (args.length == 0) {
 
@@ -410,7 +411,7 @@ public class HARestore {
 
         }
 
-        if (i != args.length - 1) {
+        if (i != args.length - 2) {
 
             usage(args);
 
@@ -419,10 +420,39 @@ public class HARestore {
         }
 
         // Journal file.
-        final File journalFile = new File(args[i++]);
+        File journalFile = new File(args[i++]);
 
         // HALogDir.
         final File haLogDir = new File(args[i++]);
+
+        /*
+         * Decompress the snapshot onto a temporary file in the current working
+         * directory.
+         */
+
+        if (journalFile.getName().endsWith(SnapshotManager.SNAPSHOT_EXT)) {
+
+            // source is the snapshot.
+            final File in = journalFile;
+
+            final String basename = journalFile.getName().substring(
+                    0,
+                    journalFile.getName().length()
+                            - SnapshotManager.SNAPSHOT_EXT.length());
+
+            // temporary file in the same directory as the snapshot.
+            final File out = File.createTempFile(basename + "-",
+                    Journal.Options.JNL, journalFile.getAbsoluteFile()
+                            .getParentFile());
+
+            System.out.println("Decompressing " + in + " to " + out);
+            
+            // Decompress the snapshot.
+            SnapshotManager.decompress(in, out);
+
+            journalFile = out;
+            
+        }
 
         // Validate journal file.
         {

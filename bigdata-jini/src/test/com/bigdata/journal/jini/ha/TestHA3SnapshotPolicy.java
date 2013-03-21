@@ -479,29 +479,7 @@ public class TestHA3SnapshotPolicy extends AbstractHA3JournalServerTestCase {
         /*
          * LOAD data on leader.
          */
-        {
-
-            final StringBuilder sb = new StringBuilder();
-            sb.append("DROP ALL;\n");
-            sb.append("LOAD <" + getFoafFileUrl("data-0.nq.gz") + ">;\n");
-            sb.append("LOAD <" + getFoafFileUrl("data-1.nq.gz") + ">;\n");
-            sb.append("LOAD <" + getFoafFileUrl("data-2.nq.gz") + ">;\n");
-            sb.append("LOAD <" + getFoafFileUrl("data-3.nq.gz") + ">;\n");
-            sb.append("INSERT {?x rdfs:label ?y . } WHERE {?x foaf:name ?y };\n");
-            sb.append("PREFIX dc: <http://purl.org/dc/elements/1.1/>\n");
-            sb.append("INSERT DATA {\n");
-            sb.append("  <http://example/book1> dc:title \"A new book\" ;\n");
-            sb.append("  dc:creator \"A.N.Other\" .\n");
-            sb.append("}\n");
-            
-            final String updateStr = sb.toString();
-            
-            // Verify quorum is still valid.
-            quorum.assertQuorum(token);
-
-            repos[0].prepareUpdate(updateStr).evaluate();
-            
-        }
+        new LargeLoadTask(token, true/* reallyLargeLoad */).call();
 
         /*
          * Verify that query on all nodes is allowed and now provides a

@@ -2073,4 +2073,118 @@ public class AbstractHA3JournalServerTestCase extends
             
      }
 
+    /**
+     * Task loads a large data set.
+     */
+    protected class LargeLoadTask implements Callable<Void> {
+        
+        private final long token;
+        private final boolean reallyLargeLoad;
+
+        /**
+         * Large load.
+         * 
+         * @param token
+         *            The token that must remain valid during the operation.
+         */
+        public LargeLoadTask(final long token) {
+        
+            this(token, false/*reallyLargeLoad*/);
+            
+        }
+        
+        /**
+         * Either large or really large load.
+         * 
+         * @param token
+         *            The token that must remain valid during the operation.
+         * @param reallyLargeLoad
+         *            if we will also load the 3 degrees of freedom file.
+         */
+        public LargeLoadTask(final long token, final boolean reallyLargeLoad) {
+
+            this.token = token;
+            
+            this.reallyLargeLoad = reallyLargeLoad;
+
+        }
+
+        public Void call() throws Exception {
+
+            final StringBuilder sb = new StringBuilder();
+            sb.append("DROP ALL;\n");
+            sb.append("LOAD <" + getFoafFileUrl("data-0.nq.gz") + ">;\n");
+            sb.append("LOAD <" + getFoafFileUrl("data-1.nq.gz") + ">;\n");
+            sb.append("LOAD <" + getFoafFileUrl("data-2.nq.gz") + ">;\n");
+            if (reallyLargeLoad)
+                sb.append("LOAD <" + getFoafFileUrl("data-3.nq.gz") + ">;\n");
+            sb.append("INSERT {?x rdfs:label ?y . } WHERE {?x foaf:name ?y };\n");
+            sb.append("PREFIX dc: <http://purl.org/dc/elements/1.1/>\n");
+            sb.append("INSERT DATA\n");
+            sb.append("{\n");
+            sb.append("  <http://example/book1> dc:title \"A new book\" ;\n");
+            sb.append("    dc:creator \"A.N.Other\" .\n");
+            sb.append("}\n");
+
+            final String updateStr = sb.toString();
+
+            final HAGlue leader = quorum.getClient().getLeader(token);
+
+            // Verify quorum is still valid.
+            quorum.assertQuorum(token);
+
+            getRemoteRepository(leader).prepareUpdate(updateStr).evaluate();
+
+            // Verify quorum is still valid.
+            quorum.assertQuorum(token);
+            
+            // Done.
+            return null;
+
+        }
+        
+    }
+    
+    /**
+     * Spin, looking for the quorum to fully meet *before* the LOAD is finished.
+     * 
+     * @return <code>true</code> iff the LOAD finished before the {@link Future}
+     * was done.
+     */
+    protected boolean awaitFullyMetDuringLOAD(final long token,
+            final Future<Void> ft) throws InterruptedException,
+            ExecutionException, TimeoutException {
+
+        final long begin = System.currentTimeMillis();
+        boolean fullyMetBeforeLoadDone = false;
+        while (!fullyMetBeforeLoadDone) {
+            final long elapsed = System.currentTimeMillis() - begin;
+            if (elapsed > loadLoadTimeoutMillis) {
+                /**
+                 * This timeout is a fail safe for LOAD operations that get HUNG
+                 * on the server and prevents CI hangs.
+                 */
+                throw new TimeoutException(
+                        "LOAD did not complete in a timely fashion.");
+            }
+            try {
+                if (quorum.isQuorumFullyMet(token) && !ft.isDone()) {
+                    // The quorum is fully met before the load is done.
+                    fullyMetBeforeLoadDone = true;
+                }
+                // Check LOAD for error.
+                ft.get(50/* timeout */, TimeUnit.MILLISECONDS);
+                // LOAD is done (no errors, future is done).
+                assertTrue(fullyMetBeforeLoadDone);
+                break;
+            } catch (TimeoutException ex) {
+                // LOAD still running.
+                continue;
+            }
+        }
+        
+        return fullyMetBeforeLoadDone;
+
+    }
+    
 }

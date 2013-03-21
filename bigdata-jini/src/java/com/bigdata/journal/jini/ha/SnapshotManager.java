@@ -32,6 +32,7 @@ import java.io.FileOutputStream;
 import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.security.DigestException;
 import java.security.MessageDigest;
@@ -1037,7 +1038,10 @@ public class SnapshotManager {
      * {@link IHABufferStrategy#computeDigest(Object, MessageDigest)}
      * 
      * @param commitCounter
+     *            The commit counter that identifies the snapshot.
      * @param digest
+     *            The digest.
+     *            
      * @throws IOException
      * @throws FileNotFoundException
      * @throws DigestException
@@ -1049,6 +1053,33 @@ public class SnapshotManager {
             throws FileNotFoundException, IOException, DigestException {
 
         final File file = getSnapshotFile(commitCounter);
+
+        getSnapshotDigest(file, digest);
+        
+    }
+
+    /**
+     * Compute the digest of a snapshot file.
+     * <p>
+     * Note: The digest is only computed for the data beyond the file header.
+     * This is for consistency with
+     * {@link IHABufferStrategy#computeDigest(Object, MessageDigest)}
+     * 
+     * @param commitCounter
+     *            The commit counter that identifies the snapshot.
+     * @param digest
+     *            The digest.
+     *            
+     * @throws IOException
+     * @throws FileNotFoundException
+     * @throws DigestException
+     * 
+     *             TODO We should pin the snapshot if we are reading it to
+     *             compute its digest.
+     */
+    static public void getSnapshotDigest(final File file,
+            final MessageDigest digest) throws FileNotFoundException,
+            IOException, DigestException {
 
         // Note: Throws FileNotFoundException.
         final GZIPInputStream is = new GZIPInputStream(
@@ -1093,6 +1124,89 @@ public class SnapshotManager {
             // update digest
             digest.update(a, 0/* off */, nread/* len */);
 
+        }
+
+    }
+
+    /**
+     * Copy the input stream to the output stream.
+     * 
+     * @param content
+     *            The input stream.
+     * @param outstr
+     *            The output stream.
+     * 
+     * @throws IOException
+     */
+    static private void copyStream(final InputStream content,
+            final OutputStream outstr) throws IOException {
+
+        final byte[] buf = new byte[1024];
+
+        while (true) {
+
+            final int rdlen = content.read(buf);
+
+            if (rdlen <= 0) {
+
+                break;
+
+            }
+
+            outstr.write(buf, 0, rdlen);
+
+        }
+
+    }
+
+    /**
+     * Decompress a snapshot onto the specified file. The original file is not
+     * modified.
+     * 
+     * @param src
+     *            The snapshot.
+     * @param dst
+     *            The file onto which the decompressed snapshot will be written.
+     * 
+     * @throws IOException
+     *             if the source file does not exist.
+     * @throws IOException
+     *             if the destination file exists and is not empty.
+     * @throws IOException
+     *             if there is a problem decompressing the source file onto the
+     *             destination file.
+     */
+    public static void decompress(final File src, final File dst)
+            throws IOException {
+
+        if (!src.exists())
+            throw new FileNotFoundException(src.getAbsolutePath());
+
+        if (!dst.exists() && dst.length() == 0)
+            throw new IOException("Output file exists and is not empty: "
+                    + dst.getAbsolutePath());
+
+        if (log.isInfoEnabled())
+            log.info("src=" + src + ", dst=" + dst);
+
+        InputStream is = null;
+        OutputStream os = null;
+        try {
+            is = new GZIPInputStream(new FileInputStream(src));
+            os = new FileOutputStream(dst);
+            copyStream(is, os);
+            os.flush();
+        } finally {
+            if (is != null)
+                try {
+                    is.close();
+                } catch (IOException ex) {
+                }
+            if (os != null)
+                try {
+                    os.close();
+                } catch (IOException ex) {
+                }
         }
 
     }
