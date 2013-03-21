@@ -438,17 +438,17 @@ public class HALogWriter {
 	 * @param data
 	 */
 	public void write(final IHAWriteMessage msg, final ByteBuffer data)
-			throws IOException {
+			throws IOException, IllegalStateException {
 
 		final Lock lock = m_stateLock.readLock();
 		lock.lock();
 		try {
 			assertOpen();
 
-			/*
-			 * Check if this really is a valid message for this file. If it is
-			 * not, then close the file and return immediately
-			 */
+            /*
+             * Check if this really is a valid message for this file. If it is
+             * not, then throw out an exception.
+             */
 			if (m_rootBlock.getCommitCounter() != msg.getCommitCounter())
 				throw new IllegalStateException("commitCounter="
 						+ m_rootBlock.getCommitCounter() + ", but msg=" + msg);

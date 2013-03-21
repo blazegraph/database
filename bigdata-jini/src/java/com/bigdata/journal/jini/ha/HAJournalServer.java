@@ -358,6 +358,20 @@ public class HAJournalServer extends AbstractServer {
     private volatile Server jettyServer;
 
     /**
+     * Enum of the run states. The states are labeled by the goal of the run
+     * state.
+     */
+    private enum RunStateEnum {
+        Restore, // apply local HALog files GT current commit point.
+        SeekConsensus, // seek consensus.
+        RunMet, // run while joined with met quorum.
+        Resync, // only resynchronization
+        Rebuild, // online disaster recovery
+        Error, // error state.
+        Shutdown; // TODO SHUTDOWN: We are not using this systematically (no ShutdownTask for this run state).
+    }
+    
+    /**
      * Caching discovery client for the {@link HAGlue} services.
      */
     public HAJournalDiscoveryClient getDiscoveryClient() {
@@ -632,8 +646,7 @@ public class HAJournalServer extends AbstractServer {
              * we would not have to do this since it will already be in the
              * Shutdown runstate.
              */
-            quorumService.runStateRef
-                    .set(HAQuorumService.RunStateEnum.Shutdown);
+            quorumService.runStateRef.set(RunStateEnum.Shutdown);
 
             /*
              * Terminate any running task.
@@ -759,20 +772,6 @@ public class HAJournalServer extends AbstractServer {
          */
         private final AtomicReference<FutureTask<Void>> runStateFutureRef = new AtomicReference<FutureTask<Void>>(/*null*/);
 
-        /**
-         * Enum of the run states. The states are labeled by the goal of the run
-         * state.
-         */
-        private enum RunStateEnum {
-            Restore, // apply local HALog files GT current commit point.
-            SeekConsensus, // seek consensus.
-            RunMet, // run while joined with met quorum.
-            Resync, // only resynchronization
-            Rebuild, // online disaster recovery
-            Error, // error state.
-            Shutdown; // TODO SHUTDOWN: We are not using this systematically (no ShutdownTask for this run state).
-        }
-        
         private final AtomicReference<RunStateEnum> runStateRef = new AtomicReference<RunStateEnum>(
                 null/* none */);
 
@@ -2230,10 +2229,13 @@ public class HAJournalServer extends AbstractServer {
 
                 final IHAWriteMessage lastLiveMsg = journal.lastLiveHAWriteMessage;
 
-                if (lastLiveMsg != null) {
+                if (lastLiveMsg != null
+                        && lastLiveMsg.getCommitCounter() >= currentWriteSetStateOnLeader
+                                .getCommitCounter()) {
 
                     /*
-                     * Can not join. Some write has been received. Leader has
+                     * Can not join. Some write has been received for this
+                     * commit point (or a greater commit point). Leader has
                      * moved on.
                      * 
                      * Note: [lastLiveMsg] was cleared to [null] when we did a
@@ -2493,7 +2495,9 @@ public class HAJournalServer extends AbstractServer {
                     
                     handleResyncMessage((IHALogRequest) req, msg, data);
 
-                } else if (journal.getRootBlockView().getCommitCounter() == msg.getCommitCounter()
+                } else if (req == null // Note: MUST be a live message!
+                        && journal.getRootBlockView().getCommitCounter() == msg
+                                .getCommitCounter()
                         && isJoinedMember(msg.getQuorumToken())) {
 
                     /*
@@ -2780,8 +2784,30 @@ public class HAJournalServer extends AbstractServer {
 
             try {
 
+                /*
+                 * Throws IllegalStateException if the message is not
+                 * appropriate for the state of the log.
+                 * 
+                 * Throws IOException if we can not write on the log.
+                 * 
+                 * We catch, log, and rethrow these messages to help diagnose
+                 * problems where the message state is not consistent with the
+                 * log state.
+                 */
                 journal.getHALogWriter().write(msg, data);
                 
+            } catch(RuntimeException ex) {
+                
+                haLog.error(ex, ex);
+
+                throw ex;
+
+            } catch (IOException ex) {
+
+                haLog.error(ex, ex);
+
+                throw ex;
+
             } finally {
                 
                 logLock.unlock();
@@ -3558,6 +3584,25 @@ public class HAJournalServer extends AbstractServer {
             
             return server.getRunState();
             
+        }
+        
+        @Override
+        public String getExtendedRunState() {
+
+            final HAQuorumService<HAGlue, HAJournal> quorumService = server.quorumService;
+
+            final RunStateEnum innerRunState = (quorumService == null ? null
+                    : quorumService.runStateRef.get());
+
+            final HAJournal journal = server.journal;
+            
+            final String innerRunStateStr = (innerRunState == null ? "N/A"
+                    : (innerRunState.name() + ((innerRunState == RunStateEnum.Resync && journal != null) ? (" @ " + journal
+                            .getRootBlockView().getCommitCounter()) : "")));
+
+            return "{server=" + server.getRunState() + ", quorumService="
+                    + innerRunStateStr + "}";
+
         }
         
     }

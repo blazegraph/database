@@ -31,10 +31,13 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.UUID;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
+import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.TimeoutException;
 
-import com.bigdata.concurrent.TimeoutException;
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.halog.HALogWriter;
 import com.bigdata.ha.msg.HARootBlockRequest;
@@ -45,16 +48,15 @@ import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
  * Test suites for an {@link HAJournalServer} quorum with a replication factor
  * of THREE (3) and a fully met {@link Quorum}.
  * 
- * TODO In order to guarantee that the LOAD operation does not terminate before
- * we are resynchronized, we either need to LOAD a sufficiently large file or we
- * need to stream data to the leader. I think we should go with a large file. We
- * should also verify that the LOAD is still running when the 3rd service joins
- * with the met quorum.
- * 
  * TODO Do we have any guards against rolling back a service in RESYNC if the
  * other services are more than 2 commit points before it? We probably should
  * not automatically roll it back to the other services in this case, but that
  * could also reduce the ergonomics of the HA3 configuration.
+ * 
+ * TODO All of these live load remains met tests could also be done with BOUNCE
+ * rather than SHUTDOWN/RESTART. BOUNCE exercises different code paths and
+ * corresponds to a zookeeper timeout, e.g., as might occur during a full GC
+ * pause.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
@@ -66,7 +68,7 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
     public TestHA3JournalServer(String name) {
         super(name);
     }
-        
+
     /**
      * Start 2 services and wait for a quorum meet. Verify that the services
      * have the same data and that the HALog files exist. Start a 3rd service.
@@ -140,26 +142,26 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
          * Now go through a commit point with a fully met quorum. The HALog
          * files should be purged at that commit point.
          */
-        {
-
-            final StringBuilder sb = new StringBuilder();
-            sb.append("DROP ALL;\n");
-            sb.append("PREFIX dc: <http://purl.org/dc/elements/1.1/>\n");
-            sb.append("INSERT DATA {\n");
-            sb.append("  <http://example/book1> dc:title \"A new book\" ;\n");
-            sb.append("  dc:creator \"A.N.Other\" .\n");
-            sb.append("}\n");
-            
-            final String updateStr = sb.toString();
-            
-            final HAGlue leader = quorum.getClient().getLeader(token);
-            
-            // Verify quorum is still valid.
-            quorum.assertQuorum(token);
-
-            getRemoteRepository(leader).prepareUpdate(updateStr).evaluate();
-            
-        }
+        simpleTransaction();
+//        {
+//
+//            final StringBuilder sb = new StringBuilder();
+//            sb.append("DROP ALL;\n");
+//            sb.append("PREFIX dc: <http://purl.org/dc/elements/1.1/>\n");
+//            sb.append("INSERT DATA {\n");
+//            sb.append("  <http://example/book1> dc:title \"A new book\" ;\n");
+//            sb.append("  dc:creator \"A.N.Other\" .\n");
+//            sb.append("}\n");
+//            
+//            final String updateStr = sb.toString();
+//            
+//            final HAGlue leader = quorum.getClient().getLeader(token);
+//            
+//            // Verify quorum is still valid.
+//            quorum.assertQuorum(token);
+//
+//            getRemoteRepository(leader).prepareUpdate(updateStr).evaluate();
+//        }
 
         // Current commit point.
         final long lastCommitCounter2 = serverA
@@ -295,29 +297,14 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
         /*
          * LOAD data on leader.
          */
-        {
+        final FutureTask<Void> ft = new FutureTask<Void>(new LargeLoadTask(
+                token, true/* reallyLargeLoad */));
 
-            final StringBuilder sb = new StringBuilder();
-            sb.append("DROP ALL;\n");
-            sb.append("LOAD <" + getFoafFileUrl("data-0.nq.gz") + ">;\n");
-            sb.append("LOAD <" + getFoafFileUrl("data-1.nq.gz") + ">;\n");
-            sb.append("LOAD <" + getFoafFileUrl("data-2.nq.gz") + ">;\n");
-            sb.append("LOAD <" + getFoafFileUrl("data-3.nq.gz") + ">;\n");
-            sb.append("INSERT {?x rdfs:label ?y . } WHERE {?x foaf:name ?y };\n");
-            sb.append("PREFIX dc: <http://purl.org/dc/elements/1.1/>\n");
-            sb.append("INSERT DATA {\n");
-            sb.append("  <http://example/book1> dc:title \"A new book\" ;\n");
-            sb.append("  dc:creator \"A.N.Other\" .\n");
-            sb.append("}\n");
-            
-            final String updateStr = sb.toString();
-            
-            // Verify quorum is still valid.
-            quorum.assertQuorum(token);
-
-            repos[0].prepareUpdate(updateStr).evaluate();
-            
-        }
+        // Start LOAD.
+        executorService.submit(ft);
+        
+        // Await LOAD, but with a timeout.
+        ft.get(loadLoadTimeoutMillis, TimeUnit.MILLISECONDS);
 
         /*
          * Verify that query on all nodes is allowed and now provides a
@@ -442,26 +429,26 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
          * Now go through a commit point with a met quorum. The HALog
          * files should be retained at that commit point.
          */
-        {
-
-            final StringBuilder sb = new StringBuilder();
-            sb.append("DROP ALL;\n");
-            sb.append("PREFIX dc: <http://purl.org/dc/elements/1.1/>\n");
-            sb.append("INSERT DATA {\n");
-            sb.append("  <http://example/book1> dc:title \"A new book\" ;\n");
-            sb.append("  dc:creator \"A.N.Other\" .\n");
-            sb.append("}\n");
-            
-            final String updateStr = sb.toString();
-            
-            final HAGlue leader = quorum.getClient().getLeader(token);
-            
-            // Verify quorum is still valid.
-            quorum.assertQuorum(token);
-
-            getRemoteRepository(leader).prepareUpdate(updateStr).evaluate();
-            
-        }
+        simpleTransaction();
+//        {
+//            final StringBuilder sb = new StringBuilder();
+//            sb.append("DROP ALL;\n");
+//            sb.append("PREFIX dc: <http://purl.org/dc/elements/1.1/>\n");
+//            sb.append("INSERT DATA {\n");
+//            sb.append("  <http://example/book1> dc:title \"A new book\" ;\n");
+//            sb.append("  dc:creator \"A.N.Other\" .\n");
+//            sb.append("}\n");
+//            
+//            final String updateStr = sb.toString();
+//            
+//            final HAGlue leader = quorum.getClient().getLeader(token);
+//            
+//            // Verify quorum is still valid.
+//            quorum.assertQuorum(token);
+//
+//            getRemoteRepository(leader).prepareUpdate(updateStr).evaluate();
+//            
+//        }
 
         // Current commit point.
         final long lastCommitCounter2 = serverA
@@ -485,25 +472,7 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
         assertDigestsEquals(new HAGlue[] { serverA, serverB, serverC });
 
         // Now force further commit when fully met to remove log files
-        {
-
-            final StringBuilder sb = new StringBuilder();
-            sb.append("PREFIX dc: <http://purl.org/dc/elements/1.1/>\n");
-            sb.append("INSERT DATA {\n");
-            sb.append("  <http://example/book2> dc:title \"Another book\" ;\n");
-            sb.append("  dc:creator \"A.N.Other\" .\n");
-            sb.append("}\n");
-            
-            final String updateStr = sb.toString();
-            
-            final HAGlue leader = quorum.getClient().getLeader(token);
-            
-            // Verify quorum is still valid.
-            quorum.assertQuorum(token);
-
-            getRemoteRepository(leader).prepareUpdate(updateStr).evaluate();
-            
-        }
+        simpleTransaction();
 
         // And again verify binary equality of ALL journals.
         assertDigestsEquals(new HAGlue[] { serverA, serverB, serverC });
@@ -518,30 +487,86 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
     }
     
     /**
-     * Similar to standard resync except that the resync occurs while a sequence of live transactions are in progress.
-     * @throws Exception 
+     * TWO (2) committed transactions then at 3000ms delay between each
+     * subsequent transaction.
+     * <P>
+     * Note: C should easily catch up with plenty of quiescence
+     * 
+     * @throws Exception
      */
-	public void testStartAB_C_MultiTransactionResync() throws Exception {
-		// 2 committed transactions then at 3000ms delay between each subsequent
-		// C should easily catch up with plenty of quiescence
-		doStartAB_C_MultiTransactionResync(3000, 2);
-		
-		// 5 committed transactions then at 1500ms delay between each subsequent
-		doStartAB_C_MultiTransactionResync(1500, 5);
-		
-		// 5 committed transactions then at 500ms delay between each subsequent
-		// C may never catch up
-		doStartAB_C_MultiTransactionResync(500, 5);
-		
-		// 0 committed transactions then at 500ms delay between each subsequent
-		// EARLY STARTING C
-		doStartAB_C_MultiTransactionResync(500, 0);
-	}
-	
-	public void doStartAB_C_MultiTransactionResync(final long transactionDelay,
-			final int initialTransactions) throws Exception {
-		// fail("TEST FAILS");
-		try {
+    public void testStartAB_C_MultiTransactionResync_2tx_then_3000ms_delay()
+            throws Exception {
+     
+        doStartAB_C_MultiTransactionResync(3000, 2);
+        
+    }
+
+    /**
+     * FIVE (5) committed transactions then at 1500ms delay between each
+     * subsequent transaction.
+     */
+    public void testStartAB_C_MultiTransactionResync_5tx_then_1500ms_delay()
+            throws Exception {
+
+        doStartAB_C_MultiTransactionResync(1500, 5);
+        
+    }
+
+    /**
+     * FIVE (5) committed transactions then at 500ms delay between each
+     * subsequent transaction.
+     * <p>
+     * Note: C might not catch up since the transactions are spaced more closely
+     * together.
+     */
+    public void testStartAB_C_MultiTransactionResync_5tx_then_500ms_delay()
+            throws Exception {
+
+        doStartAB_C_MultiTransactionResync(500, 5);
+        
+    }
+
+    /**
+     * FIVE (5) committed transactions then at 200ms delay between each
+     * subsequent transaction.
+     * <p>
+     * Note: C might not catch up since the transactions are spaced more closely
+     * together.
+     */
+    public void testStartAB_C_MultiTransactionResync_5tx_then_200ms_delay()
+            throws Exception {
+
+        doStartAB_C_MultiTransactionResync(200, 5);
+        
+    }
+
+    /**
+     * ZERO (0) committed transactions then at 500ms delay between each
+     * subsequent transaction.
+     * <P>
+     * Note: EARLY STARTING C
+     */
+    public void testStartAB_C_MultiTransactionResync_0tx_then_500ms_delay()
+            throws Exception {
+
+        doStartAB_C_MultiTransactionResync(500, 0);
+    }
+
+    /**
+     * Test where C starts after <i>initialTransactions</i> on A+B. A series of
+     * transactions are issued with the specified delay.
+     * 
+     * @param transactionDelay
+     *            The delay between the transactions.
+     * @param initialTransactions
+     *            The #of initial transactions before starting C.
+     */
+    private void doStartAB_C_MultiTransactionResync(
+            final long transactionDelay, final int initialTransactions)
+            throws Exception {
+
+        try {
+            
 			// Start 2 services.
 			final HAGlue serverA = startA();
 			final HAGlue serverB = startB();
@@ -552,26 +577,35 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
 
 			// Verify KB exists.
 			awaitKBExists(serverA);
+			
+            final HAGlue leader = quorum.getClient().getLeader(token);
 
-			/*
-			 * Note: The quorum was not fully met at the last 2-phase commit.
-		 * Instead, 2 services participated in the 2-phase commit and the third
-		 * service resynchronized when it came up and then went through a local
-		 * commit. Therefore, the HALog files should exist on all nodes.
-			 */
+            // Verify assumption in this test.
+            assertEquals(leader, serverA);
+
+            // Wait until leader is ready.
+            leader.awaitHAReady(awaitQuorumTimeout, TimeUnit.MILLISECONDS);
+            
+            /*
+             * Note: The quorum was not fully met at the last 2-phase commit.
+             * Instead, 2 services participated in the 2-phase commit and the
+             * third service resynchronized when it came up and then went
+             * through a local commit. Therefore, the HALog files should exist
+             * on all nodes.
+             */
 
 			// Current commit point.
-			final long lastCommitCounter = serverA
+			final long lastCommitCounter = leader
 					.getRootBlock(new HARootBlockRequest(null/* storeUUID */))
 					.getRootBlock().getCommitCounter();
 
 			// There is ONE commit point.
 			assertEquals(1L, lastCommitCounter);
 
-			/*
-		 * Verify that HALog files were generated and are available for commit
-		 * point ONE (1) on the services joined with the met quorum.
-			 */
+            /*
+             * Verify that HALog files were generated and are available for
+             * commit point ONE (1) on the services joined with the met quorum.
+             */
 			assertHALogDigestsEquals(1L/* firstCommitCounter */,
 					lastCommitCounter, new HAGlue[] { serverA, serverB });
 
@@ -582,29 +616,10 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
 			 * Now go through a commit point with a met quorum. The HALog files
 			 * should be retained at that commit point.
 			 */
-			{
-
-				final StringBuilder sb = new StringBuilder();
-				sb.append("DROP ALL;\n");
-				sb.append("PREFIX dc: <http://purl.org/dc/elements/1.1/>\n");
-				sb.append("INSERT DATA {\n");
-				sb.append("  <http://example/book1> dc:title \"A new book\" ;\n");
-				sb.append("  dc:creator \"A.N.Other\" .\n");
-				sb.append("}\n");
-
-				final String updateStr = sb.toString();
-
-				final HAGlue leader = quorum.getClient().getLeader(token);
-
-				// Verify quorum is still valid.
-				quorum.assertQuorum(token);
-
-				getRemoteRepository(leader).prepareUpdate(updateStr).evaluate();
-
-			}
+			simpleTransaction();
 
 			// Current commit point.
-			final long lastCommitCounter2 = serverA
+			final long lastCommitCounter2 = leader
 					.getRootBlock(new HARootBlockRequest(null/* storeUUID */))
 					.getRootBlock().getCommitCounter();
 
@@ -612,11 +627,9 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
 			assertEquals(2L, lastCommitCounter2);
 
 			// start concurrent task loads that continue until fully met
-			final AtomicBoolean spin = new AtomicBoolean(false);
-			final Thread loadThread = new Thread() {
-				public void run() {
+			final Callable<Void> task = new Callable<Void>() {
+				public Void call() throws Exception {
 					int count = 0;
-					try {
 						while (!quorum.isQuorumFullyMet(token)) {
 
 							final StringBuilder sb = new StringBuilder();
@@ -635,25 +648,30 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
 							// Verify quorum is still valid.
 							quorum.assertQuorum(token);
 
-							try {
 								getRemoteRepository(leader).prepareUpdate(
 										updateStr).evaluate();
 								log.warn("COMPLETED TRANSACTION " + count);
 
 								Thread.sleep(transactionDelay);
-							} catch (Exception e) {
-								fail("Probably unexpected on run " + count, e);
-							}
 						}
-					} finally {
-						spin.set(true);
-					}
+						// done.
+						return null;
 				}
 			};
-			loadThread.start();
+			final FutureTask<Void> ft = new FutureTask<Void>(task);
 
-			// allow number of transactions through first
-			Thread.sleep(initialTransactions * transactionDelay);
+			executorService.submit(ft);
+			
+            try {
+                // Allow number of transactions through first
+                ft.get(initialTransactions * transactionDelay,
+                        TimeUnit.MILLISECONDS);
+                if (ft.isDone()) {
+                    fail("Not expecting task to be finished.");
+                }
+            } catch (TimeoutException ex) {
+                // Ignore expected exception.
+            }
 
 			// Now Start 3rd service.
 			final HAGlue serverC = startC();
@@ -663,9 +681,8 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
 
 			log.info("FULLY MET");
 
-			while (!spin.get()) {
-				Thread.sleep(50);
-			}
+			// Wait for task to end. Check Future.
+			ft.get();
 
 			log.info("Should be safe to test digests now");
 
@@ -678,31 +695,13 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
 			assertDigestsEquals(new HAGlue[] { serverA, serverB, serverC });
 
 			// Now force further commit when fully met to remove log files
-			{
-
-				final StringBuilder sb = new StringBuilder();
-				sb.append("PREFIX dc: <http://purl.org/dc/elements/1.1/>\n");
-				sb.append("INSERT DATA {\n");
-				sb.append("  <http://example/bookFinal> dc:title \"Another book\" ;\n");
-				sb.append("  dc:creator \"A.N.Other\" .\n");
-				sb.append("}\n");
-
-				final String updateStr = sb.toString();
-
-				final HAGlue leader = quorum.getClient().getLeader(token);
-
-				// Verify quorum is still valid.
-				quorum.assertQuorum(token);
-
-				getRemoteRepository(leader).prepareUpdate(updateStr).evaluate();
-
-			}
+			simpleTransaction();
 
 			// And again verify binary equality of ALL journals.
 			// assertDigestsEquals(new HAGlue[] { serverA, serverB, serverC });
 
 			// Now verify no HALog files since fully met quorum @ commit.
-			final long lastCommitCounter3 = serverA
+			final long lastCommitCounter3 = leader
 					.getRootBlock(new HARootBlockRequest(null/* storeUUID */))
 					.getRootBlock().getCommitCounter();
 			assertHALogNotFound(0L/* firstCommitCounter */, lastCommitCounter3,
@@ -713,9 +712,11 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
 		}
 	}
     
-	   /**
-     * Similar to standard resync except that the resync occurs while a single long transaction is in progress.
-     * @throws Exception 
+    /**
+     * Similar to standard resync except that the resync occurs while a single
+     * long transaction is in progress.
+     * 
+     * @throws Exception
      */
 	public void testStartAB_C_LiveResync() throws Exception {
 
@@ -771,48 +772,57 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
 		// There are TWO (2) commit points.
 		assertEquals(2L, lastCommitCounter2);
 
-		// start concurrent task loads that continue until fully met
-		final AtomicBoolean spin = new AtomicBoolean(false);
-		final Thread loadThread = new Thread() {
-			public void run() {
-					final StringBuilder sb = new StringBuilder();
-					sb.append("DROP ALL;\n");
-		            sb.append("LOAD <" + getFoafFileUrl("data-0.nq.gz") + ">;\n");
-		            sb.append("LOAD <" + getFoafFileUrl("data-1.nq.gz") + ">;\n");
-		            sb.append("LOAD <" + getFoafFileUrl("data-2.nq.gz") + ">;\n");
-		            sb.append("LOAD <" + getFoafFileUrl("data-3.nq.gz") + ">;\n");
-					sb.append("INSERT {?x rdfs:label ?y . } WHERE {?x foaf:name ?y };\n");
-					sb.append("PREFIX dc: <http://purl.org/dc/elements/1.1/>\n");
-					sb.append("INSERT DATA\n");
-					sb.append("{\n");
-					sb.append("  <http://example/book1> dc:title \"A new book\" ;\n");
-					sb.append("    dc:creator \"A.N.Other\" .\n");
-					sb.append("}\n");
+        /*
+         * LOAD data on leader.
+         */
+        final FutureTask<Void> ft = new FutureTask<Void>(new LargeLoadTask(
+                token, true/* reallyLargeLoad */));
 
-					final String updateStr = sb.toString();
-
-					final HAGlue leader = quorum.getClient().getLeader(token);
-
-					// Verify quorum is still valid.
-					quorum.assertQuorum(token);
-
-					try {
-						getRemoteRepository(leader).prepareUpdate(updateStr)
-								.evaluate();
-						log.info("Updated");
-					} catch (Exception e) {
-						e.printStackTrace();
-						
-						fail("Probably unexpected on run ", e);
-					} finally {				
-						spin.set(true);
-					}
-			}
-		};
-		loadThread.start();
+        // Start LOAD.
+        executorService.submit(ft);
+        
+//		// start concurrent task loads that continue until fully met
+//		final AtomicBoolean spin = new AtomicBoolean(false);
+//		final Thread loadThread = new Thread() {
+//			public void run() {
+//					final StringBuilder sb = new StringBuilder();
+//					sb.append("DROP ALL;\n");
+//		            sb.append("LOAD <" + getFoafFileUrl("data-0.nq.gz") + ">;\n");
+//		            sb.append("LOAD <" + getFoafFileUrl("data-1.nq.gz") + ">;\n");
+//		            sb.append("LOAD <" + getFoafFileUrl("data-2.nq.gz") + ">;\n");
+//		            sb.append("LOAD <" + getFoafFileUrl("data-3.nq.gz") + ">;\n");
+//					sb.append("INSERT {?x rdfs:label ?y . } WHERE {?x foaf:name ?y };\n");
+//					sb.append("PREFIX dc: <http://purl.org/dc/elements/1.1/>\n");
+//					sb.append("INSERT DATA\n");
+//					sb.append("{\n");
+//					sb.append("  <http://example/book1> dc:title \"A new book\" ;\n");
+//					sb.append("    dc:creator \"A.N.Other\" .\n");
+//					sb.append("}\n");
+//
+//					final String updateStr = sb.toString();
+//
+//					final HAGlue leader = quorum.getClient().getLeader(token);
+//
+//					// Verify quorum is still valid.
+//					quorum.assertQuorum(token);
+//
+//					try {
+//						getRemoteRepository(leader).prepareUpdate(updateStr)
+//								.evaluate();
+//						log.info("Updated");
+//					} catch (Exception e) {
+//						e.printStackTrace();
+//						
+//						fail("Probably unexpected on run ", e);
+//					} finally {				
+//						spin.set(true);
+//					}
+//			}
+//		};
+//		loadThread.start();
 		
 		// allow load head start
-		Thread.sleep(300);
+		Thread.sleep(300/*ms*/);
 
 		// Now Start 3rd service.
 		final HAGlue serverC = startC();
@@ -822,12 +832,15 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
 
 		log.info("FULLY MET");
 		
-		// Need to check if load is active, if not then test has not confirmed active load
-		assertFalse(spin.get());
-		
-		while (!spin.get()) {
-			Thread.sleep(50);
-		}
+        // Await LOAD, but with a timeout.
+        ft.get(loadLoadTimeoutMillis, TimeUnit.MILLISECONDS);
+
+//		// Need to check if load is active, if not then test has not confirmed active load
+//		assertFalse(spin.get());
+//		
+//		while (!spin.get()) {
+//			Thread.sleep(50/*ms*/);
+//		}
 
 		log.info("Should be safe to test digests now");
 		
@@ -840,35 +853,18 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
 		assertDigestsEquals(new HAGlue[] { serverA, serverB, serverC });
 
 		// Now force further commit when fully met to remove log files
-		{
-
-			final StringBuilder sb = new StringBuilder();
-			sb.append("PREFIX dc: <http://purl.org/dc/elements/1.1/>\n");
-			sb.append("INSERT DATA {\n");
-			sb.append("  <http://example/bookFinal> dc:title \"Another book\" ;\n");
-			sb.append("  dc:creator \"A.N.Other\" .\n");
-			sb.append("}\n");
-
-			final String updateStr = sb.toString();
-
-			final HAGlue leader = quorum.getClient().getLeader(token);
-
-			// Verify quorum is still valid.
-			quorum.assertQuorum(token);
-
-			getRemoteRepository(leader).prepareUpdate(updateStr).evaluate();
-
-		}
-
-		// And again verify binary equality of ALL journals.
-		// assertDigestsEquals(new HAGlue[] { serverA, serverB, serverC });
+		simpleTransaction();
 
 		// Now verify no HALog files since fully met quorum @ commit.
 		final long lastCommitCounter3 = serverA
 				.getRootBlock(new HARootBlockRequest(null/* storeUUID */))
 				.getRootBlock().getCommitCounter();
+
 		assertHALogNotFound(0L/* firstCommitCounter */, lastCommitCounter3,
 				new HAGlue[] { serverA, serverB, serverC });
+
+        // And again verify binary equality of ALL journals.
+         assertDigestsEquals(new HAGlue[] { serverA, serverB, serverC });
 
 		log.info("ALL GOOD!");
 	}
@@ -1277,21 +1273,23 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
 		// Verify KB exists.
 		awaitKBExists(startup.serverA);
 
+		// Verify A is the leader.
 		assertEquals(startup.serverA, quorum.getClient().getLeader(token));
+
+        // Verify A is fully up.
+        awaitNSSAndHAReady(startup.serverA);
 
 		// Now fail leader!
 		shutdownA();
 
-		// Now check that quorum meets
+		// Now check that quorum meets around the remaining 2 services.
+		final long token2 = awaitNextQuorumMeet(token);
 
-		final long token2 = awaitMetQuorum();
-
-		// with new token
-		assertTrue(token != token2);
-
-		// and new leader
+		// Verify that we have a new leader for the quorum.
 		final HAGlue leader = quorum.getClient().getLeader(token2);
-		assertTrue(leader.equals(startup.serverB) || leader.equals(startup.serverC));
+
+        assertTrue(leader.equals(startup.serverB)
+                || leader.equals(startup.serverC));
 	}
     
     /**
@@ -1318,17 +1316,6 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
         assertEquals(logsA.listFiles().length, 2);
         assertEquals(logsB.listFiles().length, 2);
         
-//        // Test ends here!!
-//        
-//        // but we'll restart to help teardown
-//        try {
-//	        startA();
-//	        startB();
-//	        
-//	        awaitMetQuorum();
-//        } catch (Throwable t) {
-//        	log.error("Problem on tidy up", t);
-//        }
     }
     
     /**
@@ -1370,7 +1357,7 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
         assertEquals(logsA.listFiles().length, 1);
         assertEquals(logsB.listFiles().length, 1);
         assertEquals(logsC.listFiles().length, 1);
-}
+	}
     
     /**
 	 * Sandbox stress test, must be disabled before commit for CI runs
@@ -1388,7 +1375,6 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
 		}
 	}
 
-    
     /**
      * Tests that halog files are generated and removed after each commit
      * once fully met.
@@ -1399,6 +1385,7 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
      * @throws Exception 
      */
     public void testStartABC_halog() throws Exception {
+        
         // Start 3 services
         startA();
         startB();
@@ -1558,12 +1545,12 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
         assertLogCount(logsB, 1);
         assertLogCount(logsC, 1);
     }
-    
+
     private void assertLogCount(final File logdir, final int count) {
-    	final int actual = logdir.listFiles().length;
-    	if (actual != count) {
-    		fail("Actual log files: " + actual + ", expected: " + count);
-    	}
+        final int actual = logdir.listFiles().length;
+        if (actual != count) {
+            fail("Actual log files: " + actual + ", expected: " + count);
+        }
     }
     
     /**
@@ -1780,83 +1767,148 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
 		awaitPipeline(new HAGlue[] {startup.serverA, serverC2, serverB2});
 		// and return to quorum
 		assertEquals(token, awaitFullyMetQuorum());
-     }
+     
+    }
 
     /**
-     * Similar to RemainsMet but with long liveLoad
-     * 
-     * @throws Exception
-     * 
-     *             FIXME This test needs to be broken down into the following
-     *             tests:
-     *             <p>
-     *             (1) Can C join A+B when A+B are observing a sequence of short
-     *             loads. (This might be covered already by the
-     *             multi-transaction sync test above, but conceptually success
-     *             on this question needs to be answered independently of the
-     *             ability of C to join during a sustained load since these
-     *             correspond to very different code paths in HAJournalServer).
-     *             <p>
-     *             (2) Can C join A+B during a sustained load and does the load
-     *             complete successfully? There are some known problems with
-     *             respect to HALogWriter and opportunities for deadlock that
-     *             might cause problems here. There are also code paths in
-     *             HAJournalServer that need to be explicitly tested for this.
-     *             <p>
-     *             (3) Can C join A+B during a sustained load and does the load
-     *             continue to completion if we then fail B? This causes a
-     *             pipeline reordering from A+B+C to A+C during the load, and
-     *             should be broken out as a distinct test for this capability.
+     * Task loads a large data set.
      */
-    public void testABC_LiveLoadRemainsMet() throws Exception {
-		// enforce join order
+    private class LargeLoadTask implements Callable<Void> {
+        
+        private final long token;
+        private final boolean reallyLargeLoad;
+
+        /**
+         * Large load.
+         * 
+         * @param token
+         *            The token that must remain valid during the operation.
+         */
+        public LargeLoadTask(final long token) {
+        
+            this(token, false/*reallyLargeLoad*/);
+            
+        }
+        
+        /**
+         * Either large or really large load.
+         * 
+         * @param token
+         *            The token that must remain valid during the operation.
+         * @param reallyLargeLoad
+         *            if we will also load the 3 degrees of freedom file.
+         */
+        public LargeLoadTask(final long token, final boolean reallyLargeLoad) {
+
+            this.token = token;
+            
+            this.reallyLargeLoad = reallyLargeLoad;
+
+        }
+
+        public Void call() throws Exception {
+
+            final StringBuilder sb = new StringBuilder();
+            sb.append("DROP ALL;\n");
+            sb.append("LOAD <" + getFoafFileUrl("data-0.nq.gz") + ">;\n");
+            sb.append("LOAD <" + getFoafFileUrl("data-1.nq.gz") + ">;\n");
+            sb.append("LOAD <" + getFoafFileUrl("data-2.nq.gz") + ">;\n");
+            if (reallyLargeLoad)
+                sb.append("LOAD <" + getFoafFileUrl("data-3.nq.gz") + ">;\n");
+            sb.append("INSERT {?x rdfs:label ?y . } WHERE {?x foaf:name ?y };\n");
+            sb.append("PREFIX dc: <http://purl.org/dc/elements/1.1/>\n");
+            sb.append("INSERT DATA\n");
+            sb.append("{\n");
+            sb.append("  <http://example/book1> dc:title \"A new book\" ;\n");
+            sb.append("    dc:creator \"A.N.Other\" .\n");
+            sb.append("}\n");
+
+            final String updateStr = sb.toString();
+
+            final HAGlue leader = quorum.getClient().getLeader(token);
+
+            // Verify quorum is still valid.
+            quorum.assertQuorum(token);
+
+            getRemoteRepository(leader).prepareUpdate(updateStr).evaluate();
+
+            // Verify quorum is still valid.
+            quorum.assertQuorum(token);
+            
+            // Done.
+            return null;
+
+        }
+        
+    }
+    
+    /**
+     * Spin, looking for the quorum to fully meet *before* the LOAD is finished.
+     * 
+     * @return <code>true</code> iff the LOAD finished before the {@link Future}
+     * was done.
+     */
+    private boolean awaitFullyMetDuringLOAD(final long token,
+            final Future<Void> ft) throws InterruptedException,
+            ExecutionException, TimeoutException {
+
+        final long begin = System.currentTimeMillis();
+        boolean fullyMetBeforeLoadDone = false;
+        while (!fullyMetBeforeLoadDone) {
+            final long elapsed = System.currentTimeMillis() - begin;
+            if (elapsed > loadLoadTimeoutMillis) {
+                /**
+                 * This timeout is a fail safe for LOAD operations that get HUNG
+                 * on the server and prevents CI hangs.
+                 */
+                throw new TimeoutException(
+                        "LOAD did not complete in a timely fashion.");
+            }
+            try {
+                if (quorum.isQuorumFullyMet(token) && !ft.isDone()) {
+                    // The quorum is fully met before the load is done.
+                    fullyMetBeforeLoadDone = true;
+                }
+                // Check LOAD for error.
+                ft.get(50/* timeout */, TimeUnit.MILLISECONDS);
+                // LOAD is done (no errors, future is done).
+                assertTrue(fullyMetBeforeLoadDone);
+                break;
+            } catch (TimeoutException ex) {
+                // LOAD still running.
+                continue;
+            }
+        }
+        
+        return fullyMetBeforeLoadDone;
+
+    }
+    
+    /**
+     * Start A+B+C in strict sequence. Wait until the quorum fully meets. Start
+     * a long running LOAD. While the LOAD is running, fail C (the last
+     * follower). Verify that the LOAD completes successfully with the remaining
+     * services (A+B).
+     */
+    public void testABC_LiveLoadRemainsMet_fail_C() throws Exception {
+
+        // enforce join order
 		final ABC startup = new ABC(true /*sequential*/);
 		
 		final long token = awaitFullyMetQuorum();
 		
-		// start concurrent task loads that continue until fully met
-		final AtomicBoolean spin = new AtomicBoolean(false);
-		final Thread loadThread = new Thread() {
-			public void run() {
-				
-					final StringBuilder sb = new StringBuilder();
-					sb.append("DROP ALL;\n");
-                    sb.append("LOAD <" + getFoafFileUrl("data-0.nq.gz") + ">;\n");
-                    sb.append("LOAD <" + getFoafFileUrl("data-1.nq.gz") + ">;\n");
-                    sb.append("LOAD <" + getFoafFileUrl("data-2.nq.gz") + ">;\n");
-//                    sb.append("LOAD <" + getFoafFileUrl("data-3.nq.gz") + ">;\n");
-					sb.append("INSERT {?x rdfs:label ?y . } WHERE {?x foaf:name ?y };\n");
-					sb.append("PREFIX dc: <http://purl.org/dc/elements/1.1/>\n");
-					sb.append("INSERT DATA\n");
-					sb.append("{\n");
-					sb.append("  <http://example/book1> dc:title \"A new book\" ;\n");
-					sb.append("    dc:creator \"A.N.Other\" .\n");
-					sb.append("}\n");
+        // start concurrent task loads that continue until fully met
+        final FutureTask<Void> ft = new FutureTask<Void>(new LargeLoadTask(
+                token));
 
-					final String updateStr = sb.toString();
+        executorService.submit(ft);
 
-					final HAGlue leader = quorum.getClient().getLeader(token);
+        // allow load head start
+        Thread.sleep(300/* ms */);
 
-					// Verify quorum is still valid.
-					quorum.assertQuorum(token);
-
-					try {
-						getRemoteRepository(leader).prepareUpdate(updateStr)
-								.evaluate();
-					} catch (Exception e) {
-						e.printStackTrace();
-						
-						fail("Probably unexpected on run ", e);
-					} finally {				
-						spin.set(true);
-					}
-			}
-		};
-		loadThread.start();
+		// Verify load is still running.
+		assertFalse(ft.isDone());
 		
-		// allow load head start
-		Thread.sleep(300);
-
 		// shutdown C, the final follower
 		shutdownC();
 		awaitPipeline(new HAGlue[] {startup.serverA, startup.serverB});
@@ -1864,131 +1916,426 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
 		// token must remain unchanged to indicate same quorum
 		assertEquals(token, awaitMetQuorum());
 		
-		
-		final HAGlue serverC2 = startC();
-		// return to quorum
-		awaitPipeline(new HAGlue[] {startup.serverA, startup.serverB, serverC2});
-		//assertEquals(token, awaitFullyMetQuorum());
-		
-        final long begin = System.currentTimeMillis();
-        final long timeout = begin + TimeUnit.SECONDS.toMillis(320);
-        while (true) {
-            if (System.currentTimeMillis() > timeout)
-                throw new TimeoutException();
-            final long ntoken;
-			try {
-				ntoken = awaitFullyMetQuorum();				
-			} catch (RuntimeException re) {
-				if (spin.get()) {
-                    /*
-                     * Note: This strongly implies that the HALogWriter has
-                     * failed to notice the condition where the live HALog has
-                     * been closed out in such a manner as to permit the service
-                     * (C) that is trying to resych to recognize that the live
-                     * log was closed and that it can now go through the local
-                     * commit for that live log.
-                     */
-					fail("Load Complete but quorum not fully met");
-				}
-				
-				continue;
-			}
-			assertEquals(token, ntoken);
-			break;
-		}
-		
-		// Now remove first follower
-		shutdownB();
-		awaitPipeline(new HAGlue[] {startup.serverA, serverC2});
-		
-		// token must remain unchanged to indicate same quorum
-		assertEquals(token, awaitMetQuorum());
-		
-		final HAGlue serverB2 = startB();
-		// and return to quorum
-		awaitPipeline(new HAGlue[] {startup.serverA, serverC2, serverB2});
-		assertEquals(token, awaitFullyMetQuorum());
-		
-		// wait for load to finish or just exit?
-		final boolean waitForLoad = true;
-		while (waitForLoad && !spin.get()) {
-			Thread.sleep(50);
-		}
+		// Wait for the Future of the LOAD.
+		ft.get();
 
+        // token must remain unchanged to indicate same quorum
+        assertEquals(token, awaitMetQuorum());
 
-     }
+    }
 
     /**
-     * Similar to LiveLoadRemainsMet but removes first follower first to
-     * trigger pipeline re-org
+     * Start A+B+C in strict sequence. Wait until the quorum fully meets. Start
+     * a long running LOAD. While the LOAD is running, shutdown and then restart
+     * C (the last follower). Verify that the quorum fully meets once the LOAD
+     * is complete (this test variant allows C to resync and join if it could
+     * not transition to met during the LOAD).
      * 
      * @throws Exception
      */
-    public void testABC_LiveLoadRemainsMet2() throws Exception {
-		// enforce join order
-		final ABC startup = new ABC(true /*sequential*/);
+    public void testABC_LiveLoadRemainsMet_restart_C_fullyMetAfterLOAD() throws Exception {
 
-		final long token = awaitFullyMetQuorum();
+        // enforce join order
+        final ABC startup = new ABC(true /*sequential*/);
+        
+        final long token = awaitFullyMetQuorum();
+        
+        // start concurrent task loads that continue until fully met
+        final FutureTask<Void> ft = new FutureTask<Void>(new LargeLoadTask(
+                token));
+
+        executorService.submit(ft);
+
+        // allow load head start
+        Thread.sleep(300/* ms */);
+
+        // Verify load is still running.
+        assertFalse(ft.isDone());
+        
+        // shutdown C, the final follower
+        shutdownC();
+        awaitPipeline(new HAGlue[] {startup.serverA, startup.serverB});
+
+        // token must remain unchanged to indicate same quorum
+        assertEquals(token, awaitMetQuorum());
+
+        // restart C.
+		final HAGlue serverC2 = startC();
+
+		// C appears at the end of the pipeline.
+		awaitPipeline(new HAGlue[] {startup.serverA, startup.serverB, serverC2});
 		
-		// start concurrent task loads that continue until fully met
-		final AtomicBoolean spin = new AtomicBoolean(false);
-		final Thread loadThread = new Thread() {
-			public void run() {
-					final StringBuilder sb = new StringBuilder();
-					sb.append("DROP ALL;\n");
-                    sb.append("LOAD <" + getFoafFileUrl("data-0.nq.gz") + ">;\n");
-                    sb.append("LOAD <" + getFoafFileUrl("data-1.nq.gz") + ">;\n");
-                    sb.append("LOAD <" + getFoafFileUrl("data-2.nq.gz") + ">;\n");
-                    sb.append("LOAD <" + getFoafFileUrl("data-3.nq.gz") + ">;\n");
-					sb.append("INSERT {?x rdfs:label ?y . } WHERE {?x foaf:name ?y };\n");
-					sb.append("PREFIX dc: <http://purl.org/dc/elements/1.1/>\n");
-					sb.append("INSERT DATA\n");
-					sb.append("{\n");
-					sb.append("  <http://example/book1> dc:title \"A new book\" ;\n");
-					sb.append("    dc:creator \"A.N.Other\" .\n");
-					sb.append("}\n");
+        // wait for the Future.
+        ft.get();
+        
+        // Verify quorum becomes fully met now that LOAD is done.
+        assertEquals(token, awaitFullyMetQuorum());
 
-					final String updateStr = sb.toString();
+    }
 
-					final HAGlue leader = quorum.getClient().getLeader(token);
+    /**
+     * Start A+B+C in strict sequence. Wait until the quorum fully meets. Start
+     * a long running LOAD. While the LOAD is running, shutdown and then restart
+     * C (the last follower). Verify that the LOAD completes successfully and
+     * that quorum is fully met BEFORE the LOAD is complete (that is, C is able
+     * to resync and join during the LOAD).
+     * 
+     * @throws Exception
+     */
+    public void testABC_LiveLoadRemainsMet_restart_C_fullyMetDuringLOAD()
+            throws Exception {
 
-					// Verify quorum is still valid.
-					quorum.assertQuorum(token);
+        // enforce join order
+        final ABC startup = new ABC(true /*sequential*/);
+        
+        final long token = awaitFullyMetQuorum();
+        
+        // start concurrent task loads that continue until fully met
+        final FutureTask<Void> ft = new FutureTask<Void>(new LargeLoadTask(
+                token));
 
-					try {
-						getRemoteRepository(leader).prepareUpdate(updateStr)
-								.evaluate();
-					} catch (Exception e) {
-						e.printStackTrace();
-						
-						fail("Probably unexpected on run ", e);
-					} finally {				
-						spin.set(true);
-					}
-			}
-		};
-		loadThread.start();
-		
-		// allow load head start
-		Thread.sleep(300);
+        executorService.submit(ft);
 
-		// shutdown B, the first follower
-		shutdownB();
-		awaitPipeline(new HAGlue[] {startup.serverA, startup.serverC});
+        // allow load head start
+        Thread.sleep(300/* ms */);
 
-		// token must remain unchanged to indicate same quorum
-		assertEquals(token, awaitMetQuorum());
-		
-		final HAGlue serverB2 = startB();
-		// return to quorum
-		awaitPipeline(new HAGlue[] {startup.serverA, startup.serverC, serverB2});
-		assertEquals(token, awaitFullyMetQuorum());
+        // Verify load is still running.
+        assertFalse(ft.isDone());
+        
+        // shutdown C, the final follower
+        shutdownC();
+        awaitPipeline(new HAGlue[] {startup.serverA, startup.serverB});
 
-		// wait for load to finish or just exit?
-		final boolean waitForLoad = true;
-		while (waitForLoad && !spin.get()) {
-			Thread.sleep(50);
-		}
+        // token must remain unchanged to indicate same quorum
+        assertEquals(token, awaitMetQuorum());
+
+        // restart C.
+        final HAGlue serverC2 = startC();
+
+        // C comes back at the end of the pipeline.
+        awaitPipeline(new HAGlue[] {startup.serverA, startup.serverB, serverC2});
+        
+        // Await fully met quorum *before* LOAD is done.
+        assertTrue(awaitFullyMetDuringLOAD(token, ft));
+
+        // Verify fully met.
+        assertTrue(quorum.isQuorumFullyMet(token));
+
+        // Wait for the LOAD to complete and check for errors.
+        ft.get();
+        
+    }
+
+    /**
+     * Start A+B+C in strict sequence. Wait until the quorum fully meets. Start
+     * a long running LOAD. While the LOAD is running, shutdown B (the 1st
+     * follower). Verify that the LOAD completes successfully.
+     * <p>
+     * Note: This test forces a pipeline reorganization.
+     */
+    public void testABC_LiveLoadRemainsMet_fail_B() throws Exception {
+
+        // enforce join order
+        final ABC startup = new ABC(true /*sequential*/);
+        
+        final long token = awaitFullyMetQuorum();
+        
+        // start concurrent task loads that continue until fully met
+        final FutureTask<Void> ft = new FutureTask<Void>(new LargeLoadTask(
+                token));
+
+        executorService.submit(ft);
+
+        // allow load head start
+        Thread.sleep(300/* ms */);
+
+        // Verify load is still running.
+        assertFalse(ft.isDone());
+        
+        // shutdown B, the 1st follower. This forces a pipeline reorg.
+        shutdownB();
+        awaitPipeline(new HAGlue[] {startup.serverA, startup.serverC});
+
+        // token must remain unchanged to indicate same quorum
+        assertEquals(token, awaitMetQuorum());
+        
+        // Wait for the Future of the LOAD.
+        ft.get();
+
+        // token must remain unchanged to indicate same quorum
+        assertEquals(token, awaitMetQuorum());
+        
+    }
+
+    /**
+     * Start A+B+C in strict sequence. Wait until the quorum fully meets. Start
+     * a long running LOAD. While the LOAD is running, shutdown and then restart
+     * B (the 1st follower). Verify that the quorum fully meets once the LOAD is
+     * complete (this test variant allows B to resync and join if it could not
+     * transition to met during the LOAD). 
+     * <p>
+     * Note: This test forces a pipeline reorganization.
+     * 
+     * @throws Exception
+     */
+    public void testABC_LiveLoadRemainsMet_restart_B_fullyMetAfterLOAD() throws Exception {
+
+        // enforce join order
+        final ABC startup = new ABC(true /*sequential*/);
+        
+        final long token = awaitFullyMetQuorum();
+        
+        // start concurrent task loads that continue until fully met
+        final FutureTask<Void> ft = new FutureTask<Void>(new LargeLoadTask(
+                token));
+
+        executorService.submit(ft);
+
+        // allow load head start
+        Thread.sleep(300/* ms */);
+
+        // Verify load is still running.
+        assertFalse(ft.isDone());
+        
+        // shutdown B, the 1st follower. This forces a pipeline reorg.
+        shutdownB();
+        awaitPipeline(new HAGlue[] {startup.serverA, startup.serverC});
+
+        // token must remain unchanged to indicate same quorum
+        assertEquals(token, awaitMetQuorum());
+
+        // restart B.
+        final HAGlue serverB2 = startB();
+
+        // C appears at the end of the pipeline.
+        awaitPipeline(new HAGlue[] {startup.serverA, startup.serverC, serverB2});
+        
+        // wait for the Future.
+        ft.get();
+        
+        // Verify quorum becomes fully met now that LOAD is done.
+        assertEquals(token, awaitFullyMetQuorum());
+
+    }
+
+    /**
+     * Start A+B+C in strict sequence. Wait until the quorum fully meets. Start
+     * a long running LOAD. While the LOAD is running, shutdown and then restart
+     * B (the 1st follower). Verify that that quorum is fully met BEFORE the
+     * LOAD is complete (that is, B is able to resync and join during the LOAD).
+     * Verify that the LOAD completes successfully.
+     * <p>
+     * Note: This test forces a pipeline reorganization.
+     * 
+     * @throws Exception
+     */
+    public void testABC_LiveLoadRemainsMet_restart_B_fullyMetDuringLOAD()
+            throws Exception {
+
+        // enforce join order
+        final ABC startup = new ABC(true /*sequential*/);
+        
+        final long token = awaitFullyMetQuorum();
+        
+        // start concurrent task loads that continue until fully met
+        final FutureTask<Void> ft = new FutureTask<Void>(new LargeLoadTask(
+                token));
+
+        executorService.submit(ft);
+
+        // allow load head start
+        Thread.sleep(300/* ms */);
+
+        // Verify load is still running.
+        assertFalse(ft.isDone());
+        
+        // shutdown B, the 1st follower. This forces a pipeline reorg.
+        shutdownB();
+        awaitPipeline(new HAGlue[] {startup.serverA, startup.serverC});
+
+        // token must remain unchanged to indicate same quorum
+        assertEquals(token, awaitMetQuorum());
+
+        // restart B.
+        final HAGlue serverB2 = startB();
+
+        // C comes back at the end of the pipeline.
+        awaitPipeline(new HAGlue[] {startup.serverA, startup.serverB, serverB2});
+        
+        // Await fully met quorum *before* LOAD is done.
+        assertTrue(awaitFullyMetDuringLOAD(token, ft));
+
+        // Verify fully met.
+        assertTrue(quorum.isQuorumFullyMet(token));
+
+        // Wait for the LOAD to complete and check for errors.
+        ft.get();
+        
+    }
+
+    /**
+     * Start A+B+C in strict sequence. Wait until the quorum fully meets. Start
+     * a long running LOAD. While the LOAD is running, shutdown and then restart
+     * C (the last follower). Verify that that quorum is fully met BEFORE the
+     * LOAD is complete (that is, C is able to resync and join during the LOAD).
+     * Then shutdown B (the first follower, so this forces a pipeline
+     * reorganization). Verify that that quorum is fully met BEFORE the LOAD is
+     * complete (that is, C is able to resync and join during the LOAD). Verify
+     * that the LOAD completes successfully.
+     */
+    public void testABC_LiveLoadRemainsMet_restart_C_fullyMetDuringLOAD_restart_B_fullyMetDuringLOAD()
+            throws Exception {
+
+        // enforce join order
+        final ABC startup = new ABC(true /*sequential*/);
+        
+        final long token = awaitFullyMetQuorum();
+        
+        // start concurrent task loads that continue until fully met
+        final FutureTask<Void> ft = new FutureTask<Void>(new LargeLoadTask(
+                token));
+
+        executorService.submit(ft);
+
+        // allow load head start
+        Thread.sleep(300/* ms */);
+
+        // Verify load is still running.
+        assertFalse(ft.isDone());
+        
+        // shutdown C, the final follower
+        shutdownC();
+        awaitPipeline(new HAGlue[] {startup.serverA, startup.serverB});
+
+        // token must remain unchanged to indicate same quorum
+        assertEquals(token, awaitMetQuorum());
+
+        // restart C.
+        final HAGlue serverC2 = startC();
+
+        // C comes back at the end of the pipeline.
+        awaitPipeline(new HAGlue[] {startup.serverA, startup.serverB, serverC2});
+        
+        // wait for the quorum to fully meet during the LOAD.
+        assertTrue(awaitFullyMetDuringLOAD(token, ft));
+
+        // Double checked assertion. Should always be true per loop above.
+        assertTrue(quorum.isQuorumFullyMet(token));
+
+        /*
+         * Now we will remove the first follower.
+         */
+
+        // Should already be true.
+        awaitPipeline(new HAGlue[] { startup.serverA, startup.serverB, serverC2 });
+
+        // Now remove first follower
+        shutdownB();
+        awaitPipeline(new HAGlue[] { startup.serverA, serverC2 });
+
+        // token still valid.
+        quorum.assertQuorum(token);
+
+        // restart B.
+        final HAGlue serverB2 = startB();
+
+        // should return to the end of the pipeline.
+        awaitPipeline(new HAGlue[] { startup.serverA, serverC2, serverB2 });
+        
+        // Await fully met quorum *before* LOAD is done.
+        assertTrue(awaitFullyMetDuringLOAD(token, ft));
+
+        // Verify fully met.
+        assertTrue(quorum.isQuorumFullyMet(token));
+
+    }
+
+    /**
+     * Start A+B+C in strict sequence. Wait until the quorum fully meets. Start
+     * a long running LOAD. While the LOAD is running, shutdown and then restart
+     * B (the 1st follower, so this forces a pipeline reorganization). Verify
+     * that that quorum is fully met BEFORE the LOAD is complete (that is, B is
+     * able to resync and join during the LOAD). Then shutdown C (the new 1st
+     * follower, so this forces another pipeline reorganization). Verify that
+     * that quorum is fully met BEFORE the LOAD is complete (that is, C is able
+     * to resync and join during the LOAD). Verify that the LOAD completes
+     * successfully.
+     * 
+     * @throws Exception
+     */
+    public void testABC_LiveLoadRemainsMet_restart_B_fullyMetDuringLOAD_restartC_fullyMetDuringLOAD()
+            throws Exception {
+
+        // enforce join order
+        final ABC startup = new ABC(true /*sequential*/);
+        
+        final long token = awaitFullyMetQuorum();
+        
+        // start concurrent task loads that continue until fully met
+        final FutureTask<Void> ft = new FutureTask<Void>(new LargeLoadTask(
+                token, true/* reallyLargeLoad */));
+
+        executorService.submit(ft);
+
+        // allow load head start
+        Thread.sleep(300/* ms */);
+
+        // Verify load is still running.
+        assertFalse(ft.isDone());
+        
+        /*
+         * Restart the first follower.
+         */
+
+        // Should already be true.
+        awaitPipeline(new HAGlue[] { startup.serverA, startup.serverB, startup.serverC });
+
+        // Now remove first follower
+        shutdownB();
+        awaitPipeline(new HAGlue[] { startup.serverA, startup.serverC });
+
+        // token still valid.
+        quorum.assertQuorum(token);
+
+        // restart B.
+        final HAGlue serverB2 = startB();
+
+        // should return to the end of the pipeline.
+        awaitPipeline(new HAGlue[] { startup.serverA, startup.serverC, serverB2 });
+        
+        // Await fully met quorum *before* LOAD is done.
+        assertTrue(awaitFullyMetDuringLOAD(token, ft));
+
+        // Verify fully met.
+        assertTrue(quorum.isQuorumFullyMet(token));
+
+        /*
+         * Restart the first follower.
+         * 
+         * Note: This time C is the first follower.
+         */
+        
+        // Should already be true.
+        awaitPipeline(new HAGlue[] { startup.serverA, startup.serverC, serverB2 });
+
+        // Now remove first follower
+        shutdownC();
+        awaitPipeline(new HAGlue[] { startup.serverA, serverB2 });
+
+        // token still valid.
+        quorum.assertQuorum(token);
+
+        // restart C.
+        final HAGlue serverC2 = startC();
+
+        // should return to the end of the pipeline.
+        awaitPipeline(new HAGlue[] { startup.serverA, serverB2, serverC2 });
+
+        // Await fully met quorum *before* LOAD is done.
+        assertTrue(awaitFullyMetDuringLOAD(token, ft));
+
+        // Verify fully met.
+        assertTrue(quorum.isQuorumFullyMet(token));
 
     }
 

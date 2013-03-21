@@ -104,7 +104,14 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
      * The timeout used to await quorum meet or break.
      */
     protected final static long awaitQuorumTimeout = 5000;
-    
+
+    /**
+     * The timeout for long running LOAD operations. This is used to prevent
+     * hangs in CI in case the LOAD does not complete for some reason.
+     */
+    protected final static long loadLoadTimeoutMillis = TimeUnit.MINUTES
+            .toMillis(4);
+
     /**
      * A service used to run tasks for some tests.
      */

@@ -5499,6 +5499,13 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
         }
 
         @Override
+        public String getExtendedRunState() {
+
+            throw new UnsupportedOperationException();
+            
+        }
+
+        @Override
         public long awaitHAReady(final long timeout, final TimeUnit units)
                 throws AsynchronousQuorumCloseException, InterruptedException,
                 TimeoutException {

@@ -1415,6 +1415,7 @@ abstract public class WriteCacheService implements IWriteCache {
                  */
                 quorumMember.logWriteCacheBlock(msg, b.duplicate()); 
                 
+                // ASYNC MSG RMI + NIO XFER.
                 remoteWriteFuture = quorumMember.replicate(null/* req */, msg,
                         b.duplicate());
                 

@@ -223,6 +223,11 @@ public class HAGlueDelegate implements HAGlue {
     }
 
     @Override
+    public String getExtendedRunState() throws IOException {
+        return delegate.getExtendedRunState();
+    }
+
+    @Override
     public Future<IHASendStoreResponse> sendHAStore(IHARebuildRequest msg)
             throws IOException {
         return delegate.sendHAStore(msg);
