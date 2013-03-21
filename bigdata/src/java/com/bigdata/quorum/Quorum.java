@@ -353,7 +353,9 @@ public interface Quorum<S extends Remote, C extends QuorumClient<S>> {
      *            The token for the quorum.
      * 
      * @throws QuorumException
-     *             if the quorum is invalid.
+     *             if the quorum is not met.
+     * @throws QuorumException
+     *             if the quorum is not met on a the caller's token.
      * @throws QuorumException
      *             if the <i>token</i> is {@link #NO_QUORUM}.
      */

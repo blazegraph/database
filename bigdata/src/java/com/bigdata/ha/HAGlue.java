@@ -154,6 +154,11 @@ public interface HAGlue extends HAGlueBase, HAPipelineGlue, HAReadGlue,
     RunState getRunState() throws IOException;
 
     /**
+     * The extended run state of the service.
+     */
+    String getExtendedRunState() throws IOException;
+
+    /**
      * Compute the digest of the entire backing store - <strong>THIS METHOD IS
      * ONLY FOR DIAGNOSTIC PURPOSES.</strong>
      * <p>

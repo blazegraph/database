@@ -27,6 +27,7 @@ import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.math.BigInteger;
+import java.net.InetSocketAddress;
 import java.security.DigestException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -149,7 +150,7 @@ public class HAStatusServletUtil {
                 p.text("Service: path=" + quorumService.getServiceDir())
                         .node("br").close();
             }
-            
+
             /*
              * Report on the Journal.
              */
@@ -258,15 +259,17 @@ public class HAStatusServletUtil {
                         return name.endsWith(SnapshotManager.SNAPSHOT_EXT);
                     }
                 });
-                int nfiles = 0;
-                long nbytes = 0L;
-                for (File file : a) {
-                    nbytes += file.length();
-                    nfiles++;
+                {
+                    int nfiles = 0;
+                    long nbytes = 0L;
+                    for (File file : a) {
+                        nbytes += file.length();
+                        nfiles++;
+                    }
+                    p.text("SnapshotDir: nfiles=" + nfiles + ", nbytes="
+                            + nbytes + ", path=" + snapshotDir).node("br")
+                            .close();
                 }
-                p.text("SnapshotDir: nfiles=" + nfiles + ", nbytes=" + nbytes
-                        + ", path=" + snapshotDir).node("br").close();
-                
                 if (true) {
 
                     /*
@@ -277,7 +280,9 @@ public class HAStatusServletUtil {
 
                     // Note: list is ordered by increasing commitTime.
                     for (IRootBlockView rb : snapshots) {
-
+                        final File file = journal.getSnapshotManager()
+                                .getSnapshotFile(rb.getCommitCounter());
+                        final long nbytes = file.length();
                         String digestStr = null;
                         if (digests) {
                             try {
@@ -298,6 +303,8 @@ public class HAStatusServletUtil {
                                 + RootBlockView.toString(rb.getLastCommitTime())
                                 + ", commitCounter="
                                 + rb.getCommitCounter()
+                                + ", nbytes="
+                                + nbytes
                                 + (digestStr == null ? "" : ", md5="
                                         + digestStr)).node("br").close();
 
@@ -405,6 +412,14 @@ public class HAStatusServletUtil {
 
                 final int pipelineIndex = indexOf(serviceId, pipeline);
                 
+                // address where the downstream service will listen.
+                final InetSocketAddress writePipelineAddr = remoteService
+                        .getWritePipelineAddr();
+
+                // The AbstractServer and HAQuorumService run states.
+                final String extendedRunState = remoteService
+                        .getExtendedRunState();
+                
                 final String nssUrl = "http://" + hostname + ":" + nssPort;
                 
                 // hyper link to NSS service.
@@ -416,7 +431,9 @@ public class HAStatusServletUtil {
                                 : " is not joined"))//
                         + ", pipelineOrder="
                         + (pipelineIndex == -1 ? "N/A" : pipelineIndex)//
-                        + (isSelf ? " (this service)" : "")//
+                        + ", writePipelineAddr=" + writePipelineAddr//
+                        + ", service=" + (isSelf ? "self" : "other")//
+                        + ", extendedRunState=" + extendedRunState//
                 ).node("br").close();
 
             }

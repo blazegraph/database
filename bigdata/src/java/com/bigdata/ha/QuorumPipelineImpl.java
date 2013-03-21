@@ -54,6 +54,7 @@ import com.bigdata.ha.pipeline.HASendService;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.IBufferAccess;
 import com.bigdata.io.writecache.WriteCache;
+import com.bigdata.quorum.Quorum;
 import com.bigdata.quorum.QuorumException;
 import com.bigdata.quorum.QuorumMember;
 import com.bigdata.quorum.QuorumStateChangeListener;
@@ -786,7 +787,14 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> extends
         private final ByteBuffer b;
 
         /**
-         * The token for the leader.
+         * The token for the leader. The service that initiates the replication
+         * of a message MUST be the leader for this token.
+         * <p>
+         * The token is either taken from the {@link IHAWriteMessage} (if this
+         * is a live write) or from the current {@link Quorum#token()}.
+         * <p>
+         * Either way, we verify that this service is (and remains) the leader
+         * for that token throughout the {@link RobustReplicateTask}.
          */
         private final long quorumToken;
 
@@ -829,6 +837,9 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> extends
 
                 quorumToken = msg.getQuorumToken();
 
+                // Must be the leader for that token.
+                member.assertLeader(quorumToken);
+
             } else {
                 
                 /*
@@ -838,11 +849,56 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> extends
                 // Use the current quorum token.
                 quorumToken = member.getQuorum().token();
                 
+                // Must be the leader for that token.
+                member.assertLeader(quorumToken);
+                
             }
             
         }
+
+        /**
+         * This collects the assertion(s) that we make for the service that is
+         * attempting to robustly replicate a write into a single method. This
+         * was done in order to concentrate any conditional logic and design
+         * rationale into a single method.
+         * 
+         * Note: IFF we allow non-leaders to replicate HALog messages then this
+         * assert MUST be changed to verify that the quorum token remains valid
+         * and that this service remains joined with the met quorum, i.e.,
+         * 
+         * <pre>
+         * if (!quorum.isJoined(token))
+         *     throw new QuorumException();
+         * </pre>
+         */
+        private void assertQuorumState() throws QuorumException {
+
+            // Must be the leader for that token.
+            member.assertLeader(quorumToken);
+
+//            if (req == null) {
+//
+//                /*
+//                 * This service must be the leader since this is a LIVE
+//                 * write cache message (versus a historical message that is
+//                 * being replayed).
+//                 * 
+//                 * Note: The [quorumToken] is from the message IFF this is a
+//                 * live message and is otherwise the current quorum token.
+//                 */
+//                member.assertLeader(quorumToken);
+//
+//            }
+
+        }
         
         public Void call() throws Exception {
+
+            /*
+             * Note: This is tested outside of the try/catch. Do NOT retry if
+             * the quorum state has become invalid.
+             */
+            assertQuorumState();
 
             try {
 
@@ -897,35 +953,17 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> extends
                             + " bytes, retryCount=" + retryCount + ", req="
                             + req + ", msg=" + msg);
 
-                /*
-                 * Note: disable assert if we allow non-leaders to replicate
-                 * HALog messages (or just verify service joined with the
-                 * quorum).
-                 */
+                // retest while holding lock before sending the message.
+                assertQuorumState();
                 
-                if (req == null) {
-
-                    // // Note: Do not test quorum token for historical writes.
-                    // member.assertLeader(msg.getQuorumToken());
-
-                    /*
-                     * This service must be the leader.
-                     * 
-                     * Note: The [quorumToken] is from the message IFF this is a
-                     * live message and is otherwise the current quorum token.
-                     */
-                    member.assertLeader(quorumToken);
-
-                }
-
                 final PipelineState<S> downstream = pipelineStateRef.get();
 
                 final HASendService sendService = getHASendService();
 
                 final ByteBuffer b = this.b.duplicate();
 
-                new SendBufferTask<S>(req, msg, b, downstream, sendService,
-                        sendLock).call();
+                new SendBufferTask<S>(member, quorumToken, req, msg, b,
+                        downstream, sendService, sendLock).call();
 
                 return;
 
@@ -966,6 +1004,12 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> extends
                 // Sleep before each retry (including the first).
                 Thread.sleep(RETRY_SLEEP[tryCount-1]/* ms */);
 
+                /*
+                 * Note: Tested OUTSIDE of the try/catch so a quorum break will
+                 * immediately stop the retry behavior.
+                 */
+                assertQuorumState();
+
                 try {
 
                     // send to 1st follower.
@@ -974,10 +1018,16 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> extends
                     // Success.
                     return true;
                     
-                } catch (Exception ex) {
+                } catch (Throwable t) {
+                    
+                    if (InnerCause.isInnerCause(t, InterruptedException.class)) {
+                        
+                        throw (InterruptedException) t;
+                        
+                    }
                     
                     // log and retry.
-                    log.error("retry=" + tryCount + " : " + ex, ex);
+                    log.error("retry=" + tryCount + " : " + t, t);
                     
                     continue;
                     
@@ -1015,6 +1065,8 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> extends
     static private class SendBufferTask<S extends HAPipelineGlue> implements
             Callable<Void> {
 
+        private final QuorumMember<S> member;
+        private final long token; // member MUST remain leader for token.
         private final IHASyncRequest req;
         private final IHAWriteMessage msg;
         private final ByteBuffer b;
@@ -1022,11 +1074,13 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> extends
         private final HASendService sendService;
         private final Lock sendLock;
 
-        public SendBufferTask(final IHASyncRequest req,
-                final IHAWriteMessage msg, final ByteBuffer b,
-                final PipelineState<S> downstream,
+        public SendBufferTask(final QuorumMember<S> member, final long token,
+                final IHASyncRequest req, final IHAWriteMessage msg,
+                final ByteBuffer b, final PipelineState<S> downstream,
                 final HASendService sendService, final Lock sendLock) {
 
+            this.member = member;
+            this.token = token; 
             this.req = req; // Note: MAY be null.
             this.msg = msg;
             this.b = b;
@@ -1044,6 +1098,7 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> extends
              */
 
             sendLock.lock();
+
             try {
 
                 doRunWithLock();
@@ -1078,6 +1133,11 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> extends
                      * second. Timeouts are ignored during this loop.
                      */
                     while (!futSnd.isDone() && !futRec.isDone()) {
+                        /*
+                         * Make sure leader's quorum token remains valid for ALL
+                         * writes.
+                         */
+                        member.assertLeader(token);
                         try {
                             futSnd.get(1L, TimeUnit.SECONDS);
                         } catch (TimeoutException ignore) {
@@ -1116,27 +1176,37 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> extends
     public Future<Void> receiveAndReplicate(final IHASyncRequest req,
             final IHAWriteMessage msg) throws IOException {
 
+        /*
+         * FIXME We should probably pass the quorum token through from the
+         * leader for ALL replicated writes. This uses the leader's quorum token
+         * when it is available (for a live write) and otherwise uses the
+         * current quorum token (for historical writes, since we are not
+         * providing the leader's token in this case).
+         */
+        final long token = req == null ? msg.getQuorumToken() : member
+                .getQuorum().token();
+
         final RunnableFuture<Void> ft;
 
         lock.lock();
 
         try {
 
+            // Must be valid quorum.
+            member.getQuorum().assertQuorum(token);
+
             if (receiveBuffer == null) {
-               
+
                 /*
                  * The quorum broke and the receive buffer was cleared or
-                 * possibly we have become a leader.
-                 * 
-                 * TODO We should probably pass in the Quorum and then just
-                 * assert that the msg.getQuorumToken() is valid for the quorum
-                 * (but we can't do that for historical messages).
+                 * possibly we have become a leader (a distinct test since
+                 * otherwise we can hit an NPE on the receiveBuffer).
                  */
 
                 throw new QuorumException();
-            
+
             }
-        
+            
             final PipelineState<S> downstream = pipelineStateRef.get();
 
             if (log.isTraceEnabled())
@@ -1180,8 +1250,8 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> extends
              * not the last).
              */
 
-            ft = new FutureTask<Void>(new ReceiveAndReplicateTask<S>(req, msg,
-                    b, downstream, receiveService));
+            ft = new FutureTask<Void>(new ReceiveAndReplicateTask<S>(member,
+                    token, req, msg, b, downstream, receiveService));
 
         } finally {
             
@@ -1203,17 +1273,22 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> extends
     private static class ReceiveAndReplicateTask<S extends HAPipelineGlue>
             implements Callable<Void> {
         
+        private final QuorumMember<S> member;
+        private final long token;
         private final IHASyncRequest req;
         private final IHAWriteMessage msg;
         private final ByteBuffer b;
         private final PipelineState<S> downstream;
         private final HAReceiveService<HAMessageWrapper> receiveService;
 
-        public ReceiveAndReplicateTask(final IHASyncRequest req,
+        public ReceiveAndReplicateTask(final QuorumMember<S> member,
+                final long token, final IHASyncRequest req,
                 final IHAWriteMessage msg, final ByteBuffer b,
                 final PipelineState<S> downstream,
                 final HAReceiveService<HAMessageWrapper> receiveService) {
 
+            this.member = member;
+            this.token = token;
             this.req = req; // Note: MAY be null.
             this.msg = msg;
             this.b = b;
@@ -1247,6 +1322,14 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> extends
                      * ignored during this loop.
                      */
                     while (!futSnd.isDone() && !futRec.isDone()) {
+                        /*
+                         * The token must remain valid, even if this service is
+                         * not joined with the met quorum. If fact, services
+                         * MUST replicate writes regardless of whether or not
+                         * they are joined with the met quorum, but only while
+                         * there is a met quorum.
+                         */
+                        member.getQuorum().assertQuorum(token);
                         try {
                             futSnd.get(1L, TimeUnit.SECONDS);
                         } catch (TimeoutException ignore) {

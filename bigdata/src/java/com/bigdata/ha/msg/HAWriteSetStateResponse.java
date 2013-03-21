@@ -56,4 +56,13 @@ public class HAWriteSetStateResponse implements IHAWriteSetStateResponse {
         return sequence;
     }
 
+    @Override
+    public String toString() {
+        
+        return getClass().getSimpleName() + "{commitCounter=" + commitCounter
+                + ", sequence=" + sequence + ", lastCommitTime="
+                + lastCommitTime + "}";
+        
+    }
+    
 }

@@ -1054,11 +1054,17 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
     }
 
     final public void assertQuorum(final long token) {
+
+        if (this.token == NO_QUORUM)
+            throw new QuorumException("Quorum not met");
+        
         if (token != NO_QUORUM && this.token == token) {
             return;
         }
-        throw new QuorumException("Expected " + token + ", but is now "
-                + this.token);
+        
+        throw new QuorumException("Quorum not met on token: expected " + token
+                + ", actual=" + this.token);
+
     }
 
     final public void assertLeader(final long token) {
