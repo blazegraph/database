@@ -35,6 +35,7 @@ import java.security.MessageDigest;
 import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.Future;
+import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
@@ -469,7 +470,23 @@ public class TestHA3SnapshotPolicy extends AbstractHA3JournalServerTestCase {
         /*
          * LOAD data on leader.
          */
-        new LargeLoadTask(token, true/* reallyLargeLoad */).call();
+        {
+
+            final FutureTask<Void> ft = new FutureTask<Void>(new LargeLoadTask(
+                    token, true/* reallyLargeLoad */));
+
+            executorService.submit(ft);
+
+            // impose timeout on load.
+            ft.get(2 * loadLoadTimeoutMillis, TimeUnit.MILLISECONDS);
+            
+        }
+
+        // Current commit point.
+        final long lastCommitCounter2 = 2L;
+
+        // There are now TWO (2) commit points.
+        awaitCommitCounter(lastCommitCounter2, serverA, serverB);
 
         /*
          * Verify that query on all nodes is allowed and now provides a
@@ -483,14 +500,6 @@ public class TestHA3SnapshotPolicy extends AbstractHA3JournalServerTestCase {
                             .evaluate()));
 
         }
-
-        // Current commit point.
-        final long lastCommitCounter2 = serverA
-                .getRootBlock(new HARootBlockRequest(null/* storeUUID */))
-                .getRootBlock().getCommitCounter();
-
-        // There are now TWO (2) commit points.
-        assertEquals(2L, lastCommitCounter2);
 
         final HAGlue leader = quorum.getClient().getLeader(token);
 
