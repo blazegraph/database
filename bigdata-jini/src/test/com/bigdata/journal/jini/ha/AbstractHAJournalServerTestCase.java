@@ -775,7 +775,7 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
     /**
      * Await a commit point on one or more services, but only a short while as
      * these commit points should be very close together (unless there is a
-     * major GC involved).
+     * major GC involved or when simultaneously starting several services).
      * <p>
      * Note: The 2-phase commit is not truely simultaneous. In fact, the
      * services lay down their down root block asynchronously. Therefore, the
@@ -810,7 +810,7 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
                         throw new RuntimeException(e);
                     }
                 }
-            }, 1500, TimeUnit.MILLISECONDS);
+            }, 5000, TimeUnit.MILLISECONDS);
         }
 
     }
