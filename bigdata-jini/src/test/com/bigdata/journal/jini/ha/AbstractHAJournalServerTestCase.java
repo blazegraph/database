@@ -32,7 +32,6 @@ import java.io.IOException;
 import java.math.BigInteger;
 import java.security.DigestException;
 import java.security.NoSuchAlgorithmException;
-import java.util.Arrays;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -498,10 +497,20 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
      * @see TestConcurrentKBCreate
      * 
      *      Note: This method sometimes deadlocked in the repo.size() call on
-     *      the leader (HTTP end point). This was tracked down to an attempt
-     *      by the 3rd node to setup the pipeline in handleReplicatedWrite()
-     *      when it was not yet aware that a quorum existed and had not setup
-     *      its local root blocks.
+     *      the leader (HTTP end point). This was tracked down to an attempt by
+     *      the 3rd node to setup the pipeline in handleReplicatedWrite() when
+     *      it was not yet aware that a quorum existed and had not setup its
+     *      local root blocks.
+     * 
+     * @deprecated Use {@link #awaitCommitCounter(long, HAGlue...)} instead.
+     *             This method fails to ensure that the initial commit point is
+     *             visible on all services the are expected to be joined with
+     *             the met quorum. Instead, it relies on polling the specified
+     *             service until the KB is visible. This should be modified to
+     *             accept a vararg of services to be checked, it should then do
+     *             an {@link #awaitCommitCounter(long, HAGlue...)} for
+     *             commitCounter:=1 and finally verify that the KB is in fact
+     *             visible on each of the services.
      */
     protected void awaitKBExists(final HAGlue haGlue) throws IOException {
       
@@ -762,7 +771,50 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
                         .getRootBlock().getCommitCounter());
 
     }
-    
+
+    /**
+     * Await a commit point on one or more services, but only a short while as
+     * these commit points should be very close together (unless there is a
+     * major GC involved).
+     * <p>
+     * Note: The 2-phase commit is not truely simultaneous. In fact, the
+     * services lay down their down root block asynchronously. Therefore, the
+     * ability to observe a commit point on one service does not guarantee that
+     * the same commit point is simultaneously available on the other services.
+     * This issue only shows up with methods such as
+     * {@link #awaitKBExists(HAGlue)} since they are checking for visibility
+     * directly rather than waiting on a commit.
+     * <p>
+     * If an application issues an mutation request, then the services that vote
+     * YES in the 2-phase protocol will each have laid down their updated root
+     * block before the mutation request completes.
+     * 
+     * @param expected
+     * @param services
+     * @throws IOException
+     */
+    protected void awaitCommitCounter(final long expected,
+            final HAGlue... services) throws IOException {
+
+        for (HAGlue service : services) {
+            final HAGlue haGlue = service;
+            assertCondition(new Runnable() {
+                public void run() {
+                    try {
+                        assertEquals(
+                                expected,
+                                haGlue.getRootBlock(
+                                        new HARootBlockRequest(null/* storeUUID */))
+                                        .getRootBlock().getCommitCounter());
+                    } catch (IOException e) {
+                        throw new RuntimeException(e);
+                    }
+                }
+            }, 1500, TimeUnit.MILLISECONDS);
+        }
+
+    }
+
     /**
      * Return the name of the foaf data set.
      * 

@@ -1985,15 +1985,19 @@ public class AbstractHA3JournalServerTestCase extends
 		 * @throws Exception
 		 */
         public ABC(final boolean sequential) throws Exception {
-        	if (sequential) {
-        		final HAGlue[] services = startSequenceABC();
-        		
+
+            if (sequential) {
+            
+                final HAGlue[] services = startSequenceABC();
+
                 serverA = services[0];
 
                 serverB = services[1];
 
                 serverC = services[2];
-        	} else {
+
+            } else {
+                
                 final List<Callable<HAGlue>> tasks = new LinkedList<Callable<HAGlue>>();
 
                 tasks.add(new StartATask(false/* restart */));
@@ -2010,7 +2014,14 @@ public class AbstractHA3JournalServerTestCase extends
 
                 serverC = futures.get(2).get();
 
-        	}
+            }
+
+            // wait for the quorum to fully meet.
+            awaitFullyMetQuorum();
+
+            // wait for the initial commit point (KB create).
+            awaitCommitCounter(1L, serverA, serverB, serverC);
+            
         }
 
         public void shutdownAll() throws InterruptedException,

@@ -89,9 +89,6 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
         final long token = quorum.awaitQuorum(awaitQuorumTimeout,
                 TimeUnit.MILLISECONDS);
 
-        // Verify KB exists.
-        awaitKBExists(serverA);
-        
         /*
          * Note: The quorum was not fully met at the last 2-phase commit.
          * Instead, 2 services participated in the 2-phase commit and the third
@@ -100,12 +97,10 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
          */
 
         // Current commit point.
-        final long lastCommitCounter = serverA
-                .getRootBlock(new HARootBlockRequest(null/* storeUUID */))
-                .getRootBlock().getCommitCounter();
-
-        // There is ONE commit point.
-        assertEquals(1L, lastCommitCounter);
+        final long lastCommitCounter = 1L;
+        
+        // Await first commit point (KB create) on A + B.
+        awaitCommitCounter(lastCommitCounter, serverA, serverB);
 
         /*
          * Verify that HALog files were generated and are available for commit
@@ -172,20 +167,13 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
         final HAGlue serverA = abc.serverA, serverB = abc.serverB, serverC = abc.serverC;
 
         // Verify quorum is FULLY met.
-        final long token = awaitFullyMetQuorum();
+        awaitFullyMetQuorum();
 
-        // Verify KB exists on leader.
-        final HAGlue leader = quorum.getClient().getLeader(token);
+//        // Verify KB exists on leader.
+//        final HAGlue leader = quorum.getClient().getLeader(token);
 
-        awaitKBExists(leader);
-        
-        // Current commit point.
-        final long lastCommitCounter = leader
-                .getRootBlock(new HARootBlockRequest(null/* storeUUID */))
-                .getRootBlock().getCommitCounter();
-
-        // There is ONE commit point.
-        assertEquals(1L, lastCommitCounter);
+        // await the KB create commit point to become visible on each service.
+        awaitCommitCounter(1L, new HAGlue[] { serverA, serverB, serverC });
 
         // Verify binary equality of ALL journals.
         assertDigestsEquals(new HAGlue[] { serverA, serverB, serverC });
@@ -217,8 +205,11 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
         // wait for a quorum met.
         final long token = awaitMetQuorum();
 
-        // wait for KB create.
-        awaitKBExists(serverA);
+        // Current commit point.
+        final long lastCommitCounter = 1L;
+
+        // Verify 1st commit point is visible on A + B.
+        awaitCommitCounter(lastCommitCounter, new HAGlue[] { serverA, serverB });
         
         // start C.
         final HAGlue serverC = startC();
@@ -226,13 +217,9 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
         // wait for a fully met quorum.
         assertEquals(token, awaitFullyMetQuorum());
 
-        // Current commit point.
-        final long lastCommitCounter = serverA
-                .getRootBlock(new HARootBlockRequest(null/* storeUUID */))
-                .getRootBlock().getCommitCounter();
-
-        // There is ONE commit point.
-        assertEquals(1L, lastCommitCounter);
+        // Verify 1st commit point is visible on all services.
+        awaitCommitCounter(lastCommitCounter, new HAGlue[] { serverA, serverB,
+                serverC });
 
         /*
          * Verify that HALog files were generated and are available for commit
@@ -377,8 +364,8 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
         final long token = quorum.awaitQuorum(awaitQuorumTimeout,
                 TimeUnit.MILLISECONDS);
 
-        // Verify KB exists.
-        awaitKBExists(serverA);
+//        // Verify KB exists.
+//        awaitKBExists(serverA);
         
         /*
          * Note: The quorum was not fully met at the last 2-phase commit.
@@ -388,12 +375,10 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
          */
 
         // Current commit point.
-        final long lastCommitCounter = serverA
-                .getRootBlock(new HARootBlockRequest(null/* storeUUID */))
-                .getRootBlock().getCommitCounter();
+        final long lastCommitCounter = 1;
 
-        // There is ONE commit point.
-        assertEquals(1L, lastCommitCounter);
+        // Await initial commit point (KB create) on A + B.
+        awaitCommitCounter(lastCommitCounter, serverA, serverB);
 
         /*
          * Verify that HALog files were generated and are available for commit
@@ -412,12 +397,10 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
         simpleTransaction();
 
         // Current commit point.
-        final long lastCommitCounter2 = serverA
-                .getRootBlock(new HARootBlockRequest(null/* storeUUID */))
-                .getRootBlock().getCommitCounter();
+        final long lastCommitCounter2 = 2;
 
-        // There are TWO (2) commit points.
-        assertEquals(2L, lastCommitCounter2);
+        // Await 2nd commit point on A + B.
+        awaitCommitCounter(lastCommitCounter2, serverA, serverB);
 
         // Now Start 3rd service.
         final HAGlue serverC = startC();
@@ -536,8 +519,8 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
 			final long token = quorum.awaitQuorum(awaitQuorumTimeout,
 					TimeUnit.MILLISECONDS);
 
-			// Verify KB exists.
-			awaitKBExists(serverA);
+	        // Await initial commit point (KB create).
+	        awaitCommitCounter(1L, serverA, serverB);
 			
             final HAGlue leader = quorum.getClient().getLeader(token);
 
@@ -681,8 +664,6 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
      */
 	public void testStartAB_C_LiveResync() throws Exception {
 
-		// fail("TEST FAILS");
-		
 		// Start 2 services.
 		final HAGlue serverA = startA();
 		final HAGlue serverB = startB();
@@ -691,8 +672,8 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
 		final long token = quorum.awaitQuorum(awaitQuorumTimeout,
 				TimeUnit.MILLISECONDS);
 
-		// Verify KB exists.
-		awaitKBExists(serverA);
+//		// Verify KB exists.
+//		awaitKBExists(serverA);
 
 		/*
 		 * Note: The quorum was not fully met at the last 2-phase commit.
@@ -702,12 +683,10 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
 		 */
 
 		// Current commit point.
-		final long lastCommitCounter = serverA
-				.getRootBlock(new HARootBlockRequest(null/* storeUUID */))
-				.getRootBlock().getCommitCounter();
+		final long lastCommitCounter = 1;
 
-		// There is ONE commit point.
-		assertEquals(1L, lastCommitCounter);
+        // Await initial commit point (KB create) on A + B.
+        awaitCommitCounter(lastCommitCounter, serverA, serverB);
 
 		/*
 		 * Verify that HALog files were generated and are available for commit
@@ -803,8 +782,8 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
         final long token = quorum.awaitQuorum(awaitQuorumTimeout,
                 TimeUnit.MILLISECONDS);
 
-        // Verify KB exists.
-        awaitKBExists(serverA);
+//        // Verify KB exists.
+//        awaitKBExists(serverA);
         
         /*
          * Note: The quorum was not fully met at the last 2-phase commit.
@@ -814,12 +793,10 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
          */
 
         // Current commit point.
-        final long lastCommitCounter = serverA
-                .getRootBlock(new HARootBlockRequest(null/* storeUUID */))
-                .getRootBlock().getCommitCounter();
+        final long lastCommitCounter = 1;
 
-        // There is ONE commit point.
-        assertEquals(1L, lastCommitCounter);
+        // Await initial commit point (KB create) on A + B.
+        awaitCommitCounter(lastCommitCounter, serverA, serverB);
 
         /*
          * Verify that HALog files were generated and are available for commit
@@ -995,40 +972,48 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
     }
 
     /**
-     * Test Rebuild of C service where quorum was previously
-     * fully met and where a new quorum is met before C joins for rebuild.
+     * Test Rebuild of C service where quorum was previously fully met and where
+     * a new quorum is met before C joins for rebuild.
      * 
-	 * @throws Exception 
+     * @throws Exception
      */
     public void testStartABC_Rebuild() throws Exception {
-    	startA();
-    	startB();
-    	startC();
-    	
-    	awaitFullyMetQuorum();
-    	 	
+
+        {
+
+            final HAGlue serverA = startA();
+            final HAGlue serverB = startB();
+            final HAGlue serverC = startC();
+
+            awaitFullyMetQuorum();
+
+            // Await initial commit point (KB create) on all servers.
+            awaitCommitCounter(1L, serverA, serverB, serverC);
+            
+        }
+        
         // Now run several transactions
         for (int i = 0; i < 5; i++)
-        	simpleTransaction();
-        
+            simpleTransaction();
+
         // shutdown AB and destroy C
         destroyC();
         shutdownA();
         shutdownB();
-        
-        // Now restart A, B & C
-    	
-    	final HAGlue serverA = startA();
-    	final HAGlue serverB = startB();
-    	
-    	// A & B should meet
-    	awaitMetQuorum();
-        
-    	final HAGlue serverC = startC();
 
-    	// C will have go through Rebuild before joining
-     	awaitFullyMetQuorum();
-        
+        // Now restart A, B & C
+
+        final HAGlue serverA = startA();
+        final HAGlue serverB = startB();
+
+        // A & B should meet
+        awaitMetQuorum();
+
+        final HAGlue serverC = startC();
+
+        // C will have go through Rebuild before joining
+        awaitFullyMetQuorum();
+
         // Verify binary equality of ALL journals.
         assertDigestsEquals(new HAGlue[] { serverA, serverB, serverC });
     }
@@ -1047,15 +1032,17 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
      * @throws Exception 
      */
     public void testABC_Restore() throws Exception {
-       final ABC startup = new ABC(true/*sequential*/);
 
-        // Wait for a quorum meet.
-        final long token = quorum.awaitQuorum(awaitQuorumTimeout,
-                TimeUnit.MILLISECONDS);
+//        final ABC startup = 
+        new ABC(true/* sequential */);
 
-        // Verify KB exists        
-        awaitKBExists(startup.serverA);
-
+//        // Wait for a quorum meet.
+//        final long token = quorum.awaitQuorum(awaitQuorumTimeout,
+//                TimeUnit.MILLISECONDS);
+//
+//        // Verify KB exists        
+//        awaitKBExists(startup.serverA);
+//
     
         /*
          * Now go through a commit point with a met quorum. The HALog
@@ -1093,16 +1080,15 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
         
         log.warn("CHECK LOGS HAVE BEEN COPIED TO C");
         
-    	// new C should Restore and Meet as Follower with B as leader
-    	this.awaitMetQuorum();
-    	
-    	startA();
-    	
-    	// A should join the Met Quorum which will then be Fully Met
-    	this.awaitFullyMetQuorum();
-       
-}
-    
+        // new C should Restore and Meet as Follower with B as leader
+        this.awaitMetQuorum();
+
+        startA();
+
+        // A should join the Met Quorum which will then be Fully Met
+        this.awaitFullyMetQuorum();
+
+    }    
 
 	/**
      * Test quorum remains if C is failed when fully met
@@ -1118,8 +1104,8 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
         final long token = quorum.awaitQuorum(awaitQuorumTimeout,
                 TimeUnit.MILLISECONDS);
 
-        // Verify KB exists.
-        awaitKBExists(serverA);
+//        // Verify KB exists.
+//        awaitKBExists(serverA);
         
         /*
          * Note: The quorum was not fully met at the last 2-phase commit.
@@ -1129,12 +1115,10 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
          */
 
         // Current commit point.
-        final long lastCommitCounter = serverA
-                .getRootBlock(new HARootBlockRequest(null/* storeUUID */))
-                .getRootBlock().getCommitCounter();
+        final long lastCommitCounter = 1;
 
-        // There is ONE commit point.
-        assertEquals(1L, lastCommitCounter);
+        // Await initial commit point (KB create).
+        awaitCommitCounter(lastCommitCounter, serverA, serverB);
 
         /*
          * Verify that HALog files were generated and are available for commit
@@ -1211,8 +1195,8 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
 		// Wait for a quorum meet.       
 		final long token = awaitMetQuorum();
 
-		// Verify KB exists.
-		awaitKBExists(startup.serverA);
+//		// Verify KB exists.
+//		awaitKBExists(startup.serverA);
 
 		// Verify A is the leader.
 		assertEquals(startup.serverA, quorum.getClient().getLeader(token));
@@ -1231,6 +1215,7 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
 
         assertTrue(leader.equals(startup.serverB)
                 || leader.equals(startup.serverC));
+        
 	}
     
     /**
@@ -1239,9 +1224,13 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
      * @throws Exception 
      */
     public void testStartAB_halog() throws Exception {
+
         // Start 2 services
-        startA();
-        startB();
+        final HAGlue serverA = startA();
+        final HAGlue serverB = startB();
+
+        // Await first commit point on both services (KB create).
+        awaitCommitCounter(1L, new HAGlue[] { serverA, serverB });
         
         // Run through transaction
         simpleTransaction();
@@ -1266,13 +1255,19 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
      * @throws Exception 
      */
     public void testStartAB_C_halog() throws Exception {
-		doStartAB_C_halog();
+
+        doStartAB_C_halog();
+        
 	}
 	
 	private void doStartAB_C_halog() throws Exception {
-        // Start 2 services
-        startA();
-        startB();
+        
+	    // Start 2 services
+        final HAGlue serverA = startA();
+        final HAGlue serverB = startB();
+
+        // Await first commit point on both services (KB create).
+        awaitCommitCounter(1L, new HAGlue[] { serverA, serverB });
         
         // Run through transaction
         simpleTransaction();
@@ -1631,34 +1626,35 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
      * to repeatedly start an initial ABC service.
      * @throws Exception
      */
-    public void _testSANDBOXStressABC_Restart() throws Exception { // disable from standard test runs
-    	for (int i = 1; i <= 20; i++) {
-    		try {
-        		final ABC startup = new ABC(true/*sequential*/);
-        		
-    			awaitFullyMetQuorum();
-    			
-    			simpleTransaction();
-    		} catch (Throwable e) {
-    			fail("Unable to meet on run " + i, e);
-    		}
-    		
-    		
-    		// destroy attempts to take services down in simplest order, leaving
-    		//	leader until last to try to avoid reorganisation events
-    		destroyAll();
-    	}
+    // disable from standard test runs
+    public void _testSANDBOXStressABC_Restart() throws Exception {
+        for (int i = 1; i <= 20; i++) {
+            try {
+                new ABC(true/* sequential */);
+
+                awaitFullyMetQuorum();
+
+                simpleTransaction();
+            } catch (Throwable e) {
+                fail("Unable to meet on run " + i, e);
+            }
+
+            // destroy attempts to take services down in simplest order, leaving
+            // leader until last to try to avoid reorganisation events
+            destroyAll();
+        }
     }
 
-  /**
-     * We have experienced inconsistencies on test startups, this test just attempts
-     * to repeatedly start an initial ABC service.
+    /**
+     * We have experienced inconsistencies on test startups, this test just
+     * attempts to repeatedly start an initial ABC service.
      */
-    public void _testSANDBOXStressABCStartSimultaneous() throws Exception { // disable from std test runs
+    // disable from std test runs
+    public void _testSANDBOXStressABCStartSimultaneous() throws Exception {
         for (int i = 1; i <= 20; i++) {
             ABC tmp = null;
             try {
-                tmp = new ABC(false/*sequential*/);
+                tmp = new ABC(false/* sequential */);
                 awaitFullyMetQuorum();
                 tmp.shutdownAll();
             } catch (Throwable e) {

@@ -99,8 +99,8 @@ public class TestHA2JournalServer extends AbstractHA3JournalServerTestCase {
         // Verify that service self-reports role via the REST API.
         assertEquals(HAStatusEnum.Follower, getNSSHAStatus(serverB));
 
-        // Wait until KB exists.
-        awaitKBExists(serverA);
+        // Await initial commit point (KB create).
+        awaitCommitCounter(1L, serverA, serverB);
 
         /*
          * Verify we can read on the KB on both nodes.
@@ -156,8 +156,8 @@ public class TestHA2JournalServer extends AbstractHA3JournalServerTestCase {
         doNSSStatusRequest(serverA);
         doNSSStatusRequest(serverB);
 
-        // Wait until KB exists.
-        awaitKBExists(serverA);
+        // Await initial commit point (KB create).
+        awaitCommitCounter(1L, serverA, serverB);
 
         // Await [A] up and running as leader.
         assertEquals(HAStatusEnum.Leader, awaitNSSAndHAReady(serverA));
@@ -254,8 +254,8 @@ public class TestHA2JournalServer extends AbstractHA3JournalServerTestCase {
         doNSSStatusRequest(serverA);
         doNSSStatusRequest(serverB);
 
-        // Wait until KB exists.
-        awaitKBExists(serverA);
+        // Await initial commit point (KB create).
+        awaitCommitCounter(1L, serverA, serverB);
 
         // Await [A] up and running as leader.
         assertEquals(HAStatusEnum.Leader, awaitNSSAndHAReady(serverA));
@@ -339,8 +339,8 @@ public class TestHA2JournalServer extends AbstractHA3JournalServerTestCase {
         doNSSStatusRequest(serverA);
         doNSSStatusRequest(serverB);
 
-        // Wait until KB exists.
-        awaitKBExists(serverA);
+        // Await initial commit point (KB create).
+        awaitCommitCounter(1L, serverA, serverB);
 
         // Verify binary equality on the journal files.
         assertDigestsEquals(new HAGlue[] { serverA, serverB });
@@ -436,8 +436,8 @@ public class TestHA2JournalServer extends AbstractHA3JournalServerTestCase {
         doNSSStatusRequest(serverA);
         doNSSStatusRequest(serverB);
 
-        // Wait until KB exists.
-        awaitKBExists(serverA);
+        // Await initial commit point (KB create).
+        awaitCommitCounter(1L, serverA, serverB);
 
         // Verify binary equality on the journal files.
         assertDigestsEquals(new HAGlue[] { serverA, serverB });

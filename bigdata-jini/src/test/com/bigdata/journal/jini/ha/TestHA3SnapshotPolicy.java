@@ -144,14 +144,14 @@ public class TestHA3SnapshotPolicy extends AbstractHA3JournalServerTestCase {
 
         // Start 2 services.
         final HAGlue serverA = startA();
-        startB();
+        final HAGlue serverB = startB();
 
         // Wait for a quorum meet.
         final long token = quorum.awaitQuorum(awaitQuorumTimeout,
                 TimeUnit.MILLISECONDS);
 
-        // Verify KB exists.
-        awaitKBExists(serverA);
+        // Await initial commit point (KB create).
+        awaitCommitCounter(1L, serverA, serverB);
 
         final HAGlue leader = quorum.getClient().getLeader(token);
         assertEquals(serverA, leader); // A is the leader.
@@ -209,27 +209,15 @@ public class TestHA3SnapshotPolicy extends AbstractHA3JournalServerTestCase {
     public void testAB_snapshotB() throws Exception {
 
         // Start 2 services.
-        startA();
+        final HAGlue serverA = startA();
         final HAGlue serverB = startB();
 
         // Wait for a quorum meet.
         final long token = quorum.awaitQuorum(awaitQuorumTimeout,
                 TimeUnit.MILLISECONDS);
 
-        {
-            final HAGlue leader = quorum.getClient().getLeader(token);
-
-            // Verify KB exists.
-            awaitKBExists(leader);
-
-            // Verify quorum is at the expected commit point.
-            assertEquals(
-                    1L,
-                    leader.getRootBlock(
-                            new HARootBlockRequest(null/* storeUUID */))
-                            .getRootBlock().getCommitCounter());
-
-        }
+        // Await initial commit point (KB create).
+        awaitCommitCounter(1L, serverA, serverB);
 
         {
 
@@ -283,14 +271,14 @@ public class TestHA3SnapshotPolicy extends AbstractHA3JournalServerTestCase {
 
         // Start 2 services.
         final HAGlue serverA = startA();
-        startB();
+        final HAGlue serverB = startB();
 
         // Wait for a quorum meet.
         final long token = quorum.awaitQuorum(awaitQuorumTimeout,
                 TimeUnit.MILLISECONDS);
 
-        // Verify KB exists.
-        awaitKBExists(serverA);
+        // Await initial commit point (KB create).
+        awaitCommitCounter(1L, serverA, serverB);
 
         final HAGlue leader = quorum.getClient().getLeader(token);
 
@@ -377,14 +365,14 @@ public class TestHA3SnapshotPolicy extends AbstractHA3JournalServerTestCase {
 
         // Start 2 services.
         final HAGlue serverA = startA();
-        startB();
+        final HAGlue serverB = startB();
 
         // Wait for a quorum meet.
         final long token = quorum.awaitQuorum(awaitQuorumTimeout,
                 TimeUnit.MILLISECONDS);
 
-        // Verify KB exists.
-        awaitKBExists(serverA);
+        // Await initial commit point (KB create).
+        awaitCommitCounter(1L, serverA, serverB);
 
         final HAGlue leader = quorum.getClient().getLeader(token);
 
@@ -453,14 +441,14 @@ public class TestHA3SnapshotPolicy extends AbstractHA3JournalServerTestCase {
 
         // Start 2 services.
         final HAGlue serverA = startA();
-        startB();
+        final HAGlue serverB = startB();
 
         // Wait for a quorum meet.
         final long token = quorum.awaitQuorum(awaitQuorumTimeout,
                 TimeUnit.MILLISECONDS);
 
-        // Verify KB exists.
-        awaitKBExists(serverA);
+        // Await initial commit point (KB create).
+        awaitCommitCounter(1L, serverA, serverB);
 
         // The joined services, in their service join order.
         final UUID[] joined = quorum.getJoined();
@@ -646,7 +634,8 @@ public class TestHA3SnapshotPolicy extends AbstractHA3JournalServerTestCase {
         // Verify A is the leader.
         assertEquals(serverA, quorum.getClient().getLeader(token));
 
-        awaitKBExists(serverA);
+        // Await initial commit point (KB create).
+        awaitCommitCounter(1L, serverA, serverB);
         
         assertCommitCounter(1L, serverA);
         

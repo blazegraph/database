@@ -72,8 +72,8 @@ public class TestHAJournalServerGlobalWriteLock extends AbstractHA3JournalServer
         final long token = quorum.awaitQuorum(awaitQuorumTimeout,
                 TimeUnit.MILLISECONDS);
 
-        // Wait until KB exists.
-        awaitKBExists(serverA);
+        // Await initial commit point (KB create).
+        awaitCommitCounter(1L, serverA, serverB);
 
         // Verify binary equality on the journal files.
         assertDigestsEquals(new HAGlue[] { serverA, serverB });
