@@ -67,7 +67,21 @@ public class RemoteRepositoryManager extends RemoteRepository {
      * SPARQL end point URL for the default data set is formed by appending
      * <code>/sparql</code>.
      */
-    protected String baseServiceURL;
+    private final String baseServiceURL;
+
+    /**
+     * The path to the root of the web application (without the trailing "/").
+     * <p>
+     * Note: This SHOULD NOT be the SPARQL end point URL. The NanoSparqlServer
+     * has a wider interface. This should be the base URL of that interface. The
+     * SPARQL end point URL for the default data set is formed by appending
+     * <code>/sparql</code>.
+     */
+    public String getBaseServiceURL() {
+        
+        return baseServiceURL;
+        
+    }
     
     /**
      * 
