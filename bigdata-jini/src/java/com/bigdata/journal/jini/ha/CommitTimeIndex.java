@@ -143,8 +143,6 @@ public class CommitTimeIndex extends BTree {
         if(index == -1) {
             
             // No match.
-            log.warn("Not found: " + timestamp);
-            
             return null;
             
         }
@@ -229,13 +227,13 @@ public class CommitTimeIndex extends BTree {
             
             pos = -(pos+1);
 
-            if(pos == 0) {
+            if (pos == 0) {
 
                 // No entry is less than or equal to this timestamp.
                 return -1;
-                
+
             }
-                
+       
             pos--;
 
             return pos;
@@ -290,41 +288,164 @@ public class CommitTimeIndex extends BTree {
         super.insert(key, BytesUtil.getBytes(rootBlock.asReadOnlyBuffer()));
 
     }
-    
+
     /**
-     * Find the commit counter for the most recent snapshot (if any).
+     * Find and return the {@link IRootBlockView} for the oldest snapshot (if
+     * any).
      * 
-     * @return That commit counter -or- ZERO (0L) if there are no snapshots.
+     * @return That {@link IRootBlockView} -or- <code>null</code> if there are
+     *         no snapshots.
      */
-    public long getMostRecentSnapshotCommitCounter() {
-        
-        final long snapshotCommitCounter;
+    public IRootBlockView getOldestSnapshot() {
+
         synchronized (this) {
 
-            @SuppressWarnings("unchecked")
-            final ITupleIterator<IRootBlockView> itr = 
-                    rangeIterator(null/* fromKey */, null/* toKey */,
-                            1/* capacity */, IRangeQuery.DEFAULT
-                                    | IRangeQuery.REVERSE/* flags */, null/* filter */);
+            if (getEntryCount() == 0L) {
 
-            if (itr.hasNext()) {
-
-                final ITuple<IRootBlockView> t = itr.next();
-                
-                final IRootBlockView rootBlock = t.getObject();
-
-                snapshotCommitCounter = rootBlock.getCommitCounter();
-
-            } else {
-
-                snapshotCommitCounter = 0L;
+                // Empty index.
+                return null;
 
             }
 
+            // Lookup first tuple in index.
+            @SuppressWarnings("unchecked")
+            final ITuple<IRootBlockView> t = valueAt(0L, getLookupTuple());
+
+            final IRootBlockView rb = t.getObject();
+            
+            return rb;
+
         }
 
-        return snapshotCommitCounter;
+    }
+    
+    /**
+     * Find the {@link IRootBlockView} for the most recent snapshot (if any).
+     * 
+     * @return That {@link IRootBlockView} -or- <code>null</code> if there are
+     *         no snapshots.
+     */
+    public IRootBlockView getNewestSnapshot() {
         
+        /*
+         * Note: This could also be written using valueAt(nentries).
+         */
+        synchronized (this) {
+
+            @SuppressWarnings("unchecked")
+            final ITupleIterator<IRootBlockView> itr = rangeIterator(
+                    null/* fromKey */, null/* toKey */, 1/* capacity */,
+                    IRangeQuery.DEFAULT | IRangeQuery.REVERSE/* flags */, null/* filter */);
+
+            if (!itr.hasNext()) {
+
+                return null;
+
+            }
+
+            final ITuple<IRootBlockView> t = itr.next();
+
+            final IRootBlockView rb = t.getObject();
+
+            return rb;
+            
+        }
+        
+    }
+    
+    /**
+     * Find the oldest snapshot whose commit counter is LTE the specified commit
+     * counter.
+     * 
+     * @return The {@link IRootBlockView} for that snapshot -or-
+     *         <code>null</code> if there is no such snapshot.
+     *         
+     * @throws IllegalArgumentException
+     *             if <code>commitCounter LT ZERO (0)</code>
+     */
+    public IRootBlockView findByCommitCounter(final long commitCounter) {
+
+        if (commitCounter < 0L)
+            throw new IllegalArgumentException();
+
+        synchronized (this) {
+
+            // Reverse scan.
+            @SuppressWarnings("unchecked")
+            final ITupleIterator<IRootBlockView> itr = rangeIterator(
+                    null/* fromKey */, null/* toKey */, 0/* capacity */,
+                    IRangeQuery.DEFAULT | IRangeQuery.REVERSE/* flags */, null/* filter */);
+
+            while (itr.hasNext()) {
+
+                final ITuple<IRootBlockView> t = itr.next();
+
+                final IRootBlockView rb = t.getObject();
+
+                if (rb.getCommitCounter() <= commitCounter) {
+
+                    // First snapshot LTE that commit counter.
+                    return rb;
+
+                }
+
+            }
+
+            return null;
+
+        }
+       
+    }
+    
+    /**
+     * Return the snapshot that is associated with the specified ordinal index
+     * (origin ZERO) counting backwards from the most recent snapshot (0)
+     * towards the earliest snapshot (nsnapshots-1).
+     * <p>
+     * Note: The effective index is given by <code>(entryCount-1)-index</code>.
+     * If the effective index is LT ZERO (0) then there is no such snapshot and
+     * this method will return <code>null</code>.
+     * 
+     * @param index
+     *            The index.
+     * 
+     * @return The {@link IRootBlockView} for that snapshot -or-
+     *         <code>null</code> if there is no such snapshot.
+     * 
+     * @throws IllegalArgumentException
+     *             if <code>index LT ZERO (0)</code>
+     */
+    public IRootBlockView getSnapshotByReverseIndex(final int index) {
+
+        if (index < 0)
+            throw new IllegalArgumentException();
+        
+        synchronized (this) {
+
+            final long entryCount = getEntryCount();
+            
+            if (entryCount > Integer.MAX_VALUE)
+                throw new AssertionError();
+
+            final int effectiveIndex = ((int) entryCount - 1) - index;
+            
+            if (effectiveIndex < 0) {
+
+                // No such snapshot.
+                return null;
+
+            }
+
+            @SuppressWarnings("unchecked")
+            final ITuple<IRootBlockView> t = valueAt(effectiveIndex,
+                    getLookupTuple());
+
+            final IRootBlockView rb = t.getObject();
+            
+            return rb;
+
+        }
+
     }
     
     /**

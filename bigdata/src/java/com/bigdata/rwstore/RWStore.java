@@ -2616,6 +2616,17 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
                  */
                 m_writeCacheService.close();
                 m_writeCacheService = newWriteCache();
+            } else if (m_writeCacheService != null) {
+                /*
+                 * Note: We DO NOT need to reset() the WriteCacheService. If a
+                 * record was already flushed to the disk, then it is on the
+                 * disk and clearing the record from the cache will not change
+                 * that. If the record has not yet been flushed to the disk,
+                 * then we already cleared it from the WCS when we reset the
+                 * FixedAllocators (above).
+                 */
+//                m_writeCacheService.reset();
+//                m_writeCacheService.setExtent(convertAddr(m_fileSize));
             }
             /*
              * Discard any writes on the delete blocks. Those deletes MUST NOT

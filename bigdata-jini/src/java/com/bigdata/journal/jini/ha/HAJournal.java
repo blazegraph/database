@@ -414,6 +414,36 @@ public class HAJournal extends Journal {
     
         super.setQuorumToken(newValue);
 
+        if (newValue == Quorum.NO_QUORUM) {
+
+            /*
+             * If there is a running snapshot, then cancel it since the quorum
+             * has broken.
+             * 
+             * Note: The snapshot task will automatically terminate if it
+             * observes a quorum break or similar event. This is just being
+             * proactive.
+             * 
+             * TODO Lift into HAJournalServer.quorumBreak() handler?
+             * 
+             * TODO This will not be called if the quorum remains met but the
+             * local service leaves the quorum. However, we should still cancel
+             * a running snapshot if that occurs.
+             */
+            
+            final Future<IHASnapshotResponse> ft = getSnapshotManager()
+                    .getSnapshotFuture();
+
+            if (ft != null && !ft.isDone()) {
+
+                haLog.info("Canceling snapshot.");
+
+                ft.cancel(true/* mayInterruptIfRunning */);
+
+            }
+
+        }
+        
     }
     
     /**

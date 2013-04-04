@@ -264,6 +264,26 @@ public class HAJournalServer extends AbstractServer {
 
         ISnapshotPolicy DEFAULT_SNAPSHOT_POLICY = new DefaultSnapshotPolicy();
 
+//        /**
+//         * <strong>TEST SUITE OPTION ONLY!</strong>
+//         * <p>
+//         * By default, a snapshot will be taken the first time the quorum meets
+//         * for each service. This provide the initial restore point, which
+//         * corresponds to an empty {@link HAJournal} with the correct root
+//         * blocks for the quorum.
+//         * <p>
+//         * This option MAY be used to suppress this behavior. This is used by
+//         * the test suite to avoid the creation of the initial snapshot. In
+//         * combination with an {@link DefaultRestorePolicy} which specifies
+//         * <code>minRestorePoints:=0</code>, this has the effect that we do not
+//         * hold onto HALog files (other than the current HALog file) until a
+//         * snapshot has been taken. The test suites control when snapshots are
+//         * taken and are thus able to test a variety of backup scenarios.
+//         */
+//        String SNAPSHOT_ON_FIRST_MEET = "snapshotOnFirstMeet";
+//
+//        boolean DEFAULT_SNAPSHOT_ON_FIRST_MEET = true;
+
         /**
          * The policy identifies the first commit point whose backups MUST NOT
          * be released. The policy may be based on the age of the commit point,
@@ -1227,7 +1247,15 @@ public class HAJournalServer extends AbstractServer {
                 final long token = getQuorum().token();
 
                 if (getQuorum().isQuorumFullyMet(token)) {
-
+                    /*
+                     * TODO Even though the quorum is fully met, we should wait
+                     * until we have a positive indication from the leader that
+                     * it is "ha ready" before purging the HA logs and aging put
+                     * snapshots. The leader might need to explicitly schedule
+                     * this operation against the joined services and the
+                     * services should then verify that the quorum is fully met
+                     * before they actually age out the HALogs and snapshots.
+                     */
                     purgeHALogs();
 
                 }
@@ -1462,6 +1490,16 @@ public class HAJournalServer extends AbstractServer {
 
                 } // validation of pre-conditions.
 
+                /*
+                 * Conditionally take a snapshot of the journal iff there is no
+                 * existing snapshot. The journal may or may not be empty, but
+                 * we do not have any existing snapshots and we need to have one
+                 * to serve as a restore point. The service MUST be joined with
+                 * a met quorum in order to take a snapshot.
+                 */
+
+                journal.getSnapshotManager().takeInitialSnapshot();
+
                 // Block until this run state gets interrupted.
                 blockInterruptably();
                 
@@ -1687,9 +1725,16 @@ public class HAJournalServer extends AbstractServer {
                  * Note: We MUST NOT install the local root blocks unless both
                  * this service and the leader at at commitCounter ZERO(0L).
                  */
+                // Wait for the new root blocks.
                 awaitJournalToken(token);
                 {
 
+                    /*
+                     * Get rid of any existing backups. They will not be
+                     * consistent with the rebuild.
+                     */
+                    deleteBackups();
+                    
                     /*
                      * The current root block on the leader (We want to get some
                      * immutatable metadata from the leader's root block).
@@ -1722,6 +1767,12 @@ public class HAJournalServer extends AbstractServer {
                      * the local store.
                      */
                     installRootBlocks(rbu.rootBlock0, rbu.rootBlock1);
+
+                    // Note: Snapshot requires joined with met quorum.
+//                    /*
+//                     * Take a snapshot.
+//                     */
+//                    journal.getSnapshotManager().takeInitialSnapshot();
 
                 }
 
@@ -1980,6 +2031,12 @@ public class HAJournalServer extends AbstractServer {
                 installRootBlocks(
                         openRootBlock.asRootBlock(true/* rootBlock0 */),
                         openRootBlock.asRootBlock(false/* rootBlock0 */));
+
+                // Note: snapshot requires joined with met quorum.
+//                /*
+//                 * Take a snapshot.
+//                 */
+//                journal.getSnapshotManager().takeInitialSnapshot();
 
             }
 
@@ -2923,19 +2980,19 @@ public class HAJournalServer extends AbstractServer {
                         .getSnapshotManager().getRestorePolicy()
                         .getEarliestRestorableCommitPoint(journal);
 
-                if (earliestRestorableCommitPoint == Long.MAX_VALUE) {
+                /*
+                 * Release snapshots and HALog files no longer required by the
+                 * restore policy.
+                 * 
+                 * Note: The current HALog is NOT deleted.
+                 */
 
-                    // Do not retain HALogs (other than the current one).
-                    deleteHALogs(Long.MAX_VALUE);
-                    
-                } else {
+                // Delete snapshots, returning commit counter of the oldest
+                // retained snapshot.
+                final long earliestRetainedSnapshotLastCommitCounter = deleteSnapshots(earliestRestorableCommitPoint);
 
-                    // Release HALogs no longer required by the restore policy.
-                    final long earliestRetainedSnapshotLastCommitCounter = deleteSnapshots(earliestRestorableCommitPoint);
-
-                    deleteHALogs(earliestRetainedSnapshotLastCommitCounter);
-                    
-                }
+                // Delete HALogs not retained by that snapshot.
+                deleteHALogs(earliestRetainedSnapshotLastCommitCounter);
 
             } finally {
 
@@ -2946,10 +3003,38 @@ public class HAJournalServer extends AbstractServer {
         }
 
         /**
+         * We need to destroy the local backups if we do a REBUILD. Those files
+         * are no longer guaranteed to be consistent with the history of the
+         * journal.
+         */
+        private void deleteBackups() {
+            
+            logLock.lock();
+
+            try {
+
+                haLog.warn("Destroying local backups.");
+                
+                // Delete all snapshots.
+                deleteSnapshots(Long.MAX_VALUE);
+
+                // Delete all HALogs (except the current one).
+                deleteHALogs(Long.MAX_VALUE);
+                
+            } finally {
+
+                logLock.unlock();
+
+            }
+            
+        }
+        
+        /**
          * Delete snapshots that are no longer required.
          * <p>
          * Note: If ZERO (0) is passed into this method, then no snapshots will
-         * be deleted.
+         * be deleted. This is because the first possible commit counter is ONE
+         * (1).
          * 
          * @param earliestRestorableCommitPoint
          *            The earliest commit point that we need to be able to
@@ -2962,6 +3047,8 @@ public class HAJournalServer extends AbstractServer {
              * List the snapshot files for this service.
              */
             final File[] files;
+            // #of snapshot files found. Set during scan.
+            final AtomicLong nfound = new AtomicLong(); 
             // Set to the commit counter of the earliest retained snapshot.
             final AtomicLong earliestRetainedSnapshotCommitCounter = new AtomicLong(Long.MAX_VALUE);
             final SnapshotManager snapshotManager = journal
@@ -2995,6 +3082,9 @@ public class HAJournalServer extends AbstractServer {
                         // Closing commitCounter for snapshot file.
                         final long commitCounter = Long.parseLong(fileBaseName);
 
+                        // Count all snapshot files.
+                        nfound.incrementAndGet();
+                        
                         if (commitCounter >= earliestRestorableCommitPoint) {
                             /*
                              * We need to retain this snapshot.
@@ -3019,22 +3109,28 @@ public class HAJournalServer extends AbstractServer {
             int ndeleted = 0;
             long totalBytes = 0L;
 
-            if (files.length == 0) {
-
-                /*
-                 * Note: If there are no snapshots then we MUST retain ALL HALog
-                 * files.
-                 */
-                earliestRetainedSnapshotCommitCounter.set(0L);
-                
-            } else {
+            /*
+             * If people specify NoSnapshotPolicy then backup is in their hands.
+             * HALogs will not be retained beyond a fully met commit unless
+             * there is a snapshot against which they can be applied..
+             */
+            
+//            if (files.length == 0) {
+//
+//                /*
+//                 * Note: If there are no snapshots then we MUST retain ALL HALog
+//                 * files.
+//                 */
+//                earliestRetainedSnapshotCommitCounter.set(0L);
+//                
+//            } else {
 
                 for (File file : files) {
 
                     // #of bytes in that file.
                     final long len = file.length();
 
-                    if (snapshotManager.removeSnapshot(file)) {
+                    if (!snapshotManager.removeSnapshot(file)) {
 
                         haLog.warn("COULD NOT DELETE FILE: " + file);
 
@@ -3048,14 +3144,15 @@ public class HAJournalServer extends AbstractServer {
 
                 }
                 
-            }
+//            }
 
-            haLog.info("PURGED SNAPSHOTS: ndeleted=" + ndeleted
-                    + ", totalBytes=" + totalBytes
-                    + ", earliestRestorableCommitPoint="
-                    + earliestRestorableCommitPoint
-                    + ", earliestRetainedSnapshotCommitCounter="
-                    + earliestRetainedSnapshotCommitCounter.get());
+            if (haLog.isInfoEnabled())
+                haLog.info("PURGED SNAPSHOTS: nfound=" + nfound + ", ndeleted="
+                        + ndeleted + ", totalBytes=" + totalBytes
+                        + ", earliestRestorableCommitPoint="
+                        + earliestRestorableCommitPoint
+                        + ", earliestRetainedSnapshotCommitCounter="
+                        + earliestRetainedSnapshotCommitCounter.get());
 
             return earliestRetainedSnapshotCommitCounter.get();
 
@@ -3075,6 +3172,8 @@ public class HAJournalServer extends AbstractServer {
              * List the HALog files for this service.
              */
             final File[] logFiles;
+            // #of HALog files found. Set during scan.
+            final AtomicLong nfound = new AtomicLong(); 
             {
 
                 final File currentLogFile = journal.getHALogWriter()
@@ -3103,12 +3202,14 @@ public class HAJournalServer extends AbstractServer {
                             return false;
                         }
 
+                        // track #of HALog files in the directory.
+                        nfound.incrementAndGet();
+                        
                         // filter out the current log file
                         if (currentLogFile != null
                                 && name.equals(currentLogFileName)) {
                             /*
-                             * The caller requested that we NOT purge the
-                             * current HALog, and this is it.
+                             * This is the current HALog. We never purge it.
                              */
                             return false;
                         }
@@ -3158,9 +3259,11 @@ public class HAJournalServer extends AbstractServer {
 
             }
 
-            haLog.info("PURGED LOGS: ndeleted=" + ndeleted + ", totalBytes="
-                    + totalBytes + ", earliestRetainedSnapshotCommitCounter="
-                    + earliestRetainedSnapshotCommitCounter);
+            if (haLog.isInfoEnabled())
+                haLog.info("PURGED LOGS: nfound=" + nfound + ", ndeleted="
+                        + ndeleted + ", totalBytes=" + totalBytes
+                        + ", earliestRetainedSnapshotCommitCounter="
+                        + earliestRetainedSnapshotCommitCounter);
 
         }
         
@@ -3173,8 +3276,16 @@ public class HAJournalServer extends AbstractServer {
         }
 
         @Override
+        public void didMeet(final long token, final long commitCounter,
+                final boolean isLeader) {
+            // NOP
+        }
+
+        @Override
         public File getServiceDir() {
+
             return server.getServiceDir();
+            
         }
         
         /**

@@ -30,11 +30,11 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
+import net.jini.config.Configuration;
 import net.jini.core.lookup.ServiceID;
 
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.msg.HADigestRequest;
-import com.bigdata.quorum.Quorum;
 import com.bigdata.rdf.sail.webapp.client.HAStatusEnum;
 
 /**
@@ -52,6 +52,23 @@ public class TestHAJournalServer extends AbstractHA3JournalServerTestCase {
         super(name);
     }
 
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Note: This overrides some {@link Configuration} values for the
+     * {@link HAJournalServer} in order to establish conditions suitable for
+     * testing the {@link ISnapshotPolicy} and {@link IRestorePolicy}.
+     */
+    @Override
+    protected String[] getOverrides() {
+        
+        return new String[]{
+                "com.bigdata.journal.jini.ha.HAJournalServer.restorePolicy=new com.bigdata.journal.jini.ha.DefaultRestorePolicy(0L,1,0)",
+                "com.bigdata.journal.jini.ha.HAJournalServer.snapshotPolicy=new com.bigdata.journal.jini.ha.NoSnapshotPolicy()"
+        };
+        
+    }
+    
     /**
      * One service starts, quorum does not meet (replication factor is 3). This
      * also serves to verify the <code>HAJournal-A.config</code> file.

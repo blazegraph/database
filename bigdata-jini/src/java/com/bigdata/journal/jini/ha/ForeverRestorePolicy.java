@@ -40,7 +40,7 @@ public class ForeverRestorePolicy implements IRestorePolicy {
      * This policy always returns ZERO to prevent backups from being released.
      */
     @Override
-    public long getEarliestRestorableCommitPoint(HAJournal jnl) {
+    public long getEarliestRestorableCommitPoint(final HAJournal jnl) {
 
         return 0;
         

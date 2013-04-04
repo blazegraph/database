@@ -4905,9 +4905,16 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
             
         }
 
+        // This quorum member.
+        final QuorumService<HAGlue> localService = quorum.getClient();
+
         /*
          * Both a meet and a break require an exclusive write lock.
          */
+        final boolean isLeader;
+        final boolean isFollower;
+        final long localCommitCounter;
+
         final WriteLock lock = _fieldReadWriteLock.writeLock();
         
         lock.lock();
@@ -4936,6 +4943,9 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                  * widthdrawn. That is currently done by QuorumWatcherBase. So,
                  * we have to wait until we observe that to cast a new vote.
                  */
+
+                localCommitCounter = -1;
+                isLeader = isFollower = false;
                 
                 haReadyToken = Quorum.NO_QUORUM; // volatile write.
 
@@ -4947,14 +4957,16 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                 
                 quorumToken = newValue;
 
-                // This quorum member.
-                final QuorumService<HAGlue> localService = quorum.getClient();
-
                 boolean installedRBs = false;
 
+                localCommitCounter = _rootBlock.getCommitCounter();
+                
                 if (localService.isFollower(quorumToken)) {
 
-                    if (_rootBlock.getCommitCounter() == 0L) {
+                    isLeader = false;
+                    isFollower = true;
+
+                    if (localCommitCounter == 0L) {
                         
                         /*
                          * Take the root blocks from the quorum leader and use
@@ -5003,11 +5015,17 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
                 } else if (localService.isLeader(quorumToken)) {
 
+                    isLeader = true;
+                    isFollower = false;
+                    
                     // ready as leader.
                     tmp = newValue;
 
                 } else {
 
+                    isLeader = false;
+                    isFollower = false;
+                    
                     // Not ready.
                     tmp = Quorum.NO_QUORUM;
                     
@@ -5027,7 +5045,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                     doLocalAbort();
 
                 }
-                
+
                 this.haReadyToken = tmp; // volatile write.
 
                 haReadyCondition.signalAll(); // signal ALL.
@@ -5043,7 +5061,13 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
             lock.unlock();
             
         }
+        
+        if (isLeader || isFollower) {
 
+            localService.didMeet(newValue, localCommitCounter, isLeader);
+
+        }
+        
     }
     private final Condition haReadyCondition = _fieldReadWriteLock.writeLock().newCondition();
     private volatile long haReadyToken = Quorum.NO_QUORUM;
@@ -5191,6 +5215,14 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
         if (!rootBlock0.isRootBlock0())
             throw new IllegalArgumentException();
         if (rootBlock1.isRootBlock0())
+            throw new IllegalArgumentException();
+//        if (rootBlock0.getCommitCounter() != 0L)
+//            throw new IllegalArgumentException();
+//        if (rootBlock1.getCommitCounter() != 0L)
+//            throw new IllegalArgumentException();
+        if (!rootBlock0.getStoreType().equals(rootBlock1.getStoreType()))
+            throw new IllegalArgumentException();
+        if (!rootBlock0.getUUID().equals(rootBlock1.getUUID()))
             throw new IllegalArgumentException();
 
 //        if (_rootBlock.getCommitCounter() != 0) {

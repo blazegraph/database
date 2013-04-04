@@ -627,6 +627,46 @@ public class RootBlockView implements IRootBlockView {
         return new RootBlockView(rootBlock0, asReadOnlyBuffer(), checker);
 
     }
+
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Overridden to implement the hash code as the hash code of the data in the
+     * backing {@link ByteBuffer}. The {@link IRootBlockView} is immutable. The
+     * hash code is computed lazily. Once computed, the hash code is NOT
+     * recomputed for the same {@link IRootBlockView}.
+     */
+    @Override
+    public int hashCode() {
+        if (hash == 0) {
+            /*
+             * Computed once (unless there is a data race, in which case it
+             * might be computed more than once but it will be consistent).
+             */
+            hash = buf.asReadOnlyBuffer().hashCode();
+        }
+        return hash;
+    }
+
+    private volatile int hash = 0;
+
+    /**
+     * {@inheritDoc}
+     * 
+     * Overriden to implement equality based on the data in the
+     * {@link IRootBlockView}.
+     */
+    @Override
+    public boolean equals(final Object o) {
+        if (this == o)
+            return true;
+        if (!(o instanceof IRootBlockView))
+            return false;
+        final IRootBlockView o2 = (IRootBlockView) o;
+        if (!buf.asReadOnlyBuffer().equals(o2.asReadOnlyBuffer()))
+            return false;
+        return true;
+    }
     
     /**
      * Create a new read-only view from the supplied buffer.

@@ -25,6 +25,7 @@ package com.bigdata.journal.jini.ha;
 
 import java.lang.ref.WeakReference;
 import java.util.Calendar;
+import java.util.Formatter;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
@@ -47,6 +48,24 @@ public class DefaultSnapshotPolicy implements ISnapshotPolicy {
     
     final private int timeOfDay;
     final private int percentLogSize;
+
+    @Override
+    public String toString() {
+
+        final StringBuilder sb = new StringBuilder();
+
+        final Formatter f = new Formatter(sb);
+
+        f.format("%04d", timeOfDay);
+        f.flush();
+        f.close();
+        
+        final String todStr = sb.toString();
+
+        return DefaultSnapshotPolicy.class.getSimpleName() + "{timeOfDay="
+                + todStr + ", percentLogSize=" + percentLogSize + "%}";
+
+    }
     
     /**
      * The default policy wakes up at <code>0200</code> and takes a snapshot if

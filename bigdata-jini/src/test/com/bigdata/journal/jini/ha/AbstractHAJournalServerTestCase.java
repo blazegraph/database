@@ -29,6 +29,8 @@ package com.bigdata.journal.jini.ha;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.math.BigInteger;
 import java.security.DigestException;
 import java.security.NoSuchAlgorithmException;
@@ -56,6 +58,8 @@ import com.bigdata.ha.msg.HALogDigestRequest;
 import com.bigdata.ha.msg.HARootBlockRequest;
 import com.bigdata.ha.msg.HASnapshotDigestRequest;
 import com.bigdata.io.TestCase3;
+import com.bigdata.journal.DumpJournal;
+import com.bigdata.journal.Journal;
 import com.bigdata.rdf.sail.TestConcurrentKBCreate;
 import com.bigdata.rdf.sail.webapp.NanoSparqlServer;
 import com.bigdata.rdf.sail.webapp.client.ConnectOptions;
@@ -836,4 +840,30 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
         return s;
     }
     
+    /**
+     * Verify the consistency of the {@link Journal} using {@link DumpJournal}.
+     * 
+     * @param journal
+     *            the journal.
+     */
+    protected void dumpJournal(final Journal journal) {
+
+        final StringWriter sw = new StringWriter();
+
+        final PrintWriter w = new PrintWriter(sw);
+
+        // Verify can dump journal.
+        new DumpJournal(journal).dumpJournal(w, null/* namespaces */,
+                true/* dumpHistory */, true/* dumpPages */,
+                true/* dumpIndices */, false/* showTuples */);
+
+        w.flush();
+
+        w.close();
+
+        if (log.isInfoEnabled())
+            log.info(sw.toString());
+
+    }
+
 }

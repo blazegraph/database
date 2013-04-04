@@ -34,5 +34,12 @@ public class NoSnapshotPolicy implements ISnapshotPolicy {
     public void init(HAJournal jnl) {
         // NOP
     }
+    
+    @Override
+    public String toString() {
+
+        return getClass().getSimpleName();
+        
+    }
 
 }

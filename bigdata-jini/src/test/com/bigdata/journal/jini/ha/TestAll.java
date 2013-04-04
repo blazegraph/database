@@ -90,8 +90,11 @@ public class TestAll extends TestCase {
         // HA3 test suite.
         suite.addTestSuite(TestHA3JournalServer.class);
 
-        // HA3 snapshot test suite.
+        // HA3 snapshot policy test suite.
         suite.addTestSuite(TestHA3SnapshotPolicy.class);
+
+        // HA3 restore policy test suite.
+        suite.addTestSuite(TestHA3RestorePolicy.class);
 
         // Test suite for the global write lock.
         suite.addTestSuite(TestHAJournalServerGlobalWriteLock.class);

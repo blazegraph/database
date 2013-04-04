@@ -32,6 +32,8 @@ import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
+import net.jini.config.Configuration;
+
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.msg.HAGlobalWriteLockRequest;
 import com.bigdata.ha.msg.HARootBlockRequest;
@@ -46,6 +48,23 @@ import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
  */
 public class TestHAJournalServerGlobalWriteLock extends AbstractHA3JournalServerTestCase {
 
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Note: This overrides some {@link Configuration} values for the
+     * {@link HAJournalServer} in order to establish conditions suitable for
+     * testing the {@link ISnapshotPolicy} and {@link IRestorePolicy}.
+     */
+    @Override
+    protected String[] getOverrides() {
+        
+        return new String[]{
+                "com.bigdata.journal.jini.ha.HAJournalServer.restorePolicy=new com.bigdata.journal.jini.ha.DefaultRestorePolicy(0L,1,0)",
+                "com.bigdata.journal.jini.ha.HAJournalServer.snapshotPolicy=new com.bigdata.journal.jini.ha.NoSnapshotPolicy()"
+        };
+        
+    }
+    
     public TestHAJournalServerGlobalWriteLock() {
     }
 

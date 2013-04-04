@@ -57,6 +57,9 @@ import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.concurrent.FutureTaskMon;
+import com.bigdata.concurrent.NamedLock;
+import com.bigdata.ha.HAGlue;
+import com.bigdata.ha.QuorumService;
 import com.bigdata.ha.halog.IHALogReader;
 import com.bigdata.ha.msg.HASnapshotResponse;
 import com.bigdata.ha.msg.IHASnapshotRequest;
@@ -67,6 +70,7 @@ import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.RootBlockUtility;
 import com.bigdata.journal.RootBlockView;
+import com.bigdata.quorum.Quorum;
 import com.bigdata.quorum.QuorumException;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.util.ChecksumUtility;
@@ -112,6 +116,11 @@ public class SnapshotManager {
      */
     private final ISnapshotPolicy snapshotPolicy;
     
+//    /**
+//     * @see HAJournalServer.ConfigurationOptions#SNAPSHOT_ON_FIRST_MEET
+//     */
+//    private final boolean snapshotOnFirstMeet;
+    
     /**
      * @see HAJournalServer.ConfigurationOptions#RESTORE_POLICY
      */
@@ -154,6 +163,18 @@ public class SnapshotManager {
         
     }
 
+//    /**
+//     * Return <code>true</code> iff the service will take a snapshot of the
+//     * empty journal when the service first joins with a met quorum.
+//     * 
+//     * @see HAJournalServer.ConfigurationOptions#SNAPSHOT_ON_FIRST_MEET
+//     */
+//    boolean isSnapshotOnFirstMeet() {
+//        
+//        return snapshotOnFirstMeet;
+//        
+//    }
+    
     /**
      * Return the {@link IRestorePolicy}.
      *
@@ -215,6 +236,13 @@ public class SnapshotManager {
                 HAJournalServer.ConfigurationOptions.SNAPSHOT_POLICY,
                 ISnapshotPolicy.class,//
                 HAJournalServer.ConfigurationOptions.DEFAULT_SNAPSHOT_POLICY);
+
+//        snapshotOnFirstMeet = !(snapshotPolicy instanceof NoSnapshotPolicy);
+//        snapshotOnFirstMeet = (Boolean) config.getEntry(
+//                        HAJournalServer.ConfigurationOptions.COMPONENT,
+//                        HAJournalServer.ConfigurationOptions.SNAPSHOT_ON_FIRST_MEET,
+//                        Boolean.TYPE,
+//                        HAJournalServer.ConfigurationOptions.DEFAULT_SNAPSHOT_ON_FIRST_MEET);
 
         restorePolicy = (IRestorePolicy) config.getEntry(
                 HAJournalServer.ConfigurationOptions.COMPONENT,
@@ -379,17 +407,17 @@ public class SnapshotManager {
         /*
          * Validate the snapshot.
          * 
-         * TODO If the root blocks are bad, then this will throw an
-         * IOException and that will prevent the startup of the
-         * HAJournalServer. However, if we start up the server with a known
-         * bad snapshot *and* the snapshot is the earliest snapshot, then we
-         * can not restore commit points which depend on that earliest
-         * snapshot.
+         * TODO If the root blocks are bad, then this will throw an IOException
+         * and that will prevent the startup of the HAJournalServer. However, if
+         * we start up the server with a known bad snapshot *and* the snapshot
+         * is the earliest snapshot, then we can not restore commit points which
+         * depend on that earliest snapshot (we can still restore commit points
+         * that are GTE the first useable snapshot).
          * 
          * TODO A similar problem exists if any of the HALog files GTE the
-         * earliest snapshot are missing, have bad root blocks, etc. We will
-         * not be able to restore the commit point associated with that
-         * HALog file unless it also happens to correspond to a snapshot.
+         * earliest snapshot are missing, have bad root blocks, etc. We will not
+         * be able to restore the commit point associated with that HALog file
+         * unless it also happens to correspond to a snapshot.
          */
         final IRootBlockView currentRootBlock = getRootBlockForSnapshot(file);
 
@@ -460,19 +488,32 @@ public class SnapshotManager {
     }
 
     /**
-     * Find the commit counter for the most recent snapshot (if any).
+     * Find the {@link IRootBlockView} for the most oldest snapshot (if any).
      * 
-     * @return That commit counter -or- ZERO (0L) if there are no snapshots.
+     * @return That {@link IRootBlockView} -or- <code>-1L</code> if there are no
+     *         snapshots.
      */
-    public long getMostRecentSnapshotCommitCounter() {
+    public IRootBlockView getOldestSnapshot() {
+
+        return snapshotIndex.getOldestSnapshot();
+
+    }
+
+    /**
+     * Find the {@link IRootBlockView} for the most recent snapshot (if any).
+     * 
+     * @return That {@link IRootBlockView} -or- <code>-1L</code> if there are no
+     *         snapshots.
+     */
+    public IRootBlockView getNewestSnapshot() {
         
-        return snapshotIndex.getMostRecentSnapshotCommitCounter();
+        return snapshotIndex.getNewestSnapshot();
         
     }
     
     /**
      * Return the {@link IRootBlock} identifying the snapshot having the largest
-     * commitTime that is less than or equal to the given value.
+     * lastCommitTime that is less than or equal to the given value.
      * 
      * @param timestamp
      *            The given timestamp.
@@ -487,6 +528,36 @@ public class SnapshotManager {
     public IRootBlockView find(final long timestamp) {
         
         return snapshotIndex.find(timestamp);
+        
+    }
+
+    /**
+     * Find the oldest snapshot that is at least <i>minRestorePoints</i> old and
+     * returns its commit counter.
+     * 
+     * @return The {@link IRootBlockView} for that snapshot -or-
+     *         <code>null</code> if there is no such snapshot.
+     */
+    public IRootBlockView findByCommitCounter(final long commitCounter) {
+
+        return snapshotIndex.findByCommitCounter(commitCounter);
+
+    }
+    
+    /**
+     * Return the snapshot that is associated with the specified ordinal index
+     * (origin ZERO) counting backwards from the most recent snapshot (0)
+     * towards the earliest snapshot (nsnapshots-1).
+     * 
+     * @param index
+     *            The index.
+     * 
+     * @return The {@link IRootBlockView} for that snapshot -or-
+     *         <code>null</code> if there is no such snapshot.
+     */
+    public IRootBlockView getSnapshotByReverseIndex(final int index) {
+        
+        return snapshotIndex.getSnapshotByReverseIndex(index);
         
     }
     
@@ -558,6 +629,63 @@ public class SnapshotManager {
     }
 
     /**
+     * Conditionally take a snapshot of the journal iff there is no existing
+     * snapshot. The journal may or may not be empty, but we do not have any
+     * existing snapshots and we need to have one to serve as a restore point.
+     * The service MUST be joined with a met quorum in order to take a snapshot.
+     * <p>
+     * Note: A snapshot WILL NOT be taken by this method if the
+     * {@link NoSnapshotPolicy} is used. Snapshots MUST be requested using
+     * {@link #takeSnapshot(IHASnapshotRequest)} when that policy is used.
+     * 
+     * @return <code>null</code> unless a snapshot was scheduled in by this
+     *         method.
+     */
+    public Future<IHASnapshotResponse> takeInitialSnapshot() {
+
+        lock.lock();
+
+        try {
+
+            if (getNewestSnapshot() != null) {
+
+                // There are existing snapshot(s).
+                return null;
+
+            }
+
+            if (snapshotPolicy instanceof NoSnapshotPolicy) {
+
+                // No automatic snapshots.
+                return null;
+
+            }
+
+            if (snapshotFuture != null) {
+
+                if (!snapshotFuture.isDone()) {
+
+                    // Still running. Return null since we did not schedule it.
+                    return null;
+
+                }
+
+                snapshotFuture = null;
+
+            }
+
+            // Request the snapshot.
+            return snapshotFuture = takeSnapshotNow();
+
+        } finally {
+
+            lock.unlock();
+
+        }
+
+    }
+    
+    /**
      * Take a new snapshot. This is a NOP if a snapshot is already being made.
      * 
      * @return The {@link Future} if a snapshot is already being made -or- if a
@@ -589,11 +717,6 @@ public class SnapshotManager {
                 snapshotFuture = null;
 
             }
-
-            /*
-             * FIXME Handle remove of historical snapshots when they are no
-             * longer required.
-             */
 
             if (!isReadyToSnapshot(req)) {
 
@@ -694,15 +817,19 @@ public class SnapshotManager {
             return false;
             
         }
-        
-        final long snapshotCommitCounter = snapshotIndex.getMostRecentSnapshotCommitCounter();
 
-        if (journal.getRootBlockView().getCommitCounter() == snapshotCommitCounter) {
+        final IRootBlockView snapshotRootBlock = snapshotIndex
+                .getNewestSnapshot();
+
+        if (snapshotRootBlock != null
+                && journal.getRootBlockView().getCommitCounter() == snapshotRootBlock
+                        .getCommitCounter()) {
 
             /*
              * We already have a snapshot for the most recent commit point on
              * the journal.
              */
+            
             return false;
             
         }
@@ -713,6 +840,10 @@ public class SnapshotManager {
         final File[] files;
         {
 
+            // most recent snapshot commit counter or -1L if no snapshots exist.
+            final long snapshotCommitCounter = snapshotRootBlock == null ? -1L
+                    : snapshotRootBlock.getCommitCounter();
+            
             final File currentLogFile = journal.getHALogWriter().getFile();
 
             final String currentLogFileName = currentLogFile == null ? null
@@ -826,7 +957,7 @@ public class SnapshotManager {
      * @throws ExecutionException
      * @throws InterruptedException
      */
-    Future<IHASnapshotResponse> takeSnapshotNow() {
+    private Future<IHASnapshotResponse> takeSnapshotNow() {
 
         final FutureTask<IHASnapshotResponse> ft = new FutureTaskMon<IHASnapshotResponse>(
                 new SnapshotTask(this));
@@ -1003,10 +1134,25 @@ public class SnapshotManager {
                                     + ", length=" + file.length());
 
                         /*
-                         * FIXME SNAPSHOTS: This is where we need to see whether
-                         * or not we can release an earlier snapshot and the
-                         * intervening HALog files.
+                         * Attempt to purge older snapshots and HALogs.
                          */
+
+                        final Quorum<HAGlue, QuorumService<HAGlue>> quorum = journal
+                                .getQuorum();
+
+                        if (quorum != null) {
+
+                            // This quorum member.
+                            final QuorumService<HAGlue> localService = quorum
+                                    .getClient();
+
+                            if (localService != null) {
+
+                                localService.purgeHALogs();
+
+                            }
+
+                        }
 
                     }
 
@@ -1027,8 +1173,7 @@ public class SnapshotManager {
 
         }
 
-    } // class SendStoreTask
-
+    } // class SnapshotTask
     
     /**
      * Compute the digest of a snapshot file.
@@ -1069,13 +1214,16 @@ public class SnapshotManager {
      *            The commit counter that identifies the snapshot.
      * @param digest
      *            The digest.
-     *            
+     * 
      * @throws IOException
      * @throws FileNotFoundException
      * @throws DigestException
      * 
      *             TODO We should pin the snapshot if we are reading it to
-     *             compute its digest.
+     *             compute its digest. Right now we have the {@link #lock} and
+     *             synchronization on the {@link #snapshotIndex}. We probably
+     *             want a {@link NamedLock} specific to the commit counter for
+     *             each snapshot index.
      */
     static public void getSnapshotDigest(final File file,
             final MessageDigest digest) throws FileNotFoundException,

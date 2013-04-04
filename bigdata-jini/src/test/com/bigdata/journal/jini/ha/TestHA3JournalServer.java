@@ -36,6 +36,8 @@ import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
+import net.jini.config.Configuration;
+
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.halog.HALogWriter;
 import com.bigdata.ha.msg.HARootBlockRequest;
@@ -61,6 +63,24 @@ import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
  */
 public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
 
+
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Note: This overrides some {@link Configuration} values for the
+     * {@link HAJournalServer} in order to establish conditions suitable for
+     * testing the {@link ISnapshotPolicy} and {@link IRestorePolicy}.
+     */
+    @Override
+    protected String[] getOverrides() {
+        
+        return new String[]{
+                "com.bigdata.journal.jini.ha.HAJournalServer.restorePolicy=new com.bigdata.journal.jini.ha.DefaultRestorePolicy(0L,1,0)",
+                "com.bigdata.journal.jini.ha.HAJournalServer.snapshotPolicy=new com.bigdata.journal.jini.ha.NoSnapshotPolicy()"
+        };
+        
+    }
+    
     public TestHA3JournalServer() {
     }
 
@@ -1988,8 +2008,8 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
         // restart B.
         final HAGlue serverB2 = startB();
 
-        // C comes back at the end of the pipeline.
-        awaitPipeline(new HAGlue[] {startup.serverA, startup.serverB, serverB2});
+        // B comes back at the end of the pipeline.
+        awaitPipeline(new HAGlue[] {startup.serverA, startup.serverC, serverB2});
         
         // Await fully met quorum *before* LOAD is done.
         assertTrue(awaitFullyMetDuringLOAD(token, ft));

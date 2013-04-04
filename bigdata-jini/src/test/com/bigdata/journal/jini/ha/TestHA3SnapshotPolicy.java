@@ -26,61 +26,41 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.journal.jini.ha;
 
-import java.io.File;
-import java.io.IOException;
 import java.io.OutputStream;
-import java.io.PrintWriter;
-import java.math.BigInteger;
-import java.security.MessageDigest;
-import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
-import org.apache.http.HttpResponse;
-import org.apache.http.client.HttpClient;
-import org.apache.http.impl.client.DefaultHttpClient;
-import org.apache.http.util.EntityUtils;
+import net.jini.config.Configuration;
 
-import com.bigdata.btree.BytesUtil;
 import com.bigdata.ha.HAGlue;
-import com.bigdata.ha.msg.HADigestRequest;
 import com.bigdata.ha.msg.HARootBlockRequest;
 import com.bigdata.ha.msg.HASnapshotRequest;
 import com.bigdata.ha.msg.IHASnapshotResponse;
-import com.bigdata.journal.DumpJournal;
 import com.bigdata.journal.IHABufferStrategy;
 import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.Journal;
 import com.bigdata.quorum.Quorum;
-import com.bigdata.rdf.sail.webapp.client.ConnectOptions;
 import com.bigdata.rdf.sail.webapp.client.HAStatusEnum;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
 
 /**
- * Test suites for an {@link HAJournalServer} quorum with a replication factor
- * of THREE (3) and a fully met {@link Quorum}.
- * 
- * TODO Verify will not take snapshot if size on disk of HALog files since the
- * last snapshot is LT some percentage.
- * 
- * FIXME Verify release of old snapshot(s) and HALog(s) when a new snapshot is
- * taken in accordence with the {@link IRestorePolicy}.
- * <p>
- * Make sure that we never release the most current snapshot or HALogs required
- * to reconstruct a commit point protected by the restore policy.
- * <p>
- * Test for release of snapshots and HALogs as they are aged out.
+ * Test suite for the {@link ISnapshotPolicy}. This test suite is focused on the
+ * ability to request and obtain snapshots, the ability to retain the
+ * appropriate HALogs, and the ability to restore the {@link Journal} from a
+ * snapshot and the appropriate HALogs.
  * 
  * TODO Test suite for
  * {@link IHABufferStrategy#writeOnStream(OutputStream, Quorum, long)}. This is
  * used to generate snapshots.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * 
+ * @see TestHA3RestorePolicy
  */
-public class TestHA3SnapshotPolicy extends AbstractHA3JournalServerTestCase {
+public class TestHA3SnapshotPolicy extends AbstractHA3BackupTestCase {
 
     public TestHA3SnapshotPolicy() {
     }
@@ -89,21 +69,26 @@ public class TestHA3SnapshotPolicy extends AbstractHA3JournalServerTestCase {
         super(name);
     }
  
-//    /**
-//     * {@inheritDoc}
-//     * <p>
-//     * Note: This overrides some {@link Configuration} values for the
-//     * {@link HAJournalServer} in order to establish conditions suitable for
-//     * testing the {@link ISnapshotPolicy} and {@link IRestorePolicy}.
-//     */
-//    @Override
-//    protected String[] getOverrides() {
-//        
-//        return new String[]{
-//                "com.bigdata.journal.jini.ha.HAJournalServer.snapshotPolicy=new com.bigdata.journal.jini.ha.DefaultSnapshotPolicy()"
-//        };
-//        
-//    }
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Note: This overrides some {@link Configuration} values for the
+     * {@link HAJournalServer} in order to establish conditions suitable for
+     * testing the {@link ISnapshotPolicy} and {@link IRestorePolicy}.
+     */
+    @Override
+    protected String[] getOverrides() {
+        
+        /*
+         * Note: Retains ONE (1) snapshot. Plus any logs GT the commit counter
+         * of that snapshot. Does not retain logs until there is a snapshot.
+         */
+        return new String[]{
+                "com.bigdata.journal.jini.ha.HAJournalServer.restorePolicy=new com.bigdata.journal.jini.ha.DefaultRestorePolicy(0L,1,0)",
+                "com.bigdata.journal.jini.ha.HAJournalServer.snapshotPolicy=new com.bigdata.journal.jini.ha.NoSnapshotPolicy()"
+        };
+        
+    }
 
     /**
      * Start A. Verify that we can not take a snapshot since it is not joined
@@ -115,7 +100,8 @@ public class TestHA3SnapshotPolicy extends AbstractHA3JournalServerTestCase {
         final HAGlue serverA = startA();
 
         // Verify the REST API is up and service is not ready.
-        // TODO Might have to retry this if 404 observed.
+        //
+        // Note: Might have to retry this if 404 observed.
         assertEquals(HAStatusEnum.NotReady, getNSSHAStatus(serverA));
         
         // Request a snapshot.
@@ -358,9 +344,10 @@ public class TestHA3SnapshotPolicy extends AbstractHA3JournalServerTestCase {
      * Test ability to request a snapshot using an HTTP GET
      * <code>.../status?snapshot</code>.
      * 
-     * TODO Variant where the percentLogSize parameter is also expressed (and
-     * maybe make it a 2nd parameter so we could have more choices to drive the
-     * policy).
+     * TODO Variant where the percentLogSize parameter is also expressed and
+     * verify that the semantics of that argument are obeyed. Use this to verify
+     * that the server will not take snapshot if size on disk of HALog files
+     * since the last snapshot is LT some percentage.
      */
     public void testAB_snapshot_HTTP_GET() throws Exception {
 
@@ -565,48 +552,6 @@ public class TestHA3SnapshotPolicy extends AbstractHA3JournalServerTestCase {
     }
     
     /**
-     * Issue HTTP request to a service to take a snapshot.
-     * 
-     * @param haGlue
-     *            The service.
-     *            
-     * @throws Exception
-     * 
-     * TODO Add percentLogSize query parameter option.
-     */
-    private void doSnapshotRequest(final HAGlue haGlue) throws Exception {
-
-        // Client for talking to the NSS.
-        final HttpClient httpClient = new DefaultHttpClient(ccm);
-
-        // The NSS service URL (NOT the SPARQL end point).
-        final String serviceURL = getNanoSparqlServerURL(haGlue);
-
-        final ConnectOptions opts = new ConnectOptions(serviceURL
-                + "/status?snapshot");
-
-        opts.method = "GET";
-
-        try {
-
-            final HttpResponse response;
-
-            RemoteRepository.checkResponseCode(response = doConnect(httpClient,
-                    opts));
-
-            EntityUtils.consume(response.getEntity());
-
-        } catch (IOException ex) {
-
-            log.error(ex, ex);
-            
-            throw ex;
-            
-        }
-
-    }
-
-    /**
      * Unit test starts A+B and runs N transactions. It then takes a snapshot.
      * The existance of the snapshot is verified, as is the existence of the
      * HALog files for each transaction. Finally, it runs another M
@@ -615,14 +560,7 @@ public class TestHA3SnapshotPolicy extends AbstractHA3JournalServerTestCase {
      * The {@link HARestore} utility is then used to reconstruct a
      * {@link Journal} from the snapshot and replay the HALog files. We then
      * verify that the new journal is at the correct commit point and compare it
-     * for binary equality with the original journal on A.
-     * 
-     * FIXME HARestore test suite: Verify that the snapshot may be unziped and
-     * halogs applied by the {@link HARestore} utility in order to obtain a
-     * journal corresponding to a specific commit point.
-     * <p>
-     * Test can read and compare the snapshot with the journal if the journal is
-     * static. They should have the same digest.
+     * for binary equality with the original journal on A (same digests).
      */
     public void testAB_snapshot_multipleTx_restore_validate() throws Exception {
 
@@ -674,6 +612,7 @@ public class TestHA3SnapshotPolicy extends AbstractHA3JournalServerTestCase {
             // Snapshot directory is empty.
             assertEquals(0, getSnapshotDirA().list().length);
 
+            // request snapshot on A.
             final Future<IHASnapshotResponse> ft = serverA
                     .takeSnapshot(new HASnapshotRequest(0/* percentLogSize */));
 
@@ -712,160 +651,22 @@ public class TestHA3SnapshotPolicy extends AbstractHA3JournalServerTestCase {
 
         assertCommitCounter(commitCounterM, serverA);
 
-        /*
-         * FIXME Pick up this test again here in a new version of the test, but
-         * this time focus on the IRestorePolicy and when the snapshots and
-         * HALog files are released. We may have to override the restorePolicy,
-         * in which case we might need to put this test into a different file.
-         */
-
         // Check HALogs equal on A, B.
         assertHALogDigestsEquals(1L/* firstCommitCounter */, commitCounterM,
                 new HAGlue[] { serverA, serverB });
 
+        // Snapshot directory contains just the expected snapshot
+        assertEquals(
+                new String[] { SnapshotManager.getSnapshotFile(
+                        getSnapshotDirA(), commitCounterN).getName() },
+                getSnapshotDirA().list());
+
         /*
-         * Now, get the snapshot that we took above, decompress it, and
-         * then roll it forward and verify it against the current committed journal.
+         * Now, get the snapshot that we took above, decompress it, and then
+         * roll it forward and verify it against the current committed journal.
          */
-        {
-            final File snapshotFile = SnapshotManager.getSnapshotFile(
-                    getSnapshotDirA(), commitCounterN);
-
-            final String basename = snapshotFile.getName().substring(
-                    0,
-                    snapshotFile.getName().length()
-                            - SnapshotManager.SNAPSHOT_EXT.length());
-
-            // temporary file in the same directory as the snapshot.
-            final File out = File.createTempFile(basename + "-",
-                    Journal.Options.JNL, snapshotFile.getAbsoluteFile()
-                            .getParentFile());
-
-            try {
-
-                // Decompress the snapshot.
-                SnapshotManager.decompress(snapshotFile, out);
-
-                // Verify that we can open the decompressed file as a Journal.
-                {
-
-                    final Properties p = new Properties();
-                    
-                    p.setProperty(Journal.Options.FILE, out.getAbsoluteFile()
-                            .toString());
-                    
-                    Journal jnl = new Journal(p);
-
-                    try {
-
-                        // TODO Should really be logged output, not stdout.
-                        final PrintWriter w = new PrintWriter(System.out,
-                                true/* autoFlush */);
-
-                        // Verify snapshot at the expected commit point.
-                        assertEquals(commitCounterN, jnl.getRootBlockView()
-                                .getCommitCounter());
-                        
-                        // Verify can dump journal.
-                        new DumpJournal(jnl).dumpJournal(w,
-                                null/* namespaces */, true/* dumpHistory */,
-                                true/* dumpPages */, true/* dumpIndices */,
-                                false/* showTuples */);
-
-                        /*
-                         * Now roll that journal forward using the HALog directory.
-                         */
-                        final HARestore rest = new HARestore(jnl,
-                                getHALogDirA());
-
-                        /*
-                         * TODO Also write test where we stop at the specified
-                         * commit point.
-                         */
-                        rest.restore(false/* listCommitPoints */,
-                                Long.MAX_VALUE/* haltingCommitCounter */);
-
-                        // Verify journal now at the expected commit point.
-                        assertEquals(commitCounterM, jnl.getRootBlockView()
-                                .getCommitCounter());
-
-                        /*
-                         * Compute digest of the restored journal. The digest
-                         * should agree with the digest of the Journal on A
-                         * since we rolled it forward to the same commit point.
-                         */
-                        {
- 
-                            // digest of A
-                            final byte[] digestA = serverA.computeDigest(
-                                    new HADigestRequest(null/* storeUUID */))
-                                    .getDigest();
-
-                            final MessageDigest digest = MessageDigest
-                                    .getInstance("MD5");
-
-                            // digest of restored journal.
-                            ((IHABufferStrategy) (jnl.getBufferStrategy()))
-                                    .computeDigest(null/* snapshot */, digest);
-
-                            final byte[] digest2 = digest.digest();
-                            
-                            if (!BytesUtil.bytesEqual(digestA, digest2)) {
-
-                                final String digestAStr = new BigInteger(1,
-                                        digestA).toString(16);
-
-                                final String digest2Str = new BigInteger(1,
-                                        digest2).toString(16);
-
-                                fail("Digests differ after restore and replay: expected="
-                                        + digestAStr + ", actual=" + digest2Str);
-
-                            }
-
-                        }
-
-                        /*
-                         * FIXME For some reason, we need to close and reopen
-                         * the journal before it can be used.  See HARestore.
-                         */
-                        if (true) {
-                            jnl.close();
-
-                            // reopen.
-                            jnl = new Journal(p);
-                        }
-                        
-                        // Verify can dump journal after restore.
-                        new DumpJournal(jnl).dumpJournal(w,
-                                null/* namespaces */, true/* dumpHistory */,
-                                true/* dumpPages */, true/* dumpIndices */,
-                                false/* showTuples */);
-
-                    } finally {
-
-                        if (jnl != null) {
-                        
-                            jnl.close();
-                            
-                        }
-
-                    }
-                    
-                }
-                
-            } finally {
-               
-                if (out.delete()) {
-                
-                    log.warn("Could not delete: " + out);
-                    
-                }
-                
-            }
-
-        }
-
+        doRestoreA(serverA, commitCounterN);
+        
     }
 
 }

@@ -45,5 +45,11 @@ public interface ISnapshotPolicy {
      * Initialize the policy.
      */
     void init(HAJournal jnl);
+
+    /**
+     * Return a human readable summary of the policy.
+     */
+    @Override
+    String toString();
     
 }
