@@ -155,6 +155,8 @@ public class DumpJournal {
         
         boolean showTuples = false;
         
+        boolean alternateRootBlock = false;
+        
         final List<Long> addrs = new LinkedList<Long>();
         
         for(; i<args.length; i++) {
@@ -197,7 +199,13 @@ public class DumpJournal {
                 showTuples = true;
                 
             }
-            
+
+            else if(arg.equals("-alternateRootBlock")) {
+                
+                alternateRootBlock = true;
+                
+            }
+           
             else if(arg.equals("-addr")) {
                 
                 addrs.add(Long.valueOf(args[i + 1]));
@@ -253,6 +261,10 @@ public class DumpJournal {
                     properties.setProperty(Options.FILE, file.toString());
                 
                     properties.setProperty(Options.READ_ONLY, "" + true);
+
+                    if (alternateRootBlock)
+                        properties.setProperty(Options.ALTERNATE_ROOT_BLOCK,
+                                "" + true);
 
                     properties.setProperty(Options.BUFFER_MODE,
                             BufferMode.Disk.toString());

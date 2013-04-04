@@ -180,14 +180,8 @@ public interface QuorumPipeline<S extends HAPipelineGlue> {
      * goes through a commit point in which the quorum is fully met. At that
      * moment, we no longer require these log files to resynchronize any
      * service.
-     * 
-     * NOTE: We should never remove the open log file
-     * 
-     * This parameter has been removed
-     * 
-     * @param includeCurrent
-     *            When <code>true</code>, the current HA Log file will also be
-     *            purged.
+     * <p>
+     * Note: The open HALog file is NOT removed by this method.
      */
     void purgeHALogs();
     

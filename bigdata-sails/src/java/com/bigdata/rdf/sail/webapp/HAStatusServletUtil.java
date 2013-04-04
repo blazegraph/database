@@ -51,6 +51,8 @@ import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.RootBlockView;
 import com.bigdata.journal.jini.ha.HAJournal;
+import com.bigdata.journal.jini.ha.IRestorePolicy;
+import com.bigdata.journal.jini.ha.ISnapshotPolicy;
 import com.bigdata.journal.jini.ha.SnapshotManager;
 import com.bigdata.quorum.AsynchronousQuorumCloseException;
 import com.bigdata.quorum.Quorum;
@@ -149,6 +151,37 @@ public class HAStatusServletUtil {
                         .close();
                 p.text("Service: path=" + quorumService.getServiceDir())
                         .node("br").close();
+
+            }
+            
+            /*
+             * Report on the HA backup status (snapshot and restore policy).
+             * 
+             * Note: The age and commit counter for the available snapshots
+             * are provided in another section (below).
+             */
+            {
+
+                // snapshot policy.
+                p.text("Service: snapshotPolicy="
+                        + journal.getSnapshotManager().getSnapshotPolicy())
+                        .node("br").close();
+
+                // restore policy.
+                p.text("Service: restorePolicy="
+                        + journal.getSnapshotManager().getRestorePolicy())
+                        .node("br").close();
+                
+                if(true) {
+                    /*
+                     * FIXME HABackup: disable this code block. It is for
+                     * debug purposes only.
+                     */
+                    p.text("Service: getEarliestRestorableCommitPoint()="
+                            + journal.getSnapshotManager().getRestorePolicy().getEarliestRestorableCommitPoint(journal))
+                            .node("br").close();
+                }
+                    
             }
 
             /*
@@ -172,8 +205,11 @@ public class HAStatusServletUtil {
                             // ignore
                         }
                     }
-                    p.text("HAJournal: file=" + file + ", nbytes="
-                            + journal.size()
+                    final long commitCounter = journal.getRootBlockView()
+                            .getCommitCounter();
+                    p.text("HAJournal: file=" + file //
+                            + ", commitCounter=" + commitCounter //
+                            + ", nbytes=" + journal.size()//
                             + (digestStr == null ? "" : ", md5=" + digestStr))
                             .node("br").close();
                 }
