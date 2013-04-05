@@ -182,7 +182,13 @@ public interface QuorumPipeline<S extends HAPipelineGlue> {
      * service.
      * <p>
      * Note: The open HALog file is NOT removed by this method.
+     * 
+     * @param token
+     *            The quorum token. The quorum must remain fully met for this
+     *            token across this operation. If that invariant is violated
+     *            then the operation will terminate once this violation is
+     *            noticed.
      */
-    void purgeHALogs();
+    void purgeHALogs(final long token);
     
 }

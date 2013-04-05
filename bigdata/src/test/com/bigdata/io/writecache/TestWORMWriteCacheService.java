@@ -377,9 +377,9 @@ public class TestWORMWriteCacheService extends TestCase3 {
                 }
 
                 @Override
-                public void purgeHALogs() {
+                public void purgeHALogs(final long token) {
                     
-                    MyMockQuorumMember.this.purgeHALogs();
+                    MyMockQuorumMember.this.purgeHALogs(token);
                     
                 }
                 
@@ -479,7 +479,7 @@ public class TestWORMWriteCacheService extends TestCase3 {
         }
 
         @Override
-        public void purgeHALogs() {
+        public void purgeHALogs(final long token) {
             
             // NOP
             

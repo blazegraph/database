@@ -149,9 +149,9 @@ abstract public class QuorumServiceBase<S extends HAGlue, L extends AbstractJour
             }
 
             @Override
-            public void purgeHALogs() {
+            public void purgeHALogs(final long token) {
 
-                QuorumServiceBase.this.purgeHALogs();
+                QuorumServiceBase.this.purgeHALogs(token);
 
             }
 
@@ -273,7 +273,7 @@ abstract public class QuorumServiceBase<S extends HAGlue, L extends AbstractJour
      * Note: The default implementation is a NOP.
      */
     @Override
-    public void purgeHALogs() {
+    public void purgeHALogs(final long token) {
         
         // NOP
         
