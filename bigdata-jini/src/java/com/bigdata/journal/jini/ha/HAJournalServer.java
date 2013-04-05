@@ -77,6 +77,7 @@ import com.bigdata.ha.msg.IHALogRequest;
 import com.bigdata.ha.msg.IHALogRootBlocksResponse;
 import com.bigdata.ha.msg.IHARebuildRequest;
 import com.bigdata.ha.msg.IHASendStoreResponse;
+import com.bigdata.ha.msg.IHASnapshotResponse;
 import com.bigdata.ha.msg.IHASyncRequest;
 import com.bigdata.ha.msg.IHAWriteMessage;
 import com.bigdata.ha.msg.IHAWriteSetStateResponse;
@@ -1256,7 +1257,7 @@ public class HAJournalServer extends AbstractServer {
                      * services should then verify that the quorum is fully met
                      * before they actually age out the HALogs and snapshots.
                      */
-                    purgeHALogs();
+                    purgeHALogs(token);
 
                 }
                 
@@ -1497,8 +1498,30 @@ public class HAJournalServer extends AbstractServer {
                  * to serve as a restore point. The service MUST be joined with
                  * a met quorum in order to take a snapshot.
                  */
+                {
 
-                journal.getSnapshotManager().takeInitialSnapshot();
+                    // Conditionally request initial snapshot.
+                    final Future<IHASnapshotResponse> ft = journal
+                            .getSnapshotManager().takeInitialSnapshot();
+
+                    if (ft != null) {
+
+                        /*
+                         * Wait for outcome.
+                         * 
+                         * Note: Even though we are blocking on the Future, the
+                         * service is live and can receive writes. Once the
+                         * Future is done, we are just going to block anyway in
+                         * blockInterruptably().
+                         * 
+                         * Note: An exception thrown here will cause the service
+                         * to transition into the error state.
+                         */
+                        ft.get();
+
+                    }
+                    
+                }
 
                 // Block until this run state gets interrupted.
                 blockInterruptably();
@@ -1730,12 +1753,6 @@ public class HAJournalServer extends AbstractServer {
                 {
 
                     /*
-                     * Get rid of any existing backups. They will not be
-                     * consistent with the rebuild.
-                     */
-                    deleteBackups();
-                    
-                    /*
                      * The current root block on the leader (We want to get some
                      * immutatable metadata from the leader's root block).
                      */
@@ -1757,17 +1774,34 @@ public class HAJournalServer extends AbstractServer {
 
                     // Verify that the quorum remains met on this token.
                     getQuorum().assertQuorum(token);
-                    
-                    /*
-                     * Install both root blocks.
-                     * 
-                     * Note: This will take us through a local abort. That is
-                     * important. We need to discard any writes that might have
-                     * been buffered before we start the resynchronization of
-                     * the local store.
-                     */
-                    installRootBlocks(rbu.rootBlock0, rbu.rootBlock1);
 
+                    /*
+                     * Critical section.
+                     * 
+                     * Up to now we have not modified anything on the disk. Now
+                     * we are going to destroy the local data (both backups and
+                     * the root blocks of the journal).
+                     */
+                    {
+
+                        /*
+                         * Get rid of any existing backups. They will not be
+                         * consistent with the rebuild.
+                         */
+                        deleteBackups();
+
+                        /*
+                         * Install both root blocks.
+                         * 
+                         * Note: This will take us through a local abort. That
+                         * is important. We need to discard any writes that
+                         * might have been buffered before we start the
+                         * resynchronization of the local store.
+                         */
+                        installRootBlocks(rbu.rootBlock0, rbu.rootBlock1);
+
+                    }
+                    
                     // Note: Snapshot requires joined with met quorum.
 //                    /*
 //                     * Take a snapshot.
@@ -2969,11 +3003,21 @@ public class HAJournalServer extends AbstractServer {
          * Note: The current HALog file is NOT deleted by this method.
          */
         @Override
-        public void purgeHALogs() {
+        public void purgeHALogs(final long token) {
 
             logLock.lock();
 
             try {
+
+                if (!getQuorum().isQuorumFullyMet(token)) {
+                    /*
+                     * Halt operation.
+                     * 
+                     * Note: This is not an error, but we can not remove
+                     * snapshots or HALogs if this invariant is violated.
+                     */
+                    return;
+                }
 
                 // We need to retain the backups for this commit point.
                 final long earliestRestorableCommitPoint = journal
@@ -2989,10 +3033,11 @@ public class HAJournalServer extends AbstractServer {
 
                 // Delete snapshots, returning commit counter of the oldest
                 // retained snapshot.
-                final long earliestRetainedSnapshotLastCommitCounter = deleteSnapshots(earliestRestorableCommitPoint);
+                final long earliestRetainedSnapshotLastCommitCounter = deleteSnapshots(
+                        token, earliestRestorableCommitPoint);
 
                 // Delete HALogs not retained by that snapshot.
-                deleteHALogs(earliestRetainedSnapshotLastCommitCounter);
+                deleteHALogs(token, earliestRetainedSnapshotLastCommitCounter);
 
             } finally {
 
@@ -3002,33 +3047,6 @@ public class HAJournalServer extends AbstractServer {
 
         }
 
-        /**
-         * We need to destroy the local backups if we do a REBUILD. Those files
-         * are no longer guaranteed to be consistent with the history of the
-         * journal.
-         */
-        private void deleteBackups() {
-            
-            logLock.lock();
-
-            try {
-
-                haLog.warn("Destroying local backups.");
-                
-                // Delete all snapshots.
-                deleteSnapshots(Long.MAX_VALUE);
-
-                // Delete all HALogs (except the current one).
-                deleteHALogs(Long.MAX_VALUE);
-                
-            } finally {
-
-                logLock.unlock();
-
-            }
-            
-        }
-        
         /**
          * Delete snapshots that are no longer required.
          * <p>
@@ -3042,7 +3060,8 @@ public class HAJournalServer extends AbstractServer {
          * 
          * @return The commitCounter of the earliest retained snapshot.
          */
-        private long deleteSnapshots(final long earliestRestorableCommitPoint) {
+        private long deleteSnapshots(final long token,
+                final long earliestRestorableCommitPoint) {
             /*
              * List the snapshot files for this service.
              */
@@ -3076,30 +3095,43 @@ public class HAJournalServer extends AbstractServer {
                         }
 
                         // Strip off the filename extension.
-                        final String fileBaseName = name.substring(0,
-                                SnapshotManager.SNAPSHOT_EXT.length());
+                        final int len = name.length()
+                                - SnapshotManager.SNAPSHOT_EXT.length();
+                        final String fileBaseName = name.substring(0, len);
 
                         // Closing commitCounter for snapshot file.
                         final long commitCounter = Long.parseLong(fileBaseName);
 
                         // Count all snapshot files.
                         nfound.incrementAndGet();
-                        
-                        if (commitCounter >= earliestRestorableCommitPoint) {
+
+                        // true iff we will delete this snapshot.
+                        final boolean deleteFile = commitCounter < earliestRestorableCommitPoint;
+
+                        if (haLog.isInfoEnabled())
+                            log.info("snapshotFile="
+                                    + name//
+                                    + ", deleteFile="
+                                    + deleteFile//
+                                    + ", commitCounter="
+                                    + commitCounter//
+                                    + ", earliestRestoreableCommitPoint="
+                                    + earliestRestorableCommitPoint);
+
+                        if (!deleteFile
+                                && commitCounter < earliestRetainedSnapshotCommitCounter
+                                        .get()) {
+
                             /*
-                             * We need to retain this snapshot.
+                             * Update the earliest retained snapshot.
                              */
-                            if (commitCounter < earliestRetainedSnapshotCommitCounter
-                                    .get()) {
-                                // Update the earliest retained snapshot.
-                                earliestRetainedSnapshotCommitCounter
-                                        .set(commitCounter);
-                            }
-                            return false;
+
+                            earliestRetainedSnapshotCommitCounter
+                                    .set(commitCounter);
+
                         }
 
-                        // This snapshot MAY be deleted.
-                        return true;
+                        return deleteFile;
 
                     }
                 });
@@ -3129,6 +3161,16 @@ public class HAJournalServer extends AbstractServer {
 
                     // #of bytes in that file.
                     final long len = file.length();
+
+                    if (!getQuorum().isQuorumFullyMet(token)) {
+                        /*
+                         * Halt operation.
+                         * 
+                         * Note: This is not an error, but we can not remove
+                         * snapshots or HALogs if this invariant is violated.
+                         */
+                        break;
+                    }
 
                     if (!snapshotManager.removeSnapshot(file)) {
 
@@ -3167,7 +3209,8 @@ public class HAJournalServer extends AbstractServer {
          *            that are GTE this commit counter since they will be
          *            applied to that snapshot.
          */
-        private void deleteHALogs(final long earliestRetainedSnapshotCommitCounter) {
+        private void deleteHALogs(final long token,
+                final long earliestRetainedSnapshotCommitCounter) {
             /*
              * List the HALog files for this service.
              */
@@ -3215,22 +3258,29 @@ public class HAJournalServer extends AbstractServer {
                         }
 
                         // Strip off the filename extension.
-                        final String logFileBaseName = name.substring(0,
-                                IHALogReader.HA_LOG_EXT.length());
+                        
+                        final int len = name.length()
+                                - IHALogReader.HA_LOG_EXT.length();
+                        
+                        final String fileBaseName = name.substring(0, len);
 
                         // Closing commitCounter for HALog file.
                         final long logCommitCounter = Long
-                                .parseLong(logFileBaseName);
+                                .parseLong(fileBaseName);
 
-                        if (logCommitCounter >= earliestRetainedSnapshotCommitCounter) {
-                            /*
-                             * We need to retain this log file.
-                             */
-                            return false;
-                        }
+                        final boolean deleteFile = logCommitCounter < earliestRetainedSnapshotCommitCounter;
+                        
+                        if (haLog.isInfoEnabled())
+                            haLog.info("logFile="
+                                    + name//
+                                    + ", delete="
+                                    + deleteFile//
+                                    + ", logCommitCounter="
+                                    + logCommitCounter//
+                                    + ", earliestRestoreableCommitPoint="
+                                    + earliestRetainedSnapshotCommitCounter);
 
-                        // This HALog file MAY be deleted.
-                        return true;
+                        return deleteFile;
 
                     }
                 });
@@ -3244,6 +3294,16 @@ public class HAJournalServer extends AbstractServer {
 
                 // #of bytes in that HALog file.
                 final long len = logFile.length();
+
+                if (!getQuorum().isQuorumFullyMet(token)) {
+                    /*
+                     * Halt operation.
+                     * 
+                     * Note: This is not an error, but we can not remove
+                     * snapshots or HALogs if this invariant is violated.
+                     */
+                    break;
+                }
 
                 if (!logFile.delete()) {
 
@@ -3265,6 +3325,91 @@ public class HAJournalServer extends AbstractServer {
                         + ", earliestRetainedSnapshotCommitCounter="
                         + earliestRetainedSnapshotCommitCounter);
 
+        }
+        
+        /**
+         * We need to destroy the local backups if we do a REBUILD. Those files
+         * are no longer guaranteed to be consistent with the history of the
+         * journal.
+         * <p>
+         * Note: This exists as a distinct code path because we will destroy
+         * those backups without regard to the quorum token. The normal code
+         * path requires a fully met journal in order to delete snapshots and
+         * HALog files.
+         * 
+         * @throws IOException
+         *             if a file could not be deleted.
+         */
+        private void deleteBackups() throws IOException {
+            
+            logLock.lock();
+
+            try {
+
+                haLog.warn("Destroying local backups.");
+
+                // Delete all snapshots.
+                {
+
+                    final File snapshotDir = journal.getSnapshotManager()
+                            .getSnapshotDir();
+
+                    final File[] files = snapshotDir
+                            .listFiles(new FilenameFilter() {
+                                @Override
+                                public boolean accept(final File dir,
+                                        final String name) {
+                                    return name
+                                            .endsWith(SnapshotManager.SNAPSHOT_EXT);
+                                }
+                            });
+                    for (File file : files) {
+                        if (!file.delete())
+                            throw new IOException("COULD NOT DELETE FILE: "
+                                    + file);
+                    }
+                
+                }
+                
+                // Delete all HALogs (except the current one).
+                {
+
+                    final File currentLogFile = journal.getHALogWriter()
+                            .getFile();
+
+                    final String currentLogFileName = currentLogFile == null ? null
+                            : currentLogFile.getName();
+
+                    final File logDir = journal.getHALogDir();
+
+                    final File[] files = logDir.listFiles(new FilenameFilter() {
+                        @Override
+                        public boolean accept(final File dir, final String name) {
+                            // filter out the current log file
+                            if (currentLogFile != null
+                                    && name.equals(currentLogFileName)) {
+                                /*
+                                 * This is the current HALog. We never purge it.
+                                 */
+                                return false;
+                            }
+                            return name.endsWith(IHALogReader.HA_LOG_EXT);
+                        }
+                    });
+                    for (File file : files) {
+                        if (!file.delete())
+                            throw new IOException("COULD NOT DELETE FILE: "
+                                    + file);
+                    }
+                
+                }
+                
+            } finally {
+
+                logLock.unlock();
+
+            }
+            
         }
         
         @Override

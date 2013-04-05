@@ -505,7 +505,7 @@ public class HAJournal extends Journal {
     public void deleteResources() {
 
         super.deleteResources();
- 
+
         recursiveDelete(getHALogDir(), new FileFilter() {
 
             @Override

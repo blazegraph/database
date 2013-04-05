@@ -168,15 +168,16 @@ public class CommitTimeIndex extends BTree {
     }
     
     /**
-     * Find the first journal whose <em>createTime</em> is strictly greater
-     * than the timestamp.
+     * Return the {@link IRootBlockView} identifying the first snapshot whose
+     * <em>commitTime</em> is strictly greater than the timestamp.
      * 
      * @param timestamp
      *            The timestamp. A value of ZERO (0) may be used to find the
-     *            first journal.
+     *            first snapshot.
      * 
-     * @return The commit record -or- <code>null</code> if there is no commit
-     *         record whose timestamp is strictly greater than <i>timestamp</i>.
+     * @return The root block of that snapshot -or- <code>null</code> if there
+     *         is no snapshot whose timestamp is strictly greater than
+     *         <i>timestamp</i>.
      */
     synchronized public IRootBlockView findNext(final long timestamp) {
 
@@ -188,8 +189,8 @@ public class CommitTimeIndex extends BTree {
             throw new IllegalArgumentException();
         
         // find first strictly greater than.
-        final long index = findIndexOf(Math.abs(timestamp)) + 1;
-        
+        final long index = findIndexOf(timestamp) + 1;
+
         if (index == nentries) {
 
             // No match.

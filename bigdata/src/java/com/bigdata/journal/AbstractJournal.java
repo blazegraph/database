@@ -5980,17 +5980,13 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                                 + rootBlock);
                     }
 
-                    if (quorum.isQuorumFullyMet(rootBlock.getQuorumToken())) {
+                    /*
+                     * The HA log files are purged on each node any time the
+                     * quorum is fully met and goes through a commit point.
+                     * Leaving only the current open log file.
+                     */
 
-                        /*
-                         * The HA log files are purged on each node any time
-                         * the quorum is fully met and goes through a commit
-                         * point. Leaving only the current open log file.
-                         */
-
-                        localService.purgeHALogs();
-
-                    }
+                    localService.purgeHALogs(rootBlock.getQuorumToken());
 
                 } catch(Throwable t) {
                     

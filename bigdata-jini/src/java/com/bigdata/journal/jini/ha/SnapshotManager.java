@@ -512,8 +512,8 @@ public class SnapshotManager {
     }
     
     /**
-     * Return the {@link IRootBlock} identifying the snapshot having the largest
-     * lastCommitTime that is less than or equal to the given value.
+     * Return the {@link IRootBlockView} identifying the snapshot having the
+     * largest lastCommitTime that is less than or equal to the given value.
      * 
      * @param timestamp
      *            The given timestamp.
@@ -528,6 +528,24 @@ public class SnapshotManager {
     public IRootBlockView find(final long timestamp) {
         
         return snapshotIndex.find(timestamp);
+        
+    }
+
+    /**
+     * Return the {@link IRootBlockView} identifying the first snapshot whose
+     * <em>commitTime</em> is strictly greater than the timestamp.
+     * 
+     * @param timestamp
+     *            The timestamp. A value of ZERO (0) may be used to find the
+     *            first snapshot.
+     * 
+     * @return The root block of that snapshot -or- <code>null</code> if there
+     *         is no snapshot whose timestamp is strictly greater than
+     *         <i>timestamp</i>.
+     */
+    public IRootBlockView findNext(final long timestamp) {
+        
+        return snapshotIndex.findNext(timestamp);
         
     }
 
@@ -1148,7 +1166,7 @@ public class SnapshotManager {
 
                             if (localService != null) {
 
-                                localService.purgeHALogs();
+                                localService.purgeHALogs(token);
 
                             }
 

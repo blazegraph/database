@@ -119,9 +119,15 @@ public class TestHA3RestorePolicy extends AbstractHA3BackupTestCase {
         final int N = 7; // #of transactions to run before the snapshot.
         final int M = 8; // #of transactions to run after the snapshot.
         
-        // Start 2 services.
+        /*
+         * Start 3 services.
+         * 
+         * Note: We need to have three services running in order for the
+         * snapshots 
+         */
         final HAGlue serverA = startA();
         final HAGlue serverB = startB();
+        final HAGlue serverC = startC();
 
         // Wait for a quorum meet.
         final long token = quorum.awaitQuorum(awaitQuorumTimeout,
@@ -134,9 +140,15 @@ public class TestHA3RestorePolicy extends AbstractHA3BackupTestCase {
         assertEquals(serverA, quorum.getClient().getLeader(token));
 
         // Await initial commit point (KB create).
-        awaitCommitCounter(1L, serverA, serverB);
+        awaitCommitCounter(1L, serverA, serverB, serverC);
         
-        assertCommitCounter(1L, serverA);
+        /*
+         * There should not be any snapshots yet since we are using the
+         * NoSnapshotPolicy.  
+         */
+        assertEquals(0, getSnapshotDirA().list().length);
+        assertEquals(0, getSnapshotDirB().list().length);
+        assertEquals(0, getSnapshotDirC().list().length);
         
         // Now run N transactions.
         for (int i = 0; i < N; i++) {
@@ -147,11 +159,12 @@ public class TestHA3RestorePolicy extends AbstractHA3BackupTestCase {
 
         final long commitCounterN = N + 1;
 
-        assertCommitCounter(commitCounterN, serverA);
+        assertCommitCounter(commitCounterN, serverA, serverB, serverC);
 
-        // Check HALogs equal on A, B.
-        assertHALogDigestsEquals(1L/* firstCommitCounter */, commitCounterN,
-                new HAGlue[] { serverA, serverB });
+        // Only the live log is retained on the services.
+        assertEquals(1, getHALogDirA().list().length);
+        assertEquals(1, getHALogDirA().list().length);
+        assertEquals(1, getHALogDirA().list().length);
 
         /*
          * Take a snapshot.
@@ -208,8 +221,8 @@ public class TestHA3RestorePolicy extends AbstractHA3BackupTestCase {
 
         /*
          * Now run sets of M transactions until we have exceeded releasePolicy's
-         * minimum age for the existing snapshot. Since there is only one
-         * snapshot, it SHOULD NOT be removed.
+         * minimum age for the existing snapshot. However, since there is only
+         * one snapshot, it SHOULD NOT be removed.
          */
         int nnewtx = 0;
         {
@@ -228,15 +241,26 @@ public class TestHA3RestorePolicy extends AbstractHA3BackupTestCase {
 
                 final long commitCounterM = nnewtx + N + 1;
 
-                assertCommitCounter(commitCounterM, serverA);
-                
-                // Check HALogs equal on A, B.
-                assertHALogDigestsEquals(1L/* firstCommitCounter */, commitCounterM,
-                        new HAGlue[] { serverA, serverB });
+                assertCommitCounter(commitCounterM, serverA, serverB, serverC);
 
-                // Snapshot directory contains just the expected snapshot
+                /*
+                 * Verify that the snapshot directory contains just the expected
+                 * snapshot.
+                 */
                 assertEquals(new String[] { snapshotFile0.getName() },
                         getSnapshotDirA().list());
+                
+                /*
+                 * Check HALogs for existence on A.
+                 * 
+                 * Note: We can not compare the digests for equality on the
+                 * difference servers because we only took a snapshot on A and
+                 * therefore we have not pinned the HALogs on B or C.
+                 */
+                assertHALogDigestsEquals(
+                        commitCounterN + 1/* firstCommitCounter */,
+                        commitCounterM, new HAGlue[] { serverA });
+
             }
 
             // Verify snapshot still exists.
@@ -251,10 +275,15 @@ public class TestHA3RestorePolicy extends AbstractHA3BackupTestCase {
         /*
          * Request another snapshot.
          * 
-         * Note: We will now have 2 snapshots. The original snapshot is purged
-         * since it is older than the minimum retention time for a snapshot.
+         * Note: We will now have 2 snapshots. The original snapshot is NOT
+         * purged. While it is older than the minimum retention time for a
+         * snapshot, we do not yet have another snapshot that will allow us to
+         * recover the commit points GT our oldest snapshot that are within the
+         * required recovered period.
          */
         final IRootBlockView snapshotRB1;
+        final File snapshotFile1;
+        final long lastCommitCounter;
         {
             
             // Request snapshot on A.
@@ -275,33 +304,110 @@ public class TestHA3RestorePolicy extends AbstractHA3BackupTestCase {
             snapshotRB1 = ft.get().getRootBlock();
 
             // The name of the new snapshot file.
-            final File snapshotFile1 = SnapshotManager.getSnapshotFile(
-                    getSnapshotDirA(), snapshotRB1.getCommitCounter());
+            snapshotFile1 = SnapshotManager.getSnapshotFile(getSnapshotDirA(),
+                    snapshotRB1.getCommitCounter());
 
             // Verify new snapshot exists.
             assertTrue(snapshotFile1.exists());
 
-            // Verify old snapshot is gone.
-            assertFalse(snapshotFile0.exists());
+            // Verify old snapshot exists.
+            assertTrue(snapshotFile0.exists());
 
-            // Verify snapshot directory contains the only the one file.
-            assertEquals(new String[] { snapshotFile1.getName() },
-                    getSnapshotDirA().list());
-
-            /*
-             * Verify only the expected HALog files are retained.
-             */
+            // Verify snapshot directory contains the necessary files.
+            assertEquals(
+                    new String[] { snapshotFile0.getName(),
+                            snapshotFile1.getName() }, getSnapshotDirA().list());
 
             // The current commit counter on A.
-            final long lastCommitCounter = serverA
+            lastCommitCounter = serverA
                     .getRootBlock(new HARootBlockRequest(null/* storeUUID */))
                     .getRootBlock().getCommitCounter();
 
-            // Check HALogs equal on A, B.
+            // Check HALogs found on A.
+            assertHALogDigestsEquals(
+                    commitCounterN + 1/* firstCommitCounter */,
+                    lastCommitCounter/* lastCommitCounter */,
+                    new HAGlue[] { serverA });
+
+            /*
+             * Verify only the expected HALog files are retained on A (in fact,
+             * all HALogs will still be retained on B since we are not taking
+             * any snapshots there).
+             */
+            assertHALogNotFound(1L/* firstCommitCounter */,
+                    commitCounterN - 1/* lastCommitCounter */,
+                    new HAGlue[] { serverA });
+
+        }
+
+        /*
+         * Sleep until the most recent snapshot is old enough to satisify our
+         * recovery period.
+         */
+        Thread.sleep(restorePolicyMinSnapshotAgeMillis);
+
+        /*
+         * The older snapshot should still exist since we have not gone through
+         * a commit.
+         */
+        {
+            
+            // Verify new snapshot exists.
+            assertTrue(snapshotFile1.exists());
+
+            // Verify old snapshot exists.
+            assertTrue(snapshotFile0.exists());
+
+            // Verify snapshot directory contains the necessary files.
+            assertEquals(
+                    new String[] { snapshotFile0.getName(),
+                            snapshotFile1.getName() }, getSnapshotDirA().list());
+
+            // Check HALogs found on A.
+            assertHALogDigestsEquals(
+                    commitCounterN + 1/* firstCommitCounter */,
+                    lastCommitCounter/* lastCommitCounter */,
+                    new HAGlue[] { serverA });
+
+        }
+
+        // Do a simple transaction.
+        simpleTransaction();
+
+        final long lastCommitCounter2 = lastCommitCounter + 1;
+
+        // Verify the current commit counter on A, B.
+        assertCommitCounter(lastCommitCounter2, new HAGlue[] { serverA,
+                serverB, serverC });
+
+        /*
+         * Verify older snapshot and logs LT the newer snapshot are gone.
+         */
+        {
+            
+            // Verify new snapshot exists.
+            assertTrue(snapshotFile1.exists());
+
+            // Verify old snapshot is done.
+            assertFalse(snapshotFile0.exists());
+
+            // Verify snapshot directory contains the necessary files.
+            assertEquals(new String[] { snapshotFile1.getName() },
+                    getSnapshotDirA().list());
+
+            // Check HALogs found on A.
             assertHALogDigestsEquals(
                     snapshotRB1.getCommitCounter()/* firstCommitCounter */,
-                    lastCommitCounter/* lastCommitCounter */, new HAGlue[] {
-                            serverA, serverB });
+                    lastCommitCounter2/* lastCommitCounter */,
+                    new HAGlue[] { serverA });
+
+            /*
+             * Verify HALogs were removed from A (again, all HALogs will still
+             * be on B since we have not taken a snapshot there).
+             */
+            assertHALogNotFound(1L/* firstCommitCounter */,
+                    snapshotRB1.getCommitCounter() - 1/* lastCommitCounter */,
+                    new HAGlue[] { serverA });
 
         }
 

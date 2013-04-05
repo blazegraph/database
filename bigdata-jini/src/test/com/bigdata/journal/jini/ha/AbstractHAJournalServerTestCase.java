@@ -599,7 +599,11 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
      * @param lastCommitCounter
      *            The last commit point to be verified (inclusive upper bound).
      * @param services
-     *            The set of services whose HALog files will be tested.
+     *            The set of services whose HALog files will be tested. If there
+     *            is more than one service, then this method will verify that
+     *            the services have the same digests for their HALog files. If
+     *            there is only one service, then this will verify that the
+     *            HALog file exists by computing its digest.
      * 
      * @throws IOException
      * @throws DigestException
@@ -762,17 +766,20 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
      * @param expected
      *            The expected commit point.
      * @param haGlue
-     *            The remote server interface.
+     *            The remote server interface(s).
      * 
      * @throws IOException
      */
-    protected void assertCommitCounter(final long expected, final HAGlue haGlue)
+    protected void assertCommitCounter(final long expected, final HAGlue... haGlue)
             throws IOException {
 
-        assertEquals(
-                expected,
-                haGlue.getRootBlock(new HARootBlockRequest(null/* storeUUID */))
-                        .getRootBlock().getCommitCounter());
+        for (HAGlue server : haGlue) {
+            assertEquals(
+                    expected,
+                    server.getRootBlock(
+                            new HARootBlockRequest(null/* storeUUID */))
+                            .getRootBlock().getCommitCounter());
+        }
 
     }
 

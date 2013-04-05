@@ -34,17 +34,33 @@ import com.bigdata.journal.IRootBlockView;
  * deciding when snapshots (aka full backups) and HALogs (aka write ahead log
  * files for each commit point aka incremental backups) may be purged.
  * <dl>
- * <dt>minSnapshotAgeMillis</dt>
- * <dd>The minimum age of a snapshot before it may be deleted.</dd>
+ * <dt>minRestoreAgeMillis</dt>
+ * <dd>The minimum restore period (in milliseconds). Snapshots and/or HALog
+ * files will be retained to ensure the ability to restore a commit point this
+ * far in the past.</dd>
  * <dt>minSnapshots</dt>
  * <dd>The minimum number of snapshot files (aka full backups) that must be
- * retained.</dd>
+ * retained (positive integer).
+ * <p>
+ * This must be a positive integer. If the value were ZERO a snapshot would be
+ * purged as soon as it is taken. That would not provide an opportunity to make
+ * a copy of the snapshot, rendering the snapshot mechanism useless.
+ * <p>
+ * If <code>minSnapshots:=1</code> then a snapshot, once taken, will be retained
+ * until the next snapshot is taken. Further, the existence of the shapshot will
+ * cause HALog files for commit points GT that snapshot to accumulate until the
+ * next snapshot. This will occur regardless of the value of the other
+ * parameters. Thus, if you occasionally take snapshots and move them offsite,
+ * you must REMOVE the snapshot by hand in order to allow the retained HALogs to
+ * be reclaimed as well.
+ * <p>
+ * This concern does not arise if you are taking periodic snapshots.</dd>
  * <dt>minRestorePoints</dt>
  * <dd>The minimum number of commit points that must be restorable from backup.
- * This explicitly controls the number of HALog files that will be retained. It
- * also implicitly controls the number of snapshot files that will be retained
- * since an HALog file will pin the newest snapshot whose commit counter is LTE
- * to the the closing commit counter on that HALog file.</dd>
+ * This explicitly controls the number of HALog files that will be retained
+ * (non-negative). It also implicitly controls the number of snapshot files that
+ * will be retained since an HALog file will pin the newest snapshot whose
+ * commit counter is LTE to the the closing commit counter on that HALog file.</dd>
  * </dl>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -75,7 +91,7 @@ public class DefaultRestorePolicy implements IRestorePolicy {
     /**
      * The minimum age of a snapshot before it may be purged.
      */
-    private final long minSnapshotAgeMillis;
+    private final long minRestoreAgeMillis;
 
     /**
      * The minimum #of snapshots that must be retained.
@@ -91,7 +107,7 @@ public class DefaultRestorePolicy implements IRestorePolicy {
     public String toString() {
 
         return DefaultRestorePolicy.class.getSimpleName()//
-                + "{minSnapshotAge=" + minSnapshotAgeMillis + "ms"//
+                + "{minRestoreAge=" + minRestoreAgeMillis + "ms"//
                 + ",minSnapshots=" + minSnapshots //
                 + ",minRestorePoints=" + minRestorePoints //
                 + "}";
@@ -113,13 +129,13 @@ public class DefaultRestorePolicy implements IRestorePolicy {
      * policy will retain local backups unless all of the criteria are
      * satisified.
      * 
-     * @param minSnapshotAgeMillis
+     * @param minRestoreAgeMillis
      *            The minimum age of a snapshot (in milliseconds) before it may
      *            be purged.
      */
-    public DefaultRestorePolicy(final long minSnapshotAgeMillis) {
+    public DefaultRestorePolicy(final long minRestoreAgeMillis) {
 
-        this(minSnapshotAgeMillis, DEFAULT_MIN_SNAPSHOTS,
+        this(minRestoreAgeMillis, DEFAULT_MIN_SNAPSHOTS,
                 DEFAULT_MIN_RESTORE_POINTS);
 
     }
@@ -129,37 +145,72 @@ public class DefaultRestorePolicy implements IRestorePolicy {
      * policy will retain local backups unless all of the criteria are
      * satisified.
      * 
-     * @param minSnapshotAgeMillis
+     * @param minRestoreAgeMillis
      *            The minimum age of a snapshot (in milliseconds) before it may
-     *            be purged.
+     *            be purged (non-negative integer).
      * @param minSnapshots
      *            The minimum number of snapshots (aka full backups) that must
-     *            be retained locally.
+     *            be retained locally (positive integer).
+     *            <p>
+     *            This must be a positive integer. If the value were ZERO a
+     *            snapshot would be purged as soon as it is taken. That would
+     *            not provide an opportunity to make a copy of the snapshot,
+     *            rendering the snapshot mechanism useless.
+     *            <p>
+     *            If <code>minSnapshots:=1</code> then a snapshot, once taken,
+     *            will be retained until the next snapshot is taken. Further,
+     *            the existence of the shapshot will cause HALog files for
+     *            commit points GT that snapshot to accumulate until the next
+     *            snapshot. This will occur regardless of the value of the other
+     *            parameters. Thus, if you occasionally take snapshots and move
+     *            them offsite, you must REMOVE the snapshot by hand in order to
+     *            allow the retained HALogs to be reclaimed as well.
+     *            <p>
+     *            This concern does not arise if you are taking periodic
+     *            snapshots.
      * @param minRestorePoints
      *            The minimum number of restore points (aka HALog files) that
-     *            must be retained locally. If an HALog is pinned by this
-     *            parameter, then the oldest snapshot LTE the commit counter of
-     *            that HALog is also pinned, as are all HALog files GTE the
-     *            snapshot and LT the HALog.
+     *            must be retained locally (non-negative integer). If an HALog
+     *            is pinned by this parameter, then the oldest snapshot LTE the
+     *            commit counter of that HALog is also pinned, as are all HALog
+     *            files GTE the snapshot and LT the HALog.
      */
-    public DefaultRestorePolicy(final long minSnapshotAgeMillis,
+    public DefaultRestorePolicy(final long minRestoreAgeMillis,
             final int minSnapshots, final int minRestorePoints) {
 
-        if (minSnapshotAgeMillis < 0)
+        if (minRestoreAgeMillis < 0)
             throw new IllegalArgumentException(
-                    "minSnapshotAgeMillis must be GTE ZERO (0), not "
-                            + minSnapshotAgeMillis);
+                    "minRestoreAgeMillis must be GTE ZERO (0), not "
+                            + minRestoreAgeMillis);
 
-        if (minSnapshots < 1)
+        if (minSnapshots < 1) {
+            /*
+             * This must be a positive integer. If the value were ZERO a
+             * snapshot would be purged as soon as it is taken. That would not
+             * provide an opportunity to make a copy of the snapshot, rendering
+             * the snapshot mechanism useless.
+             * 
+             * If minSnapshots:=1 then a snapshot, once taken, will be retained
+             * until the next snapshot is taken. Further, the existence of the
+             * shapshot will cause HALog files for commit points GT that
+             * snapshot to accumulate until the next snapshot. This will occur
+             * regardless of the value of the other parameters. Thus, if you
+             * occasionally take snapshots and move them offsite, you must
+             * REMOVE the snapshot by hand in order to allow the retained HALogs
+             * to be reclaimed as well.
+             * 
+             * This concern does not arise if you are taking periodic snapshots.
+             */
             throw new IllegalArgumentException(
                     "minSnapshots must be GTE ONE (1), not " + minSnapshots);
+        }
 
         if (minRestorePoints < 0)
             throw new IllegalArgumentException(
                     "minRestorePoints must be GTE ZERO (0), not "
                             + minRestorePoints);
 
-        this.minSnapshotAgeMillis = minSnapshotAgeMillis;
+        this.minRestoreAgeMillis = minRestoreAgeMillis;
 
         this.minSnapshots = minSnapshots;
 
@@ -175,18 +226,25 @@ public class DefaultRestorePolicy implements IRestorePolicy {
     private long getEarliestRestorableCommitCounterByAge(final HAJournal jnl,
             final long commitCounterOnJournal) {
 
+        // The current time.
         final long now = System.currentTimeMillis();
 
-        final long then = now - minSnapshotAgeMillis;
+        // A moment [minRestoreAge] milliseconds ago.
+        final long then = now - minRestoreAgeMillis;
 
+        // The root block for the snapshot with a commitTime LTE [then].
         final IRootBlockView rootBlock = jnl.getSnapshotManager().find(then);
 
         if (rootBlock == null) {
 
-            // There are no snapshots.
+            // There are no matching snapshots.
             return commitCounterOnJournal;
             
         }
+        
+        if (log.isInfoEnabled())
+            log.info("minRestoreAgeMillis=" + minRestoreAgeMillis + ", now="
+                    + now + ", then=" + then + ", rootBlock=" + rootBlock);
         
         return rootBlock.getCommitCounter();
 
@@ -200,14 +258,8 @@ public class DefaultRestorePolicy implements IRestorePolicy {
     private long getEarliestRestorableCommitCounterBySnapshots(
             final HAJournal jnl, final long commitCounterOnJournal) {
 
-        if (minSnapshots == 0) {
-
-            return commitCounterOnJournal;
-
-        }
-        
         final IRootBlockView rootBlock = jnl.getSnapshotManager()
-                .getSnapshotByReverseIndex(minSnapshots);
+                .getSnapshotByReverseIndex(minSnapshots - 1);
 
         if (rootBlock == null) {
 
@@ -269,30 +321,45 @@ public class DefaultRestorePolicy implements IRestorePolicy {
         final long commitCounterOnJournal = jnl.getRootBlockView()
                 .getCommitCounter();
 
-        final long commitCounterByAge = getEarliestRestorableCommitCounterByAge(
+        final long commitCounterRetainedByAge = getEarliestRestorableCommitCounterByAge(
                 jnl, commitCounterOnJournal);
 
-        final long commitCounterBySnapshots = getEarliestRestorableCommitCounterBySnapshots(
+        final long commitCounterRetainedBySnapshotCount = getEarliestRestorableCommitCounterBySnapshots(
                 jnl, commitCounterOnJournal);
 
-        final long commitCounterByHALogs = getEarliestRestorableCommitCounterByHALogs(
+        final long commitCounterRetainedByHALogCount = getEarliestRestorableCommitCounterByHALogs(
                 jnl, commitCounterOnJournal);
 
-        final long ret = Math.min(commitCounterByAge,
-                Math.min(commitCounterBySnapshots, commitCounterByHALogs));
+        /*
+         * Take the minimum of those values. This is the commit counter that
+         * will be retained.
+         * 
+         * Snapshot files and HALogs GTE this commit counter will not be
+         * released.
+         */
+        final long commitCounterRetained = Math.min(commitCounterRetainedByAge,
+                Math.min(commitCounterRetainedBySnapshotCount,
+                        commitCounterRetainedByHALogCount));
 
         if (log.isInfoEnabled()) {
 
-            log.info("policy=" + this + ", commitCounterOnJournal="
-                    + commitCounterOnJournal + ", commitCounterByAge="
-                    + commitCounterByAge + ", commitCounterBySnapshots="
-                    + commitCounterBySnapshots + ", commitCounterByHALogs="
-                    + commitCounterByHALogs
-                    + ", effectiveCommitCounterReported=" + ret);
+            log.info("policy="
+                    + this
+                    + //
+                    ", commitCounterOnJournal="
+                    + commitCounterOnJournal //
+                    + ", commitCounterByAge="
+                    + commitCounterRetainedByAge //
+                    + ", commitCounterBySnapshots="
+                    + commitCounterRetainedBySnapshotCount //
+                    + ", commitCounterByHALogs="
+                    + commitCounterRetainedByHALogCount//
+                    + ", effectiveCommitCounterRetained="
+                    + commitCounterRetained);
 
         }
 
-        return ret;
+        return commitCounterRetained;
 
     }
 
