@@ -584,8 +584,6 @@ public class TestHA3SnapshotPolicy extends AbstractHA3BackupTestCase {
         // Await initial commit point (KB create).
         awaitCommitCounter(1L, serverA, serverB);
         
-        assertCommitCounter(1L, serverA);
-        
         // Now run N transactions.
         for (int i = 0; i < N; i++) {
 
@@ -595,7 +593,7 @@ public class TestHA3SnapshotPolicy extends AbstractHA3BackupTestCase {
 
         final long commitCounterN = N + 1;
 
-        assertCommitCounter(commitCounterN, serverA);
+        awaitCommitCounter(commitCounterN, serverA);
 
         // Check HALogs equal on A, B.
         assertHALogDigestsEquals(1L/* firstCommitCounter */, commitCounterN,
@@ -649,7 +647,7 @@ public class TestHA3SnapshotPolicy extends AbstractHA3BackupTestCase {
 
         final long commitCounterM = M + N + 1;
 
-        assertCommitCounter(commitCounterM, serverA);
+        awaitCommitCounter(commitCounterM, serverA);
 
         // Check HALogs equal on A, B.
         assertHALogDigestsEquals(1L/* firstCommitCounter */, commitCounterM,

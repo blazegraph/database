@@ -27,9 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.journal.jini.ha;
 
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.FutureTask;
@@ -41,6 +38,7 @@ import net.jini.config.Configuration;
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.halog.HALogWriter;
 import com.bigdata.ha.msg.HARootBlockRequest;
+import com.bigdata.journal.AbstractJournal;
 import com.bigdata.quorum.Quorum;
 import com.bigdata.rdf.sail.webapp.client.HAStatusEnum;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
@@ -58,6 +56,15 @@ import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
  * rather than SHUTDOWN/RESTART. BOUNCE exercises different code paths and
  * corresponds to a zookeeper timeout, e.g., as might occur during a full GC
  * pause.
+ * 
+ * TODO Update the existing tests to verify that the quorum token is properly
+ * set on C when C resyncs with A+B and that
+ * {@link AbstractJournal#getHAReady()} reports the correct token. This tests
+ * for a problem where we did not call setQuorumToken() again when we resync and
+ * transition into the met quorum. This meant that the HAReady token is not set
+ * for a service unless it is part of the initial quorum meet. One of the HA3
+ * backup tests covers this, but we should be checking the HAReadyToken in this
+ * test suite as well.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
@@ -802,16 +809,6 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
         final long token = quorum.awaitQuorum(awaitQuorumTimeout,
                 TimeUnit.MILLISECONDS);
 
-//        // Verify KB exists.
-//        awaitKBExists(serverA);
-        
-        /*
-         * Note: The quorum was not fully met at the last 2-phase commit.
-         * Instead, 2 services participated in the 2-phase commit and the third
-         * service resynchronized when it came up and then went through a local
-         * commit. Therefore, the HALog files should exist on all nodes.
-         */
-
         // Current commit point.
         final long lastCommitCounter = 1;
 
@@ -849,9 +846,8 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
         // now remove the halog files ensuring a RESYNC is not possible
         // but MUST leave currently open file!!
         final String openLog = HALogWriter.getHALogFileName(lastCommitCounter2 + 1);
-        final File serviceDir = new File("benchmark/CI-HAJournal-1");
-        removeFiles(new File(serviceDir, "A/HALog"), openLog);
-        removeFiles(new File(serviceDir, "B/HALog"), openLog);
+        removeFiles(getHALogDirA(), openLog);
+        removeFiles(getHALogDirB(), openLog);
 
         // Now Start 3rd service.
         final HAGlue serverC = startC();
@@ -880,44 +876,7 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
         assertHALogNotFound(0L/* firstCommitCounter */, lastCommitCounter3,
                 new HAGlue[] { serverA, serverB, serverC });
 
-        }
-
-    private void removeFiles(final File dir, final String openFile) {
-		final File[] files = dir.listFiles();
-		if (files != null)
-			for (File file: files) {
-				if (!file.getName().equals(openFile)) {
-					log.warn("removing file " + file.getName());
-					
-					file.delete();
-				}
-			}
-	}
-
-    private void copyFiles(File src, File dst) throws IOException {
-		final File[] files = src.listFiles();
-		log.warn("Copying " + src.getAbsolutePath() + " to " + dst.getAbsolutePath() + ", files: " + files.length);
-		if (files != null) {
-			for (File srcFile: files) {
-				final File dstFile = new File(dst, srcFile.getName());
-				log.info("Copying " + srcFile.getAbsolutePath() + " to " + dstFile.getAbsolutePath());
-				final FileInputStream instr = new FileInputStream(srcFile);
-				final FileOutputStream outstr = new FileOutputStream(dstFile);
-				
-				final byte[] buf = new byte[8192];
-				while (true) {
-					final int len = instr.read(buf);
-					if (len == -1)
-						break;
-					
-					outstr.write(buf, 0, len);
-				}
-				
-				outstr.close();
-				instr.close();
-			}
-		}
-	}
+    }
 
     /**
      * Test Rebuild of early starting C service where quorum was previously

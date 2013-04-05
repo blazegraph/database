@@ -709,15 +709,11 @@ public class SnapshotManager {
      * @return The {@link Future} if a snapshot is already being made -or- if a
      *         snapshot was started by the request and <code>null</code> if no
      *         snapshot will be taken in response to this request.
-     * 
-     * @throws Exception
-     * @throws ExecutionException
-     * @throws InterruptedException
      */
     public Future<IHASnapshotResponse> takeSnapshot(final IHASnapshotRequest req) {
 
-        if (req == null)
-            throw new IllegalArgumentException();
+//        if (req == null)
+//            throw new IllegalArgumentException();
         
         lock.lock();
         
@@ -736,6 +732,13 @@ public class SnapshotManager {
 
             }
 
+            if (req == null) {
+
+                /* Not running. No snapshot was scheduled (null request). */
+                return null;
+                
+            }
+            
             if (!isReadyToSnapshot(req)) {
 
                 // Pre-conditions are not met.

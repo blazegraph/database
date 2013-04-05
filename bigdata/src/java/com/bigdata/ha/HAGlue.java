@@ -230,7 +230,10 @@ public interface HAGlue extends HAGlueBase, HAPipelineGlue, HAReadGlue,
      * in progress, then the {@link Future} for that request will be returned.
      * 
      * @param req
-     *            The request.
+     *            The request (optional). When <code>null</code>, the
+     *            {@link Future} for any existing snapshot operation will be
+     *            returned but the request WILL NOT schedule a snapshot if none
+     *            is running.
      * 
      * @return A {@link Future} for the snapshot -or- <code>null</code> if no
      *         snapshot is running and none will be taken for that request.

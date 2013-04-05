@@ -159,7 +159,7 @@ public class TestHA3RestorePolicy extends AbstractHA3BackupTestCase {
 
         final long commitCounterN = N + 1;
 
-        assertCommitCounter(commitCounterN, serverA, serverB, serverC);
+        awaitCommitCounter(commitCounterN, serverA, serverB, serverC);
 
         // Only the live log is retained on the services.
         assertEquals(1, getHALogDirA().list().length);
@@ -241,7 +241,7 @@ public class TestHA3RestorePolicy extends AbstractHA3BackupTestCase {
 
                 final long commitCounterM = nnewtx + N + 1;
 
-                assertCommitCounter(commitCounterM, serverA, serverB, serverC);
+                awaitCommitCounter(commitCounterM, serverA, serverB, serverC);
 
                 /*
                  * Verify that the snapshot directory contains just the expected
@@ -377,7 +377,7 @@ public class TestHA3RestorePolicy extends AbstractHA3BackupTestCase {
         final long lastCommitCounter2 = lastCommitCounter + 1;
 
         // Verify the current commit counter on A, B.
-        assertCommitCounter(lastCommitCounter2, new HAGlue[] { serverA,
+        awaitCommitCounter(lastCommitCounter2, new HAGlue[] { serverA,
                 serverB, serverC });
 
         /*

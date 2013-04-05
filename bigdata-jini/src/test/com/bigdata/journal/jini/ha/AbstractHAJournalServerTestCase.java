@@ -762,6 +762,9 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
 
     /**
      * Assert that the remote server is at the specified commit point.
+     * <p>
+     * This method DOES NOT WAIT. It will fail unless the service is already at
+     * the specified commit point.
      * 
      * @param expected
      *            The expected commit point.
@@ -769,7 +772,10 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
      *            The remote server interface(s).
      * 
      * @throws IOException
+     * 
+     * @deprecated by {@link #awaitCommitCounter(long, HAGlue...)}.
      */
+    @Deprecated
     protected void assertCommitCounter(final long expected, final HAGlue... haGlue)
             throws IOException {
 

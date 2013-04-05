@@ -68,6 +68,8 @@ import org.apache.zookeeper.data.ACL;
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.RunState;
 import com.bigdata.ha.msg.HARootBlockRequest;
+import com.bigdata.ha.msg.HASnapshotDigestRequest;
+import com.bigdata.ha.msg.IHASnapshotResponse;
 import com.bigdata.jini.start.IServiceListener;
 import com.bigdata.jini.start.config.JavaServiceConfiguration;
 import com.bigdata.jini.start.config.ServiceConfiguration;
@@ -76,6 +78,7 @@ import com.bigdata.jini.start.config.ZookeeperClientConfig;
 import com.bigdata.jini.start.process.ProcessHelper;
 import com.bigdata.jini.util.ConfigMath;
 import com.bigdata.jini.util.JiniUtil;
+import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.jini.ha.HAJournalServer.ConfigurationOptions;
 import com.bigdata.quorum.AbstractQuorumClient;
 import com.bigdata.quorum.AsynchronousQuorumCloseException;
@@ -2198,4 +2201,154 @@ public class AbstractHA3JournalServerTestCase extends
 
     }
     
+    /**
+     * Remove files in the directory, except the "open" log file.
+     * 
+     * @param dir
+     *            The HALog directory.
+     * @param openFile
+     *            The name of the open log file.
+     */
+    protected void removeFiles(final File dir, final String openFile) {
+        final File[] files = dir.listFiles();
+        if (files != null)
+            for (File file: files) {
+                if (!file.getName().equals(openFile)) {
+                    log.warn("removing file " + file.getName());
+                    
+                    file.delete();
+                }
+            }
+    }
+
+    protected void copyFiles(File src, File dst) throws IOException {
+        final File[] files = src.listFiles();
+        log.warn("Copying " + src.getAbsolutePath() + " to " + dst.getAbsolutePath() + ", files: " + files.length);
+        if (files != null) {
+            for (File srcFile: files) {
+                final File dstFile = new File(dst, srcFile.getName());
+                log.info("Copying " + srcFile.getAbsolutePath() + " to " + dstFile.getAbsolutePath());
+                final FileInputStream instr = new FileInputStream(srcFile);
+                final FileOutputStream outstr = new FileOutputStream(dstFile);
+                
+                final byte[] buf = new byte[8192];
+                while (true) {
+                    final int len = instr.read(buf);
+                    if (len == -1)
+                        break;
+                    
+                    outstr.write(buf, 0, len);
+                }
+                
+                outstr.close();
+                instr.close();
+            }
+        }
+    }
+
+
+    /**
+     * Wait the service self-reports "RunMet".
+     */
+    protected void awaitRunMet(final HAGlue haGlue) throws Exception {
+        // Wait until HA and NSS are ready.
+        awaitNSSAndHAReady(haGlue);
+        // Wait until self-reports RunMet.
+        assertCondition(new Runnable() {
+            public void run() {
+                try {
+                    final String extendedRunState = haGlue.getExtendedRunState();
+                    if (!extendedRunState.contains("RunMet")) {
+                        fail("Expecting RunMet, not " + extendedRunState);
+                    }
+                } catch (Exception e) {
+                    fail();
+                }
+            }
+
+        }, 5, TimeUnit.SECONDS);
+    }
+
+    /**
+     * Await the specified snapshot.
+     * 
+     * @param server
+     *            The service.
+     * @param commitCounter
+     *            The commitCounter for the snapshot.
+     */
+    protected void awaitSnapshotExists(final HAGlue server,
+            final long commitCounter) throws Exception {
+
+        awaitRunMet(server);
+
+        // Wait until self-reports RunMet.
+        assertCondition(new Runnable() {
+            public void run() {
+                try {
+
+                    /*
+                     * Check the server for an active Future for a snapshot. If
+                     * we find one, then just wait for that Future.
+                     * 
+                     * Note: This WILL NOT schedule a snapshot. It just gets the
+                     * current Future (if any).
+                     * 
+                     * Note: If the snapshot is already done, then this will
+                     * return [null]. So we can not tell the difference using
+                     * this method between a snapshot that has not been
+                     * requested yet and a snapshot that is already done. If the
+                     * Future is null we will request the snapshot digest
+                     * (below) to figure out if the snapshot already exists.
+                     */
+                    {
+                        final Future<IHASnapshotResponse> ftA = server.takeSnapshot(null/* GET */);
+
+                        if (ftA != null) {
+
+                            final IRootBlockView snapshotRB = ftA.get()
+                                    .getRootBlock();
+
+                            if (snapshotRB.getCommitCounter() == commitCounter) {
+
+                                // This is the snapshot that we were waiting
+                                // for.
+                                return;
+
+                            }
+
+                        }
+
+                    }
+
+                    try {
+
+                        // If we can get the digest then the snapshot exists.
+                        server.computeHASnapshotDigest(new HASnapshotDigestRequest(
+                                commitCounter));
+                        
+                        // Found it.
+                        return;
+                        
+                    } catch (Exception ex) {
+                        
+                        if (!InnerCause.isInnerCause(ex,
+                                FileNotFoundException.class)) {
+
+                            log.error("Not expecting: " + ex, ex);
+                            
+                            fail("Not expecting: " + ex.getMessage(), ex);
+                            
+                        }
+                    }
+
+                } catch (Exception e) {
+                    fail();
+                }
+            }
+
+        }, 10, TimeUnit.SECONDS);
+
+    }
+
 }

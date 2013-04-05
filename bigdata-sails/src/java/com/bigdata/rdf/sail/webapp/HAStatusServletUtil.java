@@ -111,6 +111,10 @@ public class HAStatusServletUtil {
         // The last valid token.
         final long lastValidToken = quorum.lastValidToken();
 
+        // This token is a bit different. It is senstive to the journal role in
+        // the quorum (joined or not).
+        final long haReadyToken = journal.getHAReady();
+        
         final int njoined = quorum.getJoined().length;
 
         final QuorumService<HAGlue> quorumService = quorum.getClient();
@@ -136,9 +140,12 @@ public class HAStatusServletUtil {
             p.text("logicalServiceId=" + quorumService.getLogicalServiceId())
                     .node("br").close();
 
-            // Note: This is the *local* value of getHAStatus(). 
-            p.text("HAStatus: " + getHAStatus(journal)).node("br").close();
-            
+            // Note: This is the *local* value of getHAStatus().
+            // Note: The HAReady token reflects whether or not the service is
+            // joined.
+            p.text("HAStatus: " + getHAStatus(journal) + ", HAReadyToken="
+                    + haReadyToken).node("br").close();
+
             /*
              * Report on the Service.
              */

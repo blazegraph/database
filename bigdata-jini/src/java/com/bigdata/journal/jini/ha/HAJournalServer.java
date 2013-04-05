@@ -1488,7 +1488,7 @@ public class HAJournalServer extends AbstractServer {
                          */
                         throw new InterruptedException();
                     }
-
+                    
                 } // validation of pre-conditions.
 
                 /*
@@ -1499,6 +1499,13 @@ public class HAJournalServer extends AbstractServer {
                  * a met quorum in order to take a snapshot.
                  */
                 {
+                
+                    // Await the initial KB create commit point.
+                    while (journal.getRootBlockView().getCommitCounter() < 1) {
+
+                        Thread.sleep(100/* ms */);
+                        
+                    }
 
                     // Conditionally request initial snapshot.
                     final Future<IHASnapshotResponse> ft = journal
@@ -2388,6 +2395,9 @@ public class HAJournalServer extends AbstractServer {
                 // Verify that the quorum is valid.
                 getQuorum().assertQuorum(token);
 
+                // Set the token on the journal.
+                journal.setQuorumToken(token);
+                
                 haLog.warn("Joined met quorum: runState=" + runStateRef
                         + ", commitCounter=" + openingCommitCounter
                         + ", lastCommitTimeOfLeader="
@@ -2817,6 +2827,9 @@ public class HAJournalServer extends AbstractServer {
              * TODO What happens if we are blocked here?
              */
             getActor().serviceJoin();
+
+            // Set the token on the journal.
+            journal.setQuorumToken(token);
 
             // Transition to RunMet.
             enterRunState(new RunMetTask(token, leaderId));

@@ -94,8 +94,8 @@ public class DefaultSnapshotPolicy implements ISnapshotPolicy {
         if (timeOfDay < 0)
             throw new IllegalArgumentException();
 
-        if (percentLogSize < 10 || percentLogSize > 400)
-            throw new IllegalArgumentException("percentage must be in [10:400]");
+        if (percentLogSize < 0 || percentLogSize > 400)
+            throw new IllegalArgumentException("percentage must be in [0:400]");
 
         this.timeOfDay = timeOfDay;
 

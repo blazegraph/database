@@ -4858,15 +4858,19 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
         if (haLog.isInfoEnabled())
             haLog.info("oldValue=" + oldValue + ", newToken=" + newValue);
 
-        if (oldValue == newValue) {
+        if (oldValue == newValue && oldValue == haReadyToken) {
          
             // No change.
             return;
             
         }
-        
+
+        // This quorum member.
+        final QuorumService<HAGlue> localService = quorum.getClient();
+
         final boolean didBreak;
         final boolean didMeet;
+        final boolean didJoinMetQuorum;
 
         if (newValue == Quorum.NO_QUORUM && oldValue != Quorum.NO_QUORUM) {
 
@@ -4880,6 +4884,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
             didBreak = true;
             didMeet = false;
+            didJoinMetQuorum = false;
 
         } else if (newValue != Quorum.NO_QUORUM && oldValue == Quorum.NO_QUORUM) {
 
@@ -4891,22 +4896,27 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
             
             didBreak = false;
             didMeet = true;
+            didJoinMetQuorum = false;
 
-        } else {
+        } else if (newValue != Quorum.NO_QUORUM
+                && haReadyToken == Quorum.NO_QUORUM && localService != null
+                && localService.isJoinedMember(newValue)) {
 
             /*
-             * Excluded middle. If there was no change, then we returned
-             * immediately up above. If there is a change, then it must be
-             * either a quorum break or a quorum meet, which were identified in
-             * the if-then-else above.
+             * This service is joining a quorum that is already met.
              */
+            
+            didBreak = false;
+            didMeet = false;
+            didJoinMetQuorum = true;
+            
+        } else {
 
-            throw new AssertionError();
+            didBreak = false;
+            didMeet = false;
+            didJoinMetQuorum = false;
             
         }
-
-        // This quorum member.
-        final QuorumService<HAGlue> localService = quorum.getClient();
 
         /*
          * Both a meet and a break require an exclusive write lock.
@@ -4951,7 +4961,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
                 haReadyCondition.signalAll(); // signal ALL.
                 
-            } else if (didMeet) {
+            } else if (didMeet || didJoinMetQuorum) {
 
                 final long tmp;
                 
