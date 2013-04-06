@@ -1,3 +1,26 @@
+/**
+
+Copyright (C) SYSTAP, LLC 2006-2010.  All rights reserved.
+
+Contact:
+     SYSTAP, LLC
+     4501 Tower Road
+     Greensboro, NC 27410
+     licenses@bigdata.com
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; version 2 of the License.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+*/
 package com.bigdata.rdf.sail;
 
 import info.aduna.iteration.CloseableIteration;
@@ -47,8 +70,11 @@ public class Bigdata2Sesame2BindingSetIterator implements
     
     private final BindingSet constants;
     
-    private boolean open = true;
+    private volatile boolean open = true;
 
+    /** Pre-fetched result for {@link #next()}. */
+    private BindingSet next = null;
+    
     /**
      * 
      * @param src
@@ -96,16 +122,58 @@ public class Bigdata2Sesame2BindingSetIterator implements
     public boolean hasNext() throws QueryEvaluationException {
 
         try {
-        
-            if (open && src.hasNext())
+
+            if (!open) {
+                return false;
+            }
+            if (next != null) {
+                // already fetched.
                 return true;
-
-            close();
-
-            return false;
+            }
+            if (!src.hasNext()) {
+                // Exhausted.
+                close();
+                return false;
+            }
+            final IBindingSet bset = src.next(); // fetch
+            next = getBindingSet(bset); // resolve.
+            return true;
 
         } catch (Throwable t) {
 
+            if (!open) {
+                /**
+                 * The iterator was concurrently closed. This often means that
+                 * the connection guarding the query was concurrently closed, in
+                 * which case it is possible for a concurrent writer to have
+                 * triggered recycling (on the RWStore). Therefore, we want to
+                 * ignore any thrown exception after the iterator was closed
+                 * since a wide variety of problems could be triggered by
+                 * reading against a commit point that had since been recycled.
+                 * <p>
+                 * Note: The logic to fetch the next result was moved into
+                 * hasNext() in order to avoid doing any work in next(). Thus,
+                 * if there is any problem resolving the next chunk of
+                 * solutions, hasNext() will report [false] if the iterator was
+                 * concurrently closed and otherwise will throw out the
+                 * exception.
+                 * 
+                 * @see <a
+                 *      href="https://sourceforge.net/apps/trac/bigdata/ticket/644"
+                 *      > Bigdata2Sesame2BindingSetIterator can fail to notice
+                 *      asynchronous close() </a>
+                 */
+                return false;
+            }
+            
+            // Ensure closed.
+            try {
+                close();
+            } catch (Throwable t2) {
+                // Ignore.
+            }
+            
+            // Wrap and rethrow.
             if (InnerCause.isInnerCause(t, QueryTimeoutException.class)) {
             
                 /*
@@ -131,7 +199,11 @@ public class Bigdata2Sesame2BindingSetIterator implements
             if (!hasNext())
                 throw new NoSuchElementException();
 
-            return getBindingSet(src.next());
+            final BindingSet tmp = next;
+            
+            next = null;
+            
+            return tmp;
             
         } catch (NoSuchElementException t) {
 
@@ -141,23 +213,42 @@ public class Bigdata2Sesame2BindingSetIterator implements
 
             throw t;
             
-        } catch (Throwable t) {
-
-            if (InnerCause.isInnerCause(t, QueryTimeoutException.class)) {
-
-                /*
-                 * Align with the openrdf API.
-                 */
-
-                throw new QueryInterruptedException(t);
-
-            } else {
-
-                throw new QueryEvaluationException(t);
-
-            }
-
         }
+//        } catch (Throwable t) {
+//
+//            if (!open) {
+//                /**
+//                 * The iterator was concurrently closed. This often means that
+//                 * the connection guarding the query was concurrently closed, in
+//                 * which case it is possible for a concurrent writer to have
+//                 * triggered recycling (on the RWStore). Therefore, we want to
+//                 * ignore any thrown exception after the iterator was closed
+//                 * since a wide variety of problems could be triggered by
+//                 * reading against a commit point that had since been recycled.
+//                 * 
+//                 * @see <a
+//                 *      href="https://sourceforge.net/apps/trac/bigdata/ticket/644"
+//                 *      > Bigdata2Sesame2BindingSetIterator can fail to notice
+//                 *      asynchronous close() </a>
+//                 */
+//                throw new NoSuchElementException();
+//            }
+//
+//            if (InnerCause.isInnerCause(t, QueryTimeoutException.class)) {
+//
+//                /*
+//                 * Align with the openrdf API.
+//                 */
+//
+//                throw new QueryInterruptedException(t);
+//
+//            } else {
+//
+//                throw new QueryEvaluationException(t);
+//
+//            }
+//
+//        }
 
     }
 
@@ -176,7 +267,7 @@ public class Bigdata2Sesame2BindingSetIterator implements
      *             if a bound value is not a {@link BigdataValue}.
      */
     @SuppressWarnings("rawtypes")
-    protected BindingSet getBindingSet(final IBindingSet src) {
+    private BindingSet getBindingSet(final IBindingSet src) {
 
         if (src == null)
             throw new IllegalArgumentException();
@@ -187,7 +278,7 @@ public class Bigdata2Sesame2BindingSetIterator implements
 
         final Iterator<Map.Entry<IVariable,IConstant>> itr = src.iterator();
 
-        while(itr.hasNext()) {
+        while (itr.hasNext()) {
 
             final Map.Entry<IVariable, IConstant> entry = itr.next();
 
@@ -242,14 +333,14 @@ public class Bigdata2Sesame2BindingSetIterator implements
 
     public void close() throws QueryEvaluationException {
 
-        if(open) {
+        if (open) {
 
             open = false;
-            
+
             src.close();
-            
+
         }
-        
+
     }
 
 }

@@ -202,7 +202,7 @@ public class SPORelation extends AbstractRelation<ISPO> {
      * The purpose of statement identifiers is to allow statements about
      * statements without recourse to RDF style reification.
      */
-    final public boolean statementIdentifiers;
+    final private boolean statementIdentifiers;
 
     /**
      * When <code>true</code> the database will support statement identifiers.

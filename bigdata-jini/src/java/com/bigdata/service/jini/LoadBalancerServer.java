@@ -288,6 +288,8 @@ public class LoadBalancerServer extends AbstractServer {
 
                                 }
 
+                                formatter.flush();
+                                
                             } finally {
 
                                 // discard read-only transaction.

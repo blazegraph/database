@@ -47,7 +47,7 @@ public class TestBigdataSailRemoteRepository<S extends IIndexManager> extends
 
 	}
 
-	RepositoryConnection m_cxn = null;
+	private RepositoryConnection m_cxn = null;
 	
 	@Override
 	public void setUp() throws Exception {
@@ -61,12 +61,27 @@ public class TestBigdataSailRemoteRepository<S extends IIndexManager> extends
 	}
 	
 	@Override
+	public void tearDown() throws Exception {
+	    
+        if (m_cxn != null) {
+
+            m_cxn.close();
+
+            m_cxn = null;
+
+        }
+
+	    super.tearDown();
+	    
+	}
+	
+	@Override
     protected void doInsertWithBodyTest(final String method, final int ntriples,
             /*final String servlet,*/ final RDFFormat format) throws Exception {
 
         final Graph g = genNTRIPLES2(ntriples);
         m_cxn.add(g);
-        assertEquals(ntriples, m_cxn.size());
+        assertEquals(ntriples, getExactSize());
         
 		// Verify the expected #of statements in the store.
 		{
@@ -82,11 +97,11 @@ public class TestBigdataSailRemoteRepository<S extends IIndexManager> extends
             /*final String servlet,*/ final RDFFormat rdfFormat, final Graph g,
             final URI defaultContext) throws Exception {
 		
-		final long start = m_cxn.size();
+		final long start = getExactSize();
 		
 		m_cxn.add(g, defaultContext != null ? new Resource[] { defaultContext } : new Resource[0]);
 		
-		return m_cxn.size() - start;
+		return getExactSize() - start;
 		
 	}
 
@@ -99,11 +114,11 @@ public class TestBigdataSailRemoteRepository<S extends IIndexManager> extends
           final URI... c//
           ) throws Exception {
 
-		final long start = m_cxn.size();
+		final long start = getExactSize();
 		
 		m_cxn.remove(s, p, o, c);
 		
-		return start - m_cxn.size();
+		return start - getExactSize();
 		
 	}
 	
@@ -118,16 +133,6 @@ public class TestBigdataSailRemoteRepository<S extends IIndexManager> extends
 		
 	}
 
-    protected long countResults(final RepositoryResult<Statement> result) throws Exception {
-    	
-    	int i;
-    	for (i = 0; result.hasNext(); i++) {
-    		result.next();
-    	}
-    	return i;
-    	
-    }
-    
     /**
      * "ASK" query with an empty KB.
      */
@@ -260,7 +265,7 @@ public class TestBigdataSailRemoteRepository<S extends IIndexManager> extends
         	final File file = new File(packagePath
                     + "insert_triples_with_defaultContext.ttl");
         	m_cxn.add(file, "", RDFFormat.TURTLE, new URIImpl("http://example.org"));
-            assertEquals(7, m_cxn.size());
+            assertEquals(7, getExactSize());
         }
 
         // Verify that the data were inserted into the appropriate context.
@@ -295,7 +300,7 @@ public class TestBigdataSailRemoteRepository<S extends IIndexManager> extends
         {
         	final URL url = new URL("file:bigdata-sails/src/test/com/bigdata/rdf/sail/webapp/quads.nq");
         	m_cxn.add(url, "", RDFFormat.NQUADS);
-            assertEquals(7, m_cxn.size());
+            assertEquals(7, getExactSize());
         }
 
         /*
@@ -362,7 +367,7 @@ public class TestBigdataSailRemoteRepository<S extends IIndexManager> extends
         // Load the resource into the KB.
         {
             m_cxn.add(new URL("file:bigdata-rdf/src/test/com/bigdata/rdf/rio/small.rdf"), "", RDFFormat.RDFXML);
-            assertEquals(expectedStatementCount, m_repo.size());
+            assertEquals(expectedStatementCount, getExactSize());
         }
 
         /*

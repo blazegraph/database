@@ -41,6 +41,7 @@ import org.openrdf.model.vocabulary.RDFS;
 import org.openrdf.model.vocabulary.XMLSchema;
 
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.lexicon.ITextIndexer.FullTextQuery;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
@@ -133,15 +134,16 @@ public class TestSubjectCentricFullTextIndex extends AbstractTripleStoreTestCase
             final float minCosine, final BigdataValue[] expected) {
 
         final Hiterator hitr = store.getLexiconRelation().getSubjectCentricSearchEngine()
-                .search(query, languageCode, false/* prefixMatch */, 
-                		minCosine, 1.0d/* maxCosine */,
-                        1/* minRank */, Integer.MAX_VALUE/* maxRank */,
+                .search(new FullTextQuery(
+                		query, languageCode, false/* prefixMatch */, 
+                        null,//regex
                         false/* matchAllTerms */,
                         false, // matchExact
+                		minCosine, 1.0d/* maxCosine */,
+                        1/* minRank */, Integer.MAX_VALUE/* maxRank */,
                         Long.MAX_VALUE,//2L/* timeout */,
-                        TimeUnit.MILLISECONDS,// TimeUnit.SECONDS
-                        null//regex
-                        );
+                        TimeUnit.MILLISECONDS// TimeUnit.SECONDS
+                        ));
 
         // assertEquals("#hits", (long) expected.length, itr.size());
 

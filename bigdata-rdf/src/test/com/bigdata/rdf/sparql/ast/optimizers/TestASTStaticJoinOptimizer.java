@@ -48,10 +48,10 @@ import com.bigdata.rdf.sparql.ast.QueryType;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.TermNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
-import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpBase.Annotations;
+import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.service.ServiceNode;
-import com.bigdata.rdf.store.BD;
+import com.bigdata.rdf.store.BDS;
 
 /**
  * Test suite for {@link ASTStaticJoinOptimizer}.
@@ -592,19 +592,19 @@ public class TestASTStaticJoinOptimizer extends AbstractASTEvaluationTestCase {
                     new ConstantNode(b), new ConstantNode(b), 2l));
 
             whereClause.addChild(newStatementPatternNode(new VarNode("x"),
-                    new ConstantNode(f), new ConstantNode(f), 1l, true));
-
-            whereClause.addChild(newStatementPatternNode(new VarNode("x"),
                     new ConstantNode(d), new ConstantNode(d), 4l));
-
-            whereClause.addChild(newStatementPatternNode(new VarNode("x"),
-                    new ConstantNode(g), new ConstantNode(g), 1l, true));
 
             whereClause.addChild(newStatementPatternNode(new VarNode("x"),
                     new ConstantNode(a), new ConstantNode(a), 1l));
 
             whereClause.addChild(newStatementPatternNode(new VarNode("x"),
                     new ConstantNode(c), new ConstantNode(c), 3l));
+
+            whereClause.addChild(newStatementPatternNode(new VarNode("x"),
+                    new ConstantNode(f), new ConstantNode(f), 1l, true));
+
+            whereClause.addChild(newStatementPatternNode(new VarNode("x"),
+                    new ConstantNode(g), new ConstantNode(g), 1l, true));
 
             given.setProjection(projection);
             given.setWhereClause(whereClause);
@@ -693,7 +693,7 @@ public class TestASTStaticJoinOptimizer extends AbstractASTEvaluationTestCase {
          */
         final IBindingSet[] bsets = new IBindingSet[]{};
 
-        final IV search = makeIV(BD.SEARCH);
+        final IV search = makeIV(BDS.SEARCH);
 
         final IV foo = makeIV(new LiteralImpl("foo"));
 
@@ -701,7 +701,7 @@ public class TestASTStaticJoinOptimizer extends AbstractASTEvaluationTestCase {
 
         final IV b = makeIV(new URIImpl("http://example/b"));
         
-        final IV serviceRef = makeIV(BD.SEARCH);
+        final IV serviceRef = makeIV(BDS.SEARCH);
         
 //        @SuppressWarnings("rawtypes")
 //        final IV c = makeIV(new URIImpl("http://example/c"));
@@ -821,7 +821,7 @@ public class TestASTStaticJoinOptimizer extends AbstractASTEvaluationTestCase {
          */
         final IBindingSet[] bsets = new IBindingSet[]{};
 
-        final IV search = makeIV(BD.SEARCH);
+        final IV search = makeIV(BDS.SEARCH);
 
         final IV foo = makeIV(new LiteralImpl("foo"));
 
@@ -839,7 +839,7 @@ public class TestASTStaticJoinOptimizer extends AbstractASTEvaluationTestCase {
         
         final IV g = makeIV(new URIImpl("http://example/g"));
 
-        final IV serviceRef = makeIV(BD.SEARCH);
+        final IV serviceRef = makeIV(BDS.SEARCH);
 
         // The source AST.
         final QueryRoot given = new QueryRoot(QueryType.SELECT);
@@ -856,14 +856,8 @@ public class TestASTStaticJoinOptimizer extends AbstractASTEvaluationTestCase {
             
             whereClause.addChild(serviceNode);
 
-            whereClause.addChild(newStatementPatternNode(new VarNode("x"),
-                    new ConstantNode(f), new ConstantNode(f), 1l, true));
-
             whereClause.addChild(newStatementPatternNode(new VarNode("y"),
                     new ConstantNode(d), new ConstantNode(d), 3l));
-
-            whereClause.addChild(newStatementPatternNode(new VarNode("y"),
-                    new ConstantNode(g), new ConstantNode(g), 1l, true));
 
             whereClause.addChild(newStatementPatternNode(new VarNode("y"),
                     new ConstantNode(c), new ConstantNode(c), 2l));
@@ -876,6 +870,12 @@ public class TestASTStaticJoinOptimizer extends AbstractASTEvaluationTestCase {
 
             whereClause.addChild(newStatementPatternNode(new VarNode("y"),
                     new ConstantNode(b), new ConstantNode(b), 1l));
+
+            whereClause.addChild(newStatementPatternNode(new VarNode("x"),
+                    new ConstantNode(f), new ConstantNode(f), 1l, true));
+
+            whereClause.addChild(newStatementPatternNode(new VarNode("y"),
+                    new ConstantNode(g), new ConstantNode(g), 1l, true));
 
             given.setProjection(projection);
             given.setWhereClause(whereClause);
@@ -1329,7 +1329,7 @@ public class TestASTStaticJoinOptimizer extends AbstractASTEvaluationTestCase {
          */
         final IBindingSet[] bsets = new IBindingSet[]{};
 
-//        final IV search = makeIV(BD.SEARCH);
+//        final IV search = makeIV(BDS.SEARCH);
 //
 //        final IV foo = makeIV(new LiteralImpl("foo"));
 
@@ -1624,9 +1624,6 @@ public class TestASTStaticJoinOptimizer extends AbstractASTEvaluationTestCase {
             whereClause.addChild(newStatementPatternNode(new VarNode("x"),
                     new ConstantNode(b), new ConstantNode(b), 2l));
 
-            whereClause.addChild(newStatementPatternNode(new VarNode("x"),
-                    new ConstantNode(f), new ConstantNode(f), 1l, true));
-
             whereClause.addChild(runFirst(newStatementPatternNode(new VarNode("x"),
                     new ConstantNode(a), new ConstantNode(a), 100l)));
 
@@ -1638,6 +1635,9 @@ public class TestASTStaticJoinOptimizer extends AbstractASTEvaluationTestCase {
 
             whereClause.addChild(newStatementPatternNode(new VarNode("x"),
                     new ConstantNode(c), new ConstantNode(c), 3l));
+
+            whereClause.addChild(newStatementPatternNode(new VarNode("x"),
+                    new ConstantNode(f), new ConstantNode(f), 1l, true));
 
             given.setProjection(projection);
             given.setWhereClause(whereClause);
@@ -1728,20 +1728,20 @@ public class TestASTStaticJoinOptimizer extends AbstractASTEvaluationTestCase {
             whereClause.addChild(newStatementPatternNode(new VarNode("x"),
                     new ConstantNode(b), new ConstantNode(b), 2l));
 
-            whereClause.addChild(runLast(newStatementPatternNode(new VarNode("x"),
-                    new ConstantNode(f), new ConstantNode(f), 1l, true)));
-
             whereClause.addChild(runFirst(newStatementPatternNode(new VarNode("x"),
                     new ConstantNode(a), new ConstantNode(a), 100l)));
-
-            whereClause.addChild(newStatementPatternNode(new VarNode("x"),
-                    new ConstantNode(e), new ConstantNode(e), 1l, true));
 
             whereClause.addChild(newStatementPatternNode(new VarNode("x"),
                     new ConstantNode(d), new ConstantNode(d), 4l));
 
             whereClause.addChild(newStatementPatternNode(new VarNode("x"),
                     new ConstantNode(c), new ConstantNode(c), 3l));
+
+            whereClause.addChild(newStatementPatternNode(new VarNode("x"),
+                    new ConstantNode(e), new ConstantNode(e), 1l, true));
+
+            whereClause.addChild(runLast(newStatementPatternNode(new VarNode("x"),
+                    new ConstantNode(f), new ConstantNode(f), 1l, true)));
 
             given.setProjection(projection);
             given.setWhereClause(whereClause);

@@ -40,6 +40,9 @@ import com.bigdata.bop.NV;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
 
+/**
+ * SPARQL REGEX operator.
+ */
 public class RegexBOp extends XSDBooleanIVValueExpression 
 		implements INeedsMaterialization {
 
@@ -242,17 +245,30 @@ public class RegexBOp extends XSDBooleanIVValueExpression
 					case 'm':
 						f |= Pattern.MULTILINE;
 						break;
-					case 'i':
-						f |= Pattern.CASE_INSENSITIVE;
+					case 'i': {
+                    /*
+                     * The SPARQL REGEX operator is based on the XQuery REGEX
+                     * operator. That operator should be Unicode clean by
+                     * default. Therefore, when case-folding is specified, we
+                     * also need to include the UNICODE_CASE option.
+                     * 
+                     * @see <a
+                     * href="https://sourceforge.net/apps/trac/bigdata/ticket/655"
+                     * > SPARQL REGEX operator does not perform case-folding
+                     * correctly for Unicode data </a>
+                     */
+					    f |= Pattern.CASE_INSENSITIVE;
+                        f |= Pattern.UNICODE_CASE;
 						break;
+					}
 					case 'x':
 						f |= Pattern.COMMENTS;
 						break;
 					case 'd':
 						f |= Pattern.UNIX_LINES;
 						break;
-					case 'u':
-						f |= Pattern.UNICODE_CASE;
+					case 'u': // Implicit with 'i' flag.
+//						f |= Pattern.UNICODE_CASE;
 						break;
 					default:
 						throw new IllegalArgumentException();

@@ -56,6 +56,7 @@ import com.bigdata.counters.CounterSet;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.DumpJournal;
 import com.bigdata.journal.IIndexManager;
+import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.rdf.sail.sparql.ast.SimpleNode;
 import com.bigdata.rdf.sail.webapp.BigdataRDFContext.RunningQuery;
@@ -349,14 +350,14 @@ public class StatusServlet extends BigdataRDFServlet {
             XMLBuilder.Node current = doc.root("html");
             {
                 current = current.node("head");
-                current.node("meta").attr("http-equiv", "Content-Type")
-                        .attr("content", "text/html;charset=utf-8").close();
+				current.node("meta").attr("http-equiv", "Content-Type").attr(
+						"content", "text/html;charset=utf-8").close();
                 current.node("title").textNoEncode("bigdata&#174;").close();
                 current = current.close();// close the head.
             }
             
             // open the body
-            current = current.node("body","");
+			current = current.node("body");
 
             // Dump Journal?
             final boolean dumpJournal = req.getParameter(DUMP_JOURNAL) != null;
@@ -447,8 +448,8 @@ public class StatusServlet extends BigdataRDFServlet {
                         .append(SHOW_QUERIES).toString();
                 
                 final String showQueriesDetailsURL = req.getRequestURL()
-                        .append("?").append(SHOW_QUERIES).append("=")
-                        .append(DETAILS).toString();
+						.append("?").append(SHOW_QUERIES).append("=").append(
+								DETAILS).toString();
 
                 current.node("p").text("Show ")
                         //
@@ -457,14 +458,23 @@ public class StatusServlet extends BigdataRDFServlet {
                         .text(", ")//
                         .node("a").attr("href", showQueriesDetailsURL)//
                         .text("query details").close()//
-                        .text(".");
+						.text(".").close();
 
             }
 
             if (showNamespaces) {
 
+				long timestamp = getTimestamp(req);
+
+				if (timestamp == ITx.READ_COMMITTED) {
+
+					// Use the last commit point.
+					timestamp = getIndexManager().getLastCommitTime();
+
+				}
+
                 final List<String> namespaces = getBigdataRDFContext()
-                        .getNamespaces();
+						.getNamespaces(timestamp);
 
                 current.node("h3", "Namespaces: ");
 
@@ -480,8 +490,7 @@ public class StatusServlet extends BigdataRDFServlet {
 
                 // General information on the connected kb.
                 current.node("pre", getBigdataRDFContext().getKBInfo(
-                                getNamespace(req), getTimestamp(req))
-                                .toString());
+						getNamespace(req), getTimestamp(req)).toString());
 
             }
 
@@ -537,6 +546,7 @@ public class StatusServlet extends BigdataRDFServlet {
             
             if (!showQueries) {
                 // Nothing more to do.
+				doc.closeAll(current);
                 return;
             }
 
@@ -725,11 +735,10 @@ public class StatusServlet extends BigdataRDFServlet {
                         current = current.node("FORM").attr("method", "POST")
                                 .attr("action", "");
 
-                        final String detailsURL = req.getRequestURL()
-                                .append("?").append(SHOW_QUERIES).append("=")
-                                .append(DETAILS).append("&").append(QUERY_ID)
-                                .append("=").append(queryId.toString())
-                                .toString();
+						final String detailsURL = req.getRequestURL().append(
+								"?").append(SHOW_QUERIES).append("=").append(
+								DETAILS).append("&").append(QUERY_ID).append(
+								"=").append(queryId.toString()).toString();
 
                         final BOpStats stats = q.getStats().get(
                                 q.getQuery().getId());
@@ -740,11 +749,16 @@ public class StatusServlet extends BigdataRDFServlet {
                         final String chunksOut = stats == null ? NA : Long
                                 .toString(stats.chunksOut.get());
 
-                        current.node("p")//
-                                .text("solutions=" + solutionsOut)//
-                                .text(", chunks=" + chunksOut)//
-                                .text(", children=" + children.length)//
-                                .text(", elapsed=" + elapsedMillis + "ms")//
+						current.node("p")
+								//
+								.text("solutions=" + solutionsOut)
+								//
+								.text(", chunks=" + chunksOut)
+								//
+								.text(", children=" + children.length)
+								//
+								.text(", elapsed=" + elapsedMillis + "ms")
+								//
                                 .text(", ").node("a").attr("href", detailsURL)
                                 .text("details").close()//
                                 .close();
@@ -752,11 +766,11 @@ public class StatusServlet extends BigdataRDFServlet {
                         // open <p>
                         current = current.node("p");
                         // Pass the queryId.
-                        current.node("INPUT").attr("type", "hidden")
-                                .attr("name", "queryId").attr("value", queryId)
+						current.node("INPUT").attr("type", "hidden").attr(
+								"name", "queryId").attr("value", queryId)
                                 .close();
-                        current.node("INPUT").attr("type", "submit")
-                                .attr("name", CANCEL_QUERY).attr("value", "Cancel")
+						current.node("INPUT").attr("type", "submit").attr(
+								"name", CANCEL_QUERY).attr("value", "Cancel")
                                 .close();
                         current = current.close(); // close <p>
 
@@ -826,8 +840,8 @@ public class StatusServlet extends BigdataRDFServlet {
 
                                 current.node("h2", "Query Plan");
 
-                                current.node("pre",
-                                        BOpUtility.toString(queryPlan));
+								current.node("pre", BOpUtility
+										.toString(queryPlan));
 
                             }
 

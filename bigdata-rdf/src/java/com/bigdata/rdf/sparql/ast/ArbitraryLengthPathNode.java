@@ -9,6 +9,7 @@ import com.bigdata.bop.Constant;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.rdf.sparql.ast.PathNode.PathMod;
+import com.bigdata.rdf.sparql.ast.eval.AST2BOpBase;
 
 /**
  * A special kind of AST node that represents the SPARQL 1.1 arbitrary length
@@ -19,7 +20,7 @@ import com.bigdata.rdf.sparql.ast.PathNode.PathMod;
  */
 public class ArbitraryLengthPathNode 
 	extends GroupMemberNodeBase<ArbitraryLengthPathNode> 
-		implements IBindingProducerNode {
+		implements IBindingProducerNode, IReorderableNode {
 
     /**
      * 
@@ -204,6 +205,41 @@ public class ArbitraryLengthPathNode
         
         return sb.toString();
 
+	}
+
+//	@Override
+	public boolean isReorderable() {
+
+		final long estCard = getEstimatedCardinality();
+		
+		return estCard >= 0 && estCard < Long.MAX_VALUE;
+		
+	}
+
+//	@Override
+	public long getEstimatedCardinality() {
+		
+		final JoinGroupNode group = subgroup();
+
+		/*
+		 * Only deal with singleton paths for now.
+		 * 
+		 * TODO finish the ASTCardinalityOptimizer
+		 */
+		if (group.arity() == 1) {
+			
+			final BOp node = group.get(0);
+			
+			final long estCard = node.getProperty(
+					AST2BOpBase.Annotations.ESTIMATED_CARDINALITY, 
+					Long.MAX_VALUE); 
+			
+			return estCard;
+			
+		}
+		
+		return Long.MAX_VALUE;		
+		
 	}
 
     

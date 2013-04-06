@@ -1031,6 +1031,240 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
     }
 
     /**
+     * Variant using an array of objects in the desired order. A single root
+     * leaf is generated from those objects. The root leaf is then fed into the
+     * algorithm to efficient construct the corresponding read-only
+     * {@link IndexSegment}.
+     * 
+     * @param a
+     *            The array of objects to be written onto the index. The index
+     *            must know how to generate tuples from these objects. The
+     *            objects must already be in the natural order of the keys that
+     *            will be generated for those tuples.
+     * @param alen
+     *            The #of elements in that array.
+     * @param indexMetadata
+     *            The {@link IndexMetadata} that will serve as the template for
+     *            the generated {@link IndexSegment}. 
+     * @param outFile
+     *            The file on which the {@link IndexSegment} will be written.
+     *            The file MAY exist, but if it exists then it MUST be empty.
+     * @param tmpDir
+     *            The temporary directory in data are buffered during the build
+     *            (optional - the default temporary directory is used if this is
+     *            <code>null</code>).
+     * @param m
+     *            The branching factor for the generated {@link IndexSegment}.
+     * @param compactingMerge
+     *            When <code>true</code> the caller asserts that <i>src</i> is a
+     *            {@link FusedView} and deleted index entries WILL NOT be
+     *            included in the generated {@link IndexSegment}. Otherwise, it
+     *            is assumed that the only select component(s) of the index
+     *            partition view are being exported onto an {@link IndexSegment}
+     *            and deleted index entries will therefore be propagated to the
+     *            new {@link IndexSegment} (aka an incremental build).
+     * @param createTime
+     *            The commit time associated with the view from which the
+     *            {@link IndexSegment} is being generated. This value is written
+     *            into {@link IndexSegmentCheckpoint#commitTime}.
+     * @param bufferNodes
+     *            When <code>true</code> the generated nodes will be fully
+     *            buffered in RAM (faster, but imposes a memory constraint).
+     *            Otherwise they will be written onto a temporary file and then
+     *            transferred to the output file en mass.
+     * @return
+     * @throws IOException
+     * 
+     *             TODO We could pass a flag indicating whether the leaf needs
+     *             to be sorted after it is generated, but the caller would
+     *             still be responsible for ensuring that there are no
+     *             duplicates in the array.
+     */
+//    * @param fromKey
+//    *            The lowest key that will be included (inclusive). When
+//    *            <code>null</code> there is no lower bound.
+//    * @param toKey
+//    *            The first key that will be included (exclusive). When
+//    *            <code>null</code> there is no upper bound.
+    @SuppressWarnings("unchecked")
+    public static IndexSegmentBuilder newInstance(
+            final Object[] a, final int alen,
+            final IndexMetadata indexMetadata, final File outFile,
+            final File tmpDir, final int m, final boolean compactingMerge,
+            final long createTime,
+            //final byte[] fromKey, final byte[] toKey, 
+            final boolean bufferNodes)
+            throws IOException {
+
+        if (a == null)
+            throw new IllegalArgumentException();
+
+        if (alen < 0)
+            throw new IllegalArgumentException();
+
+        if (alen > a.length)
+            throw new IllegalArgumentException();
+
+        if (indexMetadata == null)
+            throw new IllegalArgumentException();
+
+        if (outFile == null)
+            throw new IllegalArgumentException();
+
+        if (tmpDir == null)
+            throw new IllegalArgumentException();
+
+        if (createTime <= 0L)
+            throw new IllegalArgumentException();
+
+        final boolean hasVersionTimestamps = indexMetadata
+                .getVersionTimestamps();
+
+        if (hasVersionTimestamps)
+            throw new IllegalArgumentException(
+                    "versionTimestamps not available in source [].");
+        
+        final boolean hasDeleteMarkers = indexMetadata.getDeleteMarkers();
+
+        if (hasDeleteMarkers && !compactingMerge)
+            throw new IllegalArgumentException(
+                    "deleteMarkers not available in source [].");
+
+        final boolean hasRawRecords = indexMetadata.getRawRecords();
+
+        // A temporary leaf used to buffer the data in RAM.
+        final MutableLeafData tleaf = new MutableLeafData(alen,
+                hasVersionTimestamps, hasDeleteMarkers, hasRawRecords);
+
+        final int flags;
+        if (compactingMerge) {
+
+            /*
+             * For a compacting merge the delete markers are ignored so they
+             * will NOT be transferred to the new index segment.
+             */
+
+            flags = IRangeQuery.DEFAULT;
+
+        } else {
+
+            /*
+             * For an incremental build the deleted tuples are propagated to the
+             * new index segment. This is required in order for the fact that
+             * those tuples were deleted as of the commitTime to be retained by
+             * the generated index segment.
+             */
+
+            flags = IRangeQuery.DEFAULT | IRangeQuery.DELETED;
+
+        }
+
+        /*
+         * Iterator reading the source tuples to be copied to the index segment.
+         * 
+         * Note: The DELETED flag was set above unless this is a compacting
+         * merge. That is necessary to ensure that deleted tuples are preserved
+         * when the index segment does not reflect the total history of a view.
+         * 
+         * The tuples are materialized and buffered in a single, and potentially
+         * very large, leaf. That is Ok since the MutableLeaf is using very
+         * simple data structures.
+         * 
+         * @todo The fastRangeCount is a hint that we want to eagerly
+         * materialize all of the data. This hint should be turned into
+         * pre-fetch and into a single IO for the index segment leaves if they
+         * are not in memory. [In fact, the hint is completely ignored at this
+         * point. If hints get more weight, then review code for their use.]
+         */
+//        final ITupleIterator<?> titr = src.rangeIterator(fromKey, toKey,
+//                (int) fastRangeCount/* capacity */, flags, null/* filter */);
+
+        // init per API specification.
+        long minimumVersionTimestamp = Long.MAX_VALUE;
+        long maximumVersionTimestamp = Long.MIN_VALUE;
+        @SuppressWarnings("rawtypes")
+        final ITupleSerializer tupSer = indexMetadata.getTupleSerializer();
+        for (int i = 0; i < alen; i++) {
+
+//            final ITuple<?> tuple = titr.next();
+
+            tleaf.keys.keys[i] = tupSer.serializeKey(a[i]);
+
+            // Note: Version timestamps are not available from a[].
+//            if (hasVersionTimestamps) {
+//
+//                final long t = tuple.getVersionTimestamp();
+//
+//                tleaf.versionTimestamps[i] = t;
+//
+//                if (t < minimumVersionTimestamp) {
+//
+//                    minimumVersionTimestamp = t;
+//
+//                }
+//
+//                if (t > maximumVersionTimestamp) {
+//
+//                    maximumVersionTimestamp = t;
+//
+//                }
+//
+//            }
+
+            // Note: delete markers are not available from a[].
+//            if (hasDeleteMarkers && tuple.isDeletedVersion()) {
+//
+//                /*
+//                 * Note: When delete markers are used, the array will be
+//                 * pre-populated with [false] so we only have to set the flag on
+//                 * the tuples that are actually deleted.
+//                 */
+//                tleaf.deleteMarkers[i] = true;
+//
+//            } else {
+
+                /*
+                 * Note: If the source has raw records for some values, then
+                 * this will cause those records to be materialized within the
+                 * single massive root leaf. From there, the data will be
+                 * written onto the index segment file.
+                 */
+                tleaf.vals.values[i] = tupSer.serializeVal(a[i]);
+
+//            }
+
+//            i++;
+
+        }
+
+        tleaf.keys.nkeys = alen; // note final #of tuples.
+        tleaf.vals.nvalues = alen; // note final #of tuples.
+        tleaf.maximumVersionTimestamp = maximumVersionTimestamp;
+        tleaf.minimumVersionTimestamp = minimumVersionTimestamp;
+
+        // The exact range count.
+        final int nentries = alen;
+
+        // The source iterator (reading on the fully buffered tuples).
+        @SuppressWarnings("rawtypes")
+        final ITupleIterator<?> itr = new MyTupleIterator(tleaf, flags);
+
+        // Setup the index segment build operation.
+        return IndexSegmentBuilder.newInstance(//
+                outFile, //
+                tmpDir, //
+                nentries, // exact range count
+                itr,     // source iterator
+                m, // the output branching factor.
+                indexMetadata,//
+                createTime,//
+                compactingMerge,//
+                bufferNodes//
+        );
+
+    }
+
+    /**
      * <p>
      * A more flexible factory for an {@link IndexSegment} build which permits
      * override of the index segment branching factor, replacement of the

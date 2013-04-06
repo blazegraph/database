@@ -36,6 +36,7 @@ import java.util.concurrent.TimeUnit;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.ProxyTestCase;
+import com.bigdata.rdf.lexicon.ITextIndexer.FullTextQuery;
 
 /**
  * Test suite using examples based on <a
@@ -153,9 +154,12 @@ public class TestSearch extends ProxyTestCase<IIndexManager> {
 
                 final String query = "child proofing";
 
-                final Hiterator<Hit<Long>> itr = ndx.search(query,
-                        languageCode, prefixMatch, minCosine, maxCosine,
-                        minRank, maxRank, matchAllTerms, false/* matchExact*/, timeout, unit, regex);
+                final Hiterator<Hit<Long>> itr = ndx.search(new FullTextQuery(
+                		query,
+                        languageCode, prefixMatch, regex, 
+                        matchAllTerms, false/* matchExact*/, 
+                        minCosine, maxCosine,
+                        minRank, maxRank, timeout, unit));
 //                                query, languageCode, 0d/* minCosine */,
 //                                Integer.MAX_VALUE/* maxRank */);
                 

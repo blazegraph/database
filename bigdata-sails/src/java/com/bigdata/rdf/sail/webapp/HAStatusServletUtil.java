@@ -517,11 +517,11 @@ public class HAStatusServletUtil {
 
             }
 
-            // flush PrintWriter before resuming writes on Writer.
-            out.flush();
-
             // close section.
             out.print("\n</pre>");
+
+            // flush PrintWriter before resuming writes on Writer.
+            out.flush();
 
         }
 

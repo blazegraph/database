@@ -35,6 +35,7 @@ import java.util.concurrent.TimeUnit;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.ProxyTestCase;
+import com.bigdata.rdf.lexicon.ITextIndexer.FullTextQuery;
 
 /**
  * Simple test verifies that the {@link FullTextIndex} data are restart safe.
@@ -143,9 +144,11 @@ public class TestSearchRestartSafe extends ProxyTestCase<IIndexManager> {
 //                    ndx.search(
 //                        text, languageCode
 //                        );
-                ndx.search(text,
-                        languageCode, prefixMatch, minCosine, maxCosine,
-                        minRank, maxRank, matchAllTerms, false/* matchExact*/, timeout, unit, regex);
+                ndx.search(new FullTextQuery(text,
+                        languageCode, prefixMatch, 
+                        regex, matchAllTerms, false/* matchExact*/, 
+                        minCosine, maxCosine,
+                        minRank, maxRank, timeout, unit));
                 
                 assertEquals(1, itr.size()); // Note: 2nd result pruned by cosine.
 
@@ -176,9 +179,11 @@ public class TestSearchRestartSafe extends ProxyTestCase<IIndexManager> {
                         indexManager, NAMESPACE, ITx.UNISOLATED, properties);
 
                 final Hiterator<?> itr = // ndx.search(text, languageCode);
-                    ndx.search(text,
-                            languageCode, prefixMatch, minCosine, maxCosine,
-                            minRank, maxRank, matchAllTerms, false/* matchExact*/, timeout, unit, regex);
+                    ndx.search(new FullTextQuery(text,
+                            languageCode, prefixMatch, 
+                            regex, matchAllTerms, false/* matchExact*/, 
+                            minCosine, maxCosine,
+                            minRank, maxRank, timeout, unit));
 
                 assertEquals(1, itr.size()); // Note: 2nd result pruned by cosine.
 

@@ -58,6 +58,7 @@ import org.openrdf.model.vocabulary.RDFS;
 import org.openrdf.query.GraphQueryResult;
 import org.openrdf.query.TupleQueryResult;
 import org.openrdf.repository.RepositoryException;
+import org.openrdf.repository.RepositoryResult;
 import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFHandlerException;
 import org.openrdf.rio.RDFParseException;
@@ -1428,6 +1429,34 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
     	
     	return g;
     	
+    }
+
+    /**
+     * Return the #of solutions in a result set.
+     * 
+     * @param result
+     *            The result set.
+     *            
+     * @return The #of solutions.
+     */
+    protected long countResults(final RepositoryResult<Statement> result)
+            throws Exception {
+
+        long i;
+        for (i = 0; result.hasNext(); i++) {
+            result.next();
+        }
+        return i;
+
+    }
+
+    /**
+     * Return the exact number of statements in the repository.
+     */
+    protected long getExactSize() {
+
+        return getSail().getDatabase().getStatementCount(true/* true */);
+
     }
 
 }

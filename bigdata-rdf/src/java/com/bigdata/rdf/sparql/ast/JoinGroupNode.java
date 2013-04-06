@@ -286,7 +286,8 @@ public class JoinGroupNode extends GraphPatternGroup<IGroupMemberNode> {
 	}
 
 	/**
-	 * Return only the {@link NamedSubqueryInclude} child nodes in this group.
+	 * Return the nodes of the supplied type.  Uses isAssignableFrom to 
+	 * determine whether the node is an instance of the supplied type.
 	 */
 	@SuppressWarnings("unchecked")
 	public <T> List<T> getChildren(final Class<T> type) {
