@@ -36,7 +36,7 @@ import com.bigdata.rdf.sparql.ast.optimizers.ASTSparql11SubqueryOptimizer;
  */
 public class SubqueryRoot extends SubqueryBase implements IJoinNode {
 
-    public interface Annotations extends SubqueryBase.Annotations,
+    public interface Annotations extends //SubqueryBase.Annotations,
             IJoinNode.Annotations {
         
         /**

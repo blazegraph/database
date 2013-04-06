@@ -67,7 +67,21 @@ public class RemoteRepositoryManager extends RemoteRepository {
      * SPARQL end point URL for the default data set is formed by appending
      * <code>/sparql</code>.
      */
-    protected String baseServiceURL;
+    private final String baseServiceURL;
+
+    /**
+     * The path to the root of the web application (without the trailing "/").
+     * <p>
+     * Note: This SHOULD NOT be the SPARQL end point URL. The NanoSparqlServer
+     * has a wider interface. This should be the base URL of that interface. The
+     * SPARQL end point URL for the default data set is formed by appending
+     * <code>/sparql</code>.
+     */
+    public String getBaseServiceURL() {
+        
+        return baseServiceURL;
+        
+    }
     
     /**
      * 
@@ -122,18 +136,20 @@ public class RemoteRepositoryManager extends RemoteRepository {
      * Obtain a <a href="http://vocab.deri.ie/void/"> VoID </a> description of
      * the configured KBs. Each KB has its own namespace and corresponds to a
      * VoID "data set".
+     * <p>
+     * Note: This method uses an HTTP GET and hence can be cached by the server.
      * 
      * @return A <a href="http://vocab.deri.ie/void/"> VoID </a> description of
      *         the configured KBs.
-     *         
-     * @throws Exception 
+     * 
+     * @throws Exception
      */
     public GraphQueryResult getRepositoryDescriptions() throws Exception {
 
         final ConnectOptions opts = newConnectOptions(baseServiceURL + "/namespace");
         
         opts.method = "GET";
-        
+
         HttpResponse response = null;
 
         opts.acceptHeader = ConnectOptions.DEFAULT_GRAPH_ACCEPT_HEADER;

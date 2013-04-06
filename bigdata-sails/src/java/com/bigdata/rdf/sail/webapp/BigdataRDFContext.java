@@ -97,6 +97,7 @@ import com.bigdata.rdf.sail.SPARQLUpdateEvent;
 import com.bigdata.rdf.sail.sparql.Bigdata2ASTSPARQLParser;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.QueryHints;
+import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryType;
 import com.bigdata.rdf.sparql.ast.Update;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -104,6 +105,7 @@ import com.bigdata.relation.AbstractResource;
 import com.bigdata.relation.RelationSchema;
 import com.bigdata.rwstore.RWStore;
 import com.bigdata.sparse.ITPS;
+import com.bigdata.sparse.SparseRowStore;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 import com.bigdata.util.concurrent.ThreadPoolExecutorBaseStatisticsTask;
 
@@ -748,11 +750,11 @@ public class BigdataRDFContext extends BigdataBaseContext {
         final AbstractQuery setupQuery(final BigdataSailRepositoryConnection cxn) {
 
             // Note the begin time for the query.
-            final long begin =  System.nanoTime();
-            
+            final long begin = System.nanoTime();
+
             final AbstractQuery query = newQuery(cxn);
 
-        	// Figure out the UUID under which the query will execute.
+            // Figure out the UUID under which the query will execute.
             final UUID queryId2 = setQueryId(((BigdataSailQuery) query)
                     .getASTContainer());
             
@@ -845,6 +847,16 @@ public class BigdataRDFContext extends BigdataBaseContext {
          */
         private AbstractQuery newQuery(final BigdataSailRepositoryConnection cxn) {
 
+            final long queryTimeout = getConfig().queryTimeout;
+            
+            if (queryTimeout > 0) {
+
+                final QueryRoot originalQuery = astContainer.getOriginalAST();
+
+                originalQuery.setTimeout(queryTimeout);
+                
+            }
+            
 //            final ASTContainer astContainer = ((BigdataParsedQuery) parsedQuery)
 //                    .getASTContainer();
 
@@ -2169,15 +2181,28 @@ public class BigdataRDFContext extends BigdataBaseContext {
      * Return a list of the namespaces for the {@link AbstractTripleStore}s
      * registered against the bigdata instance.
      */
-    /*package*/ List<String> getNamespaces() {
+    /*package*/ List<String> getNamespaces(final long timestamp) {
     
         // the triple store namespaces.
         final List<String> namespaces = new LinkedList<String>();
 
+        final SparseRowStore grs = getIndexManager().getGlobalRowStore(
+                timestamp);
+
+        if (grs == null) {
+
+            log.warn("No GRS @ timestamp="
+                    + TimestampUtility.toString(timestamp));
+
+            // Empty.
+            return namespaces;
+            
+        }
+
         // scan the relation schema in the global row store.
         @SuppressWarnings("unchecked")
-        final Iterator<ITPS> itr = (Iterator<ITPS>) getIndexManager()
-                .getGlobalRowStore().rangeIterator(RelationSchema.INSTANCE);
+        final Iterator<ITPS> itr = (Iterator<ITPS>) grs
+                .rangeIterator(RelationSchema.INSTANCE);
 
         while (itr.hasNext()) {
 

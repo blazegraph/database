@@ -34,6 +34,7 @@ import java.util.List;
 import org.openrdf.model.URI;
 
 import com.bigdata.bop.BOp;
+import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.rdf.internal.IV;
@@ -200,7 +201,7 @@ public class ASTJoinOrderByTypeOptimizer extends AbstractJoinGroupOptimizer
      */
 	@Override
     protected void optimizeJoinGroup(final AST2BOpContext ctx,
-    		final StaticAnalysis sa, final JoinGroupNode joinGroup) {
+    		final StaticAnalysis sa, final IBindingSet[] bSets, final JoinGroupNode joinGroup) {
 
 		if (!ASTStaticJoinOptimizer.isStaticOptimizer(ctx, joinGroup))
 			return;

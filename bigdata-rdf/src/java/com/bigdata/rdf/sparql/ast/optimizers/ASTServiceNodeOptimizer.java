@@ -53,6 +53,7 @@ import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.service.ServiceCall;
 import com.bigdata.rdf.sparql.ast.service.ServiceNode;
 import com.bigdata.rdf.store.BD;
+import com.bigdata.rdf.store.BDS;
 
 /**
  * Rewrites the WHERE clause of each query by lifting out {@link ServiceNode}s
@@ -195,7 +196,7 @@ public class ASTServiceNodeOptimizer implements IASTOptimizer {
                 final TermNode serviceRef = serviceNode.getServiceRef();
 
                 if (serviceRef.isConstant()
-                        && serviceRef.getValue().equals(BD.SEARCH)) {
+                        && serviceRef.getValue().equals(BDS.SEARCH)) {
 
                     if (all || !first) {
 

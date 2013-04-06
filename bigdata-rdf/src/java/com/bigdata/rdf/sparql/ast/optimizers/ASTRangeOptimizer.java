@@ -33,8 +33,8 @@ import java.util.Map;
 import org.apache.log4j.Logger;
 import org.openrdf.model.URI;
 
+import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IValueExpression;
-import com.bigdata.bop.IVariable;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.constraints.RangeBOp;
 import com.bigdata.rdf.sparql.ast.FilterNode;
@@ -65,7 +65,7 @@ public class ASTRangeOptimizer extends AbstractJoinGroupOptimizer
      */
     @SuppressWarnings("rawtypes")
 	protected void optimizeJoinGroup(final AST2BOpContext ctx, 
-    		final StaticAnalysis sa, final JoinGroupNode group) {
+    		final StaticAnalysis sa, final IBindingSet[] bSets, final JoinGroupNode group) {
 
     	/*
     	 * First see if we have anything "rangeable".

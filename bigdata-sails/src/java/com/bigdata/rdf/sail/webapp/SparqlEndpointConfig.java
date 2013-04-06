@@ -68,11 +68,33 @@ public class SparqlEndpointConfig {
      */
     final public boolean describeEachNamedGraph;
 
+    /**
+     * When <code>true</code>, requests will be refused for mutation operations
+     * on the database made through the REST API. This may be used to help lock
+     * down a public facing interface.
+     * 
+     * @see ConfigParams#READ_ONLY
+     */
+    final public boolean readOnly;
+
+    /**
+     * When non-zero, this specifies the timeout (milliseconds) for a query.
+     * This may be used to limit resource consumption on a public facing
+     * interface.
+     * 
+     * @see ConfigParams#QUERY_TIMEOUT
+     */
+    final public long queryTimeout;
+    
     public SparqlEndpointConfig(final String namespace, final long timestamp,
             final int queryThreadPoolSize,
-            final boolean describeEachNamedGraph) {
+            final boolean describeEachNamedGraph, final boolean readOnly,
+            final long queryTimeout) {
 
         if (namespace == null)
+            throw new IllegalArgumentException();
+
+        if (queryTimeout < 0L)
             throw new IllegalArgumentException();
 
         this.namespace = namespace;
@@ -82,6 +104,10 @@ public class SparqlEndpointConfig {
         this.queryThreadPoolSize = queryThreadPoolSize;
 
         this.describeEachNamedGraph = describeEachNamedGraph;
+        
+        this.readOnly = readOnly;
+        
+        this.queryTimeout = queryTimeout;
         
     }
 

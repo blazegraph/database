@@ -34,6 +34,7 @@ import java.util.UUID;
 import org.openrdf.query.algebra.StatementPattern.Scope;
 
 import com.bigdata.bop.BOp;
+import com.bigdata.bop.IBindingSet;
 import com.bigdata.rdf.sparql.ast.ArbitraryLengthPathNode;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
 import com.bigdata.rdf.sparql.ast.FilterNode;
@@ -67,7 +68,7 @@ public class ASTPropertyPathOptimizer extends AbstractJoinGroupOptimizer
      * Optimize the join group.
      */
 	protected void optimizeJoinGroup(final AST2BOpContext ctx, 
-    		final StaticAnalysis sa, final JoinGroupNode group) {
+    		final StaticAnalysis sa, final IBindingSet[] bSets, final JoinGroupNode group) {
 
     	for (PropertyPathNode node : group.getChildren(PropertyPathNode.class)) {
     		

@@ -80,6 +80,7 @@ import com.bigdata.ganglia.GangliaService;
 import com.bigdata.ganglia.GangliaSlopeEnum;
 import com.bigdata.ganglia.IGangliaDefaults;
 import com.bigdata.ganglia.util.GangliaUtil;
+import com.bigdata.journal.NoSuchIndexException;
 import com.bigdata.journal.TemporaryStore;
 import com.bigdata.journal.TemporaryStoreFactory;
 import com.bigdata.rawstore.Bytes;
@@ -89,6 +90,7 @@ import com.bigdata.service.ndx.IClientIndex;
 import com.bigdata.service.ndx.ScaleOutIndexCounters;
 import com.bigdata.sparse.GlobalRowStoreHelper;
 import com.bigdata.sparse.SparseRowStore;
+import com.bigdata.util.InnerCause;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 import com.bigdata.util.concurrent.ShutdownHelper;
 import com.bigdata.util.concurrent.TaskCounters;
@@ -1014,7 +1016,14 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
             getIndexCache().dropIndexFromCache(name);
 
         } catch (Exception e) {
-
+        	if(InnerCause.isInnerCause(e, NoSuchIndexException.class)) {
+        		/*
+        		 * Wrap with the root cause per the API for dropIndex().
+        		 */
+        		final NoSuchIndexException tmp = new NoSuchIndexException(name);
+        		tmp.initCause(e);
+        		throw tmp;
+        	}
             throw new RuntimeException( e );
             
         }

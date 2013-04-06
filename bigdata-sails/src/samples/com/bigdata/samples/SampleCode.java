@@ -53,6 +53,7 @@ import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
 import com.bigdata.rdf.sail.BigdataSailRepository;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
 import com.bigdata.rdf.store.BD;
+import com.bigdata.rdf.store.BDS;
 import com.bigdata.service.AbstractTransactionService;
 
 /**
@@ -311,7 +312,7 @@ public class SampleCode {
             cxn.close();
         }
         
-        String query = "select ?x where { ?x <"+BD.SEARCH+"> \"Yell\" . }";
+        String query = "select ?x where { ?x <"+BDS.SEARCH+"> \"Yell\" . }";
         executeSelectQuery(repo, query, QueryLanguage.SPARQL);
         // will match A, C, and D
         return true;

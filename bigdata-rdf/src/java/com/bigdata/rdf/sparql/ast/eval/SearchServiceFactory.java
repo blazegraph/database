@@ -50,6 +50,7 @@ import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.constraints.RangeBOp;
 import com.bigdata.rdf.internal.impl.literal.XSDNumericIV;
 import com.bigdata.rdf.lexicon.ITextIndexer;
+import com.bigdata.rdf.lexicon.ITextIndexer.FullTextQuery;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
 import com.bigdata.rdf.sparql.ast.GroupNodeBase;
@@ -65,6 +66,7 @@ import com.bigdata.rdf.sparql.ast.service.ServiceFactory;
 import com.bigdata.rdf.sparql.ast.service.ServiceNode;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BD;
+import com.bigdata.rdf.store.BDS;
 import com.bigdata.search.Hiterator;
 import com.bigdata.search.IHit;
 import com.bigdata.striterator.ICloseableIterator;
@@ -196,7 +198,7 @@ public class SearchServiceFactory implements ServiceFactory {
 
                 final URI uri = (URI) ((ConstantNode) p).getValue();
 
-                if (!uri.stringValue().startsWith(BD.SEARCH_NAMESPACE))
+                if (!uri.stringValue().startsWith(BDS.NAMESPACE))
                     throw new RuntimeException("Expecting search predicate: "
                             + sp);
 
@@ -265,39 +267,39 @@ public class SearchServiceFactory implements ServiceFactory {
                         "Search predicate appears multiple times for same search variable: predicate="
                                 + uri + ", searchVar=" + searchVar);
 
-            if (uri.equals(BD.SEARCH)) {
+            if (uri.equals(BDS.SEARCH)) {
 
                 assertObjectIsLiteral(sp);
 
-            } else if (uri.equals(BD.RELEVANCE) || uri.equals(BD.RANK)) {
+            } else if (uri.equals(BDS.RELEVANCE) || uri.equals(BDS.RANK)) {
                 
                 assertObjectIsVariable(sp);
                 
-            } else if(uri.equals(BD.MIN_RANK)||uri.equals(BD.MAX_RANK)) {
+            } else if(uri.equals(BDS.MIN_RANK)||uri.equals(BDS.MAX_RANK)) {
 
                 assertObjectIsLiteral(sp);
 
-            } else if (uri.equals(BD.MIN_RELEVANCE) || uri.equals(BD.MAX_RELEVANCE)) {
+            } else if (uri.equals(BDS.MIN_RELEVANCE) || uri.equals(BDS.MAX_RELEVANCE)) {
 
                 assertObjectIsLiteral(sp);
 
-            } else if(uri.equals(BD.MATCH_ALL_TERMS)) {
+            } else if(uri.equals(BDS.MATCH_ALL_TERMS)) {
                 
                 assertObjectIsLiteral(sp);
                 
-            } else if(uri.equals(BD.MATCH_EXACT)) {
+            } else if(uri.equals(BDS.MATCH_EXACT)) {
                 
                 assertObjectIsLiteral(sp);
                 
-            } else if(uri.equals(BD.SUBJECT_SEARCH)) {
+            } else if(uri.equals(BDS.SUBJECT_SEARCH)) {
                 
                 assertObjectIsLiteral(sp);
                 
-            } else if(uri.equals(BD.SEARCH_TIMEOUT)) {
+            } else if(uri.equals(BDS.SEARCH_TIMEOUT)) {
                 
                 assertObjectIsLiteral(sp);
                 
-            } else if(uri.equals(BD.MATCH_REGEX)) {
+            } else if(uri.equals(BDS.MATCH_REGEX)) {
                 
             	// a variable for the object is equivalent to regex = null
 //                assertObjectIsLiteral(sp);
@@ -310,9 +312,9 @@ public class SearchServiceFactory implements ServiceFactory {
             
         }
         
-        if (!uris.contains(BD.SEARCH)) {
+        if (!uris.contains(BDS.SEARCH)) {
             throw new RuntimeException("Required search predicate not found: "
-                    + BD.SEARCH + " for searchVar=" + searchVar);
+                    + BDS.SEARCH + " for searchVar=" + searchVar);
         }
         
     }
@@ -392,7 +394,7 @@ public class SearchServiceFactory implements ServiceFactory {
              * 
              * [?searchVar bd:search objValue]
              */
-            final StatementPatternNode sp = statementPatterns.get(BD.SEARCH);
+            final StatementPatternNode sp = statementPatterns.get(BDS.SEARCH);
 
             query = (Literal) sp.o().getValue();
             
@@ -432,27 +434,27 @@ public class SearchServiceFactory implements ServiceFactory {
                 final IVariable<?> oVar = meta.o().isVariable() ? (IVariable<?>) meta
                         .o().getValueExpression() : null;
 
-                if (BD.RELEVANCE.equals(p)) {
+                if (BDS.RELEVANCE.equals(p)) {
                     relVar = oVar;
-                } else if (BD.RANK.equals(p)) {
+                } else if (BDS.RANK.equals(p)) {
                     rankVar = oVar;
-                } else if (BD.MIN_RANK.equals(p)) {
+                } else if (BDS.MIN_RANK.equals(p)) {
                     minRank = (Literal) oVal;
-                } else if (BD.MAX_RANK.equals(p)) {
+                } else if (BDS.MAX_RANK.equals(p)) {
                     maxRank = (Literal) oVal;
-                } else if (BD.MIN_RELEVANCE.equals(p)) {
+                } else if (BDS.MIN_RELEVANCE.equals(p)) {
                     minRelevance = (Literal) oVal;
-                } else if (BD.MAX_RELEVANCE.equals(p)) {
+                } else if (BDS.MAX_RELEVANCE.equals(p)) {
                     maxRelevance = (Literal) oVal;
-                } else if (BD.MATCH_ALL_TERMS.equals(p)) {
+                } else if (BDS.MATCH_ALL_TERMS.equals(p)) {
                     matchAllTerms = ((Literal) oVal).booleanValue();
-                } else if (BD.MATCH_EXACT.equals(p)) {
+                } else if (BDS.MATCH_EXACT.equals(p)) {
                     matchExact = ((Literal) oVal).booleanValue();
-                } else if (BD.SUBJECT_SEARCH.equals(p)) {
+                } else if (BDS.SUBJECT_SEARCH.equals(p)) {
                     subjectSearch = ((Literal) oVal).booleanValue();
-                } else if (BD.SEARCH_TIMEOUT.equals(p)) {
+                } else if (BDS.SEARCH_TIMEOUT.equals(p)) {
                     searchTimeout = (Literal) oVal;
-                } else if (BD.MATCH_REGEX.equals(p)) {
+                } else if (BDS.MATCH_REGEX.equals(p)) {
                     matchRegex = (Literal) oVal;
                 }
             }
@@ -507,18 +509,20 @@ public class SearchServiceFactory implements ServiceFactory {
                 prefixMatch = false;
             }
 
-            return (Hiterator) textIndex.search(s,//
+            return (Hiterator) textIndex.search(new FullTextQuery(
+        		s,//
                 query.getLanguage(),// 
                 prefixMatch,//
-                minRelevance == null ? BD.DEFAULT_MIN_RELEVANCE : minRelevance.doubleValue()/* minCosine */, 
-                maxRelevance == null ? BD.DEFAULT_MAX_RELEVANCE : maxRelevance.doubleValue()/* maxCosine */, 
-                minRank == null ? BD.DEFAULT_MIN_RANK/*1*/ : minRank.intValue()/* minRank */,
-                maxRank == null ? BD.DEFAULT_MAX_RANK/*Integer.MAX_VALUE*/ : maxRank.intValue()/* maxRank */,
+                matchRegex == null ? null : matchRegex.stringValue(),
                 matchAllTerms,
                 matchExact,
-                searchTimeout == null ? BD.DEFAULT_TIMEOUT/*0L*/ : searchTimeout.longValue()/* timeout */,
-                TimeUnit.MILLISECONDS,
-                matchRegex == null ? null : matchRegex.stringValue());
+                minRelevance == null ? BDS.DEFAULT_MIN_RELEVANCE : minRelevance.doubleValue()/* minCosine */, 
+                maxRelevance == null ? BDS.DEFAULT_MAX_RELEVANCE : maxRelevance.doubleValue()/* maxCosine */, 
+                minRank == null ? BDS.DEFAULT_MIN_RANK/*1*/ : minRank.intValue()/* minRank */,
+                maxRank == null ? BDS.DEFAULT_MAX_RANK/*Integer.MAX_VALUE*/ : maxRank.intValue()/* maxRank */,
+                searchTimeout == null ? BDS.DEFAULT_TIMEOUT/*0L*/ : searchTimeout.longValue()/* timeout */,
+                TimeUnit.MILLISECONDS
+                ));
         
         }
 

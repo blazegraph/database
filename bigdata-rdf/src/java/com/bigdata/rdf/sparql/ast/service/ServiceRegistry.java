@@ -17,6 +17,7 @@ import com.bigdata.rdf.sparql.ast.eval.SearchServiceFactory;
 import com.bigdata.rdf.sparql.ast.service.history.HistoryServiceFactory;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BD;
+import com.bigdata.rdf.store.BDS;
 
 import cutthecrap.utils.striterators.ReadOnlyIterator;
 
@@ -74,10 +75,10 @@ public class ServiceRegistry {
                 new RemoteServiceFactoryImpl(true/* isSparql11 */));
 
         // Add the Bigdata search service.
-        add(BD.SEARCH, new SearchServiceFactory());
+        add(BDS.SEARCH, new SearchServiceFactory());
 
         // Add the Bigdata search in search service.
-        add(BD.SEARCH_IN_SEARCH, new SearchInSearchServiceFactory());
+        add(BDS.SEARCH_IN_SEARCH, new SearchInSearchServiceFactory());
 
         if (QueryHints.DEFAULT_DESCRIBE_CACHE) {
 

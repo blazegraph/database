@@ -28,13 +28,12 @@ import java.util.Properties;
 import org.apache.log4j.Logger;
 import org.openrdf.query.GraphQueryResult;
 import org.openrdf.query.QueryLanguage;
-import org.openrdf.query.TupleQueryResult;
 import org.openrdf.repository.RepositoryConnection;
 import org.openrdf.repository.sail.SailGraphQuery;
 import org.openrdf.rio.RDFFormat;
 
 import com.bigdata.rdf.axioms.NoAxioms;
-import com.bigdata.rdf.store.BD;
+import com.bigdata.rdf.store.BDS;
 import com.bigdata.rdf.vocab.NoVocabulary;
 
 /**
@@ -118,8 +117,8 @@ public class TestTicket581 extends QuadsTestCase {
 //			"} as %set1 " +
 			"WHERE { " +
 //			"	?so <"+BD.SEARCH+"> \"music\" . " +
-			"   service <"+BD.SEARCH+"> { " +
-			"	  ?so <"+BD.SEARCH+"> \"music\" . " +
+			"   service <"+BDS.SEARCH+"> { " +
+			"	  ?so <"+BDS.SEARCH+"> \"music\" . " +
             "   } " +
 			"	?object ?p ?so . " +
 			"	?object ?p ?o . " +

@@ -49,6 +49,7 @@ import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.IJournal;
 import com.bigdata.journal.IResourceLock;
 import com.bigdata.journal.IResourceLockService;
+import com.bigdata.journal.NoSuchIndexException;
 import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rdf.rules.FastClosure;
 import com.bigdata.rdf.rules.FullClosure;
@@ -700,7 +701,12 @@ abstract public class AbstractResource<E> implements IMutableResource<E> {
 
                 final String name = itr.next();
 
-                indexManager.dropIndex(name);
+				try {
+					indexManager.dropIndex(name);
+				} catch (NoSuchIndexException ex) {
+					// If the index does not exist, keep on going.
+					log.warn("Ignored: " + ex);
+				}
 
             }
 

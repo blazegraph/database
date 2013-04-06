@@ -30,6 +30,7 @@ package com.bigdata.rdf.sparql.ast;
 import java.util.Map;
 
 import com.bigdata.bop.BOp;
+import com.bigdata.bop.ModifiableBOpBase;
 
 /**
  * Anything which can appear in an {@link IGroupNode}.
@@ -43,6 +44,10 @@ abstract public class GroupMemberNodeBase<E extends IGroupMemberNode> extends
 
     private static final long serialVersionUID = 1L;
 
+    public interface Annotations extends IGroupMemberNode.Annotations {
+    	
+    }
+    
     private IGroupNode<IGroupMemberNode> parent;
 
     final public IGroupNode<IGroupMemberNode> getParent() {

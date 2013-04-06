@@ -484,19 +484,28 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
     private void doDescribeNamespaces(final HttpServletRequest req,
             final HttpServletResponse resp) throws IOException {
 
+        long timestamp = getTimestamp(req);
+
+        if (timestamp == ITx.READ_COMMITTED) {
+        
+            // Use the last commit point.
+            timestamp = getIndexManager().getLastCommitTime();
+            
+        }
+        
         /*
          * The set of registered namespaces for KBs.
          */
         final List<String> namespaces = getBigdataRDFContext()
-                .getNamespaces();
+                .getNamespaces(timestamp);
 
         final Graph g = new GraphImpl();
 
         for(String namespace : namespaces) {
             
-            // Get a view onto that KB instance.
+            // Get a view onto that KB instance for that timestamp.
             final AbstractTripleStore tripleStore = getBigdataRDFContext()
-                    .getTripleStore(namespace, ITx.READ_COMMITTED);
+                    .getTripleStore(namespace, timestamp);
 
             if (tripleStore == null) {
 
