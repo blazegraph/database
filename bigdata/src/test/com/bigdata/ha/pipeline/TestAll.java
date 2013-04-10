@@ -64,9 +64,6 @@ public class TestAll extends TestCase {
         // Test of HASendService and HAReceiveService (2 nodes).
         suite.addTestSuite(TestHASendAndReceive.class);
 
-        // Test of HASendService and HAReceiveService w/ interrupts (2 nodes).
-        suite.addTestSuite(TestHASendAndReceiveInterrupts.class);
-
         // Test of HASendService and HAReceiveService (3 nodes).
         suite.addTestSuite(TestHASendAndReceive3Nodes.class);
 
