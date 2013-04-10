@@ -2153,17 +2153,17 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
 
     }
 
-    public void testStress_LiveLoadRemainsMet() throws Exception {
-        for (int i = 1; i <= 20; i++) {
-            try {
-//                testABC_LiveLoadRemainsMet_restart_B_fullyMetDuringLOAD_restartC_fullyMetDuringLOAD();
-                testABC_LiveLoadRemainsMet_restart_C_fullyMetDuringLOAD();
-            } catch (Throwable e) {
-                fail("Run " + i, e);
-            } finally {
-                destroyAll();
-            }
-        }
-    }
+//    public void testStress_LiveLoadRemainsMet() throws Exception {
+//        for (int i = 1; i <= 20; i++) {
+//            try {
+////                testABC_LiveLoadRemainsMet_restart_B_fullyMetDuringLOAD_restartC_fullyMetDuringLOAD();
+//                testABC_LiveLoadRemainsMet_restart_C_fullyMetDuringLOAD();
+//            } catch (Throwable e) {
+//                fail("Run " + i, e);
+//            } finally {
+//                destroyAll();
+//            }
+//        }
+//    }
 
 }
