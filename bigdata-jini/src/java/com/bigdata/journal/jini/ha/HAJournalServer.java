@@ -2191,7 +2191,6 @@ public class HAJournalServer extends AbstractServer {
                     /*
                      * Note: Uncaught exception will result in SeekConsensus.
                      */
-
                 } finally {
 
                     if (ft != null) {
@@ -2702,7 +2701,7 @@ public class HAJournalServer extends AbstractServer {
                      */
 
                     if ((msg.getCommitCounter() == journal.getRootBlockView().getCommitCounter())
-                    && ((msg.getSequence() + 1) == logWriter.getSequence())) {
+                            && (msg.getSequence() == logWriter.getSequence())) {
 
                         /*
                          * We just received a live message that is the successor

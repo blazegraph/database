@@ -112,7 +112,7 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
      * The timeout for long running LOAD operations. This is used to prevent
      * hangs in CI in case the LOAD does not complete for some reason.
      */
-    protected final static long loadLoadTimeoutMillis = TimeUnit.MINUTES
+    protected final static long longLoadTimeoutMillis = TimeUnit.MINUTES
             .toMillis(4);
 
     /**
@@ -575,7 +575,7 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
 
                 if (!BytesUtil.bytesEqual(digests[i - 1], digests[i])) {
 
-                    fail("Services have different digest: serviceA="
+                    fail("Services have different digest @ i="+i+": serviceA="
                             + services[i - 1] + ", serviceB=" + services[i]);
 
                 }

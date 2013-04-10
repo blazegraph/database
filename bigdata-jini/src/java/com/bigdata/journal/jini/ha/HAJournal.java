@@ -771,6 +771,7 @@ public class HAJournal extends Journal {
                 final IBufferAccess buf = DirectBufferPool.INSTANCE.acquire();
 
                 long nsent = 0;
+                boolean success = false;
                 try {
 
                     while (r.hasMoreBuffers()) {
@@ -792,16 +793,37 @@ public class HAJournal extends Journal {
                         try {
                             // wait for message to make it through the pipeline.
                             ft.get();
+                            nsent++;
                         } finally {
-                            ft.cancel(true/* mayInterruptIfRunning */);
+                            /*
+                             * DO NOT PROPAGATE THE INTERRUPT TO THE PIPELINE.
+                             * 
+                             * Note: Either the Future isDone() or *this* thread
+                             * was interrupted. If ft.isDone() then we do not
+                             * need to cancel the Future. If *this* thread was
+                             * interrupted, then we DO NOT propagate that
+                             * interrupt to the pipeline.
+                             * 
+                             * This thread will be interrupted if the service
+                             * that requested the HALog file is has caught up
+                             * and transitioned from Resync to RunMet.
+                             * 
+                             * Propagating the interrupt to the pipeline (by
+                             * calling ft.cancel(true)) would causes the socket
+                             * channel to be asynchronously closed. The sends on
+                             * the pipeline do not have a frame that marks off
+                             * one from the next, so the next queued send can
+                             * wind up being interrupted.
+                             * 
+                             * Because we do not cancel the Future, the send()
+                             * will complete normally. This is Ok. The receiver
+                             * can discard the message and payload.
+                             */
+//                            ft.cancel(true/* mayInterruptIfRunning */);
                         }
                         
-                        nsent++;
-                        
                     }
-
-                    if (haLog.isDebugEnabled())
-                        haLog.debug("req=" + req + ", nsent=" + nsent);
+                    success = true;
 
                     return null;
 
@@ -809,6 +831,10 @@ public class HAJournal extends Journal {
 
                     buf.release();
 
+                    if (haLog.isDebugEnabled())
+                        haLog.debug("req=" + req + ", nsent=" + nsent
+                                + ", success=" + success);
+                    
                 }
 
             }
@@ -940,10 +966,24 @@ public class HAJournal extends Journal {
                             haLog.debug("Sending block: sequence=" + sequence
                                     + ", offset=" + offset + ", nbytes=" + nbytes);
 
-                        final Future<?> snd = getBufferStrategy().sendRawBuffer(req, sequence,
-                                quorumToken, fileExtent, offset, nbytes, b);
+                        final Future<?> ft = getBufferStrategy()
+                                .sendRawBuffer(req, sequence, quorumToken,
+                                        fileExtent, offset, nbytes, b);
                         
-                        snd.get(); // wait for data sent!
+                        try {
+
+                            ft.get(); // wait for data sent!
+                            
+                        } finally {
+                            /*
+                             * Note: As per sendHAStore(), we DO NOT want to do
+                             * ft.cancel() here. This would cause the
+                             * asynchronous close of the socket channel for the
+                             * write pipeline.
+                             * 
+                             * See sendHAStore().
+                             */
+                        }
 
                         remaining -= nbytes;
                         

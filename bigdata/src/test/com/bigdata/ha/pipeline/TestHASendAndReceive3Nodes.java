@@ -25,11 +25,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.ha.pipeline;
 
 import java.io.IOException;
-import java.net.BindException;
 import java.net.InetSocketAddress;
-import java.net.ServerSocket;
 import java.nio.ByteBuffer;
-import java.util.Random;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
@@ -37,8 +34,6 @@ import java.util.concurrent.TimeoutException;
 
 import com.bigdata.ha.msg.HAWriteMessageBase;
 import com.bigdata.ha.msg.IHAWriteMessageBase;
-import com.bigdata.ha.pipeline.HAReceiveService;
-import com.bigdata.ha.pipeline.HASendService;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.IBufferAccess;
 import com.bigdata.io.TestCase3;
@@ -54,65 +49,7 @@ import com.bigdata.util.InnerCause;
  */
 public class TestHASendAndReceive3Nodes extends TestCase3 {
 
-	private ChecksumUtility chk = new ChecksumUtility();
-
-	/**
-	 * A random number generated - the seed is NOT fixed.
-	 */
-	private Random r = new Random();
-
-//	/**
-//	 * Returns random data that will fit in N bytes. N is chosen randomly in
-//	 * 1:256.
-//	 * 
-//	 * @return A new {@link ByteBuffer} wrapping a new <code>byte[]</code> of
-//	 *         random length and having random contents.
-//	 */
-//	public ByteBuffer getRandomData() {
-//
-//		final int nbytes = r.nextInt(256) + 1;
-//
-//		return getRandomData(nbytes);
-//
-//	}
-
-	/**
-	 * Returns random data that will fit in <i>nbytes</i>.
-	 * 
-	 * @return A new {@link ByteBuffer} wrapping a new <code>byte[]</code>
-	 *         having random contents.
-	 */
-	private ByteBuffer getRandomData(final int nbytes) {
-
-		final byte[] bytes = new byte[nbytes];
-
-		r.nextBytes(bytes);
-
-		return ByteBuffer.wrap(bytes);
-
-	}
-
-	/**
-	 * Returns random data that will fit in <i>nbytes</i>.
-	 * 
-	 * @return A new {@link ByteBuffer} wrapping a new <code>byte[]</code>
-	 *         having random contents.
-	 */
-	private ByteBuffer getRandomData(final ByteBuffer b, final int nbytes) {
-
-		final byte[] a = new byte[nbytes];
-
-		r.nextBytes(a);
-
-		b.limit(nbytes);
-		b.position(0);
-		b.put(a);
-
-		b.flip();
-
-		return b;
-
-	}
+	private ChecksumUtility chk;
 
 	public TestHASendAndReceive3Nodes() {
 
@@ -140,6 +77,10 @@ public class TestHASendAndReceive3Nodes extends TestCase3 {
      */
     @Override
 	protected void setUp() throws Exception {
+
+        super.setUp();
+        
+        chk = new ChecksumUtility();
 
         /*
          * Setup C at the end of the pipeline.
@@ -201,6 +142,8 @@ public class TestHASendAndReceive3Nodes extends TestCase3 {
 	@Override
 	protected void tearDown() throws Exception {
 
+	    super.tearDown();
+	    
 		if (receiveServiceB != null) {
 			receiveServiceB.terminate();
 			receiveServiceB = null;
@@ -219,36 +162,6 @@ public class TestHASendAndReceive3Nodes extends TestCase3 {
 		
 		chk = null;
 		
-		r = null;
-		
-	}
-
-	/**
-	 * Return an open port on current machine. Try the suggested port first. If
-	 * suggestedPort is zero, just select a random port
-	 */
-	private static int getPort(int suggestedPort) throws IOException {
-
-		ServerSocket openSocket;
-		try {
-			openSocket = new ServerSocket(suggestedPort);
-		} catch (BindException ex) {
-			// the port is busy, so look for a random open port
-			openSocket = new ServerSocket(0);
-		}
-
-		final int port = openSocket.getLocalPort();
-
-		openSocket.close();
-
-		if (suggestedPort != 0 && port != suggestedPort) {
-
-			log.warn("suggestedPort is busy: suggestedPort=" + suggestedPort + ", using port=" + port + " instead");
-
-		}
-
-		return port;
-
 	}
 
     public void testSimpleExchange() throws InterruptedException,
@@ -263,20 +176,6 @@ public class TestHASendAndReceive3Nodes extends TestCase3 {
 		final Future<Void> futRec1 = receiveServiceB.receiveData(msg1, rcv1);
 		final Future<Void> futRec2 = receiveServiceC.receiveData(msg1, rcv2);
 		final Future<Void> futSnd = sendServiceA.send(tst1);
-//		while (!futSnd.isDone() && !futRec2.isDone()) {
-//			try {
-//				futSnd.get(10L, TimeUnit.MILLISECONDS);
-//			} catch (TimeoutException ignore) {
-//			}
-//            try {
-//                futRec1.get(10L, TimeUnit.MILLISECONDS);
-//            } catch (TimeoutException ignore) {
-//            }
-//			try {
-//				futRec2.get(10L, TimeUnit.MILLISECONDS);
-//			} catch (TimeoutException ignore) {
-//			}
-//		}
 		futSnd.get(timeout,TimeUnit.MILLISECONDS);
 		futRec1.get(timeout,TimeUnit.MILLISECONDS);
 		futRec2.get(timeout,TimeUnit.MILLISECONDS);
@@ -300,7 +199,9 @@ public class TestHASendAndReceive3Nodes extends TestCase3 {
 				futSnd.get(10L, TimeUnit.MILLISECONDS);
 			} catch (TimeoutException ignore) {
 			} catch (ExecutionException e) {
-				assertTrue(e.getCause().getMessage().equals("Checksum Error"));
+                if (!InnerCause.isInnerCause(e, ChecksumError.class)) {
+                    fail("Expecting " + ChecksumError.class + ", not " + e, e);
+                }
 			}
 			try {
 				futRec2.get(10L, TimeUnit.MILLISECONDS);

@@ -465,7 +465,7 @@ public class TestHA3SnapshotPolicy extends AbstractHA3BackupTestCase {
             executorService.submit(ft);
 
             // impose timeout on load.
-            ft.get(2 * loadLoadTimeoutMillis, TimeUnit.MILLISECONDS);
+            ft.get(2 * longLoadTimeoutMillis, TimeUnit.MILLISECONDS);
             
         }
 

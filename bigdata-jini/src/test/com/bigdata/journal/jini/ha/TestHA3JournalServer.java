@@ -298,7 +298,7 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
         executorService.submit(ft);
         
         // Await LOAD, but with a timeout.
-        ft.get(loadLoadTimeoutMillis, TimeUnit.MILLISECONDS);
+        ft.get(longLoadTimeoutMillis, TimeUnit.MILLISECONDS);
 
         /*
          * Verify that query on all nodes is allowed and now provides a
@@ -760,7 +760,7 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
 		log.info("FULLY MET");
 		
         // Await LOAD, but with a timeout.
-        ft.get(loadLoadTimeoutMillis, TimeUnit.MILLISECONDS);
+        ft.get(longLoadTimeoutMillis, TimeUnit.MILLISECONDS);
 
 		log.info("Should be safe to test digests now");
 		
@@ -1725,7 +1725,7 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
 		assertEquals(token, awaitMetQuorum());
 		
         // Await LOAD, but with a timeout.
-        ft.get(loadLoadTimeoutMillis, TimeUnit.MILLISECONDS);
+        ft.get(longLoadTimeoutMillis, TimeUnit.MILLISECONDS);
 
         // token must remain unchanged to indicate same quorum
         assertEquals(token, awaitMetQuorum());
@@ -1774,7 +1774,7 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
 		awaitPipeline(new HAGlue[] {startup.serverA, startup.serverB, serverC2});
 		
         // Await LOAD, but with a timeout.
-        ft.get(loadLoadTimeoutMillis, TimeUnit.MILLISECONDS);
+        ft.get(longLoadTimeoutMillis, TimeUnit.MILLISECONDS);
 
         // Verify quorum becomes fully met now that LOAD is done.
         assertEquals(token, awaitFullyMetQuorum());
@@ -1830,7 +1830,7 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
         assertTrue(quorum.isQuorumFullyMet(token));
 
         // Await LOAD, but with a timeout.
-        ft.get(loadLoadTimeoutMillis, TimeUnit.MILLISECONDS);
+        ft.get(longLoadTimeoutMillis, TimeUnit.MILLISECONDS);
         
     }
 
@@ -1868,7 +1868,7 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
         assertEquals(token, awaitMetQuorum());
         
         // Await LOAD, but with a timeout.
-        ft.get(loadLoadTimeoutMillis, TimeUnit.MILLISECONDS);
+        ft.get(longLoadTimeoutMillis, TimeUnit.MILLISECONDS);
 
         // token must remain unchanged to indicate same quorum
         assertEquals(token, awaitMetQuorum());
@@ -1919,7 +1919,7 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
         awaitPipeline(new HAGlue[] {startup.serverA, startup.serverC, serverB2});
         
         // Await LOAD, but with a timeout.
-        ft.get(loadLoadTimeoutMillis, TimeUnit.MILLISECONDS);
+        ft.get(longLoadTimeoutMillis, TimeUnit.MILLISECONDS);
         
         // Verify quorum becomes fully met now that LOAD is done.
         assertEquals(token, awaitFullyMetQuorum());
@@ -1977,7 +1977,7 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
         assertTrue(quorum.isQuorumFullyMet(token));
 
         // Await LOAD, but with a timeout.
-        ft.get(loadLoadTimeoutMillis, TimeUnit.MILLISECONDS);
+        ft.get(longLoadTimeoutMillis, TimeUnit.MILLISECONDS);
         
     }
 
@@ -2001,7 +2001,7 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
         
         // start concurrent task loads that continue until fully met
         final FutureTask<Void> ft = new FutureTask<Void>(new LargeLoadTask(
-                token));
+                token, true/* reallyLargeLoad */));
 
         executorService.submit(ft);
 
@@ -2057,7 +2057,7 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
         assertTrue(quorum.isQuorumFullyMet(token));
 
         // Await LOAD, but with a timeout.
-        ft.get(loadLoadTimeoutMillis, TimeUnit.MILLISECONDS);
+        ft.get(longLoadTimeoutMillis, TimeUnit.MILLISECONDS);
 
     }
 
@@ -2149,8 +2149,21 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
         assertTrue(quorum.isQuorumFullyMet(token));
 
         // Await LOAD, but with a timeout.
-        ft.get(2 * loadLoadTimeoutMillis, TimeUnit.MILLISECONDS);
+        ft.get(2 * longLoadTimeoutMillis, TimeUnit.MILLISECONDS);
 
+    }
+
+    public void testStress_LiveLoadRemainsMet() throws Exception {
+        for (int i = 1; i <= 20; i++) {
+            try {
+//                testABC_LiveLoadRemainsMet_restart_B_fullyMetDuringLOAD_restartC_fullyMetDuringLOAD();
+                testABC_LiveLoadRemainsMet_restart_C_fullyMetDuringLOAD();
+            } catch (Throwable e) {
+                fail("Run " + i, e);
+            } finally {
+                destroyAll();
+            }
+        }
     }
 
 }

@@ -2173,7 +2173,7 @@ public class AbstractHA3JournalServerTestCase extends
         boolean fullyMetBeforeLoadDone = false;
         while (!fullyMetBeforeLoadDone) {
             final long elapsed = System.currentTimeMillis() - begin;
-            if (elapsed > loadLoadTimeoutMillis) {
+            if (elapsed > longLoadTimeoutMillis) {
                 /**
                  * This timeout is a fail safe for LOAD operations that get HUNG
                  * on the server and prevents CI hangs.

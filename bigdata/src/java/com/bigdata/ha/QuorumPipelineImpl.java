@@ -31,6 +31,7 @@ import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.util.UUID;
 import java.util.concurrent.Callable;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
@@ -906,9 +907,9 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> extends
                 
             } catch (Throwable t) {
 
-                if (InnerCause.isInnerCause(t, InterruptedException.class)) {
+                if (InnerCause.isInnerCause(t, InterruptedException.class)||InnerCause.isInnerCause(t, CancellationException.class)) {
                  
-                    throw (InterruptedException) t;
+                    throw new RuntimeException(t);
                     
                 }
                 
@@ -1020,9 +1021,9 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> extends
                     
                 } catch (Throwable t) {
                     
-                    if (InnerCause.isInnerCause(t, InterruptedException.class)) {
+                    if (InnerCause.isInnerCause(t, InterruptedException.class)||InnerCause.isInnerCause(t, CancellationException.class)) {
                         
-                        throw (InterruptedException) t;
+                        throw new RuntimeException( t );
                         
                     }
                     

@@ -28,6 +28,7 @@ import java.io.IOException;
 import java.net.BindException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
+import java.nio.channels.AsynchronousCloseException;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
@@ -512,7 +513,7 @@ public class HAReceiveService<M extends IHAWriteMessageBase> extends Thread {
                     message = null; 
 
                     // [waitFuture] is available for receiveData().
-                    futureReady.signal();
+                    futureReady.signalAll();
 
                 } finally {
 
@@ -828,70 +829,101 @@ public class HAReceiveService<M extends IHAWriteMessageBase> extends Thread {
         }
         
         public Void call() throws Exception {
-        	
-//            awaitAccept();
-//            
-//            /*
-//             * Get the client connection and open the channel in a non-blocking
-//             * mode so we will read whatever is available and loop until all
-//             * data has been read.
-//             */
-//            final SocketChannel client = server.accept();
-//            client.configureBlocking(false);
-//            
-//            final Selector clientSelector = Selector.open();
+        
+//          awaitAccept();
+//          
+//          /*
+//           * Get the client connection and open the channel in a non-blocking
+//           * mode so we will read whatever is available and loop until all
+//           * data has been read.
+//           */
+//          final SocketChannel client = server.accept();
+//          client.configureBlocking(false);
+//          
+//          final Selector clientSelector = Selector.open();
 //
-//            // must register OP_READ selector on the new client
-//            final SelectionKey clientKey = client.register(clientSelector,
-//                    SelectionKey.OP_READ);
+//          // must register OP_READ selector on the new client
+//          final SelectionKey clientKey = client.register(clientSelector,
+//                  SelectionKey.OP_READ);
 
-            Client client = clientRef.get();
+          Client client = clientRef.get();
 
-//            if (client != null) {
+//          if (client != null) {
 //
-//                /*
-//                 * Note: We need to know when the client connection is no longer
-//                 * valid. The code here does not appear to do the trick.
-//                 * changeUpStream() is handling this instead.
-//                 * 
-//                 * We need to decide whether the client is no longer valid
-//                 * (either because the upstream HASendService has changed (our
-//                 * predecessor in the pipeline might have died) or because it
-//                 * has closed is socket connection to this HAReceiveService).
-//                 * 
-//                 * Either way, we need to establish a client connection using
-//                 * awaitAccept().
-//                 */
-//                if (!client.client.isConnected()) {
-//                    log.warn("Closing old client connection.");
-//                    clientRef.set(client = null);
-//                }
+//              /*
+//               * Note: We need to know when the client connection is no longer
+//               * valid. The code here does not appear to do the trick.
+//               * changeUpStream() is handling this instead.
+//               * 
+//               * We need to decide whether the client is no longer valid
+//               * (either because the upstream HASendService has changed (our
+//               * predecessor in the pipeline might have died) or because it
+//               * has closed is socket connection to this HAReceiveService).
+//               * 
+//               * Either way, we need to establish a client connection using
+//               * awaitAccept().
+//               */
+//              if (!client.client.isConnected()) {
+//                  log.warn("Closing old client connection.");
+//                  clientRef.set(client = null);
+//              }
 //
-//            }
-            
-            if (client == null) {
+//          }
+          
+            if (client == null || !client.client.isOpen()) {
 
-                /*
-                 * Accept and the initialize a connection from the upstream
-                 * HASendService.
-                 */
-                
-                // Accept a client connection (blocks)
-                awaitAccept();
+                final Client tmp = clientRef.getAndSet(null);
+                if (tmp != null) {
+                    // Close existing connection if not open.
+                    tmp.close();
+                }
 
-                // New client connection.
-                client = new Client(server);//, sendService, addrNext);
+              /*
+               * Accept and the initialize a connection from the upstream
+               * HASendService.
+               */
+              
+              // Accept a client connection (blocks)
+              awaitAccept();
 
-                // save off reference.
-                clientRef.set(client);
+              // New client connection.
+              client = new Client(server);//, sendService, addrNext);
+
+              // save off reference.
+              clientRef.set(client);
 
             }
+
+//            boolean success = false;
+//            try {
+                doReceiveAndReplicate(client);
+//                success = true;
+                // success.
+                return null;
+//            } finally {
+//                try {
+//                    if(success) {
+//                        ack(client);
+//                    } else {
+//                        nack(client);
+//                    }
+//                } catch (IOException ex) {
+//                    // log and ignore.
+//                    log.error(ex, ex);
+//                }
+//            }
+            
+        } // call.
+        
+        private void doReceiveAndReplicate(final Client client)
+                throws Exception {
 
             /*
              * We should now have parameters ready in the WriteMessage and can
              * begin transferring data from the stream to the writeCache.
              */
             final long begin = System.currentTimeMillis();
+            long mark = begin;
 
             // #of bytes remaining (to be received).
             int rem = message.getSize();
@@ -909,14 +941,43 @@ public class HAReceiveService<M extends IHAWriteMessageBase> extends Thread {
             
                 if (nkeys == 0) {
                 
-                    // Nothing available.
-                    final long elapsed = System.currentTimeMillis() - begin;
+                    /*
+                     * Nothing available.
+                     */
+                    
+                    // time since last mark.
+                    final long now = System.currentTimeMillis();
+                    final long elapsed = now - mark;
                     
                     if (elapsed > 10000) {
                         // Issue warning if we have been blocked for a while.
                         log.warn("Blocked: awaiting " + rem + " out of "
                                 + message.getSize() + " bytes.");
+                        mark = now;// reset mark.
                     }
+
+                    if (!client.client.isOpen()
+                            || !client.clientSelector.isOpen()) {
+                        
+                        /*
+                         * The channel has been closed. The request must be
+                         * failed. TODO Or set EOF:=true? 
+                         * 
+                         * Note: The [callback] is NOT notified. The service
+                         * that issued the RMI request to this service to
+                         * receive the payload over the HAReceivedService will
+                         * see this exception thrown back across the RMI
+                         * request.
+                         * 
+                         * @see HAReceiveService.receiveData().
+                         */
+                        
+                        throw new AsynchronousCloseException();
+                        
+                    }
+                    
+                    // no keys. nothing to read.
+                    continue;
                     
                 }
 
@@ -938,7 +999,7 @@ public class HAReceiveService<M extends IHAWriteMessageBase> extends Thread {
                                 + " bytes remaining.");
 
                     if (rdlen > 0) {
-                    	reads++;
+                        reads++;
                         updateChk(rdlen);
                     }
 
@@ -1015,7 +1076,7 @@ public class HAReceiveService<M extends IHAWriteMessageBase> extends Thread {
 						+ ", number of reads: " + reads + ", buffer: "
 						+ localBuffer);
 
-        	if (message.getChk() != (int) chk.getValue()) {
+            if (message.getChk() != (int) chk.getValue()) {
                 throw new ChecksumError("msg=" + message.toString()
                         + ", actual=" + chk.getValue());
             }
@@ -1024,10 +1085,97 @@ public class HAReceiveService<M extends IHAWriteMessageBase> extends Thread {
                 callback.callback(message, localBuffer);
             }
 
-            // success.
-            return null;
-
         } // call()
+
+//        private void ack(final Client client) throws IOException {
+//            
+//            if (log.isTraceEnabled())
+//                log.trace("Will ACK");
+//            
+//            ack(client.client, HASendService.ACK);
+//            
+//            if (log.isTraceEnabled())
+//                log.trace("Did ACK");
+//
+//        }
+//
+//        private void nack(final Client client) throws IOException {
+//
+//            if (log.isTraceEnabled())
+//                log.trace("Will NACK");
+//
+//            ack(client.client, HASendService.NACK);
+//
+//            if (log.isTraceEnabled())
+//                log.trace("Did NACK");
+//
+//        }
+//
+//        /**
+//         * ACK/NACK the payload.
+//         * 
+//         * @param client
+//         * @throws IOException
+//         */
+//        private void ack(final SocketChannel client, final byte ret)
+//                throws IOException {
+//
+//            // FIXME optimize.
+//            final ByteBuffer b = ByteBuffer.wrap(new byte[] { ret /* ACK */});
+//
+//            // The #of bytes to transfer.
+//            final int remaining = b.remaining();
+//
+////            if (log.isTraceEnabled())
+////                log.trace("Will send " + remaining + " bytes");
+//
+////            try {
+//
+//                int nwritten = 0;
+//                
+//                while (nwritten < remaining) {
+//
+//                    /*
+//                     * Write the data. Depending on the channel, will either
+//                     * block or write as many bytes as can be written
+//                     * immediately (this latter is true for socket channels in a
+//                     * non-blocking mode). IF it blocks, should block until
+//                     * finished or until this thread is interrupted, e.g., by
+//                     * shutting down the thread pool on which it is running.
+//                     * 
+//                     * Note: If the SocketChannel is closed by an interrupt,
+//                     * then the send request for the [data] payload will fail.
+//                     * However, the SocketChannel will be automatically reopened
+//                     * for the next request (unless the HASendService has been
+//                     * terminated).
+//                     */
+//
+//                    final int nbytes = client.write(b);
+//
+//                    nwritten += nbytes;
+//
+////                    if (log.isTraceEnabled())
+////                        log.trace("Sent " + nbytes + " bytes with " + nwritten
+////                                + " of out " + remaining + " written so far");
+//
+//                }
+//                return;
+//            
+////            while (client.isOpen()) {
+////
+////                if (client.write(b) > 0) {
+////                    
+////                    // Sent (N)ACK byte.
+////                    return;
+////
+////                }
+////
+////            }
+//            
+////            // channel is closed.
+////            throw new AsynchronousCloseException();
+//            
+//        }
             
     } // class ReadTask
 
@@ -1069,7 +1217,7 @@ public class HAReceiveService<M extends IHAWriteMessageBase> extends Thread {
             localBuffer = buffer;// DO NOT duplicate()! (side-effects required)
             localBuffer.limit(message.getSize());
             localBuffer.position(0);
-            messageReady.signal();
+            messageReady.signalAll();
 
             if (log.isTraceEnabled())
                 log.trace("Will accept data for message: msg=" + msg);
