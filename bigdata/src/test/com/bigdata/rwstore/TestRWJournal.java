@@ -2041,6 +2041,79 @@ public class TestRWJournal extends AbstractJournalTestCase {
 		}
 		
 		/**
+		 * This test releases over a blobs worth of deferred frees where the
+		 * blob requires a blob header.
+		 * 
+		 * To test this we use a max fixed alloc of 192 bytes, so 24 8 bytes addresses can be stored
+		 * in each "leaf" and 48 leaves can be addressed in a standard blob header.
+		 * 
+		 * This should set the allocation threshold at 48 * 24 = 1152 deferred addresses
+		 * 
+		 * Anything greater than that requires that the blob header itself is a blob and this is
+		 * what we need to test.
+		 */
+		public void test_stressBlobBlobHeaderDeferredFrees() {
+
+            final Properties properties = new Properties(getProperties());
+
+            properties.setProperty(
+                    AbstractTransactionService.Options.MIN_RELEASE_AGE, "4000");
+
+            final int maxFixed = 3; // 192 bytes (3 * 64)
+            properties.setProperty(RWStore.Options.ALLOCATION_SIZES,
+            		"1,2," + maxFixed);
+            
+            final int maxAlloc = maxFixed * 64;
+            final int leafEntries = maxAlloc / 8;
+            final int headerEntries = maxAlloc / 4;
+            final int threshold = headerEntries * leafEntries;
+            
+            final int nallocs = threshold << 3; // 8 times greater than allocation threshold
+
+			Journal store = (Journal) getStore(properties);
+            try {
+
+            	RWStrategy bs = (RWStrategy) store.getBufferStrategy();
+            	
+            	ArrayList<Long> addrs = new ArrayList<Long>();
+            	for (int i = 0; i < nallocs; i++) {
+            		addrs.add(bs.write(randomData(45)));
+            	}
+            	store.commit();
+
+            	for (long addr : addrs) {
+            		bs.delete(addr);
+            	}
+                for (int i = 0; i < nallocs; i++) {
+                    if(!bs.isCommitted(addrs.get(i))) {
+                        fail("i="+i+", addr="+addrs.get(i));
+                    }
+                }
+
+               	store.commit();
+               	
+            	// Age the history (of the deletes!)
+            	Thread.currentThread().sleep(6000);
+            	
+            	// modify store but do not allocate similar size block
+            	// as that we want to see has been removed
+               	final long addr2 = bs.write(randomData(220)); // modify store
+            	
+            	store.commit();
+            	bs.delete(addr2); // modify store
+               	store.commit();
+            	
+               	// delete is actioned
+            	for (int i = 0; i < nallocs; i++) {
+                   	assertFalse(bs.isCommitted(addrs.get(i)));
+            	}
+              } catch (InterruptedException e) {
+			} finally {
+            	store.destroy();
+            }
+		}
+		
+		/**
 		 * Can be tested by removing RWStore call to journal.removeCommitRecordEntries
 		 * in freeDeferrals.
 		 * 
