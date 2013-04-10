@@ -27,7 +27,11 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.io;
 
+import java.io.IOException;
+import java.net.BindException;
+import java.net.ServerSocket;
 import java.nio.ByteBuffer;
+import java.util.Random;
 import java.util.concurrent.TimeUnit;
 
 import junit.framework.AssertionFailedError;
@@ -46,6 +50,12 @@ import com.bigdata.journal.TestHelper;
  */
 public class TestCase3 extends TestCase2 {
 
+    
+    /**
+     * A random number generated - the seed is NOT fixed.
+     */
+    protected Random r;
+
     /**
      * 
      */
@@ -61,10 +71,19 @@ public class TestCase3 extends TestCase2 {
      
     }
 
+    @Override
+    protected void setUp() throws Exception {
+        
+        r = new Random();
+
+    }
+
     protected void tearDown() throws Exception {
 
         super.tearDown();
 
+        r = null;
+        
         TestHelper.checkJournalsClosed(this);
         
     }
@@ -251,6 +270,72 @@ public class TestCase3 extends TestCase2 {
         
         assertCondition(cond, 5, TimeUnit.SECONDS);
         
+    }
+
+    /**
+     * Returns random data that will fit in <i>nbytes</i>.
+     * 
+     * @return A new {@link ByteBuffer} wrapping a new <code>byte[]</code>
+     *         having random contents.
+     */
+    protected ByteBuffer getRandomData(final int nbytes) {
+
+        final byte[] bytes = new byte[nbytes];
+
+        r.nextBytes(bytes);
+
+        return ByteBuffer.wrap(bytes);
+
+    }
+
+    /**
+     * Returns random data that will fit in <i>nbytes</i>.
+     * 
+     * @return A new {@link ByteBuffer} wrapping a new <code>byte[]</code>
+     *         having random contents.
+     */
+    protected ByteBuffer getRandomData(final ByteBuffer b, final int nbytes) {
+
+        final byte[] a = new byte[nbytes];
+
+        r.nextBytes(a);
+        
+        b.limit(nbytes);
+        b.position(0);
+        b.put(a);
+        
+        b.flip();
+        
+        return b;
+
+    }
+
+    /**
+     * Return an open port on current machine. Try the suggested port first. If
+     * suggestedPort is zero, just select a random port
+     */
+    protected static int getPort(int suggestedPort) throws IOException {
+
+        ServerSocket openSocket;
+        try {
+            openSocket = new ServerSocket(suggestedPort);
+        } catch (BindException ex) {
+            // the port is busy, so look for a random open port
+            openSocket = new ServerSocket(0);
+        }
+
+        final int port = openSocket.getLocalPort();
+
+        openSocket.close();
+
+        if (suggestedPort != 0 && port != suggestedPort) {
+
+            log.warn("suggestedPort is busy: suggestedPort=" + suggestedPort + ", using port=" + port + " instead");
+
+        }
+
+        return port;
+
     }
 
 }

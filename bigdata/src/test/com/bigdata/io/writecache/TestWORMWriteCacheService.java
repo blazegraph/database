@@ -29,9 +29,7 @@ package com.bigdata.io.writecache;
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
-import java.net.BindException;
 import java.net.InetSocketAddress;
-import java.net.ServerSocket;
 import java.nio.ByteBuffer;
 import java.nio.channels.Channel;
 import java.nio.channels.FileChannel;
@@ -2728,33 +2726,33 @@ public class TestWORMWriteCacheService extends TestCase3 {
      * HA pipeline tests.
      */
 
-    /**
-     * Return an open port on current machine. Try the suggested port first. If
-     * suggestedPort is zero, just select a random port
-     */
-    private static int getPort(final int suggestedPort) throws IOException {
-
-        ServerSocket openSocket;
-        try {
-            openSocket = new ServerSocket(suggestedPort);
-        } catch (BindException ex) {
-            // the port is busy, so look for a random open port
-            openSocket = new ServerSocket(0);
-        }
-
-        final int port = openSocket.getLocalPort();
-
-        openSocket.close();
-
-        if (suggestedPort != 0 && port != suggestedPort) {
-
-            log.warn("suggestedPort is busy: suggestedPort=" + suggestedPort
-                    + ", using port=" + port + " instead");
-
-        }
-
-        return port;
-
-    }
+//    /**
+//     * Return an open port on current machine. Try the suggested port first. If
+//     * suggestedPort is zero, just select a random port
+//     */
+//    private static int getPort(final int suggestedPort) throws IOException {
+//
+//        ServerSocket openSocket;
+//        try {
+//            openSocket = new ServerSocket(suggestedPort);
+//        } catch (BindException ex) {
+//            // the port is busy, so look for a random open port
+//            openSocket = new ServerSocket(0);
+//        }
+//
+//        final int port = openSocket.getLocalPort();
+//
+//        openSocket.close();
+//
+//        if (suggestedPort != 0 && port != suggestedPort) {
+//
+//            log.warn("suggestedPort is busy: suggestedPort=" + suggestedPort
+//                    + ", using port=" + port + " instead");
+//
+//        }
+//
+//        return port;
+//
+//    }
 
 }
