@@ -6,7 +6,7 @@ from the root directory of the SVN checkout of the bigdata code base.
 
 The basic procedure is:
 
-0. The nodes should have synchronized clocks, both for logging and to ensure
+0. The nodes MUST have synchronized clocks, both for logging and to ensure
    that the transaction services have closely correlated clocks for assigning
    timestamps.  Make sure that ntp or a similar service is running to synchronize
    the clocks.
