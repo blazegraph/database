@@ -148,6 +148,20 @@ public class ConfigMath {
     }
 
     /**
+     * Convert days to milliseconds.
+     * 
+     * @param d
+     *            days
+     *            
+     * @return Milliseconds.
+     */
+    public static long d2ms(final long m) {
+
+        return TimeUnit.DAYS.toMillis(m);
+
+    }
+
+    /**
      * Return the absolute path for the file.
      * 
      * @param file
