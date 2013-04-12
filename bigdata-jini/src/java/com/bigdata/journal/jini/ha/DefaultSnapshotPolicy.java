@@ -107,6 +107,13 @@ public class DefaultSnapshotPolicy implements ISnapshotPolicy {
         
         final long initialDelay = delay(timeOfDay);
 
+        if (log.isInfoEnabled())
+            log.info("initialDelay=" + initialDelay + "ms" + " (hours="
+                    + TimeUnit.MILLISECONDS.toHours(initialDelay)
+                    + ", minutes="
+                    + (TimeUnit.MILLISECONDS.toMinutes(initialDelay) % 60L)
+                    + ")");
+
         jnl.addScheduledTask(new SnapshotTask(jnl), initialDelay, 1/* delay */,
                 TimeUnit.DAYS);
 

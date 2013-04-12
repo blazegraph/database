@@ -253,6 +253,9 @@ public class SnapshotManager {
         snapshotIndex = CommitTimeIndex.createTransient();
 
         populateSnapshotIndex();
+
+        // Initialize the snapshot policy.  It can self-schedule.
+        snapshotPolicy.init(journal);
         
     }
     
