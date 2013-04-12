@@ -337,19 +337,19 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
                         .getName()
                         + ".executorService"));
 
-        if (Boolean.valueOf(properties.getProperty(
-                Options.COLLECT_QUEUE_STATISTICS,
-                Options.DEFAULT_COLLECT_QUEUE_STATISTICS))) {
+//        if (Boolean.valueOf(properties.getProperty(
+//                Options.COLLECT_QUEUE_STATISTICS,
+//                Options.DEFAULT_COLLECT_QUEUE_STATISTICS))) {
             
             scheduledExecutorService = Executors
                     .newSingleThreadScheduledExecutor(new DaemonThreadFactory(
                             getClass().getName() + ".sampleService"));
             
-        } else {
-         
-            scheduledExecutorService = null;
-            
-        }
+//        } else {
+//         
+//            scheduledExecutorService = null;
+//            
+//        }
         
         {
             
@@ -2202,8 +2202,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
 
     /**
      * Used to sample and report on the queue associated with the
-     * {@link #executorService} and <code>null</code> if we will not be
-     * collecting data on task execution.
+     * {@link #executorService}. May be used to schedule other tasks as well.
      */
     private final ScheduledExecutorService scheduledExecutorService;
 
