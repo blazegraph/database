@@ -25,10 +25,6 @@ package com.bigdata.journal;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
-import java.net.InetAddress;
-import java.net.InetSocketAddress;
-import java.net.URLEncoder;
 import java.nio.ByteBuffer;
 import java.util.Collection;
 import java.util.List;
@@ -38,8 +34,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-import java.util.concurrent.FutureTask;
-import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.Semaphore;
@@ -65,18 +59,7 @@ import com.bigdata.config.IntegerValidator;
 import com.bigdata.config.LongValidator;
 import com.bigdata.counters.AbstractStatisticsCollector;
 import com.bigdata.counters.CounterSet;
-import com.bigdata.counters.ICounterSet;
-import com.bigdata.counters.ganglia.BigdataGangliaService;
-import com.bigdata.counters.ganglia.BigdataMetadataFactory;
-import com.bigdata.counters.ganglia.HostMetricsCollector;
-import com.bigdata.counters.ganglia.QueryEngineMetricsCollector;
 import com.bigdata.counters.httpd.CounterSetHTTPD;
-import com.bigdata.ganglia.DefaultMetadataFactory;
-import com.bigdata.ganglia.GangliaMetadataFactory;
-import com.bigdata.ganglia.GangliaService;
-import com.bigdata.ganglia.GangliaSlopeEnum;
-import com.bigdata.ganglia.IGangliaDefaults;
-import com.bigdata.ganglia.util.GangliaUtil;
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.QuorumService;
 import com.bigdata.journal.jini.ha.HAJournal;
@@ -99,7 +82,6 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
 import com.bigdata.util.concurrent.LatchedExecutor;
 import com.bigdata.util.concurrent.ShutdownHelper;
 import com.bigdata.util.concurrent.ThreadPoolExecutorBaseStatisticsTask;
-import com.bigdata.util.httpd.AbstractHTTPD;
 
 /**
  * Concrete implementation suitable for a local and unpartitioned database.
@@ -139,11 +121,16 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
      * Options understood by the {@link Journal}.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     public interface Options extends com.bigdata.journal.Options,
             com.bigdata.journal.ConcurrencyManager.Options,
-            com.bigdata.journal.TemporaryStoreFactory.Options {
+            com.bigdata.journal.TemporaryStoreFactory.Options,
+            com.bigdata.journal.QueueStatsPlugIn.Options,
+            com.bigdata.journal.PlatformStatsPlugIn.Options,
+            com.bigdata.journal.HttpPlugin.Options
+            // Note: Do not import. Forces bigdata-ganglia dependency.
+            // com.bigdata.journal.GangliaPlugIn.Options
+            {
 
         /**
          * The capacity of the {@link HardReferenceQueue} backing the
@@ -188,129 +175,6 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
 
         String DEFAULT_READ_POOL_SIZE = "0";
         
-        /*
-         * Performance counters options.
-         */
-        
-        /**
-         * Boolean option for the collection of statistics from the underlying
-         * operating system (default
-         * {@value #DEFAULT_COLLECT_PLATFORM_STATISTICS}).
-         * 
-         * @see AbstractStatisticsCollector#newInstance(Properties)
-         */
-        String COLLECT_PLATFORM_STATISTICS = Journal.class.getName()
-                + ".collectPlatformStatistics";
-
-        String DEFAULT_COLLECT_PLATFORM_STATISTICS = "false"; 
-
-        /**
-         * Boolean option for the collection of statistics from the various
-         * queues using to run tasks (default
-         * {@link #DEFAULT_COLLECT_QUEUE_STATISTICS}).
-         */
-        String COLLECT_QUEUE_STATISTICS = Journal.class.getName()
-                + ".collectQueueStatistics";
-
-        String DEFAULT_COLLECT_QUEUE_STATISTICS = "false";
-
-		/**
-		 * Integer option specifies the port on which an httpd service will be
-		 * started that exposes the {@link CounterSet} for the client (default
-		 * {@value #DEFAULT_HTTPD_PORT}). When ZERO (0), a random port will be
-		 * used and the actual port selected may be discovered using
-		 * {@link Journal#getHttpdURL()}. The httpd service may be disabled by
-		 * specifying <code>-1</code> as the port.
-		 */
-        String HTTPD_PORT = Journal.class.getName() + ".httpdPort";
-
-        /**
-         * The default http service port is <code>-1</code>, which means
-         * performance counter reporting is disabled by default.
-         */
-        String DEFAULT_HTTPD_PORT = "-1";
-        
-        /**
-         * The delay between reports of performance counters in milliseconds (
-         * {@value #DEFAULT_REPORT_DELAY}). When ZERO (0L), performance counter
-         * reporting will be disabled.
-         * 
-         * @see #DEFAULT_REPORT_DELAY
-         */
-        String REPORT_DELAY = Journal.class.getName() + ".reportDelay";
-
-        /**
-         * The default {@link #REPORT_DELAY}.
-         */
-        String DEFAULT_REPORT_DELAY = ""+(60*1000);
-
-        /*
-         * Ganglia
-         */
-        
-        // Listen
-
-        /**
-         * The multicast group used to join the ganglia performance monitoring
-         * network.
-         */
-        String GANGLIA_LISTEN_GROUP = Journal.class.getName()
-                + ".ganglia.listenGroup";
-
-        String DEFAULT_GANGLIA_LISTEN_GROUP = IGangliaDefaults.DEFAULT_GROUP;
-
-        /**
-         * The port for the multicast group used to join the ganglia performance
-         * monitoring network.
-         */
-        String GANGLIA_LISTEN_PORT = Journal.class.getName()
-                + ".ganglia.listenPort";
-
-        String DEFAULT_GANGLIA_LISTEN_PORT = Integer
-                .toString(IGangliaDefaults.DEFAULT_PORT);
-
-        /**
-         * When <code>true</code>, the embedded {@link GangliaService} will
-         * listen on to the specified multicast group and build up an internal
-         * model of the metrics in the ganglia network.
-         * <p>
-         * Note: If both {@link #GANGLIA_LISTEN} and {@link #GANGLIA_REPORT} are
-         * <code>false</code> then the embedded {@link GangliaService} will not
-         * be started.
-         */
-        String GANGLIA_LISTEN = Journal.class.getName()
-                + ".ganglia.listen";
-
-        String DEFAULT_GANGLIA_LISTEN = "false";
-
-        // Report
-
-        /**
-         * When <code>true</code>, the embedded {@link GangliaService} will
-         * report performance metrics to the specified gmetad server(s).
-         * <p>
-         * Note: If both {@link #GANGLIA_LISTEN} and {@link #GANGLIA_REPORT} are
-         * <code>false</code> then the embedded {@link GangliaService} will not
-         * be started.
-         */
-        String GANGLIA_REPORT = Journal.class.getName()
-                + ".ganglia.report";
-
-        String DEFAULT_GANGLIA_REPORT = "false";
-
-        /**
-         * An list of the metric servers (<code>gmetad</code> instances) to
-         * which metrics will be sent. The default is to send metrics to the
-         * well known multicast group for ganglia. Zero or more hosts may be
-         * specified, separated by whitespace or commas. The port for each host
-         * is optional and defaults to the well known port for ganglia. Each
-         * host may be either a unicast address or a multicast group.
-         */
-        String GANGLIA_SERVERS = Journal.class.getName()
-                + ".ganglia.servers";
-
-        String DEFAULT_GANGLIA_SERVERS = IGangliaDefaults.DEFAULT_GROUP;
-
     }
     
     /**
@@ -943,12 +807,18 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
         final CounterSet root = new CounterSet();
 
         // Host wide performance counters (collected from the OS).
-        if (platformStatisticsCollector != null) {
+        {
 
-            root.attach(platformStatisticsCollector.getCounters());
+            final AbstractStatisticsCollector t = getPlatformStatisticsCollector();
 
+            if (t != null) {
+
+                root.attach(t.getCounters());
+
+            }
+            
         }
-
+        
         // JVM wide performance counters.
         {
             
@@ -985,11 +855,25 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
             tmp.makePath(IJournalCounters.transactionManager)
                     .attach(localTransactionManager.getCounters());
 
-            if (queueSampleTask != null) {
+            {
 
-                tmp.makePath(IJournalCounters.executorService)
-                        .attach(queueSampleTask.getCounters());
+                final IPlugIn<Journal, ThreadPoolExecutorBaseStatisticsTask> plugin = pluginQueueStats
+                        .get();
 
+                if (plugin != null) {
+
+                    final ThreadPoolExecutorBaseStatisticsTask t = plugin
+                            .getService();
+
+                    if (t != null) {
+
+                        tmp.makePath(IJournalCounters.executorService).attach(
+                                t.getCounters());
+
+                    }
+
+                }
+                
             }
 
         }
@@ -1711,32 +1595,45 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
          */
         localTransactionManager.shutdown();
 
-        /*
-         * Note: The embedded GangliaService is executed on the main thread
-         * pool. We need to terminate the GangliaService in order for the thread
-         * pool to shutdown.
-         */
         {
-            final FutureTask<Void> ft = gangliaFuture.getAndSet(null);
 
-            if (ft != null) {
+            final IPlugIn<?, ?> plugIn = pluginGanglia.get();
 
-                ft.cancel(true/* mayInterruptIfRunning */);
+            if (plugIn != null) {
+
+                // stop if running.
+                plugIn.stopService(false/* immediateShutdown */);
 
             }
 
-            // Clear the state reference.
-            gangliaService.set(null);
         }
         
-        if (platformStatisticsCollector != null) {
+        {
+        
+            final IPlugIn<?, ?> plugIn = pluginQueueStats.get();
 
-            platformStatisticsCollector.stop();
+            if (plugIn != null) {
 
-            platformStatisticsCollector = null;
+                // stop if running.
+                plugIn.stopService(false/* immediateShutdown */);
 
+            }
+            
         }
 
+        {
+         
+            final IPlugIn<?, ?> plugIn = pluginPlatformStats.get();
+
+            if (plugIn != null) {
+
+                // stop if running.
+                plugIn.stopService(false/* immediateShutdown */);
+
+            }
+            
+        }
+        
         if (scheduledExecutorService != null) {
 
             scheduledExecutorService.shutdown();
@@ -1744,14 +1641,17 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
         }
         
         // optional httpd service for the local counters.
-        if (httpd != null) {
+        {
+            
+            final IPlugIn<?, ?> plugIn = pluginHttpd.get();
 
-            httpd.shutdown();
+            if (plugIn != null) {
 
-            httpd = null;
+                // stop if running.
+                plugIn.stopService(false/* immediateShutdown */);
 
-            httpdURL = null;
-
+            }
+            
         }
         
         /*
@@ -1808,43 +1708,63 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
             return;
 
         /*
-         * Note: The embedded GangliaService is executed on the main thread
-         * pool. We need to terminate the GangliaService in order for the thread
-         * pool to shutdown.
+         * Note: The ganglia plug in is executed on the main thread pool. We
+         * need to terminate it in order for the thread pool to shutdown.
          */
         {
-            final FutureTask<Void> ft = gangliaFuture.getAndSet(null);
 
-            if (ft != null) {
+            final IPlugIn<?, ?> plugIn = pluginGanglia.get();
 
-                ft.cancel(true/* mayInterruptIfRunning */);
+            if (plugIn != null) {
+
+                // stop if running.
+                plugIn.stopService(true/* immediateShutdown */);
 
             }
-
-            // Clear the state reference.
-            gangliaService.set(null);
+            
         }
 
-        if (platformStatisticsCollector != null) {
+        {
 
-            platformStatisticsCollector.stop();
+            final IPlugIn<?, ?> plugIn = pluginQueueStats.get();
 
-            platformStatisticsCollector = null;
+            if (plugIn != null) {
 
+                // stop if running.
+                plugIn.stopService(true/* immediateShutdown */);
+
+            }
+            
+        }
+
+        {
+         
+            final IPlugIn<?, ?> plugIn = pluginPlatformStats.get();
+
+            if (plugIn != null) {
+
+                // stop if running.
+                plugIn.stopService(true/* immediateShutdown */);
+
+            }
+            
         }
 
         if (scheduledExecutorService != null)
             scheduledExecutorService.shutdownNow();
         
         // optional httpd service for the local counters.
-        if (httpd != null) {
+        {
+            
+            final IPlugIn<?, ?> plugIn = pluginHttpd.get();
 
-            httpd.shutdown();
+            if (plugIn != null) {
 
-            httpd = null;
+                // stop if running.
+                plugIn.stopService(false/* immediateShutdown */);
 
-            httpdURL = null;
-
+            }
+            
         }
 
         // Note: can be null if error in ctor.
@@ -2207,55 +2127,45 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
      */
     private final ScheduledExecutorService scheduledExecutorService;
 
-    /**
-     * Collects interesting statistics on the {@link #executorService}.
-     * 
-     * @see Options#COLLECT_QUEUE_STATISTICS
+    /*
+     * plugins.
      */
-    private ThreadPoolExecutorBaseStatisticsTask queueSampleTask = null;
-
-    /**
-     * Collects interesting statistics on the host and process.
-     * 
-     * @see Options#COLLECT_PLATFORM_STATISTICS
-     */
-    private AbstractStatisticsCollector platformStatisticsCollector = null;
-
-    /**
-     * httpd reporting the live counters -or- <code>null</code> if not enabled.
-     * 
-     * @see Options#HTTPD_PORT
-     */
-    private AbstractHTTPD httpd = null;
+    
+    private final AtomicReference<IPlugIn<Journal, ThreadPoolExecutorBaseStatisticsTask>> pluginQueueStats = new AtomicReference<IPlugIn<Journal,ThreadPoolExecutorBaseStatisticsTask>>();
+    private final AtomicReference<IPlugIn<Journal, AbstractStatisticsCollector>> pluginPlatformStats = new AtomicReference<IPlugIn<Journal, AbstractStatisticsCollector>>();
+    private final AtomicReference<IPlugIn<Journal, ?>> pluginHttpd = new AtomicReference<IPlugIn<Journal, ?>>();
     
     /**
-     * The URL that may be used to access the httpd service exposed by this
-     * client -or- <code>null</code> if not enabled.
+     * An optional plug in for Ganglia.
+     * <p>
+     * Note: The plug in concept was introduced to decouple the ganglia
+     * component. Do not introduce imports into the {@link Journal} class that
+     * would make the ganglia code a required dependency!
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/609">
+     *      bigdata-ganglia is required dependency for Journal </a>
      */
-    private String httpdURL = null;
+    private final AtomicReference<IPlugIn<Journal, ?>> pluginGanglia = new AtomicReference<IPlugIn<Journal, ?>>();
 
     /**
-     * The URL that may be used to access the httpd service exposed by this
-     * client -or- <code>null</code> if not enabled.
+     * Host wide performance counters (collected from the OS) (optional).
+     * 
+     * @see PlatformStatsPlugIn
      */
-    final public String getHttpdURL() {
-        
-        return httpdURL;
-        
+    protected AbstractStatisticsCollector getPlatformStatisticsCollector() {
+
+        final IPlugIn<Journal, AbstractStatisticsCollector> plugin = pluginPlatformStats
+                .get();
+
+        if (plugin == null)
+            return null;
+
+        final AbstractStatisticsCollector t = plugin.getService();
+
+        return t;
+
     }
     
-    /**
-     * Future for an embedded {@link GangliaService} which listens to
-     * <code>gmond</code> instances and other {@link GangliaService}s and
-     * reports out metrics from {@link #getCounters()} to the ganglia network.
-     */
-    private final AtomicReference<FutureTask<Void>> gangliaFuture = new AtomicReference<FutureTask<Void>>();
-
-    /**
-     * The embedded ganglia peer.
-     */
-    private final AtomicReference<BigdataGangliaService> gangliaService = new AtomicReference<BigdataGangliaService>();
-
     /**
      * An executor service used to read on the local disk.
      * 
@@ -2287,12 +2197,6 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
      *         Thompson</a>
-     * 
-     *         FIXME Make sure that we disable this by default (including the
-     *         http reporting, the process and host monitoring, and the ganglia
-     *         monitoring) for the unit tests or we will have a bunch of
-     *         sampling processes running! (Right now, these things are disabled
-     *         by default in {@link Journal.Options}.)
      */
     private class StartDeferredTasksTask implements Runnable {
 
@@ -2328,375 +2232,67 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
         protected void startDeferredTasks() throws IOException {
 
             // start collection on various work queues.
-            startQueueStatisticsCollection();
+            {
+
+                final IPlugIn<Journal, ThreadPoolExecutorBaseStatisticsTask> tmp = new QueueStatsPlugIn();
+                
+                tmp.startService(Journal.this);
+                
+                // Save reference iff started.
+                pluginQueueStats.set(tmp);
+                
+            }
             
             // start collecting performance counters (if enabled).
-            startPlatformStatisticsCollection();
+            {
+
+                final IPlugIn<Journal, AbstractStatisticsCollector> tmp = new PlatformStatsPlugIn();
+                
+                tmp.startService(Journal.this);
+                
+                pluginPlatformStats.set(tmp);
+                
+            }
 
             // start the local httpd service reporting on this service.
-            startHttpdService();
+            {
 
-            /*
-             * Start embedded Ganglia peer. It will develop a snapshot of the
+                final IPlugIn<Journal, CounterSetHTTPD> tmp = new HttpPlugin();
+                
+                tmp.startService(Journal.this);
+                
+                pluginHttpd.set(tmp);
+                
+            }
+
+            /**
+             * Start embedded ganglia peer. It will develop a snapshot of the
              * metrics in memory for all nodes reporting in the ganglia network
              * and will self-report metrics from the performance counter
              * hierarchy to the ganglia network.
+             * 
+             * Note: Do NOT invoke this plug in unless it will start and run to
+             * avoid a CLASSPATH dependency on bigdata-ganglia when it is not
+             * used. The plugin requires platform statistics collection to run,
+             * so if you do not want to have a CLASSPATH dependency on ganglia,
+             * you need to disable the PlatformStatsPlugIn.
+             * 
+             * @see <a
+             *      href="https://sourceforge.net/apps/trac/bigdata/ticket/609">
+             *      bigdata-ganglia is required dependency for Journal </a>
              */
-            {
+            if (getPlatformStatisticsCollector() != null) {
 
-                final Properties properties = getProperties();
+                final IPlugIn<Journal, ?> tmp = new GangliaPlugIn();
 
-                final boolean listen = Boolean
-                        .valueOf(properties.getProperty(Options.GANGLIA_LISTEN,
-                                Options.DEFAULT_GANGLIA_LISTEN));
+                tmp.startService(Journal.this);
 
-                final boolean report = Boolean
-                        .valueOf(properties.getProperty(Options.GANGLIA_REPORT,
-                                Options.DEFAULT_GANGLIA_REPORT));
+                if (tmp.isRunning()) {
 
-                if (listen || report)
-                    startGangliaService(Journal.this.platformStatisticsCollector);
+                    // Save reference iff started.
+                    pluginGanglia.set(tmp);
 
-            }
-
-        }
-
-        /**
-         * Setup sampling on the client's thread pool. This collects interesting
-         * statistics about the thread pool for reporting to the load balancer
-         * service.
-         */
-        protected void startQueueStatisticsCollection() {
-
-            final boolean collectQueueStatistics = Boolean.valueOf(getProperty(
-                    Options.COLLECT_QUEUE_STATISTICS,
-                    Options.DEFAULT_COLLECT_QUEUE_STATISTICS));
-
-            if (log.isInfoEnabled())
-                log.info(Options.COLLECT_QUEUE_STATISTICS + "="
-                        + collectQueueStatistics);
-
-            if (!collectQueueStatistics) {
-
-                return;
-
-            }
-
-            final long initialDelay = 0; // initial delay in ms.
-			final long delay = 1000; // delay in ms.
-			final TimeUnit unit = TimeUnit.MILLISECONDS;
-
-			queueSampleTask = new ThreadPoolExecutorBaseStatisticsTask(
-					executorService);
-
-			addScheduledTask(queueSampleTask, initialDelay,
-					delay, unit);
-
-        }
-        
-        /**
-         * Start collecting performance counters from the OS (if enabled).
-         */
-        protected void startPlatformStatisticsCollection() {
-
-            final boolean collectPlatformStatistics = Boolean
-                    .valueOf(getProperty(Options.COLLECT_PLATFORM_STATISTICS,
-                            Options.DEFAULT_COLLECT_PLATFORM_STATISTICS));
-
-            if (log.isInfoEnabled())
-                log.info(Options.COLLECT_PLATFORM_STATISTICS + "="
-                        + collectPlatformStatistics);
-
-            if (!collectPlatformStatistics) {
-
-                return;
-
-            }
-
-            final Properties p = getProperties();
-
-            if (p.getProperty(AbstractStatisticsCollector.Options.PROCESS_NAME) == null) {
-
-                // Set default name for this process.
-                p.setProperty(AbstractStatisticsCollector.Options.PROCESS_NAME,
-                        "service" + ICounterSet.pathSeparator
-                                + Journal.class.getName());
-
-            }
-
-            try {
-
-                final AbstractStatisticsCollector tmp = AbstractStatisticsCollector
-                        .newInstance(p);
-
-                tmp.start();
-
-                // Note: synchronized(Journal.this) keeps find bugs happy.
-                synchronized(Journal.this) {
-                    
-                    Journal.this.platformStatisticsCollector = tmp;
-                    
                 }
-                
-                if (log.isInfoEnabled())
-                    log.info("Collecting platform statistics.");
-
-            } catch (Throwable t) {
-
-                log.error(t, t);
-                
-            }
-
-        }
-
-        /**
-         * Start the local httpd service (if enabled). The service is started on
-         * the {@link Journal#getHttpdPort()}, on a randomly assigned
-         * port if the port is <code>0</code>, or NOT started if the port is
-         * <code>-1</code>. If the service is started, then the URL for the
-         * service is reported to the load balancer and also written into the
-         * file system. When started, the httpd service will be shutdown with
-         * the federation.
-         * 
-         * @throws UnsupportedEncodingException
-         */
-        protected void startHttpdService() throws UnsupportedEncodingException {
-            
-            final int httpdPort = Integer.valueOf(getProperty(
-                    Options.HTTPD_PORT, Options.DEFAULT_HTTPD_PORT));
-
-            if (log.isInfoEnabled())
-                log.info(Options.HTTPD_PORT + "=" + httpdPort
-                        + (httpdPort == -1 ? " (disabled)" : ""));
-
-            if (httpdPort == -1) {
-
-                return;
-
-            }
-
-            final AbstractHTTPD httpd;
-            try {
-
-                httpd = new CounterSetHTTPD(httpdPort, Journal.this);
-
-            } catch (IOException e) {
-
-                log.error("Could not start httpd: port=" + httpdPort, e);
-
-                return;
-                
-            }
-
-            if (httpd != null) {
-
-                // Note: synchronized(Journal.this) keeps findbugs happy.
-                synchronized (Journal.this) {
-
-                    // save reference to the daemon.
-                    Journal.this.httpd = httpd;
-
-                    // the URL that may be used to access the local httpd.
-                    Journal.this.httpdURL = "http://"
-                            + AbstractStatisticsCollector.fullyQualifiedHostName
-                            + ":" + httpd.getPort() + "/?path="
-                            + URLEncoder.encode("", "UTF-8");
-
-                    if(log.isInfoEnabled())
-                        log.info("Performance counters: " + httpdURL);
-                
-                }
-
-            }
-
-        }
-        
-        /**
-         * Start embedded Ganglia peer. It will develop a snapshot of the
-         * cluster metrics in memory and will self-report metrics from the
-         * performance counter hierarchy to the ganglia network.
-         * 
-         * @param statisticsCollector
-         *            Performance counters will be harvested from here.
-         * 
-         * @see https://sourceforge.net/apps/trac/bigdata/ticket/441 (Ganglia
-         *      Integration).
-         */
-        protected void startGangliaService(
-                final AbstractStatisticsCollector statisticsCollector) {
-
-            if(statisticsCollector == null)
-                return;
-            
-            try {
-
-                final Properties properties = Journal.this.getProperties();
-
-                final String hostName = AbstractStatisticsCollector.fullyQualifiedHostName;
-
-                /*
-                 * Note: This needs to be the value reported by the statistics
-                 * collector since that it what makes it into the counter set
-                 * path prefix for this service.
-                 * 
-                 * TODO This implies that we can not enable the embedded ganglia
-                 * peer unless platform level statistics collection is enabled.
-                 * We should be able to separate out the collection of host
-                 * metrics from whether or not we are collecting metrics from
-                 * the bigdata service. Do this when moving the host and process
-                 * (pidstat) collectors into the bigdata-ganglia module.
-                 */
-                final String serviceName = statisticsCollector.getProcessName();
-
-                final InetAddress listenGroup = InetAddress
-                        .getByName(properties.getProperty(
-                                Options.GANGLIA_LISTEN_GROUP,
-                                Options.DEFAULT_GANGLIA_LISTEN_GROUP));
-
-                final int listenPort = Integer.valueOf(properties.getProperty(
-                        Options.GANGLIA_LISTEN_PORT,
-                        Options.DEFAULT_GANGLIA_LISTEN_PORT));
-
-                final boolean listen = Boolean.valueOf(properties.getProperty(
-                        Options.GANGLIA_LISTEN,
-                        Options.DEFAULT_GANGLIA_LISTEN));
-
-                final boolean report = Boolean.valueOf(properties.getProperty(
-                        Options.GANGLIA_REPORT,
-                        Options.DEFAULT_GANGLIA_REPORT));
-
-                // Note: defaults to the listenGroup and port if nothing given.
-                final InetSocketAddress[] metricsServers = GangliaUtil.parse(
-                        // server(s)
-                        properties.getProperty(
-                        Options.GANGLIA_SERVERS,
-                        Options.DEFAULT_GANGLIA_SERVERS),
-                        // default host (same as listenGroup)
-                        listenGroup.getHostName(),
-                        // default port (same as listenGroup)
-                        listenPort
-                        );
-
-                final int quietPeriod = IGangliaDefaults.QUIET_PERIOD;
-
-                final int initialDelay = IGangliaDefaults.INITIAL_DELAY;
-
-                /*
-                 * Note: Use ZERO (0) if you are running gmond on the same host.
-                 * That will prevent the GangliaService from transmitting a
-                 * different heartbeat, which would confuse gmond and gmetad.
-                 */
-                final int heartbeatInterval = 0; // IFF using gmond.
-                // final int heartbeatInterval =
-                // IGangliaDefaults.HEARTBEAT_INTERVAL;
-
-                // Use the report delay for the interval in which we scan the
-                // performance counters.
-                final int monitoringInterval = (int) TimeUnit.MILLISECONDS
-                        .toSeconds(Long.parseLong(properties.getProperty(
-                                Options.REPORT_DELAY,
-                                Options.DEFAULT_REPORT_DELAY)));
-
-                final String defaultUnits = IGangliaDefaults.DEFAULT_UNITS;
-
-                final GangliaSlopeEnum defaultSlope = IGangliaDefaults.DEFAULT_SLOPE;
-
-                final int defaultTMax = IGangliaDefaults.DEFAULT_TMAX;
-
-                final int defaultDMax = IGangliaDefaults.DEFAULT_DMAX;
-
-                // Note: Factory is extensible (application can add its own
-                // delegates).
-                final GangliaMetadataFactory metadataFactory = new GangliaMetadataFactory(
-                        new DefaultMetadataFactory(//
-                                defaultUnits,//
-                                defaultSlope,//
-                                defaultTMax,//
-                                defaultDMax//
-                        ));
-
-                /*
-                 * Layer on the ability to (a) recognize and align host
-                 * bigdata's performance counters hierarchy with those declared
-                 * by ganglia and; (b) provide nice declarations for various
-                 * application counters of interest.
-                 */
-                metadataFactory.add(new BigdataMetadataFactory(hostName,
-                        serviceName, defaultSlope, defaultTMax, defaultDMax,
-                        heartbeatInterval));
-
-                // The embedded ganglia peer.
-                final BigdataGangliaService gangliaService = new BigdataGangliaService(
-                        hostName, //
-                        serviceName, //
-                        metricsServers,//
-                        listenGroup,//
-                        listenPort, //
-                        listen,// listen
-                        report,// report
-                        false,// mock,
-                        quietPeriod, //
-                        initialDelay, //
-                        heartbeatInterval,//
-                        monitoringInterval, //
-                        defaultDMax,// globalDMax
-                        metadataFactory);
-
-                // Collect and report host metrics.
-                gangliaService.addMetricCollector(new HostMetricsCollector(
-                        statisticsCollector));
-
-                // Collect and report QueryEngine metrics.
-                gangliaService
-                        .addMetricCollector(new QueryEngineMetricsCollector(
-                                Journal.this, statisticsCollector));
-
-                /*
-                 * TODO The problem with reporting per-service statistics is
-                 * that ganglia lacks a facility to readily aggregate statistics
-                 * across services on a host (SMS + anything). The only way this
-                 * can readily be made to work is if each service has a distinct
-                 * metric for the same value (e.g., Mark and Sweep GC). However,
-                 * that causes a very large number of distinct metrics. I have
-                 * commented this out for now while I think it through some
-                 * more. Maybe we will wind up only reporting the per-host
-                 * counters to ganglia?
-                 * 
-                 * Maybe the right way to handle this is to just filter by the
-                 * service type? Basically, that is what we are doing for the
-                 * QueryEngine metrics.
-                 */
-                // Collect and report service metrics.
-//                gangliaService.addMetricCollector(new ServiceMetricsCollector(
-//                        statisticsCollector, null/* filter */));
-
-                // Wrap as Future.
-                final FutureTask<Void> ft = new FutureTask<Void>(
-                        gangliaService, (Void) null);
-                
-                // Save reference to future.
-                gangliaFuture.set(ft);
-
-                // Set the state reference.
-                Journal.this.gangliaService.set(gangliaService);
-
-                // Start the embedded ganglia service.
-                getExecutorService().submit(ft);
-
-            } catch (RejectedExecutionException t) {
-                
-                /*
-                 * Ignore.
-                 * 
-                 * Note: This occurs if the federation shutdown() before we
-                 * start the embedded ganglia peer. For example, it is common
-                 * when running a short lived utility service such as
-                 * ListServices.
-                 */
-                
-            } catch (Throwable t) {
-
-                log.error(t, t);
 
             }
 
