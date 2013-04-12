@@ -49,6 +49,34 @@ public class DefaultSnapshotPolicy implements ISnapshotPolicy {
     final private int timeOfDay;
     final private int percentLogSize;
 
+    /**
+     * Convert a delay in milliseconds into an <code>hh:mm</code> format string
+     * representing the hours and minutes remaining in that delay.
+     * 
+     * @param delay
+     *            The delay in milliseconds.
+     *            
+     * @return The string representation of the countdown.
+     */
+    public static String toHHMM(final long delay) {
+
+        final int hh = (int) TimeUnit.MILLISECONDS.toHours(delay);
+        final int mm = (int) (TimeUnit.MILLISECONDS.toMinutes(delay) % 60L);
+
+        final StringBuilder sb = new StringBuilder();
+
+        final Formatter f = new Formatter(sb);
+
+        f.format("%02d:%02d", hh, mm);
+        f.flush();
+        f.close();
+        
+        final String str = sb.toString();
+
+        return str;
+        
+    }
+    
     @Override
     public String toString() {
 
@@ -62,8 +90,12 @@ public class DefaultSnapshotPolicy implements ISnapshotPolicy {
         
         final String todStr = sb.toString();
 
-        return DefaultSnapshotPolicy.class.getSimpleName() + "{timeOfDay="
-                + todStr + ", percentLogSize=" + percentLogSize + "%}";
+        return DefaultSnapshotPolicy.class.getSimpleName() //
+                + "{timeOfDay=" + todStr //
+                + ", percentLogSize=" + percentLogSize + "%}"
+                // how long until the next snapshot check.
+                + ", countdown=" + toHHMM(delay(timeOfDay)
+                        );
 
     }
     
@@ -105,17 +137,17 @@ public class DefaultSnapshotPolicy implements ISnapshotPolicy {
 
     public void init(final HAJournal jnl) {
         
+        // delay until next run (ms).
         final long initialDelay = delay(timeOfDay);
 
-        if (log.isInfoEnabled())
-            log.info("initialDelay=" + initialDelay + "ms" + " (hours="
-                    + TimeUnit.MILLISECONDS.toHours(initialDelay)
-                    + ", minutes="
-                    + (TimeUnit.MILLISECONDS.toMinutes(initialDelay) % 60L)
-                    + ")");
+        // run once per day.
+        final long delay = TimeUnit.DAYS.toMillis(1);
 
-        jnl.addScheduledTask(new SnapshotTask(jnl), initialDelay, 1/* delay */,
-                TimeUnit.DAYS);
+        if (log.isInfoEnabled())
+            log.info("initialDelay=" + toHHMM(initialDelay));
+
+        jnl.addScheduledTask(new SnapshotTask(jnl), initialDelay, delay,
+                TimeUnit.MILLISECONDS);
 
     }
 
