@@ -241,12 +241,18 @@ public interface ITransactionService extends ITimestampService {
 
     /**
      * Return the timestamp whose historical data MAY be released. This time is
-     * derived from the timestamp of the earliest running transaction MINUS the
-     * minimum release age and is updated whenever the earliest running
-     * transaction terminates. This value is monotonically increasing. It will
-     * always be LT the last non-zero last commit time. It will never be
-     * negative. It MAY be ZERO (0L) and will be ZERO (0L) on startup (unless
-     * explicitly set by the database to the last known commit time).
+     * derived from the minimum of the timestamp of the earliest running
+     * transaction and <code>now-minReleaseAge</code> and is updated whenever
+     * the earliest running transaction terminates. This value is monotonically
+     * increasing. It will always be LT the last non-zero last commit time. It
+     * will never be negative. It MAY be ZERO (0L) and will be ZERO (0L) on
+     * startup (unless explicitly set by the database to the last known commit
+     * time).
+     * <p>
+     * The returned values is used to identify the most recent commit point LTE
+     * the releaseTime. This is the earliest commit point on whose data MAY be
+     * released. (Consequently, the first commit point GT the releaseTime is the
+     * earliest visible commit point.)
      */
     public long getReleaseTime() throws IOException;
     

@@ -825,6 +825,8 @@ abstract public class AbstractTransactionService extends AbstractService
     private volatile long earliestOpenTxId = 0L;
     
     /**
+     * {@inheritDoc}
+     * 
      * @see Options#MIN_RELEASE_AGE
      */
     public long getReleaseTime() {

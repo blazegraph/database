@@ -1264,12 +1264,12 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 			 * If the store can recycle storage then we must provide a hook to
 			 * allow the removal of cached data when it is available for recycling.
 			 */
-			if (_bufferStrategy instanceof IRWStrategy) {
+			if (_bufferStrategy instanceof IHistoryManager) {
 
 			    final int checkpointRecordSize = getByteCount(_commitRecordIndex
                         .getCheckpoint().getCheckpointAddr());
 
-			    ((IRWStrategy) _bufferStrategy).registerExternalCache(
+			    ((IHistoryManager) _bufferStrategy).registerExternalCache(
                         historicalIndexCache, checkpointRecordSize);
 			    
             }
@@ -3893,9 +3893,9 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
      */
 	private boolean isHistoryGone(final long commitTime) {
 
-	    if (this._bufferStrategy instanceof IRWStrategy) {
+	    if (this._bufferStrategy instanceof IHistoryManager) {
 
-	        final long lastReleaseTime = ((IRWStrategy) _bufferStrategy)
+	        final long lastReleaseTime = ((IHistoryManager) _bufferStrategy)
                     .getLastReleaseTime();
 	        
             if (commitTime <= lastReleaseTime) {
@@ -6407,11 +6407,11 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
     /**
      * Remove all commit records between the two provided keys.
-     * 
+     * <p>
      * This is called from the RWStore when it checks for deferredFrees against
      * the CommitRecordIndex where the CommitRecords reference the deleteBlocks
      * that have been deferred.
-     * 
+     * <p>
      * Once processed the records for the effected range muct be removed as they
      * reference invalid states.
      * 
@@ -6419,6 +6419,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
      * @param toKey
      * 
      * @see https://sourceforge.net/apps/trac/bigdata/ticket/440
+     * @see IHistoryManager#checkDeferredFrees(AbstractJournal)
      */
     public int removeCommitRecordEntries(final byte[] fromKey,
             final byte[] toKey) {
