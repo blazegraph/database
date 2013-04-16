@@ -23,6 +23,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.journal.jini.ha;
 
+import com.bigdata.ha.msg.IHASnapshotRequest;
+
 /**
  * The policy that specifies when a new snapshot will be taken. The decision to
  * take a snapshot is a local decision. The snapshot is assumed to be written to
@@ -52,4 +54,10 @@ public interface ISnapshotPolicy {
     @Override
     String toString();
     
+    /**
+     * Return a request for a snapshot using the configured parameters for this
+     * {@link ISnapshotPolicy}.
+     */
+    IHASnapshotRequest newSnapshotRequest();
+
 }

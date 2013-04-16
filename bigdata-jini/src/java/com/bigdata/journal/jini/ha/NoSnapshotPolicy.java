@@ -23,6 +23,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.journal.jini.ha;
 
+import com.bigdata.ha.msg.HASnapshotRequest;
+import com.bigdata.ha.msg.IHASnapshotRequest;
+
 /**
  * Policy NEVER takes a snapshot.
  * 
@@ -40,6 +43,12 @@ public class NoSnapshotPolicy implements ISnapshotPolicy {
 
         return getClass().getSimpleName();
         
+    }
+
+    public IHASnapshotRequest newSnapshotRequest() {
+
+        return new HASnapshotRequest(100/* percentLogSize */);
+
     }
 
 }

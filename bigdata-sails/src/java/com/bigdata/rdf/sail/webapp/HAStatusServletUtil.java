@@ -51,9 +51,11 @@ import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.RootBlockView;
 import com.bigdata.journal.jini.ha.HAJournal;
+import com.bigdata.journal.jini.ha.ISnapshotPolicy;
 import com.bigdata.journal.jini.ha.SnapshotManager;
 import com.bigdata.quorum.AsynchronousQuorumCloseException;
 import com.bigdata.quorum.Quorum;
+import com.bigdata.quorum.QuorumException;
 import com.bigdata.quorum.zk.ZKQuorumImpl;
 import com.bigdata.rdf.sail.webapp.client.HAStatusEnum;
 import com.bigdata.zookeeper.DumpZookeeper;
@@ -168,10 +170,30 @@ public class HAStatusServletUtil {
             {
 
                 // snapshot policy.
-                p.text("Service: snapshotPolicy="
-                        + journal.getSnapshotManager().getSnapshotPolicy())
-                        .node("br").close();
-
+                {
+                    final SnapshotManager mgr = journal.getSnapshotManager();
+//                    final IRootBlockView lastSnapshotRB = mgr
+//                            .getNewestSnapshot();
+//                    final long sinceCommitCounter = lastSnapshotRB == null ? -1L
+//                            : lastSnapshotRB.getCommitCounter();
+//                    final long haLogBytesOnDiskSinceLastSnapshot = mgr
+//                            .getHALogFileBytesSinceCommitCounter(sinceCommitCounter);
+                    final ISnapshotPolicy snapshotPolicy = mgr
+                            .getSnapshotPolicy();
+                    final boolean takeSnapshot = mgr
+                            .isReadyToSnapshot(snapshotPolicy
+                                    .newSnapshotRequest());
+                    p.text("Service"//
+                            + ": snapshotPolicy="
+                            + snapshotPolicy//
+                            + ", shouldSnapshot="
+                            + takeSnapshot//
+//                            + ", lastSnapshotCommitCounter="
+//                            + sinceCommitCounter//
+//                            + ", HALogFileBytesOnDiskSinceLastSnapshot="
+//                            + haLogBytesOnDiskSinceLastSnapshot//
+                    ).node("br").close();
+                }
                 // restore policy.
                 p.text("Service: restorePolicy="
                         + journal.getSnapshotManager().getRestorePolicy())
@@ -212,11 +234,23 @@ public class HAStatusServletUtil {
                     }
                     final long commitCounter = journal.getRootBlockView()
                             .getCommitCounter();
+                    // TODO Move this stuff to a TXS Status section?
+                    long releaseTime = -1;
+                    try {
+                        // Note: Can throw exception if quorum is not met.
+                        releaseTime = journal.getTransactionService()
+                                .getReleaseTime();
+                    } catch (QuorumException ex) {
+                        // Ignore.
+                    }
                     p.text("HAJournal: file=" + file //
                             + ", commitCounter=" + commitCounter //
                             + ", nbytes=" + journal.size()//
-                            + (digestStr == null ? "" : ", md5=" + digestStr))
-                            .node("br").close();
+                            + (digestStr == null ? "" : ", md5=" + digestStr)//
+                            + (releaseTime != -1L ? ", releaseTime="
+                                    + RootBlockView.toString(releaseTime)//
+                            : "")//
+                    ).node("br").close();
                 }
             }
 

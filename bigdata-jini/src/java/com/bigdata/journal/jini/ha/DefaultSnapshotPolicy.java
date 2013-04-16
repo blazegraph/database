@@ -32,6 +32,7 @@ import java.util.concurrent.TimeUnit;
 import org.apache.log4j.Logger;
 
 import com.bigdata.ha.msg.HASnapshotRequest;
+import com.bigdata.ha.msg.IHASnapshotRequest;
 import com.bigdata.ha.msg.IHASnapshotResponse;
 
 /**
@@ -151,6 +152,13 @@ public class DefaultSnapshotPolicy implements ISnapshotPolicy {
 
     }
 
+    @Override
+    public IHASnapshotRequest newSnapshotRequest() {
+
+        return new HASnapshotRequest(percentLogSize);
+        
+    }
+    
     private class SnapshotTask implements Runnable {
         
         /**
@@ -184,7 +192,7 @@ public class DefaultSnapshotPolicy implements ISnapshotPolicy {
 
                 // Conditionally start a snapshot.
                 final Future<IHASnapshotResponse> f = jnl.getSnapshotManager()
-                        .takeSnapshot(new HASnapshotRequest(percentLogSize));
+                        .takeSnapshot(newSnapshotRequest());
 
                 if (f != null) {
 

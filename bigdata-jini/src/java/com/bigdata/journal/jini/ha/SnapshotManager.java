@@ -708,6 +708,12 @@ public class SnapshotManager {
     
     /**
      * Take a new snapshot. This is a NOP if a snapshot is already being made.
+     * <p>
+     * Note: The service must be joined with a met quorum to take a snapshot.
+     * This is checked here and also in HAJournal when we take the snapshot.
+     * This is necessary in order to ensure that the snapshots are copies of a
+     * journal state that the quorum agrees on, otherwise we could later attempt
+     * to restore from an invalid state.
      * 
      * @return The {@link Future} if a snapshot is already being made -or- if a
      *         snapshot was started by the request and <code>null</code> if no
@@ -742,6 +748,17 @@ public class SnapshotManager {
                 
             }
             
+            final long token = journal.getQuorum().token();
+
+            if (!journal.getQuorum().getClient().isJoinedMember(token)) {
+
+                haLog.warn("Service not joined with met quorum.");
+                
+                // This service is not joined with a met quorum.
+                return null;
+                
+            }
+
             if (!isReadyToSnapshot(req)) {
 
                 // Pre-conditions are not met.
@@ -819,28 +836,11 @@ public class SnapshotManager {
      * snapshot. If the size(halogs) as a percentage of the size(journal) is LTE
      * the given [percentLogSize], then we return [false] to indicate that no
      * snapshot should be taken.
-     * <p>
-     * Note: The service must be joined with a met quorum to take a snapshot.
-     * This is checked here and also in HAJournal when we take the snapshot.
-     * This is necessary in order to ensure that the snapshots are copies of a
-     * journal state that the quorum agrees on, otherwise we could later attempt
-     * to restore from an invalid state.
      */
-    private boolean isReadyToSnapshot(final IHASnapshotRequest req) {
+    public boolean isReadyToSnapshot(final IHASnapshotRequest req) {
 
-        if(req == null)
+        if (req == null)
             throw new IllegalArgumentException();
-        
-        final long token = journal.getQuorum().token();
-        
-        if (!journal.getQuorum().getClient().isJoinedMember(token)) {
-
-            haLog.warn("Service not joined with met quorum.");
-            
-            // This service is not joined with a met quorum.
-            return false;
-            
-        }
 
         final IRootBlockView snapshotRootBlock = snapshotIndex
                 .getNewestSnapshot();
@@ -853,20 +853,72 @@ public class SnapshotManager {
              * We already have a snapshot for the most recent commit point on
              * the journal.
              */
-            
+
             return false;
-            
+
         }
+
+        final long sinceCommitCounter = snapshotRootBlock == null ? 0L
+                : snapshotRootBlock.getCommitCounter();
+
+        // Get HALog bytes on disk since that commit counter (strictly GT).
+        final long haLogBytesOnDisk = getHALogFileBytesSinceCommitCounter(sinceCommitCounter);
+
+        /*
+         * Figure out the size of the HALog files written since the last
+         * snapshot as a percentage of the size of the journal.
+         */
         
+        final long journalSize = journal.size();
+
+        // size(HALogs)/size(journal) as percentage.
+        final int actualPercentLogSize = (int) (100 * (((double) haLogBytesOnDisk) / ((double) journalSize)));
+
+        final int thresholdPercentLogSize = req.getPercentLogSize();
+
+        final boolean takeSnapshot = (actualPercentLogSize >= thresholdPercentLogSize);
+
+        if (haLog.isInfoEnabled()) {
+
+            haLog.info("sinceCommitCounter="
+                    + sinceCommitCounter//
+                    + ", haLogBytesOnDisk="
+                    + haLogBytesOnDisk//
+                    + ", journalSize="
+                    + journalSize//
+                    + ", percentLogSize="
+                    + actualPercentLogSize//
+                    + "%, takeSnapshot=" + (takeSnapshot ? "" : " not")
+                    + " be taken");
+
+        }
+        return takeSnapshot;
+
+    }
+
+    /**
+     * Return the #of bytes in the HALog files since a given commit point.
+     * <p>
+     * Note: The current (live) HALog file is NOT in the reported total. The
+     * total only reports the bytes on disk for the committed transactions.
+     * 
+     * @param sinceCommitCounter
+     *            The exclusive lower bound and <code>-1L</code> if the total
+     *            bytes on disk for ALL HALog files should be reported.
+     *            
+     * @return The #of bytes in those HALog files.
+     */
+    public long getHALogFileBytesSinceCommitCounter(final long sinceCommitCounter) {
+
         /*
          * List the HALog files for this service.
          */
         final File[] files;
         {
 
-            // most recent snapshot commit counter or -1L if no snapshots exist.
-            final long snapshotCommitCounter = snapshotRootBlock == null ? -1L
-                    : snapshotRootBlock.getCommitCounter();
+//            // most recent snapshot commit counter or -1L if no snapshots exist.
+//            final long snapshotCommitCounter = snapshotRootBlock == null ? -1L
+//                    : snapshotRootBlock.getCommitCounter();
             
             final File currentLogFile = journal.getHALogWriter().getFile();
 
@@ -894,27 +946,28 @@ public class SnapshotManager {
                         return false;
                     }
 
-                    // filter out the current log file
                     if (currentLogFile != null
                             && name.equals(currentLogFileName)) {
-                        /*
-                         * The caller requested that we NOT purge the
-                         * current HALog, and this is it.
-                         */
+                        // filter out the current log file
                         return false;
                     }
 
                     // Strip off the filename extension.
                     final String logFileBaseName = name.substring(0,
-                            IHALogReader.HA_LOG_EXT.length());
+                            name.length() - IHALogReader.HA_LOG_EXT.length());
 
                     // Closing commitCounter for HALog file.
                     final long logCommitCounter = Long
                             .parseLong(logFileBaseName);
 
-                    if (logCommitCounter >= snapshotCommitCounter) {
+                    if (logCommitCounter > sinceCommitCounter) {
                         /*
                          * HALog is more recent than the current snapshot
+                         * 
+                         * Note: We do not include the HALog file if it was for
+                         * the commit point of the snapshot. We are only
+                         * counting HALog file bytes that have NOT yet been
+                         * incorporated into a snapshot.
                          */
                         return true;
                     }
@@ -941,35 +994,14 @@ public class SnapshotManager {
 
         }
 
-        /*
-         * Figure out the size of the HALog files written since the last
-         * snapshot as a percentage of the size of the journal.
-         */
+        if (haLog.isInfoEnabled())
+            haLog.info("sinceCommitCounter=" + sinceCommitCounter + ", files="
+                    + files.length + ", bytesOnDisk=" + totalBytes);
+
+        return totalBytes;
         
-        final long journalSize = journal.size();
-
-        // size(HALogs)/size(journal) as percentage.
-        final int actualPercentLogSize = (int) (100 * (((double) totalBytes) / ((double) journalSize)));
-
-        final int thresholdPercentLogSize = req.getPercentLogSize();
-
-        final boolean takeSnapshot = (actualPercentLogSize >= thresholdPercentLogSize);
-
-        if (haLog.isInfoEnabled()) {
-
-            haLog.info("There are " + files.length
-                    + " HALog files since the last snapshot occupying "
-                    + totalBytes + " bytes.  The journal is currently "
-                    + journalSize + " bytes.  The HALogs are " + actualPercentLogSize
-                    + " of the journal on the disk.  A new snapshot should"
-                    + (takeSnapshot ? "" : " not") + " be taken");
-
-        }
-        
-        return takeSnapshot;
-
     }
-
+    
     /**
      * Take a snapshot.
      * 

@@ -2093,8 +2093,8 @@ public class HAJournalServer extends AbstractServer {
             }
 
             /*
-             * Atomic decision whether HALog *was* for live write set when rbs
-             * were obtained from leader.
+             * Atomic decision whether HALog *was* for live write set when root
+             * blocks were obtained from leader.
              * 
              * Note: Even if true, it is possible that the write set could have
              * been committed since then. However, if false then guaranteed that
@@ -2373,7 +2373,7 @@ public class HAJournalServer extends AbstractServer {
                 if (haLog.isInfoEnabled())
                     haLog.info("Will attempt to join met quorum.");
 
-                final UUID leaderId = getQuorum().getLeaderId();
+                final UUID leaderId = getQuorum().getLeaderId(); // FIXME HA TXS: REFACTOR COMMON CODE WITH resyncTransitionToMetQuorum
                 
                 // The vote cast by the leader.
                 final long lastCommitTimeOfQuorumLeader = getQuorum()
@@ -2393,7 +2393,7 @@ public class HAJournalServer extends AbstractServer {
 
                 // Verify that the quorum is valid.
                 getQuorum().assertQuorum(token);
-
+                //FIXME HA TXS: We must have the releaseTime before calling setQuorumToken().  CRITICAL SECTION exclusion here.
                 // Set the token on the journal.
                 journal.setQuorumToken(token);
                 
@@ -2804,7 +2804,7 @@ public class HAJournalServer extends AbstractServer {
 
             // Vote the consensus for the met quorum.
             final Quorum<?, ?> quorum = getQuorum();
-            final UUID leaderId = quorum.getLeaderId();
+            final UUID leaderId = quorum.getLeaderId(); // FIXME HA TXS: RECONCILE AND COMBINE WITH doConditionJoinWithMetQuorum()
             final long token = msg.getQuorumToken();
             quorum.assertQuorum(token);
             // Note: Concurrent quorum break will cause NPE here.
@@ -2826,7 +2826,7 @@ public class HAJournalServer extends AbstractServer {
              * TODO What happens if we are blocked here?
              */
             getActor().serviceJoin();
-
+            // FIXME HA TXS: We must have the releaseTime before calling setQuorumToken().  CRITICAL SECTION exclusion here.
             // Set the token on the journal.
             journal.setQuorumToken(token);
 
