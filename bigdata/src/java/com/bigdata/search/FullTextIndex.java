@@ -1085,7 +1085,7 @@ public class FullTextIndex<V extends Comparable<V>> extends AbstractRelation {
             	
                 final ITermMetadata md = e.getValue();
 
-                final CountIndexTask<V> task1 = new CountIndexTask<V>(termText, prefixMatch, md
+                final CountIndexTask<V> task1 = new CountIndexTask<V>(termText, 0, 1, prefixMatch, md
                         .getLocalTermWeight(), this);
                 
                 hits = new SingleTokenHitCollector<V>(task1);
@@ -1095,13 +1095,14 @@ public class FullTextIndex<V extends Comparable<V>> extends AbstractRelation {
 	            final List<CountIndexTask<V>> tasks = new ArrayList<CountIndexTask<V>>(
 	                    qdata.distinctTermCount());
 	
+	            int i = 0;
 	            for (Map.Entry<String, ITermMetadata> e : qdata.terms.entrySet()) {
 	
 	                final String termText = e.getKey();
 	
 	                final ITermMetadata md = e.getValue();
 	
-	                tasks.add(new CountIndexTask<V>(termText, prefixMatch, md
+	                tasks.add(new CountIndexTask<V>(termText, i++, qdata.terms.size(), prefixMatch, md
 	                        .getLocalTermWeight(), this));
 	
 	            }
@@ -1116,14 +1117,15 @@ public class FullTextIndex<V extends Comparable<V>> extends AbstractRelation {
 	            final List<Callable<Object>> tasks = new ArrayList<Callable<Object>>(
 	                    qdata.distinctTermCount());
 	
+	            int i = 0;
 	            for (Map.Entry<String, ITermMetadata> e : qdata.terms.entrySet()) {
 	
 	                final String termText = e.getKey();
 	
 	                final ITermMetadata md = e.getValue();
 	
-	                tasks.add(new ReadIndexTask<V>(termText, prefixMatch, md
-	                        .getLocalTermWeight(), this, hits));
+	                tasks.add(new ReadIndexTask<V>(termText, i++, qdata.terms.size(),
+	                		prefixMatch, md.getLocalTermWeight(), this, hits));
 	
 	            }
 	
@@ -1178,8 +1180,10 @@ public class FullTextIndex<V extends Comparable<V>> extends AbstractRelation {
 	        	
 		        final int nterms = qdata.terms.size();
 		        
-		        if (log.isInfoEnabled())
+		        if (log.isInfoEnabled()) {
 		        	log.info("matchAll=true, nterms=" + nterms);
+		        	log.info("size before: " + a.length);
+		        }
 		        
 	        	final Hit<V>[] tmp = new Hit[a.length];
 	        	
@@ -1190,6 +1194,10 @@ public class FullTextIndex<V extends Comparable<V>> extends AbstractRelation {
 	        			tmp[i++] = hit;
 	        		}
 	        		
+	        	}
+	        	
+	        	if (log.isDebugEnabled()) {
+	        		log.debug(i);
 	        	}
 	        	
 	        	if (i < a.length) {
