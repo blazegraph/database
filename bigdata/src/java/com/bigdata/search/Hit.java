@@ -1,8 +1,12 @@
 package com.bigdata.search;
 
+import it.unimi.dsi.bits.LongArrayBitVector;
+
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.log4j.Logger;
+
+import test.it.unimi.dsi.bits.LongArrayBitVectorTest;
 
 /**
  * Metadata about a search result.
@@ -18,8 +22,11 @@ public class Hit<V extends Comparable<V>> implements IHit<V>,
     /** note: defaults to an illegal value. */
     private V docId = null;
     
-    /** #of terms reporting. */
-    private int nterms;
+//    /** #of terms reporting. */
+//    private int nterms;
+
+    /** Array of whether each search term appears or does not appear in the hit. **/
+    private LongArrayBitVector searchTerms;
     
     /** Net cosine for the reporting terms. */
     private double cosine;
@@ -54,11 +61,24 @@ public class Hit<V extends Comparable<V>> implements IHit<V>,
 
     }
     
+    synchronized void setNumSearchTerms(final int numSearchTerms) {
+    	
+    	this.searchTerms = LongArrayBitVector.ofLength(numSearchTerms);// boolean[numSearchTerms];
+    	
+    }
+    
     /**
      * The #of terms for which a hit was reported for this document.
      */
     synchronized public int getTermCount() {
         
+    	if (searchTerms.size() == 0)
+    		return 0;
+    	
+    	int nterms = 0;
+    	for (boolean b : searchTerms)
+    		if (b) nterms++;
+    	
         return nterms;
         
     }
@@ -84,13 +104,15 @@ public class Hit<V extends Comparable<V>> implements IHit<V>,
     /**
      * Adds another component to the cosine.
      */
-    public void add(final String term, final double weight) {
+    public void add(final int termNdx, final double weight) {
         
         synchronized (this) {
 
             cosine += weight;
 
-            nterms++;
+//            nterms++;
+            
+            searchTerms.set(termNdx, true);
 
         }
 
@@ -105,7 +127,7 @@ public class Hit<V extends Comparable<V>> implements IHit<V>,
 
     public String toString() {
         
-        return "Hit{docId"+docId+",nterms="+nterms+",cosine="+cosine+"}";
+        return "Hit{docId"+docId+",nterms="+getTermCount()+",cosine="+cosine+"}";
         
     }
 

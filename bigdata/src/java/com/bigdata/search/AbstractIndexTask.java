@@ -17,6 +17,8 @@ public abstract class AbstractIndexTask<V extends Comparable<V>> {
     final private static Logger log = Logger.getLogger(AbstractIndexTask.class);
 
     protected final String queryTerm;
+    protected final int queryTermNdx;
+    protected final int numQueryTerms;
     protected final double queryTermWeight;
     protected final byte[] fromKey;
     protected final byte[] toKey;
@@ -27,6 +29,10 @@ public abstract class AbstractIndexTask<V extends Comparable<V>> {
      * 
      * @param termText
      *            The term text for the search term.
+     * @param termNdx
+     * 			  The index of this term within the overall search.
+     * @param numTerms
+     * 			  The overall number of search terms.
      * @param prefixMatch
      *            When <code>true</code> any term having <i>termText</i> as a
      *            prefix will be matched. Otherwise the term must be an exact
@@ -36,8 +42,10 @@ public abstract class AbstractIndexTask<V extends Comparable<V>> {
      * @param searchEngine
      *            The search engine.
      */
-    public AbstractIndexTask(final String termText, final boolean prefixMatch,
-            final double queryTermWeight, final FullTextIndex<V> searchEngine) {
+    public AbstractIndexTask(final String termText, 
+    		final int termNdx, final int numTerms, 
+    		final boolean prefixMatch, final double queryTermWeight, 
+    		final FullTextIndex<V> searchEngine) {
 
         if (termText == null)
             throw new IllegalArgumentException();
@@ -46,6 +54,10 @@ public abstract class AbstractIndexTask<V extends Comparable<V>> {
             throw new IllegalArgumentException();
         
         this.queryTerm = termText;
+        
+        this.queryTermNdx = termNdx;
+        
+        this.numQueryTerms = numTerms;
 
         this.queryTermWeight = queryTermWeight;
 

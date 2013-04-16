@@ -41,6 +41,10 @@ public class CountIndexTask<V extends Comparable<V>> extends AbstractIndexTask<V
      * 
      * @param termText
      *            The term text for the search term.
+     * @param termNdx
+     * 			  The index of this term within the overall search.
+     * @param numTerms
+     * 			  The overall number of search terms.
      * @param prefixMatch
      *            When <code>true</code> any term having <i>termText</i> as a
      *            prefix will be matched. Otherwise the term must be an exact
@@ -50,10 +54,11 @@ public class CountIndexTask<V extends Comparable<V>> extends AbstractIndexTask<V
      * @param searchEngine
      *            The search engine.
      */
-    public CountIndexTask(final String termText, final boolean prefixMatch,
+    public CountIndexTask(final String termText, final int termNdx, final int numTerms, 
+    		final boolean prefixMatch,
             final double queryTermWeight, final FullTextIndex<V> searchEngine) {
 
-    	super(termText, prefixMatch, queryTermWeight, searchEngine);
+    	super(termText, termNdx, numTerms, prefixMatch, queryTermWeight, searchEngine);
     	
         if (log.isDebugEnabled())
             log.debug("termText=[" + termText + "], prefixMatch=" + prefixMatch
