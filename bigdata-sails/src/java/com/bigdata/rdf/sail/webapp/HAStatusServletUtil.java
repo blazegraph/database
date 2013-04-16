@@ -234,22 +234,22 @@ public class HAStatusServletUtil {
                     }
                     final long commitCounter = journal.getRootBlockView()
                             .getCommitCounter();
-                    // TODO Move this stuff to a TXS Status section?
-                    long releaseTime = -1;
-                    try {
-                        // Note: Can throw exception if quorum is not met.
-                        releaseTime = journal.getTransactionService()
-                                .getReleaseTime();
-                    } catch (QuorumException ex) {
-                        // Ignore.
-                    }
+//                    // TODO Move this stuff to a TXS Status section?
+//                    long releaseTime = -1;
+//                    try {
+//                        // Note: Can throw exception if quorum is not met.
+//                        releaseTime = journal.getTransactionService()
+//                                .getReleaseTime();
+//                    } catch (QuorumException ex) {
+//                        // Ignore.
+//                    }
                     p.text("HAJournal: file=" + file //
                             + ", commitCounter=" + commitCounter //
                             + ", nbytes=" + journal.size()//
                             + (digestStr == null ? "" : ", md5=" + digestStr)//
-                            + (releaseTime != -1L ? ", releaseTime="
-                                    + RootBlockView.toString(releaseTime)//
-                            : "")//
+//                            + (releaseTime != -1L ? ", releaseTime="
+//                                    + RootBlockView.toString(releaseTime)//
+//                            : "")//
                     ).node("br").close();
                 }
             }
