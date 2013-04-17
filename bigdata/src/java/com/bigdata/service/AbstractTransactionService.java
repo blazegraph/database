@@ -1330,7 +1330,7 @@ abstract public class AbstractTransactionService extends AbstractService
      * will not return a timestamp whose absolute value corresponds to an active
      * transaction.
      */
-    protected final TxId2CommitTimeIndex startTimeIndex = TxId2CommitTimeIndex
+    private final TxId2CommitTimeIndex startTimeIndex = TxId2CommitTimeIndex
             .createTransient();
 
     /**

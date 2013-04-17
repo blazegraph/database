@@ -44,7 +44,6 @@ import com.bigdata.ha.msg.IHASnapshotDigestResponse;
 import com.bigdata.ha.msg.IHASnapshotRequest;
 import com.bigdata.ha.msg.IHASnapshotResponse;
 import com.bigdata.journal.AbstractJournal;
-import com.bigdata.journal.ITransactionService;
 import com.bigdata.journal.Journal;
 import com.bigdata.quorum.AsynchronousQuorumCloseException;
 import com.bigdata.quorum.QuorumException;
@@ -66,7 +65,7 @@ import com.bigdata.service.IService;
  *       the standard jini smart proxy naming pattern.
  */
 public interface HAGlue extends HAGlueBase, HAPipelineGlue, HAReadGlue,
-        HACommitGlue, ITransactionService, IService {
+        HACommitGlue, HATXSGlue, IService {
 
     /*
      * Administrative
