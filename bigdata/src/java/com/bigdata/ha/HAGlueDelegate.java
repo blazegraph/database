@@ -29,6 +29,7 @@ import java.rmi.RemoteException;
 import java.security.DigestException;
 import java.security.NoSuchAlgorithmException;
 import java.util.UUID;
+import java.util.concurrent.BrokenBarrierException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -38,12 +39,15 @@ import com.bigdata.ha.msg.IHA2PhaseCommitMessage;
 import com.bigdata.ha.msg.IHA2PhasePrepareMessage;
 import com.bigdata.ha.msg.IHADigestRequest;
 import com.bigdata.ha.msg.IHADigestResponse;
+import com.bigdata.ha.msg.IHAGatherReleaseTimeRequest;
 import com.bigdata.ha.msg.IHAGlobalWriteLockRequest;
 import com.bigdata.ha.msg.IHALogDigestRequest;
 import com.bigdata.ha.msg.IHALogDigestResponse;
 import com.bigdata.ha.msg.IHALogRequest;
 import com.bigdata.ha.msg.IHALogRootBlocksRequest;
 import com.bigdata.ha.msg.IHALogRootBlocksResponse;
+import com.bigdata.ha.msg.IHANotifyReleaseTimeRequest;
+import com.bigdata.ha.msg.IHANotifyReleaseTimeResponse;
 import com.bigdata.ha.msg.IHAReadRequest;
 import com.bigdata.ha.msg.IHAReadResponse;
 import com.bigdata.ha.msg.IHARebuildRequest;
@@ -55,10 +59,10 @@ import com.bigdata.ha.msg.IHASnapshotDigestResponse;
 import com.bigdata.ha.msg.IHASnapshotRequest;
 import com.bigdata.ha.msg.IHASnapshotResponse;
 import com.bigdata.ha.msg.IHASyncRequest;
+import com.bigdata.ha.msg.IHATXSLockRequest;
 import com.bigdata.ha.msg.IHAWriteMessage;
 import com.bigdata.ha.msg.IHAWriteSetStateRequest;
 import com.bigdata.ha.msg.IHAWriteSetStateResponse;
-import com.bigdata.journal.ValidationError;
 import com.bigdata.quorum.AsynchronousQuorumCloseException;
 import com.bigdata.quorum.QuorumException;
 
@@ -166,39 +170,58 @@ public class HAGlueDelegate implements HAGlue {
     }
 
     @Override
-    public long nextTimestamp() throws IOException {
-        return delegate.nextTimestamp();
+    public Future<Void> gatherMinimumVisibleCommitTime(
+            final IHAGatherReleaseTimeRequest req) throws IOException {
+        return delegate.gatherMinimumVisibleCommitTime(req);
     }
 
     @Override
-    public long newTx(long timestamp) throws IOException {
-        return delegate.newTx(timestamp);
+    public IHANotifyReleaseTimeResponse notifyEarliestCommitTime(
+            final IHANotifyReleaseTimeRequest req) throws IOException,
+            InterruptedException, BrokenBarrierException {
+        return delegate.notifyEarliestCommitTime(req);
     }
 
     @Override
-    public long commit(long tx) throws ValidationError, IOException {
-        return delegate.commit(tx);
+    public Future<Void> getTXSCriticalSectionLockOnLeader(
+            final IHATXSLockRequest req) throws IOException {
+        return delegate.getTXSCriticalSectionLockOnLeader(req);
     }
 
-    @Override
-    public void abort(long tx) throws IOException {
-        delegate.abort(tx);
-    }
-
-    @Override
-    public void notifyCommit(long commitTime) throws IOException {
-        delegate.notifyCommit(commitTime);
-    }
-
-    @Override
-    public long getLastCommitTime() throws IOException {
-        return delegate.getLastCommitTime();
-    }
-
-    @Override
-    public long getReleaseTime() throws IOException {
-        return delegate.getReleaseTime();
-    }
+//    @Override
+//    public long nextTimestamp() throws IOException {
+//        return delegate.nextTimestamp();
+//    }
+//
+//    @Override
+//    public long newTx(long timestamp) throws IOException {
+//        return delegate.newTx(timestamp);
+//    }
+//
+//    @Override
+//    public long commit(long tx) throws ValidationError, IOException {
+//        return delegate.commit(tx);
+//    }
+//
+//    @Override
+//    public void abort(long tx) throws IOException {
+//        delegate.abort(tx);
+//    }
+//
+//    @Override
+//    public void notifyCommit(long commitTime) throws IOException {
+//        delegate.notifyCommit(commitTime);
+//    }
+//
+//    @Override
+//    public long getLastCommitTime() throws IOException {
+//        return delegate.getLastCommitTime();
+//    }
+//
+//    @Override
+//    public long getReleaseTime() throws IOException {
+//        return delegate.getReleaseTime();
+//    }
 
     @Override
     public IHALogRootBlocksResponse getHALogRootBlocksForWriteSet(

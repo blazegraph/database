@@ -2370,44 +2370,13 @@ public class HAJournalServer extends AbstractServer {
 
                 }
 
-                if (haLog.isInfoEnabled())
-                    haLog.info("Will attempt to join met quorum.");
-
-                final UUID leaderId = getQuorum().getLeaderId(); // FIXME HA TXS: REFACTOR COMMON CODE WITH resyncTransitionToMetQuorum
+                /*
+                 * Cast the leader's vote, join with the met quorum, and
+                 * transition to RunMet.
+                 */
                 
-                // The vote cast by the leader.
-                final long lastCommitTimeOfQuorumLeader = getQuorum()
-                        .getCastVote(leaderId);
-
-                // Verify that the quorum is valid.
-                getQuorum().assertQuorum(token);
-
-                // Cast that vote.
-                getActor().castVote(lastCommitTimeOfQuorumLeader);
-
-                // Verify that the quorum is valid.
-                getQuorum().assertQuorum(token);
-
-                // Attempt to join the met quorum.
-                getActor().serviceJoin();
-
-                // Verify that the quorum is valid.
-                getQuorum().assertQuorum(token);
-                //FIXME HA TXS: We must have the releaseTime before calling setQuorumToken().  CRITICAL SECTION exclusion here.
-                // Set the token on the journal.
-                journal.setQuorumToken(token);
-                
-                haLog.warn("Joined met quorum: runState=" + runStateRef
-                        + ", commitCounter=" + openingCommitCounter
-                        + ", lastCommitTimeOfLeader="
-                        + lastCommitTimeOfQuorumLeader + ", nextBlockSeq="
-                        + logWriter.getSequence());
-
-                // Verify that the quorum is valid.
-                getQuorum().assertQuorum(token);
-
-                enterRunState(new RunMetTask(token, leaderId));
-                
+                doCastLeadersVoteAndServiceJoin(token);
+                                
                 // Done with resync.
                 return true;
 
@@ -2802,20 +2771,52 @@ public class HAJournalServer extends AbstractServer {
             // Accept the message - log and apply.
             acceptHAWriteMessage(msg, data);
 
+            /*
+             * Cast the leader's vote, join with the met quorum, and
+             * transition to RunMet.
+             */
+            doCastLeadersVoteAndServiceJoin(msg.getQuorumToken());
+            
+        }
+
+        /**
+         * Cast the leader's vote, join with the met quorum, and transition to
+         * RunMet.
+         * 
+         * @param token
+         *            The token that must remain valid throughout this
+         *            operation.
+         */
+        private void doCastLeadersVoteAndServiceJoin(final long token) {
+            
             // Vote the consensus for the met quorum.
             final Quorum<?, ?> quorum = getQuorum();
-            final UUID leaderId = quorum.getLeaderId(); // FIXME HA TXS: RECONCILE AND COMBINE WITH doConditionJoinWithMetQuorum()
-            final long token = msg.getQuorumToken();
-            quorum.assertQuorum(token);
-            // Note: Concurrent quorum break will cause NPE here.
-            final long leadersVote = quorum.getCastVote(leaderId);
-            getActor().castVote(leadersVote);
-            // getActor().castVote(rootBlock.getLastCommitTime());
 
-            log.warn("Service voted for lastCommitTime of quorum, is receiving pipeline writes, and should join the met quorum");
+            // UUID of the quorum leader.
+            final UUID leaderId = quorum.getLeaderId();
+            
+            // Verify that the quorum is valid.
+            quorum.assertQuorum(token);
 
             /*
-             * Attempt to join.
+             * Get the vote cast by the leader.
+             * 
+             * Note: Concurrent quorum break will cause NPE here.
+             */
+            final long leadersVote = quorum.getCastVote(leaderId);
+            
+            if (haLog.isInfoEnabled())
+                haLog.info("Will attempt to join met quorum: " + token
+                        + ", leadersVote=" + leadersVote);
+
+            // Cast that vote.
+            getActor().castVote(leadersVote);
+
+            // Verify that the quorum is valid.
+            getQuorum().assertQuorum(token);
+            
+            /*
+             * Attempt to join the met quorum.
              * 
              * Note: This will throw an exception if this services is not in the
              * consensus.
@@ -2824,12 +2825,20 @@ public class HAJournalServer extends AbstractServer {
              * are handling a replicated write).
              * 
              * TODO What happens if we are blocked here?
+             * 
+             * FIXME HA TXS: CRITICAL SECTION exclusion here.
              */
             getActor().serviceJoin();
-            // FIXME HA TXS: We must have the releaseTime before calling setQuorumToken().  CRITICAL SECTION exclusion here.
+
+            // Verify that the quorum is valid.
+            getQuorum().assertQuorum(token);
+
             // Set the token on the journal.
             journal.setQuorumToken(token);
 
+            // Verify that the quorum is valid.
+            getQuorum().assertQuorum(token);
+            
             // Transition to RunMet.
             enterRunState(new RunMetTask(token, leaderId));
 

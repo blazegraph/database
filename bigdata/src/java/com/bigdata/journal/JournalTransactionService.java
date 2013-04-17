@@ -32,7 +32,7 @@ import java.util.Properties;
 import java.util.concurrent.ExecutionException;
 
 import com.bigdata.service.AbstractFederation;
-import com.bigdata.service.AbstractTransactionService;
+import com.bigdata.service.AbstractHATransactionService;
 import com.bigdata.service.DataService;
 
 /**
@@ -41,9 +41,10 @@ import com.bigdata.service.DataService;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class JournalTransactionService extends AbstractTransactionService {
+abstract public class JournalTransactionService extends
+        AbstractHATransactionService {
 
-    protected final Journal journal;
+    private final Journal journal;
 
     /**
      * @param properties
@@ -498,7 +499,7 @@ public class JournalTransactionService extends AbstractTransactionService {
      *             always.
      */
     @Override
-    public AbstractFederation getFederation() {
+    public AbstractFederation<?> getFederation() {
 
         throw new UnsupportedOperationException();
         

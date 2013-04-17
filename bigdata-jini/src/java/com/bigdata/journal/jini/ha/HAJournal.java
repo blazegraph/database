@@ -95,7 +95,6 @@ import com.bigdata.journal.IHABufferStrategy;
 import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
-import com.bigdata.journal.ValidationError;
 import com.bigdata.journal.WriteExecutorService;
 import com.bigdata.journal.jini.ha.HAJournalServer.HAQuorumService;
 import com.bigdata.quorum.AsynchronousQuorumCloseException;
@@ -629,52 +628,6 @@ public class HAJournal extends Journal {
 
             super(serviceId, writePipelineAddr);
             
-        }
-
-        /*
-         * ITransactionService
-         * 
-         * This interface is delegated to the Journal's local transaction
-         * service. This service MUST be the quorum leader.
-         * 
-         * Note: If the quorum breaks, the service which was the leader will
-         * invalidate all open transactions. This is handled in AbstractJournal.
-         * 
-         * FIXME HA TXS: We should really pair the quorum token with the
-         * transaction identifier in order to guarantee that the quorum token
-         * does not change (e.g., that the quorum does not break) across the
-         * scope of the transaction. That will require either changing the
-         * ITransactionService API and/or defining an HA variant of that API.
-         */
-        
-        @Override
-        public long newTx(final long timestamp) throws IOException {
-
-            getQuorum().assertLeader(getQuorumToken());
-
-            // Delegate to the Journal's local transaction service.
-            return HAJournal.this.newTx(timestamp);
-
-        }
-
-        @Override
-        public long commit(final long tx) throws ValidationError, IOException {
-
-            getQuorum().assertLeader(getQuorumToken());
-
-            // Delegate to the Journal's local transaction service.
-            return HAJournal.this.commit(tx);
-
-        }
-
-        @Override
-        public void abort(final long tx) throws IOException {
-
-            getQuorum().assertLeader(getQuorumToken());
-            
-            // Delegate to the Journal's local transaction service.
-            HAJournal.this.abort(tx);
-
         }
 
         @Override

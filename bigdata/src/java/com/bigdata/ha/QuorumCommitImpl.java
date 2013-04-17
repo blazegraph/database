@@ -461,7 +461,7 @@ public class QuorumCommitImpl<S extends HACommitGlue> extends
             /*
              * If there were any errors, then throw an exception listing them.
              * 
-             * TODO But only throw the exception if the errors were for a joined
+             * FIXME But only throw the exception if the errors were for a joined
              * service. Otherwise just log.
              */
             if (!causes.isEmpty()) {

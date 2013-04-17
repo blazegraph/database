@@ -49,6 +49,7 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.BrokenBarrierException;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
@@ -95,6 +96,7 @@ import com.bigdata.counters.AbstractStatisticsCollector;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
 import com.bigdata.ha.HAGlue;
+import com.bigdata.ha.HATXSGlue;
 import com.bigdata.ha.QuorumService;
 import com.bigdata.ha.RunState;
 import com.bigdata.ha.msg.HAReadResponse;
@@ -106,12 +108,15 @@ import com.bigdata.ha.msg.IHA2PhaseCommitMessage;
 import com.bigdata.ha.msg.IHA2PhasePrepareMessage;
 import com.bigdata.ha.msg.IHADigestRequest;
 import com.bigdata.ha.msg.IHADigestResponse;
+import com.bigdata.ha.msg.IHAGatherReleaseTimeRequest;
 import com.bigdata.ha.msg.IHAGlobalWriteLockRequest;
 import com.bigdata.ha.msg.IHALogDigestRequest;
 import com.bigdata.ha.msg.IHALogDigestResponse;
 import com.bigdata.ha.msg.IHALogRequest;
 import com.bigdata.ha.msg.IHALogRootBlocksRequest;
 import com.bigdata.ha.msg.IHALogRootBlocksResponse;
+import com.bigdata.ha.msg.IHANotifyReleaseTimeRequest;
+import com.bigdata.ha.msg.IHANotifyReleaseTimeResponse;
 import com.bigdata.ha.msg.IHAReadRequest;
 import com.bigdata.ha.msg.IHAReadResponse;
 import com.bigdata.ha.msg.IHARebuildRequest;
@@ -123,6 +128,7 @@ import com.bigdata.ha.msg.IHASnapshotDigestResponse;
 import com.bigdata.ha.msg.IHASnapshotRequest;
 import com.bigdata.ha.msg.IHASnapshotResponse;
 import com.bigdata.ha.msg.IHASyncRequest;
+import com.bigdata.ha.msg.IHATXSLockRequest;
 import com.bigdata.ha.msg.IHAWriteMessage;
 import com.bigdata.ha.msg.IHAWriteSetStateRequest;
 import com.bigdata.ha.msg.IHAWriteSetStateResponse;
@@ -153,6 +159,7 @@ import com.bigdata.rwstore.IHistoryManager;
 import com.bigdata.rwstore.IRWStrategy;
 import com.bigdata.rwstore.sector.MemStrategy;
 import com.bigdata.rwstore.sector.MemoryManager;
+import com.bigdata.service.AbstractHATransactionService;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.stream.Stream;
 import com.bigdata.util.ChecksumUtility;
@@ -2844,25 +2851,44 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
             rootAddrs[PREV_ROOTBLOCK] = this.m_rootBlockCommitter
                     .handleCommit(commitTime);
 
-			/*
-			 * Write the commit record onto the store.
-			 * 
-			 * @todo Modify to log the current root block and set the address of
-			 * that root block in the commitRecord. This will be of use solely
-			 * in disaster recovery scenarios where your root blocks are toast,
-			 * but good root blocks can be found elsewhere in the file.
-			 */
+            if ((_bufferStrategy instanceof IHABufferStrategy)
+                    && quorum != null && quorum.isHighlyAvailable()) {
 
-			final IRootBlockView old = _rootBlock;
+                try {
+                    /**
+                     * CRITICAL SECTION. We need obtain a distributed consensus
+                     * for the services joined with the met quorum concerning
+                     * the earliest commit point that is pinned by the
+                     * combination of the active transactions and the
+                     * minReleaseAge on the TXS. New transaction starts during
+                     * this critical section will block (on the leader or the
+                     * folllower) unless they are guaranteed to be allowable,
+                     * e.g., based on the current minReleaseAge, the new tx
+                     * would read from the most recent commit point, the new tx
+                     * would ready from a commit point that is already pinned by
+                     * an active transaction on that node, etc.
+                     * 
+                     * @see <a href=
+                     *      "https://docs.google.com/document/d/14FO2yJFv_7uc5N0tvYboU-H6XbLEFpvu-G8RhAzvxrk/edit?pli=1#"
+                     *      > HA TXS Design Document </a>
+                     * 
+                     * @see <a
+                     *      href="https://sourceforge.net/apps/trac/bigdata/ticket/623"
+                     *      > HA TXS / TXS Bottleneck </a>
+                     */
+                    
+                    ((AbstractHATransactionService) getLocalTransactionManager()
+                            .getTransactionService())
+                            .updateReleaseTimeConsensus();
+                    
+                } catch (Exception ex) {
 
-			final long newCommitCounter = old.getCommitCounter() + 1;
-			
-            final ICommitRecord commitRecord = new CommitRecord(commitTime,
-                    newCommitCounter, rootAddrs);
-
-            final long commitRecordAddr = write(ByteBuffer
-                    .wrap(CommitRecordSerializer.INSTANCE
-                            .serialize(commitRecord)));
+                    // Wrap and rethrow.
+                    throw new RuntimeException(ex);
+                    
+                }
+                
+            }
 
             /*
              * Before flushing the commitRecordIndex we need to check for
@@ -2877,6 +2903,26 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
             if (_bufferStrategy instanceof IHistoryManager) {
                 ((IHistoryManager) _bufferStrategy).checkDeferredFrees(this);
             }
+
+            /*
+             * Write the commit record onto the store.
+             * 
+             * @todo Modify to log the current root block and set the address of
+             * that root block in the commitRecord. This will be of use solely
+             * in disaster recovery scenarios where your root blocks are toast,
+             * but good root blocks can be found elsewhere in the file.
+             */
+
+            final IRootBlockView old = _rootBlock;
+
+            final long newCommitCounter = old.getCommitCounter() + 1;
+            
+            final ICommitRecord commitRecord = new CommitRecord(commitTime,
+                    newCommitCounter, rootAddrs);
+
+            final long commitRecordAddr = write(ByteBuffer
+                    .wrap(CommitRecordSerializer.INSTANCE
+                            .serialize(commitRecord)));
 
             /*
              * Add the commit record to an index so that we can recover
@@ -3416,6 +3462,50 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
 	}
 
+    /**
+     * Resolve the {@link ICommitRecord} for the earliest visible commit point
+     * based on the current {@link ITransactionService#getReleaseTime()}.
+     */
+    protected ICommitRecord getEarliestVisibleCommitRecord() {
+
+        final ReadLock lock = _fieldReadWriteLock.readLock();
+
+        lock.lock();
+
+        try {
+
+            final long releaseTime = getLocalTransactionManager()
+                    .getTransactionService().getReleaseTime();
+
+            if (releaseTime == 0) {
+
+                // Nothing committed yet.
+                return null;
+                
+            }
+            
+            final CommitRecordIndex commitRecordIndex = _commitRecordIndex;
+
+            if (commitRecordIndex == null)
+                throw new AssertionError();
+
+            final ICommitRecord commitRecord = commitRecordIndex
+                    .findNext(releaseTime);
+
+            return commitRecord;
+
+        } catch (IOException e) {
+
+            // Note: Should not be thrown. Local method call.
+            throw new RuntimeException(e);
+
+        } finally {
+
+            lock.unlock();
+            
+        }
+	}
+	
 	/**
 	 * Returns a read-only view of the most recently committed
 	 * {@link ICommitRecord} containing the root addresses.
@@ -4941,7 +5031,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                  * We do not need to discard read-only tx since the committed
                  * state should remain valid even when a quorum is lost.
                  * 
-                 * FIXME HA : QUORUM TX INTEGRATION (discard running read/write tx).
+                 * FIXME HA TXS INTEGRATION (discard running read/write tx).
                  */
                 
                 // local abort (no quorum, so we can do 2-phase abort).
@@ -6323,43 +6413,52 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
          * ITransactionService.
          * 
          * Note: API is mostly implemented by Journal/HAJournal.
+         * 
+         * Note: We should either not expose the ITransactionService or we
+         * should delegate the rest of this API. I am leaning toward NOT
+         * exposing the ITransactionService interface since (a) it does not
+         * appear to be necessary to start transactions on a specific service;
+         * and (b) if we do, then we really need to track remote transactions
+         * (by the remote Service UUID) and cancel them if the remote service
+         * leaves the met quorum. All we really need to expose here is the
+         * HATXSGlue interface and that DOES NOT need to extend the
+         * ITransactionService interface.
          */
         
         @Override
-        public long newTx(long timestamp) throws IOException {
-            throw new UnsupportedOperationException();
-        }
+        public Future<Void> gatherMinimumVisibleCommitTime(
+                final IHAGatherReleaseTimeRequest req) throws IOException {
 
-        @Override
-        public long commit(long tx) throws ValidationError, IOException {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public void abort(long tx) throws IOException {
-            throw new UnsupportedOperationException();
-        }
-        
-        @Override
-        public void notifyCommit(long commitTime) throws IOException {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public long getLastCommitTime() throws IOException {
+            final Future<Void> ft = ((HATXSGlue) AbstractJournal.this
+                    .getLocalTransactionManager().getTransactionService())
+                    .gatherMinimumVisibleCommitTime(req);
             
-            return AbstractJournal.this.getLastCommitTime();
+            return getProxy(ft, true/* asynchFuture */);
             
         }
 
         @Override
-        public long getReleaseTime() throws IOException {
-            throw new UnsupportedOperationException();
+        public IHANotifyReleaseTimeResponse notifyEarliestCommitTime(
+                final IHANotifyReleaseTimeRequest req) throws IOException,
+                InterruptedException, BrokenBarrierException {
+
+            return ((HATXSGlue) AbstractJournal.this
+                    .getLocalTransactionManager().getTransactionService())
+                    .notifyEarliestCommitTime(req);
+
         }
 
         @Override
-        public long nextTimestamp() throws IOException {
-            throw new UnsupportedOperationException();
+        public Future<Void> getTXSCriticalSectionLockOnLeader(
+                final IHATXSLockRequest req) throws IOException {
+
+            final Future<Void> f = ((HATXSGlue) AbstractJournal.this
+                    .getLocalTransactionManager().getTransactionService())
+                    .getTXSCriticalSectionLockOnLeader(req);
+            
+            // Note: MUST be an asynchronous Future!!!
+            return getProxy(f, true/* asynchronousFuture */);
+
         }
 
         /*
