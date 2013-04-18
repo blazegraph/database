@@ -809,7 +809,7 @@ public class ZKQuorumImpl<S extends Remote, C extends QuorumClient<S>> extends
                                         false/* watch */, null/* stat */));
                         if (serviceId.equals(state.serviceUUID())) {
                             // Found this service.
-                            log.warn("Service already joined");
+                            log.warn("Service " + serviceId + " already joined in quorum of " + children.length);
                             return;
                         }
                     }

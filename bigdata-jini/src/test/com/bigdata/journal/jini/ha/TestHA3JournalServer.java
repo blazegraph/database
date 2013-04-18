@@ -27,11 +27,18 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.journal.jini.ha;
 
 import java.io.File;
+import java.io.IOException;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.UUID;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+
+import junit.framework.AssertionFailedError;
 
 import net.jini.config.Configuration;
 
@@ -40,6 +47,7 @@ import com.bigdata.ha.HAStatusEnum;
 import com.bigdata.ha.halog.HALogWriter;
 import com.bigdata.ha.msg.HARootBlockRequest;
 import com.bigdata.journal.AbstractJournal;
+import com.bigdata.quorum.AsynchronousQuorumCloseException;
 import com.bigdata.quorum.Quorum;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
 
@@ -1468,7 +1476,117 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
         }
     }
     
+    public void testABCMultiTransactionFollowerReads() throws Exception {
+    	// doABCMultiTransactionFollowerReads(2000/*nTransactions*/, 20/*delay per transaction*/); // STRESS
+    	doABCMultiTransactionFollowerReads(200/*nTransactions*/, 20/*delay per transaction*/);
+    }
+    
     /**
+     * Tests multiple concurrent reads on followers in presence of multiple updates.
+     * @throws Exception 
+     */
+    protected void doABCMultiTransactionFollowerReads(final int nTransactions, final long transactionDelay) throws Exception {
+
+        final long timeout = TimeUnit.MINUTES.toMillis(4);
+        try {
+            
+			// Start all services.
+            final ABC services = new ABC(true/* sequential */);
+
+
+			// Wait for a quorum meet.
+			final long token = quorum.awaitQuorum(awaitQuorumTimeout,
+					TimeUnit.MILLISECONDS);
+
+			awaitFullyMetQuorum();
+			
+            final HAGlue leader = quorum.getClient().getLeader(token);
+
+            // Verify assumption in this test.
+            assertEquals(leader, services.serverA);
+
+            // Wait until leader is ready.
+            leader.awaitHAReady(awaitQuorumTimeout, TimeUnit.MILLISECONDS);
+            
+			// start concurrent task to load for specified transactions
+			final Callable<Void> task = new Callable<Void>() {
+				public Void call() throws Exception {
+						for (int n = 0; n < nTransactions; n++) {
+
+							final StringBuilder sb = new StringBuilder();
+							sb.append("PREFIX dc: <http://purl.org/dc/elements/1.1/>\n");
+							sb.append("INSERT DATA {\n");
+							sb.append("  <http://example/book" + n
+									+ "> dc:title \"A new book\" ;\n");
+							sb.append("  dc:creator \"A.N.Other\" .\n");
+							sb.append("}\n");
+
+							final String updateStr = sb.toString();
+
+							final HAGlue leader = quorum.getClient().getLeader(
+									token);
+
+							// Verify quorum is still valid.
+							quorum.assertQuorum(token);
+
+								getRemoteRepository(leader).prepareUpdate(
+										updateStr).evaluate();
+								log.warn("COMPLETED TRANSACTION " + n);
+
+								Thread.sleep(transactionDelay);
+						}
+						// done.
+						return null;
+				}
+			};
+			final FutureTask<Void> load = new FutureTask<Void>(task);
+
+			executorService.submit(load);
+			
+			// Now create a Callable for the final followes to repeatedly query against the current commit point
+			final Callable<Void> query = new Callable<Void>() {
+				public Void call() throws Exception {
+						int queryCount = 0;
+						SimpleDateFormat df = new SimpleDateFormat("hh:mm:ss,SSS");
+						while (!load.isDone()) {
+
+							final StringBuilder sb = new StringBuilder();
+							sb.append("SELECT (COUNT(*) AS ?count) WHERE { ?s ?p ?o }\n");
+
+							final String query = sb.toString();
+
+							// final RemoteRepository follower = getRemoteRepository(services.serverA); // try with Leader to see difference! 6537 queries (less than for follower)
+							final RemoteRepository follower = getRemoteRepository(services.serverC); // 10109 queries for 2000 transact	ons
+
+							// Verify quorum is still valid.
+							quorum.assertQuorum(token);
+
+							follower.prepareTupleQuery(query).evaluate();
+							
+							// add date time format to support comparison with HA logs
+							log.info(df.format(new Date()) + " - completed query: " + ++queryCount);
+						}
+						// done.
+						return null;
+				}
+			};
+			
+			final FutureTask<Void> queries = new FutureTask<Void>(query);
+			
+			executorService.submit(queries);
+			
+			// Now wait for query completion!
+			queries.get();
+			
+			assertTrue(load.isDone());
+			
+		} finally {
+			destroyAll();
+		}
+	    	
+    }
+    
+   /**
      * Tests that halog files are removed after fully met on rebuild
      * face
      * @throws Exception 
@@ -1800,7 +1918,7 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
         
         // start concurrent task loads that continue until fully met
         final FutureTask<Void> ft = new FutureTask<Void>(new LargeLoadTask(
-                token));
+                token, true));
 
         executorService.submit(ft);
 
@@ -1814,6 +1932,9 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
         shutdownC();
         awaitPipeline(new HAGlue[] {startup.serverA, startup.serverB});
 
+        // And no longer joined.
+        awaitJoined(new HAGlue[] {startup.serverA, startup.serverB});
+
         // token must remain unchanged to indicate same quorum
         assertEquals(token, awaitMetQuorum());
 
@@ -1823,16 +1944,43 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
         // C comes back at the end of the pipeline.
         awaitPipeline(new HAGlue[] {startup.serverA, startup.serverB, serverC2});
         
+        // And Joins.
+        // awaitJoined(new HAGlue[] {startup.serverA, startup.serverB, serverC2});
+        
         // Await fully met quorum *before* LOAD is done.
-        assertTrue(awaitFullyMetDuringLOAD(token, ft));
+        assertTrue(awaitFullyMetDuringLOAD2(token, ft));
 
         // Verify fully met.
         assertTrue(quorum.isQuorumFullyMet(token));
 
+        /*
         // Await LOAD, but with a timeout.
         ft.get(longLoadTimeoutMillis, TimeUnit.MILLISECONDS);
+        // no delay needed since commit2Phase should ensure stores all synced
         
+        try {
+        	assertDigestsEquals(new HAGlue[] { startup.serverA, startup.serverB, serverC2 });
+        } catch (final AssertionFailedError afe) {
+        	shutdownA();
+        	shutdownB();
+        	shutdownC();
+        	throw afe;
+        }
+        */
     }
+    
+    /**
+     * Stress test disabled for CI
+     */
+	public void _test_stress() throws Exception {
+		for (int i = 0; i < 20; i++) {
+			try {
+				testABC_LiveLoadRemainsMet_restart_C_fullyMetDuringLOAD();
+			} finally {
+				destroyAll();
+			}
+		}
+	}
 
     /**
      * Start A+B+C in strict sequence. Wait until the quorum fully meets. Start
@@ -1947,7 +2095,7 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
         
         // start concurrent task loads that continue until fully met
         final FutureTask<Void> ft = new FutureTask<Void>(new LargeLoadTask(
-                token));
+                token, true));
 
         executorService.submit(ft);
 
@@ -1979,6 +2127,7 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
         // Await LOAD, but with a timeout.
         ft.get(longLoadTimeoutMillis, TimeUnit.MILLISECONDS);
         
+		// assertDigestsEquals(new HAGlue[] { startup.serverA, serverB2, startup.serverC });
     }
 
     /**
@@ -2025,7 +2174,7 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
         awaitPipeline(new HAGlue[] {startup.serverA, startup.serverB, serverC2});
         
         // wait for the quorum to fully meet during the LOAD.
-        assertTrue(awaitFullyMetDuringLOAD(token, ft));
+        assertTrue(awaitFullyMetDuringLOAD2(token, ft));
 
         // Double checked assertion. Should always be true per loop above.
         assertTrue(quorum.isQuorumFullyMet(token));
@@ -2051,7 +2200,7 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
         awaitPipeline(new HAGlue[] { startup.serverA, serverC2, serverB2 });
         
         // Await fully met quorum *before* LOAD is done.
-        assertTrue(awaitFullyMetDuringLOAD(token, ft));
+        assertTrue(awaitFullyMetDuringLOAD2(token, ft));
 
         // Verify fully met.
         assertTrue(quorum.isQuorumFullyMet(token));
@@ -2115,7 +2264,7 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
         awaitPipeline(new HAGlue[] { startup.serverA, startup.serverC, serverB2 });
         
         // Await fully met quorum *before* LOAD is done.
-        assertTrue(awaitFullyMetDuringLOAD(token, ft));
+        assertTrue(awaitFullyMetDuringLOAD2(token, ft));
 
         // Verify fully met.
         assertTrue(quorum.isQuorumFullyMet(token));
@@ -2143,7 +2292,7 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
         awaitPipeline(new HAGlue[] { startup.serverA, serverB2, serverC2 });
 
         // Await fully met quorum *before* LOAD is done.
-        assertTrue(awaitFullyMetDuringLOAD(token, ft));
+        assertTrue(awaitFullyMetDuringLOAD2(token, ft));
 
         // Verify fully met.
         assertTrue(quorum.isQuorumFullyMet(token));

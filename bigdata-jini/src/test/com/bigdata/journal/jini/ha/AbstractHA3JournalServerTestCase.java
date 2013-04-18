@@ -2200,7 +2200,32 @@ public class AbstractHA3JournalServerTestCase extends
         return fullyMetBeforeLoadDone;
 
     }
-    
+
+    /**
+     * IMHO a simpler, clearer implementation
+     * 
+     * @param token
+     * @param ft
+     * @return
+     * @throws InterruptedException
+     * @throws ExecutionException
+     * @throws TimeoutException
+     */
+    protected boolean awaitFullyMetDuringLOAD2(final long token,
+            final Future<Void> ft) throws InterruptedException,
+            ExecutionException, TimeoutException {
+
+        try {
+			assertTrue(token == awaitFullyMetQuorum((int) (longLoadTimeoutMillis/awaitQuorumTimeout)));
+		} catch (AsynchronousQuorumCloseException e) {
+			throw new RuntimeException(e);
+		} catch (IOException e) {
+			throw new RuntimeException(e);
+		}
+        
+        return !ft.isDone();
+
+    }   
     /**
      * Remove files in the directory, except the "open" log file.
      * 

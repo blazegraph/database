@@ -2801,6 +2801,8 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
 		lock.lock();
 
+		final IRootBlockView old = _rootBlock;
+
 		try {
 
 			assertOpen();
@@ -2855,6 +2857,10 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
             if ((_bufferStrategy instanceof IHABufferStrategy)
                     && quorum != null && quorum.isHighlyAvailable()) {
 
+			final long newCommitCounter = old.getCommitCounter() + 1;
+			
+            final ICommitRecord commitRecord = new CommitRecord(commitTime,
+                    newCommitCounter, rootAddrs);
                 try {
                     /**
                      * CRITICAL SECTION. We need obtain a distributed consensus
@@ -2913,8 +2919,6 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
              * in disaster recovery scenarios where your root blocks are toast,
              * but good root blocks can be found elsewhere in the file.
              */
-
-            final IRootBlockView old = _rootBlock;
 
             final long newCommitCounter = old.getCommitCounter() + 1;
             
@@ -3206,6 +3210,16 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
 			return commitTime;
 
+		} catch (Throwable t) {
+			if (_bufferStrategy instanceof IHABufferStrategy) {
+				log.warn("BufferStrategy reset from root block after commit failure", t);
+				
+				((IHABufferStrategy) _bufferStrategy).resetFromHARootBlock(old);
+			} else {
+				log.error("BufferStrategy does not support recovery from commit failure: " + _bufferStrategy);
+			}
+			
+			throw new RuntimeException(t); // wrap and rethrow
 		} finally {
 
 			lock.unlock();
@@ -3997,7 +4011,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                 return true; // no index available
                 
             }
-
+            
 	    }
 	    
 	    return false;
@@ -4164,6 +4178,9 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
         if (ndx != null) {
 
             if (isHistoryGone(commitTime)) {
+            	
+            	if (log.isTraceEnabled())
+            		log.trace("Removing entry from cache: " + name);
 
                 /*
                  * No longer visible.
@@ -4486,7 +4503,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
         final long offset  = getPhysicalAddress(checkpointAddr);
         
         ICommitter ndx = historicalIndexCache.get(offset);
-
+        
         if (ndx == null) {
 
             /*
@@ -4497,6 +4514,12 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
             ndx = Checkpoint
                     .loadFromCheckpoint(this, checkpointAddr, true/* readOnly */);
 
+            if (log.isTraceEnabled())
+            	log.trace("Adding checkpoint to historical index at " + checkpointAddr);
+
+        } else {
+            if (log.isTraceEnabled())
+            	log.trace("Found historical index at " + checkpointAddr + ", historicalIndexCache.size(): " + historicalIndexCache.size());
         }
 
         // Note: putIfAbsent is used to make concurrent requests atomic.
