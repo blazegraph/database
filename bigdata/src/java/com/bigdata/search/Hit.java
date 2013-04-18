@@ -26,7 +26,8 @@ public class Hit<V extends Comparable<V>> implements IHit<V>,
 //    private int nterms;
 
     /** Array of whether each search term appears or does not appear in the hit. **/
-    private LongArrayBitVector searchTerms;
+//    private LongArrayBitVector searchTerms;
+    private boolean[] searchTerms;
     
     /** Net cosine for the reporting terms. */
     private double cosine;
@@ -63,7 +64,8 @@ public class Hit<V extends Comparable<V>> implements IHit<V>,
     
     synchronized void setNumSearchTerms(final int numSearchTerms) {
     	
-    	this.searchTerms = LongArrayBitVector.ofLength(numSearchTerms);// boolean[numSearchTerms];
+//    	this.searchTerms = LongArrayBitVector.ofLength(numSearchTerms);
+    	this.searchTerms = new boolean[numSearchTerms];
     	
     }
     
@@ -72,7 +74,8 @@ public class Hit<V extends Comparable<V>> implements IHit<V>,
      */
     synchronized public int getTermCount() {
         
-    	if (searchTerms.size() == 0)
+//    	if (searchTerms.size() == 0)
+    	if (searchTerms == null || searchTerms.length == 0)
     		return 0;
     	
     	int nterms = 0;
@@ -112,7 +115,8 @@ public class Hit<V extends Comparable<V>> implements IHit<V>,
 
 //            nterms++;
             
-            searchTerms.set(termNdx, true);
+//            searchTerms.set(termNdx, true);
+            searchTerms[termNdx] = true;
 
         }
 
