@@ -148,15 +148,25 @@ public interface HAGlue extends HAGlueBase, HAPipelineGlue, HAReadGlue,
     int getNSSPort() throws IOException;
     
     /**
-     * The {@link RunState} of the service.
+     * The {@link RunState} of the service - this does NOT tell you whether the
+     * service is ready to act as a leader or follower.
      */
     RunState getRunState() throws IOException;
 
     /**
-     * The extended run state of the service.
+     * The extended run state of the service - this embeds more information but
+     * is not designed for progamatic interpretation.
      */
     String getExtendedRunState() throws IOException;
 
+    /**
+     * A simplified summary of the HA status of the service. This may be used to
+     * reliably decide whether the service is the {@link HAStatusEnum#Leader}, a
+     * {@link HAStatusEnum#Follower}, or {@link HAStatusEnum#NotReady}. This is
+     * exposed both here (an RMI interface) and by the REST API.
+     */
+    HAStatusEnum getHAStatus() throws IOException;
+    
     /**
      * Compute the digest of the entire backing store - <strong>THIS METHOD IS
      * ONLY FOR DIAGNOSTIC PURPOSES.</strong>

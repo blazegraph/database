@@ -96,6 +96,7 @@ import com.bigdata.counters.AbstractStatisticsCollector;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
 import com.bigdata.ha.HAGlue;
+import com.bigdata.ha.HAStatusEnum;
 import com.bigdata.ha.HATXSGlue;
 import com.bigdata.ha.QuorumService;
 import com.bigdata.ha.RunState;
@@ -5637,6 +5638,57 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
             
         }
 
+        @Override
+        public HAStatusEnum getHAStatus() {
+
+            final Quorum<HAGlue, QuorumService<HAGlue>> quorum = getQuorum();
+
+            final QuorumService<HAGlue> quorumService = quorum.getClient();
+
+            // check, but do not wait.
+            final long haReadyToken = AbstractJournal.this.getHAReady();
+
+            final HAStatusEnum status;
+            
+            if (haReadyToken == Quorum.NO_QUORUM) {
+            
+                // Quorum is not met (as percieved by the HAJournal).
+                status = HAStatusEnum.NotReady;
+                
+            } else {
+                
+                if (quorumService.isLeader(haReadyToken)) {
+                
+                    // Service is leader.
+                    status = HAStatusEnum.Leader;
+                    
+                } else if (quorumService.isFollower(haReadyToken)) {
+                    
+                    // Service is follower.
+                    status = HAStatusEnum.Follower;
+                    
+                } else {
+                    
+                    /*
+                     * awaitHAReady() should only return successfully (and hence
+                     * haReadyToken should only be a valid token) if the service was
+                     * elected as either a leader or a follower. However, it is
+                     * possible for the service to have concurrently left the met
+                     * quorum, in which case the if/then/else pattern will fall
+                     * through to this code path.
+                     */
+                    
+                    // Quorum is not met (as percieved by the HAJournal).
+                    status = HAStatusEnum.NotReady;
+                    
+                }
+                
+            }
+
+            return status;
+
+        }
+        
         @Override
         public long awaitHAReady(final long timeout, final TimeUnit units)
                 throws AsynchronousQuorumCloseException, InterruptedException,

@@ -251,6 +251,11 @@ public class HAGlueDelegate implements HAGlue {
     }
 
     @Override
+    public HAStatusEnum getHAStatus() throws IOException {
+        return delegate.getHAStatus();
+    }
+
+    @Override
     public Future<IHASendStoreResponse> sendHAStore(IHARebuildRequest msg)
             throws IOException {
         return delegate.sendHAStore(msg);
