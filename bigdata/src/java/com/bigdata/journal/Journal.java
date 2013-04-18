@@ -41,7 +41,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
-import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.Semaphore;
@@ -70,6 +69,7 @@ import com.bigdata.counters.AbstractStatisticsCollector;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.httpd.CounterSetHTTPD;
 import com.bigdata.ha.HAGlue;
+import com.bigdata.ha.HAStatusEnum;
 import com.bigdata.ha.HATXSGlue;
 import com.bigdata.ha.QuorumService;
 import com.bigdata.ha.msg.HAGatherReleaseTimeRequest;
@@ -78,7 +78,6 @@ import com.bigdata.ha.msg.HANotifyReleaseTimeResponse;
 import com.bigdata.ha.msg.IHAGatherReleaseTimeRequest;
 import com.bigdata.ha.msg.IHANotifyReleaseTimeRequest;
 import com.bigdata.ha.msg.IHANotifyReleaseTimeResponse;
-import com.bigdata.ha.msg.IHATXSLockRequest;
 import com.bigdata.journal.jini.ha.HAJournal;
 import com.bigdata.quorum.Quorum;
 import com.bigdata.quorum.QuorumException;
@@ -460,14 +459,12 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
         /**
          * Find the minimum value across the responses when the {@link #barrier}
          * breaks.
-         * 
-         * TODO Check the timestamps for validity on the follower as well.
          */
         @Override
         public void run() {
 
             // This is the timestamp from the BarrierState ctor.
-            final long timeLeader = leadersValue.getTimestampOnFollower();
+            final long timeLeader = leadersValue.getTimestamp();
             
             // Start with the leader's value (from ctor).
             minimumResponse = leadersValue;
@@ -485,7 +482,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
                  * Verify that the timestamp from the ctor is BEFORE the
                  * timestamp assigned by the follower for its response.
                  */
-                assertBefore(timeLeader, response.getTimestampOnFollower());
+                assertBefore(timeLeader, response.getTimestamp());
 
             }
 
@@ -503,20 +500,21 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
          * TODO Timeout on duration that we will wait for the followers to
          * response? (Probably not, this is very similar to the 2-phase commit).
          * 
-         * FIXME Like the 2-phase commit, the overall protocol should succeed if
-         * we can get ((k+1)/2) services that do not fail this step. Thus for
-         * HA3, we should allow one error on a follower, the leader is sending
-         * the messages and is presumed to succeed, and one follower COULD fail
-         * without failing the protocol. If the protocol does fail we have to
-         * fail the commit, to getting this right is NECESSARY. At a mimimum, we
-         * must not fail if all joined services on entry to this method respond
-         * without failing (that is, succeed if no services fail during this
-         * protocol). [Review further whether we can allow the 2-phase commit to
-         * rely on a service that was not joined when we took this step. We
-         * probably can given that the serviceJoin() code path of the follower
-         * is MUTEX with the negotiation of the consensus releaseTime value so
-         * long as the service uses an appropriate releaseTime when it joins.
-         * Which it should do, but review this closely.]
+         * FIXME HA TXS: Like the 2-phase commit, the overall protocol should
+         * succeed if we can get ((k+1)/2) services that do not fail this step.
+         * Thus for HA3, we should allow one error on a follower, the leader is
+         * sending the messages and is presumed to succeed, and one follower
+         * COULD fail without failing the protocol. If the protocol does fail we
+         * have to fail the commit, to getting this right is NECESSARY. At a
+         * mimimum, we must not fail if all joined services on entry to this
+         * method respond without failing (that is, succeed if no services fail
+         * during this protocol). [Review further whether we can allow the
+         * 2-phase commit to rely on a service that was not joined when we took
+         * this step. We probably can given that the serviceJoin() code path of
+         * the follower is MUTEX with the negotiation of the consensus
+         * releaseTime value so long as the service uses an appropriate
+         * releaseTime when it joins. Which it should do, but review this
+         * closely.]
          */
         private void messageFollowers(final long token) throws IOException {
 
@@ -624,32 +622,30 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
 
         }
         
-        /**
-         * The maximum error allowed (milliseconds) in the clocks.
-         * 
-         * TODO Should this be zero?
-         */
-        private static final long epsilon = 3;
-        
-        /**
-         * Assert that t1 LT t2.
-         * 
-         * @param t1
-         * @param t2
-         * 
-         * @throws ClocksNotSynchronizedException
-         */
-        private void assertBefore(final long t1, final long t2) {
-
-            if (t1 < t2)
-                return;
-
-            throw new ClocksNotSynchronizedException();
-
-        }
-        
     }
 
+//    /**
+//     * The maximum error allowed (milliseconds) in the clocks.
+//     */
+//    private static final long epsilon = 3;
+    
+    /**
+     * Assert that t1 LT t2.
+     * 
+     * @param t1
+     * @param t2
+     * 
+     * @throws ClocksNotSynchronizedException
+     */
+    private void assertBefore(final long t1, final long t2) {
+
+        if (t1 < t2)
+            return;
+
+        throw new ClocksNotSynchronizedException();
+
+    }
+    
     /**
      * {@inheritDoc}
      * <p>
@@ -710,12 +706,26 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
          */
         final private ReentrantLock barrierLock = new ReentrantLock();
         
+//        final private Condition barrierBroke = barrierLock.newCondition();
+        
         /**
          * This is used to coordinate the protocol for achiving an atomic
          * consensus on the new <i>releaseTime</i> for the services joined with
          * a met quorum.
          */
         final private AtomicReference<BarrierState> barrierRef = new AtomicReference<BarrierState>();
+        
+        @Override
+        public void executeWithBarrierLock(final Runnable r) {
+            
+            barrierLock.lock();
+            try {
+                r.run();
+            } finally {
+                barrierLock.unlock();
+            }
+            
+        }
         
         /**
          * {@inheritDoc}
@@ -745,7 +755,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
             barrierLock.lock();
 
             try {
-                
+
                 getQuorum().assertLeader(token);
 
                 if (!barrierRef.compareAndSet(null/* expectedValue */,
@@ -755,37 +765,39 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
 
                 }
 
-            } finally {
+                try {
 
-                barrierLock.unlock();
-                
-            }
+                    /*
+                     * Message the followers and block until the barrier breaks.
+                     */
+                    barrierState.messageFollowers(token);
 
-            try {
+                } finally {
 
-                /*
-                 * Message the followers and block until the barrier breaks.
-                 */
-                barrierState.messageFollowers(token);
+                    // Clear the barrierRef.
+                    if (!barrierRef.compareAndSet(barrierState/* expected */,
+                            null)) {
 
-            } finally {
+                        throw new AssertionError();
 
-                // Clear the barrierRef.
-                if (!barrierRef.compareAndSet(barrierState/* expected */, null)) {
-
-                    throw new AssertionError();
+                    }
 
                 }
 
+                /*
+                 * Update the release time on the leader
+                 */
+
+                final long consensusValue = barrierState.consensus
+                        .getCommitTime();
+
+                setReleaseTime(Math.max(0L, consensusValue - 1));
+
+            } finally {
+
+                barrierLock.unlock();
+
             }
-
-            /* 
-             * Update the release time on the leader
-             */
-
-            final long consensusValue = barrierState.consensus.getCommitTime();
-            
-            setReleaseTime(Math.max(0L, consensusValue - 1));
 
         }
 
@@ -809,8 +821,6 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
                 if (newValue < oldValue) {
                     
                     /*
-                     * FIXME HA TXS: Rollback releaseTime if commit fails.
-                     * 
                      * Note: We might have to allow this to roll back the
                      * release time if a commit fails.
                      */
@@ -834,7 +844,12 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
             }
 
         }
-        
+
+        /**
+         * {@inheritDoc}
+         * <p>
+         * "Gather" runs on the follower.
+         */
         @Override
         public Future<Void> gatherMinimumVisibleCommitTime(
                 final IHAGatherReleaseTimeRequest req) throws IOException {
@@ -880,9 +895,14 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
             
             public Void call() throws Exception {
                 
+                final long now = nextTimestamp();
+
+                // Verify event on leader occurs before event on follower.
+                assertBefore(req.getTimestampOnLeader(), now);
+
                 final long token = req.token();
 
-                barrierLock.lock();
+                barrierLock.lock(); // take lock on follower!
 
                 try {
 
@@ -982,146 +1002,168 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
   
         }
 
-        @Override
-        public Future<Void> getTXSCriticalSectionLockOnLeader(
-                final IHATXSLockRequest req) throws IOException {
-
-            getQuorum().assertLeader(req.token());
-
-            /*
-             * We need to submit a task that owns the lock for the critical
-             * section.
-             * 
-             * Note: The task needs to own the lock BEFORE it runs and unlock
-             * the lock when it is done. It needs to own the lock before it runs
-             * since the receipt of the Future for this task by the remote
-             * service is its permission to do the serviceJoin.
-             * 
-             * Note: If we can not submit the task to the executor service, then
-             * we need to to release the lock (RejectedExecutionException).
-             * 
-             * FIXME HA TXS: This code is broken. We are not asking the lock
-             * before the tasks executes and, if we did, then we would not own
-             * it in the thread in which we are executing the task and hence
-             * would be unable to release the lock in that thread. This may need
-             * to be coordinated using a Condition so we block in the RMI Thread
-             * (here) until the submitted task gains the lock in its own Thread.
-             * That condition could probably use a different Lock object to
-             * communicate, but it might be possible to do this using the
-             * barrierLock.
-             * 
-             * FIXME HA TXS: An HAJournalServer that will join with a met quorum
-             * MUST obtain this lock on the leader before executing the
-             * serviceJoin. They MUST cancel the Future obtained from this
-             * method regardless. A timeout on the leader is necessary in case a
-             * network partition or sudden power failure otherwise prevents the
-             * remote service from releasing this lock since the leader can not
-             * go through a commit point while this lock is held. The service
-             * that is trying to join MUST verify that the obtained Future is
-             * not yet done (!isDone()) after it has successfully joined. If the
-             * Future.isDone() when it checks, then it effectively lost the lock
-             * and MUST do a serviceLeave() and then retry.
-             */
-            
-            // Note: Takes lock *here*.
-            final BarrierLockTask task = new BarrierLockTask();
-
-            try {
-
-                // Wrap.
-                final FutureTask<Void> ft = new FutureTask<Void>(task);
-
-                // Submit for evaluation.
-                getExecutorService().submit(ft);
-
-                // Return Future to caller.  Will be async RMI Future.
-                return ft;
-
-            } catch (RejectedExecutionException ex) {
-
-                // Release the lock if we could not submit the task.
-                barrierLock.unlock();
-
-                // Rethrow the exception.
-                throw ex;
-                
-            }
-
-        }
-
         /**
-         * Helper class used to implement the
-         * {@link HATXSGlue#getTXSCriticalSectionLockOnLeader(IHATXSLockRequest)}
-         * method.
+         * Helper method returns the {@link HAStatusEnum} -or- <code>null</code>
+         * if this is not HA. This is a <em>low latency local</em> method call.
+         * The code path is against the local (non-remote) HAGlue obeject. It is
+         * NOT an RMI.
          */
-        private class BarrierLockTask implements Callable<Void> {
+        private final HAStatusEnum getHAStatus() {
             
-            public BarrierLockTask() {
-                
-            }
-            
-            public Void call() throws Exception {
+            // Quorum iff HA.
+            final Quorum<HAGlue, QuorumService<HAGlue>> quorum = getQuorum();
 
-                // block until we get the lock.
-                barrierLock.lock();
-                try {
-                    // Sleep until interrupted.
-                    Thread.sleep(Long.MAX_VALUE);
-                } finally {
-                    barrierLock.unlock();
-                }
-
+            if(quorum == null) {
+             
+                // Not HA.
                 return null;
                 
             }
             
-        } // class BarrierLockTask
+            // Note: Invocation against local HAGlue object (NOT RMI).
+            try {
+
+                return quorum.getClient().getService().getHAStatus();
+                
+            } catch (IOException ex) {
+                
+                // Note: Exception is never thrown (not RMI).
+                throw new RuntimeException(ex);
+                
+            }
+
+        }
         
         @Override
         public long newTx(final long timestamp) {
 
-            if (timestamp == ITx.UNISOLATED) {
+            if (TimestampUtility.isReadWriteTx(timestamp)) {
 
-                /*
-                 * This is a request for a read/write transaction.
-                 */
+                // The caller has provided a TxId, not a timestamp.
+                throw new IllegalArgumentException();
+                
+            }
+            
+            // The HAStatusEnum -or- null if not HA.
+            final HAStatusEnum haStatus = getHAStatus();
 
-                final Quorum<HAGlue, QuorumService<HAGlue>> quorum = getQuorum();
+            if (haStatus == null) {
+             
+                // Not HA.
+                return _newTx(timestamp);
+                
+            }
 
-                if (quorum != null) {
+            if (haStatus == HAStatusEnum.NotReady) {
 
-                    /*
-                     * We must be the quorum leader.
-                     */
-
-                    final long token = getQuorumToken();
-
-                    getQuorum().assertLeader(token);
-
-                }
+                // Not ready.
+                throw new QuorumException();
 
             }
 
+            if (timestamp == ITx.UNISOLATED && haStatus != HAStatusEnum.Leader) {
+
+                // Read/Write Tx starts are only allowed on the Leader.
+                throw new QuorumException("Not quorum leader");
+
+            }
+
+            if (timestamp == ITx.UNISOLATED || timestamp == ITx.READ_COMMITTED) {
+
+                /*
+                 * A read-write tx reads on the current commit point.
+                 * 
+                 * A read-committed tx reads on the current commit point.
+                 * 
+                 * The current commit point is always visible, so these requests
+                 * are non-blocking.
+                 * 
+                 * Note: We have verified that this service is the quorum leader
+                 * above if the request is for a read-write tx.
+                 */
+        
+                return _newTx(timestamp);
+                
+            }
+
             /*
-             * FIXME HA TXS : OPTIMIZE newTx() : We do need an HA code path
-             * here. However, it needs to be concerned with blocking the calling
-             * Thread IF the request can not be satisified in a non-blocking
-             * manner.
-             * 
-             * FIXME It is safe if we always take the barrierLock here, but that
-             * is (MUCH) too conservative. We only need it if the TXS can not
-             * start the new Tx based on local state.
-             * 
-             * FIXME A tx SHOULD start without this lock as long as its
-             * readsOnCommitTime would be GTE the readsOnCommitTime of the
-             * earliestActiveTx -OR- its readsOnCommitTime is LTE
-             * now-releaseAge. This decision needs to be pushed down into the
-             * TXS implementation class using AbstractTransactionService#lock.
-             * 
-             * Leader: block on the barrierLock.
-             * 
-             * Follower: block on the barrierLock (but the follower needs to
-             * hold this in gather()).
+             * The request is a read-only tx against some specific historical
+             * commit point. It will be allowed (without blocking at the
+             * barrier) if the commit point is known to be pinned based on
+             * either the minReleaseAge or the earliestActiveTx. We use the
+             * AbstractTransactionService's lock to make these inspections
+             * atomic.
+             */
+            
+            lock.lock(); // Note: AbstractTransactionService.lock
+
+            try {
+
+                final long now = nextTimestamp();
+
+                /*
+                 * TODO Should we reject tx starts against future history? The
+                 * AbstractTransactionService used to reject this case but that
+                 * code has been commented out. Perhaps because of minor clock
+                 * differences that could arise?
+                 */
+//                if (timestamp > now) {
+//                    // Timestamp is in the future.
+//                    throw new IllegalArgumentException();
+//                }
+                
+                final long minReleaseAge = getMinReleaseAge();
+
+                final long ageOfTxView = now - timestamp;
+
+                if (ageOfTxView < minReleaseAge) {
+
+                    // Start tx. Commit point pinned by minReleaseAge.
+                    return _newTx(timestamp);
+
+                }
+
+                /*
+                 * Handle commit point pinned by earliestActiveTx's
+                 * readsOnCommitTime.
+                 */
+                {
+
+                    final TxState state = getEarlestActiveTx();
+
+                    if (state != null && state.readsOnCommitTime <= timestamp) {
+
+                        // Start Tx. Commit point pinned by earliestActiveTx.
+                        return _newTx(timestamp);
+
+                    }
+
+                }
+
+                final IRootBlockView rootBlock = getRootBlockView();
+                
+                if (rootBlock.getCommitCounter() == 0L) {
+
+                    // Start Tx. No commits so nothing could be released.
+                    return _newTx(timestamp);
+
+                }
+
+                if (rootBlock.getLastCommitTime() <= timestamp) {
+
+                    // Tx reads on most recent commit point.
+                    return _newTx(timestamp);
+
+                }
+
+            } finally {
+            
+                lock.unlock();
+                
+            }
+
+            /*
+             * Must block at barrier.
              */
             
             barrierLock.lock();
@@ -1135,55 +1177,6 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
                 barrierLock.unlock();
                 
             }
-
-//            final Quorum<HAGlue, QuorumService<HAGlue>> quorum = getQuorum();
-//
-//            if (quorum == null) {
-//
-//                // Not HA. 
-//                return this._newTx(timestamp);
-//
-//            }
-//
-//            final long token = getQuorumToken();
-//
-//            if (quorum.getMember().isLeader(token)) {
-//
-//                // HA and this is the leader.
-//                return this._newTx(timestamp);
-//
-//            }
-//            
-//            /*
-//             * The transaction needs to be allocated by the leader.
-//             * 
-//             * Note: Heavy concurrent query on a HAJournal will pin history
-//             * on the leader. However, the lastReleaseTime will advance
-//             * since clients will tend to read against the then current
-//             * lastCommitTime, so we will still recycle the older commit
-//             * points once there is no longer an active reader for those
-//             * commit points.
-//             */
-//            
-//            final HAGlue leaderService = quorum.getMember()
-//                    .getLeader(token);
-//            
-//            final long tx;
-//            try {
-//
-//                // delegate to the quorum leader.
-//                tx = leaderService.newTx(timestamp);
-//
-//            } catch (IOException e) {
-//                
-//                throw new RuntimeException(e);
-//                
-//            }
-//
-//            // Make sure the quorum is still valid.
-//            quorum.assertQuorum(token);
-//
-//            return tx;
 
         }
         
@@ -1263,233 +1256,8 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
 
             return super.commit(tx);
 
-//            if (quorum.getMember().isLeader(token)) {
-//
-//                // HA and this is the leader.
-//                return super.commit(tx);
-//
-//            }
-//            
-//            /*
-//             * Delegate to the quorum leader.
-//             */
-//            
-//            final HAGlue leaderService = quorum.getMember()
-//                    .getLeader(token);
-//            
-//            final long commitTime;
-//            try {
-//
-//                // delegate to the quorum leader.
-//                commitTime = leaderService.commit(tx);
-//
-//            } catch (IOException e) {
-//                
-//                throw new RuntimeException(e);
-//                
-//            }
-//
-//            // Make sure the quorum is still valid.
-//            quorum.assertQuorum(token);
-//
-//            return commitTime;
-
         }
-        
-//        @Override
-//        public void abort(final long tx) {
-//
-//            final Quorum<HAGlue, QuorumService<HAGlue>> quorum = getQuorum();
-//
-//            if (quorum != null) {
-//
-//                final long token = getQuorumToken();
-//
-//                getQuorum().assertLeader(token);
-//                
-//            }
-//
-//            super.abort(tx);
-//            
-//            return;
-//            
-////            if (quorum.getMember().isLeader(token)) {
-////
-////                // HA and this is the leader.
-////                super.abort(tx);
-////                
-////                return;
-////
-////            }
-////            
-////            /*
-////             * Delegate to the quorum leader.
-////             */
-////            
-////            final HAGlue leaderService = quorum.getMember()
-////                    .getLeader(token);
-////            
-////            try {
-////
-////                // delegate to the quorum leader.
-////                leaderService.abort(tx);
-////
-////            } catch (IOException e) {
-////                
-////                throw new RuntimeException(e);
-////                
-////            }
-////
-////            // Make sure the quorum is still valid.
-////            quorum.assertQuorum(token);
-////
-////            return;
-//
-//        }
-
-//        @Override
-//        public void notifyCommit(final long commitTime) {
-//            
-//            final Quorum<HAGlue, QuorumService<HAGlue>> quorum = getQuorum();
-//
-//            if (quorum != null) {
-//
-//                final long token = getQuorumToken();
-//
-//                getQuorum().assertLeader(token);
-//
-//            }
-//
-//            super.notifyCommit(commitTime);
-//
-////            if (quorum.getMember().isLeader(token)) {
-////
-////                // HA and this is the leader.
-////                super.notifyCommit(commitTime);
-////                
-////                return;
-////
-////            }
-////            
-////            /*
-////             * Delegate to the quorum leader.
-////             */
-////            
-////            final HAGlue leaderService = quorum.getMember()
-////                    .getLeader(token);
-////            
-////            try {
-////
-////                // delegate to the quorum leader.
-////                leaderService.notifyCommit(commitTime);
-////
-////            } catch (IOException e) {
-////                
-////                throw new RuntimeException(e);
-////                
-////            }
-////
-////            // Make sure the quorum is still valid.
-////            quorum.assertQuorum(token);
-////
-////            return;
-//
-//        }
-
-//        @Override
-//        public long getReleaseTime() {
-//            
-//            final Quorum<HAGlue, QuorumService<HAGlue>> quorum = getQuorum();
-//
-//            if (quorum == null) {
-//
-//                // Not HA. 
-//                return super.getReleaseTime();
-//
-//            }
-//
-//            final long token = getQuorumToken();
-//
-//            if (quorum.getMember().isLeader(token)) {
-//
-//                // HA and this is the leader.
-//                return super.getReleaseTime();
-//                
-//            }
-//            
-//            /*
-//             * Delegate to the quorum leader.
-//             */
-//            
-//            final HAGlue leaderService = quorum.getMember()
-//                    .getLeader(token);
-//
-//            final long releaseTime;
-//            try {
-//
-//                // delegate to the quorum leader.
-//                releaseTime = leaderService.getReleaseTime();
-//
-//            } catch (IOException e) {
-//                
-//                throw new RuntimeException(e);
-//                
-//            }
-//
-//            // Make sure the quorum is still valid.
-//            quorum.assertQuorum(token);
-//
-//            return releaseTime;
-//
-//        }
-//
-//        @Override
-//        public long nextTimestamp(){
-//        
-//            final Quorum<HAGlue, QuorumService<HAGlue>> quorum = getQuorum();
-//
-//            if (quorum == null) {
-//
-//                // Not HA. 
-//                return super.nextTimestamp();
-//
-//            }
-//
-//            final long token = getQuorumToken();
-//
-//            if (quorum.getMember().isLeader(token)) {
-//
-//                // HA and this is the leader.
-//                return super.nextTimestamp();
-//                
-//            }
-//            
-//            /*
-//             * Delegate to the quorum leader.
-//             */
-//            
-//            final HAGlue leaderService = quorum.getMember()
-//                    .getLeader(token);
-//
-//            final long nextTimestamp;
-//            try {
-//
-//                // delegate to the quorum leader.
-//                nextTimestamp = leaderService.nextTimestamp();
-//
-//            } catch (IOException e) {
-//                
-//                throw new RuntimeException(e);
-//                
-//            }
-//
-//            // Make sure the quorum is still valid.
-//            quorum.assertQuorum(token);
-//
-//            return nextTimestamp;
-//
-//        }
-        
+                
         protected void activateTx(final TxState state) {
             if (txLog.isInfoEnabled())
                 txLog.info("OPEN : txId=" + state.tx
@@ -2225,51 +1993,6 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
      * @see ITransactionService#newTx(long)
      */
     final public long newTx(final long timestamp) {
-
-//        IRawTx tx = null;
-//        try {
-//            if (getBufferStrategy() instanceof IRWStrategy) {
-//                
-//                /*
-//                 * This code pre-increments the active transaction count within
-//                 * the RWStore before requesting a new transaction from the
-//                 * transaction service. This ensures that the RWStore does not
-//                 * falsely believe that there are no open transactions during
-//                 * the call to AbstractTransactionService#newTx().
-//                 * 
-//                 * @see https://sourceforge.net/apps/trac/bigdata/ticket/440#comment:13
-//                 */
-//                tx = ((IRWStrategy) getBufferStrategy()).newTx();
-//            }
-//            try {
-//
-//                return getTransactionService().newTx(timestamp);
-//
-//            } catch (IOException ioe) {
-//
-//                /*
-//                 * Note: IOException is declared for RMI but will not be thrown
-//                 * since the transaction service is in fact local.
-//                 */
-//
-//                throw new RuntimeException(ioe);
-//
-//            }
-//
-//        } finally {
-//        
-//            if (tx != null) {
-//            
-//                /*
-//                 * If we had pre-incremented the transaction counter in the
-//                 * RWStore, then we decrement it before leaving this method.
-//                 */
-//
-//                tx.close();
-//
-//            }
-//            
-//        }
 
         /*
          * Note: The RWStore native tx pre-increment logic is now handled by

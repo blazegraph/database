@@ -62,7 +62,7 @@ public class HANotifyReleaseTimeRequest implements IHANotifyReleaseTimeRequest {
     }
 
     @Override
-    public long getTimestampOnFollower() {
+    public long getTimestamp() {
         return timestampOnFollower;
     }
 

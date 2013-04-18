@@ -230,7 +230,11 @@ public interface HAGlue extends HAGlueBase, HAPipelineGlue, HAReadGlue,
      *             if a timeout expires while awaiting the global lock.
      * @throws InterruptedException
      *             if interrupted while awaiting the lock.
+     * 
+     * @deprecated This is no longer necessary to support backups since we can
+     *             now take snapshots without suspending writers.
      */
+    @Deprecated 
     Future<Void> globalWriteLock(IHAGlobalWriteLockRequest req)
             throws IOException, TimeoutException, InterruptedException;
 

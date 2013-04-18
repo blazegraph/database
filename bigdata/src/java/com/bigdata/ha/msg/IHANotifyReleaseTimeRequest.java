@@ -67,6 +67,6 @@ public interface IHANotifyReleaseTimeRequest extends IHAMessage {
      * the new release time. This is used to detect problems where the clocks
      * are not synchronized on the services.
      */
-    public long getTimestampOnFollower();
+    public long getTimestamp();
 
 }
