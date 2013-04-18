@@ -53,6 +53,7 @@ import org.openrdf.query.TupleQueryResult;
 
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.ha.HAGlue;
+import com.bigdata.ha.HAStatusEnum;
 import com.bigdata.ha.msg.HADigestRequest;
 import com.bigdata.ha.msg.HALogDigestRequest;
 import com.bigdata.ha.msg.HARootBlockRequest;
@@ -64,7 +65,6 @@ import com.bigdata.rdf.sail.TestConcurrentKBCreate;
 import com.bigdata.rdf.sail.webapp.NanoSparqlServer;
 import com.bigdata.rdf.sail.webapp.client.ConnectOptions;
 import com.bigdata.rdf.sail.webapp.client.DefaultClientConnectionManagerFactory;
-import com.bigdata.rdf.sail.webapp.client.HAStatusEnum;
 import com.bigdata.rdf.sail.webapp.client.HttpException;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
 import com.bigdata.util.InnerCause;

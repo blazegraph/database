@@ -34,11 +34,11 @@ import java.util.concurrent.TimeoutException;
 import net.jini.config.Configuration;
 
 import com.bigdata.ha.HAGlue;
+import com.bigdata.ha.HAStatusEnum;
 import com.bigdata.ha.msg.HARootBlockRequest;
 import com.bigdata.ha.msg.HASnapshotRequest;
 import com.bigdata.ha.msg.IHASnapshotResponse;
 import com.bigdata.journal.IRootBlockView;
-import com.bigdata.rdf.sail.webapp.client.HAStatusEnum;
 
 /**
  * Test suites for the {@link IRestorePolicy}.

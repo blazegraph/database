@@ -34,8 +34,8 @@ import net.jini.config.Configuration;
 import net.jini.core.lookup.ServiceID;
 
 import com.bigdata.ha.HAGlue;
+import com.bigdata.ha.HAStatusEnum;
 import com.bigdata.ha.msg.HADigestRequest;
-import com.bigdata.rdf.sail.webapp.client.HAStatusEnum;
 
 /**
  * Life cycle and related tests for a single remote {@link HAJournalServer} out
