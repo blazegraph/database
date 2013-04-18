@@ -99,6 +99,7 @@ import com.bigdata.quorum.zk.ZKQuorumImpl;
 import com.bigdata.rdf.sail.webapp.ConfigParams;
 import com.bigdata.rdf.sail.webapp.NanoSparqlServer;
 import com.bigdata.rwstore.RWStore;
+import com.bigdata.service.AbstractHATransactionService;
 import com.bigdata.service.jini.FakeLifeCycle;
 import com.bigdata.service.jini.RemoteAdministrable;
 import com.bigdata.service.jini.RemoteDestroyAdmin;
@@ -1125,27 +1126,6 @@ public class HAJournalServer extends AbstractServer {
             
         }
 
-//        @Override
-//        public void start(final Quorum<?,?> quorum) {
-//            
-//            if (haLog.isTraceEnabled())
-//                log.trace("START");
-//            
-//            super.start(quorum);
-//
-//            // Note: It appears to be a problem to do this here. Maybe because
-//            // the watcher is not running yet? Could submit a task that could
-//            // await an appropriate condition to start....
-////            final QuorumActor<?, ?> actor = quorum.getActor();
-////            actor.memberAdd();
-////            actor.pipelineAdd();
-////            actor.castVote(journal.getLastCommitTime());
-//
-////            // Inform the Journal about the current token (if any).
-////            journal.setQuorumToken(quorum.token());
-//            
-//        }
-        
         @Override
         public void quorumMeet(final long token, final UUID leaderId) {
 
@@ -1222,6 +1202,44 @@ public class HAJournalServer extends AbstractServer {
             }
         }
         
+        /**
+         * {@inheritDoc}
+         * <p>
+         * If there is a fully met quorum, then we can purge all HA logs
+         * <em>EXCEPT</em> the current one.
+         */
+        @Override
+        public void serviceLeave() {
+
+            super.serviceLeave();
+
+            // FIXME serviceLeave() needs event handler.
+//            // Submit task to handle this event.
+//            server.singleThreadExecutor.execute(new MonitoredFutureTask<Void>(
+//                    new ServiceLeaveTask()));
+        }
+
+        private class ServiceLeaveTask implements Callable<Void> {
+            public Void call() throws Exception {
+                /*
+                 * Set token. Journal will notice that it is no longer
+                 * "HA Ready"
+                 * 
+                 * FIXME AbstractJournal.setQuorumToken() must detect case where
+                 * it transitions from a met quorum through a service leave and
+                 * clears its haReady token.
+                 */
+                journal.setQuorumToken(getQuorum().token());
+                try {
+                    journal.getHALogWriter().disable();
+                } catch (IOException e) {
+                    haLog.error(e, e);
+                }
+                enterRunState(new SeekConsensusTask());
+                return null;
+            }
+        }
+
         /**
          * {@inheritDoc}
          * <p>
@@ -2373,6 +2391,10 @@ public class HAJournalServer extends AbstractServer {
                 /*
                  * Cast the leader's vote, join with the met quorum, and
                  * transition to RunMet.
+                 * 
+                 * Note: We are blocking the write pipeline on this code path
+                 * because the [logLock] is held. We verify the pre-conditions
+                 * for the join with the met quorum while holding the [logLock].
                  */
                 
                 doCastLeadersVoteAndServiceJoin(token);
@@ -2782,6 +2804,14 @@ public class HAJournalServer extends AbstractServer {
         /**
          * Cast the leader's vote, join with the met quorum, and transition to
          * RunMet.
+         * <p>
+         * Note: The write pipeline will be blocked during this method. This is
+         * achieved via two different mechanisms. If the call stack goes through
+         * {@link #handleReplicatedWrite(IHASyncRequest, IHAWriteMessage, ByteBuffer)}
+         * , then the write pipeline is naturally blocked. For
+         * {@link #conditionalJoinWithMetQuorum(HAGlue, long, long)}, we are
+         * holding the {@link #logLock} which ensures that new write messages
+         * can not be processed.
          * 
          * @param token
          *            The token that must remain valid throughout this
@@ -2821,24 +2851,40 @@ public class HAJournalServer extends AbstractServer {
              * Note: This will throw an exception if this services is not in the
              * consensus.
              * 
-             * Note: We are BLOCKING the pipeline while we wait here (since we
-             * are handling a replicated write).
+             * Note: The write pipeline is BLOCKED. Either we are handling a
+             * replicated write -or- we are holding the logLock (or both).
+             * 
+             * Note: The serviceJoin() needs to be MUTEX with the critical
+             * section of the consensus protocol to identify the new release
+             * time. This is necessary to ensure that the follower does not
+             * start a new Tx against a commit point after the follower has
+             * notified the leader about its earliest visible commit point and
+             * before the leader has notified the followers about the new
+             * consensus release time.
              * 
              * TODO What happens if we are blocked here?
-             * 
-             * FIXME HA TXS: CRITICAL SECTION exclusion here.
              */
-            getActor().serviceJoin();
+            ((AbstractHATransactionService) journal.getTransactionService())
+                    .executeWithBarrierLock(new Runnable() {
 
-            // Verify that the quorum is valid.
-            getQuorum().assertQuorum(token);
+                        public void run() {
+                            
+                            // Verify that the quorum is valid.
+                            getQuorum().assertQuorum(token);
 
-            // Set the token on the journal.
-            journal.setQuorumToken(token);
+                            getActor().serviceJoin();
 
-            // Verify that the quorum is valid.
-            getQuorum().assertQuorum(token);
-            
+                            // Verify that the quorum is valid.
+                            getQuorum().assertQuorum(token);
+
+                            // Set the token on the journal.
+                            journal.setQuorumToken(token);
+
+                            // Verify that the quorum is valid.
+                            getQuorum().assertQuorum(token);
+                        }
+                    });
+
             // Transition to RunMet.
             enterRunState(new RunMetTask(token, leaderId));
 

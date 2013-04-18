@@ -505,6 +505,30 @@ abstract public class AbstractTransactionService extends AbstractService
 
             setRunState(TxServiceRunState.ShutdownNow);
 
+            // Abort all active transactions.
+            abortAllTx();
+
+            super.shutdownNow();
+
+            setRunState(TxServiceRunState.Halted);
+
+        } finally {
+
+            lock.unlock();
+
+        }
+
+    }
+
+    /**
+     * Abort all active transactions.
+     */
+    public void abortAllTx() {
+
+        lock.lock();
+
+        try {
+
             for (long tx : activeTx.keySet()) {
 
                 final TxState state = activeTx.get(tx);
@@ -533,15 +557,15 @@ abstract public class AbstractTransactionService extends AbstractService
                             abortImpl(state);
 
                             assert state.isAborted() : state.toString();
-                            
-                        } catch(Throwable t) {
-                            
+
+                        } catch (Throwable t) {
+
                             log.error(state.toString(), t);
-                            
+
                         } finally {
 
                             deactivateTx(state);
-                            
+
                         }
 
                     }
@@ -555,7 +579,7 @@ abstract public class AbstractTransactionService extends AbstractService
                      * need to acquire it here.
                      */
                     updateReleaseTime(Math.abs(state.tx));
-                    
+
                 }
 
             } // foreach tx in activeTx
@@ -571,19 +595,14 @@ abstract public class AbstractTransactionService extends AbstractService
                         + activeTx.size());
 
             }
-
-            super.shutdownNow();
-
-            setRunState(TxServiceRunState.Halted);
-
         } finally {
 
             lock.unlock();
 
         }
-        
-    }
 
+    }
+    
     /**
      * Immediate/fast shutdown of the service and then destroys any persistent
      * state associated with the service.
@@ -812,6 +831,29 @@ abstract public class AbstractTransactionService extends AbstractService
 //      return earliestTxStartTime;
 //      
 //    }
+
+    /**
+     * Return the {@link TxState} for the earliest active Tx -or-
+     * <code>null</code> if there is no active tx.
+     * <p>
+     * Note: The {@link #lock} is required in order to make atomic decisions
+     * about the earliest active tx. Without the {@link #lock}, the tx could
+     * stop or a new tx could start, thereby invalidating the "easliest active"
+     * guarantee.
+     * 
+     * @throws IllegalMonitorStateException
+     *             unless the {@link #lock} is held by the caller.
+     */
+    protected TxState getEarlestActiveTx() {
+        
+        if (!lock.isHeldByCurrentThread())
+            throw new IllegalMonitorStateException();
+        
+        final TxState state = getTxState(earliestOpenTxId);
+
+        return state;
+        
+    }
     
     /**
      * The minimum over the absolute values of the active transactions and ZERO

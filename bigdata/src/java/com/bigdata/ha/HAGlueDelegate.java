@@ -59,7 +59,6 @@ import com.bigdata.ha.msg.IHASnapshotDigestResponse;
 import com.bigdata.ha.msg.IHASnapshotRequest;
 import com.bigdata.ha.msg.IHASnapshotResponse;
 import com.bigdata.ha.msg.IHASyncRequest;
-import com.bigdata.ha.msg.IHATXSLockRequest;
 import com.bigdata.ha.msg.IHAWriteMessage;
 import com.bigdata.ha.msg.IHAWriteSetStateRequest;
 import com.bigdata.ha.msg.IHAWriteSetStateResponse;
@@ -182,11 +181,11 @@ public class HAGlueDelegate implements HAGlue {
         return delegate.notifyEarliestCommitTime(req);
     }
 
-    @Override
-    public Future<Void> getTXSCriticalSectionLockOnLeader(
-            final IHATXSLockRequest req) throws IOException {
-        return delegate.getTXSCriticalSectionLockOnLeader(req);
-    }
+//    @Override
+//    public Future<Void> getTXSCriticalSectionLockOnLeader(
+//            final IHATXSLockRequest req) throws IOException {
+//        return delegate.getTXSCriticalSectionLockOnLeader(req);
+//    }
 
 //    @Override
 //    public long nextTimestamp() throws IOException {

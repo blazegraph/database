@@ -425,7 +425,7 @@ public class HAJournal extends Journal {
              * 
              * TODO Lift into HAJournalServer.quorumBreak() handler?
              * 
-             * TODO This will not be called if the quorum remains met but the
+             * FIXME This will not be called if the quorum remains met but the
              * local service leaves the quorum. However, we should still cancel
              * a running snapshot if that occurs.
              */
@@ -1054,10 +1054,10 @@ public class HAJournal extends Journal {
          * connections distinct KBs per the ticket below, then we will need to
          * have a different global write lock - perhaps via the
          * {@link WriteExecutorService}.
-         * <p>
-         * In fact, we could deprecate this method. It is no longer necessary to
-         * support backups since we can now take snapshots without suspending
-         * writers.
+         * 
+         * @deprecated This method is no longer necessary to support backups
+         *             since we can now take snapshots without suspending
+         *             writers.
          * 
          * @see https://sourceforge.net/apps/trac/bigdata/ticket/566 (
          *      Concurrent unisolated operations against multiple KBs on the

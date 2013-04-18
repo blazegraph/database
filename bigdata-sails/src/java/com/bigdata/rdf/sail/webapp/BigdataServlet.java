@@ -38,6 +38,7 @@ import javax.servlet.http.HttpServletResponse;
 import org.apache.log4j.Logger;
 
 import com.bigdata.ha.HAGlue;
+import com.bigdata.ha.HAStatusEnum;
 import com.bigdata.ha.QuorumService;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.Journal;
@@ -146,7 +147,7 @@ abstract public class BigdataServlet extends HttpServlet implements IMimeTypes {
      */
     protected boolean isWritable(final HttpServletRequest req,
             final HttpServletResponse resp) throws IOException {
-
+        
         final Quorum<HAGlue, QuorumService<HAGlue>> quorum = getQuorum();
 
         if (quorum == null) {
@@ -154,16 +155,6 @@ abstract public class BigdataServlet extends HttpServlet implements IMimeTypes {
             // No quorum.
             return true;
             
-        }
-        
-        if (quorum.getClient().isLeader(quorum.token())) {
-            
-            /*
-             * There is a quorum. The quorum is met. This is the leader.
-             */
- 
-            return true;
-
         }
 
         /*
@@ -187,12 +178,20 @@ abstract public class BigdataServlet extends HttpServlet implements IMimeTypes {
 
         // Note: Response also has status code plus everything above.
         
-        buildResponse(resp, HTTP_METHOD_NOT_ALLOWED, MIME_TEXT_PLAIN,
-                "Not quorum leader.");
-        
-        // Not writable.  Response has been committed.
-        return false;
-        
+        // Note: Invocation against local HAGlue object (NOT RMI).
+        final HAStatusEnum haStatus = getQuorum().getClient().getService()
+                .getHAStatus();
+
+        switch (haStatus) {
+        case Leader:
+            return true;
+        default:
+            buildResponse(resp, HTTP_METHOD_NOT_ALLOWED, MIME_TEXT_PLAIN,
+                    "Not quorum leader.");
+            // Not writable.  Response has been committed.
+            return false;
+        }
+                
 	}
 	
     /**
@@ -210,49 +209,82 @@ abstract public class BigdataServlet extends HttpServlet implements IMimeTypes {
             final HttpServletResponse resp) throws IOException {
 
         final Quorum<HAGlue, QuorumService<HAGlue>> quorum = getQuorum();
-        
-        if(quorum == null) {
+
+        if (quorum == null) {
          
             // No quorum.
             return true;
-            
+
         }
-        
-        final long quorumToken = quorum.token();
 
-        if (!quorum.isQuorumMet()) {
+        // Note: Invocation against local HAGlue object (NOT RMI).
+        final HAStatusEnum haStatus = getQuorum().getClient().getService()
+                .getHAStatus();
 
-            /*
-             * The quorum is not met.
-             */
-
-            buildResponse(resp, HTTP_METHOD_NOT_ALLOWED, MIME_TEXT_PLAIN,
-                    "Quorum is not met.");
-
-            return false;
-
-        } else if (!quorum.getClient().isJoinedMember(quorumToken)) {
-
-            /*
-             * The quorum is met, but this service is not joined with the met
-             * quorum.
-             */
-
-            buildResponse(resp, HTTP_METHOD_NOT_ALLOWED, MIME_TEXT_PLAIN,
-                    "Service is not joined with met quorum.");
-
-            return false;
-
-        } else {
-
-            /*
-             * There is a quorum. The quorum is met. This service is part of the
-             * met quorum.
-             */
-
+        switch (haStatus) {
+        case Leader:
+        case Follower:
             return true;
-
+        default:
+            // Not ready.
+            buildResponse(resp, HTTP_METHOD_NOT_ALLOWED, MIME_TEXT_PLAIN,
+                    "Not HA Ready.");
+            // Response has been committed.
+            return false;
         }
+
+//        final long quorumToken = quorum.token();
+//
+//        if (!quorum.isQuorumMet()) {
+//
+//            /*
+//             * The quorum is not met.
+//             */
+//
+//            buildResponse(resp, HTTP_METHOD_NOT_ALLOWED, MIME_TEXT_PLAIN,
+//                    "Quorum is not met.");
+//
+//            return false;
+//
+//        } else if (!quorum.getClient().isJoinedMember(quorumToken)) {
+//
+//            /*
+//             * The quorum is met, but this service is not joined with the met
+//             * quorum.
+//             */
+//
+//            buildResponse(resp, HTTP_METHOD_NOT_ALLOWED, MIME_TEXT_PLAIN,
+//                    "Service is not joined with met quorum.");
+//
+//            return false;
+//
+//        } else if (getIndexManager() instanceof AbstractJournal
+//                && ((AbstractJournal) getIndexManager()).getHAReady() == Quorum.NO_QUORUM) {
+//
+//            /*
+//             * The service is not "HA Ready".
+//             * 
+//             * Note: There is a lag between when a service joins with a met
+//             * quorum and when it has completed some internal asynchronous
+//             * processing to become "HA Ready". This handles that gap for the
+//             * HAJournalServer.
+//             */
+//            
+//            buildResponse(resp, HTTP_METHOD_NOT_ALLOWED, MIME_TEXT_PLAIN,
+//                    "Service is not HA Ready.");
+//
+//            return false;
+//
+//        } else {
+//            
+//            /*
+//             * There is a quorum. The quorum is met. This service is part of the
+//             * met quorum.
+//             */
+//
+//            return true;
+//
+//        }
 
     }
     

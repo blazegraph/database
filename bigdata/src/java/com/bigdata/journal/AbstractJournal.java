@@ -129,7 +129,6 @@ import com.bigdata.ha.msg.IHASnapshotDigestResponse;
 import com.bigdata.ha.msg.IHASnapshotRequest;
 import com.bigdata.ha.msg.IHASnapshotResponse;
 import com.bigdata.ha.msg.IHASyncRequest;
-import com.bigdata.ha.msg.IHATXSLockRequest;
 import com.bigdata.ha.msg.IHAWriteMessage;
 import com.bigdata.ha.msg.IHAWriteSetStateRequest;
 import com.bigdata.ha.msg.IHAWriteSetStateResponse;
@@ -161,6 +160,7 @@ import com.bigdata.rwstore.IRWStrategy;
 import com.bigdata.rwstore.sector.MemStrategy;
 import com.bigdata.rwstore.sector.MemoryManager;
 import com.bigdata.service.AbstractHATransactionService;
+import com.bigdata.service.AbstractTransactionService;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.stream.Stream;
 import com.bigdata.util.ChecksumUtility;
@@ -5031,13 +5031,15 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                  * 
                  * We do not need to discard read-only tx since the committed
                  * state should remain valid even when a quorum is lost.
-                 * 
-                 * FIXME HA TXS INTEGRATION (discard running read/write tx).
+                 * However, it would be a bit odd to leave read-only
+                 * transactions running if you could not start a new read-only
+                 * because the quorum is not met.
                  */
+                ((AbstractTransactionService) getLocalTransactionManager()
+                        .getTransactionService()).abortAllTx();
                 
-                // local abort (no quorum, so we can do 2-phase abort).
-//                _abort();
-//                getLocalTransactionManager().
+                // local abort (no quorum, so 2-phase abort not required).
+                 doLocalAbort(); // FIXME HA : local abort on quorum break -or- service leave?
                 
                 /*
                  * Note: We can not re-cast our vote until our last vote is
@@ -5643,6 +5645,13 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
             final Quorum<HAGlue, QuorumService<HAGlue>> quorum = getQuorum();
 
+            if (quorum == null) {
+
+                // Not HA.
+                return null;
+
+            }
+            
             final QuorumService<HAGlue> quorumService = quorum.getClient();
 
             // check, but do not wait.
@@ -6500,18 +6509,18 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
         }
 
-        @Override
-        public Future<Void> getTXSCriticalSectionLockOnLeader(
-                final IHATXSLockRequest req) throws IOException {
-
-            final Future<Void> f = ((HATXSGlue) AbstractJournal.this
-                    .getLocalTransactionManager().getTransactionService())
-                    .getTXSCriticalSectionLockOnLeader(req);
-            
-            // Note: MUST be an asynchronous Future!!!
-            return getProxy(f, true/* asynchronousFuture */);
-
-        }
+//        @Override
+//        public Future<Void> getTXSCriticalSectionLockOnLeader(
+//                final IHATXSLockRequest req) throws IOException {
+//
+//            final Future<Void> f = ((HATXSGlue) AbstractJournal.this
+//                    .getLocalTransactionManager().getTransactionService())
+//                    .getTXSCriticalSectionLockOnLeader(req);
+//            
+//            // Note: MUST be an asynchronous Future!!!
+//            return getProxy(f, true/* asynchronousFuture */);
+//
+//        }
 
         /*
          * IService

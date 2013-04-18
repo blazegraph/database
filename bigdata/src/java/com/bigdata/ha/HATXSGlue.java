@@ -26,12 +26,10 @@ package com.bigdata.ha;
 import java.io.IOException;
 import java.util.concurrent.BrokenBarrierException;
 import java.util.concurrent.Future;
-import java.util.concurrent.locks.Lock;
 
 import com.bigdata.ha.msg.IHAGatherReleaseTimeRequest;
 import com.bigdata.ha.msg.IHANotifyReleaseTimeRequest;
 import com.bigdata.ha.msg.IHANotifyReleaseTimeResponse;
-import com.bigdata.ha.msg.IHATXSLockRequest;
 import com.bigdata.journal.ITransactionService;
 
 /**
@@ -85,25 +83,25 @@ public interface HATXSGlue {
             IHANotifyReleaseTimeRequest req) throws IOException,
             InterruptedException, BrokenBarrierException;
 
-    /**
-     * Return an asynchronous {@link Future} for a task executing on the quorum
-     * leader that holds the {@link Lock} protecting the critical section
-     * contended by
-     * {@link #gatherMinimumVisibleCommitTime(IHAGatherReleaseTimeRequest)}.
-     * This lock is used by a service that wishes to join a met quorum to
-     * prevent a service join that is concurrent with the critical section in
-     * which the already joined services agree on the new <i>releaseTime</i>.
-     * <p>
-     * Note: The leader MAY impose a timeout on this lock such that a service
-     * which does not complete its work in a timely fashion will lose the lock.
-     * The service MUST check the {@link Future} and verify that it is still
-     * running. If the {@link Future#isCancelled()}, then the service MUST NOT
-     * complete its service join (or must do a service leave to exit the
-     * quorum).
-     * 
-     * @return The {@link Future} for the task holding that lock.
-     */
-    Future<Void> getTXSCriticalSectionLockOnLeader(IHATXSLockRequest req)
-            throws IOException;
+//    /**
+//     * Return an asynchronous {@link Future} for a task executing on the quorum
+//     * leader that holds the {@link Lock} protecting the critical section
+//     * contended by
+//     * {@link #gatherMinimumVisibleCommitTime(IHAGatherReleaseTimeRequest)}.
+//     * This lock is used by a service that wishes to join a met quorum to
+//     * prevent a service join that is concurrent with the critical section in
+//     * which the already joined services agree on the new <i>releaseTime</i>.
+//     * <p>
+//     * Note: The leader MAY impose a timeout on this lock such that a service
+//     * which does not complete its work in a timely fashion will lose the lock.
+//     * The service MUST check the {@link Future} and verify that it is still
+//     * running. If the {@link Future#isCancelled()}, then the service MUST NOT
+//     * complete its service join (or must do a service leave to exit the
+//     * quorum).
+//     * 
+//     * @return The {@link Future} for the task holding that lock.
+//     */
+//    Future<Void> getTXSCriticalSectionLockOnLeader(IHATXSLockRequest req)
+//            throws IOException;
 
 }

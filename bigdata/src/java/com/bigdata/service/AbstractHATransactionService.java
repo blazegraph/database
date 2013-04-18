@@ -55,4 +55,9 @@ abstract public class AbstractHATransactionService extends
     abstract public void updateReleaseTimeConsensus() throws IOException,
             TimeoutException, InterruptedException;
 
+    /**
+     * Used to make a serviceJoin() MUTEX with the consensus protocol.
+     */
+    abstract public void executeWithBarrierLock(Runnable r);
+    
 }
