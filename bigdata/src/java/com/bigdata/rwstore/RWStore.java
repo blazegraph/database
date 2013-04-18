@@ -53,6 +53,8 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock.ReadLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock.WriteLock;
 
 import org.apache.log4j.Logger;
 
@@ -101,6 +103,7 @@ import com.bigdata.rawstore.IAllocationContext;
 import com.bigdata.rawstore.IPSOutputStream;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.service.AbstractTransactionService;
+import com.bigdata.util.ChecksumError;
 import com.bigdata.util.ChecksumUtility;
 
 /**
@@ -546,7 +549,9 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 	 * a store-wide allocation lock when creating new allocation areas, but
 	 * significant contention may be avoided.
 	 */
-    final private ReentrantLock m_allocationLock = new ReentrantLock();
+    final private ReentrantReadWriteLock m_allocationLock = new ReentrantReadWriteLock();
+    final private WriteLock m_allocationWriteLock = m_allocationLock.writeLock();
+    final private ReadLock m_allocationReadLock = m_allocationLock.readLock();
 
 	/**
 	 * The deferredFreeList is simply an array of releaseTime,freeListAddrs
@@ -897,7 +902,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
         if (latchedAddr == 0)
             return;
 
-        m_allocationLock.lock();
+        m_allocationWriteLock.lock();
         try {
             FixedAllocator alloc = null;
             try {
@@ -937,7 +942,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 
         } finally {
 
-            m_allocationLock.unlock();
+        	m_allocationWriteLock.unlock();
 
         }
 	}
@@ -954,7 +959,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
     	if (latchedAddr == 0)
     		return;
 
-    	m_allocationLock.lock();
+    	m_allocationWriteLock.lock();
 		try {		
 			// assert m_commitList.size() == 0;
 			
@@ -975,7 +980,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 	        
 			// assert m_commitList.size() == 0;
 		} finally {
-			m_allocationLock.unlock();
+			m_allocationWriteLock.unlock();
 		}
 	}
 	
@@ -1398,24 +1403,16 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 					final FixedAllocator allocator;
 					final ArrayList<? extends Allocator> freeList;
 					assert allocSize > 0;
-
-					// m_minFixedAlloc and m_maxFixedAlloc may not be set since
-					// as finals they must be set in the constructor.  Therefore
-					// recalculate for local load
-					final int minFixedAlloc = 64 * m_allocSizes[0];
-					final int maxFixedAlloc = 64 * m_allocSizes[m_allocSizes.length-1];
-					int index = 0;
-					int fixedSize = minFixedAlloc;
-					while (fixedSize < allocSize && fixedSize < maxFixedAlloc)
-						fixedSize = 64 * m_allocSizes[++index];
-
-					if (allocSize != fixedSize) {
-						throw new IllegalStateException("Unexpected allocator size: " 
-								+ allocSize + " != " + fixedSize);
+					
+					final int slotSizeIndex = slotSizeIndex(allocSize);
+					
+					if (slotSizeIndex == -1) {
+						throw new IllegalStateException("Unexpected allocation size of: " + allocSize);
 					}
+
 					allocator = new FixedAllocator(this, allocSize);//, m_writeCache);
 
-					freeList = m_freeFixed[index];
+					freeList = m_freeFixed[slotSizeIndex];
 
 					allocator.read(strBuf);
 	                final int chk = ChecksumUtility.getCHK().checksum(buf,
@@ -1447,6 +1444,83 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 		for (int index = 0; index < m_allocs.size(); index++) {
 			((Allocator) m_allocs.get(index)).setIndex(index);
 		}
+	}
+	
+	/**
+	 * Computes the slot size index given the absolute slot size.
+	 * 
+	 * If the slotSizes are [1,2,4] this corresponds to absolute sizes by 
+	 * multiplying by 64 of [64, 128, 256], so slotSizeIndex(64) would return 0,
+	 * and any parameter other than 64, 128 or 256 would return -1.
+	 * 
+	 * @param allocSize - absolute slot size
+	 * @return
+	 */
+	private int slotSizeIndex(final int allocSize) {
+		if (allocSize % 64 != 0)
+			return -1;
+		
+		final int slotSize = allocSize / 64;
+		int slotSizeIndex = -1;
+		for (int index = 0; index < m_allocSizes.length; index++) {
+			if (m_allocSizes[index] == slotSize) {
+				slotSizeIndex = index;
+				break;
+			}
+		}
+		
+		return slotSizeIndex;
+	}
+	
+	/**
+	 * Required for HA to support post commit message to synchronize allocators
+	 * with new state.  By this time the new allocator state will have been flushed
+	 * to the disk, so should be 1) On disk, 2) Probably in OS cache and 3) Possibly
+	 * in the WriteCache.
+	 * 
+	 * For efficiency we do not want to default to reading from disk.
+	 * 
+	 * If there is an existing allocator, then we can compare the old with the new state
+	 * to determine which addresses have been freed and hence which addresses should be
+	 * removed from the external cache.
+	 * 
+	 * @param index of Alloctor to be updated
+	 * @param addr on disk to be read
+	 * @throws InterruptedException 
+	 * @throws ChecksumError 
+	 * @throws IOException 
+	 */
+	private void updateFixedAllocator(final int index, final long addr) throws ChecksumError, InterruptedException, IOException {
+		final ByteBuffer buf = m_writeCacheService.read(addr, ALLOC_BLOCK_SIZE);
+
+		final ByteArrayInputStream baBuf = new ByteArrayInputStream(buf.array());
+		final DataInputStream strBuf = new DataInputStream(baBuf);
+
+		final int allocSize = strBuf.readInt(); // if Blob < 0
+		assert allocSize > 0;
+		
+		final int slotIndex = slotSizeIndex(allocSize);
+		if (slotIndex == -1)
+			throw new IllegalStateException("Invalid allocation size: " + allocSize);
+		
+		final FixedAllocator allocator = new FixedAllocator(this, allocSize);
+		final ArrayList<? extends Allocator> freeList = m_freeFixed[slotIndex];
+		
+		if (index < m_allocs.size()) {
+			final FixedAllocator old = m_allocs.get(index);
+			freeList.remove(old);
+			
+			m_allocs.set(index,  allocator);
+			allocator.setFreeList(freeList);
+			
+			// Need to iterate over all allocated bits in "old" and see if they
+			//	are clear in "new".  If so then clear from externalCache
+
+		} else {
+			assert index == m_allocs.size();
+			m_allocs.add(allocator);
+		}
+
 	}
 	
 	/**
@@ -1573,38 +1647,43 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 	 * @return
 	 */
 	public ByteBuffer getData(final long rwaddr, final int sze) {
-		// must allow for checksum
-		if (sze > (m_maxFixedAlloc-4) || m_writeCacheService == null) {
-		    final byte buf[] = new byte[sze + 4]; // 4 bytes for checksum
-		
-		    getData(rwaddr, buf, 0, sze+4);
-		
-		    return ByteBuffer.wrap(buf, 0, sze);
-		} else {
-            final long paddr = physicalAddress((int) rwaddr);
+		m_allocationReadLock.lock(); // protection against resetFromHARootBlock!!
+		try {
+			// must allow for checksum
+			if (sze > (m_maxFixedAlloc-4) || m_writeCacheService == null) {
+			    final byte buf[] = new byte[sze + 4]; // 4 bytes for checksum
 			
-            if (paddr == 0) {
-                
-                assertAllocators();
-
-                throw new PhysicalAddressResolutionException(rwaddr);
-                
+			    getData(rwaddr, buf, 0, sze+4);
+			
+			    return ByteBuffer.wrap(buf, 0, sze);
+			} else {
+	            final long paddr = physicalAddress((int) rwaddr);
+				
+	            if (paddr == 0) {
+	                
+	                assertAllocators();
+	
+	                throw new PhysicalAddressResolutionException(rwaddr);
+	                
+				}
+	            
+				assert paddr > 0;
+	            try {
+					return m_writeCacheService.read(paddr, sze+4);
+				} catch (Throwable e) {
+					/*
+					 * Note: ClosedByInterruptException can be thrown out of
+					 * FileChannelUtility.readAll(), typically because the LIMIT on
+					 * a query was satisfied, but we do not want to log that as an
+					 * error.
+					 */
+	//				log.error(e,e);
+					throw new RuntimeException("addr=" + rwaddr + " : cause=" + e, e);
+	
+				}
 			}
-            
-			assert paddr > 0;
-            try {
-				return m_writeCacheService.read(paddr, sze+4);
-			} catch (Throwable e) {
-				/*
-				 * Note: ClosedByInterruptException can be thrown out of
-				 * FileChannelUtility.readAll(), typically because the LIMIT on
-				 * a query was satisfied, but we do not want to log that as an
-				 * error.
-				 */
-//				log.error(e,e);
-				throw new RuntimeException("addr=" + rwaddr + " : cause=" + e, e);
-
-			}
+		} finally {
+			m_allocationReadLock.unlock();
 		}
 	}
 
@@ -1921,7 +2000,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 		case -2:
 			return;
 		}
-		m_allocationLock.lock();
+		m_allocationWriteLock.lock();
 		try {
 			if (m_lockAddresses != null && m_lockAddresses.containsKey((int)laddr))
 				throw new IllegalStateException("address locked: " + laddr);
@@ -1987,7 +2066,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 				}
 			}
 		} finally {
-			m_allocationLock.unlock();
+			m_allocationWriteLock.unlock();
 		}
 		
 	}
@@ -2021,7 +2100,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 	 */
 	boolean isSessionProtected() {
 	    
-	    if (!m_allocationLock.isHeldByCurrentThread()) {
+	    if (!m_allocationWriteLock.isHeldByCurrentThread()) {
             /*
              * In order for changes to m_activeTxCount to be visible the caller
              * MUST be holding the lock.
@@ -2115,7 +2194,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 				new ByteArrayInputStream(hdr, 0, hdr.length-4) );
 		
 		// retain lock for all frees
-		m_allocationLock.lock();
+		m_allocationWriteLock.lock();
 		try {
 			final int allocs = instr.readInt();
 			int rem = sze;
@@ -2130,7 +2209,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 		} catch (IOException ioe) {
 			throw new RuntimeException(ioe);
 		} finally {
-			m_allocationLock.unlock();
+			m_allocationWriteLock.unlock();
 		}
 	}
 
@@ -2154,7 +2233,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 			return;
 		}
 		
-		m_allocationLock.lock();
+		m_allocationWriteLock.lock();
 		try {		
 			final FixedAllocator alloc = getBlockByAddress(addr);
 			final int addrOffset = getOffset(addr);
@@ -2200,7 +2279,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 			
 			m_recentAlloc = true;
 		} finally {
-			m_allocationLock.unlock();
+			m_allocationWriteLock.unlock();
 		}
 
 	}
@@ -2221,7 +2300,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
      */
 	void removeFromExternalCache(final long clr, final int slotSize) {
 
-	    assert m_allocationLock.isLocked();
+	    assert m_allocationWriteLock.isHeldByCurrentThread();
 
         if (m_externalCache == null)
             return;
@@ -2278,7 +2357,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 			throw new IllegalArgumentException("Allocation size to big: " + size + " > " + m_maxFixedAlloc);
 		}
 		
-		m_allocationLock.lock();
+		m_allocationWriteLock.lock();
 		try {
 			try {
 				final FixedAllocator allocator;
@@ -2347,7 +2426,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 				throw new RuntimeException(t);
 			}
 		} finally {
-			m_allocationLock.unlock();
+			m_allocationWriteLock.unlock();
 		}
 	}
 	
@@ -2386,7 +2465,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
     public long alloc(final byte buf[], final int size,
 			final IAllocationContext context) {
 
-		m_allocationLock.lock();
+    	m_allocationWriteLock.lock();
 		try {
 			final long begin = System.nanoTime();
 
@@ -2468,7 +2547,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 
 			return newAddr;
 		} finally {
-			m_allocationLock.unlock();
+			m_allocationWriteLock.unlock();
 		}
 	}
 
@@ -2548,7 +2627,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
         if (log.isInfoEnabled()) {
             log.info("RWStore Reset");
         }
-	    m_allocationLock.lock();
+        m_allocationWriteLock.lock();
 		try {
 	        assertOpen();
 //	        assertNoRebuild();
@@ -2639,7 +2718,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 		} catch (Exception e) {
 			throw new IllegalStateException("Unable to reset the store", e);
 		} finally {
-		    m_allocationLock.unlock();
+			m_allocationWriteLock.unlock();
 		}
 	}
 
@@ -2737,7 +2816,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 		checkCoreAllocations();
 
 		// take allocation lock to prevent other threads allocating during commit
-		m_allocationLock.lock();
+		m_allocationWriteLock.lock();
 		
 		try {
 		
@@ -2815,7 +2894,8 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 				    
 				}
 			}
-			m_commitList.clear();
+			// DO NOT clear the commit list until the writes have been flushed
+			// m_commitList.clear();
 
 			writeMetaBits();
 
@@ -2836,6 +2916,9 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 
 			m_metaTransientBits = (int[]) m_metaBits.clone();
 
+			// It is now safe to clear the commit list
+			m_commitList.clear();
+
 //				if (m_commitCallback != null) {
 //					m_commitCallback.commitComplete();
 //				}
@@ -2845,12 +2928,8 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 		} catch (IOException e) {
 			throw new StorageTerminalError("Unable to commit transaction", e);
 		} finally {
-            try {
-                // m_committing = false;
-                m_recentAlloc = false;
-            } finally {
-                m_allocationLock.unlock();
-            }
+            m_recentAlloc = false;
+            m_allocationWriteLock.unlock();
 		}
 
 		checkCoreAllocations();
@@ -2874,7 +2953,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
          * This may have adverse effects wrt concurrency deadlock issues, but
          * none have been noticed so far.
          */
-        m_allocationLock.lock();
+        m_allocationWriteLock.lock();
 
         try {
             /**
@@ -2948,7 +3027,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 
         } finally {
         
-            m_allocationLock.unlock();
+        	m_allocationWriteLock.unlock();
             
         }
 
@@ -3188,7 +3267,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 	
 	void metaFree(final int bit) {
 		
-		if (!m_allocationLock.isHeldByCurrentThread()) {
+		if (!m_allocationWriteLock.isHeldByCurrentThread()) {
 			/*
 			 * Must hold the allocation lock while allocating or clearing
 			 * allocations.
@@ -4089,7 +4168,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 	 * DeferredFrees are written to the deferred PSOutputStream
 	 */
 	public void deferFree(final int rwaddr, final int sze) {
-	    m_allocationLock.lock();
+		m_allocationWriteLock.lock();
 		try {
 			if (sze > (this.m_maxFixedAlloc-4)) {
 				m_deferredFreeOut.writeInt(-rwaddr);
@@ -4101,7 +4180,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
             throw new RuntimeException("Could not free: rwaddr=" + rwaddr
                     + ", size=" + sze, e);
 		} finally {
-			m_allocationLock.unlock();
+			m_allocationWriteLock.unlock();
 		}
 	}
 	
@@ -4134,7 +4213,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 //	}
 
 	public long saveDeferrals() {
-	    m_allocationLock.lock();
+		m_allocationWriteLock.lock();
 		try {
 			if (m_deferredFreeOut.getBytesWritten() == 0) {
 				return 0;
@@ -4152,7 +4231,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 		} catch (IOException e) {
 			throw new RuntimeException("Cannot write to deferred free", e);
 		} finally {
-		    m_allocationLock.unlock();
+			m_allocationWriteLock.unlock();
 		}
 	}
 
@@ -4171,7 +4250,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 		final byte[] buf = new byte[sze+4]; // allow for checksum
 		getData(addr, buf);
 		final DataInputStream strBuf = new DataInputStream(new ByteArrayInputStream(buf));
-		m_allocationLock.lock();
+		m_allocationWriteLock.lock();
 		int totalFreed = 0;
 		try {
 			int nxtAddr = strBuf.readInt();
@@ -4203,7 +4282,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 		} catch (IOException e) {
 			throw new RuntimeException("Problem freeing deferrals", e);
 		} finally {
-			m_allocationLock.unlock();
+			m_allocationWriteLock.unlock();
 		}
 		
 		return totalFreed;
@@ -4318,11 +4397,11 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
      * @param context
      */
 	public void registerContext(IAllocationContext context) {
-		m_allocationLock.lock();
+		m_allocationWriteLock.lock();
 		try {
 			establishContextAllocation(context);
 		} finally {
-			m_allocationLock.unlock();
+			m_allocationWriteLock.unlock();
 		}
 	}
 	
@@ -4340,7 +4419,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
      */
 	public void detachContext(final IAllocationContext context) {
 	    assertOpen();
-		m_allocationLock.lock();
+	    m_allocationWriteLock.lock();
 		try {
 			final ContextAllocation alloc = m_contexts.remove(context);
 			
@@ -4355,7 +4434,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 				releaseSessions();
 			}
 		} finally {
-			m_allocationLock.unlock();
+			m_allocationWriteLock.unlock();
 		}
 	}
 	
@@ -4370,7 +4449,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
      */
 	public void abortContext(final IAllocationContext context) {
 	    assertOpen();
-		m_allocationLock.lock();
+	    m_allocationWriteLock.lock();
 		try {
 			final ContextAllocation alloc = m_contexts.remove(context);
 			
@@ -4380,7 +4459,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 			}
 			
 		} finally {
-			m_allocationLock.unlock();
+			m_allocationWriteLock.unlock();
 		}
 	}
 	
@@ -4542,7 +4621,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
          * The allocation lock MUST be held to make changes in the membership of
          * m_contexts atomic with respect to free().
          */
-        assert m_allocationLock.isHeldByCurrentThread();
+        assert m_allocationWriteLock.isHeldByCurrentThread();
         
         ContextAllocation ret = m_contexts.get(context);
         
@@ -5271,10 +5350,10 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
         writeCache.closeForWrites();
         
 		/*
-		 * Setup buffer for writing. We receive the buffer with pos=0, Ê
+		 * Setup buffer for writing. We receive the buffer with pos=0,
 		 * limit=#ofbyteswritten. However, flush() expects pos=limit, will
 		 * clear pos to zero and then write bytes up to the limit. So,
-		 * we set the position to the limit before calling flush. Ê Ê Ê
+		 * we set the position to the limit before calling flush.
 		 */
 		final ByteBuffer bb = b.buffer();
 		final int limit = bb.limit();
@@ -5284,7 +5363,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
          * Flush the scattered writes in the write cache to the backing
          * store.
          */
-        m_allocationLock.lock(); // TODO This lock is not necessary (verify!)
+		m_allocationReadLock.lock(); // TODO This lock is not necessary (verify!)
         try {
             // Flush writes.
             writeCache.flush(false/* force */);
@@ -5292,7 +5371,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
             // install reads into readCache (if any)
             m_writeCacheService.installReads(writeCache);
         } finally {
-            m_allocationLock.unlock();
+        	m_allocationReadLock.unlock();
         }
     }
 
@@ -5558,19 +5637,22 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 	}
 	
     private void activateTx() {
-        m_allocationLock.lock();
+    	m_allocationWriteLock.lock();
         try {
             m_activeTxCount++;
             if(log.isInfoEnabled())
                 log.info("#activeTx="+m_activeTxCount);
         } finally {
-            m_allocationLock.unlock();
+        	m_allocationWriteLock.unlock();
         }
     }
     
     private void deactivateTx() {
-        m_allocationLock.lock();
+    	m_allocationWriteLock.lock();
         try {
+        	if (log.isInfoEnabled())
+        		log.info("Deactivating TX " + m_activeTxCount);
+        	
         	if (m_activeTxCount == 0) {
         		throw new IllegalStateException("Tx count must be positive!");
         	}
@@ -5582,7 +5664,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
             	releaseSessions();
             }
         } finally {
-            m_allocationLock.unlock();
+        	m_allocationWriteLock.unlock();
         }
     }
 
@@ -5630,12 +5712,12 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
             final ConcurrentWeakValueCache<Long, ICommitter> externalCache,
             final int dataSize) {
 	
-		m_allocationLock.lock();
+    	m_allocationWriteLock.lock();
 		try {
 			m_externalCache = externalCache;
 			m_cachedDatasize = getSlotSize(dataSize);
 		} finally {
-			m_allocationLock.unlock();
+			m_allocationWriteLock.unlock();
 		}
 	}
 
@@ -5651,7 +5733,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
      * @return <code>true</code> iff the address is currently committed.
      */
     public boolean isCommitted(final int rwaddr) {
-        m_allocationLock.lock();
+    	m_allocationWriteLock.lock();
         try {
 
             final FixedAllocator alloc = getBlockByAddress(rwaddr);
@@ -5661,7 +5743,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
             return alloc.isCommitted(offset);
             
         } finally {
-            m_allocationLock.unlock();
+        	m_allocationWriteLock.unlock();
         }
 	}
 
@@ -5694,26 +5776,38 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
      */
 	public void resetFromHARootBlock(final IRootBlockView rootBlock) {
 
+		final Lock writeLock = this.m_extensionLock.writeLock();
+		
+		writeLock.lock();
 	    try {
-
-		    // should not be any dirty allocators
-			// assert m_commitList.size() == 0;
-			
-			// Remove all current allocators
-			m_allocs.clear();
-			
-			assert m_nextAllocation != 0;
-			
-			m_nextAllocation = 0;
-
-			initfromRootBlock(rootBlock);
-			
-			assert m_nextAllocation != 0;
+	    	m_allocationWriteLock.lock();
+	    	try {
+			    // should not be any dirty allocators
+				// assert m_commitList.size() == 0;
+				
+				// Remove all current allocators
+				m_allocs.clear();
+				
+				assert m_nextAllocation != 0;
+				
+				m_nextAllocation = 0;
+	
+				initfromRootBlock(rootBlock);
+				
+				// KICK external cache into touch - FIXME: handle with improved Allocator synchronization
+				m_externalCache.clear();
+				
+				assert m_nextAllocation != 0;
+	    	} finally {
+	    		m_allocationWriteLock.unlock();
+	    	}
 		
 	    } catch (IOException e) {
 		
 	        throw new RuntimeException(e);
 	        
+		} finally {
+			writeLock.unlock();
 		}
 
 	}
@@ -5891,7 +5985,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 		getData(addr, buf);
 		final DataInputStream strBuf = new DataInputStream(
 				new ByteArrayInputStream(buf));
-		m_allocationLock.lock();
+		m_allocationWriteLock.lock();
 //		int totalFreed = 0;
 		try {
 			int nxtAddr = strBuf.readInt();
@@ -5934,7 +6028,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
         } catch (IOException e) {
             throw new RuntimeException("Problem checking deferrals: " + e, e);
         } finally {
-            m_allocationLock.unlock();
+        	m_allocationWriteLock.unlock();
         }
     }
 

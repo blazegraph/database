@@ -186,6 +186,44 @@ public class TestRWJournal extends AbstractJournalTestCase {
 		return properties;
 
 	}
+	
+	/**
+	 * The RWStore relies on several bit manipulation methods to manage both FixedAllocators
+	 * and meta allocations.
+	 * <p>
+	 * This test stresses these methods.
+	 */
+	public void testRWBits() {
+		final int bSize = 32 << 1; // a smaller array stresses more than a larger - say 8192
+		final int[] bits = new int[bSize];
+		final int nbits = bSize * 32;
+		
+		// Set all the bits one at a time
+		for (int i = 0; i < nbits; i++) {
+			final int b = RWStore.fndBit(bits, bSize);
+			assertTrue(b != -1);
+			assertFalse(RWStore.tstBit(bits,  b));
+			RWStore.setBit(bits,  b);
+			assertTrue(RWStore.tstBit(bits,  b));
+		}
+		
+		// check that all are set
+		assertTrue(-1 == RWStore.fndBit(bits, bSize));
+		
+		// now loop around clearing a random bit, then searching and setting it
+		for (int i = 0; i < 30 * 1024 * 1024; i++) {
+			final int b = r.nextInt(nbits);
+			assertTrue(RWStore.tstBit(bits,  b));
+			RWStore.clrBit(bits, b);
+			assertFalse(RWStore.tstBit(bits,  b));
+			
+			assertTrue(b == RWStore.fndBit(bits,  bSize));
+			RWStore.setBit(bits, b);
+			assertTrue(RWStore.tstBit(bits,  b));
+		}
+		
+		assertTrue(-1 == RWStore.fndBit(bits, bSize));
+	}
 
 	/**
 	 * Verify normal operation and basic assumptions when creating a new journal
