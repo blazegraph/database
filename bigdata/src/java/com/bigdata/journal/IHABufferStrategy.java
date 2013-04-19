@@ -138,13 +138,26 @@ public interface IHABufferStrategy extends IBufferStrategy {
     		InterruptedException;
     
     /**
-     * Called from {@link AbstractJournal} commit2Phase to ensure is able to
-     * read committed data that has been streamed directly to the backing store.
+     * Reload from the current root block - <strong>CAUTION : THIS IS NOT A
+     * RESET / ABORT</strong>. The purpose of this method is to reload the root
+     * block under some very limited circumstances, specifically when the root
+     * blocks were replaced during a REBUILD or RESYNC of the backing store for
+     * HA.
      * <p>
-     * Note: This method is used when the root blocks of the leader are installed
-     * onto a follower.  This can change the {@link UUID} for the backing store file.
-     * The {@link IHABufferStrategy} implementation MUST update any cached value for
-     * that {@link UUID}.
+     * Note: This method is used when the root blocks of the leader are
+     * installed onto a follower. This can change the {@link UUID} for the
+     * backing store file. The {@link IHABufferStrategy} implementation MUST
+     * update any cached value for that {@link UUID}.
+     * 
+     * FIXME This is currently called from {@link AbstractJournal} commit2Phase
+     * to ensure that the allocators on the followers are in sync with recently
+     * committed data. It SHOULD NOT be called for this purpose. Instead, we
+     * should be maintaining the allocators either incrementally as writes (and
+     * deletes) are replicated or during the commit protocol (through an
+     * extension of the RWStore commit protocol for HA).
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/662" >
+     *      Latency on followers during commit on leader </a>
      */
     void resetFromHARootBlock(final IRootBlockView rootBlock);
 
@@ -152,7 +165,7 @@ public interface IHABufferStrategy extends IBufferStrategy {
      * Return the #of {@link WriteCache} blocks that were written out for the
      * last write set. This is used to communicate the #of write cache blocks in
      * the commit point back to {@link AbstractJournal#commitNow(long)}. It is
-     * part of the commit protocol. 
+     * part of the commit protocol.
      * <p>
      * Note: This DOES NOT reflect the current value of the block sequence
      * counter for ongoing writes. That counter is owned by the
@@ -160,6 +173,12 @@ public interface IHABufferStrategy extends IBufferStrategy {
      * 
      * @see WriteCacheService#resetSequence()
      * @see #getCurrentBlockSequence()
+     * 
+     *      FIXME I would prefer to expose the {@link WriteCacheService} to the
+     *      {@link AbstractJournal} and let it directly invoke
+     *      {@link WriteCacheService#resetSequence()}. The current pattern
+     *      requires the {@link IHABufferStrategy} implementations to track the
+     *      lastBlockSequence and is messy.
      */
     long getBlockSequence(); // TODO RENAME => getBlockSequenceCountForCommitPoint()
 
@@ -174,7 +193,9 @@ public interface IHABufferStrategy extends IBufferStrategy {
      * Snapshot the allocators in preparation for computing a digest of the
      * committed allocations.
      * 
-     * @return The snapshot in a format that is backing store specific.
+     * @return The snapshot in a format that is backing store specific -or-
+     *         <code>null</code> if the snapshot is a NOP for the
+     *         {@link IBufferStrategy} (e.g., for the WORM).
      */
     Object snapshotAllocators();
 
