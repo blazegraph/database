@@ -48,7 +48,7 @@ public class ReadIndexTask<V extends Comparable<V>> extends AbstractIndexTask<V>
      * inserted, the {@link Hit#setDocId(long) docId} is set on the {@link Hit}
      * and a new instance is assigned to {@link #tmp}.
      */
-    private Hit<V> tmp = new Hit<V>();
+    private Hit<V> tmp;// = new Hit<V>();
 
     /**
      * Setup a task that will perform a range scan for entries matching the
@@ -98,6 +98,8 @@ public class ReadIndexTask<V extends Comparable<V>> extends AbstractIndexTask<V>
         itr = searchEngine.getIndex()
                 .rangeIterator(fromKey, toKey, 0/* capacity */,
                         IRangeQuery.KEYS | IRangeQuery.VALS, null/* filter */);
+        
+        tmp = new Hit<V>(numTerms);
 
     }
     
@@ -180,8 +182,7 @@ public class ReadIndexTask<V extends Comparable<V>> extends AbstractIndexTask<V>
                 if (oldValue == null) {
                     hit = tmp;
                     hit.setDocId(docId);
-                    hit.setNumSearchTerms(numQueryTerms);
-                    tmp = new Hit<V>();
+                    tmp = new Hit<V>(numQueryTerms);
                 } else {
                     hit = oldValue;
                 }

@@ -27,7 +27,7 @@ public class Hit<V extends Comparable<V>> implements IHit<V>,
 
     /** Array of whether each search term appears or does not appear in the hit. **/
 //    private LongArrayBitVector searchTerms;
-    private boolean[] searchTerms;
+    private final boolean[] searchTerms;
     
     /** Net cosine for the reporting terms. */
     private double cosine;
@@ -43,8 +43,11 @@ public class Hit<V extends Comparable<V>> implements IHit<V>,
      * 
      * @see ReadIndexTask2
      */
-    Hit() {
+    Hit(final int numSearchTerms) {
 
+//    	this.searchTerms = LongArrayBitVector.ofLength(numSearchTerms);
+    	this.searchTerms = new boolean[numSearchTerms];
+    	
     }
     
     synchronized void setDocId(final V docId) {
@@ -62,12 +65,12 @@ public class Hit<V extends Comparable<V>> implements IHit<V>,
 
     }
     
-    synchronized void setNumSearchTerms(final int numSearchTerms) {
-    	
-//    	this.searchTerms = LongArrayBitVector.ofLength(numSearchTerms);
-    	this.searchTerms = new boolean[numSearchTerms];
-    	
-    }
+//    synchronized void setNumSearchTerms(final int numSearchTerms) {
+//    	
+////    	this.searchTerms = LongArrayBitVector.ofLength(numSearchTerms);
+//    	this.searchTerms = new boolean[numSearchTerms];
+//    	
+//    }
     
     /**
      * The #of terms for which a hit was reported for this document.
@@ -75,7 +78,7 @@ public class Hit<V extends Comparable<V>> implements IHit<V>,
     synchronized public int getTermCount() {
         
 //    	if (searchTerms.size() == 0)
-    	if (searchTerms == null || searchTerms.length == 0)
+    	if (searchTerms.length == 0)
     		return 0;
     	
     	int nterms = 0;
