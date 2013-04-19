@@ -1170,6 +1170,19 @@ public class WORMStrategy extends AbstractBufferStrategy implements
 
     }
 
+    /**
+     * The sequence number for the last {@link WriteCache} block written in the
+     * current commit. This is set in {@link #commit()} when we flush the
+     * {@link WriteCacheService}. This is used to prepare the new
+     * {@link IRootBlockView}. The value of this field is NOT incremented as
+     * writes are made, but only after they have been flushed.
+     * 
+     * TODO This pattern arose because {@link WriteCacheService#resetSequence()}
+     * is called from {@link #commit()}. It might be more pleasant to call that
+     * from {@link AbstractJournal#commitNow(long)} so we could consolidate this
+     * logic. That requires us to expose the {@link WriteCacheService} to the
+     * {@link AbstractJournal} through the {@link IHABufferStrategy}.
+     */
     private long lastBlockSequence = 0;
 
     @Override
@@ -2437,12 +2450,9 @@ public class WORMStrategy extends AbstractBufferStrategy implements
     private final void releaseWriteCache() {
 
         if (writeCacheService != null) {
-//           try {
-        		// FIXME: just reset to preserve read cache?
-                writeCacheService.close();
-//            } catch (InterruptedException e) {
-//                throw new RuntimeException(e);
-//            }
+
+            writeCacheService.close();
+            
         }
             
     }
@@ -2452,10 +2462,15 @@ public class WORMStrategy extends AbstractBufferStrategy implements
      * of this method are ignored.
      */
     @Override
-	public void delete(long addr) {
-    	if (writeCacheService != null)
-    		writeCacheService.clearWrite(addr, 0);
-	}
+	public void delete(final long addr) {
+
+        if (writeCacheService != null) {
+
+            writeCacheService.clearWrite(addr, 0);
+
+        }
+
+    }
 
     @Override
     public void writeRawBuffer(final IHAWriteMessage msg, final IBufferAccess b)
@@ -2710,13 +2725,19 @@ public class WORMStrategy extends AbstractBufferStrategy implements
 
         // Note: Potentially updated (if root blocks were reinstalled).
         storeUUIDRef.set(rootBlock.getUUID());
-        
+
     }
 
     @Override
     public Object snapshotAllocators() {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException();
+
+        /*
+         * Note: The WORM does not have a concept of allocators. There is
+         * nothing that we need to snapshot since there is no state that is
+         * overwritten.
+         */
+        return null;
+        
     }
 
     @Override
@@ -2746,6 +2767,17 @@ public class WORMStrategy extends AbstractBufferStrategy implements
             // The capacity of that buffer (typically 1MB).
             final int bufferCapacity = b.capacity();
 
+            /*
+             * FIXME computeDigest(): This probably should be userExtent +
+             * header, not fileExtent. By choosing userExtent, we are
+             * effectively snapshotting the region on which we will compute the
+             * digest. However, there might be bytes not yet written onto the
+             * backing file (e.g., in the write cache service). Those bytes
+             * would not show up in a read from the file so we would need to do
+             * more work to make this digest computation safe for concurrent
+             * writes. What is safe is to compute the digest from the last
+             * commit point. That "snapshop" is always valid for the WORM.
+             */
             // The size of the file at the moment we begin.
             final long fileExtent = getExtent();
 
