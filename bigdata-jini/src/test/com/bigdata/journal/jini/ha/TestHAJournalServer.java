@@ -99,9 +99,18 @@ public class TestHAJournalServer extends AbstractHA3JournalServerTestCase {
         // Verify can access the REST API "status" page.
         doNSSStatusRequest(serverA);
 
+        // Verify self-reports as NotReady.
+        awaitHAStatus(serverA, HAStatusEnum.NotReady);
+        
         // Verify that service self-reports as NotReady via the REST API.
         assertEquals(HAStatusEnum.NotReady, getNSSHAStatus(serverA));
-        
+
+        // Verify can not read on service.
+        assertReadRejected(serverA);
+
+        // Verify can not write on service.
+        assertWriteRejected(serverA);
+
         assertTrue(getHAJournalFileA().exists());
         assertTrue(getHALogDirA().exists());
         assertTrue(getSnapshotDirA().exists());
@@ -134,6 +143,15 @@ public class TestHAJournalServer extends AbstractHA3JournalServerTestCase {
         
         doNSSStatusRequest(serverB);
 
+        // Verify self-reports as NotReady.
+        awaitHAStatus(serverB, HAStatusEnum.NotReady);
+
+        // Verify can not read on service.
+        assertReadRejected(serverB);
+
+        // Verify can not write on service.
+        assertWriteRejected(serverB);
+
         assertTrue(getHAJournalFileB().exists());
         assertTrue(getHALogDirB().exists());
         assertTrue(getSnapshotDirB().exists());
@@ -161,6 +179,15 @@ public class TestHAJournalServer extends AbstractHA3JournalServerTestCase {
         }
         
         doNSSStatusRequest(serverC);
+
+        // Verify self-reports as NotReady.
+        awaitHAStatus(serverC, HAStatusEnum.NotReady);
+
+        // Verify can not read on service.
+        assertReadRejected(serverC);
+
+        // Verify can not write on service.
+        assertWriteRejected(serverC);
 
         assertTrue(getHAJournalFileC().exists());
         assertTrue(getHALogDirC().exists());
@@ -270,6 +297,9 @@ public class TestHAJournalServer extends AbstractHA3JournalServerTestCase {
 
             doNSSStatusRequest(serverA);
 
+            // Verify self-reports as NotReady.
+            awaitHAStatus(serverA, HAStatusEnum.NotReady);
+
             digestA = serverA.computeDigest(
                     new HADigestRequest(null/* storeId */)).getDigest();
 
@@ -301,6 +331,9 @@ public class TestHAJournalServer extends AbstractHA3JournalServerTestCase {
 
             // Verify NSS is running.
             doNSSStatusRequest(serverA);
+
+            // Verify self-reports as NotReady.
+            awaitHAStatus(serverA, HAStatusEnum.NotReady);
 
             /*
              * Verify no changes in digest on restart?

@@ -87,6 +87,7 @@ import com.bigdata.quorum.Quorum;
 import com.bigdata.quorum.QuorumClient;
 import com.bigdata.quorum.QuorumException;
 import com.bigdata.quorum.zk.ZKQuorumImpl;
+import com.bigdata.rdf.sail.webapp.client.HttpException;
 import com.bigdata.service.jini.JiniClientConfig;
 import com.bigdata.service.jini.RemoteDestroyAdmin;
 import com.bigdata.util.InnerCause;
@@ -2086,7 +2087,55 @@ public class AbstractHA3JournalServerTestCase extends
         getRemoteRepository(leader).prepareUpdate(updateStr).evaluate();
             
      }
+    
+    /**
+     * Verify that an attempt to read on the specified service is disallowed.
+     */
+    protected void assertWriteRejected(final HAGlue haGlue) throws IOException,
+            Exception {
 
+        final StringBuilder sb = new StringBuilder();
+        sb.append("DROP ALL;\n");
+        sb.append("PREFIX dc: <http://purl.org/dc/elements/1.1/>\n");
+        sb.append("INSERT DATA {\n");
+        sb.append("  <http://example/book1> dc:title \"A new book\" ;\n");
+        sb.append("  dc:creator \"A.N.Other\" .\n");
+        sb.append("}\n");
+
+        final String updateStr = sb.toString();
+
+        try {
+
+            getRemoteRepository(haGlue).prepareUpdate(updateStr).evaluate();
+
+        } catch (HttpException ex) {
+
+            assertEquals("statusCode", 405, ex.getStatusCode());
+
+        }
+        
+    }
+
+    /**
+     * Verify that an attempt to read on the specified service is disallowed.
+     */
+    protected void assertReadRejected(final HAGlue haGlue) throws IOException,
+            Exception {
+
+        final String queryStr = "SELECT (COUNT(*) as ?count) {?s ?p ?o}";
+
+        try {
+         
+            getRemoteRepository(haGlue).prepareTupleQuery(queryStr).evaluate();
+            
+        } catch (HttpException ex) {
+            
+            assertEquals("statusCode", 405, ex.getStatusCode());
+            
+        }
+        
+    }
+    
     /**
      * Task loads a large data set.
      */

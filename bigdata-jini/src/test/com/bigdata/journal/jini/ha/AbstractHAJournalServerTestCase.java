@@ -249,6 +249,24 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
     }
 
     /**
+     * Check the HAStatusEnum for the service.
+     */
+    protected void awaitHAStatus(final HAGlue haGlue,
+            final HAStatusEnum expected) throws IOException {
+
+        assertCondition(new Runnable() {
+            public void run() {
+                try {
+                    assertEquals(expected, haGlue.getHAStatus());
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+            }
+        }, 5, TimeUnit.SECONDS);
+
+    }
+
+    /**
      * Check the NSS API by issuing a "GET .../status" request.
      * <p>
      * Note: The NSS server will not allow reads or writes until the

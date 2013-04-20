@@ -118,6 +118,10 @@ public class TestHA2JournalServer extends AbstractHA3JournalServerTestCase {
         // Verify that service self-reports role via the REST API.
         assertEquals(HAStatusEnum.Follower, getNSSHAStatus(serverB));
 
+        // Check RMI API.
+        awaitHAStatus(serverA, HAStatusEnum.Leader);
+        awaitHAStatus(serverB, HAStatusEnum.Follower);
+
         // Await initial commit point (KB create).
         awaitCommitCounter(1L, serverA, serverB);
 
@@ -158,6 +162,9 @@ public class TestHA2JournalServer extends AbstractHA3JournalServerTestCase {
          */
         assertHALogDigestsEquals(1L/* firstCommitCounter */,
                 lastCommitCounter1, new HAGlue[] { serverA, serverB });
+
+        // Verify can not write on follower.
+        assertWriteRejected(serverB);
         
     }
 
@@ -183,6 +190,10 @@ public class TestHA2JournalServer extends AbstractHA3JournalServerTestCase {
 
         // Await [B] up and running as follower.
         assertEquals(HAStatusEnum.Follower, awaitNSSAndHAReady(serverB));
+
+        // Verify self-reporting by RMI in their respective roles.
+        awaitHAStatus(serverA, HAStatusEnum.Leader);
+        awaitHAStatus(serverB, HAStatusEnum.Follower);
         
         // Verify binary equality on the journal files.
         assertDigestsEquals(new HAGlue[] { serverA, serverB });
@@ -231,6 +242,9 @@ public class TestHA2JournalServer extends AbstractHA3JournalServerTestCase {
             
             // The leader MAY have changed (since the quorum broke).
             final HAGlue leader2 = quorum.getClient().getLeader(token2);
+
+            // Verify leader self-reports in new role.
+            awaitHAStatus(leader2, HAStatusEnum.Leader);
 
 //            final UUID leaderId2 = leader2.getServiceId();
 //
@@ -282,6 +296,10 @@ public class TestHA2JournalServer extends AbstractHA3JournalServerTestCase {
         // Await [B] up and running as follower.
         assertEquals(HAStatusEnum.Follower, awaitNSSAndHAReady(serverB));
 
+        // Verify self-reports in role.
+        awaitHAStatus(serverA, HAStatusEnum.Leader);
+        awaitHAStatus(serverB, HAStatusEnum.Follower);
+
         // Verify binary equality on the journal files.
         assertDigestsEquals(new HAGlue[] { serverA, serverB });
 
@@ -320,6 +338,9 @@ public class TestHA2JournalServer extends AbstractHA3JournalServerTestCase {
 //            final UUID leaderId2 = leader2.getServiceId();
 //
 //            assertFalse(leaderId1.equals(leaderId2));
+            
+            // Verify leader self-reports in new role.
+            awaitHAStatus(leader2, HAStatusEnum.Leader);
             
             /*
              * Verify we can read on the KB on both nodes.

@@ -1139,10 +1139,8 @@ public class HAJournalServer extends AbstractServer {
 
         private class QuorumMeetTask implements Callable<Void> {
             private final long token;
-//            private final UUID leaderId;
             public QuorumMeetTask(final long token, final UUID leaderId) {
                 this.token = token;
-//                this.leaderId = leaderId;
             }
             public Void call() throws Exception {
                 journal.setQuorumToken(token);
@@ -1225,9 +1223,10 @@ public class HAJournalServer extends AbstractServer {
                  * Set token. Journal will notice that it is no longer
                  * "HA Ready"
                  * 
-                 * FIXME AbstractJournal.setQuorumToken() must detect case where
-                 * it transitions from a met quorum through a service leave and
-                 * clears its haReady token.
+                 * Note: AbstractJournal.setQuorumToken() will detect
+                 * case where it transitions from a met quorum through 
+                 * a service leave and will clear its haReady token and
+                 * update its haStatus field appropriately.
                  */
                 journal.setQuorumToken(getQuorum().token());
                 try {
@@ -1235,7 +1234,7 @@ public class HAJournalServer extends AbstractServer {
                 } catch (IOException e) {
                     haLog.error(e, e);
                 }
-                enterRunState(new SeekConsensusTask());
+                enterRunState(new SeekConsensusTask()); // TODO Versus ERROR state?
                 return null;
             }
         }

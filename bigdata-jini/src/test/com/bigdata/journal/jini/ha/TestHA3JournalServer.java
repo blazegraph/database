@@ -27,18 +27,17 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.journal.jini.ha;
 
 import java.io.File;
-import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.UUID;
 import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Future;
+import java.util.concurrent.Executors;
 import java.util.concurrent.FutureTask;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-
-import junit.framework.AssertionFailedError;
+import java.util.concurrent.atomic.AtomicLong;
 
 import net.jini.config.Configuration;
 
@@ -47,7 +46,6 @@ import com.bigdata.ha.HAStatusEnum;
 import com.bigdata.ha.halog.HALogWriter;
 import com.bigdata.ha.msg.HARootBlockRequest;
 import com.bigdata.journal.AbstractJournal;
-import com.bigdata.quorum.AsynchronousQuorumCloseException;
 import com.bigdata.quorum.Quorum;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
 
@@ -131,6 +129,9 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
          * commit. Therefore, the HALog files should exist on all nodes.
          */
 
+        awaitHAStatus(serverA, HAStatusEnum.Leader);
+        awaitHAStatus(serverB, HAStatusEnum.Follower);
+        
         // Current commit point.
         final long lastCommitCounter = 1L;
         
@@ -147,11 +148,18 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
         // Verify binary equality of (A,B) journals.
         assertDigestsEquals(new HAGlue[] { serverA, serverB });
 
+        // Verify can not write on follower.
+        assertWriteRejected(serverB);
+        
         // Start 3rd service.
         final HAGlue serverC = startC();
 
         // Wait until the quorum is fully met. The token should not change.
         assertEquals(token, awaitFullyMetQuorum());
+
+        awaitHAStatus(serverA, HAStatusEnum.Leader);
+        awaitHAStatus(serverB, HAStatusEnum.Follower);
+        awaitHAStatus(serverC, HAStatusEnum.Follower);
 
         // The commit counter has not changed.
         assertEquals(
@@ -187,6 +195,10 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
         // Verify no HALog files since fully met quorum @ commit.
         assertHALogNotFound(0L/* firstCommitCounter */, lastCommitCounter,
                 new HAGlue[] { serverA, serverB, serverC });
+
+        // Verify can not write on followers.
+        assertWriteRejected(serverB);
+        assertWriteRejected(serverC);
 
     }
 
@@ -443,6 +455,9 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
         // Wait until the quorum is fully met.  After RESYNC
         assertEquals(token, awaitFullyMetQuorum());
 
+        // Await C as Follower.
+        awaitHAStatus(serverC, HAStatusEnum.Follower);
+        
         // HALog files now exist on ALL services, on original commitCounter!
         assertHALogDigestsEquals(1L/* firstCommitCounter */, lastCommitCounter2,
                 new HAGlue[] { serverA, serverB, serverC });
@@ -2302,17 +2317,185 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
 
     }
 
-//    public void testStress_LiveLoadRemainsMet() throws Exception {
-//        for (int i = 1; i <= 20; i++) {
-//            try {
-////                testABC_LiveLoadRemainsMet_restart_B_fullyMetDuringLOAD_restartC_fullyMetDuringLOAD();
-//                testABC_LiveLoadRemainsMet_restart_C_fullyMetDuringLOAD();
-//            } catch (Throwable e) {
-//                fail("Run " + i, e);
-//            } finally {
-//                destroyAll();
-//            }
-//        }
-//    }
+    /**
+     * Variant of {@link #testABC_LargeLoad()} that issues concurrent HA Status
+     * requests. This is a regression test for a deadlock observed when a status
+     * request was issued during a BSBM 100M load on an HA3 cluster.
+     */
+    public void testABC_LargeLoad_concurrentStatusRequests() throws Exception {
+        
+        final HAGlue serverA = startA();
+        final HAGlue serverB = startB();
+        
+        // wait for a quorum met.
+        final long token = awaitMetQuorum();
+
+        // Current commit point.
+        final long lastCommitCounter = 1L;
+
+        // Verify 1st commit point is visible on A + B.
+        awaitCommitCounter(lastCommitCounter, new HAGlue[] { serverA, serverB });
+        
+        // start C.
+        final HAGlue serverC = startC();
+
+        // wait for a fully met quorum.
+        assertEquals(token, awaitFullyMetQuorum());
+        
+        /*
+         * LOAD data on leader.
+         */
+        final FutureTask<Void> ft = new FutureTask<Void>(new LargeLoadTask(
+                token, true/* reallyLargeLoad */));
+
+        final AtomicLong nsuccess = new AtomicLong();
+
+        // All concurrent requests.
+        final ScheduledExecutorService scheduledExecutor = Executors
+                .newScheduledThreadPool(3/* corePoolSize */);
+
+        ScheduledFuture<?> scheduledFuture = null;
+        
+        try {
+
+            // Start LOAD.
+            executorService.submit(ft);
+
+            // Start STATUS requests.  Fixed Rate, so can be concurrent.
+            scheduledFuture = scheduledExecutor.scheduleAtFixedRate(new Runnable() {
+                public void run() {
+                    try {
+                        doNSSStatusRequest(serverA);
+                        nsuccess.incrementAndGet();
+                    } catch (Exception e) {
+                        throw new RuntimeException(e);
+                    }
+                }
+            }, 50L/* initialDelay */, 20L/* period */, TimeUnit.MILLISECONDS);
+            
+            // Await LOAD, but with a timeout.
+            ft.get(longLoadTimeoutMillis, TimeUnit.MILLISECONDS);
+
+            if (scheduledFuture.isDone()) {
+                /*
+                 * Note: We are not expecting this to complete during the load.
+                 */
+                scheduledFuture.get();
+                fail("Not expecting scheduledFuture to be done: nsuccess="
+                        + nsuccess);
+            }
+
+        } finally {
+
+            ft.cancel(true/* mayInterruptIfRunning */);
+
+            if (scheduledFuture != null)
+                scheduledFuture.cancel(true/* mayInterruptIfRunning */);
+            
+            scheduledExecutor.shutdownNow();
+            
+        }
+        
+    }
+
+    /**
+     * Verify that the {@link HAStatusEnum} is updated coorectly as services are
+     * fail over, when their roles change, and when the quorum meets and breaks.
+     */
+    public void testQuorumABC_HAStatusUpdatesWithFailovers() throws Exception {
+
+        // Start 2 services.
+        HAGlue serverA = startA();
+        HAGlue serverB = startB();
+
+        // Wait for a quorum meet.
+        final long token = quorum.awaitQuorum(awaitQuorumTimeout,
+                TimeUnit.MILLISECONDS);
+
+        awaitHAStatus(serverA, HAStatusEnum.Leader);
+        awaitHAStatus(serverB, HAStatusEnum.Follower);
+
+        // Start 3rd service.
+        HAGlue serverC = startC();
+
+        // Wait until the quorum is fully met. The token should not change.
+        assertEquals(token, awaitFullyMetQuorum());
+
+        awaitHAStatus(serverB, HAStatusEnum.Follower);
+
+        // Simple transaction.
+        simpleTransaction();
+
+        /*
+         * Shutdown A. This causes a quorum break. B will become the new leader.
+         */
+        shutdownA();
+
+        final long token2 = quorum.awaitQuorum(awaitQuorumTimeout * 2,
+                TimeUnit.MILLISECONDS);
+
+        // New token.
+        assertEquals(token2, token + 1);
+
+        /*
+         * Figure out the new leader.
+         */
+        final HAGlue leader = quorum.getClient().getLeader(token2);
+        final HAGlue follower1;
+        if (leader == serverB) {
+            follower1 = serverC;
+        } else {
+            follower1 = serverB;
+        }
+
+        // Self-report in the correct roles.
+        awaitHAStatus(leader, HAStatusEnum.Leader);
+        awaitHAStatus(follower1, HAStatusEnum.Follower);
+
+        // Restart A.
+        serverA = startA();
+
+        // Self-report in the correct roles.
+        awaitHAStatus(leader, HAStatusEnum.Leader);
+        awaitHAStatus(follower1, HAStatusEnum.Follower);
+        awaitHAStatus(serverA, HAStatusEnum.Follower);
+
+        /*
+         * Shutdown follower1 (either B or C). Quorum remains met.
+         */
+        if (follower1 == serverC)
+            shutdownC();
+        else if (follower1 == serverB)
+            shutdownB();
+        else
+            throw new AssertionError();
+        
+        // Correct roles.
+        awaitHAStatus(leader, HAStatusEnum.Leader);
+        awaitHAStatus(serverA, HAStatusEnum.Follower);
+
+        /*
+         * Shutdown A.  Quorum breaks. 
+         */
+        
+        shutdownA();
+        
+        // Correct roles.
+        awaitHAStatus(leader, HAStatusEnum.NotReady);
+
+    }
+
+//  public void testStress_LiveLoadRemainsMet() throws Exception {
+//  for (int i = 1; i <= 20; i++) {
+//      try {
+////          testABC_LiveLoadRemainsMet_restart_B_fullyMetDuringLOAD_restartC_fullyMetDuringLOAD();
+//          testABC_LiveLoadRemainsMet_restart_C_fullyMetDuringLOAD();
+//      } catch (Throwable e) {
+//          fail("Run " + i, e);
+//      } finally {
+//          destroyAll();
+//      }
+//  }
+//}
 
 }
