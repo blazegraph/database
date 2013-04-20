@@ -64,34 +64,72 @@ public abstract class AbstractIndexTask<V extends Comparable<V>> {
         final IKeyBuilder keyBuilder = searchEngine.getIndex()
                 .getIndexMetadata().getKeyBuilder();
 
-        {// = recordBuilder.getFromKey(keyBuilder, termText);
-            keyBuilder.reset();
-            keyBuilder
-                    .appendText(termText, true/* unicode */, false/* successor */);
-            fromKey = keyBuilder.getKey();
+//        {// = recordBuilder.getFromKey(keyBuilder, termText);
+//            keyBuilder.reset();
+//            keyBuilder
+//                    .appendText(termText, true/* unicode */, false/* successor */);
+//            fromKey = keyBuilder.getKey();
+//        }
+//
+//        if (prefixMatch) {
+//            /*
+//             * Accepts anything starting with the search term. E.g., given
+//             * "bro", it will match "broom" and "brown" but not "break".
+//             * 
+//             * Note: This uses the successor of the Unicode sort key, so it will
+//             * scan all keys starting with that prefix until the sucessor of
+//             * that prefix.
+//             */
+//            keyBuilder.reset();
+//            keyBuilder.appendText(termText, true/* unicode */, true/*successor*/);
+//            toKey = keyBuilder.getKey();
+//        } else {
+//            /*
+//             * Accepts only those entries that exactly match the search term.
+//             * 
+//             * Note: This uses the fixed length successor of the fromKey. That
+//             * gives us a key-range scan which only access keys having the same
+//             * Unicode sort key.
+//             */
+//            toKey = SuccessorUtil.successor(fromKey.clone());
+//        }
+
+        /*
+		 * Changed this to lop off the last three bytes (the pad plus
+		 * run-length) for prefix search. Adding this three byte suffix to the
+		 * prefix was causing problems for searches whose prefix ended with a
+		 * numeric less than 7, because this codes to a byte less than the pad
+		 * byte.
+		 * 
+		 * TODO We eventually need to change the pad byte to code to zero, but
+		 * this will break binary compatibility.
+		 */
+        
+        { // from key
+	        keyBuilder.reset();
+	        keyBuilder
+	                .appendText(termText, true/* unicode */, false/* successor */);
+	        final byte[] tmp = keyBuilder.getKey();
+	        
+	        if (prefixMatch) {
+	        	fromKey = new byte[tmp.length-3];
+	        	System.arraycopy(tmp, 0, fromKey, 0, fromKey.length);
+	        } 
+	        else
+	        {// = recordBuilder.getFromKey(keyBuilder, termText);
+	            fromKey = tmp;
+	        }
         }
 
-        if (prefixMatch) {
-            /*
-             * Accepts anything starting with the search term. E.g., given
-             * "bro", it will match "broom" and "brown" but not "break".
-             * 
-             * Note: This uses the successor of the Unicode sort key, so it will
-             * scan all keys starting with that prefix until the sucessor of
-             * that prefix.
-             */
-            keyBuilder.reset();
-            keyBuilder.appendText(termText, true/* unicode */, true/*successor*/);
-            toKey = keyBuilder.getKey();
-        } else {
-            /*
-             * Accepts only those entries that exactly match the search term.
-             * 
-             * Note: This uses the fixed length successor of the fromKey. That
-             * gives us a key-range scan which only access keys having the same
-             * Unicode sort key.
-             */
-            toKey = SuccessorUtil.successor(fromKey.clone());
+        { // to key
+	        /*
+	         * Accepts only those entries that exactly match the search term.
+	         * 
+	         * Note: This uses the fixed length successor of the fromKey. That
+	         * gives us a key-range scan which only access keys having the same
+	         * Unicode sort key.
+	         */
+	        toKey = SuccessorUtil.successor(fromKey.clone());
         }
 
     }

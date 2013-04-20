@@ -1008,6 +1008,7 @@ public class FullTextIndex<V extends Comparable<V>> extends AbstractRelation {
                     + ", minRank=" + minRank
                     + ", maxRank=" + maxRank
                     + ", matchAllTerms=" + matchAllTerms
+                    + ", prefixMatch=" + prefixMatch
                     + ", timeout=" + timeout + ", unit=" + unit);
 
         if (timeout == 0L) {
@@ -1162,7 +1163,7 @@ public class FullTextIndex<V extends Comparable<V>> extends AbstractRelation {
 	        
 	        if (a.length == 0) {
 	        	
-	            log.warn("No hits: languageCode=[" + languageCode + "], query=["
+	            log.info("No hits: languageCode=[" + languageCode + "], query=["
 	                    + query + "]");
 	            
 	            cache.put(cacheKey, a);
