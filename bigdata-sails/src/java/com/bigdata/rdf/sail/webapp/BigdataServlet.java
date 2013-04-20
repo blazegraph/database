@@ -187,7 +187,7 @@ abstract public class BigdataServlet extends HttpServlet implements IMimeTypes {
             return true;
         default:
             buildResponse(resp, HTTP_METHOD_NOT_ALLOWED, MIME_TEXT_PLAIN,
-                    "Not quorum leader.");
+                    haStatus.name());
             // Not writable.  Response has been committed.
             return false;
         }
@@ -228,7 +228,7 @@ abstract public class BigdataServlet extends HttpServlet implements IMimeTypes {
         default:
             // Not ready.
             buildResponse(resp, HTTP_METHOD_NOT_ALLOWED, MIME_TEXT_PLAIN,
-                    "Not HA Ready.");
+                    haStatus.name());
             // Response has been committed.
             return false;
         }
