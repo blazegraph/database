@@ -2235,15 +2235,53 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
         final long token = this.quorumToken;
 
+        /*
+         * This code path is too expensive and has been observed to deadlock.
+         * Turn this into a non-blocking code path through correct maintenance
+         * of the haReadyToken and the haStatus fields.
+         */
+//        if (token != Quorum.NO_QUORUM) {
+//            
+//          // Quorum exists, are we the leader for that token?
+//          final boolean isLeader = quorum.getClient().isLeader(token);
+//
+//          // read-only unless this is the leader.
+//          return !isLeader;
+//
+//        }
+
+        /*
+         * This code path is completely non-blocking. It relies on volatile
+         * writes on [quorumToken] and [haStatus].
+         * 
+         * The rule is read-only if there is a met quorum unless this is the
+         * leader and read/write if there is no quorum or if the quorum is not
+         * met.
+         */
         if (token != Quorum.NO_QUORUM) {
 
-            // Quorum exists, are we the leader for that token?
-            final boolean isLeader = quorum.getClient().isLeader(token);
-
-            // read-only unless this is the leader.
-            return !isLeader;
+            switch (haStatus) {
+            case Leader: // read/write
+                return false;
+            case Follower: // read-only
+                return true;
+            case NotReady: 
+                /*
+                 * This case is considered "read-only" locally, but not
+                 * available for reads by the HA layer (REST API, SPARQL, etc).
+                 */
+                return true;
+            default:
+                throw new AssertionError();
+            }
 
         }
+
+        /*
+         * Note: Default for HA permits read/write access when the quorum is not
+         * met. This allows us to make local changes when setting up the
+         * service, doing resync, etc.
+         */
 
         return false;
 
@@ -2795,16 +2833,15 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 	 * @return The timestamp assigned to the commit record -or- 0L if there were
 	 *         no data to commit.
 	 */
+    // Note: Overridden by StoreManager (DataService).
 	protected long commitNow(final long commitTime) {
+	    
+        final WriteLock lock = _fieldReadWriteLock.writeLock();
 
-		final WriteLock lock = _fieldReadWriteLock.writeLock();
+        lock.lock();
 
-		lock.lock();
-
-		final IRootBlockView old = _rootBlock;
-
-		try {
-
+        try {
+            
 			assertOpen();
 
 			final long beginNanos = System.nanoTime();
@@ -2857,10 +2894,6 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
             if ((_bufferStrategy instanceof IHABufferStrategy)
                     && quorum != null && quorum.isHighlyAvailable()) {
 
-			final long newCommitCounter = old.getCommitCounter() + 1;
-			
-            final ICommitRecord commitRecord = new CommitRecord(commitTime,
-                    newCommitCounter, rootAddrs);
                 try {
                     /**
                      * CRITICAL SECTION. We need obtain a distributed consensus
@@ -2919,6 +2952,8 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
              * in disaster recovery scenarios where your root blocks are toast,
              * but good root blocks can be found elsewhere in the file.
              */
+
+            final IRootBlockView old = _rootBlock;
 
             final long newCommitCounter = old.getCommitCounter() + 1;
             
@@ -3210,23 +3245,13 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
 			return commitTime;
 
-		} catch (Throwable t) {
-			if (_bufferStrategy instanceof IHABufferStrategy) {
-				log.warn("BufferStrategy reset from root block after commit failure", t);
-				
-				((IHABufferStrategy) _bufferStrategy).resetFromHARootBlock(old);
-			} else {
-				log.error("BufferStrategy does not support recovery from commit failure: " + _bufferStrategy);
-			}
-			
-			throw new RuntimeException(t); // wrap and rethrow
-		} finally {
+        } finally {
 
-			lock.unlock();
+            lock.unlock();
 
-		}
-
-	}
+        }
+        
+    }
 
 //    /**
 //     * (debug only) For the {@link RWStrategy}, scans the
@@ -4179,8 +4204,8 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
             if (isHistoryGone(commitTime)) {
             	
-            	if (log.isTraceEnabled())
-            		log.trace("Removing entry from cache: " + name);
+                if (log.isTraceEnabled())
+                    log.trace("Removing entry from cache: " + name);
 
                 /*
                  * No longer visible.
@@ -4515,11 +4540,16 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                     .loadFromCheckpoint(this, checkpointAddr, true/* readOnly */);
 
             if (log.isTraceEnabled())
-            	log.trace("Adding checkpoint to historical index at " + checkpointAddr);
+                log.trace("Adding checkpoint to historical index at "
+                        + checkpointAddr);
 
         } else {
+
             if (log.isTraceEnabled())
-            	log.trace("Found historical index at " + checkpointAddr + ", historicalIndexCache.size(): " + historicalIndexCache.size());
+                log.trace("Found historical index at " + checkpointAddr
+                        + ", historicalIndexCache.size(): "
+                        + historicalIndexCache.size());
+            
         }
 
         // Note: putIfAbsent is used to make concurrent requests atomic.
@@ -4968,6 +4998,8 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
          */
         
         final long oldValue = quorumToken;
+        final long oldReady = haReadyToken;
+        final HAStatusEnum oldStatus = haStatus;
 
         if (haLog.isInfoEnabled())
             haLog.info("oldValue=" + oldValue + ", newToken=" + newValue);
@@ -4985,6 +5017,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
         final boolean didBreak;
         final boolean didMeet;
         final boolean didJoinMetQuorum;
+        final boolean didLeaveMetQuorum;
 
         if (newValue == Quorum.NO_QUORUM && oldValue != Quorum.NO_QUORUM) {
 
@@ -4996,9 +5029,10 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
             
             this.quorumToken = newValue;
 
-            didBreak = true;
+            didBreak = true; // quorum break.
             didMeet = false;
             didJoinMetQuorum = false;
+            didLeaveMetQuorum = haReadyToken != Quorum.NO_QUORUM; // if service was joined with met quorum, then it just left the met quorum.
 
         } else if (newValue != Quorum.NO_QUORUM && oldValue == Quorum.NO_QUORUM) {
 
@@ -5009,12 +5043,15 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
              */
             
             didBreak = false;
-            didMeet = true;
+            didMeet = true; // quorum meet.
             didJoinMetQuorum = false;
+            didLeaveMetQuorum = false;
 
-        } else if (newValue != Quorum.NO_QUORUM
-                && haReadyToken == Quorum.NO_QUORUM && localService != null
-                && localService.isJoinedMember(newValue)) {
+        } else if (newValue != Quorum.NO_QUORUM // quorum exists
+                && haReadyToken == Quorum.NO_QUORUM // service was not joined with met quorum.
+                && localService != null //
+                && localService.isJoinedMember(newValue) // service is now joined with met quorum.
+                ) {
 
             /*
              * This service is joining a quorum that is already met.
@@ -5022,13 +5059,31 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
             
             didBreak = false;
             didMeet = false;
-            didJoinMetQuorum = true;
+            didJoinMetQuorum = true; // service joined with met quorum.
+            didLeaveMetQuorum = false;
             
+        } else if (newValue != Quorum.NO_QUORUM // quorum exists
+                && haReadyToken != Quorum.NO_QUORUM // service was joined with met quorum
+                && localService != null //
+                && !localService.isJoinedMember(newValue) // service is no longer joined with met quorum.
+                ) {
+
+            /*
+             * This service is leaving a quorum that is already met (but this is
+             * not a quorum break since the new token is not NO_QUORUM).
+             */
+            
+            didBreak = false;
+            didMeet = false;
+            didJoinMetQuorum = false;
+            didLeaveMetQuorum = true; // service left met quorum. quorum stil met.
+
         } else {
 
             didBreak = false;
             didMeet = false;
             didJoinMetQuorum = false;
+            didLeaveMetQuorum = false;
             
         }
 
@@ -5045,7 +5100,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
         try {
 
-            if (didBreak) {
+            if (didBreak || didLeaveMetQuorum) {
 
                 /*
                  * We also need to discard any active read/write tx since there
@@ -5061,8 +5116,14 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                 ((AbstractTransactionService) getLocalTransactionManager()
                         .getTransactionService()).abortAllTx();
                 
-                // local abort (no quorum, so 2-phase abort not required).
-                 doLocalAbort(); // FIXME HA : local abort on quorum break -or- service leave?
+                /*
+                 * Local abort (no quorum, so 2-phase abort not required).
+                 * 
+                 * FIXME HA : local abort on quorum break -or- service leave?
+                 * 
+                 * FIXME HA : Abort the unisolated connection?
+                 */
+                doLocalAbort(); 
                 
                 /*
                  * Note: We can not re-cast our vote until our last vote is
@@ -5073,8 +5134,12 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                 localCommitCounter = -1;
                 isLeader = isFollower = false;
                 
+                quorumToken = newValue; // volatile write.
+                
                 haReadyToken = Quorum.NO_QUORUM; // volatile write.
-
+                
+                haStatus = HAStatusEnum.NotReady; // volatile write.
+                
                 haReadyCondition.signalAll(); // signal ALL.
                 
             } else if (didMeet || didJoinMetQuorum) {
@@ -5087,7 +5152,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
                 localCommitCounter = _rootBlock.getCommitCounter();
                 
-                if (localService.isFollower(quorumToken)) {
+                if (localService.isFollower(newValue)) {
 
                     isLeader = false;
                     isFollower = true;
@@ -5100,8 +5165,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                          */
 
                         // Remote interface for the quorum leader.
-                        final HAGlue leader = localService
-                                .getLeader(quorumToken);
+                        final HAGlue leader = localService.getLeader(newValue);
 
                         log.info("Fetching root block from leader.");
                         final IRootBlockView leaderRB;
@@ -5139,7 +5203,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                     // ready as follower.
                     tmp = newValue;
 
-                } else if (localService.isLeader(quorumToken)) {
+                } else if (localService.isLeader(newValue)) {
 
                     isLeader = true;
                     isFollower = false;
@@ -5157,10 +5221,23 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                     
                 }
 
+                /*
+                 * Note: These volatile writes need to occur before we do the
+                 * local abort since the readOnly versus readWrite state of the
+                 * journal is decided based on the [haStatus].
+                 */
+                
+                this.haReadyToken = tmp; // volatile write.
+
+                // volatile write.
+                this.haStatus = isLeader ? HAStatusEnum.Leader
+                        : isFollower ? HAStatusEnum.Follower
+                                : HAStatusEnum.NotReady;
+                
                 if (!installedRBs) {
 
                     /*
-                     * If we install the RBs, the a local abort was already
+                     * If we install the RBs, then a local abort was already
                      * done. Otherwise we need to do one now (this covers the
                      * case when setQuorumToken() is called on the leader as
                      * well as cases where the service is either not a follower
@@ -5171,8 +5248,6 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                     doLocalAbort();
 
                 }
-
-                this.haReadyToken = tmp; // volatile write.
 
                 haReadyCondition.signalAll(); // signal ALL.
                 
@@ -5188,6 +5263,18 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
             
         }
         
+        if (haLog.isInfoEnabled())
+            haLog.info("qorumToken(" + oldValue + " => " + newValue
+                    + "), haReadyToken(" + oldReady + " => " + haReadyToken //
+                    + "), haStatus(" + oldStatus + " => " + haStatus //
+                    + "), isLeader=" + isLeader//
+                    + ", isFollower=" + isFollower//
+                    + ", didMeet=" + didMeet//
+                    + ", didBreak=" + didBreak//
+                    + ", didJoin=" + didJoinMetQuorum//
+                    + ", didLeave=" + didLeaveMetQuorum//
+            );
+
         if (isLeader || isFollower) {
 
             localService.didMeet(newValue, localCommitCounter, isLeader);
@@ -5197,6 +5284,10 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
     }
     private final Condition haReadyCondition = _fieldReadWriteLock.writeLock().newCondition();
     private volatile long haReadyToken = Quorum.NO_QUORUM;
+    /**
+     * Updated with the {@link #haReadyToken}.
+     */
+    private volatile HAStatusEnum haStatus = HAStatusEnum.NotReady;
     
     /**
      * Await the service being ready to partitipate in an HA quorum. The
@@ -5674,50 +5765,52 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                 return null;
 
             }
+  
+            return haStatus;
             
-            final QuorumService<HAGlue> quorumService = quorum.getClient();
-
-            // check, but do not wait.
-            final long haReadyToken = AbstractJournal.this.getHAReady();
-
-            final HAStatusEnum status;
-            
-            if (haReadyToken == Quorum.NO_QUORUM) {
-            
-                // Quorum is not met (as percieved by the HAJournal).
-                status = HAStatusEnum.NotReady;
-                
-            } else {
-                
-                if (quorumService.isLeader(haReadyToken)) {
-                
-                    // Service is leader.
-                    status = HAStatusEnum.Leader;
-                    
-                } else if (quorumService.isFollower(haReadyToken)) {
-                    
-                    // Service is follower.
-                    status = HAStatusEnum.Follower;
-                    
-                } else {
-                    
-                    /*
-                     * awaitHAReady() should only return successfully (and hence
-                     * haReadyToken should only be a valid token) if the service was
-                     * elected as either a leader or a follower. However, it is
-                     * possible for the service to have concurrently left the met
-                     * quorum, in which case the if/then/else pattern will fall
-                     * through to this code path.
-                     */
-                    
-                    // Quorum is not met (as percieved by the HAJournal).
-                    status = HAStatusEnum.NotReady;
-                    
-                }
-                
-            }
-
-            return status;
+//            final QuorumService<HAGlue> quorumService = quorum.getClient();
+//
+//            // check, but do not wait.
+//            final long haReadyToken = AbstractJournal.this.getHAReady();
+//
+//            final HAStatusEnum status;
+//            
+//            if (haReadyToken == Quorum.NO_QUORUM) {
+//            
+//                // Quorum is not met (as percieved by the HAJournal).
+//                status = HAStatusEnum.NotReady;
+//                
+//            } else {
+//                
+//                if (quorumService.isLeader(haReadyToken)) {
+//                
+//                    // Service is leader.
+//                    status = HAStatusEnum.Leader;
+//                    
+//                } else if (quorumService.isFollower(haReadyToken)) {
+//                    
+//                    // Service is follower.
+//                    status = HAStatusEnum.Follower;
+//                    
+//                } else {
+//                    
+//                    /*
+//                     * awaitHAReady() should only return successfully (and hence
+//                     * haReadyToken should only be a valid token) if the service was
+//                     * elected as either a leader or a follower. However, it is
+//                     * possible for the service to have concurrently left the met
+//                     * quorum, in which case the if/then/else pattern will fall
+//                     * through to this code path.
+//                     */
+//                    
+//                    // Quorum is not met (as percieved by the HAJournal).
+//                    status = HAStatusEnum.NotReady;
+//                    
+//                }
+//                
+//            }
+//
+//            return status;
 
         }
         
