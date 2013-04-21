@@ -930,7 +930,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
                 if(log.isTraceEnabled())
                     log.trace("Query running...");
 //                try {
-    			if(explain) {
+            if (explain && !update) {
 					/*
 					 * The data goes to a bit bucket and we send an
 					 * "explanation" of the query evaluation back to the caller.
@@ -943,6 +943,11 @@ public class BigdataRDFContext extends BigdataBaseContext {
 					 * once it is terminated the IRunningQuery will have been
 					 * cleared from the internal map maintained by the
 					 * QueryEngine, at which point we can not longer find it.
+					 * 
+					 * Note: We can't do this for UPDATE since it would have
+					 * a side-effect anyway.  The way to "EXPLAIN" an UPDATE 
+					 * is to break it down into the component QUERY bits and
+					 * execute those.
 					 */
     				doQuery(cxn, new NullOutputStream());
     			} else {
@@ -1220,7 +1225,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
 
             final SparqlUpdateResponseWriter listener;
             final ByteArrayOutputStream baos;
-            if(monitor) {
+            if (monitor) {
 
                 /*
                  * Establish a listener that will log the process onto an XHTML
@@ -1795,7 +1800,8 @@ public class BigdataRDFContext extends BigdataBaseContext {
     }
 
 	/**
-     * Metadata about running queries.
+     * Metadata about running {@link AbstractQueryTask}s (this includes both
+     * queries and update requests).
      */
 	static class RunningQuery {
 
