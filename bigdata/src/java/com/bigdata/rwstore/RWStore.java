@@ -6146,7 +6146,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
     /**
      * @see IHABufferStrategy#computeDigest(Object, MessageDigest)
      */
-    public void computeDigestOld(final Object snapshot, final MessageDigest digest)
+    public void computeDigest(final Object snapshot, final MessageDigest digest)
             throws DigestException, IOException {
 
         if (snapshot != null)
@@ -6251,7 +6251,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
      * @throws DigestException
      * @throws IOException
      */
-    public void computeDigest(final Object snapshot, final MessageDigest digest)
+    public void computeDigestNew(final Object snapshot, final MessageDigest digest)
             throws DigestException, IOException {
         if (snapshot != null)
             throw new UnsupportedOperationException();

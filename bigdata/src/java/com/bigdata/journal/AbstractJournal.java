@@ -3193,11 +3193,6 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                                 nonJoinedPipelineServiceIds, quorumToken,
                                 commitTime);
 
-                        // Now the root blocks are down we can commit any
-                        //	transient state
-            			if (_bufferStrategy instanceof IRWStrategy) {
-            				((IRWStrategy) _bufferStrategy).postCommit();
-            			}
                     } else {
 
                         quorumService.abort2Phase(quorumToken);
@@ -5589,7 +5584,13 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
             final boolean leader = localService == null ? false : localService
                     .isLeader(rootBlock.getQuorumToken());
 
-            if (!leader) {
+            if (leader) {
+                // Now the root blocks are down we can commit any
+                //	transient state
+    			if (_bufferStrategy instanceof IRWStrategy) {
+    				((IRWStrategy) _bufferStrategy).postCommit();
+    			}
+            } else {
 
                 /*
                  * Ensure allocators are synced after commit. This is only done
@@ -5602,6 +5603,10 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                     haLog.info("Reset from root block: serviceUUID="
                             + localService.getServiceId());
 
+                /**
+                 * FIXME: Replace call for resetFromHARootBlock with call to
+                 * postHACommit(rootBlock) to sync FixedAllocators
+                 */
                 ((IHABufferStrategy) _bufferStrategy)
                         .resetFromHARootBlock(rootBlock);
 

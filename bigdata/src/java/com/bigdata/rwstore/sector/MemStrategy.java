@@ -154,7 +154,7 @@ public class MemStrategy implements IBufferStrategy, IRWStrategy, IAllocationMan
 
 	@Override
 	public void commit() {
-		// NOP
+		// NOP. synchronization moved to postCommit
 		// m_mmgr.commit();
 		// m_dirty = false;
 	}
@@ -162,7 +162,7 @@ public class MemStrategy implements IBufferStrategy, IRWStrategy, IAllocationMan
 
 	@Override
 	public void postCommit() {
-		m_mmgr.commit();
+		m_mmgr.postCommit();
 		m_dirty = false;
 	}
 

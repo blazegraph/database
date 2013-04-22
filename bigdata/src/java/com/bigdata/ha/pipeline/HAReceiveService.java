@@ -994,7 +994,7 @@ public class HAReceiveService<M extends IHAWriteMessageBase> extends Thread {
                     final int rdlen = client.client.read(localBuffer);
 
                     if (log.isTraceEnabled())
-                        log.trace("Read " + rdlen + " bytes of "
+                        log.trace("Read " + rdlen + " bytes with "
                                 + (rdlen > 0 ? rem - rdlen : rem)
                                 + " bytes remaining.");
 
