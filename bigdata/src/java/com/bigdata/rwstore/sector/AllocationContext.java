@@ -368,6 +368,11 @@ public class AllocationContext implements IMemoryManager {//, IStore {
 	}
 
 	@Override
+	public void postCommit() {
+		m_root.postCommit();
+	}
+
+	@Override
 	public void registerExternalCache(
 			ConcurrentWeakValueCache<Long, ICommitter> historicalIndexCache,
 			int byteCount) {

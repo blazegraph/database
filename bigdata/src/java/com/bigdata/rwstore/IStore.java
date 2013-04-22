@@ -64,6 +64,12 @@ public interface IStore extends IAllocationManager, IStreamStore,
      */
 	public void commit();
 	
+    /**
+     * Hook that supports synchronization with an external commit before which
+     * a rollback to "pre-commit" state is supported.
+     */
+	public void postCommit();
+	
 //	/**************************************************************
 //	 * Odd method needed by PSInputStream to fetch data of unknown
 //	 *	size into a buffer

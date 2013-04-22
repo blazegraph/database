@@ -1192,6 +1192,11 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
 
 	@Override
 	public void commit() {
+		// NOP, the commit of the transient objects is now in postCommit
+	}
+
+	@Override
+	public void postCommit() {
 		m_allocationLock.lock();
 		try {
 			final Iterator<SectorAllocator> sectors = m_sectors.iterator();
