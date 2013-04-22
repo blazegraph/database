@@ -154,6 +154,14 @@ public class MemStrategy implements IBufferStrategy, IRWStrategy, IAllocationMan
 
 	@Override
 	public void commit() {
+		// NOP
+		// m_mmgr.commit();
+		// m_dirty = false;
+	}
+
+
+	@Override
+	public void postCommit() {
 		m_mmgr.commit();
 		m_dirty = false;
 	}
