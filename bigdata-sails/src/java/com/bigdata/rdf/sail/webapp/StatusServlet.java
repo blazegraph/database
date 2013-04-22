@@ -78,6 +78,11 @@ import com.bigdata.util.InnerCause;
  * the request begins to execute. This is true for both SPARQL QUERY and SPARQL
  * UPDATE requests.
  * 
+ * TODO The KB addressed by the request should also be displayed as metadata
+ * associated with the request. We should make this a restriction that can be
+ * placed onto the status page and make it easy to see the status for different
+ * KBs.
+ * 
  * @author thompsonbry
  * @author martyncutcher
  */
