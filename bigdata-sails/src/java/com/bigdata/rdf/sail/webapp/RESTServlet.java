@@ -208,7 +208,8 @@ public class RESTServlet extends BigdataRDFServlet {
 
         } else if (req.getParameter(StatusServlet.CANCEL_QUERY) != null) {
 
-            StatusServlet.doCancelQuery(req, resp, getIndexManager());
+            StatusServlet.doCancelQuery(req, resp, getIndexManager(),
+                    getBigdataRDFContext());
 
             buildResponse(resp, HTTP_OK, MIME_TEXT_PLAIN);
             
