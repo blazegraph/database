@@ -24,6 +24,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rwstore;
 
+import java.nio.ByteBuffer;
+import java.security.MessageDigest;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
@@ -328,26 +330,10 @@ public class FixedAllocator implements Allocator {
                     	// clear out writes - FIXME is releaseSession okay
                     	block.releaseCommitWrites(m_store.m_writeCacheService);
                     	
-                        block.m_transients = block.m_live.clone();
+                    	// Moved to postCommit()
+                        // block.m_transients = block.m_live.clone();
                     }
 
-                    /**
-                     * If this allocator is shadowed then copy the new committed
-                     * state to m_saveCommit
-                     */
-                    if (m_context != null) {
-                        throw new IllegalStateException("Must not commit shadowed FixedAllocator!");
-//                    } else if (m_store.isSessionPreserved()) {
-//                        block.m_commit = block.m_transients.clone();
-                    } else {
-                        block.m_commit = block.m_live.clone();
-                        // if m_saveCommit is set then it must be m_pendingContextCommit
-                        if (block.m_saveCommit != null) {
-                        	if (!m_pendingContextCommit)
-                        		throw new IllegalStateException("Unexpected m_saveCommit when no pending commit");
-                        	block.m_saveCommit = null;
-                        }
-                    }
                 }
                 // add checksum
                 final int chk = ChecksumUtility.getCHK().checksum(buf,
@@ -357,27 +343,6 @@ public class FixedAllocator implements Allocator {
 			    str.close();
 			}
 
-			if (m_pendingContextCommit) {
-				m_pendingContextCommit = false;
-				if (hasFree()) {
-					m_freeList.add(this);
-				}
-			}
-			
-			if (!protectTransients /*!this.m_sessionActive*/) {
-				m_freeBits += m_freeTransients;
-	
-				// Handle re-addition to free list once transient frees are
-				// added back
-				if (m_freeWaiting && m_freeBits >= m_store.cDefaultFreeBitsThreshold) {
-					m_freeList.add(this);
-					m_freeWaiting = false;
-				}
-	
-				m_freeTransients = 0;
-				
-			}
-			
             if (log.isDebugEnabled())
                 checkBits();
 			
@@ -1162,4 +1127,100 @@ public class FixedAllocator implements Allocator {
 	public int getSlotSize() {
 		return m_size;
 	}
+	
+	/**
+	 * Add the committed allocated slot contents to the digest
+	 * 
+	 * FIXME: First version is correct rather than optimal, need to
+	 * consider if there is any benefit to 
+	 * 
+	 * @param snapshot
+	 * @param digest
+	 */
+    public void computeDigest(final Object snapshot, final MessageDigest digest) {
+    	// create buffer of slot size
+    	final ByteBuffer bb = ByteBuffer.allocate(m_size);
+    	for (AllocBlock b : m_allocBlocks) {
+    		final int bits = b.m_commit.length * 32;
+    		final long startAddr = RWStore.convertAddr(b.m_addr);
+    		for (int i = 0; i < bits; i++) {
+    			if (RWStore.tstBit(b.m_commit, i)) {
+    				final long paddr = startAddr + (m_size * i);
+    				
+    				bb.position(0);   				
+                    m_store.readRaw(paddr, bb);
+                    
+                    digest.update(bb);
+
+    			}
+    		}
+    	}
+    	
+		{
+			final byte[] data = digest.digest();
+			final StringBuffer sb = new StringBuffer();
+			for (byte b : data) {
+				if (sb.length() > 0)
+					sb.append(",");
+				sb.append(b);
+			}
+
+			log.warn("ALLOCATOR[" + m_index + ":" + m_size + "] freeBits: " + freebits() +  ", DIGEST:" + sb.toString());
+		}
+    }
+
+    /**
+     * Update the historical commit bits only once confirmed
+     */
+	public void postCommit() {
+		final boolean protectTransients = m_sessionActive || m_store.isSessionProtected();
+		
+    	for (AllocBlock b : m_allocBlocks) {
+            b.m_commit = b.m_live.clone();
+            if (!protectTransients)
+            	b.m_transients = b.m_live.clone();
+            
+            /**
+             * If this allocator is shadowed then copy the new committed
+             * state to m_saveCommit
+             */
+            if (m_context != null) {
+                throw new IllegalStateException("Must not commit shadowed FixedAllocator!");
+//            } else if (m_store.isSessionPreserved()) {
+//                block.m_commit = block.m_transients.clone();
+            } else {
+                b.m_commit = b.m_live.clone();
+                // if m_saveCommit is set then it must be m_pendingContextCommit
+                if (b.m_saveCommit != null) {
+                	if (!m_pendingContextCommit)
+                		throw new IllegalStateException("Unexpected m_saveCommit when no pending commit");
+                	b.m_saveCommit = null;
+                }
+            }
+
+    	}
+    	
+		if (m_pendingContextCommit) {
+			m_pendingContextCommit = false;
+			if (hasFree()) {
+				m_freeList.add(this);
+			}
+		}
+		
+		if (!protectTransients /*!this.m_sessionActive*/) {
+			m_freeBits += m_freeTransients;
+
+			// Handle re-addition to free list once transient frees are
+			// added back
+			if (m_freeWaiting && m_freeBits >= m_store.cDefaultFreeBitsThreshold) {
+				m_freeList.add(this);
+				m_freeWaiting = false;
+			}
+
+			m_freeTransients = 0;
+			
+		}
+		
+	}
+
 }

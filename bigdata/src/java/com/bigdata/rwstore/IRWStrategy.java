@@ -36,4 +36,10 @@ public interface IRWStrategy extends IBufferStrategy, IAllocationManager,
 //     */
 //	void resetFromHARootBlock(IRootBlockView rootBlock);
     
+    /**
+     * Called post commit to dispose any transient commit state retained to
+     * support reset/rollback
+     */
+    public void postCommit();
+    
 }

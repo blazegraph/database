@@ -3110,6 +3110,12 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                 // write the root block on to the backing store.
                 _bufferStrategy.writeRootBlock(newRootBlock, forceOnCommit);
 
+                // Now the root blocks are down we can commit any
+                //	transient state
+    			if (_bufferStrategy instanceof IRWStrategy) {
+    				((IRWStrategy) _bufferStrategy).postCommit();
+    			}
+    			
                 // set the new root block.
                 _rootBlock = newRootBlock;
 
@@ -3187,6 +3193,11 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                                 nonJoinedPipelineServiceIds, quorumToken,
                                 commitTime);
 
+                        // Now the root blocks are down we can commit any
+                        //	transient state
+            			if (_bufferStrategy instanceof IRWStrategy) {
+            				((IRWStrategy) _bufferStrategy).postCommit();
+            			}
                     } else {
 
                         quorumService.abort2Phase(quorumToken);
@@ -3245,10 +3256,9 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
 			return commitTime;
 
-        } finally {
+		} finally {
 
-            lock.unlock();
-
+			lock.unlock();
         }
         
     }

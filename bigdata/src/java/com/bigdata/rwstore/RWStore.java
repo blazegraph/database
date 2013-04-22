@@ -451,7 +451,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 	// private final ArrayList<BlobAllocator> m_freeBlobs;
 
 	/** lists of blocks requiring commitment. */
-	private final ArrayList<Allocator> m_commitList;
+	private final ArrayList<FixedAllocator> m_commitList;
 
 //	private WriteBlock m_writes;
 	
@@ -731,7 +731,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
         
 		final IRootBlockView m_rb = fileMetadata.rootBlock;
 
-		m_commitList = new ArrayList<Allocator>();
+		m_commitList = new ArrayList<FixedAllocator>();
 
 		m_allocs = new ArrayList<FixedAllocator>();
 		
@@ -2860,11 +2860,11 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 			// assert m_deferredFreeOut.getBytesWritten() == 0;
 
 			// save allocation headers
-			final Iterator<Allocator> iter = m_commitList.iterator();
+			final Iterator<FixedAllocator> iter = m_commitList.iterator();
 			
 			while (iter.hasNext()) {
 			    
-				final Allocator allocator = iter.next();
+				final FixedAllocator allocator = iter.next();
 				
 				// the bit in metabits for the old allocator version.
 				final int old = allocator.getDiskAddr();
@@ -2915,9 +2915,9 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 			// writeFileSpec();
 
 			m_metaTransientBits = (int[]) m_metaBits.clone();
-
-			// It is now safe to clear the commit list
-			m_commitList.clear();
+			
+			// Must be called from AbstractJournal commitNow after writeRootBlock
+			// postCommit();
 
 //				if (m_commitCallback != null) {
 //					m_commitCallback.commitComplete();
@@ -2939,6 +2939,22 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
                     + m_metaBitsAddr + ", active contexts: "
                     + m_contexts.size());
     }
+	
+	/**
+	 * Commits the FixedAllocator bits
+	 */
+	public void postCommit() {
+		m_allocationWriteLock.lock();
+		try {
+			for (FixedAllocator fa : m_commitList) {
+				fa.postCommit();
+			}
+			
+			m_commitList.clear();
+		} finally {
+			m_allocationWriteLock.unlock();
+		}
+	}
 
     public int checkDeferredFrees(final AbstractJournal journal) {
         
@@ -3967,7 +3983,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 //		}
 //	}
 
-	void addToCommit(final Allocator allocator) {
+	void addToCommit(final FixedAllocator allocator) {
 		if (!m_commitList.contains(allocator)) {
 			m_commitList.add(allocator);
 		}
@@ -6130,7 +6146,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
     /**
      * @see IHABufferStrategy#computeDigest(Object, MessageDigest)
      */
-    public void computeDigest(final Object snapshot, final MessageDigest digest)
+    public void computeDigestOld(final Object snapshot, final MessageDigest digest)
             throws DigestException, IOException {
 
         if (snapshot != null)
@@ -6227,6 +6243,44 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 
     }
 
+    /**
+     * This alternative implementation checks the live allocations
+     * 
+     * @param snapshot
+     * @param digest
+     * @throws DigestException
+     * @throws IOException
+     */
+    public void computeDigest(final Object snapshot, final MessageDigest digest)
+            throws DigestException, IOException {
+        if (snapshot != null)
+            throw new UnsupportedOperationException();
+
+    	m_allocationWriteLock.lock();
+    	try {
+    		// FIXME add digest for RootBlocks!
+    		
+    		for (FixedAllocator fa : m_allocs) {
+    			fa.computeDigest(snapshot, digest);
+    		}
+    	} finally {
+    		m_allocationWriteLock.unlock();
+    	}
+    	
+    	{
+    		final byte[] data = digest.digest();
+    		final StringBuffer sb = new StringBuffer();
+    		for (byte b : data) {
+    			if (sb.length() > 0)
+    				sb.append(",");
+    			sb.append(b);
+    		}
+    		
+    		log.warn("STORE DIGEST: " + sb.toString());
+    		log.warn("Free Deferrals: " + this.m_deferredFreeOut.getBytesWritten());
+    	}
+    }
+    
     /**
      * Used as part of the rebuild protocol
      * @throws IOException 

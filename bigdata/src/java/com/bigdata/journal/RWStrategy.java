@@ -884,6 +884,11 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy,
 //		m_rebuildSequence++;
 	}
 
+	@Override
+	public void postCommit() {
+		m_store.postCommit();
+	}
+
 //	private int m_rebuildSequence = -1;
 //	
 //	@Override
