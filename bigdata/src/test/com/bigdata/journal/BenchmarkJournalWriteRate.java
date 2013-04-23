@@ -585,25 +585,36 @@ abstract public class BenchmarkJournalWriteRate extends TestCase2 {
 
     public static class BenchmarkTransientJournal extends BenchmarkJournalWriteRate {
 
+        @Override
         protected BufferMode getBufferMode() {return BufferMode.Transient;}
 
     }
     
     public static class BenchmarkDirectJournal extends BenchmarkJournalWriteRate {
 
+        @Override
         protected BufferMode getBufferMode() {return BufferMode.Direct;}
 
     }
     
     public static class BenchmarkMappedJournal extends BenchmarkJournalWriteRate {
 
+        @Override
         protected BufferMode getBufferMode() {return BufferMode.Mapped;}
 
     }
     
     public static class BenchmarkDiskJournal extends BenchmarkJournalWriteRate {
 
+        @Override
         protected BufferMode getBufferMode() {return BufferMode.Disk;}
+        
+    }
+
+    public static class BenchmarkDiskRWJournal extends BenchmarkJournalWriteRate {
+
+        @Override
+        protected BufferMode getBufferMode() {return BufferMode.DiskRW;}
         
     }
 
@@ -861,9 +872,10 @@ abstract public class BenchmarkJournalWriteRate extends TestCase2 {
         TestSuite suite = new TestSuite("Benchmark Journal Write Rates");
         
         suite.addTestSuite( BenchmarkTransientJournal.class );
-        suite.addTestSuite( BenchmarkDirectJournal.class );
+//        suite.addTestSuite( BenchmarkDirectJournal.class );
 //        suite.addTestSuite( BenchmarkMappedJournal.class );
         suite.addTestSuite( BenchmarkDiskJournal.class );
+        suite.addTestSuite( BenchmarkDiskRWJournal.class );
         suite.addTestSuite( BenchmarkSmallRecordOptimium.class );
         suite.addTestSuite( BenchmarkBlockBasedOptimium.class );
         suite.addTestSuite( BenchmarkSustainedTransferOptimium.class );
