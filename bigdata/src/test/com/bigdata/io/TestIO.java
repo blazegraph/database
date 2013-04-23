@@ -36,7 +36,7 @@ import java.text.NumberFormat;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
 
-import junit.framework.TestCase;
+import junit.framework.TestCase2;
 
 /**
  * Low level IO performance tests in support of bigdata design options.
@@ -86,8 +86,8 @@ import junit.framework.TestCase;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestIO extends TestCase {
-
+public class TestIO extends TestCase2 {
+    
     /**
      * 
      */
@@ -143,8 +143,7 @@ public class TestIO extends TestCase {
      * @return Units/seconds, e.g., the #of pages written per second. If
      *         <i>nanos</i> is zero(0) then this method returns zero.
      */
-
-    public double getUnitsPerSecond(long units,long nanos) {
+    private double getUnitsPerSecond(long units,long nanos) {
     
         if( nanos == 0 ) return 0d;
         
@@ -201,12 +200,12 @@ public class TestIO extends TestCase {
         
     }
 
-    final public static int KiloByte = 1024;
-    final public static int MegaByte = 1024*1024;
-    final public static int GigaByte = 1024*1024*1024;
-    final public static int TeraByte = 1024*1024*1024*1024;
-    final public static int PetaByte = 1024*1024*1024*1024*1024;
-    final public static int ExaByte  = 1024*1024*1024*1024*1024*1024;
+    final private static int KiloByte = 1024;
+    final private static int MegaByte = 1024*1024;
+    final private static int GigaByte = 1024*1024*1024;
+    final private static int TeraByte = 1024*1024*1024*1024;
+    final private static int PetaByte = 1024*1024*1024*1024*1024;
+    final private static int ExaByte  = 1024*1024*1024*1024*1024*1024;
     
     /**
      * Test of raw IO performance for random writes.
@@ -271,7 +270,6 @@ public class TestIO extends TestCase {
 //                , new File("D:/")
         );
         
-        file.deleteOnExit();
         System.err.println("file=" + file);
 
         final RandomAccessFile raf = new RandomAccessFile(file,
@@ -364,14 +362,111 @@ public class TestIO extends TestCase {
 
             raf.close();
             
-            if(! file.delete() ) {
-                throw new RuntimeException("Could not delete file: "+file);
+            if (!file.delete()) {
+                throw new RuntimeException("Could not delete file: " + file);
             }
-            
-            System.err.println("deleted: " + file);
+
+            if (log.isInfoEnabled())
+                log.info("deleted: " + file);
 
         }
 
     }
     
+    /**
+     * Low level test of the ability to modify a file a sync it to the
+     * underlying storage media. This test is interested in the absolute maximum
+     * syncs per second that the hardware can support.
+     * 
+     * @throws IOException
+     */
+    public void test_commitsPerSec() throws IOException {
+
+        // page size.
+        final int pageSize = 512;// * KiloByte;
+        if (log.isInfoEnabled())
+            log.info("pageSize=" + nf.format(pageSize) + " bytes");
+
+        /*
+         * The #of commits. We update the same page for each commit and then
+         * sync the FileChannel to the disk.
+         */
+        final int numCommits = 10000;
+        if (log.isInfoEnabled())
+            log.info("numCommits=" + nf.format(numCommits) + " commits");
+
+        /*
+         * Create a temporary file for the test. You can specify the directory
+         * using an optional argument as a means of choosing which disk drive or
+         * partition to use for the test.
+         */
+        final File file = File.createTempFile("test", ".dbCache");
+
+        final RandomAccessFile raf = new RandomAccessFile(file, "rw");
+
+        try {
+
+            final FileChannel fileChannel = raf.getChannel();
+
+            /*
+             * Allocate direct buffer.
+             */
+            final ByteBuffer buf = ByteBuffer.allocateDirect(pageSize);
+
+            /*
+             * Extend the file to its maximum size. We set the limit to one
+             * before extending the file so that we only write the very last
+             * byte of the extent. We then restore the limit to the capacity of
+             * the buffer, since that is its initial condition and the
+             * assumption through the rest of this code.
+             */
+            assert buf.limit() == buf.capacity();
+            FileChannelUtility.writeAll(fileChannel, buf, 0L/* pos */);
+
+            long startNanos = System.nanoTime();
+
+            // Always update the first byte.
+            final long pos = 0L;
+
+            for (int i = 0; i < numCommits; i++) {
+
+                buf.position(0);
+                buf.limit(pageSize);
+
+                // overwrite the buffer.
+                final byte v = (byte) (i % 256);
+                for (int off = 0; off < pageSize; off++) {
+                    buf.put(off/* index */, v/* newValue */);
+                }
+
+                // write on page.
+                FileChannelUtility.writeAll(fileChannel, buf, pos);
+
+                // Sync the channel to the disk.
+                fileChannel.force(false/* metadata */);
+
+            }
+
+            final long endNanos = System.nanoTime();
+
+            final long elapsedNanos = endNanos - startNanos;
+
+            System.err.println("Did " + nf.format(numCommits) + " commits in "
+                    + TimeUnit.NANOSECONDS.toSeconds(elapsedNanos) + " secs");
+            System.err.println(""
+                    + nf.format(getUnitsPerSecond(numCommits, elapsedNanos))
+                    + " pages per second");
+
+        } finally {
+
+            raf.close();
+
+            if (!file.delete()) {
+                throw new RuntimeException("Could not delete file: " + file);
+            }
+
+        }
+
+    }
+
 }
