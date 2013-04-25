@@ -160,6 +160,16 @@ public interface IHABufferStrategy extends IBufferStrategy {
      *      Latency on followers during commit on leader </a>
      */
     void resetFromHARootBlock(final IRootBlockView rootBlock);
+    
+    /**
+     * Provides a trigger for synchronization of transient state after a commit.
+     * <p>
+     * For the RWStore this may be used to avoid a call to resetFromHARootBlock
+     * that could add significant latency to the HA commit2Phase protocol.
+     * 
+     * @param rootBlock
+     */
+    void postHACommit(final IRootBlockView rootBlock);
 
     /**
      * Return the #of {@link WriteCache} blocks that were written out for the

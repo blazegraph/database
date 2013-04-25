@@ -664,12 +664,14 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 		
         @Override
         protected void addAddress(int latchedAddr, int size) {
-        	RWStore.this.addAddress(latchedAddr, size);
+        	// No longer valid
+        	// RWStore.this.addAddress(latchedAddr, size);
         }
 
         @Override
         protected void removeAddress(int latchedAddr) {
-        	RWStore.this.removeAddress(latchedAddr);
+        	// No longer valid
+        	// RWStore.this.removeAddress(latchedAddr);
         }
 
 	};
@@ -897,54 +899,58 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
      *            <i>latchedAddr</i> but the address itself should not yet be
      *            allocated.
      */
-    void addAddress(final int latchedAddr, final int size) {
-        // ignore zero address
-        if (latchedAddr == 0)
-            return;
+	void addAddress(final int latchedAddr, final int size) {
+		// ignore zero address
+		if (latchedAddr == 0)
+			return;
 
-        m_allocationWriteLock.lock();
-        try {
-            FixedAllocator alloc = null;
-            try {
-                alloc = getBlock(latchedAddr);
-            } catch (final PhysicalAddressResolutionException par) {
-                // Must create new allocator
-            }
-            final int size2 = size < 0 ? -size : size;
-            if (alloc == null) {
-                final int i = fixedAllocatorIndex(size2);
-                final int block = 64 * m_allocSizes[i];
-                final ArrayList<FixedAllocator> list = m_freeFixed[i];
-                final FixedAllocator allocator = new FixedAllocator(this, block);
+		m_allocationWriteLock.lock();
+		try {
+			FixedAllocator alloc = null;
+			try {
+				alloc = getBlock(latchedAddr);
+			} catch (final PhysicalAddressResolutionException par) {
+				// Must create new allocator
+			}
+			final int size2 = size < 0 ? -size : size;
+			if (alloc == null) {
+				final int i = fixedAllocatorIndex(size2);
+				final int block = 64 * m_allocSizes[i];
+				final ArrayList<FixedAllocator> list = m_freeFixed[i];
+				if (log.isTraceEnabled())
+					log.trace("Creating new Allocator for address: "
+							+ latchedAddr);
 
-                allocator.setFreeList(list);
-                allocator.setIndex(m_allocs.size());
+				final FixedAllocator allocator = new FixedAllocator(this, block);
 
-                m_allocs.add(allocator);
+				allocator.setFreeList(list);
+				allocator.setIndex(m_allocs.size());
 
-                // Check correctly synchronized creation
-                assert allocator == getBlock(latchedAddr);
+				m_allocs.add(allocator);
 
-                alloc = allocator;
-            }
+				// Check correctly synchronized creation
+				assert allocator == getBlock(latchedAddr);
 
-            assert size2 <= alloc.getSlotSize();
+				alloc = allocator;
+			}
 
-            if (size > 0) {
+			assert size2 <= alloc.getSlotSize();
 
-                /*
-                 * This is a real allocation.
-                 */
+			if (size > 0) {
 
-                alloc.setAddressExternal(latchedAddr);
+				/*
+				 * This is a real allocation.
+				 */
 
-            }
+				alloc.setAddressExternal(latchedAddr);
 
-        } finally {
+			}
 
-        	m_allocationWriteLock.unlock();
+		} finally {
 
-        }
+			m_allocationWriteLock.unlock();
+
+		}
 	}
     
     /**
@@ -955,29 +961,32 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
      * @param latchedAddr
      */
 	void removeAddress(final int latchedAddr) {
-    	// ignore zero address
-    	if (latchedAddr == 0)
-    		return;
+		// ignore zero address
+		if (latchedAddr == 0)
+			return;
 
-    	m_allocationWriteLock.lock();
-		try {		
+		m_allocationWriteLock.lock();
+		try {
 			// assert m_commitList.size() == 0;
-			
+
 			final FixedAllocator alloc = getBlockByAddress(latchedAddr);
-			
+
 			assert alloc != null;
-			
+
 			final int addrOffset = getOffset(latchedAddr);
 			if (alloc == null) {
-				throw new IllegalArgumentException("Invalid address provided to immediateFree: " + latchedAddr);
+				throw new IllegalArgumentException(
+						"Invalid address provided to immediateFree: "
+								+ latchedAddr);
 			}
-	        final long pa = alloc.getPhysicalAddress(addrOffset);
-	        
-	        if (log.isTraceEnabled())
-	            log.trace("Freeing allocation at " + latchedAddr + ", physical address: " + pa);
-	        
-	        alloc.free(latchedAddr, 0, false);
-	        
+			final long pa = alloc.getPhysicalAddress(addrOffset);
+
+			if (log.isTraceEnabled())
+				log.trace("Freeing allocation at " + latchedAddr
+						+ ", physical address: " + pa);
+
+			alloc.free(latchedAddr, 0, false);
+
 			// assert m_commitList.size() == 0;
 		} finally {
 			m_allocationWriteLock.unlock();
@@ -1131,6 +1140,91 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 		
 	}
 	
+	/*
+	 * Utility to encapsulate RootBlock interpreation
+	 */
+	static class RootBlockInfo {
+		
+		static int nextAllocation(final IRootBlockView rb) {
+		    final long nxtOffset = rb.getNextOffset();
+
+		    // next allocation to be made (in -32K units).
+		    final int ret = -(int) (nxtOffset >> 32);
+		    
+            /*
+             * Skip the first 32K in the file. The root blocks live here but
+             * nothing else.
+             */
+		    return ret == 0 ? -(1 + META_ALLOCATION) : ret;
+		}
+		
+		/*
+		 * Meta-Allocations stored as {int address; int[8] bits}, so each block
+		 * holds 8*32=256 allocation slots of 1K totaling 256K.
+		 * 
+		 * The returned int array is a flattened list of these int[9] blocks
+		 */
+		static int[] metabits(final IRootBlockView rb, final ReopenFileChannel reopener) throws IOException {
+			final long rawmbaddr = rb.getMetaBitsAddr();
+			
+            /*
+             * The #of int32 values in the metabits region.
+             * 
+             * We get this by taking bottom 16 bits of the metaBitsAddr. This
+             * gives the #of int32 values in the metabits regions (up to 64k
+             * int32 values).
+             */
+			final int metaBitsStore = (int) (rawmbaddr & 0xFFFF);
+			
+			
+		    // The byte offset of the metabits region in the file.
+		    final long pmaddr = rawmbaddr >> 16;
+			
+            /*
+             * Read the metabits block, including a header and the int32[]
+             * that encodes both startAddrs and bit vectors.
+             */
+            final byte[] buf = new byte[metaBitsStore * 4];
+
+			FileChannelUtility.readAll(reopener, ByteBuffer.wrap(buf), pmaddr);
+	
+			final DataInputStream strBuf = new DataInputStream(new ByteArrayInputStream(buf));
+			
+			// Can handle minor store version incompatibility
+			strBuf.readInt(); // STORE VERSION
+			strBuf.readLong(); // Last Deferred Release Time
+			strBuf.readInt(); // cDefaultMetaBitsSize
+			
+			final int allocBlocks = strBuf.readInt();
+			strBuf.readLong(); // m_storageStatsAddr
+
+			// step over those reserved ints
+            for (int i = 0; i < cReservedMetaBits; i++) {
+                strBuf.readInt();
+            }
+
+            // step over the allocSizes
+			for (int i = 0; i < allocBlocks; i++) {
+				strBuf.readInt();
+			}
+			final int metaBitsSize = metaBitsStore - allocBlocks - cMetaHdrFields; // allow for header fields
+			
+			// Must be multiple of 9
+			assert metaBitsSize % 9 == 0;
+			
+			int[] ret = new int[metaBitsSize];
+			for (int i = 0; i < metaBitsSize; i++) {
+				ret[i] = strBuf.readInt();
+			}
+
+			/*
+			 * Meta-Allocations stored as {int address; int[8] bits}, so each block
+			 * holds 8*32=256 allocation slots of 1K totaling 256K.
+			 */
+			return ret;
+		}
+	}
+	
 	/**
 	 * Should be called where previously initFileSpec was used.
 	 * 
@@ -1149,13 +1243,13 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 	 * 
 	 * @throws IOException
 	 */
-	private void initfromRootBlock(final IRootBlockView m_rb) throws IOException {
+	private void initfromRootBlock(final IRootBlockView rb) throws IOException {
 		// m_rb = m_fmv.getRootBlock();
-		assert(m_rb != null);
+		assert(rb != null);
 
-		m_storeUUID = m_rb.getUUID();
+		m_storeUUID = rb.getUUID();
 		
-		if (m_rb.getNextOffset() == 0) {
+		if (rb.getNextOffset() == 0) {
 
 		    defaultInit();
 		    
@@ -1175,7 +1269,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
              * FixedAllocators in order to turn it into a byte offset on the
              * file.
              */
-		    final long nxtOffset = m_rb.getNextOffset();
+		    final long nxtOffset = rb.getNextOffset();
 
 		    // next allocation to be made (in -32K units).
 		    m_nextAllocation = -(int) (nxtOffset >> 32);
@@ -1204,7 +1298,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 			 * Get the fileSize in -32K units from the root block.
 			 */
 			{
-                final long metaAddr = m_rb.getMetaStartAddr();
+                final long metaAddr = rb.getMetaStartAddr();
 
                 // in units of -32K.
                 m_fileSize = (int) -(metaAddr & 0xFFFFFFFF);
@@ -1219,7 +1313,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
              * the file. The bottom 16-bits are the length (see below). The top
              * 48-bits are the byte offset.
              */
-			long rawmbaddr = m_rb.getMetaBitsAddr();
+			long rawmbaddr = rb.getMetaBitsAddr();
 			
             /*
              * The #of int32 values in the metabits region.
@@ -1366,6 +1460,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 		close();
 	}
 
+	@SuppressWarnings("unchecked")
 	protected void readAllocationBlocks() throws IOException {
 		
 		assert m_allocs.size() == 0;
@@ -1392,41 +1487,9 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 				if (tstBit(m_metaBits, i)) {
 					final long addr = blockStart + ((i-startBit) * ALLOC_BLOCK_SIZE);
 
-					final byte buf[] = new byte[ALLOC_BLOCK_SIZE];
+					final FixedAllocator allocator = readAllocator(addr);
 
-					FileChannelUtility.readAll(m_reopener, ByteBuffer.wrap(buf), addr);
-
-					final ByteArrayInputStream baBuf = new ByteArrayInputStream(buf);
-					final DataInputStream strBuf = new DataInputStream(baBuf);
-
-					final int allocSize = strBuf.readInt(); // if Blob < 0
-					final FixedAllocator allocator;
-					final ArrayList<? extends Allocator> freeList;
-					assert allocSize > 0;
-					
-					final int slotSizeIndex = slotSizeIndex(allocSize);
-					
-					if (slotSizeIndex == -1) {
-						throw new IllegalStateException("Unexpected allocation size of: " + allocSize);
-					}
-
-					allocator = new FixedAllocator(this, allocSize);//, m_writeCache);
-
-					freeList = m_freeFixed[slotSizeIndex];
-
-					allocator.read(strBuf);
-	                final int chk = ChecksumUtility.getCHK().checksum(buf,
-	                        buf.length - baBuf.available());
-	                
-	                int tstChk = strBuf.readInt();
-	                if (tstChk != chk) {
-	                	throw new IllegalStateException("FixedAllocator checksum error");
-	                }
-
-					allocator.setDiskAddr(i); // store bit, not physical
-												// address!
-					allocator.setFreeList(freeList);
-
+					allocator.setDiskAddr(i); // store bit, not physical address!
 					m_allocs.add(allocator);
 					
 					if (m_storageStats != null) {
@@ -1444,6 +1507,48 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 		for (int index = 0; index < m_allocs.size(); index++) {
 			((Allocator) m_allocs.get(index)).setIndex(index);
 		}
+	}
+	
+	private FixedAllocator readAllocator(final long addr) throws IOException {
+		final byte buf[] = new byte[ALLOC_BLOCK_SIZE];
+
+		FileChannelUtility.readAll(m_reopener, ByteBuffer.wrap(buf), addr);
+
+		final ByteArrayInputStream baBuf = new ByteArrayInputStream(buf);
+		final DataInputStream strBuf = new DataInputStream(baBuf);
+
+		final int allocSize = strBuf.readInt(); // if Blob < 0
+
+		assert allocSize > 0;
+		
+		final int slotSizeIndex = slotSizeIndex(allocSize);
+		
+		if (slotSizeIndex == -1) {
+			throw new IllegalStateException("Unexpected allocation size of: " + allocSize);
+		}
+
+		final FixedAllocator fa =  new FixedAllocator(this, allocSize);//, m_writeCache);
+		fa.read(strBuf);
+		
+        final int chk = ChecksumUtility.getCHK().checksum(buf,
+                buf.length - baBuf.available());
+        
+        int tstChk = strBuf.readInt();
+        if (tstChk != chk) {
+        	throw new IllegalStateException("FixedAllocator checksum error");
+        }
+
+		if (slotSizeIndex == -1) {
+			throw new IllegalStateException("Unexpected allocation size of: " + allocSize);
+		}
+
+		final ArrayList<? extends Allocator> freeList;
+		
+		freeList = m_freeFixed[slotSizeIndex];
+
+		fa.setFreeList(freeList);
+
+        return fa;
 	}
 	
 	/**
@@ -3114,7 +3219,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
      * If we need to add int values to the header we can do so and reduce the
      * reservation by 1 each time
      */
-    final int cReservedMetaBits = 20;
+    final static int cReservedMetaBits = 20;
     
     /**
      * MetaBits Header
@@ -3125,7 +3230,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
      * 5-6 int[2] storage stats addr
      * + 20 reserved
      */
-	final private int cMetaHdrFields = 7 + cReservedMetaBits;  
+	final static private int cMetaHdrFields = 7 + cReservedMetaBits;  
 	/**
 	 * @see Options#META_BITS_SIZE
 	 */
@@ -5828,6 +5933,177 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 
 	}
 
+	@SuppressWarnings("unchecked")
+	public void postHACommit(final IRootBlockView rbv) {
+
+		final Lock writeLock = this.m_extensionLock.writeLock();
+		
+		writeLock.lock();
+	    try {
+	    	m_allocationWriteLock.lock();
+	    	try {
+	    		// Current FixedAllocators for sanity
+				log.warn("POSTHACOMMIT START");
+				for (int index = 0; index < m_allocs.size(); index++) {
+					final FixedAllocator xfa = m_allocs.get(index);
+					log.warn("Allocator " + index + ", startAddress: " + xfa.getStartAddr() + ", allocated: " + xfa.getAllocatedSlots());
+				}
+
+	    		final ArrayList<FixedAllocator> nallocs = new ArrayList<FixedAllocator>();
+	    		
+	    		// current metabits
+	    		final int[] oldmetabits = m_metaBits;
+	    		// new metabits
+	    		m_metaBits = RootBlockInfo.metabits(rbv, m_reopener);
+	    		
+	    		// need to compute modded metabits, those newly written slots by ANDing
+	    		// new bits with compliment of current
+	    		int[] moddedBits = m_metaBits.clone();
+	    		for (int b = 0; b < moddedBits.length; b+=9) {
+	    			// int[0] is startAddr, int[1:9] bits
+	    			for (int i = 1; i < 9; i++) {
+	    				moddedBits[b+i] &= ~oldmetabits[b+i];
+	    			}
+	    		}
+	    		
+	    		// Stage One: Count moddedBits
+	    		// Stage Two: Compute Address of modded bits
+	    		// Stage Three: Read Allocator from modded address
+	    		// Stage Four: Update Live Allocators
+	    		
+				int modCount = 0;
+	    		for (int i = 0; i < moddedBits.length; i+=9) {
+	    			final long startAddr = convertAddr(m_metaBits[i]);
+	    			for (int j = 1; j < 9; j++) {
+	    				final int chkbits = moddedBits[i+j];
+						for (int b = 0; b < 32; b++) {
+							if ((chkbits & (1 << b)) != 0) {
+								modCount++;
+								// Calculate address
+								final int bit = b + (32 * (j-1));
+								final long paddr = startAddr + (bit * ALLOC_BLOCK_SIZE);
+								if (log.isTraceEnabled())
+									log.trace("Allocator at: " + paddr);
+								
+								// metaBit
+								final int metaBit = (i * 9 * 32) + (j * 32) + b;
+								
+								// Now try to read it in
+								final FixedAllocator nalloc = readAllocator(paddr);
+								if (log.isTraceEnabled())
+									log.trace("Allocator read of size: " + nalloc.m_size + ", metaBit: " + metaBit);
+								
+								nalloc.setDiskAddr(metaBit);
+								
+								// Now can we find an existing one to replace, otherwise we need to add to the new list
+								boolean found = false;
+								if (log.isTraceEnabled())
+									log.trace("Checking allocator at " + nalloc.getStartAddr());
+								for (int index = 0; !found && index < m_allocs.size(); index++) {
+									final FixedAllocator xfa = m_allocs.get(index);
+									if (xfa.getStartAddr() == nalloc.getStartAddr()) {
+										if (log.isTraceEnabled())
+											log.trace("Found updated allocator at " + index 
+												+ ", size: " + xfa.m_size + " vs " + nalloc.m_size + ", allocated slots: " + xfa.getAllocatedSlots() + " vs " + nalloc.getAllocatedSlots());
+										
+										// Compare allocators to see if same
+										found = true;
+										
+										// Replace old with new
+										m_allocs.set(index,  nalloc);
+										
+										// remove old from free list (if set)
+										xfa.removeFromFreeList();
+									}
+								}
+								if (!found) {
+									nallocs.add(nalloc);
+								}
+							}
+						}
+	    			}
+	    		}
+	    		
+	    		if (log.isTraceEnabled()) {
+					log.trace("OLD BITS: " + BytesUtil.toHexString(oldmetabits));
+		    		log.trace("NEW BITS: " + BytesUtil.toHexString(m_metaBits));
+		    		log.trace("MODDED BITS: " + BytesUtil.toHexString(moddedBits));
+		    		log.trace("MODDED COUNT: " + modCount + " from " + m_allocs.size() + " Allocators");
+	    		}
+	    		
+	    		// Now add in any new allocators, first sorting and setting their index number
+	    		if (nallocs.size() > 0) {
+	    			Collections.sort(nallocs);
+	    			
+	    			final int sindex = m_allocs.size();
+	    			for (int index = 0; index < nallocs.size(); index++) {
+	    				((Allocator) nallocs.get(index)).setIndex(sindex + index);
+	    				if (log.isTraceEnabled())
+							log.trace("New Allocator, index: " + (sindex + index));
+	    			}
+
+	    			if (log.isTraceEnabled())
+						log.trace("Adding new allocators: " + sindex);
+	    			
+	    			m_allocs.addAll(nallocs);
+	    		}
+	    		
+	    		{
+				    final long nxtOffset = rbv.getNextOffset();
+	
+				    // next allocation to be made (in -32K units).
+				    m_nextAllocation = -(int) (nxtOffset >> 32);
+					
+					if (m_nextAllocation == 0) {
+	
+		                /*
+		                 * Skip the first 32K in the file. The root blocks live here but
+		                 * nothing else.
+		                 */
+			
+					    m_nextAllocation = -(1 + META_ALLOCATION);
+					    
+					}
+					
+					m_committedNextAllocation = m_nextAllocation;
+	    		}
+	    		
+	    		if (log.isTraceEnabled()) {
+					log.trace("POSTHACOMMIT END");
+					for (int index = 0; index < m_allocs.size(); index++) {
+						final FixedAllocator xfa = m_allocs.get(index);
+						log.trace("Allocator " + index + ", startAddress: " + xfa.getStartAddr() + ", allocated: " + xfa.getAllocatedSlots());
+					}
+	    		}
+
+				// KICK external cache into touch - FIXME: handle with improved Allocator synchronization
+				m_externalCache.clear();
+				
+				assert m_nextAllocation != 0;
+	    	} finally {
+	    		m_allocationWriteLock.unlock();
+	    	}
+		
+	    } catch (IOException e) {
+		
+	        throw new RuntimeException(e);
+	        
+		} finally {
+			writeLock.unlock();
+		}
+	    
+	    // FIXME: Remove once allocators are synced
+//	    log.error("Complete implementation of postHACommit()");
+//	    
+//	    resetFromHARootBlock(rbv);
+//	    
+//		log.warn("POSTHACOMMIT AFTER RESET");
+//		for (int index = 0; index < m_allocs.size(); index++) {
+//			final FixedAllocator xfa = m_allocs.get(index);
+//			log.warn("Allocator " + index + ", startAddress: " + xfa.getStartAddr() + ", allocated: " + xfa.getAllocatedSlots());
+//		}
+	}
+
 	/**
 	 * Simple class to collect up DeleteBlockStats and returned by
 	 * checkDeleteBlocks, called from DumpJournal.
@@ -6244,14 +6520,14 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
     }
 
     /**
-     * This alternative implementation checks the live allocations
+     * This alternative implementation checks only the live allocations
      * 
      * @param snapshot
      * @param digest
      * @throws DigestException
      * @throws IOException
      */
-    public void computeDigestNew(final Object snapshot, final MessageDigest digest)
+    public void computeDigestAlt(final Object snapshot, final MessageDigest digest)
             throws DigestException, IOException {
         if (snapshot != null)
             throw new UnsupportedOperationException();

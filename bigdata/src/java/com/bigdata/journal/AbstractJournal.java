@@ -5600,15 +5600,14 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                  */
 
                 if (haLog.isInfoEnabled() && localService != null)
-                    haLog.info("Reset from root block: serviceUUID="
+                    haLog.info("PostHACommit: serviceUUID="
                             + localService.getServiceId());
 
                 /**
-                 * FIXME: Replace call for resetFromHARootBlock with call to
-                 * postHACommit(rootBlock) to sync FixedAllocators
+                 * Call to sync any transient state
                  */
                 ((IHABufferStrategy) _bufferStrategy)
-                        .resetFromHARootBlock(rootBlock);
+                        .postHACommit(rootBlock);
 
                 /*
                  * Clear reference and reload from the store.

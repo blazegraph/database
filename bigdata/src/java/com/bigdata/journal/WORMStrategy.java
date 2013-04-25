@@ -2862,6 +2862,12 @@ public class WORMStrategy extends AbstractBufferStrategy implements
 //		m_rebuildSequence++;
 	}
 
+	@Override
+	public void postHACommit(final IRootBlockView rootBlock) {
+		// Simply call through to resetFromHARootBlock
+		resetFromHARootBlock(rootBlock);
+	}
+
 //	@Override
 //	public void prepareForRebuild(HARebuildRequest req) {
 //		assert m_rebuildRequest == null;
