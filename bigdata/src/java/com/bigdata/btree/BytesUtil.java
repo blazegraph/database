@@ -1534,6 +1534,29 @@ public class BytesUtil {
        };    
 
     /**
+     * Utility to convert an int array to a hex string
+     * 
+     * @param buf
+     *            The data.
+     *            
+     * @return The hex string.
+     */
+    static public String toHexString(final int[] ibuf) {
+        final byte[] buf = new byte[ibuf.length*4];
+        for (int i = 0; i < ibuf.length; i++) {
+        	final int v = ibuf[i];
+        	final int sb = i * 4;
+        	buf[sb] = (byte) (v >>> 24 & 0xFF);
+        	buf[sb+1] = (byte) (v >>> 16 & 0xFF);
+        	buf[sb+2] = (byte) (v >>> 8 & 0xFF);
+        	buf[sb+3] = (byte) (v & 0xFF);
+        }
+        
+        return toHexString(buf, buf.length);
+        
+    }
+    
+    /**
      * Utility to convert a byte array to a hex string.
      * 
      * @param buf

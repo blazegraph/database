@@ -33,6 +33,7 @@ import java.io.*;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.btree.BytesUtil;
 import com.bigdata.rawstore.IAllocationContext;
 import com.bigdata.rwstore.RWStore.AllocationStats;
 import com.bigdata.rwstore.StorageStats.Bucket;
@@ -75,6 +76,11 @@ public class FixedAllocator implements Allocator {
 	}
 
 	public long getStartAddr() {
+//		if (m_startAddr == 0) {
+//			log.warn("zero m_startAddr, setting to " + m_allocBlocks.get(0).m_addr);
+//			
+//			m_startAddr = m_allocBlocks.get(0).m_addr;
+//		}
 		return RWStore.convertAddr(m_startAddr);
 	}
 
@@ -200,6 +206,15 @@ public class FixedAllocator implements Allocator {
 			m_freeList.add(this);
 			m_freeWaiting = false;
 		}
+	}
+	
+	/**
+	 * To support postHACommit an allocator can be removed from the current freelist
+	 */
+	void removeFromFreeList() {
+		if (m_freeList != null)
+			m_freeList.remove(this);
+		
 	}
 
 	volatile private IAllocationContext m_context;
@@ -1119,6 +1134,9 @@ public class FixedAllocator implements Allocator {
 			blockSize >>= RWStore.ALLOCATION_SCALEUP;
 
 			ab.m_addr = grabAllocation(m_store, blockSize);
+			
+			if (block == 0)
+				m_startAddr = ab.m_addr;
 		}
 		
 		ab.setBitExternal(bit);
@@ -1140,6 +1158,8 @@ public class FixedAllocator implements Allocator {
     public void computeDigest(final Object snapshot, final MessageDigest digest) {
     	// create buffer of slot size
     	final ByteBuffer bb = ByteBuffer.allocate(m_size);
+    	final byte[] ba = m_index == 0 && log.isDebugEnabled() ? bb.array() : null;
+    	
     	for (AllocBlock b : m_allocBlocks) {
     		final int bits = b.m_commit.length * 32;
     		final long startAddr = RWStore.convertAddr(b.m_addr);
@@ -1152,6 +1172,9 @@ public class FixedAllocator implements Allocator {
                     
                     digest.update(bb);
 
+        			if (ba != null) {
+        				log.debug(BytesUtil.toHexString(ba));
+        			}
     			}
     		}
     	}
@@ -1166,6 +1189,7 @@ public class FixedAllocator implements Allocator {
 			}
 
 			log.warn("ALLOCATOR[" + m_index + ":" + m_size + "] freeBits: " + freebits() +  ", DIGEST:" + sb.toString());
+			
 		}
     }
 
