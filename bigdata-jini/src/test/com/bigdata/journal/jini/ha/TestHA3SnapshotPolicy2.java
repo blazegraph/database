@@ -122,13 +122,13 @@ public class TestHA3SnapshotPolicy2 extends AbstractHA3BackupTestCase {
         final HAGlue serverA = startA();
 
         // Snapshot directory is empty.
-        assertEquals(0, getSnapshotDirA().list().length);
+        assertEquals(0, recursiveCount(getSnapshotDirA(),SnapshotManager.SNAPSHOT_FILTER));
 
         // Wait a bit.
         Thread.sleep(awaitSnapshotMillis/*ms*/);
         
         // Snapshot directory is still empty.
-        assertEquals(0, getSnapshotDirA().list().length);
+        assertEquals(0, recursiveCount(getSnapshotDirA(),SnapshotManager.SNAPSHOT_FILTER));
 
         // Start B.  Both A and B should take a snapshot when quorum meets.
         final HAGlue serverB = startB();

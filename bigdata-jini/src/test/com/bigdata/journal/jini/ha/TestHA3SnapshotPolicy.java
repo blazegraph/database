@@ -37,6 +37,7 @@ import net.jini.config.Configuration;
 
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.HAStatusEnum;
+import com.bigdata.ha.halog.IHALogReader;
 import com.bigdata.ha.msg.HARootBlockRequest;
 import com.bigdata.ha.msg.HASnapshotRequest;
 import com.bigdata.ha.msg.IHASnapshotResponse;
@@ -155,7 +156,7 @@ public class TestHA3SnapshotPolicy extends AbstractHA3BackupTestCase {
                             .getRootBlock().getCommitCounter());
 
             // Snapshot directory is empty.
-            assertEquals(0, getSnapshotDirA().list().length);
+            assertEquals(0, recursiveCount(getSnapshotDirA(),SnapshotManager.SNAPSHOT_FILTER));
 
             final Future<IHASnapshotResponse> ft = leader
                     .takeSnapshot(new HASnapshotRequest(0/* percentLogSize */));
@@ -176,9 +177,9 @@ public class TestHA3SnapshotPolicy extends AbstractHA3BackupTestCase {
             assertEquals(commitCounter, snapshotRB.getCommitCounter());
 
             // Snapshot directory contains the desired filename.
-            assertEquals(new String[] { "00000000000000000001"
-                    + SnapshotManager.SNAPSHOT_EXT }, getSnapshotDirA().list());
-
+            assertExpectedSnapshots(getSnapshotDirA(),
+                    new long[] { commitCounter });
+                    
             // Verify digest of snapshot agrees with digest of journal.
             assertSnapshotDigestEquals(leader, commitCounter);
 
@@ -212,8 +213,8 @@ public class TestHA3SnapshotPolicy extends AbstractHA3BackupTestCase {
             quorum.assertQuorum(token);
 
             // Snapshot directory is empty.
-            assertEquals(0, getSnapshotDirA().list().length);
-            assertEquals(0, getSnapshotDirB().list().length);
+            assertEquals(0, recursiveCount(getSnapshotDirA(),SnapshotManager.SNAPSHOT_FILTER));
+            assertEquals(0, recursiveCount(getSnapshotDirB(),SnapshotManager.SNAPSHOT_FILTER));
 
             final Future<IHASnapshotResponse> ft = serverB
                     .takeSnapshot(new HASnapshotRequest(0/* percentLogSize */));
@@ -234,12 +235,12 @@ public class TestHA3SnapshotPolicy extends AbstractHA3BackupTestCase {
             assertEquals(commitCounter, snapshotRB.getCommitCounter());
 
             // Snapshot directory remains empty on A.
-            assertEquals(0, getSnapshotDirA().list().length);
+            assertEquals(0, recursiveCount(getSnapshotDirA(),SnapshotManager.SNAPSHOT_FILTER));
 
             // Snapshot directory contains the desired filename on B.
-            assertEquals(new String[] { "00000000000000000001"
-                    + SnapshotManager.SNAPSHOT_EXT }, getSnapshotDirB().list());
-
+            assertExpectedSnapshots(getSnapshotDirB(),
+                    new long[] { commitCounter });
+            
             // Verify digest of snapshot agrees with digest of journal.
             assertSnapshotDigestEquals(serverB, commitCounter);
 
@@ -282,7 +283,7 @@ public class TestHA3SnapshotPolicy extends AbstractHA3BackupTestCase {
                             .getRootBlock().getCommitCounter());
 
             // Snapshot directory is empty.
-            assertEquals(0, getSnapshotDirA().list().length);
+            assertEquals(0, recursiveCount(getSnapshotDirA(),SnapshotManager.SNAPSHOT_FILTER));
 
             final Future<IHASnapshotResponse> ft = leader
                     .takeSnapshot(new HASnapshotRequest(0/* percentLogSize */));
@@ -302,9 +303,9 @@ public class TestHA3SnapshotPolicy extends AbstractHA3BackupTestCase {
             // Verify snapshot is for the expected commit point.
             assertEquals(commitCounter, snapshotRB.getCommitCounter());
 
-            // Snapshot directory contains the desired filename.
-            assertEquals(new String[] { "00000000000000000001"
-                    + SnapshotManager.SNAPSHOT_EXT }, getSnapshotDirA().list());
+            // Snapshot directory contains the expected snapshot(s).
+            assertExpectedSnapshots(getSnapshotDirA(),
+                    new long[] { commitCounter });
 
             // Verify digest of snapshot agrees with digest of journal.
             assertSnapshotDigestEquals(leader, commitCounter);
@@ -377,7 +378,7 @@ public class TestHA3SnapshotPolicy extends AbstractHA3BackupTestCase {
                             .getRootBlock().getCommitCounter());
 
             // Snapshot directory is empty.
-            assertEquals(0, getSnapshotDirA().list().length);
+            assertEquals(0, recursiveCount(getSnapshotDirA(),SnapshotManager.SNAPSHOT_FILTER));
 
             doSnapshotRequest(leader);
 
@@ -408,11 +409,13 @@ public class TestHA3SnapshotPolicy extends AbstractHA3BackupTestCase {
                 
             }
 
-            // Snapshot directory contains the desired filename.
-            assertEquals(new String[] { "00000000000000000001"
-                    + SnapshotManager.SNAPSHOT_EXT }, getSnapshotDirA().list());
+            final long commitCounter = 1L;
 
-            assertSnapshotDigestEquals(leader, 1L/* commitCounter */);
+            // Snapshot directory contains the desired filename.
+            assertExpectedSnapshots(getSnapshotDirA(),
+                    new long[] { commitCounter });
+
+            assertSnapshotDigestEquals(leader, commitCounter);
 
         }
 
@@ -496,7 +499,7 @@ public class TestHA3SnapshotPolicy extends AbstractHA3BackupTestCase {
             quorum.assertQuorum(token);
 
             // Snapshot directory is empty.
-            assertEquals(0, getSnapshotDirA().list().length);
+            assertEquals(0, recursiveCount(getSnapshotDirA(), SnapshotManager.SNAPSHOT_FILTER));
 
             final Future<IHASnapshotResponse> ft = leader
                     .takeSnapshot(new HASnapshotRequest(0/* percentLogSize */));
@@ -539,10 +542,8 @@ public class TestHA3SnapshotPolicy extends AbstractHA3BackupTestCase {
             assertEquals(commitCounter, snapshotRB.getCommitCounter());
 
             // Snapshot directory contains the desired filename.
-            assertEquals(
-                    new String[] { SnapshotManager.getSnapshotFile(
-                            getSnapshotDirA(), 2L).getName() },
-                    getSnapshotDirA().list());
+            assertExpectedSnapshots(getSnapshotDirA(),
+                    new long[] { commitCounter });
 
             // Verify digest of snapshot agrees with digest of journal.
             assertSnapshotDigestEquals(leader, commitCounter);
@@ -608,7 +609,7 @@ public class TestHA3SnapshotPolicy extends AbstractHA3BackupTestCase {
             quorum.assertQuorum(token);
 
             // Snapshot directory is empty.
-            assertEquals(0, getSnapshotDirA().list().length);
+            assertEquals(0, recursiveCount(getSnapshotDirA(),SnapshotManager.SNAPSHOT_FILTER));
 
             // request snapshot on A.
             final Future<IHASnapshotResponse> ft = serverA
@@ -628,10 +629,7 @@ public class TestHA3SnapshotPolicy extends AbstractHA3BackupTestCase {
             assertEquals(commitCounterN, snapshotRB.getCommitCounter());
 
             // Snapshot directory contains the desired filename.
-            assertEquals(
-                    new String[] { SnapshotManager.getSnapshotFile(
-                            getSnapshotDirA(), commitCounterN).getName() },
-                    getSnapshotDirA().list());
+            assertExpectedSnapshots(getSnapshotDirA(), new long[]{commitCounterN});
 
             // Verify digest of snapshot agrees with digest of journal.
             assertSnapshotDigestEquals(serverA, commitCounterN);
@@ -654,10 +652,7 @@ public class TestHA3SnapshotPolicy extends AbstractHA3BackupTestCase {
                 new HAGlue[] { serverA, serverB });
 
         // Snapshot directory contains just the expected snapshot
-        assertEquals(
-                new String[] { SnapshotManager.getSnapshotFile(
-                        getSnapshotDirA(), commitCounterN).getName() },
-                getSnapshotDirA().list());
+        assertExpectedSnapshots(getSnapshotDirA(), new long[]{commitCounterN});
 
         /*
          * Now, get the snapshot that we took above, decompress it, and then

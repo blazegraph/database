@@ -326,7 +326,9 @@ public class HAJournal extends Journal {
             if (!haLogDir.exists()) {
 
                 // Create the directory.
-                haLogDir.mkdirs();
+                if (!haLogDir.mkdirs())
+                    throw new IOException("Could not create directory: "
+                            + haLogDir);
 
             }
 
@@ -519,50 +521,31 @@ public class HAJournal extends Journal {
         });
         
         recursiveDelete(getSnapshotManager().getSnapshotDir(),
-                new FileFilter() {
-
-            @Override
-            public boolean accept(File f) {
-        
-                if (f.isDirectory())
-                    return true;
-                
-                return f.getName().endsWith(SnapshotManager.SNAPSHOT_EXT);
-            }
-
-        });
+                SnapshotManager.SNAPSHOT_FILTER);
         
     }
     
     /**
      * Recursively removes any files and subdirectories and then removes the
-     * file (or directory) itself. Only files recognized by
-     * {@link #getFileFilter()} will be deleted.
+     * file (or directory) itself. Only files recognized by filter will be
+     * deleted.
      * 
      * @param f
      *            A file or directory.
+     * @param fileFilter
+     *            The filter.
      */
-    private void recursiveDelete(final File f,final FileFilter fileFilter) {
+    private void recursiveDelete(final File f, final FileFilter fileFilter) {
 
-        if (f.isDirectory()) {
-
-            final File[] children = f.listFiles(fileFilter);
-
-            for (int i = 0; i < children.length; i++) {
-
-                recursiveDelete(children[i], fileFilter);
-
-            }
-
-        }
-
-        if (log.isInfoEnabled())
-            log.info("Removing: " + f);
-
-        if (f.exists() && !f.delete()) {
-
-            log.warn("Could not remove: " + f);
-
+        try {
+            CommitCounterUtility.recursiveDelete(false/* errorIfDeleteFails */, f,
+                    fileFilter);
+        } catch (IOException e) {
+            /*
+             * Note: IOException is not thrown here since
+             * errorIfDeleteFails:=false.
+             */
+            throw new RuntimeException(e);
         }
 
     }
@@ -645,7 +628,7 @@ public class HAJournal extends Journal {
                 // The commit counter of the desired closing root block.
                 final long commitCounter = msg.getCommitCounter();
 
-                final File logFile = new File(haLogDir,
+                final File logFile = new File(getHALogDir(),
                         HALogWriter.getHALogFileName(commitCounter));
 
                 if (!logFile.exists()) {

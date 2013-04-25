@@ -35,6 +35,7 @@ import net.jini.config.Configuration;
 
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.HAStatusEnum;
+import com.bigdata.ha.halog.IHALogReader;
 import com.bigdata.ha.msg.HARootBlockRequest;
 import com.bigdata.ha.msg.HASnapshotRequest;
 import com.bigdata.ha.msg.IHASnapshotResponse;
@@ -146,9 +147,9 @@ public class TestHA3RestorePolicy extends AbstractHA3BackupTestCase {
          * There should not be any snapshots yet since we are using the
          * NoSnapshotPolicy.  
          */
-        assertEquals(0, getSnapshotDirA().list().length);
-        assertEquals(0, getSnapshotDirB().list().length);
-        assertEquals(0, getSnapshotDirC().list().length);
+        assertEquals(0, recursiveCount(getSnapshotDirA(),SnapshotManager.SNAPSHOT_FILTER));
+        assertEquals(0, recursiveCount(getSnapshotDirB(),SnapshotManager.SNAPSHOT_FILTER));
+        assertEquals(0, recursiveCount(getSnapshotDirC(),SnapshotManager.SNAPSHOT_FILTER));
         
         // Now run N transactions.
         for (int i = 0; i < N; i++) {
@@ -162,9 +163,9 @@ public class TestHA3RestorePolicy extends AbstractHA3BackupTestCase {
         awaitCommitCounter(commitCounterN, serverA, serverB, serverC);
 
         // Only the live log is retained on the services.
-        assertEquals(1, getHALogDirA().list().length);
-        assertEquals(1, getHALogDirA().list().length);
-        assertEquals(1, getHALogDirA().list().length);
+        assertEquals(1, recursiveCount(getHALogDirA(),IHALogReader.HALOG_FILTER));
+        assertEquals(1, recursiveCount(getHALogDirB(),IHALogReader.HALOG_FILTER));
+        assertEquals(1, recursiveCount(getHALogDirC(),IHALogReader.HALOG_FILTER));
 
         /*
          * Take a snapshot.
@@ -182,7 +183,7 @@ public class TestHA3RestorePolicy extends AbstractHA3BackupTestCase {
             quorum.assertQuorum(token);
 
             // Snapshot directory is empty.
-            assertEquals(0, getSnapshotDirA().list().length);
+            assertEquals(0, recursiveCount(getSnapshotDirA(),SnapshotManager.SNAPSHOT_FILTER));
 
             // request snapshot on A.
             final Future<IHASnapshotResponse> ft = serverA
@@ -209,8 +210,8 @@ public class TestHA3RestorePolicy extends AbstractHA3BackupTestCase {
                     commitCounterN);
 
             // Snapshot directory contains the desired filename.
-            assertEquals(new String[] { snapshotFile0.getName() },
-                    getSnapshotDirA().list());
+            assertExpectedSnapshots(getSnapshotDirA(),
+                    new long[] { commitCounterN });
 
             // Verify digest of snapshot agrees with digest of journal.
             assertSnapshotDigestEquals(serverA, commitCounterN);
@@ -247,8 +248,8 @@ public class TestHA3RestorePolicy extends AbstractHA3BackupTestCase {
                  * Verify that the snapshot directory contains just the expected
                  * snapshot.
                  */
-                assertEquals(new String[] { snapshotFile0.getName() },
-                        getSnapshotDirA().list());
+                assertExpectedSnapshots(getSnapshotDirA(),
+                        new long[] { snapshotRB0.getCommitCounter() });
                 
                 /*
                  * Check HALogs for existence on A.
@@ -267,8 +268,8 @@ public class TestHA3RestorePolicy extends AbstractHA3BackupTestCase {
             assertTrue(snapshotFile0.exists());
             
             // Verify snapshot directory contains the only the one file.
-            assertEquals(new String[] { snapshotFile0.getName() },
-                    getSnapshotDirA().list());
+            assertExpectedSnapshots(getSnapshotDirA(),
+                    new long[] { snapshotRB0.getCommitCounter() });
 
         }
 
@@ -314,9 +315,10 @@ public class TestHA3RestorePolicy extends AbstractHA3BackupTestCase {
             assertTrue(snapshotFile0.exists());
 
             // Verify snapshot directory contains the necessary files.
-            assertEquals(
-                    new String[] { snapshotFile0.getName(),
-                            snapshotFile1.getName() }, getSnapshotDirA().list());
+            assertExpectedSnapshots(
+                    getSnapshotDirA(),
+                    new long[] { snapshotRB0.getCommitCounter(),
+                            snapshotRB1.getCommitCounter() });
 
             // The current commit counter on A.
             lastCommitCounter = serverA
@@ -359,9 +361,10 @@ public class TestHA3RestorePolicy extends AbstractHA3BackupTestCase {
             assertTrue(snapshotFile0.exists());
 
             // Verify snapshot directory contains the necessary files.
-            assertEquals(
-                    new String[] { snapshotFile0.getName(),
-                            snapshotFile1.getName() }, getSnapshotDirA().list());
+            assertExpectedSnapshots(
+                    getSnapshotDirA(),
+                    new long[] { snapshotRB0.getCommitCounter(),
+                            snapshotRB1.getCommitCounter() });
 
             // Check HALogs found on A.
             assertHALogDigestsEquals(
@@ -392,8 +395,8 @@ public class TestHA3RestorePolicy extends AbstractHA3BackupTestCase {
             assertFalse(snapshotFile0.exists());
 
             // Verify snapshot directory contains the necessary files.
-            assertEquals(new String[] { snapshotFile1.getName() },
-                    getSnapshotDirA().list());
+            assertExpectedSnapshots(getSnapshotDirA(),
+                    new long[] { snapshotRB1.getCommitCounter() });
 
             // Check HALogs found on A.
             assertHALogDigestsEquals(

@@ -24,6 +24,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.journal.jini.ha;
 
 import java.io.File;
+import java.io.FileFilter;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.security.DigestException;
@@ -151,11 +152,9 @@ public class AbstractHA3BackupTestCase extends AbstractHA3JournalServerTestCase 
         final File snapshotFile = SnapshotManager.getSnapshotFile(
                 getSnapshotDirA(), commitCounterN);
 
-        final String basename = snapshotFile.getName().substring(
-                0,
-                snapshotFile.getName().length()
-                        - SnapshotManager.SNAPSHOT_EXT.length());
-
+        final String basename = CommitCounterUtility.getBaseName(
+                snapshotFile.getName(), SnapshotManager.SNAPSHOT_EXT);
+        
         // temporary file in the same directory as the snapshot.
         final File out = File.createTempFile(basename + "-",
                 Journal.Options.JNL, snapshotFile.getAbsoluteFile()
@@ -273,6 +272,68 @@ public class AbstractHA3BackupTestCase extends AbstractHA3JournalServerTestCase 
             }
 
         }
+
+    }
+
+    /**
+     * Verify the existence of the snapshot files for the specified commit
+     * points and verify that no other snapshot files exist.
+     * 
+     * @param snapshotDir
+     *            The snapshot directory.
+     * @param commitCounters
+     *            The commit points.
+     */
+    protected void assertExpectedSnapshots(final File snapshotDir,
+            final long[] commitCounters) {
+
+        for (long commitCounter : commitCounters) {
+
+            final File file = SnapshotManager.getSnapshotFile(snapshotDir,
+                    commitCounter);
+            
+            if (!file.exists())
+                fail("Snapshot not found: " + file);
+
+        }
+        
+        assertEquals(commitCounters.length,
+                recursiveCount(snapshotDir, SnapshotManager.SNAPSHOT_FILTER));
+
+    }
+
+    /**
+     * Recursively count any files matching the filter.
+     * 
+     * @param f
+     *            A file or directory.
+     */
+    protected long recursiveCount(final File f, final FileFilter fileFilter) {
+       
+        return recursiveCount(f, fileFilter, 0/* initialValue */);
+
+    }
+    
+    private long recursiveCount(final File f, final FileFilter fileFilter,
+            long n) {
+
+        if (f.isDirectory()) {
+
+            final File[] children = f.listFiles(fileFilter);
+
+            for (int i = 0; i < children.length; i++) {
+
+                n = recursiveCount(children[i], fileFilter, n);
+
+            }
+
+        } else {
+
+            n++;
+
+        }
+
+        return n;
 
     }
 

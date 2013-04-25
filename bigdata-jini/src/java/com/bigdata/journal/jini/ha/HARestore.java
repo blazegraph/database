@@ -457,13 +457,11 @@ public class HARestore {
             // source is the snapshot.
             final File in = journalFile;
 
-            final String basename = journalFile.getName().substring(
-                    0,
-                    journalFile.getName().length()
-                            - SnapshotManager.SNAPSHOT_EXT.length());
+            final long commitCounter = SnapshotManager
+                    .parseCommitCounterFile(journalFile.getName());
 
             // temporary file in the same directory as the snapshot.
-            final File out = File.createTempFile(basename + "-",
+            final File out = File.createTempFile("" + commitCounter + "-",
                     Journal.Options.JNL, journalFile.getAbsoluteFile()
                             .getParentFile());
 

@@ -28,6 +28,7 @@ import java.util.concurrent.TimeUnit;
 import org.apache.log4j.Logger;
 
 import com.bigdata.journal.IRootBlockView;
+import com.bigdata.journal.jini.ha.SnapshotIndex.ISnapshotRecord;
 
 /**
  * The default restore policy. This policy supports three different criteria for
@@ -233,7 +234,8 @@ public class DefaultRestorePolicy implements IRestorePolicy {
         final long then = now - minRestoreAgeMillis;
 
         // The root block for the snapshot with a commitTime LTE [then].
-        final IRootBlockView rootBlock = jnl.getSnapshotManager().find(then);
+        final ISnapshotRecord sr = jnl.getSnapshotManager().find(then);
+        final IRootBlockView rootBlock = sr == null ? null : sr.getRootBlock();
 
         if (rootBlock == null) {
 
@@ -258,17 +260,17 @@ public class DefaultRestorePolicy implements IRestorePolicy {
     private long getEarliestRestorableCommitCounterBySnapshots(
             final HAJournal jnl, final long commitCounterOnJournal) {
 
-        final IRootBlockView rootBlock = jnl.getSnapshotManager()
+        final ISnapshotRecord r = jnl.getSnapshotManager()
                 .getSnapshotByReverseIndex(minSnapshots - 1);
 
-        if (rootBlock == null) {
+        if (r == null) {
 
             // There are fewer than minSnapshots snapshots.
             return 0L;
             
         }
         
-        return rootBlock.getCommitCounter();
+        return r.getRootBlock().getCommitCounter();
         
     }
 
@@ -292,16 +294,16 @@ public class DefaultRestorePolicy implements IRestorePolicy {
         }
 
         // Find the oldest snapshot LTE that commitCounter.
-        final IRootBlockView rootBlock = jnl.getSnapshotManager()
-                .findByCommitCounter(desiredCommitCounter);
+        final ISnapshotRecord r = jnl.getSnapshotManager().findByCommitCounter(
+                desiredCommitCounter);
 
-        if (rootBlock == null) {
+        if (r == null) {
 
             return commitCounterOnJournal;
 
         }
 
-        return rootBlock.getCommitCounter();
+        return r.getRootBlock().getCommitCounter();
 
     }
 

@@ -58,6 +58,6 @@ abstract public class AbstractHATransactionService extends
     /**
      * Used to make a serviceJoin() MUTEX with the consensus protocol.
      */
-    abstract public void executeWithBarrierLock(Runnable r);
+    abstract public void runWithBarrierLock(Runnable r);
     
 }

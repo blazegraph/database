@@ -26,6 +26,7 @@ package com.bigdata.journal.jini.ha;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.File;
+import java.io.FileFilter;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
@@ -36,9 +37,7 @@ import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.security.DigestException;
 import java.security.MessageDigest;
-import java.util.Formatter;
-import java.util.LinkedList;
-import java.util.List;
+import java.util.Iterator;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -70,9 +69,13 @@ import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.RootBlockUtility;
 import com.bigdata.journal.RootBlockView;
+import com.bigdata.journal.jini.ha.SnapshotIndex.ISnapshotRecord;
+import com.bigdata.journal.jini.ha.SnapshotIndex.SnapshotRecord;
 import com.bigdata.quorum.Quorum;
 import com.bigdata.quorum.QuorumException;
 import com.bigdata.rawstore.Bytes;
+import com.bigdata.striterator.Resolver;
+import com.bigdata.striterator.Striterator;
 import com.bigdata.util.ChecksumUtility;
 
 /**
@@ -104,6 +107,61 @@ public class SnapshotManager {
      */
     public final static String SNAPSHOT_TMP_SUFFIX = ".tmp";
 
+    /**
+     * A {@link FileFilter} that visits all files ending with the
+     * {@link #SNAPSHOT_EXT} and the names of all direct child directories. This
+     * {@link FileFilter} may be used to establish recursive scans of the
+     * {@link #getSnapshotDir()}.
+     */
+    static public final FileFilter SNAPSHOT_FILTER = new FileFilter() {
+
+        @Override
+        public boolean accept(File f) {
+
+            if (f.isDirectory()) {
+
+                return true;
+
+            }
+
+            return f.getName().endsWith(SnapshotManager.SNAPSHOT_EXT);
+
+        }
+
+    };
+    
+    /**
+     * A {@link FileFilter} that visits all temporary files used to generate
+     * snapshots and the names of all direct child directories.  This is used
+     * to clean out any temporary files that might be left lying around if the
+     * process was terminated while taking a snapshot.
+     * 
+     * @see #SNAPSHOT_TMP_PREFIX
+     * @see #SNAPSHOT_TMP_SUFFIX
+     */
+    static private final FileFilter TEMP_FILE_FILTER = new FileFilter() {
+
+        @Override
+        public boolean accept(final File file) {
+            if (file.isDirectory()) {
+                // Visit directory, but do not delete.
+                return true;
+            }
+            final String name = file.getName();
+            if (name.startsWith(SNAPSHOT_TMP_PREFIX)
+                    && name.endsWith(SNAPSHOT_TMP_SUFFIX)) {
+
+                // One of our temporary files.
+                return true;
+
+            }
+            return false;
+        }
+    };
+    
+    /**
+     * The journal.
+     */
     private final HAJournal journal;
     
     /**
@@ -129,8 +187,7 @@ public class SnapshotManager {
     /**
      * An in memory index over the last commit time of each snapshot. This is
      * populated when the {@link HAJournal} starts from the file system and
-     * maintained as snapshots are taken or destroyed. All operations on this
-     * index MUST be synchronized on its object monitor.
+     * maintained as snapshots are taken or destroyed.
      * <p>
      * Note: This index is not strictly necessary. We can also visit the files
      * in the file system. However, the index makes it much faster to locate a
@@ -138,7 +195,7 @@ public class SnapshotManager {
      * to the {@link IRootBlockView} for that snapshot (faster than opening the
      * snapshot file on the disk).
      */
-    private final CommitTimeIndex snapshotIndex;
+    private final SnapshotIndex snapshotIndex;
 
     /**
      * Lock used to guard the decision to take a snapshot.
@@ -193,15 +250,14 @@ public class SnapshotManager {
     }
     
 //    /**
-//     * An in memory index over the last commit time of each snapshot. This is
-//     * populated when the {@link HAJournal} starts from the file system and
-//     * maintained as snapshots are taken or destroyed. All operations on this
-//     * index MUST be synchronized on its object monitor.
+//     * An in memory index over the commitTime for the commit point of each
+//     * snapshot. This is populated when the {@link HAJournal} starts from the
+//     * file system and maintained as snapshots are taken or destroyed.
 //     */
-//    private CommitTimeIndex getSnapshotIndex() {
+//    private SnapshotIndex getSnapshotIndex() {
 //
 //        return snapshotIndex;
-//        
+//
 //    }
 
     public SnapshotManager(final HAJournalServer server,
@@ -224,13 +280,6 @@ public class SnapshotManager {
                                 HAJournalServer.ConfigurationOptions.DEFAULT_SNAPSHOT_DIR)//
                 );
 
-        if (!snapshotDir.exists()) {
-
-            // Create the directory.
-            snapshotDir.mkdirs();
-
-        }
-
         snapshotPolicy = (ISnapshotPolicy) config.getEntry(
                 HAJournalServer.ConfigurationOptions.COMPONENT,
                 HAJournalServer.ConfigurationOptions.SNAPSHOT_POLICY,
@@ -250,13 +299,37 @@ public class SnapshotManager {
                 IRestorePolicy.class, //
                 HAJournalServer.ConfigurationOptions.DEFAULT_RESTORE_POLICY);
 
-        snapshotIndex = CommitTimeIndex.createTransient();
+        snapshotIndex = SnapshotIndex.createTransient();
 
-        populateSnapshotIndex();
+        /*
+         * Delete any temporary files that were left lying around in the
+         * snapshot directory.
+         */
+        CommitCounterUtility.recursiveDelete(false/* errorIfDeleteFails */,
+                getSnapshotDir(), TEMP_FILE_FILTER);
+ 
+        // Make sure the snapshot directory exists.
+        ensureSnapshotDirExists();
+        
+        // Populate the snapshotIndex from the snapshotDir.
+        populateIndexRecursive(getSnapshotDir(), SNAPSHOT_FILTER);
 
         // Initialize the snapshot policy.  It can self-schedule.
         snapshotPolicy.init(journal);
         
+    }
+
+    private void ensureSnapshotDirExists() throws IOException {
+
+        if (!snapshotDir.exists()) {
+
+            // Create the directory.
+            if (!snapshotDir.mkdirs())
+                throw new IOException("Could not create directory: "
+                        + snapshotDir);
+
+        }
+
     }
     
     /**
@@ -265,86 +338,22 @@ public class SnapshotManager {
      * 
      * @throws IOException 
      */
-    private void populateSnapshotIndex() throws IOException {
+    private void populateIndexRecursive(final File f,
+            final FileFilter fileFilter) throws IOException {
 
-        /*
-         * Delete any temporary files that were left lying around in the
-         * snapshot directory.
-         */
-        {
-            final File[] files;
+        if (f.isDirectory()) {
 
-            final File snapshotDir = getSnapshotDir();
-            
-            files = snapshotDir.listFiles(new FilenameFilter() {
+            final File[] children = f.listFiles(fileFilter);
 
-                /**
-                 * Return <code>true</code> iff the file is an HALog file that
-                 * should be deleted.
-                 * 
-                 * @param name
-                 *            The name of that HALog file (encodes the
-                 *            commitCounter).
-                 */
-                @Override
-                public boolean accept(final File dir, final String name) {
+            for (int i = 0; i < children.length; i++) {
 
-                    if (name.startsWith(SNAPSHOT_TMP_PREFIX)
-                            && name.endsWith(SNAPSHOT_TMP_SUFFIX)) {
+                populateIndexRecursive(children[i], fileFilter);
 
-                        // One of our temporary files.
-                        return true;
-                        
-                    }
-
-                    return false;
-
-                }
-            });
-
-            for(File file : files) {
-                
-                if(!file.delete()) {
-
-                    log.warn("Could not delete temporary file: "+file);
-                    
-                }
-                
             }
-            
-        }
 
-        /*
-         * List the snapshot files for this service.
-         */
-        final File[] files;
-        {
+        } else {
 
-            final File snapshotDir = getSnapshotDir();
-
-            files = snapshotDir.listFiles(new FilenameFilter() {
-
-                @Override
-                public boolean accept(final File dir, final String name) {
-
-                    if (!name.endsWith(SNAPSHOT_EXT)) {
-                        // Not an snapshot file.
-                        return false;
-                    }
-
-                    return true;
-
-                }
-            });
-
-        }
-        
-        /*
-         * Populate the snapshot index from the file system.
-         */
-        for (File file : files) {
-
-            addSnapshot(file);
+            addSnapshot(f);
 
         }
 
@@ -424,11 +433,9 @@ public class SnapshotManager {
          */
         final IRootBlockView currentRootBlock = getRootBlockForSnapshot(file);
 
-        synchronized (snapshotIndex) {
+        final long sizeOnDisk = file.length();
 
-            snapshotIndex.add(currentRootBlock);
-
-        }
+        snapshotIndex.add(new SnapshotRecord(currentRootBlock, sizeOnDisk));
 
     }
 
@@ -449,9 +456,13 @@ public class SnapshotManager {
 
         final long commitTime = currentRootBlock.getLastCommitTime();
         
-        synchronized (snapshotIndex) {
+        final Lock lock = snapshotIndex.writeLock();
+        
+        lock.lock();
+        
+        try {
 
-            final IRootBlockView tmp = (IRootBlockView) snapshotIndex
+            final ISnapshotRecord tmp = (ISnapshotRecord) snapshotIndex
                     .lookup(commitTime);
 
             if (tmp == null) {
@@ -462,7 +473,7 @@ public class SnapshotManager {
 
             }
 
-            if (!currentRootBlock.equals(tmp)) {
+            if (!currentRootBlock.equals(tmp.getRootBlock())) {
 
                 log.error("Root blocks differ for index and snapshot: commitTime="
                         + commitTime
@@ -477,6 +488,10 @@ public class SnapshotManager {
             // Remove the index entry for that commit time.
             snapshotIndex.remove(commitTime);
 
+        } finally {
+            
+            lock.unlock();
+            
         }
 
         // Remove the snapshot file on the disk.
@@ -491,62 +506,65 @@ public class SnapshotManager {
     }
 
     /**
-     * Find the {@link IRootBlockView} for the most oldest snapshot (if any).
+     * Find the {@link ISnapshotRecord} for the most oldest snapshot (if any).
      * 
-     * @return That {@link IRootBlockView} -or- <code>-1L</code> if there are no
+     * @return That {@link ISnapshotRecord} -or- <code>null</code> if there are no
      *         snapshots.
      */
-    public IRootBlockView getOldestSnapshot() {
+    public ISnapshotRecord getOldestSnapshot() {
 
         return snapshotIndex.getOldestSnapshot();
 
     }
 
     /**
-     * Find the {@link IRootBlockView} for the most recent snapshot (if any).
+     * Find the {@link ISnapshotRecord} for the most recent snapshot (if any).
      * 
-     * @return That {@link IRootBlockView} -or- <code>-1L</code> if there are no
+     * @return That {@link ISnapshotRecord} -or- <code>null</code> if there are no
      *         snapshots.
      */
-    public IRootBlockView getNewestSnapshot() {
+    public ISnapshotRecord getNewestSnapshot() {
         
         return snapshotIndex.getNewestSnapshot();
         
     }
     
     /**
-     * Return the {@link IRootBlockView} identifying the snapshot having the
+     * Return the {@link ISnapshotRecord} identifying the snapshot having the
      * largest lastCommitTime that is less than or equal to the given value.
      * 
      * @param timestamp
      *            The given timestamp.
      * 
-     * @return The {@link IRootBlockView} of the identified snapshot -or-
+     * @return The {@link ISnapshotRecord} of the identified snapshot -or-
      *         <code>null</code> iff there are no snapshots in the index that
      *         satisify the probe.
      * 
      * @throws IllegalArgumentException
-     *             if <i>timestamp</i> is less than or equals to ZERO (0L).
+     *             if <i>timestamp</i> is less than ZERO (0L).
      */
-    public IRootBlockView find(final long timestamp) {
+    public ISnapshotRecord find(final long timestamp) {
         
         return snapshotIndex.find(timestamp);
         
     }
 
     /**
-     * Return the {@link IRootBlockView} identifying the first snapshot whose
+     * Return the {@link ISnapshotRecord} identifying the first snapshot whose
      * <em>commitTime</em> is strictly greater than the timestamp.
      * 
      * @param timestamp
      *            The timestamp. A value of ZERO (0) may be used to find the
      *            first snapshot.
      * 
-     * @return The root block of that snapshot -or- <code>null</code> if there
-     *         is no snapshot whose timestamp is strictly greater than
-     *         <i>timestamp</i>.
+     * @return The {@link ISnapshotRecord} for that snapshot -or-
+     *         <code>null</code> if there is no snapshot whose timestamp is
+     *         strictly greater than <i>timestamp</i>.
+     * 
+     * @throws IllegalArgumentException
+     *             if <i>timestamp</i> is less than ZERO (0L).
      */
-    public IRootBlockView findNext(final long timestamp) {
+    public ISnapshotRecord findNext(final long timestamp) {
         
         return snapshotIndex.findNext(timestamp);
         
@@ -556,10 +574,10 @@ public class SnapshotManager {
      * Find the oldest snapshot that is at least <i>minRestorePoints</i> old and
      * returns its commit counter.
      * 
-     * @return The {@link IRootBlockView} for that snapshot -or-
+     * @return The {@link ISnapshotRecord} for that snapshot -or-
      *         <code>null</code> if there is no such snapshot.
      */
-    public IRootBlockView findByCommitCounter(final long commitCounter) {
+    public ISnapshotRecord findByCommitCounter(final long commitCounter) {
 
         return snapshotIndex.findByCommitCounter(commitCounter);
 
@@ -573,10 +591,10 @@ public class SnapshotManager {
      * @param index
      *            The index.
      * 
-     * @return The {@link IRootBlockView} for that snapshot -or-
+     * @return The {@link ISnapshotRecord} for that snapshot -or-
      *         <code>null</code> if there is no such snapshot.
      */
-    public IRootBlockView getSnapshotByReverseIndex(final int index) {
+    public ISnapshotRecord getSnapshotByReverseIndex(final int index) {
         
         return snapshotIndex.getSnapshotByReverseIndex(index);
         
@@ -590,30 +608,182 @@ public class SnapshotManager {
      * 
      * @return A list of the {@link IRootBlockView} for the known snapshots.
      */
-    public List<IRootBlockView> getSnapshots() {
+    @SuppressWarnings({ "unchecked", "rawtypes" })
+    public Iterator<ISnapshotRecord> getSnapshots() {
 
-        final List<IRootBlockView> l = new LinkedList<IRootBlockView>();
+        final ITupleIterator<ISnapshotRecord> itr = snapshotIndex
+                .rangeIterator();
+
+        return new Striterator(itr)
+                .addFilter(new Resolver<ITupleIterator<ISnapshotRecord>, ITuple<ISnapshotRecord>, ISnapshotRecord>() {
+                    private static final long serialVersionUID = 1L;
+                    @Override
+                    protected ISnapshotRecord resolve(ITuple<ISnapshotRecord> e) {
+                        return e.getObject();
+                    }
+                });
+    }
+    
+    /**
+     * Delete all snapshots and any empty directories, but ensure that the
+     * {@link #getSnapshotDir()} exists as a post-condition.
+     * 
+     * @throws IOException
+     *             if any file can not be deleted.
+     */
+    public void deleteAllSnapshots() throws IOException {
+
+        final File snapshotDir = journal.getSnapshotManager().getSnapshotDir();
+
+        CommitCounterUtility.recursiveDelete(true/* errorIfDeleteFails */,
+                snapshotDir, SNAPSHOT_FILTER);
+
+        ensureSnapshotDirExists();
+
+    }
+
+    /**
+     * Delete snapshots that are no longer required.
+     * <p>
+     * Note: If ZERO (0) is passed into this method, then no snapshots will be
+     * deleted. This is because the first possible commit counter is ONE (1).
+     * <p>
+     * Note: As a special case, if there are no snapshots then we DO NOT pin the
+     * HALogs and return {@link Long#MAX_VALUE} so all HALogs except the live
+     * log will be purged at each commit.
+     * 
+     * @param earliestRestorableCommitPoint
+     *            The earliest commit counter that we need to be able to restore
+     *            from local backups.
+     * 
+     * @return The commitCounter of the earliest retained snapshot.
+     */
+    public long deleteSnapshots(final long token,
+            final long earliestRestorableCommitPoint) {
+
+        // #of snapshots.
+        final long nbefore = snapshotIndex.getEntryCount();
         
-        synchronized (snapshotIndex) {
+        if (haLog.isInfoEnabled())
+            log.info("token="
+                    + token//
+                    + ", earliestRestoreableCommitPoint="
+                    + earliestRestorableCommitPoint//
+                    + ", nsnapshots=" + nbefore);
 
-            @SuppressWarnings("unchecked")
-            final ITupleIterator<IRootBlockView> itr = snapshotIndex.rangeIterator();
+        if (nbefore == 0L) {
 
-            while(itr.hasNext()) {
+            /*
+             * As a special case, if there are no snapshots then we DO NOT pin
+             * the HALogs.
+             */
+            
+            return Long.MAX_VALUE;
+            
+        }
+        
+        /*
+         * Iterator scanning all snapshots. We break out of the scan once we
+         * encounter the first snapshot GTE the [earliestRestorableCommitPoint].
+         */
+        
+        @SuppressWarnings("unchecked")
+        final ITupleIterator<ISnapshotRecord> titr = snapshotIndex
+                .rangeIterator();
 
-                final ITuple<IRootBlockView> t = itr.next();
+        // #of snapshots that we wind up deleting.
+        long ndeleted = 0L;
+        
+        // #of bytes on the disk for those deleted snapshots.
+        long totalBytesReclaimed = 0L;
+        
+        while(titr.hasNext()) {
 
-                final IRootBlockView rootBlock = t.getObject();
+            final ISnapshotRecord r = titr.next().getObject();
+            
+            final IRootBlockView rb = r.getRootBlock();
 
-                l.add(rootBlock);
+            final long commitCounter = rb.getCommitCounter();
+            
+            // true iff we will delete this snapshot.
+            final boolean deleteFile = commitCounter < earliestRestorableCommitPoint;
+
+            final long len = r.sizeOnDisk();
+            
+            final File file = getSnapshotFile(commitCounter);
+
+            if (haLog.isInfoEnabled())
+                log.info("snapshotFile="
+                        + file//
+                        + ", sizeOnDisk="
+                        + len//
+                        + ", deleteFile="
+                        + deleteFile//
+                        + ", commitCounter="
+                        + commitCounter//
+                        + ", earliestRestoreableCommitPoint="
+                        + earliestRestorableCommitPoint);
+
+            if(!deleteFile) {
+            
+                // Break out of the scan.
+                break;
+
+            }
+            
+            if (!journal.getQuorum().isQuorumFullyMet(token)) {
+                /*
+                 * Halt operation.
+                 * 
+                 * Note: This is not an error, but we can not remove snapshots
+                 * or HALogs if this invariant is violated.
+                 */
+                break;
+            }
+
+            if (!removeSnapshot(file)) {
+
+                haLog.warn("COULD NOT DELETE FILE: " + file);
+
+                continue;
 
             }
 
+            ndeleted++;
+
+            totalBytesReclaimed += len;
+
         }
 
-        return l;
+        /*
+         * If people specify NoSnapshotPolicy then backup is in their hands.
+         * HALogs will not be retained beyond a fully met commit unless there is
+         * a snapshot against which they can be applied..
+         */
+
+        // The earliest remaining snapshot.
+        final ISnapshotRecord oldestSnapshot = snapshotIndex
+                .getOldestSnapshot();
+
+        /*
+         * The commit counter for the earliest remaining snapshot and 0L if
+         * there are no retained snapshots.
+         */
+        final long earliestRetainedSnapshotCommitCounter = oldestSnapshot == null ? 0L
+                : oldestSnapshot.getRootBlock().getCommitCounter();
+
+        if (haLog.isInfoEnabled())
+            haLog.info("PURGED SNAPSHOTS: nbefore=" + nbefore + ", ndeleted="
+                    + ndeleted + ", totalBytesReclaimed=" + totalBytesReclaimed
+                    + ", earliestRestorableCommitPoint="
+                    + earliestRestorableCommitPoint
+                    + ", earliestRetainedSnapshotCommitCounter="
+                    + earliestRetainedSnapshotCommitCounter);
+
+        return earliestRetainedSnapshotCommitCounter;
+
     }
-    
+
     /**
      * Return the {@link Future} of the current snapshot operation (if any).
      * 
@@ -804,32 +974,86 @@ public class SnapshotManager {
     public static File getSnapshotFile(final File snapshotDir,
             final long commitCounter) {
 
-        /*
-         * Format the name of the file.
-         * 
-         * Note: The commit counter in the file name should be zero filled to 20
-         * digits so we have the files in lexical order in the file system (for
-         * convenience).
-         */
-        final String file;
-        {
-
-            final StringBuilder sb = new StringBuilder();
-
-            final Formatter f = new Formatter(sb);
-
-            f.format("%020d" + SNAPSHOT_EXT, commitCounter);
-            f.flush();
-            f.close();
-
-            file = sb.toString();
-
-        }
-
-        return new File(snapshotDir, file);
+        return CommitCounterUtility.getCommitCounterFile(snapshotDir,
+                commitCounter, SNAPSHOT_EXT);
 
     }
 
+//    public static File getCommitCounterFile(final File dir,
+//            final long commitCounter, final String ext) {
+//
+//        /*
+//         * Format the name of the file.
+//         * 
+//         * Note: The commit counter in the file name should be zero filled to 20
+//         * digits so we have the files in lexical order in the file system (for
+//         * convenience).
+//         */
+//        final String file;
+//        {
+//
+//            final StringBuilder sb = new StringBuilder();
+//
+//            final Formatter f = new Formatter(sb);
+//
+//            f.format("%020d" + ext, commitCounter);
+//            f.flush();
+//            f.close();
+//
+//            file = sb.toString();
+//
+//        }
+//
+//        return new File(dir, file);
+//
+//    }
+
+    /**
+     * Parse out the commitCounter from the file name.
+     */
+    public static long parseCommitCounterFile(final String name)
+            throws NumberFormatException {
+
+        return CommitCounterUtility.parseCommitCounterFile(name, SNAPSHOT_EXT);
+
+    }
+    
+//    /**
+//     * Parse out the commitCounter from the file name.
+//     * 
+//     * @param name
+//     *            The file name
+//     * @param ext
+//     *            The expected file extension.
+//     * 
+//     * @return The commit counter from the file name.
+//     * 
+//     * @throws IllegalArgumentException
+//     *             if either argument is <code>null</code>
+//     * @throws NumberFormatException
+//     *             if the file name can not be interpreted as a commit counter.
+//     */
+//    public static long parseCommitCounterFile(final String name,
+//            final String ext) throws NumberFormatException {
+//
+//        if (name == null)
+//            throw new IllegalArgumentException();
+//
+//        if (ext == null)
+//            throw new IllegalArgumentException();
+//
+//        // Strip off the filename extension.
+//        final int len = name.length() - ext.length();
+//
+//        final String fileBaseName = name.substring(0, len);
+//
+//        // Closing commitCounter for snapshot file.
+//        final long commitCounter = Long.parseLong(fileBaseName);
+//
+//        return commitCounter;
+//        
+//    }
+    
     /**
      * Find the commit counter for the most recent snapshot (if any). Count up
      * the bytes on the disk for the HALog files GTE the commitCounter of that
@@ -842,8 +1066,11 @@ public class SnapshotManager {
         if (req == null)
             throw new IllegalArgumentException();
 
-        final IRootBlockView snapshotRootBlock = snapshotIndex
+        final ISnapshotRecord newestSnapshot = snapshotIndex
                 .getNewestSnapshot();
+
+        final IRootBlockView snapshotRootBlock = newestSnapshot == null ? null
+                : newestSnapshot.getRootBlock();
 
         if (snapshotRootBlock != null
                 && journal.getRootBlockView().getCommitCounter() == snapshotRootBlock
@@ -1277,9 +1504,9 @@ public class SnapshotManager {
      * 
      *             TODO We should pin the snapshot if we are reading it to
      *             compute its digest. Right now we have the {@link #lock} and
-     *             synchronization on the {@link #snapshotIndex}. We probably
-     *             want a {@link NamedLock} specific to the commit counter for
-     *             each snapshot index.
+     *             {@link SnapshotIndex#readLock()}. We probably want a
+     *             {@link NamedLock} specific to the commit counter for each
+     *             snapshot index.
      */
     static public void getSnapshotDigest(final File file,
             final MessageDigest digest) throws FileNotFoundException,

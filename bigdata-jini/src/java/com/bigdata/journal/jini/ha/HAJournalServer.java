@@ -24,6 +24,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.journal.jini.ha;
 
 import java.io.File;
+import java.io.FileFilter;
 import java.io.FileNotFoundException;
 import java.io.FilenameFilter;
 import java.io.IOException;
@@ -2864,7 +2865,7 @@ public class HAJournalServer extends AbstractServer {
              * TODO What happens if we are blocked here?
              */
             ((AbstractHATransactionService) journal.getTransactionService())
-                    .executeWithBarrierLock(new Runnable() {
+                    .runWithBarrierLock(new Runnable() {
 
                         public void run() {
                             
@@ -3099,8 +3100,9 @@ public class HAJournalServer extends AbstractServer {
 
                 // Delete snapshots, returning commit counter of the oldest
                 // retained snapshot.
-                final long earliestRetainedSnapshotLastCommitCounter = deleteSnapshots(
-                        token, earliestRestorableCommitPoint);
+                final long earliestRetainedSnapshotLastCommitCounter = journal
+                        .getSnapshotManager().deleteSnapshots(token,
+                                earliestRestorableCommitPoint);
 
                 // Delete HALogs not retained by that snapshot.
                 deleteHALogs(token, earliestRetainedSnapshotLastCommitCounter);
@@ -3113,158 +3115,154 @@ public class HAJournalServer extends AbstractServer {
 
         }
 
-        /**
-         * Delete snapshots that are no longer required.
-         * <p>
-         * Note: If ZERO (0) is passed into this method, then no snapshots will
-         * be deleted. This is because the first possible commit counter is ONE
-         * (1).
-         * 
-         * @param earliestRestorableCommitPoint
-         *            The earliest commit point that we need to be able to
-         *            restore from local backups.
-         * 
-         * @return The commitCounter of the earliest retained snapshot.
-         */
-        private long deleteSnapshots(final long token,
-                final long earliestRestorableCommitPoint) {
-            /*
-             * List the snapshot files for this service.
-             */
-            final File[] files;
-            // #of snapshot files found. Set during scan.
-            final AtomicLong nfound = new AtomicLong(); 
-            // Set to the commit counter of the earliest retained snapshot.
-            final AtomicLong earliestRetainedSnapshotCommitCounter = new AtomicLong(Long.MAX_VALUE);
-            final SnapshotManager snapshotManager = journal
-                    .getSnapshotManager();
-            {
-
-                final File snapshotDir = snapshotManager.getSnapshotDir();
-
-                files = snapshotDir.listFiles(new FilenameFilter() {
-
-                    /**
-                     * Return <code>true</code> iff the file is an snapshot file
-                     * that should be deleted.
-                     * 
-                     * @param name
-                     *            The name of that file (encodes the
-                     *            commitCounter).
-                     */
-                    @Override
-                    public boolean accept(final File dir, final String name) {
-
-                        if (!name.endsWith(SnapshotManager.SNAPSHOT_EXT)) {
-                            // Not an snapshot file.
-                            return false;
-                        }
-
-                        // Strip off the filename extension.
-                        final int len = name.length()
-                                - SnapshotManager.SNAPSHOT_EXT.length();
-                        final String fileBaseName = name.substring(0, len);
-
-                        // Closing commitCounter for snapshot file.
-                        final long commitCounter = Long.parseLong(fileBaseName);
-
-                        // Count all snapshot files.
-                        nfound.incrementAndGet();
-
-                        // true iff we will delete this snapshot.
-                        final boolean deleteFile = commitCounter < earliestRestorableCommitPoint;
-
-                        if (haLog.isInfoEnabled())
-                            log.info("snapshotFile="
-                                    + name//
-                                    + ", deleteFile="
-                                    + deleteFile//
-                                    + ", commitCounter="
-                                    + commitCounter//
-                                    + ", earliestRestoreableCommitPoint="
-                                    + earliestRestorableCommitPoint);
-
-                        if (!deleteFile
-                                && commitCounter < earliestRetainedSnapshotCommitCounter
-                                        .get()) {
-
-                            /*
-                             * Update the earliest retained snapshot.
-                             */
-
-                            earliestRetainedSnapshotCommitCounter
-                                    .set(commitCounter);
-
-                        }
-
-                        return deleteFile;
-
-                    }
-                });
-
-            }
-
-            int ndeleted = 0;
-            long totalBytes = 0L;
-
-            /*
-             * If people specify NoSnapshotPolicy then backup is in their hands.
-             * HALogs will not be retained beyond a fully met commit unless
-             * there is a snapshot against which they can be applied..
-             */
-            
-//            if (files.length == 0) {
+//        /**
+//         * Delete snapshots that are no longer required.
+//         * <p>
+//         * Note: If ZERO (0) is passed into this method, then no snapshots will
+//         * be deleted. This is because the first possible commit counter is ONE
+//         * (1).
+//         * 
+//         * @param earliestRestorableCommitPoint
+//         *            The earliest commit point that we need to be able to
+//         *            restore from local backups.
+//         * 
+//         * @return The commitCounter of the earliest retained snapshot.
+//         */
+//        private long deleteSnapshots(final long token,
+//                final long earliestRestorableCommitPoint) {
+//            /*
+//             * List the snapshot files for this service.
+//             */
+//            final File[] files;
+//            // #of snapshot files found. Set during scan.
+//            final AtomicLong nfound = new AtomicLong(); 
+//            // Set to the commit counter of the earliest retained snapshot.
+//            final AtomicLong earliestRetainedSnapshotCommitCounter = new AtomicLong(Long.MAX_VALUE);
+//            final SnapshotManager snapshotManager = journal
+//                    .getSnapshotManager();
+//            {
 //
-//                /*
-//                 * Note: If there are no snapshots then we MUST retain ALL HALog
-//                 * files.
-//                 */
-//                earliestRetainedSnapshotCommitCounter.set(0L);
-//                
-//            } else {
-
-                for (File file : files) {
-
-                    // #of bytes in that file.
-                    final long len = file.length();
-
-                    if (!getQuorum().isQuorumFullyMet(token)) {
-                        /*
-                         * Halt operation.
-                         * 
-                         * Note: This is not an error, but we can not remove
-                         * snapshots or HALogs if this invariant is violated.
-                         */
-                        break;
-                    }
-
-                    if (!snapshotManager.removeSnapshot(file)) {
-
-                        haLog.warn("COULD NOT DELETE FILE: " + file);
-
-                        continue;
-
-                    }
-
-                    ndeleted++;
-
-                    totalBytes += len;
-
-                }
-                
+//                final File snapshotDir = snapshotManager.getSnapshotDir();
+//
+//                files = snapshotDir.listFiles(new FilenameFilter() {
+//
+//                    /**
+//                     * Return <code>true</code> iff the file is an snapshot file
+//                     * that should be deleted.
+//                     * 
+//                     * @param name
+//                     *            The name of that file (encodes the
+//                     *            commitCounter).
+//                     */
+//                    @Override
+//                    public boolean accept(final File dir, final String name) {
+//
+//                        if (!name.endsWith(SnapshotManager.SNAPSHOT_EXT)) {
+//                            // Not an snapshot file.
+//                            return false;
+//                        }
+//
+//                        // Closing commitCounter for snapshot file.
+//                        final long commitCounter = SnapshotManager
+//                                .parseCommitCounterFile(name);
+//
+//                        // Count all snapshot files.
+//                        nfound.incrementAndGet();
+//
+//                        // true iff we will delete this snapshot.
+//                        final boolean deleteFile = commitCounter < earliestRestorableCommitPoint;
+//
+//                        if (haLog.isInfoEnabled())
+//                            log.info("snapshotFile="
+//                                    + name//
+//                                    + ", deleteFile="
+//                                    + deleteFile//
+//                                    + ", commitCounter="
+//                                    + commitCounter//
+//                                    + ", earliestRestoreableCommitPoint="
+//                                    + earliestRestorableCommitPoint);
+//
+//                        if (!deleteFile
+//                                && commitCounter < earliestRetainedSnapshotCommitCounter
+//                                        .get()) {
+//
+//                            /*
+//                             * Update the earliest retained snapshot.
+//                             */
+//
+//                            earliestRetainedSnapshotCommitCounter
+//                                    .set(commitCounter);
+//
+//                        }
+//
+//                        return deleteFile;
+//
+//                    }
+//                });
+//
 //            }
-
-            if (haLog.isInfoEnabled())
-                haLog.info("PURGED SNAPSHOTS: nfound=" + nfound + ", ndeleted="
-                        + ndeleted + ", totalBytes=" + totalBytes
-                        + ", earliestRestorableCommitPoint="
-                        + earliestRestorableCommitPoint
-                        + ", earliestRetainedSnapshotCommitCounter="
-                        + earliestRetainedSnapshotCommitCounter.get());
-
-            return earliestRetainedSnapshotCommitCounter.get();
-
-        }
+//
+//            int ndeleted = 0;
+//            long totalBytes = 0L;
+//
+//            /*
+//             * If people specify NoSnapshotPolicy then backup is in their hands.
+//             * HALogs will not be retained beyond a fully met commit unless
+//             * there is a snapshot against which they can be applied..
+//             */
+//            
+////            if (files.length == 0) {
+////
+////                /*
+////                 * Note: If there are no snapshots then we MUST retain ALL HALog
+////                 * files.
+////                 */
+////                earliestRetainedSnapshotCommitCounter.set(0L);
+////                
+////            } else {
+//
+//                for (File file : files) {
+//
+//                    // #of bytes in that file.
+//                    final long len = file.length();
+//
+//                    if (!getQuorum().isQuorumFullyMet(token)) {
+//                        /*
+//                         * Halt operation.
+//                         * 
+//                         * Note: This is not an error, but we can not remove
+//                         * snapshots or HALogs if this invariant is violated.
+//                         */
+//                        break;
+//                    }
+//
+//                    if (!snapshotManager.removeSnapshot(file)) {
+//
+//                        haLog.warn("COULD NOT DELETE FILE: " + file);
+//
+//                        continue;
+//
+//                    }
+//
+//                    ndeleted++;
+//
+//                    totalBytes += len;
+//
+//                }
+//                
+////            }
+//
+//            if (haLog.isInfoEnabled())
+//                haLog.info("PURGED SNAPSHOTS: nfound=" + nfound + ", ndeleted="
+//                        + ndeleted + ", totalBytes=" + totalBytes
+//                        + ", earliestRestorableCommitPoint="
+//                        + earliestRestorableCommitPoint
+//                        + ", earliestRetainedSnapshotCommitCounter="
+//                        + earliestRetainedSnapshotCommitCounter.get());
+//
+//            return earliestRetainedSnapshotCommitCounter.get();
+//
+//        }
         
         /**
          * Delete HALogs that are no longer required.
@@ -3415,42 +3413,45 @@ public class HAJournalServer extends AbstractServer {
                 haLog.warn("Destroying local backups.");
 
                 // Delete all snapshots.
-                {
-
-                    final File snapshotDir = journal.getSnapshotManager()
-                            .getSnapshotDir();
-
-                    final File[] files = snapshotDir
-                            .listFiles(new FilenameFilter() {
-                                @Override
-                                public boolean accept(final File dir,
-                                        final String name) {
-                                    return name
-                                            .endsWith(SnapshotManager.SNAPSHOT_EXT);
-                                }
-                            });
-                    for (File file : files) {
-                        if (!file.delete())
-                            throw new IOException("COULD NOT DELETE FILE: "
-                                    + file);
-                    }
-                
-                }
+                journal.getSnapshotManager().deleteAllSnapshots();
                 
                 // Delete all HALogs (except the current one).
-                {
+                deleteAllHALogsExceptCurrent();
+                                
+            } finally {
 
-                    final File currentLogFile = journal.getHALogWriter()
-                            .getFile();
+                logLock.unlock();
 
-                    final String currentLogFileName = currentLogFile == null ? null
-                            : currentLogFile.getName();
+            }
+            
+        }
 
-                    final File logDir = journal.getHALogDir();
+        /**
+         * Delete all HALog files (except the current one).
+         * 
+         * @throws IOException
+         */
+        private void deleteAllHALogsExceptCurrent() throws IOException {
+        
+            final File currentLogFile = journal.getHALogWriter()
+                    .getFile();
 
-                    final File[] files = logDir.listFiles(new FilenameFilter() {
+            final String currentLogFileName = currentLogFile == null ? null
+                    : currentLogFile.getName();
+
+            final File logDir = journal.getHALogDir();
+
+            CommitCounterUtility.recursiveDelete(true/* errorIfDeleteFails */,
+                    logDir, new FileFilter() {
+
                         @Override
-                        public boolean accept(final File dir, final String name) {
+                        public boolean accept(final File f) {
+
+                            if (f.isDirectory())
+                                return true;
+
+                            final String name = f.getName();
+
                             // filter out the current log file
                             if (currentLogFile != null
                                     && name.equals(currentLogFileName)) {
@@ -3459,22 +3460,12 @@ public class HAJournalServer extends AbstractServer {
                                  */
                                 return false;
                             }
+
                             return name.endsWith(IHALogReader.HA_LOG_EXT);
+
                         }
+
                     });
-                    for (File file : files) {
-                        if (!file.delete())
-                            throw new IOException("COULD NOT DELETE FILE: "
-                                    + file);
-                    }
-                
-                }
-                
-            } finally {
-
-                logLock.unlock();
-
-            }
             
         }
         
@@ -3609,6 +3600,10 @@ public class HAJournalServer extends AbstractServer {
                 NSSConfigurationOptions.PORT, Integer.TYPE,
                 NSSConfigurationOptions.DEFAULT_PORT);
 
+//        final String servletContextListenerClass = (String) config.getEntry(COMPONENT,
+//                NSSConfigurationOptions.SERVLET_CONTEXT_LISTENER_CLASS, String.class,
+//                NSSConfigurationOptions.DEFAULT_SERVLET_CONTEXT_LISTENER_CLASS);
+
         log.warn("Starting NSS: port=" + port);
 
         final Map<String, String> initParams = new LinkedHashMap<String, String>();
@@ -3622,6 +3617,9 @@ public class HAJournalServer extends AbstractServer {
             // Note: Create will be handled by the QuorumListener (above).
             initParams.put(ConfigParams.CREATE, Boolean.toString(create));
 
+//            initParams.put(ConfigParams.SERVLET_CONTEXT_LISTENER_CLASS,
+//                    servletContextListenerClass);
+            
         }
         
         if (jettyServer != null && jettyServer.isRunning()) {

@@ -91,6 +91,7 @@ public class TestAll extends TestCase {
         suite.addTestSuite(TestHA3JournalServer.class);
 
         // HA3 snapshot policy test suite.
+        suite.addTestSuite(TestSnapshotIndex.class);
         suite.addTestSuite(TestHA3SnapshotPolicy.class);
         suite.addTestSuite(TestHA3SnapshotPolicy2.class);
 

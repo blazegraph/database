@@ -33,7 +33,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
 import java.util.Comparator;
-import java.util.List;
+import java.util.Iterator;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 
@@ -53,6 +53,7 @@ import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.RootBlockView;
 import com.bigdata.journal.jini.ha.HAJournal;
 import com.bigdata.journal.jini.ha.ISnapshotPolicy;
+import com.bigdata.journal.jini.ha.SnapshotIndex.ISnapshotRecord;
 import com.bigdata.journal.jini.ha.SnapshotManager;
 import com.bigdata.quorum.AsynchronousQuorumCloseException;
 import com.bigdata.quorum.Quorum;
@@ -233,7 +234,7 @@ public class HAStatusServletUtil {
                     }
                     final long commitCounter = journal.getRootBlockView()
                             .getCommitCounter();
-//                    // FIXME HA TXS : Move this stuff to a TXS Status section once HA TXS is finished.
+//                    // Move this stuff to a TXS Status section?
 //                    long releaseTime = -1;
 //                    try {
 //                        // Note: Can throw exception if quorum is not met.
@@ -242,9 +243,10 @@ public class HAStatusServletUtil {
 //                    } catch (QuorumException ex) {
 //                        // Ignore.
 //                    }
+                    final long fileSize = file == null ? 0L : file.length();
                     p.text("HAJournal: file=" + file //
                             + ", commitCounter=" + commitCounter //
-                            + ", nbytes=" + journal.size()//
+                            + ", nbytes=" + fileSize//
                             + (digestStr == null ? "" : ", md5=" + digestStr)//
 //                            + (releaseTime != -1L ? ", releaseTime="
 //                                    + RootBlockView.toString(releaseTime)//
@@ -323,40 +325,58 @@ public class HAStatusServletUtil {
 
             /*
              * Report #of files and bytes in the snapshot directory.
+             * 
+             * Note: This uses the in-memory index rather than scanning the
+             * directory in order to reduce latency associated with the file
+             * system.
              */
             {
-                final File snapshotDir = journal
-                        .getSnapshotManager().getSnapshotDir();
-                final File[] a = snapshotDir.listFiles(new FilenameFilter() {
-                    @Override
-                    public boolean accept(File dir, String name) {
-                        return name.endsWith(SnapshotManager.SNAPSHOT_EXT);
-                    }
-                });
                 {
+//                    final File snapshotDir = journal
+//                            .getSnapshotManager().getSnapshotDir();
+//                    final File[] a = snapshotDir.listFiles(new FilenameFilter() {
+//                        @Override
+//                        public boolean accept(File dir, String name) {
+//                            return name.endsWith(SnapshotManager.SNAPSHOT_EXT);
+//                        }
+//                    });
+//                    for (File file : a) {
+//                        nbytes += file.length();
+//                        nfiles++;
+//                    }
+                    /*
+                     * List the available snapshots (in order by increasing
+                     * commitTime).
+                     */
+                    final Iterator<ISnapshotRecord> itr = journal
+                            .getSnapshotManager().getSnapshots();
                     int nfiles = 0;
                     long nbytes = 0L;
-                    for (File file : a) {
-                        nbytes += file.length();
+                    while (itr.hasNext()) {
+                        final ISnapshotRecord sr = itr.next();
+                        nbytes += sr.sizeOnDisk();
                         nfiles++;
                     }
                     p.text("SnapshotDir: nfiles=" + nfiles + ", nbytes="
-                            + nbytes + ", path=" + snapshotDir).node("br")
-                            .close();
+                            + nbytes + ", path="
+                            + journal.getSnapshotManager().getSnapshotDir())
+                            .node("br").close();
                 }
                 if (true) {
 
                     /*
-                     * List the available snapshots.
+                     * List the available snapshots (in order by increasing
+                     * commitTime).
                      */
-                    final List<IRootBlockView> snapshots = journal
+                    final Iterator<ISnapshotRecord> itr = journal
                             .getSnapshotManager().getSnapshots();
 
-                    // Note: list is ordered by increasing commitTime.
-                    for (IRootBlockView rb : snapshots) {
-                        final File file = journal.getSnapshotManager()
-                                .getSnapshotFile(rb.getCommitCounter());
-                        final long nbytes = file.length();
+                    while(itr.hasNext()) {
+                        final ISnapshotRecord r = itr.next();
+                        final IRootBlockView rb = r.getRootBlock();
+                        final long nbytes = r.sizeOnDisk();
+//                        final File file = journal.getSnapshotManager()
+//                                .getSnapshotFile(rb.getCommitCounter());
                         String digestStr = null;
                         if (digests) {
                             try {
