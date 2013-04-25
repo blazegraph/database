@@ -90,12 +90,17 @@ public class BigdataRDFServletContextListener implements
      */
     private boolean closeIndexManager;
 
+    public BigdataRDFServletContextListener() {
+        super();
+    }
+    
     protected BigdataRDFContext getBigdataRDFContext() {
 
         return rdfContext;
         
     }
     
+    @Override
     public void contextInitialized(final ServletContextEvent e) {
 
         if(log.isInfoEnabled())
@@ -382,6 +387,7 @@ public class BigdataRDFServletContextListener implements
 
     }
 
+    @Override
     public void contextDestroyed(final ServletContextEvent e) {
 
         if(log.isInfoEnabled())
