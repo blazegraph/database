@@ -716,7 +716,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
         final private AtomicReference<BarrierState> barrierRef = new AtomicReference<BarrierState>();
         
         @Override
-        public void executeWithBarrierLock(final Runnable r) {
+        public void runWithBarrierLock(final Runnable r) {
             
             barrierLock.lock();
             try {
