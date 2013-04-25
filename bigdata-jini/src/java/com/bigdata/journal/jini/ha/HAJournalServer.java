@@ -3600,9 +3600,9 @@ public class HAJournalServer extends AbstractServer {
                 NSSConfigurationOptions.PORT, Integer.TYPE,
                 NSSConfigurationOptions.DEFAULT_PORT);
 
-//        final String servletContextListenerClass = (String) config.getEntry(COMPONENT,
-//                NSSConfigurationOptions.SERVLET_CONTEXT_LISTENER_CLASS, String.class,
-//                NSSConfigurationOptions.DEFAULT_SERVLET_CONTEXT_LISTENER_CLASS);
+        final String servletContextListenerClass = (String) config.getEntry(COMPONENT,
+                NSSConfigurationOptions.SERVLET_CONTEXT_LISTENER_CLASS, String.class,
+                NSSConfigurationOptions.DEFAULT_SERVLET_CONTEXT_LISTENER_CLASS);
 
         log.warn("Starting NSS: port=" + port);
 
@@ -3617,8 +3617,8 @@ public class HAJournalServer extends AbstractServer {
             // Note: Create will be handled by the QuorumListener (above).
             initParams.put(ConfigParams.CREATE, Boolean.toString(create));
 
-//            initParams.put(ConfigParams.SERVLET_CONTEXT_LISTENER_CLASS,
-//                    servletContextListenerClass);
+            initParams.put(ConfigParams.SERVLET_CONTEXT_LISTENER_CLASS,
+                    servletContextListenerClass);
             
         }
         
