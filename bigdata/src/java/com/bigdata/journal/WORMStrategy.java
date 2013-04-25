@@ -2729,6 +2729,17 @@ public class WORMStrategy extends AbstractBufferStrategy implements
     }
 
     @Override
+    public void postHACommit(final IRootBlockView rootBlock) {
+
+        final long rbNextOffset = rootBlock.getNextOffset();
+        
+        nextOffset.set(rbNextOffset);
+        
+        commitOffset.set(rbNextOffset);
+        
+    }
+
+    @Override
     public Object snapshotAllocators() {
 
         /*
@@ -2860,12 +2871,6 @@ public class WORMStrategy extends AbstractBufferStrategy implements
 		FileChannelUtility.writeAll(this.opener, transfer, msg.getFirstOffset());
 		
 //		m_rebuildSequence++;
-	}
-
-	@Override
-	public void postHACommit(final IRootBlockView rootBlock) {
-		// Simply call through to resetFromHARootBlock
-		resetFromHARootBlock(rootBlock);
 	}
 
 //	@Override

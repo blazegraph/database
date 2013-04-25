@@ -148,13 +148,9 @@ public interface IHABufferStrategy extends IBufferStrategy {
      * installed onto a follower. This can change the {@link UUID} for the
      * backing store file. The {@link IHABufferStrategy} implementation MUST
      * update any cached value for that {@link UUID}.
-     * 
-     * FIXME This is currently called from {@link AbstractJournal} commit2Phase
-     * to ensure that the allocators on the followers are in sync with recently
-     * committed data. It SHOULD NOT be called for this purpose. Instead, we
-     * should be maintaining the allocators either incrementally as writes (and
-     * deletes) are replicated or during the commit protocol (through an
-     * extension of the RWStore commit protocol for HA).
+     * <p>
+     * Use {@link #postHACommit(IRootBlockView)} rather than this method in the
+     * 2-phase commit on the follower.
      * 
      * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/662" >
      *      Latency on followers during commit on leader </a>
@@ -164,10 +160,15 @@ public interface IHABufferStrategy extends IBufferStrategy {
     /**
      * Provides a trigger for synchronization of transient state after a commit.
      * <p>
-     * For the RWStore this may be used to avoid a call to resetFromHARootBlock
-     * that could add significant latency to the HA commit2Phase protocol.
+     * For the RWStore this is used to resynchronize the allocators during the
+     * 2-phase commit on the follower with the delta in the allocators from the
+     * write set associated with that commit.
      * 
      * @param rootBlock
+     *            The newly installed root block.
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/662" >
+     *      Latency on followers during commit on leader </a>
      */
     void postHACommit(final IRootBlockView rootBlock);
 
