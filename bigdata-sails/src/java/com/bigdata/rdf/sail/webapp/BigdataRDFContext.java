@@ -41,6 +41,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -214,8 +215,42 @@ public class BigdataRDFContext extends BigdataBaseContext {
      * The currently executing queries (does not include queries where a client
      * has established a connection but the query is not running because the
      * {@link #queryService} is blocking).
+     * <p>
+     * Note: This includes both SPARQL QUERY and SPARQL UPDATE requests.
+     * However, the {@link AbstractQueryTask#queryId2} might not yet be bound
+     * since it is not set until the request begins to execute. See
+     * {@link AbstractQueryTask#setQueryId(ASTContainer)}.
      */
     private final ConcurrentHashMap<Long/* queryId */, RunningQuery> m_queries = new ConcurrentHashMap<Long, RunningQuery>();
+    
+    /**
+     * The currently executing QUERY and UPDATE requests.
+     * <p>
+     * Note: This does not include requests where a client has established a
+     * connection to the SPARQL end point but the request is not executing
+     * because the {@link #queryService} is blocking).
+     * <p>
+     * Note: This collection was introduced because the SPARQL UPDATE requests
+     * are not executed on the {@link QueryEngine} and hence we can not use
+     * {@link QueryEngine#getRunningQuery(UUID)} to resolve the {@link Future}
+     * of an {@link UpdateTask}.
+     */
+    private final ConcurrentHashMap<UUID/* queryId2 */, RunningQuery> m_queries2 = new ConcurrentHashMap<UUID, RunningQuery>();
+
+    /**
+     * Return the {@link RunningQuery} for a currently executing SPARQL QUERY or
+     * UPDATE request.
+     * 
+     * @param queryId2
+     *            The {@link UUID} for the request.
+     *            
+     * @return The {@link RunningQuery} iff it was found.
+     */
+    RunningQuery getQueryById(final UUID queryId2) {
+
+        return m_queries2.get(queryId2);
+        
+    }
     
     /**
      * Factory for the query identifiers.
@@ -487,13 +522,22 @@ public class BigdataRDFContext extends BigdataBaseContext {
          */
         protected final Long queryId;
 
-		/**
-		 * The queryId used by the {@link QueryEngine}. If the application has
-		 * not specified this using {@link QueryHints#QUERYID} then this is
-		 * assigned and set on the query using {@link QueryHints#QUERYID}. This
-		 * decision can not be made until we parse the query so the behavior is
-		 * handled by the subclasses.
-		 */
+        /**
+         * The queryId used by the {@link QueryEngine}. If the application has
+         * not specified this using {@link QueryHints#QUERYID} then this is
+         * assigned and set on the query using {@link QueryHints#QUERYID}. This
+         * decision can not be made until we parse the query so the behavior is
+         * handled by the subclasses. This also means that {@link #queryId2} is
+         * NOT available until the {@link AbstractQueryTask} begins to execute.
+         * <p>
+         * Note: Even though a SPARQL UPDATE request does not execute on the
+         * {@link QueryEngine}, a {@link UUID} will also be bound for the SPARQL
+         * UPDATE request. This provides us with a consistent identifier that
+         * can be used by clients and in the XHTML UI on the status page to
+         * refer to a SPARQL UPDATE request.
+         * 
+         * @see AbstractQueryTask#setQueryId(ASTContainer)
+         */
         volatile protected UUID queryId2;
 
         /**
@@ -505,6 +549,13 @@ public class BigdataRDFContext extends BigdataBaseContext {
          * {@link #queryId2}.
          */
         protected AbstractOperation sailQueryOrUpdate;
+
+        /**
+         * The {@link Future} of the {@link UpdateTask} and <code>null</code> if
+         * this is not a SPARQL UPDATE or if the {@link UpdateTask} has not
+         * begun execution.
+         */
+        volatile protected Future<Void> updateFuture;
         
         /**
          * When <code>true</code>, provide an "explanation" for the query (query
@@ -538,6 +589,45 @@ public class BigdataRDFContext extends BigdataBaseContext {
          */
         final boolean monitor;
         
+        /**
+         * The timstamp (in nanoseconds) when the task obtains its connection
+         * and begins to execute. 
+         */
+        private volatile long beginNanos = 0L;
+        
+        /**
+         * The timstamp (in nanoseconds) when the task finishes its execution.
+         */
+        private volatile long endNanos = 0L;
+        
+        /**
+         * Return the elapsed execution time in milliseconds. This will be ZERO
+         * (0) until the task begins to execute.
+         * <p>
+         * Note: This is used to report the elapsed time for the execution of
+         * SPARQL UPDATE requests. Since SPARQL UPDATE requests are not run on
+         * the {@link QueryEngine}, {@link IRunningQuery#getElapsed()} can not
+         * be used for UPDATEs. It could also be used for QUERYs, but those are
+         * run on the {@link QueryEngine} and {@link IRunningQuery#getElapsed()}
+         * may be used instead.
+         */
+        public long getElapsedExecutionMillis() {
+
+            if (beginNanos == 0L) {
+                // Not yet executing.
+                return 0L;
+            }
+            long now = endNanos;
+            if (now == 0L) {
+                // Not yet done executing.
+                now = System.nanoTime();
+            }
+            // Elasped execution time (wall clock).
+            final long elapsed = now - beginNanos;
+            // Convert to milliseconds.
+            return TimeUnit.NANOSECONDS.toMillis(elapsed);
+        }
+
         /**
          * 
          * @param namespace
@@ -777,9 +867,12 @@ public class BigdataRDFContext extends BigdataBaseContext {
 			// Set the IRunningQuery's UUID (volatile write!) 
 			this.queryId2 = queryId2;
 			
-			// Stuff it in the map of running queries.
-            m_queries.put(queryId, new RunningQuery(queryId.longValue(),
-                    queryId2, begin, this));
+            final RunningQuery r = new RunningQuery(queryId.longValue(),
+                    queryId2, begin, this);
+
+            // Stuff it in the maps of running queries.
+            m_queries.put(queryId, r);
+            m_queries2.put(queryId2, r);
 
             return query;
             
@@ -824,12 +917,24 @@ public class BigdataRDFContext extends BigdataBaseContext {
             // Set the query object.
             this.sailQueryOrUpdate = update;
             
-            // Set the IRunningQuery's UUID (volatile write!) 
+            /*
+             * Make a note of the UUID associated with this UPDATE request
+             * (volatile write!)
+             * 
+             * Note: While the UPDATE request does not directly execute on the
+             * QueryEngine, each request UPDATE is assigned a UUID. The UUID is
+             * either assigned by a query hint specified with the SPARQL UPDATE
+             * request or generated automatically. In either case, it becomes
+             * bound on the ASTContainer as a query hint.
+             */
             this.queryId2 = queryId2;
+
+            final RunningQuery r = new RunningQuery(queryId.longValue(),
+                    queryId2, begin, this);
             
-            // Stuff it in the map of running queries.
-            m_queries.put(queryId, new RunningQuery(queryId.longValue(),
-                    queryId2, begin, this));
+            // Stuff it in the maps of running queries.
+            m_queries.put(queryId, r);
+            m_queries2.put(queryId2, r);
 
             return update;
             
@@ -893,7 +998,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
          *            The query.
          * 
          * @return The {@link UUID} which will be associated with the
-         *         {@link IRunningQuery}.
+         *         {@link IRunningQuery} and never <code>null</code>.
          */
 		protected UUID setQueryId(final ASTContainer astContainer) {
 			assert queryId2 == null; // precondition.
@@ -901,10 +1006,12 @@ public class BigdataRDFContext extends BigdataBaseContext {
             final String queryIdStr = astContainer.getQueryHint(
                     QueryHints.QUERYID);
             if (queryIdStr == null) {
+                // Not specified, so generate and set on query hint.
                 queryId2 = UUID.randomUUID();
                 astContainer.setQueryHint(QueryHints.QUERYID,
                         queryId2.toString());
 			} else {
+			    // Specified by a query hint.
 				queryId2 = UUID.fromString(queryIdStr);
 			}
             return queryId2;
@@ -929,8 +1036,9 @@ public class BigdataRDFContext extends BigdataBaseContext {
                 cxn = getQueryConnection(namespace, timestamp);
                 if(log.isTraceEnabled())
                     log.trace("Query running...");
+                beginNanos = System.nanoTime();
 //                try {
-    			if(explain) {
+            if (explain && !update) {
 					/*
 					 * The data goes to a bit bucket and we send an
 					 * "explanation" of the query evaluation back to the caller.
@@ -943,6 +1051,11 @@ public class BigdataRDFContext extends BigdataBaseContext {
 					 * once it is terminated the IRunningQuery will have been
 					 * cleared from the internal map maintained by the
 					 * QueryEngine, at which point we can not longer find it.
+					 * 
+					 * Note: We can't do this for UPDATE since it would have
+					 * a side-effect anyway.  The way to "EXPLAIN" an UPDATE 
+					 * is to break it down into the component QUERY bits and
+					 * execute those.
 					 */
     				doQuery(cxn, new NullOutputStream());
     			} else {
@@ -975,7 +1088,9 @@ public class BigdataRDFContext extends BigdataBaseContext {
                 }
                 throw new Exception(t);
             } finally {
+                endNanos = System.nanoTime();
                 m_queries.remove(queryId);
+                m_queries2.remove(queryId2);
 //                if (os != null) {
 //                    try {
 //                        os.close();
@@ -1188,7 +1303,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
          * The timestamp for the commit point associated with the update and
          * <code>-1</code> if the commit point has not yet been assigned.
          */
-        public AtomicLong commitTime = new AtomicLong(-1);
+        public final AtomicLong commitTime = new AtomicLong(-1);
         
         public UpdateTask(final String namespace, final long timestamp,
                 final String baseURI, final ASTContainer astContainer,
@@ -1220,7 +1335,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
 
             final SparqlUpdateResponseWriter listener;
             final ByteArrayOutputStream baos;
-            if(monitor) {
+            if (monitor) {
 
                 /*
                  * Establish a listener that will log the process onto an XHTML
@@ -1795,7 +1910,8 @@ public class BigdataRDFContext extends BigdataBaseContext {
     }
 
 	/**
-     * Metadata about running queries.
+     * Metadata about running {@link AbstractQueryTask}s (this includes both
+     * queries and update requests).
      */
 	static class RunningQuery {
 
@@ -1805,16 +1921,17 @@ public class BigdataRDFContext extends BigdataBaseContext {
 		 */
 		final long queryId;
 
-		/**
-		 * The unique identifier for this query for the {@link QueryEngine}.
-		 * 
-		 * @see QueryEngine#getRunningQuery(UUID)
-		 */
-		final UUID queryId2;
+        /**
+         * The unique identifier for this query for the {@link QueryEngine}
+         * (non-<code>null</code>).
+         * 
+         * @see QueryEngine#getRunningQuery(UUID)
+         */
+        final UUID queryId2;
 
-		/**
-		 * The task executing the query.
-		 */
+        /**
+         * The task executing the query (non-<code>null</code>).
+         */
 		final AbstractQueryTask queryTask;
 		
 //		/** The query. */
@@ -1826,6 +1943,12 @@ public class BigdataRDFContext extends BigdataBaseContext {
 		public RunningQuery(final long queryId, final UUID queryId2,
 				final long begin,
 				final AbstractQueryTask queryTask) {
+
+            if (queryId2 == null)
+                throw new IllegalArgumentException();
+            
+            if (queryTask == null)
+                throw new IllegalArgumentException();
 
 			this.queryId = queryId;
 

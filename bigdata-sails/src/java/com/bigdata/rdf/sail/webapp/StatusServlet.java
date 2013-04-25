@@ -19,7 +19,7 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-*/
+ */
 package com.bigdata.rdf.sail.webapp;
 
 import java.io.IOException;
@@ -38,6 +38,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.UUID;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -59,14 +61,27 @@ import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.rdf.sail.sparql.ast.SimpleNode;
+import com.bigdata.rdf.sail.webapp.BigdataRDFContext.AbstractQueryTask;
 import com.bigdata.rdf.sail.webapp.BigdataRDFContext.RunningQuery;
+import com.bigdata.rdf.sail.webapp.BigdataRDFContext.UpdateTask;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
+import com.bigdata.rdf.sparql.ast.UpdateRoot;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.util.InnerCause;
 
 /**
  * A status page for the service.
+ * 
+ * TODO A remote client can not act to cancel a request that is in the queue
+ * until it begins to execute. This is because the UUID is not assigned until
+ * the request begins to execute. This is true for both SPARQL QUERY and SPARQL
+ * UPDATE requests.
+ * 
+ * TODO The KB addressed by the request should also be displayed as metadata
+ * associated with the request. We should make this a restriction that can be
+ * placed onto the status page and make it easy to see the status for different
+ * KBs.
  * 
  * @author thompsonbry
  * @author martyncutcher
@@ -86,7 +101,7 @@ public class StatusServlet extends BigdataRDFServlet {
      * default namespace.
      */
     private static final String SHOW_KB_INFO = "showKBInfo";
-    
+
     /**
      * The name of a request parameter used to request a list of the namespaces
      * which could be served.
@@ -130,8 +145,8 @@ public class StatusServlet extends BigdataRDFServlet {
     /**
      * @see #SHOW_QUERIES
      */
-    private static final String DETAILS = "details"; 
-    
+    private static final String DETAILS = "details";
+
     /**
      * The name of a request parameter whose value is the {@link UUID} of a
      * top-level query.
@@ -146,7 +161,7 @@ public class StatusServlet extends BigdataRDFServlet {
      * @see #QUERY_ID
      */
     static final String CANCEL_QUERY = "cancelQuery";
-    
+
     /**
      * Request a snapshot of the journal (HA only). The snapshot will be written
      * into the configured directory on the server. If a snapshot is already
@@ -181,21 +196,21 @@ public class StatusServlet extends BigdataRDFServlet {
 
         if (cancelQuery) {
 
-            doCancelQuery(req, resp, getIndexManager());
+            doCancelQuery(req, resp, getIndexManager(), getBigdataRDFContext());
 
             // Fall through.
-            
+
         }
-            
+
         /*
          * The other actions are all "safe" (idempotent).
          */
         doGet(req, resp);
-        
+
         return;
-            
+
     }
-    
+
     /**
      * Cancel a running query.
      * 
@@ -214,7 +229,8 @@ public class StatusServlet extends BigdataRDFServlet {
      * @throws IOException
      */
     static void doCancelQuery(final HttpServletRequest req,
-            final HttpServletResponse resp, final IIndexManager indexManager)
+            final HttpServletResponse resp, final IIndexManager indexManager,
+            final BigdataRDFContext context)
             throws IOException {
 
         final String[] a = req.getParameterValues(QUERY_ID);
@@ -224,50 +240,104 @@ public class StatusServlet extends BigdataRDFServlet {
             buildResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN);
 
             return;
-            
+
         }
-        
+
         final Set<UUID> queryIds = new LinkedHashSet<UUID>();
-        
-        for(String s : a) {
-            
+
+        for (String s : a) {
+
             queryIds.add(UUID.fromString(s));
-            
+
         }
 
         final QueryEngine queryEngine = (QueryEngine) QueryEngineFactory
                 .getQueryController(indexManager);
-        
-        for(UUID queryId : queryIds) {
-            
-            final IRunningQuery q;
-            try {
-                q = queryEngine.getRunningQuery(queryId);
-            } catch (RuntimeException ex) {
-                // ignore. (typically the query has already terminated).
-                if (log.isInfoEnabled())
-                    log.info("No such query: " + queryId);
-                continue;
-            }
 
-            if( q == null ) {
+        for (UUID queryId : queryIds) {
 
-                if (log.isInfoEnabled())
-                    log.info("No such query: " + queryId);
-
+            if (!tryCancelQuery(queryEngine, queryId)) {
+                if (!tryCancelUpdate(context, queryId)) {
+                    if (log.isInfoEnabled()) {
+                        log.info("No such QUERY or UPDATE: " + queryId);
+                    }
+                }
             }
             
-            if (q.cancel(true/* mayInterruptIfRunning */)) {
+        }
 
-                // TODO Could paint the page with this information.
-                if (log.isInfoEnabled())
-                    log.info("Cancelled query: " + queryId);
+    }
+
+    static private boolean tryCancelQuery(final QueryEngine queryEngine,
+            final UUID queryId) {
+
+        final IRunningQuery q;
+        try {
+
+            q = queryEngine.getRunningQuery(queryId);
+
+        } catch (RuntimeException ex) {
+
+            /*
+             * Ignore.
+             * 
+             * Either the IRunningQuery has already terminated or this is an
+             * UPDATE rather than a QUERY.
+             */
+
+            return false;
+
+        }
+
+        if (q != null && q.cancel(true/* mayInterruptIfRunning */)) {
+
+            // TODO Could paint the page with this information.
+            if (log.isInfoEnabled())
+                log.info("Cancelled query: " + queryId);
+
+            return true;
+
+        }
+
+        return false;
+
+    }
+
+    /**
+     * Attempt to cancel a running SPARQL UPDATE request.
+     * @param context
+     * @param queryId
+     * @return
+     */
+    static private boolean tryCancelUpdate(final BigdataRDFContext context,
+            final UUID queryId) {
+
+        final RunningQuery query = context.getQueryById(queryId);
+
+        if (query != null) {
+
+            if (query.queryTask instanceof UpdateTask) {
+
+                final Future<Void> f = ((UpdateTask) query.queryTask).updateFuture;
+
+                if (f != null) {
+
+                    if (f.cancel(true/* mayInterruptIfRunning */)) {
+
+                        return true;
+
+                    }
+
+                }
 
             }
 
         }
 
-    }
+        // Either not found or found but not running when cancelled.
+        return false;
+
+   }
     
     /**
      * <p>
@@ -311,29 +381,29 @@ public class StatusServlet extends BigdataRDFServlet {
 
             return;
         }
-        
+
         // IRunningQuery objects currently running on the query controller.
         final boolean showQueries = req.getParameter(SHOW_QUERIES) != null;
 
-		boolean showQueryDetails = false;
-		if (showQueries) {
-			for (String tmp : req.getParameterValues(SHOW_QUERIES)) {
-				if (tmp.equals(DETAILS))
-					showQueryDetails = true;
-			}
-		}
+        boolean showQueryDetails = false;
+        if (showQueries) {
+            for (String tmp : req.getParameterValues(SHOW_QUERIES)) {
+                if (tmp.equals(DETAILS))
+                    showQueryDetails = true;
+            }
+        }
 
-		/*
-		 * The maximum inline length of BOp#toString() visible on the page. The
-		 * entire thing is accessible via the title attribute (a flyover). Use
-		 * ZERO (0) to see everything.
-		 */
-		int maxBopLength = 0;
-		if (req.getParameter("maxBopLength") != null) {
-			maxBopLength = Integer.valueOf(req.getParameter("maxBopLength"));
-			if (maxBopLength < 0)
-				maxBopLength = 0;
-		}
+        /*
+         * The maximum inline length of BOp#toString() visible on the page. The
+         * entire thing is accessible via the title attribute (a flyover). Use
+         * ZERO (0) to see everything.
+         */
+        int maxBopLength = 0;
+        if (req.getParameter("maxBopLength") != null) {
+            maxBopLength = Integer.valueOf(req.getParameter("maxBopLength"));
+            if (maxBopLength < 0)
+                maxBopLength = 0;
+        }
 
         // Information about the KB (stats, properties).
         final boolean showKBInfo = req.getParameter(SHOW_KB_INFO) != null;
@@ -350,26 +420,26 @@ public class StatusServlet extends BigdataRDFServlet {
             XMLBuilder.Node current = doc.root("html");
             {
                 current = current.node("head");
-				current.node("meta").attr("http-equiv", "Content-Type").attr(
-						"content", "text/html;charset=utf-8").close();
+                current.node("meta").attr("http-equiv", "Content-Type").attr(
+                        "content", "text/html;charset=utf-8").close();
                 current.node("title").textNoEncode("bigdata&#174;").close();
                 current = current.close();// close the head.
             }
-            
+
             // open the body
-			current = current.node("body");
+            current = current.node("body");
 
             // Dump Journal?
             final boolean dumpJournal = req.getParameter(DUMP_JOURNAL) != null;
-            
-            if(dumpJournal && getIndexManager() instanceof AbstractJournal) {
-                
+
+            if (dumpJournal && getIndexManager() instanceof AbstractJournal) {
+
                 current.node("h1", "Dump Journal").node("p", "Running...");
-                
-//                final XMLBuilder.Node section = current.node("pre");
+
+                // final XMLBuilder.Node section = current.node("pre");
                 // flush writer before writing on PrintStream.
                 doc.getWriter().flush();
-                
+
                 // dump onto the response.
                 final PrintWriter out = new PrintWriter(resp.getOutputStream(),
                         true/* autoFlush */);
@@ -393,48 +463,48 @@ public class StatusServlet extends BigdataRDFServlet {
                     } else {
 
                         namespaces = new LinkedList<String>();
-                        
+
                         for (String namespace : a) {
 
                             namespaces.add(namespace);
 
                         }
-                    
+
                     }
-                    
+
                 }
 
                 final boolean dumpHistory = false;
-                
+
                 final boolean dumpPages = req.getParameter(DUMP_PAGES) != null;
-                
+
                 final boolean dumpIndices = false;
-                
+
                 final boolean dumpTuples = false;
-                
+
                 dump.dumpJournal(out, namespaces, dumpHistory, dumpPages,
                         dumpIndices, dumpTuples);
 
                 // flush PrintStream before resuming writes on Writer.
                 out.flush();
-                
+
                 // close section.
-//                section.close();
+                // section.close();
                 out.print("\n</pre>");
-                
+
             }
-            
-//            final boolean showQuorum = req.getParameter(SHOW_QUORUM) != null;
-            
+
+            // final boolean showQuorum = req.getParameter(SHOW_QUORUM) != null;
+
             if (getIndexManager() instanceof AbstractJournal
                     && ((AbstractJournal) getIndexManager())
                             .isHighlyAvailable()) {
 
-                new HAStatusServletUtil(getIndexManager())
-                        .doGet(req, resp, current);
+                new HAStatusServletUtil(getIndexManager()).
+                        doGet(req, resp, current);
 
             }
-            
+
             current.node("br", "Accepted query count="
                     + getBigdataRDFContext().getQueryIdFactory().get());
 
@@ -446,10 +516,10 @@ public class StatusServlet extends BigdataRDFServlet {
 
                 final String showQueriesURL = req.getRequestURL().append("?")
                         .append(SHOW_QUERIES).toString();
-                
+
                 final String showQueriesDetailsURL = req.getRequestURL()
-						.append("?").append(SHOW_QUERIES).append("=").append(
-								DETAILS).toString();
+                        .append("?").append(SHOW_QUERIES).append("=").append(
+                                DETAILS).toString();
 
                 current.node("p").text("Show ")
                         //
@@ -458,23 +528,23 @@ public class StatusServlet extends BigdataRDFServlet {
                         .text(", ")//
                         .node("a").attr("href", showQueriesDetailsURL)//
                         .text("query details").close()//
-						.text(".").close();
+                        .text(".").close();
 
             }
 
             if (showNamespaces) {
 
-				long timestamp = getTimestamp(req);
+                long timestamp = getTimestamp(req);
 
-				if (timestamp == ITx.READ_COMMITTED) {
+                if (timestamp == ITx.READ_COMMITTED) {
 
-					// Use the last commit point.
-					timestamp = getIndexManager().getLastCommitTime();
+                    // Use the last commit point.
+                    timestamp = getIndexManager().getLastCommitTime();
 
-				}
+                }
 
                 final List<String> namespaces = getBigdataRDFContext()
-						.getNamespaces(timestamp);
+                        .getNamespaces(timestamp);
 
                 current.node("h3", "Namespaces: ");
 
@@ -490,7 +560,7 @@ public class StatusServlet extends BigdataRDFServlet {
 
                 // General information on the connected kb.
                 current.node("pre", getBigdataRDFContext().getKBInfo(
-						getNamespace(req), getTimestamp(req)).toString());
+                        getNamespace(req), getTimestamp(req)).toString());
 
             }
 
@@ -503,7 +573,7 @@ public class StatusServlet extends BigdataRDFServlet {
                         .getQueryController(getIndexManager());
 
                 final CounterSet counterSet = queryEngine.getCounters();
-                
+
                 if (getBigdataRDFContext().getSampleTask() != null) {
 
                     /*
@@ -523,30 +593,30 @@ public class StatusServlet extends BigdataRDFServlet {
 
                 }
 
-//                @SuppressWarnings("rawtypes")
-//                final Iterator<ICounter> itr = counterSet
-//                        .getCounters(null/* filter */);
-//                
-//                while(itr.hasNext()) {
-//
-//                    final ICounter<?> c = itr.next();
-//
-//                    final Object value = c.getInstrument().getValue();
-//
-//                    // The full path to the metric name.
-//                    final String path = c.getPath();
-//                 
-//                    current.node("br", path + "=" + value);
-//
-//                }
+                // @SuppressWarnings("rawtypes")
+                // final Iterator<ICounter> itr = counterSet
+                // .getCounters(null/* filter */);
+                //                
+                // while(itr.hasNext()) {
+                //
+                // final ICounter<?> c = itr.next();
+                //
+                // final Object value = c.getInstrument().getValue();
+                //
+                // // The full path to the metric name.
+                // final String path = c.getPath();
+                //                 
+                // current.node("br", path + "=" + value);
+                //
+                // }
 
                 current.node("pre", counterSet.toString());
-                
+
             }
-            
+
             if (!showQueries) {
                 // Nothing more to do.
-				doc.closeAll(current);
+                doc.closeAll(current);
                 return;
             }
 
@@ -559,58 +629,36 @@ public class StatusServlet extends BigdataRDFServlet {
             {
 
                 final String[] a = req.getParameterValues(QUERY_ID);
-                
+
                 if (a != null && a.length > 0) {
 
-                    for(String s : a) {
-                        
+                    for (String s : a) {
+
                         final UUID queryId = UUID.fromString(s);
-                        
+
                         requestedQueryIds.add(queryId);
-                        
+
                     }
-                    
+
                 }
-                
+
             }
+
+            /**
+             * Obtain a cross walk from the {@link QueryEngine}'s
+             * {@link IRunningQuery#getQueryId()} to {@link NanoSparqlServer}'s
+             * {@link RunningQuery#queryId}.
+             * 
+             * Note: This does NOT include the SPARQL UPDATE requests because
+             * they are not executed directly by the QueryEngine and hence are
+             * not assigned {@link IRunningQuery}s.
+             */
             
-            // Marker timestamp used to report the age of queries.
-            final long now = System.nanoTime();
+            // Map from IRunningQuery.queryId => RunningQuery (for SPARQL QUERY requests).
+            final Map<UUID/* IRunningQuery.queryId */, RunningQuery> crosswalkMap = getQueryCrosswalkMap();
 
             /*
-             * Map providing a cross walk from the QueryEngine's
-             * IRunningQuery.getQueryId() to NanoSparqlServer's
-             * RunningQuery.queryId.
-             */
-            final Map<UUID/* IRunningQuery.queryId */, RunningQuery> crosswalkMap = new LinkedHashMap<UUID, RunningQuery>();
-
-            /*
-             * Map providing the accepted RunningQuery objects in descending
-             * order by their elapsed run time.
-             */
-            final TreeMap<Long/* elapsed */, RunningQuery> acceptedQueryAge = newQueryMap();
-
-            {
-
-                final Iterator<RunningQuery> itr = getBigdataRDFContext()
-                        .getQueries().values().iterator();
-
-                while (itr.hasNext()) {
-
-                    final RunningQuery query = itr.next();
-
-                    crosswalkMap.put(query.queryId2, query);
-
-                    final long age = now - query.begin;
-
-                    acceptedQueryAge.put(age, query);
-
-                }
-
-            }
-
-            /*
-             * Show the queries which are currently executing (actually running
+             * Show the queries that are currently executing (actually running
              * on the QueryEngine).
              */
 
@@ -623,7 +671,9 @@ public class StatusServlet extends BigdataRDFServlet {
 
             /*
              * Map providing the QueryEngine's IRunningQuery objects in order by
-             * descending elapsed evaluation time.
+             * descending elapsed evaluation time (longest running queries are
+             * listed first). This provides a stable ordering and help people to
+             * focus on the problem queries.
              */
             final TreeMap<Long, IRunningQuery> runningQueryAge = newQueryMap();
 
@@ -661,9 +711,11 @@ public class StatusServlet extends BigdataRDFServlet {
             /*
              * Now, paint the page for each query (or for each queryId that was
              * requested).
+             * 
+             * Note: This is only SPARQL QUERY requests.
              */
             {
-                
+
                 final Iterator<Map.Entry<Long/* age */, IRunningQuery>> itr = runningQueryAge
                         .entrySet().iterator();
 
@@ -672,7 +724,7 @@ public class StatusServlet extends BigdataRDFServlet {
                     final Map.Entry<Long/* age */, IRunningQuery> e = itr
                             .next();
 
-                    final long age = e.getKey();
+//                  final long age = e.getKey();
 
                     final IRunningQuery q = e.getValue();
 
@@ -680,7 +732,7 @@ public class StatusServlet extends BigdataRDFServlet {
                         // Already terminated (normal completion).
                         continue;
                     }
-                    
+
                     final UUID queryId = q.getQueryId();
 
                     if (!requestedQueryIds.isEmpty()
@@ -718,161 +770,92 @@ public class StatusServlet extends BigdataRDFServlet {
                         continue;
                     }
 
-                    // An array of the declared child queries.
-                    final IRunningQuery[] children = ((AbstractRunningQuery) q)
-                            .getChildren();
+                    // Paint the query.
+                    current = showQuery(req, resp, w, current, q,
+                            acceptedQuery, showQueryDetails, maxBopLength);
 
-                    final long elapsedMillis = q.getElapsed();
+                } // next IRunningQuery.
+                
+            } // end of block in which we handle the running queries.
 
-                    current.node("h1", "Query");
-                    {
-                        /*
-                         * TODO Could provide an "EXPLAIN" link. That would
-                         * block until the query completes and then give you the
-                         * final state of the query.
-                         */
-                        // FORM for CANCEL action.
-                        current = current.node("FORM").attr("method", "POST")
-                                .attr("action", "");
+            /*
+             * Now handle any SPARQL UPDATE requests.
+             * 
+             * Note: Since these are not directly run on the QueryEngine, we
+             * proceed from the set of active RunningQuery objects maintained by
+             * the NSS.  If we find anything there, it is presumed to still be
+             * executing (it it is done, it will be removed very soon after the
+             * UPDATE commits).
+             * 
+             * FIXME SPARQL UPDATE REQUESTS.
+             */
+            {
+                
+                final Iterator<RunningQuery> itr = getBigdataRDFContext()
+                        .getQueries().values().iterator();
 
-						final String detailsURL = req.getRequestURL().append(
-								"?").append(SHOW_QUERIES).append("=").append(
-								DETAILS).append("&").append(QUERY_ID).append(
-								"=").append(queryId.toString()).toString();
+                while (itr.hasNext()) {
 
-                        final BOpStats stats = q.getStats().get(
-                                q.getQuery().getId());
+                    final RunningQuery acceptedQuery = itr.next();
 
-                        final String solutionsOut = stats == null ? NA : Long
-                                .toString(stats.unitsOut.get());
+                    if (!(acceptedQuery.queryTask instanceof UpdateTask)) {
 
-                        final String chunksOut = stats == null ? NA : Long
-                                .toString(stats.chunksOut.get());
-
-						current.node("p")
-								//
-								.text("solutions=" + solutionsOut)
-								//
-								.text(", chunks=" + chunksOut)
-								//
-								.text(", children=" + children.length)
-								//
-								.text(", elapsed=" + elapsedMillis + "ms")
-								//
-                                .text(", ").node("a").attr("href", detailsURL)
-                                .text("details").close()//
-                                .close();
-
-                        // open <p>
-                        current = current.node("p");
-                        // Pass the queryId.
-						current.node("INPUT").attr("type", "hidden").attr(
-								"name", "queryId").attr("value", queryId)
-                                .close();
-						current.node("INPUT").attr("type", "submit").attr(
-								"name", CANCEL_QUERY).attr("value", "Cancel")
-                                .close();
-                        current = current.close(); // close <p>
-
-                        current = current.close(); // close <FORM>
+                        // Not an UPDATE request.
+                        continue;
 
                     }
 
-                    final String queryString;
+                    // The UUID for this UPDATE request.
+                    final UUID queryId = acceptedQuery.queryId2;
 
-                    if (acceptedQuery != null) {
-
+                    if (queryId == null) {
+                        
                         /*
-                         * A top-level query submitted to the NanoSparqlServer.
+                         * Note: The UUID is not assigned until the UPDATE
+                         * request begins to execute.
                          */
+                        continue;
+                    
+                    }
+                    
+                    if (!requestedQueryIds.isEmpty()
+                            && !requestedQueryIds.contains(queryId)) {
+                        // Information was not requested for this UPDATE.
+                        continue;
+                    }
 
-                        final ASTContainer astContainer = acceptedQuery.queryTask.astContainer;
+                    if (acceptedQuery.queryTask.updateFuture == null) {
 
-                        queryString = astContainer.getQueryString();
-
-                        if (queryString != null) {
-
-                            current.node("h2", "SPARQL");
-                            
-                            current.node("pre", queryString);
-
-                        }
-
-                        if (showQueryDetails) {
-
-                            final SimpleNode parseTree = ((SimpleNode) astContainer
-                                    .getParseTree());
-
-                            if (parseTree != null) {
-
-                                current.node("h2", "Parse Tree");
-
-                                current.node("pre", parseTree.dump(""));
-
-                            }
-
-                            final QueryRoot originalAST = astContainer
-                                    .getOriginalAST();
-
-                            if (originalAST != null) {
-
-                                current.node("h2", "Original AST");
-
-                                current.node("pre", originalAST.toString());
-
-                            }
-
-                            final QueryRoot optimizedAST = astContainer
-                                    .getOptimizedAST();
-
-                            if (optimizedAST != null) {
-
-                                current.node("h2", "Optimized AST");
-
-                                current.node("pre", optimizedAST.toString());
-
-                            }
-
-                            final PipelineOp queryPlan = astContainer
-                                    .getQueryPlan();
-
-                            if (queryPlan != null) {
-
-                                current.node("h2", "Query Plan");
-
-								current.node("pre", BOpUtility
-										.toString(queryPlan));
-
-                            }
-
-                        }
+                        // Request has not yet been queued for execution.
+                        continue;
 
                     } else {
 
-                        /*
-                         * Typically a sub-query for some top-level query, but
-                         * this could also be something submitted via a
-                         * different mechanism to run on the QueryEngine.
-                         */
+                        final Future<Void> f = acceptedQuery.queryTask.updateFuture;
 
-                        queryString = "N/A";
-
-                    }
-
-                    if (showQueryDetails) {
-
-                        current.node("h2", "Query Evaluation Statistics");
-
-                        // Format as a table, writing onto the response.
-                        QueryLog.getTableXHTML(queryString, q, children, w,
-                                !showQueryDetails, maxBopLength);
+                        if (f.isDone()) {
+                            try {
+                                f.get();
+                                // Already terminated (normal completion).
+                                continue;
+                            } catch (InterruptedException ex) {
+                                // Propagate interrupt.
+                                Thread.currentThread().interrupt();
+                            } catch (ExecutionException ex) {
+                                // Already terminated (failure).
+                                continue;
+                            }
+                        }
 
                     }
+                    
+                    showUpdateRequest(req, resp, current, acceptedQuery,
+                            showQueryDetails);
 
-                } // next IRunningQuery.
+                }
 
-            } // end of block in which we handle the running queries.
-
+            }
+            
             doc.closeAll(current);
 
         } finally {
@@ -884,6 +867,324 @@ public class StatusServlet extends BigdataRDFServlet {
 
     }
 
+    private XMLBuilder.Node showUpdateRequest(final HttpServletRequest req,
+            final HttpServletResponse resp, //final Writer w,
+            XMLBuilder.Node current,// final IRunningQuery q,
+            final RunningQuery acceptedQuery, final boolean showQueryDetails)
+            throws IOException {
+
+        // The UUID for this UPDATE request.
+        final UUID queryId = acceptedQuery.queryId2;
+
+        // The UpdateTask.
+        final UpdateTask updateTask = (UpdateTask) acceptedQuery.queryTask;
+
+        final long elapsedMillis = updateTask.getElapsedExecutionMillis();
+
+        current.node("h1", "Update");
+        {
+
+            // Open <FORM>
+            current = current.node("FORM").attr("method", "POST")
+                    .attr("action", "");
+
+            final String detailsURL = req.getRequestURL().append(
+                    "?").append(SHOW_QUERIES).append("=").append(
+                    DETAILS).append("&").append(QUERY_ID).append(
+                    "=").append(queryId.toString()).toString();
+            
+            // Open <p>.
+            current.node("p")
+            //
+//            .text("solutions=" + solutionsOut)
+//            //
+//            .text(", chunks=" + chunksOut)
+//            //
+//            .text(", children=" + children.length)
+            //
+            .text("elapsed=" + elapsedMillis + "ms")
+            //
+            .text(", ").node("a").attr("href", detailsURL)
+            .text("details").close()//
+            .close();
+
+            // open <p>
+            current = current.node("p");
+            // Pass the queryId.
+            current.node("INPUT").attr("type", "hidden").attr(
+                    "name", "queryId").attr("value", queryId)
+                    .close();
+            current.node("INPUT").attr("type", "submit").attr(
+                    "name", CANCEL_QUERY).attr("value", "Cancel")
+                    .close();
+            current = current.close(); // close <p>
+
+            current = current.close(); // close <FORM>
+
+        }
+
+        {
+
+            /*
+             * A top-level query submitted to the NanoSparqlServer.
+             */
+
+            final ASTContainer astContainer = acceptedQuery.queryTask.astContainer;
+
+            final String queryString = astContainer.getQueryString();
+
+            if (queryString != null) {
+
+                current.node("h2", "SPARQL");
+
+                current.node("pre", queryString);
+
+            }
+
+            if (showQueryDetails) {
+
+                final SimpleNode parseTree = ((SimpleNode) astContainer
+                        .getParseTree());
+
+                if (parseTree != null) {
+
+                    current.node("h2", "Parse Tree");
+
+                    current.node("pre", parseTree.dump(""));
+
+                }
+
+                final UpdateRoot originalAST = astContainer
+                        .getOriginalUpdateAST();
+
+                if (originalAST != null) {
+
+                    current.node("h2", "Original AST");
+
+                    current.node("pre", originalAST.toString());
+
+                }
+                
+                /*
+                 * Note: The UPDATE request is optimized piece by piece, and
+                 * those pieces are often rewrites. Thus, the optimized AST is
+                 * not available here. Likewise, neither is the query plan.
+                 * However, when a UPDATE operation is rewritten to include a
+                 * QUERY that is executed (e.g., INSERT/DELETE/WHERE), then that
+                 * QUERY will be an IRunningQuery visible on the QueryEngine.
+                 * 
+                 * @see AST2BOpUpdate
+                 */
+
+//                final QueryRoot optimizedAST = astContainer
+//                        .getOptimizedAST();
+//
+//                if (optimizedAST != null) {
+//
+//                    current.node("h2", "Optimized AST");
+//
+//                    current.node("pre", optimizedAST.toString());
+//
+//                }
+//
+//                final PipelineOp queryPlan = astContainer
+//                        .getQueryPlan();
+//
+//                if (queryPlan != null) {
+//
+//                    current.node("h2", "Query Plan");
+//
+//                    current.node("pre", BOpUtility
+//                            .toString(queryPlan));
+//
+//                }
+
+            }
+
+        }
+
+        return current;
+
+    }
+    
+    /**
+     * Paint a single query.
+     * 
+     * @param req
+     * @param resp
+     * @param w
+     * @param current
+     * @param q
+     * @param acceptedQuery
+     * @param showQueryDetails
+     * @param maxBopLength
+     * @return
+     * @throws IOException
+     */
+    private XMLBuilder.Node showQuery(final HttpServletRequest req,
+            final HttpServletResponse resp, final Writer w,
+            XMLBuilder.Node current, final IRunningQuery q,
+            final RunningQuery acceptedQuery, final boolean showQueryDetails,
+            final int maxBopLength) throws IOException {
+
+        // The UUID assigned to the IRunningQuery.
+        final UUID queryId = q.getQueryId();
+        
+        // An array of the declared child queries.
+        final IRunningQuery[] children = ((AbstractRunningQuery) q)
+                .getChildren();
+
+        final long elapsedMillis = q.getElapsed();
+
+        current.node("h1", "Query");
+        {
+            /*
+             * TODO Could provide an "EXPLAIN" link. That would
+             * block until the query completes and then give you the
+             * final state of the query.
+             */
+            // FORM for CANCEL action.
+            current = current.node("FORM").attr("method", "POST")
+                    .attr("action", "");
+
+            final String detailsURL = req.getRequestURL().append(
+                    "?").append(SHOW_QUERIES).append("=").append(
+                    DETAILS).append("&").append(QUERY_ID).append(
+                    "=").append(queryId.toString()).toString();
+
+            final BOpStats stats = q.getStats().get(
+                    q.getQuery().getId());
+
+            final String solutionsOut = stats == null ? NA : Long
+                    .toString(stats.unitsOut.get());
+
+            final String chunksOut = stats == null ? NA : Long
+                    .toString(stats.chunksOut.get());
+
+            current.node("p")
+                    //
+                    .text("solutions=" + solutionsOut)
+                    //
+                    .text(", chunks=" + chunksOut)
+                    //
+                    .text(", children=" + children.length)
+                    //
+                    .text(", elapsed=" + elapsedMillis + "ms")
+                    //
+                    .text(", ").node("a").attr("href", detailsURL)
+                    .text("details").close()//
+                    .close();
+
+            // open <p>
+            current = current.node("p");
+            // Pass the queryId.
+            current.node("INPUT").attr("type", "hidden").attr(
+                    "name", "queryId").attr("value", queryId)
+                    .close();
+            current.node("INPUT").attr("type", "submit").attr(
+                    "name", CANCEL_QUERY).attr("value", "Cancel")
+                    .close();
+            current = current.close(); // close <p>
+
+            current = current.close(); // close <FORM>
+
+        }
+
+        final String queryString;
+
+        if (acceptedQuery != null) {
+
+            /*
+             * A top-level query submitted to the NanoSparqlServer.
+             */
+
+            final ASTContainer astContainer = acceptedQuery.queryTask.astContainer;
+
+            queryString = astContainer.getQueryString();
+
+            if (queryString != null) {
+
+                current.node("h2", "SPARQL");
+
+                current.node("pre", queryString);
+
+            }
+
+            if (showQueryDetails) {
+
+                final SimpleNode parseTree = ((SimpleNode) astContainer
+                        .getParseTree());
+
+                if (parseTree != null) {
+
+                    current.node("h2", "Parse Tree");
+
+                    current.node("pre", parseTree.dump(""));
+
+                }
+
+                final QueryRoot originalAST = astContainer
+                        .getOriginalAST();
+
+                if (originalAST != null) {
+
+                    current.node("h2", "Original AST");
+
+                    current.node("pre", originalAST.toString());
+
+                }
+
+                final QueryRoot optimizedAST = astContainer
+                        .getOptimizedAST();
+
+                if (optimizedAST != null) {
+
+                    current.node("h2", "Optimized AST");
+
+                    current.node("pre", optimizedAST.toString());
+
+                }
+
+                final PipelineOp queryPlan = astContainer
+                        .getQueryPlan();
+
+                if (queryPlan != null) {
+
+                    current.node("h2", "Query Plan");
+
+                    current.node("pre", BOpUtility
+                            .toString(queryPlan));
+
+                }
+
+            }
+
+        } else {
+
+            /*
+             * Typically a sub-query for some top-level query, but
+             * this could also be something submitted via a
+             * different mechanism to run on the QueryEngine.
+             */
+
+            queryString = "N/A";
+
+        }
+
+        if (showQueryDetails) {
+
+            current.node("h2", "Query Evaluation Statistics");
+
+            // Format as a table, writing onto the response.
+            QueryLog.getTableXHTML(queryString, q, children, w,
+                    !showQueryDetails, maxBopLength);
+
+        }
+
+        return current;
+        
+    }
+    
     /**
      * Return a {@link Map} whose natural order puts the entries into descending
      * order based on their {@link Long} keys. This is used with keys which
@@ -900,11 +1201,75 @@ public class StatusServlet extends BigdataRDFServlet {
              * execution time (longest running queries are first).
              */
             public int compare(final Long o1, final Long o2) {
-                if (o1.longValue() < o2.longValue()) return 1;
-                if (o1.longValue() > o2.longValue()) return -1;
+                if (o1.longValue() < o2.longValue())
+                    return 1;
+                if (o1.longValue() > o2.longValue())
+                    return -1;
                 return 0;
             }
         });
+    }
+
+    /**
+     * Map providing a cross walk from the {@link QueryEngine}'s
+     * {@link IRunningQuery#getQueryId()} to {@link NanoSparqlServer}'s
+     * {@link RunningQuery#queryId}.
+     * <p>
+     * Note: The obtained {@link RunningQuery} objects are NOT the
+     * {@link IRunningQuery} objects of the {@link QueryEngine}. They are
+     * metadata wrappers for the NSS {@link AbstractQueryTask} objects. However,
+     * because we are starting with the {@link QueryEngine}'s
+     * {@link IRunningQuery} {@link UUID}s, this only captures the SPARQL QUERY
+     * requests and not the SPARQL UPDATE requests (since the latter do not
+     * execute on the {@link QueryEngine} .
+     * 
+     * @return The mapping from {@link IRunningQuery#getQueryId()} to
+     *         {@link RunningQuery}.
+     */
+    private Map<UUID/* IRunningQuery.queryId */, RunningQuery> getQueryCrosswalkMap() {
+
+        final Map<UUID/* IRunningQuery.queryId */, RunningQuery> crosswalkMap = new LinkedHashMap<UUID, RunningQuery>();
+
+//        // Marker timestamp used to report the age of queries.
+//        final long now = System.nanoTime();
+
+//        /*
+//         * Map providing the accepted RunningQuery objects in descending order
+//         * by their elapsed run time.
+//         */
+//        final TreeMap<Long/* elapsed */, RunningQuery> acceptedQueryAge = newQueryMap();
+
+        {
+
+            final Iterator<RunningQuery> itr = getBigdataRDFContext()
+                    .getQueries().values().iterator();
+
+            while (itr.hasNext()) {
+
+                final RunningQuery query = itr.next();
+
+//                if (query.queryTask instanceof UpdateTask) {
+//
+//                    // A SPARQL UPDATE
+//                    updateTasks.add(query);
+//
+//                } else {
+
+                // A SPARQL Query.
+                crosswalkMap.put(query.queryId2, query);
+
+//                }
+
+//                final long age = now - query.begin;
+//
+//                acceptedQueryAge.put(age, query);
+
+            }
+
+        }
+
+        return crosswalkMap;
+
     }
 
 }
