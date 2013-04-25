@@ -22,6 +22,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.rdf.sail.webapp;
 
+import javax.servlet.ServletContextEvent;
+import javax.servlet.ServletContextListener;
+
 /**
  * Interface declaring the <code>config-param</code>s understood by the
  * {@link BigdataRDFServletContextListener}.
@@ -124,5 +127,24 @@ public interface ConfigParams {
     String QUERY_TIMEOUT = "queryTimeout";
 
     long DEFAULT_QUERY_TIMEOUT = 0L;
+
+    /**
+     * A class that extends {@link BigdataRDFServletContextListener}. This
+     * offers applications a means to hook the {@link ServletContextListener}
+     * methods.
+     * <p>
+     * Note:
+     * 
+     * @see BigdataRDFServletContextListener#contextInitialized(ServletContextEvent)
+     * @see BigdataRDFServletContextListener#contextDestroyed(ServletContextEvent)
+     * @see #DEFAULT_SERVLET_CONTEXT_LISTENER_CLASS
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/667" >
+     *      Provide NanoSparqlServer initialization hook </a>
+     */
+    String SERVLET_CONTEXT_LISTENER_CLASS = "servletContextListenerClass";
+
+    String DEFAULT_SERVLET_CONTEXT_LISTENER_CLASS = BigdataRDFServletContextListener.class
+            .getName();
 
 }

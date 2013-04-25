@@ -346,7 +346,7 @@ public class QueryServlet extends BigdataRDFServlet {
                         timestamp, updateStr, null/* acceptOverride */, req,
                         resp, os, true/* update */);
                 
-                if(updateTask == null) {
+                if (updateTask == null) {
                     // KB not found. Response already committed.
                     return;
                 }
@@ -366,82 +366,19 @@ public class QueryServlet extends BigdataRDFServlet {
             if (log.isTraceEnabled())
                 log.trace("Will run update: " + updateStr);
 
-//            if (queryTask.explain) {
-//                resp.setContentType(BigdataServlet.MIME_TEXT_HTML);
-//                final Writer w = new OutputStreamWriter(os, queryTask.charset);
-//                try {
-//                    // Begin executing the query (asynchronous)
-//                    getBigdataRDFContext().queryService.execute(ft);
-//                    // Send an explanation instead of the query results.
-//                    explainQuery(queryStr, queryTask, ft, w);
-//                } finally {
-//                    w.flush();
-//                    w.close();
-//                    os.flush();
-//                    os.close();
-//                }
-//
-//            } else {
-//                resp.setContentType(queryTask.mimeType);
-//
-//                if (queryTask.charset != null) {
-//
-//                    // Note: Binary encodings do not specify charset.
-//                    resp.setCharacterEncoding(queryTask.charset.name());
-//
-//                }
-//
-//                if (isAttachment(queryTask.mimeType)) {
-//                    /*
-//                     * Mark this as an attachment (rather than inline). This is
-//                     * just a hint to the user agent. How the user agent handles
-//                     * this hint is up to it.
-//                     */
-//                    resp.setHeader("Content-disposition",
-//                            "attachment; filename=query" + queryTask.queryId
-//                                    + "." + queryTask.fileExt);
-//                }
-//
-//                if (TimestampUtility.isCommitTime(queryTask.timestamp)) {
-//
-//                    /*
-//                     * A read against a commit time or a read-only tx. Such
-//                     * results SHOULD be cached because the data from which the
-//                     * response was constructed have snapshot isolation. (Note:
-//                     * It is possible that the commit point against which the
-//                     * query reads will be aged out of database and that the
-//                     * query would therefore fail if it were retried. This can
-//                     * happen with the RWStore or in scale-out.)
-//                     * 
-//                     * Note: READ_COMMITTED requests SHOULD NOT be cached. Such
-//                     * requests will read against then current committed state
-//                     * of the database each time they are processed.
-//                     * 
-//                     * Note: UNISOLATED queries SHOULD NOT be cached. Such
-//                     * operations will read on (and write on) the then current
-//                     * state of the unisolated indices on the database each time
-//                     * they are processed. The results of such operations could
-//                     * be different with each request.
-//                     * 
-//                     * Note: Full read-write transaction requests SHOULD NOT be
-//                     * cached unless they are queries and the transaction scope
-//                     * is limited to the request (rather than running across
-//                     * multiple requests).
-//                     */
-//
-//                    resp.addHeader("Cache-Control", "public");
-//
-//                    // to disable caching.
-//                    // r.addHeader("Cache-Control", "no-cache");
-//
-//                }
+            updateTask.updateFuture = ft;
+            
+            /*
+             * Begin executing the query (asynchronous).
+             * 
+             * Note: UPDATEs currently contend with QUERYs against the same
+             * thread pool.
+             */
+            getBigdataRDFContext().queryService.execute(ft);
 
-                // Begin executing the query (asynchronous)
-                getBigdataRDFContext().queryService.execute(ft);
+            // Wait for the Future.
+            ft.get();
 
-                // Wait for the Future.
-                ft.get();
-                
         } catch (Throwable e) {
             try {
                 throw BigdataRDFServlet.launderThrowable(e, resp, updateStr);

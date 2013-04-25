@@ -48,7 +48,7 @@ public class ReadIndexTask<V extends Comparable<V>> extends AbstractIndexTask<V>
      * inserted, the {@link Hit#setDocId(long) docId} is set on the {@link Hit}
      * and a new instance is assigned to {@link #tmp}.
      */
-    private Hit<V> tmp = new Hit<V>();
+    private Hit<V> tmp;// = new Hit<V>();
 
     /**
      * Setup a task that will perform a range scan for entries matching the
@@ -56,6 +56,10 @@ public class ReadIndexTask<V extends Comparable<V>> extends AbstractIndexTask<V>
      * 
      * @param termText
      *            The term text for the search term.
+     * @param termNdx
+     * 			  The index of this term within the overall search.
+     * @param numTerms
+     * 			  The overall number of search terms.
      * @param prefixMatch
      *            When <code>true</code> any term having <i>termText</i> as a
      *            prefix will be matched. Otherwise the term must be an exact
@@ -67,11 +71,12 @@ public class ReadIndexTask<V extends Comparable<V>> extends AbstractIndexTask<V>
      * @param hits
      *            The map where the hits are being aggregated.
      */
-    public ReadIndexTask(final String termText, final boolean prefixMatch,
-            final double queryTermWeight, final FullTextIndex<V> searchEngine,
-            final IHitCollector<V> hits) {
+    public ReadIndexTask(final String termText, 
+    		final int termNdx, final int numTerms,
+    		final boolean prefixMatch, final double queryTermWeight, 
+    		final FullTextIndex<V> searchEngine, final IHitCollector<V> hits) {
 
-    	super(termText, prefixMatch, queryTermWeight, searchEngine);
+    	super(termText, termNdx, numTerms, prefixMatch, queryTermWeight, searchEngine);
     	
         if (hits == null)
             throw new IllegalArgumentException();
@@ -93,6 +98,8 @@ public class ReadIndexTask<V extends Comparable<V>> extends AbstractIndexTask<V>
         itr = searchEngine.getIndex()
                 .rangeIterator(fromKey, toKey, 0/* capacity */,
                         IRangeQuery.KEYS | IRangeQuery.VALS, null/* filter */);
+        
+        tmp = new Hit<V>(numTerms);
 
     }
     
@@ -175,13 +182,13 @@ public class ReadIndexTask<V extends Comparable<V>> extends AbstractIndexTask<V>
                 if (oldValue == null) {
                     hit = tmp;
                     hit.setDocId(docId);
-                    tmp = new Hit<V>();
+                    tmp = new Hit<V>(numQueryTerms);
                 } else {
                     hit = oldValue;
                 }
             }
             
-            hit.add( queryTerm, queryTermWeight * termWeight );
+            hit.add( queryTermNdx, queryTermWeight * termWeight );
             
             nhits++;
             

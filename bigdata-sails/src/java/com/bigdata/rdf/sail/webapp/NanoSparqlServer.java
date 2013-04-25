@@ -27,6 +27,8 @@ import java.net.URL;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+import javax.servlet.ServletContextListener;
+
 import org.apache.log4j.Logger;
 import org.eclipse.jetty.server.Handler;
 import org.eclipse.jetty.server.Server;
@@ -140,6 +142,10 @@ public class NanoSparqlServer {
      *            the database. Regardless, each query will be issued against a
      *            read-only transaction.</dt>
      *            </dl>
+     *            <dt>servletContextListenerClass</dt>
+     *            <dd>The name of a class that extends
+     *            {@link BigdataRDFServletContextListener}. This allows you to
+     *            hook the {@link ServletContextListener} events.</dd>
      *            </p>
      */
 //	 *            <dt>bufferCapacity [#bytes]</dt>
@@ -156,6 +162,7 @@ public class NanoSparqlServer {
         int queryThreadPoolSize = ConfigParams.DEFAULT_QUERY_THREAD_POOL_SIZE;
         boolean forceOverflow = false;
         Long readLock = null;
+        String servletContextListenerClass = ConfigParams.DEFAULT_SERVLET_CONTEXT_LISTENER_CLASS;
 
         /*
          * Handle all arguments starting with "-". These should appear before
@@ -184,6 +191,8 @@ public class NanoSparqlServer {
                                 "Read lock must be commit time or -1 (MINUS ONE) to assert a read lock on the last commit time: "
                                         + readLock);
                     }
+                } else if (arg.equals("-servletContextListenerClass")) {
+                    servletContextListenerClass = args[++i];
                 } else {
                     usage(1/* status */, "Unknown argument: " + arg);
                 }
@@ -275,6 +284,9 @@ public class NanoSparqlServer {
                     ConfigParams.READ_LOCK,
                     Long.toString(readLock));
         }
+        
+        initParams.put(ConfigParams.SERVLET_CONTEXT_LISTENER_CLASS,
+                servletContextListenerClass);
 
         // Create the service.
         final Server server = NanoSparqlServer.newInstance(port, propertyFile,
@@ -336,7 +348,7 @@ public class NanoSparqlServer {
      */
     static public Server newInstance(final int port,
             final IIndexManager indexManager,
-            final Map<String, String> initParams) {
+            final Map<String, String> initParams) throws Exception {
 
         final Server server = new Server(port);
 
@@ -384,7 +396,7 @@ public class NanoSparqlServer {
      *      Embedding Jetty </a>
      */
     static public Server newInstance(final int port, final String propertyFile,
-            final Map<String, String> initParams) {
+            final Map<String, String> initParams) throws Exception {
 
         final Server server = new Server(port);
 
@@ -456,7 +468,7 @@ public class NanoSparqlServer {
      */
     static private ServletContextHandler getContextHandler(
             final Server server,
-            final Map<String, String> initParams) {
+            final Map<String, String> initParams) throws Exception {
 
         if (initParams == null)
             throw new IllegalArgumentException();
@@ -475,7 +487,31 @@ public class NanoSparqlServer {
          * Register a listener which will handle the life cycle events for the
          * ServletContext.
          */
-        context.addEventListener(new BigdataRDFServletContextListener());
+        {
+
+            String className = initParams
+                    .get(ConfigParams.SERVLET_CONTEXT_LISTENER_CLASS);
+
+            if (className == null)
+                className = ConfigParams.DEFAULT_SERVLET_CONTEXT_LISTENER_CLASS;
+
+            final Class<BigdataRDFServletContextListener> cls = (Class<BigdataRDFServletContextListener>) Class
+                    .forName(className);
+
+            if (!BigdataRDFServletContextListener.class.isAssignableFrom(cls)) {
+            
+                throw new RuntimeException("Invalid option: "
+                        + ConfigParams.SERVLET_CONTEXT_LISTENER_CLASS + "="
+                        + className + ":: Class does not extend "
+                        + BigdataRDFServletContextListener.class);
+
+            }
+
+            final BigdataRDFServletContextListener listener = cls.newInstance();
+
+            context.addEventListener(listener);
+
+        }
 
         /*
          * Set the servlet context properties.
