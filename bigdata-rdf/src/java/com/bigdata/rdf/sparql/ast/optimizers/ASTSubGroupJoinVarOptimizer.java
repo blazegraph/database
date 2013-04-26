@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.optimizers;
 
+import java.util.Arrays;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
@@ -126,7 +127,35 @@ public class ASTSubGroupJoinVarOptimizer implements IASTOptimizer {
             final IVariable[] joinVars = boundByGroup.toArray(new IVariable[0]);
 
             group.setJoinVars(joinVars);
+            
+            /*
+             * The variables used by the group and its children, including 
+             * filters.
+             */
+            final Set<IVariable<?>> usedByGroup = sa
+            		.getSpannedVariables(group, 
+            				true /*filters*/, new LinkedHashSet<IVariable<?>>());
 
+            /*
+             * Find the set of variables which have appeared in the query and
+             * may be bound by the time the group is evaluated.
+             */
+            final Set<IVariable<?>> maybeIncomingBindings = sa
+                    .getMaybeIncomingBindings(
+                            (GraphPatternGroup<?>) group,
+                            new LinkedHashSet<IVariable<?>>());
+
+            /*
+             * Retain the variables used by the group that have already
+             * appeared previously in the query up to this point. 
+             */
+            usedByGroup.retainAll(maybeIncomingBindings);
+            
+            @SuppressWarnings("rawtypes")
+            final IVariable[] projectInVars = usedByGroup.toArray(new IVariable[0]);
+
+            group.setProjectInVars(projectInVars);
+            
         }
 
         /*
