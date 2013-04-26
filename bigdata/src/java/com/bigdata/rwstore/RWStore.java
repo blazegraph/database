@@ -5959,7 +5959,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 	    		// need to compute modded metabits, those newly written slots by ANDing
 	    		// new bits with compliment of current
 	    		int[] moddedBits = m_metaBits.clone();
-	    		for (int b = 0; b < moddedBits.length; b+=9) {
+	    		for (int b = 0; b < oldmetabits.length; b+=9) {
 	    			// int[0] is startAddr, int[1:9] bits
 	    			for (int i = 1; i < 9; i++) {
 	    				moddedBits[b+i] &= ~oldmetabits[b+i];
