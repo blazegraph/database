@@ -6046,8 +6046,10 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 	    		}
 	    		
 				
-	    		if (log.isTraceEnabled()) {
-					log.trace("Checked freed addresses: " + totalFreed);
+	    		if (log.isInfoEnabled())
+	    			log.info("Released: " + totalFreed + " addresses from " + modCount + " modified Allocators");
+
+				if (log.isTraceEnabled()) {
 					log.trace("OLD BITS: " + BytesUtil.toHexString(oldmetabits));
 		    		log.trace("NEW BITS: " + BytesUtil.toHexString(m_metaBits));
 		    		log.trace("MODDED BITS: " + BytesUtil.toHexString(moddedBits));
