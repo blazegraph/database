@@ -31,6 +31,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.RandomAccessFile;
+import java.lang.ref.WeakReference;
 import java.nio.ByteBuffer;
 import java.nio.channels.Channel;
 import java.nio.channels.ClosedByInterruptException;
@@ -44,6 +45,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -5943,11 +5945,14 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 	    	m_allocationWriteLock.lock();
 	    	try {
 	    		// Current FixedAllocators for sanity
-				log.warn("POSTHACOMMIT START");
-				for (int index = 0; index < m_allocs.size(); index++) {
-					final FixedAllocator xfa = m_allocs.get(index);
-					log.warn("Allocator " + index + ", startAddress: " + xfa.getStartAddr() + ", allocated: " + xfa.getAllocatedSlots());
-				}
+	    		if (log.isTraceEnabled()) 
+	    		{
+	    			log.trace("POSTHACOMMIT START");
+					for (int index = 0; index < m_allocs.size(); index++) {
+						final FixedAllocator xfa = m_allocs.get(index);
+						log.trace("Allocator " + index + ", size: " + xfa.m_size + ", startAddress: " + xfa.getStartAddr() + ", allocated: " + (xfa.getAllocatedSlots()/xfa.m_size));
+					}
+	    		}
 
 	    		final ArrayList<FixedAllocator> nallocs = new ArrayList<FixedAllocator>();
 	    		
@@ -5966,12 +5971,22 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 	    			}
 	    		}
 	    		
+	    		if (log.isTraceEnabled()) {
+	    			StringBuffer sb = new StringBuffer();
+	    			Iterator<Entry<Long, WeakReference<ICommitter>>> entries = m_externalCache.entryIterator();
+	    			while (entries.hasNext()) {
+	    				sb.append(entries.next().getKey() + "|");
+	    			}
+	    			
+	    			log.trace("External Cache Start Size: " + m_externalCache.size() + ", entries: " + sb.toString());
+	    		}
 	    		// Stage One: Count moddedBits
 	    		// Stage Two: Compute Address of modded bits
 	    		// Stage Three: Read Allocator from modded address
 	    		// Stage Four: Update Live Allocators
 	    		
 				int modCount = 0;
+				int totalFreed = 0;
 	    		for (int i = 0; i < moddedBits.length; i+=9) {
 	    			final long startAddr = convertAddr(m_metaBits[i]);
 	    			for (int j = 1; j < 9; j++) {
@@ -5999,23 +6014,29 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 								boolean found = false;
 								if (log.isTraceEnabled())
 									log.trace("Checking allocator at " + nalloc.getStartAddr());
+								
 								for (int index = 0; !found && index < m_allocs.size(); index++) {
 									final FixedAllocator xfa = m_allocs.get(index);
 									if (xfa.getStartAddr() == nalloc.getStartAddr()) {
 										if (log.isTraceEnabled())
 											log.trace("Found updated allocator at " + index 
-												+ ", size: " + xfa.m_size + " vs " + nalloc.m_size + ", allocated slots: " + xfa.getAllocatedSlots() + " vs " + nalloc.getAllocatedSlots());
+												+ ", size: " + xfa.m_size + " vs " + nalloc.m_size + ", allocated slots: " + (xfa.getAllocatedSlots()/xfa.m_size) + " vs " + (nalloc.getAllocatedSlots()/xfa.m_size));
 										
 										// Compare allocators to see if same
 										found = true;
 										
 										// Replace old with new
 										m_allocs.set(index,  nalloc);
+										nalloc.setIndex(index);
 										
 										// remove old from free list (if set)
 										xfa.removeFromFreeList();
+										
+										// now clear any cached writes now freed
+										totalFreed +=nalloc.removeFreedWrites(xfa, m_externalCache);
 									}
 								}
+								
 								if (!found) {
 									nallocs.add(nalloc);
 								}
@@ -6024,7 +6045,9 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 	    			}
 	    		}
 	    		
+				
 	    		if (log.isTraceEnabled()) {
+					log.trace("Checked freed addresses: " + totalFreed);
 					log.trace("OLD BITS: " + BytesUtil.toHexString(oldmetabits));
 		    		log.trace("NEW BITS: " + BytesUtil.toHexString(m_metaBits));
 		    		log.trace("MODDED BITS: " + BytesUtil.toHexString(moddedBits));
@@ -6076,8 +6099,12 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 					}
 	    		}
 
-				// KICK external cache into touch - FIXME: handle with improved Allocator synchronization
-				m_externalCache.clear();
+	    		if (log.isTraceEnabled())
+	    			log.trace("External Cache Pre Clear Size: " + m_externalCache.size());
+				
+	    		// If FixedAllocator.removeFreedWrites does its job then we do not
+	    		//	need to clear the external cache	    		
+				// m_externalCache.clear();
 				
 				assert m_nextAllocation != 0;
 	    	} finally {

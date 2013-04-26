@@ -34,6 +34,8 @@ import java.io.*;
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.BytesUtil;
+import com.bigdata.cache.ConcurrentWeakValueCache;
+import com.bigdata.journal.ICommitter;
 import com.bigdata.rawstore.IAllocationContext;
 import com.bigdata.rwstore.RWStore.AllocationStats;
 import com.bigdata.rwstore.StorageStats.Bucket;
@@ -1245,6 +1247,55 @@ public class FixedAllocator implements Allocator {
 			
 		}
 		
+	}
+
+	/*
+	 * Checks for allocations committed in xfa that are free in this allocator
+	 * and should be removed from the historical external cache.
+	 */
+	public int removeFreedWrites(final FixedAllocator xfa,
+			final ConcurrentWeakValueCache<Long, ICommitter> externalCache) {
+		// Compare the committed bits in each AllocBlock
+		int count = 0;
+		for (int i = 0; i < m_allocBlocks.size(); i++) {
+			final AllocBlock ab = m_allocBlocks.get(i);
+			final AllocBlock xab = xfa.m_allocBlocks.get(i);
+			// NOTE that absolute bit offsets are bumped by 3 for historical reasons
+			final int blockBitOffset = 3 + (i * xab.m_commit.length * 32);
+			for (int b = 0; b < xab.m_commit.length; b++) {
+				if (xab.m_commit[b] != ab.m_commit[b]) { // some difference
+					// compute those set in xfa not set in ab (removed)
+					final int removed = xab.m_commit[b] & ~ab.m_commit[b];
+					if (removed != 0) { // something to do
+						// need to test each of 32 bits
+						for (int bit = 0; bit < 32; bit++) {
+							if ((removed & (1 << bit)) != 0) {
+								// Test bit calculation
+								final int tstBit = blockBitOffset + (b * 32) + bit;
+								if (!(xfa.isCommitted(tstBit) && !isCommitted(tstBit)))  {
+									log.error("Bit problem: " + tstBit);
+								}
+								
+								final long paddr = xfa.getPhysicalAddress(tstBit);
+								
+								if (log.isTraceEnabled()) {
+									log.trace("Checking address for removal: " + paddr);
+								}
+								
+								count++;
+								
+								externalCache.remove(paddr);
+							}
+						}
+					}
+				}
+			}
+		}
+		
+		if (log.isTraceEnabled())
+			log.trace("FA index: " + m_index + ", freed: " + count);
+		
+		return count;
 	}
 
 }
