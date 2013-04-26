@@ -3417,6 +3417,7 @@ public class AST2BOpUtility extends AST2BOpJoins {
                 new NV(HTreeHashIndexOp.Annotations.RELATION_NAME, new String[]{ctx.getLexiconNamespace()}),//
                 new NV(HTreeHashIndexOp.Annotations.JOIN_TYPE, joinType),//
                 new NV(HTreeHashIndexOp.Annotations.JOIN_VARS, joinVars),//
+                new NV(HTreeHashIndexOp.Annotations.PROJECT_IN_VARS, subgroup.getProjectInVars()),//
                 new NV(HTreeHashIndexOp.Annotations.SELECT, selectVars),//
                 new NV(HTreeHashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
         );
@@ -3430,6 +3431,7 @@ public class AST2BOpUtility extends AST2BOpJoins {
                 new NV(PipelineOp.Annotations.SHARED_STATE, true),// live stats.
                 new NV(JVMHashIndexOp.Annotations.JOIN_TYPE, joinType),//
                 new NV(JVMHashIndexOp.Annotations.JOIN_VARS, joinVars),//
+                new NV(HTreeHashIndexOp.Annotations.PROJECT_IN_VARS, subgroup.getProjectInVars()),//
                 new NV(JVMHashIndexOp.Annotations.SELECT, selectVars),//
                 new NV(JVMHashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
             ); 

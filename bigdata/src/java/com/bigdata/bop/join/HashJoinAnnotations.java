@@ -84,4 +84,13 @@ public interface HashJoinAnnotations {
      */
     long DEFAULT_NO_JOIN_VARS_LIMIT = Long.MAX_VALUE;
     
+
+    /**
+     * The {@link IVariable[]} specifying what variables need to flow into
+     * the right operator of the hash join (i.e. what visible variables inside
+     * the right operator have appeared previously in the query and may be
+     * bound). 
+     */
+    String PROJECT_IN_VARS = HashJoinAnnotations.class.getName() + ".projectInVars";
+    
 }
