@@ -24,7 +24,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 /*
  * Created on Apr 26, 2013
  */
-package com.bigdata.bop.solutions;
+package com.bigdata.bop.join;
 
 import java.util.Arrays;
 import java.util.concurrent.ConcurrentHashMap;
