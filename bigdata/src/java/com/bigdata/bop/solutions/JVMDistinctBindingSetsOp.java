@@ -39,6 +39,7 @@ import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.engine.BOpStats;
+import com.bigdata.bop.join.JVMDistinctFilter;
 import com.bigdata.bop.join.JVMHashJoinUtility;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.striterator.ICloseableIterator;
