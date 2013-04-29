@@ -838,7 +838,7 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
          * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/668" >
          * JoinGroup optimizations </a>
          */
-        final boolean distinct = true;
+        final boolean distinct = false;
         
         final IDistinctFilter distinctFilter;
         
