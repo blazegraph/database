@@ -325,7 +325,7 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
         rightSolutionsRef.set(//
                 new JVMHashIndex(//
                         keyVars,//
-                        !indexSolutionsHavingUnboundJoinVars,//
+                        indexSolutionsHavingUnboundJoinVars,//
                         new LinkedHashMap<Key, Bucket>(op.getProperty(
                                 HashMapAnnotations.INITIAL_CAPACITY,
                                 HashMapAnnotations.DEFAULT_INITIAL_CAPACITY),//
