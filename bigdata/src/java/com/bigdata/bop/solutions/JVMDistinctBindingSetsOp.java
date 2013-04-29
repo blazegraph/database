@@ -23,8 +23,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.bop.solutions;
 
-import java.util.LinkedList;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentMap;
@@ -39,9 +37,11 @@ import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.engine.BOpStats;
+import com.bigdata.bop.join.IDistinctFilter;
 import com.bigdata.bop.join.JVMDistinctFilter;
 import com.bigdata.bop.join.JVMHashJoinUtility;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
+import com.bigdata.relation.accesspath.UnsyncLocalOutputBuffer;
 import com.bigdata.striterator.ICloseableIterator;
 
 /**
@@ -168,13 +168,17 @@ public class JVMDistinctBindingSetsOp extends PipelineOp {
 
         private final BOpContext<IBindingSet> context;
 
-        private final JVMDistinctFilter filter;
+        private final IDistinctFilter filter;
+        
+        private final int chunkCapacity;
         
         DistinctTask(final JVMDistinctBindingSetsOp op,
                 final BOpContext<IBindingSet> context) {
 
             this.context = context;
 
+            this.chunkCapacity = op.getChunkCapacity();
+            
             final IVariable<?>[] vars = op.getVariables();
 
             /*
@@ -186,7 +190,7 @@ public class JVMDistinctBindingSetsOp extends PipelineOp {
                 final IQueryAttributes attribs = context.getRunningQuery()
                         .getAttributes();
 
-                JVMDistinctFilter filter = (JVMDistinctFilter) attribs.get(key);
+                IDistinctFilter filter = (IDistinctFilter) attribs.get(key);
 
                 if (filter == null) {
 
@@ -194,7 +198,7 @@ public class JVMDistinctBindingSetsOp extends PipelineOp {
                             op.getInitialCapacity(), op.getLoadFactor(),
                             op.getConcurrencyLevel());
 
-                    final JVMDistinctFilter tmp = (JVMDistinctFilter) attribs
+                    final IDistinctFilter tmp = (IDistinctFilter) attribs
                             .putIfAbsent(key, filter);
 
                     if (tmp != null)
@@ -212,94 +216,31 @@ public class JVMDistinctBindingSetsOp extends PipelineOp {
 
             final BOpStats stats = context.getStats();
 
-            final ICloseableIterator<IBindingSet[]> itr = context
-                    .getSource();
+            final ICloseableIterator<IBindingSet[]> itr = context.getSource();
 
             final IBlockingBuffer<IBindingSet[]> sink = context.getSink();
 
             try {
 
-                while (itr.hasNext()) {
-                    
-                    final IBindingSet[] a = itr.next();
+                final UnsyncLocalOutputBuffer<IBindingSet> unsyncBuffer = new UnsyncLocalOutputBuffer<IBindingSet>(
+                        chunkCapacity, sink);
 
-                    stats.chunksIn.increment();
-                    stats.unitsIn.add(a.length);
+                filter.filterSolutions(itr, stats, unsyncBuffer);
 
-                    // The distinct solutions accepted from this chunk. 
-                    final List<IBindingSet> accepted = new LinkedList<IBindingSet>();
-
-                    int naccepted = 0;
-
-                    for (IBindingSet bset : a) {
-
-						/*
-						 * Test to see if this solution is distinct from those
-						 * already seen.
-						 */
-                        final IBindingSet tmp = filter.accept2(bset);
-
-                        if (tmp != null) {
-
-                            /*
-                             * This is a distinct solution.
-                             */
-                            
-                            accepted.add(tmp);
-
-                            naccepted++;
-
-                        }
-
-                    }
-
-                    if (naccepted > 0) {
-
-						/*
-						 * At least one solution was accepted as distinct, so
-						 * copy the selected solutions to the output of the
-						 * operator.
-						 */
-                    	
-                        final IBindingSet[] b = accepted
-                                .toArray(new IBindingSet[naccepted]);
-                        
-//                        System.err.println("output: "
-//                                + Arrays.toString(b));
-
-                        // copy the distinct solutions to the output.
-                        sink.add(b);
-
-//                        stats.unitsOut.add(naccepted);
-//                        stats.chunksOut.increment();
-
-                    }
-
-                }
+                unsyncBuffer.flush();
 
                 sink.flush();
 
-                if(context.isLastInvocation()) {
-
-					/*
-					 * Discard the map.
-					 * 
-					 * Note: The map can not be discarded (or cleared) until the
-					 * last invocation. However, we only get the benefit of the
-					 * lastInvocation signal if the operator is single threaded
-					 * and running on the query controller. That is not a
-					 * requirement for this DISTINCT implementation, so the map
-					 * is not going to be cleared until the query goes out of
-					 * scope and is swept by GC.
-					 */
-                    filter.clear();
-
-                }
-                
                 // done.
                 return null;
-                
+
             } finally {
+
+                if (context.isLastInvocation()) {
+
+                    filter.release();
+
+                }
 
                 sink.close();
 

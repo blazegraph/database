@@ -53,7 +53,7 @@ public class HTreeHashIndexOp extends HashIndexOp {
             HTreeHashJoinAnnotations {
 
     }
-
+    
     /**
      * Deep copy constructor.
      */

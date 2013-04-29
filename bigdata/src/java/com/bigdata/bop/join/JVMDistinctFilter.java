@@ -35,6 +35,9 @@ import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.bindingSet.ListBindingSet;
+import com.bigdata.bop.engine.BOpStats;
+import com.bigdata.relation.accesspath.IBuffer;
+import com.bigdata.striterator.ICloseableIterator;
 
 /**
  * Utility class for imposing a DISTINCT filter on {@link IBindingSet}. This
@@ -42,7 +45,7 @@ import com.bigdata.bop.bindingSet.ListBindingSet;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
-public class JVMDistinctFilter {
+public class JVMDistinctFilter implements IDistinctFilter {
     
     private static final Logger log = Logger.getLogger(JVMDistinctFilter.class);
 
@@ -107,7 +110,7 @@ public class JVMDistinctFilter {
      *            The set of variables on which the DISTINCT filter will be
      *            imposed. Only these variables will be present in the
      *            "accepted" solutions. Any variable bindings not specified in
-     *            this array will be dropped).
+     *            this array will be dropped.
      * @param initialCapacity
      * @param loadFactor
      * @param concurrencyLevel
@@ -129,6 +132,23 @@ public class JVMDistinctFilter {
 
     }
 
+    /* (non-Javadoc)
+     * @see com.bigdata.bop.join.IDistinctFilter#clear()
+     */
+    @Override
+    public void release() {
+
+        map.clear();
+
+    }
+
+    @Override
+    public IVariable<?>[] getProjectedVars() {
+
+        return vars;
+        
+    }
+
     /**
      * If the bindings are distinct for the configured variables then return
      * those bindings.
@@ -139,7 +159,7 @@ public class JVMDistinctFilter {
      * @return The distinct as bound values -or- <code>null</code> if the
      *         binding set duplicates a solution which was already accepted.
      */
-    public IConstant<?>[] accept(final IBindingSet bset) {
+    private IConstant<?>[] _accept(final IBindingSet bset) {
 
         final IConstant<?>[] r = new IConstant<?>[vars.length];
 
@@ -168,20 +188,13 @@ public class JVMDistinctFilter {
 
     }
 
-    /**
-     * If the bindings are distinct for the configured variables then return a
-     * new {@link IBindingSet} consisting of only the selected variables.
-     * 
-     * @param bset
-     *            The binding set to be filtered.
-     * 
-     * @return A new {@link IBindingSet} containing only the distinct as bound
-     *         values -or- <code>null</code> if the binding set duplicates a
-     *         solution which was already accepted.
+    /* (non-Javadoc)
+     * @see com.bigdata.bop.join.IDistinctFilter#accept(com.bigdata.bop.IBindingSet)
      */
-    public IBindingSet accept2(final IBindingSet bset) {
+    @Override
+    public IBindingSet accept(final IBindingSet bset) {
 
-        final IConstant<?>[] vals = accept(bset);
+        final IConstant<?>[] vals = _accept(bset);
 
         if (vals == null) {
 
@@ -212,12 +225,44 @@ public class JVMDistinctFilter {
 
     }
 
-    /**
-     * Discard the map backing this filter.
-     */
-    public void clear() {
+    @Override
+    public long filterSolutions(final ICloseableIterator<IBindingSet[]> itr,
+            final BOpStats stats, final IBuffer<IBindingSet> sink) {
 
-        map.clear();
+        long n = 0L;
+
+        while (itr.hasNext()) {
+
+            final IBindingSet[] a = itr.next();
+
+            stats.chunksIn.increment();
+            stats.unitsIn.add(a.length);
+
+            for (IBindingSet bset : a) {
+
+                /*
+                 * Test to see if this solution is distinct from those already
+                 * seen.
+                 */
+                if ((bset = accept(bset)) == null) {
+
+                    // Drop duplicate solution.
+                    continue;
+                }
+
+                /*
+                 * This is a distinct solution.
+                 */
+
+                sink.add(bset);
+
+                n++;
+
+            }
+
+        } // next chunk.
+
+        return n;
 
     }
 
