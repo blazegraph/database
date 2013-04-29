@@ -32,7 +32,6 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -44,13 +43,13 @@ import com.bigdata.bop.Constant;
 import com.bigdata.bop.HTreeAnnotations;
 import com.bigdata.bop.HashMapAnnotations;
 import com.bigdata.bop.IBindingSet;
-import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.engine.BOpStats;
-import com.bigdata.bop.join.JVMHashJoinUtility.JVMHashIndex.Bucket;
-import com.bigdata.bop.join.JVMHashJoinUtility.JVMHashIndex.SolutionHit;
+import com.bigdata.bop.join.JVMHashIndex.Bucket;
+import com.bigdata.bop.join.JVMHashIndex.Key;
+import com.bigdata.bop.join.JVMHashIndex.SolutionHit;
 import com.bigdata.counters.CAT;
 import com.bigdata.htree.HTree;
 import com.bigdata.rdf.internal.impl.literal.XSDBooleanIV;
@@ -74,523 +73,7 @@ import cutthecrap.utils.striterators.Visitor;
 public class JVMHashJoinUtility implements IHashJoinUtility {
 
     private static final Logger log = Logger.getLogger(JVMHashJoinUtility.class);
-    
-    public static class JVMHashIndex {
 
-        /**
-         * Note: If joinVars is an empty array, then the solutions will all hash to
-         * ONE (1).
-         */
-        private static final int ONE = 1;
-        
-        /**
-         * Return the hash code which will be used as the key given the ordered
-         * as-bound values for the join variables.
-         * 
-         * @param joinVars
-         *            The join variables.
-         * @param bset
-         *            The bindings whose as-bound hash code for the join variables
-         *            will be computed.
-         * @param ignoreUnboundVariables
-         *            If a variable without a binding should be silently ignored.
-         * 
-         * @return The hash code.
-         * 
-         * @throws JoinVariableNotBoundException
-         *             if there is no binding for a join variable.
-         */
-        private static int hashCode(final IVariable<?>[] joinVars,
-                final IBindingSet bset, final boolean ignoreUnboundVariables)
-                throws JoinVariableNotBoundException {
-
-            int h = ONE;
-
-            for (IVariable<?> v : joinVars) {
-
-                final IConstant<?> c = bset.get(v);
-
-                if (c == null) {
-
-                    if(ignoreUnboundVariables)
-                        continue;
-
-                    // Reject any solution which does not have a binding for a join
-                    // variable.
-
-                    throw new JoinVariableNotBoundException(v.getName());
-                    
-                }
-
-                h = 31 * h + c.hashCode();
-                
-            }
-            
-            if (log.isTraceEnabled())
-                log.trace("hashCode=" + h + ", joinVars="
-                        + Arrays.toString(joinVars) + " : " + bset);
-
-            return h;
-
-        }
-
-       
-        /**
-         * Return an array of constants corresponding to the as-bound values of the
-         * join variables for the given solution.
-         * 
-         * @param joinVars
-         *            The join variables.
-         * @param bset
-         *            The solution.
-         * @param optional
-         *            <code>true</code> iff the hash join is optional.
-         * 
-         * @return The as-bound values for the join variables for that solution. 
-         */
-        static private Key makeKey(final IVariable<?>[] joinVars,
-                final IBindingSet bset, final boolean optional) {
-
-            final IConstant<?>[] vals = new IConstant<?>[joinVars.length];
-
-            for (int i = 0; i < joinVars.length; i++) {
-
-                final IVariable<?> v = joinVars[i];
-
-                vals[i] = bset.get(v);
-
-            }
-
-            int hashCode = ONE;
-            try {
-
-                /*
-                 * Note: The original version of this class always throws an
-                 * exception for an unbound join variable out of its hashCode() impl
-                 * and then handles that exception here.
-                 */
-                
-                hashCode = hashCode(joinVars, bset, false/* ignoreUnboundVariables */);
-
-            } catch (JoinVariableNotBoundException ex) {
-                
-                if (!optional) {
-                    
-                    // Drop solution;
-                    
-                    if (log.isDebugEnabled())
-                        log.debug(ex);
-
-                    return null;
-
-                }
-
-            }
-            
-            return new Key(hashCode, vals);
-
-        }
-
-        /**
-         * Wrapper for the keys in the hash table. This is necessary for the hash
-         * table to compare the keys as equal and also provides a efficiencies in
-         * the hash code and equals() methods.
-         */
-        static class Key {
-            
-            private final int hash;
-
-            private final IConstant<?>[] vals;
-
-            private Key(final int hashCode, final IConstant<?>[] vals) {
-                this.vals = vals;
-                this.hash = hashCode;
-            }
-
-            public int hashCode() {
-                return hash;
-            }
-
-            public boolean equals(final Object o) {
-                if (this == o)
-                    return true;
-                if (!(o instanceof Key)) {
-                    return false;
-                }
-                final Key t = (Key) o;
-                if (vals.length != t.vals.length)
-                    return false;
-                for (int i = 0; i < vals.length; i++) {
-                    if (vals[i] == t.vals[i])
-                        continue;
-                    if (vals[i] == null)
-                        return false;
-                    if (!vals[i].equals(t.vals[i]))
-                        return false;
-                }
-                return true;
-            }
-        }
-        
-        /**
-         * An input solution and a hit counter.
-         */
-        public static class SolutionHit {
-
-            /**
-             * The input solution.
-             */
-            final public IBindingSet solution;
-
-            /**
-             * The #of hits on that input solution when processing the join against
-             * the subquery.
-             */
-            public final CAT nhits = new CAT();
-            
-            private SolutionHit(final IBindingSet solution) {
-                
-                if(solution == null)
-                    throw new IllegalArgumentException();
-                
-                this.solution = solution;
-                
-            }
-            
-            public String toString() {
-
-                return getClass().getName() + "{nhits=" + nhits + ",solution="
-                        + solution + "}";
-
-            }
-            
-        } // class SolutionHit
-
-        /**
-         * A group of solutions having the same as-bound values for their join vars.
-         * Each solution is paired with a hit counter so we can support OPTIONAL
-         * semantics for the join.
-         */
-        public static class Bucket implements Iterable<SolutionHit>,
-                Comparable<Bucket> {
-
-            /** The hash code for this collision bucket. */
-            private final int hashCode;
-            
-            /**
-             * A set of solutions (and their hit counters) which have the same
-             * as-bound values for the join variables.
-             */
-            private final List<SolutionHit> solutions = new LinkedList<SolutionHit>(); 
-
-            public String toString() {
-                return super.toString()
-                        + //
-                        "{hashCode=" + hashCode + ",#solutions=" + solutions.size()
-                        + "}";
-            }
-            
-            public Bucket(final int hashCode, final IBindingSet solution) {
-
-                this.hashCode = hashCode;
-                
-                add(solution);
-                
-            }
-
-            public void add(final IBindingSet solution) {
-             
-                if (solution == null)
-                    throw new IllegalArgumentException();
-                
-                solutions.add(new SolutionHit(solution));
-                
-            }
-            
-            /**
-             * Add the solution to the bucket iff the solutions is not already
-             * present in the bucket.
-             * <p>
-             * Note: There is already a hash index in place on the join variables
-             * when we are doing a DISTINCT filter. Further, only the "join"
-             * variables are "selected" and participate in a DISTINCT filter.
-             * Therefore, if we have a hash collision such that two solutions would
-             * be directed into the same {@link Bucket} then we can not improve
-             * matters but must simply scan the solutions in the bucket to decide
-             * whether the new solution duplicates a solution which is already
-             * present.
-             * 
-             * @param solution
-             *            The solution.
-             * 
-             * @return <code>true</code> iff the bucket was modified by this
-             *         operation.
-             */
-            public boolean addDistinct(final IBindingSet solution) {
-
-                if(solutions.isEmpty()) {
-
-                    // First solution.
-                    solutions.add(new SolutionHit(solution));
-                    
-                    return true;
-                    
-                }
-
-                final Iterator<SolutionHit> itr = solutions.iterator();
-                
-                while(itr.hasNext()) {
-                    
-                    final SolutionHit aSolution = itr.next();
-                    
-                    if(aSolution.solution.equals(solution)) {
-                        
-                        // Solution already in this bucket.
-                        return false;
-                        
-                    }
-                    
-                }
-                
-                // This is a distinct solution.
-                solutions.add(new SolutionHit(solution));
-                
-                return true;
-                
-            }
-            
-            public Iterator<SolutionHit> iterator() {
-                
-//                return Collections.unmodifiableList(solutions).iterator();
-                return solutions.iterator();
-                
-            }
-
-//            @SuppressWarnings("unchecked")
-//            public Iterator<IBindingSet> bindingSetIterator() {
-//                
-//                return new Striterator(solutions.iterator()).addFilter(new Resolver() {
-//                    
-//                    @Override
-//                    protected Object resolve(Object obj) {
-//                        return ((SolutionHit)obj).solution;
-//                    }
-//                });
-//                
-//            }
-
-            /**
-             * Orders the buckets based on their hash codes.
-             */
-            @Override
-            public int compareTo(final Bucket o) {
-                if (hashCode > o.hashCode)
-                    return 1;
-                if (hashCode < o.hashCode)
-                    return -1;
-                return 0;
-            }
-
-        } // Bucket
-
-        /**
-         * The backing map - this is NOT thread safe.
-         */
-        private final Map<Key, Bucket> map;
-        private final IVariable<?>[] joinVars;
-//        private final boolean optional;
-
-        public JVMHashIndex(final int initialCapacity, final float loadFactor,
-                final IVariable<?>[] joinVars) {//, final boolean optional) {
-
-            if (joinVars == null) {
-                /*
-                 * A ZERO LENGTH joinVars[] means that all solutions will be in
-                 * the same hash bucket. This can arise due to poor assignment
-                 * of join variables or simply because there are no available
-                 * join variables (full cross product join). Such joins are very
-                 * expensive.
-                 */
-                throw new IllegalArgumentException();
-            }
-            
-            this.map = new LinkedHashMap<Key, Bucket>(initialCapacity,
-                    loadFactor);
-
-            this.joinVars = joinVars;
-
-            /*
-             * TOOD Can we pass this in and remove it from the API? But see
-             * filterDistinct().
-             */
-//            this.optional = optional;
-
-        }
-
-        /**
-         * Add the solution to the index.
-         * 
-         * @param bset
-         *            The {@link IBindingSet}.
-         * @param optional
-         * 
-         * @return The {@link Key} iff the solution was added to the index and
-         *         <code>null</code> iff the solution was not added (because a
-         *         {@link Key} could not be formed for the solution given the
-         *         specified {@link #joinVars}).
-         * 
-         *         TODO javadoc on OPTIONAL
-         */
-        public Key add(final IBindingSet bset,final boolean optional) {
-
-            final Key key = makeKey(joinVars, bset, optional);
-
-            if (key == null) {
-
-                // Drop solution.
-                return null;
-                
-            }
-
-            Bucket b = map.get(key);
-
-            if (b == null) {
-
-                map.put(key, b = new Bucket(key.hash, bset));
-
-            } else {
-
-                b.add(bset);
-
-            }
-
-            return key;
-            
-        }
-        
-        /**
-         * Add the solution to the index iff the solution is not already present
-         * in the index.
-         * 
-         * @param solution
-         *            The solution.
-         * 
-         * @return <code>true</code> iff the index was modified by this
-         *         operation.
-         */
-        public boolean addDistinct(final IBindingSet bset) {
-
-            // TODO Review why optional:=true here.
-            final Key key = makeKey(joinVars, bset, true/* optional */);
-
-            assert key != null;
-
-            Bucket b = map.get(key);
-
-            if (b == null) {
-
-                // New bucket holding just this solution.
-                map.put(key, b = new Bucket(key.hash, bset));
-
-                return true;
-
-            } else {
-
-                if (b.addDistinct(bset)) {
-
-                    // Existing bucket not having this solution.
-                    return true;
-
-                }
-
-                // Existing bucket with duplicate solution.
-                return false;
-
-            }
-
-        }
-
-        /**
-         * Return the hash {@link Bucket} into which the given solution is mapped.
-         * <p>
-         * Note: The caller must apply an appropriate join constraint in order
-         * to correctly reject solutions that (a) violate the join contract; and
-         * (b) that are present in the hash bucket due to a hash collection
-         * rather than because they have the same bindings for the join
-         * variables.
-         * 
-         * @param left
-         *            The probe.
-         * @param optional
-         * 
-         * @return The hash {@link Bucket} into which the given solution is
-         *         mapped -or- <code>null</code> if there is no such hash
-         *         bucket.
-         * 
-         *         TODO javadoc [optional].
-         */
-        public Bucket getBucket(final IBindingSet left, final boolean optional) {
-
-            final Key key = makeKey(joinVars, left, optional);
-
-            if (key == null) {
-
-                return null;
-
-            }
-
-            // Probe the hash map : May return [null]!
-            return map.get(key);
-
-        }
-
-        /**
-         * Visit all buckets in the hash index.
-         */
-        public Iterator<Bucket> buckets() {
-            
-            return map.values().iterator();
-            
-        }
-        
-        /**
-         * The #of buckets in the hash index. Each bucket has a distinct hash
-         * code. Hash collisions can cause solutions that are distinct in their
-         * {@link #joinVars} to nevertheless be mapped into the same hash
-         * bucket.
-         * 
-         * @return The #of buckets in the hash index.
-         */
-        public int bucketCount() {
-            
-            return map.size();
-            
-        }
-        
-        /**
-         * Export the {@link Bucket}s as an array.
-         */
-        public Bucket[] toArray() {
-
-            // source.
-            final Iterator<Bucket> bucketIterator = map.values().iterator();
-
-            final Bucket[] a = new Bucket[map.size()];
-
-            int i = 0;
-
-            while (bucketIterator.hasNext()) {
-
-                a[i++] = bucketIterator.next();
-
-            }
-
-            return a;
-
-        }
-
-    }
-    
     /**
      * <code>true</code> until the state is discarded by {@link #release()}.
      */
@@ -609,15 +92,21 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
      */
     private final JoinTypeEnum joinType;
     
-    /**
-     * <code>true</code> iff the join is OPTIONAL.
-     */
-    private final boolean optional;
-    
-    /**
-     * <code>true</code> iff this is a DISTINCT filter.
-     */
-    private final boolean filter;
+//    /**
+//     * <code>true</code> iff the join is OPTIONAL.
+//     */
+//    private final boolean optional;
+//    
+//    /**
+//     * <code>true</code> iff this is a DISTINCT filter.
+//     */
+//    private final boolean filter;
+//    
+//    /**
+//     * <code>true</code> iff a solution having an unbound {@link #joinVars}
+//     * should be dropped and <code>false</code> if it should be indexed anyway.
+//     */
+//    private final boolean dropSolutionsHavingUnboundJoinVars;
 
     /**
      * @see HashJoinAnnotations#ASK_VAR
@@ -701,6 +190,8 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
         if (askVar != null)
             sb.append(",askVar=" + askVar);
         sb.append(",joinVars=" + Arrays.toString(joinVars));
+        if (projectedInVars != null)
+            sb.append(",projectedInVars=" + Arrays.toString(projectedInVars));
         if (selectVars != null)
             sb.append(",selectVars=" + Arrays.toString(selectVars));
         if (constraints != null)
@@ -727,8 +218,6 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
      * @see JVMHashJoinAnnotations
      */
     public JVMHashJoinUtility(final PipelineOp op, final JoinTypeEnum joinType) {
-//            final boolean optional,
-//            final boolean filter) {
 
         if (op == null)
             throw new IllegalArgumentException();
@@ -738,8 +227,42 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
         
         this.op = op;
         this.joinType = joinType;
-        this.optional = joinType == JoinTypeEnum.Optional;
-        this.filter = joinType == JoinTypeEnum.Filter;
+        /*
+         * Note: This flag needs to be [true] if we allow solutions to be stored
+         * in the hash index that have unbound variables for the "joinVars". We
+         * do this for OPTIONAL because all solutions must be indexed for an
+         * OPTIONAL join since solutions that do not join will be reported.
+         * 
+         * A DISTINCT FILTER does this as well. This is because "joinVars" is
+         * really the list of projected variables for a SELECT DISTINCT for a
+         * DISTINCT FILTER.
+         * 
+         * By this reasoning, we should also do this for MINUS/NOT EXISTS. That
+         * is, for everything except a NORMAL and EXISTS joins.
+         * 
+         * This suggests a historical bug (fixed below) in MINUS / NOT EXISTS
+         * handling.
+         * 
+         * TODO Write a unit test for that bug involving a source solution with
+         * an unbound join variable and see whether the solution is dropped or
+         * reported (I believe that it should be reported).
+         */
+//        final boolean optional = joinType == JoinTypeEnum.Optional;
+        final boolean filter = joinType == JoinTypeEnum.Filter;
+        final boolean indexSolutionsHavingUnboundJoinVars;
+        switch(joinType) {
+        case Normal:
+        case Exists:
+            indexSolutionsHavingUnboundJoinVars = false;
+            break;
+        case Optional:  // OPTIONAL join.
+        case NotExists: // NOT EXISTS and MINUS
+        case Filter:    // SELECT DISTINCT
+            indexSolutionsHavingUnboundJoinVars = true;
+            break;
+        default:
+            throw new UnsupportedOperationException();
+        }
 
         // Optional variable used for (NOT) EXISTS.
         this.askVar = (IVariable<?>) op
@@ -773,34 +296,44 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
 //        this.filter = filter;
 
         /*
-         * TODO Parameter for LinkedHashMap versus HashMap. HashMap is going to
-         * be faster for insert and search. LinkedHashMap will be faster for the
-         * iterator. Some join patterns do not require us to use an iterator at
-         * all, in which case HashMap is the clear winner. (For example, a
-         * non-optional hash join against an access path never uses the iterator
-         * over the hash index.)
+         * TODO Parameter for the map implementation class.
          * 
-         * TODO There is an opportunity for CONCURRENT hash map for at least the
-         * DISTINCT SOLUTIONS filter and perhaps for others as well. However, to
-         * do this with the DISTINCT SOLUTIONS filter we would have to make the
-         * mutation operations on a Bucket atomic. E.g., using the synchronized
-         * keyword. This would give us what amounts to per-hash code striped
-         * locks.
+         * - HashMap is going to be faster for insert and search.
          * 
-         * Note: the JVMDistinctBindingSetsOp does not use this class right now
-         * because it enjoys better concurrency than the JVMHashJoinUtility.
-         * Also see JVMDistinctFilter, which is the backing implementation for
-         * the JVMDistinctBindingSetsOp.
+         * - LinkedHashMap will be faster for the iterator.
+         * 
+         * - ConcurrentHashMap will be faster if (a) the JVMHashIndex is safe
+         * for concurrent inserts; and (b) the JVMHashIndexOp is safe for
+         * concurrent execution.  [These conditions are not currently true.]
+         * 
+         * Some join patterns do not require us to use an iterator at all, in
+         * which case HashMap is the clear winner. (For example, a non-optional
+         * hash join against an access path never uses the iterator over the
+         * hash index.)
          */
-        rightSolutionsRef.set(new JVMHashIndex(//
-                op.getProperty(HashMapAnnotations.INITIAL_CAPACITY,
-                        HashMapAnnotations.DEFAULT_INITIAL_CAPACITY),//
-                op.getProperty(HashMapAnnotations.LOAD_FACTOR,
-                        HashMapAnnotations.DEFAULT_LOAD_FACTOR),//
-                        joinVars//
-//                        optional//
+
+        /*
+         * The ordered variables for the keys in the hash index.
+         * 
+         * For SELECT DISTINCT, use the [select] variables.
+         * 
+         * Otherwise use the [joinVars].
+         */
+        final IVariable<?>[] keyVars = filter ? (IVariable<?>[]) op
+                .getProperty(JoinAnnotations.SELECT) : joinVars;
+                
+        rightSolutionsRef.set(//
+                new JVMHashIndex(//
+                        keyVars,//
+                        !indexSolutionsHavingUnboundJoinVars,//
+                        new LinkedHashMap<Key, Bucket>(op.getProperty(
+                                HashMapAnnotations.INITIAL_CAPACITY,
+                                HashMapAnnotations.DEFAULT_INITIAL_CAPACITY),//
+                                op.getProperty(HashMapAnnotations.LOAD_FACTOR,
+                                        HashMapAnnotations.DEFAULT_LOAD_FACTOR)//
+                        )//
                 ));
-        
+
     }
     
     public JoinTypeEnum getJoinType() {
@@ -877,7 +410,7 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
 
             for (IBindingSet bset : all) {
 
-                if (index.add(bset, optional) == null) {
+                if (index.add(bset) == null) {
 
                     continue;
 
@@ -905,14 +438,9 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
     }
 
     /*
-     * FIXME I have observed two apparent bugs in this class. First, it was not
-     * assigning the output of [bset.copy(joinVars)] back to bset. Second, it
-     * was failing to output the first solution in a given bucket. I suspect
-     * that nobody is calling this code and that the JVMDistinctBindingSetOp is
-     * being used instead (which is a better choice since it allows full
-     * concurrency) - I have verified this.  This method is not called. We might
-     * use the method by the same name on the HTreeHashJoinUtility, but not this
-     * version.
+     * Note: This implementation is not used. The JVMDistinctFilter is based on
+     * a ConcurrenthashMap and provides better throughput. For this reason, the
+     * JVMDistinctFilter is is used by the JVMDistinctBindingSetsOp.
      */
     @Override
     public long filterSolutions(final ICloseableIterator<IBindingSet[]> itr,
@@ -1017,8 +545,7 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
                 if (log.isDebugEnabled())
                     log.debug("Considering " + left);
 
-                final Bucket bucket = rightSolutions.getBucket(
-                        left, optional);
+                final Bucket bucket = rightSolutions.getBucket(left);
 
                 if (bucket == null)
                     continue;
@@ -1308,21 +835,12 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
          * Note: This should be set by the HashIndexOp (or passed in through the
          * interface).
          * 
-         * Note: Enabling this causes failures. See the ticket below. I suspect
-         * that these failures are related to underproducing solutions, but some
-         * of them might also be related to a failure to produce the correct set
-         * of variables for [projectedInVars].
-         * 
-         * TODO I have factored out the JVMHashIndex class. This class tracks
-         * the #of hits for each distinct solution. We can use this to correct
-         * the output cardinality.
-         * 
          * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/668" >
          * JoinGroup optimizations </a>
          */
-        final boolean distinct = false;
+        final boolean distinct = true;
         
-        final JVMDistinctFilter distinctFilter;
+        final IDistinctFilter distinctFilter;
         
         if (distinct && projectedInVars != null && projectedInVars.length > 0) {
 
@@ -1352,89 +870,43 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
         
         try {
 
-//            if (true) {
-//
-//          /*
-//          * Code works, uses Striterator pattern.
-//          *
-//                 * The selected variables -or- <code>null</code> if all
-//                 * variables should be projected.
-//                 */
-//                final IVariable<?>[] selected = getSelectVars();
-//                
-//                final ICloseableIterator<IBindingSet> itr = indexScan();
-//
-//                try {
-//
-//                    while (itr.hasNext()) {
-//
-//                        IBindingSet bs = itr.next();
-//
-//                        if (selected != null) {
-//
-//                            // Drop variables which are not projected.
-//                            bs = bs.copy(selected);
-//
-//                        }
-//                        
-//                        out.add(bs);
-//
-//                        if (log.isDebugEnabled())
-//                            log.debug("Output solution: " + bs);
-//
-//                    }
-//
-//                } finally {
-//
-//                    itr.close();
-//
-//                }
-//
-//            } else {
+            final JVMHashIndex rightSolutions = getRightSolutions();
 
-                /*
-                 * Code works, uses nested iterators pattern.
-                 */
-            
-                final JVMHashIndex rightSolutions = getRightSolutions();
+            final IVariable<?>[] selected = getSelectVars();
 
-                final IVariable<?>[] selected = getSelectVars();
+            if (log.isInfoEnabled())
+                log.info("rightSolutions: #buckets="
+                        + rightSolutions.bucketCount());
 
-                if (log.isInfoEnabled())
-                    log.info("rightSolutions: #buckets="
-                            + rightSolutions.bucketCount());
+            // source.
+            final Iterator<Bucket> bucketIterator = rightSolutions.buckets();
 
-                // source.
-                final Iterator<Bucket> bucketIterator = rightSolutions.
-                        buckets();
+            while (bucketIterator.hasNext()) {
 
-                while (bucketIterator.hasNext()) {
+                final Bucket bucket = bucketIterator.next();
 
-                    final Bucket bucket = bucketIterator.next();
+                for (SolutionHit solutionHit : bucket) {
 
-                    for (SolutionHit solutionHit : bucket) {
+                    IBindingSet bs = solutionHit.solution;
 
-                        IBindingSet bs = solutionHit.solution;
+                    if (distinctFilter != null) {
 
-                        if (distinctFilter != null) {
+                        /*
+                         * Note: The DISTINCT filter is based on the variables
+                         * that are projected INTO the child join group.
+                         * However, those are NOT always the same as the
+                         * variables that are projected OUT of the child join
+                         * group, so we need to
+                         */
 
-                            /*
-                             * Note: The DISTINCT filter is based on the
-                             * variables that are projected INTO the child
-                             * join group.  However, those are NOT always
-                             * the same as the variables that are projected
-                             * OUT of the child join group, so we need to
-                             * 
-                             */
-                            
-                            if ((bs = distinctFilter.accept2(bs)) == null) {
+                        if ((bs = distinctFilter.accept(bs)) == null) {
 
-                                // Drop duplicate solutions.
-                                continue;
-                                
-                            }
+                            // Drop duplicate solutions.
+                            continue;
 
-                        } else if (selected != null) {
+                        }
+
+                    } else if (selected != null) {
 
                         /*
                          * FIXME We should be using projectedInVars here since
@@ -1443,22 +915,20 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
                          * joins, but there might be exceptions for joining with
                          * a named solution set).
                          */
-                            
-                            // Drop variables which are not projected.
-                            bs = bs.copy(selected);
 
-                        }
-
-                        out.add(bs);
-
-                        if (log.isDebugEnabled())
-                            log.debug("Output solution: " + bs);
+                        // Drop variables which are not projected.
+                        bs = bs.copy(selected);
 
                     }
 
+                    out.add(bs);
+
+                    if (log.isDebugEnabled())
+                        log.debug("Output solution: " + bs);
+
                 }
 
-//            }
+            }
 
         } catch (Throwable t) {
             
@@ -1607,7 +1077,7 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
 
         // The next collision bucket in hash code order from the 1st source.
         final Bucket firstBucket = sortedSourceBuckets[0][sourceIndex[0]];
-        final int hashCode = firstBucket.hashCode;
+        final int hashCode = firstBucket.hashCode();
         currentBucket[0] = firstBucket;
 
         for (int i = 1; i < sourceIndex.length; i++) {
@@ -1636,7 +1106,7 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
                 	break;
                 }
                 
-                if (otherBucket.hashCode < hashCode) {
+                if (otherBucket.hashCode() < hashCode) {
 
                     sourceIndex[i]++;
 
@@ -1644,7 +1114,7 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
 
                 }
 
-                if (otherBucket.hashCode > hashCode) {
+                if (otherBucket.hashCode() > hashCode) {
 
                     if (!optional) {
 
@@ -1834,15 +1304,14 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
 			}
 
 			// Must be the same hash code.
-			assert firstBucket.hashCode == otherBucket.hashCode;
+			assert firstBucket.hashCode() == otherBucket.hashCode();
 
 		}
 
 		final SolutionHit[] set = new SolutionHit[nsources];
 		
-		final Striterator sols1 = new Striterator(firstBucket.solutions
-				.listIterator());
-		
+		final Striterator sols1 = new Striterator(firstBucket.iterator());
+
 		sols1.addFilter(new Visitor() {
             private static final long serialVersionUID = 1L;
             @Override
@@ -1860,7 +1329,7 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
 			
 			// if optional then if there are no solutions don't try and
 			// expand further
-			if (!(optional && (otherBucket == null || otherBucket.solutions.isEmpty()))) {
+			if (!(optional && (otherBucket == null || otherBucket.isEmpty()))) {
 				sols1.addFilter(new Expander() {
                     private static final long serialVersionUID = 1L;
                     @Override

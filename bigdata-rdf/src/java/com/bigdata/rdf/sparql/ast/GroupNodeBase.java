@@ -256,6 +256,22 @@ public abstract class GroupNodeBase<E extends IGroupMemberNode> extends
             }
             
         }
+        
+        if (this instanceof GraphPatternGroup) {
+
+            final GraphPatternGroup<?> t = (GraphPatternGroup<?>) this;
+
+            final IVariable<?>[] joinVars = t.getJoinVars();
+
+            if (joinVars != null)
+                sb.append(" [joinVars=" + joinVars + "]");
+
+            final IVariable<?>[] projectInVars = t.getProjectInVars();
+
+            if (projectInVars != null)
+                sb.append(" [projectInVars=" + projectInVars + "]");
+
+        }
 
         sb.append(" {");
 

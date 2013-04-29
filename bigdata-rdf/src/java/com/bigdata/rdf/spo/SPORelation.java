@@ -1660,14 +1660,14 @@ public class SPORelation extends AbstractRelation<ISPO> {
      * 
      * @param keyOrder
      *            The selected index order.
-     * @param filter
-     *            An optional filter on the visited {@link IV}s.
      * @param fromKey
      *            The first key for the scan -or- <code>null</code> to start the
      *            scan at the head of the index.
      * @param toKey
      *            The last key (exclusive upper bound) for the scan -or-
      *            <code>null</code> to scan until the end of the index.
+     * @param termIdFilter
+     *            An optional filter on the visited {@link IV}s.
      * 
      * @return An iterator visiting the distinct term identifiers.
      * 

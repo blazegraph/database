@@ -114,8 +114,7 @@ abstract public class HashIndexOp extends PipelineOp {
      * @param args
      * @param annotations
      */
-    public HashIndexOp(final BOp[] args,
-            final Map<String, Object> annotations) {
+    public HashIndexOp(final BOp[] args, final Map<String, Object> annotations) {
 
         super(args, annotations);
 
