@@ -169,6 +169,8 @@ public class JVMHashIndex {
 
                 }
 
+                continue;
+                
             }
 
             h = 31 * h + c.hashCode();
