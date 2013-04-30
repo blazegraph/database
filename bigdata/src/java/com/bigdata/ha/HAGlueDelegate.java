@@ -69,6 +69,8 @@ import com.bigdata.quorum.QuorumException;
  * Delegation pattern.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * 
+ * @deprecated No longer used.
  */
 public class HAGlueDelegate implements HAGlue {
 

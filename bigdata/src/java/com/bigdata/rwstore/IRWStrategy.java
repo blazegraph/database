@@ -38,7 +38,11 @@ public interface IRWStrategy extends IBufferStrategy, IAllocationManager,
     
     /**
      * Called post commit to dispose any transient commit state retained to
-     * support reset/rollback
+     * support reset/rollback.
+     * <p>
+     * Note: It is the responsibility of the commit protocol layers to wind up
+     * calling {@link IBufferStrategy#abort()} if there is a failure during the
+     * commit protocol.
      */
     public void postCommit();
     
