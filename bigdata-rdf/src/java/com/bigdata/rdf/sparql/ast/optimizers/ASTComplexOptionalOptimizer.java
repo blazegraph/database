@@ -133,6 +133,11 @@ public class ASTComplexOptionalOptimizer implements IASTOptimizer {
 
 //    private static final Logger log = Logger
 //            .getLogger(ASTComplexOptionalOptimizer.class);
+	
+	/**
+	 * Set this to false to only optimize the top level group.
+	 */
+	private static boolean recurse = true;
     
     @Override
     public IQueryNode optimize(final AST2BOpContext context,
@@ -201,8 +206,12 @@ public class ASTComplexOptionalOptimizer implements IASTOptimizer {
                 @SuppressWarnings("unchecked")
                 final GraphPatternGroup<IGroupMemberNode> childGroup = (GraphPatternGroup<IGroupMemberNode>) child;
 
-                convertComplexOptionalGroups(context, sa, query, childGroup,
-                        exogenousVars);
+                if (recurse) {
+                
+	                convertComplexOptionalGroups(context, sa, query, childGroup,
+	                        exogenousVars);
+	                
+                }
 
                 if (childGroup.isOptional()
                         && (!(childGroup.arity() == 1 && childGroup.get(0) instanceof NamedSubqueryInclude))) {
@@ -223,8 +232,12 @@ public class ASTComplexOptionalOptimizer implements IASTOptimizer {
 
                 final SubqueryRoot subqueryRoot = (SubqueryRoot) child;
 
-                convertComplexOptionalGroups(context, sa, query,
-                        subqueryRoot.getWhereClause(), exogenousVars);
+                if (recurse) {
+                
+	                convertComplexOptionalGroups(context, sa, query,
+	                        subqueryRoot.getWhereClause(), exogenousVars);
+	                
+                }
 
             }
 
