@@ -28,11 +28,12 @@ import java.io.FileFilter;
 import java.io.FileNotFoundException;
 import java.io.FilenameFilter;
 import java.io.IOException;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
 import java.net.InetSocketAddress;
 import java.net.URL;
 import java.nio.ByteBuffer;
 import java.rmi.Remote;
-import java.rmi.RemoteException;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -54,7 +55,6 @@ import net.jini.core.lookup.ServiceItem;
 import net.jini.core.lookup.ServiceRegistrar;
 
 import org.apache.log4j.Logger;
-import org.apache.log4j.MDC;
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.KeeperException.NodeExistsException;
 import org.apache.zookeeper.data.ACL;
@@ -62,11 +62,9 @@ import org.eclipse.jetty.server.Server;
 
 import com.bigdata.concurrent.FutureTaskMon;
 import com.bigdata.ha.HAGlue;
-import com.bigdata.ha.HAGlueDelegate;
 import com.bigdata.ha.HAPipelineGlue;
 import com.bigdata.ha.QuorumService;
 import com.bigdata.ha.QuorumServiceBase;
-import com.bigdata.ha.RunState;
 import com.bigdata.ha.halog.HALogWriter;
 import com.bigdata.ha.halog.IHALogReader;
 import com.bigdata.ha.msg.HALogRequest;
@@ -102,8 +100,6 @@ import com.bigdata.rdf.sail.webapp.NanoSparqlServer;
 import com.bigdata.rwstore.RWStore;
 import com.bigdata.service.AbstractHATransactionService;
 import com.bigdata.service.jini.FakeLifeCycle;
-import com.bigdata.service.jini.RemoteAdministrable;
-import com.bigdata.service.jini.RemoteDestroyAdmin;
 import com.bigdata.util.InnerCause;
 import com.bigdata.util.concurrent.LatchedExecutor;
 import com.bigdata.util.concurrent.MonitoredFutureTask;
@@ -299,6 +295,13 @@ public class HAJournalServer extends AbstractServer {
 
         IRestorePolicy DEFAULT_RESTORE_POLICY = new DefaultRestorePolicy();
 
+        /**
+         * Permit override of the {@link HAJournal} implementation class.
+         */
+        String HA_JOURNAL_CLASS = "HAJournalClass";
+
+        String DEFAULT_HA_JOURNAL_CLASS = HAJournal.class.getName();
+
     }
     
     /**
@@ -384,7 +387,7 @@ public class HAJournalServer extends AbstractServer {
      * Enum of the run states. The states are labeled by the goal of the run
      * state.
      */
-    private enum RunStateEnum {
+    static enum RunStateEnum {
         Restore, // apply local HALog files GT current commit point.
         SeekConsensus, // seek consensus.
         RunMet, // run while joined with met quorum.
@@ -553,7 +556,7 @@ public class HAJournalServer extends AbstractServer {
             }
 
             // The HAJournal.
-            this.journal = new HAJournal(this, config, quorum);
+            this.journal = newHAJournal(this, config, quorum);
             
         }
 
@@ -564,12 +567,90 @@ public class HAJournalServer extends AbstractServer {
         // our external interface.
         haGlueService = journal.newHAGlue(serviceUUID);
 
-        // wrap the external interface, exposing administrative functions.
-        final AdministrableHAGlueService administrableService = new AdministrableHAGlueService(
-                this, haGlueService);
+//        // wrap the external interface, exposing administrative functions.
+//        final AdministrableHAGlueService administrableService = new AdministrableHAGlueService(
+//                this, haGlueService);
+//
+//        // return that wrapped interface.
+//        return administrableService;
 
-        // return that wrapped interface.
-        return administrableService;
+        /*
+         * Return that object. This will get proxied. If we wrap it with a
+         * delegation pattern here, then RMI methods on a subclass of
+         * HAGlueService will not be visible on the exported proxy.
+         */
+        return haGlueService;
+
+    }
+
+    /**
+     * Permit override of the {@link HAJournal} implementation class.
+     * 
+     * @throws ConfigurationException
+     */
+    private HAJournal newHAJournal(final HAJournalServer server,
+            final Configuration config,
+            final Quorum<HAGlue, QuorumService<HAGlue>> quorum)
+            throws ConfigurationException {
+
+        final String className = (String) config.getEntry(
+                ConfigurationOptions.COMPONENT,
+                ConfigurationOptions.HA_JOURNAL_CLASS, String.class,
+                ConfigurationOptions.DEFAULT_HA_JOURNAL_CLASS);
+
+        try {
+            @SuppressWarnings("unchecked")
+            final Class<HAJournal> cls = (Class<HAJournal>) Class
+                    .forName(className);
+
+            if (!HAJournal.class.isAssignableFrom(cls)) {
+
+                throw new ConfigurationException("Invalid option: "
+                        + ConfigurationOptions.HA_JOURNAL_CLASS + "="
+                        + className + ":: Class does not extend "
+                        + HAJournal.class);
+
+            }
+
+            final Constructor<HAJournal> ctor = cls.getConstructor(new Class[] {
+                    HAJournalServer.class, Configuration.class, Quorum.class });
+
+            final HAJournal jnl = ctor.newInstance(new Object[] { server,
+                    config, quorum });
+
+            return jnl;
+
+        } catch (ClassNotFoundException e) {
+
+            throw new ConfigurationException(
+                    ConfigurationOptions.HA_JOURNAL_CLASS + "=" + className, e);
+
+        } catch (NoSuchMethodException e) {
+
+            throw new ConfigurationException(
+                    ConfigurationOptions.HA_JOURNAL_CLASS + "=" + className, e);
+
+        } catch (InstantiationException e) {
+
+            throw new ConfigurationException(
+                    ConfigurationOptions.HA_JOURNAL_CLASS + "=" + className, e);
+
+        } catch (IllegalAccessException e) {
+
+            throw new ConfigurationException(
+                    ConfigurationOptions.HA_JOURNAL_CLASS + "=" + className, e);
+
+        } catch (IllegalArgumentException e) {
+
+            throw new ConfigurationException(
+                    ConfigurationOptions.HA_JOURNAL_CLASS + "=" + className, e);
+
+        } catch (InvocationTargetException e) {
+
+            throw new ConfigurationException(
+                    ConfigurationOptions.HA_JOURNAL_CLASS + "=" + className, e);
+
+        }
 
     }
 
@@ -798,6 +879,15 @@ public class HAJournalServer extends AbstractServer {
         private final AtomicReference<RunStateEnum> runStateRef = new AtomicReference<RunStateEnum>(
                 null/* none */);
 
+        /*
+         * Exposed to HAJournal.HAGlueService.
+         */
+        protected RunStateEnum getRunStateEnum() {
+        
+            return runStateRef.get();
+            
+        }
+        
         protected void setRunState(final RunStateEnum runState) {
 
             if (runStateRef.get() == RunStateEnum.Shutdown) {
@@ -3712,219 +3802,154 @@ public class HAJournalServer extends AbstractServer {
 
     }
     
-    /**
-     * Adds jini administration interfaces to the basic {@link HAGlue} interface
-     * exposed by the {@link HAJournal}.
-     * 
-     * @see HAJournal.HAGlueService
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
-     *         Thompson</a>
-     */
-    public static class AdministrableHAGlueService extends HAGlueDelegate
-            implements RemoteAdministrable, RemoteDestroyAdmin {
-
-        final protected HAJournalServer server;
-
-        public AdministrableHAGlueService(final HAJournalServer server,
-                final HAGlue service) {
-
-            super(service);
-
-            this.server = server;
-            
-        }
-        
-        public Object getAdmin() throws RemoteException {
-
-            if (log.isInfoEnabled())
-                log.info("serviceID=" + server.getServiceID());
-
-            return server.proxy;
-            
-        }
-        
-//        /**
-//         * Sets up the {@link MDC} logging context. You should do this on every
-//         * client facing point of entry and then call
-//         * {@link #clearLoggingContext()} in a <code>finally</code> clause. You
-//         * can extend this method to add additional context.
-//         * <p>
-//         * This implementation adds the following parameters to the {@link MDC}.
-//         * <dl>
-//         * <dt>serviceName</dt>
-//         * <dd>The serviceName is typically a configuration property for the
-//         * service. This datum can be injected into log messages using
-//         * <em>%X{serviceName}</em> in your log4j pattern layout.</dd>
-//         * <dt>serviceUUID</dt>
-//         * <dd>The serviceUUID is, in general, assigned asynchronously by the
-//         * service registrar. Once the serviceUUID becomes available it will be
-//         * added to the {@link MDC}. This datum can be injected into log
-//         * messages using <em>%X{serviceUUID}</em> in your log4j pattern layout.
-//         * </dd>
-//         * <dt>hostname</dt>
-//         * <dd>The hostname statically determined. This datum can be injected
-//         * into log messages using <em>%X{hostname}</em> in your log4j pattern
-//         * layout.</dd>
-//         * <dt>clientname
-//         * <dt>
-//         * <dd>The hostname or IP address of the client making the request.</dd>
-//         * </dl>
-//         * Note: {@link InetAddress#getHostName()} is used. This method makes a
-//         * one-time best effort attempt to resolve the host name from the
-//         * {@link InetAddress}.
-//         */
-//        private void setupLoggingContext() {
+//    /**
+//     * Adds jini administration interfaces to the basic {@link HAGlue} interface
+//     * exposed by the {@link HAJournal}.
+//     * 
+//     * @see HAJournal.HAGlueService
+//     * 
+//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+//     *         Thompson</a>
+//     */
+//    public static class AdministrableHAGlueService extends HAGlueDelegate
+//            implements RemoteAdministrable, RemoteDestroyAdmin {
 //
-//            try {
+//        final protected HAJournalServer server;
 //
-//                // Note: This _is_ a local method call.
-//                final ServiceID serviceUUID = server.getServiceID();
+//        public AdministrableHAGlueService(final HAJournalServer server,
+//                final HAGlue service) {
 //
-//                // Will be null until assigned by the service registrar.
+//            super(service);
 //
-//                if (serviceUUID != null) {
-//
-//                    MDC.put("serviceUUID", serviceUUID);
-//
-//                }
-//
-//                MDC.put("serviceName", server.getServiceName());
-//
-//                MDC.put("hostname", server.getHostName());
-//
-//                try {
-//
-//                    final InetAddress clientAddr = ((ClientHost) ServerContext
-//                            .getServerContextElement(ClientHost.class))
-//                            .getClientHost();
-//
-//                    MDC.put("clientname", clientAddr.getHostName());
-//
-//                } catch (ServerNotActiveException e) {
-//
-//                    /*
-//                     * This exception gets thrown if the client has made a
-//                     * direct (vs RMI) call so we just ignore it.
-//                     */
-//
-//                }
-//
-//            } catch (Throwable t) {
-//
-//                /*
-//                 * Ignore.
-//                 */
-//
-//            }
-//
+//            this.server = server;
+//            
 //        }
-
-        /**
-         * Clear the logging context.
-         */
-        protected void clearLoggingContext() {
-            
-            MDC.remove("serviceName");
-
-            MDC.remove("serviceUUID");
-
-            MDC.remove("hostname");
-            
-            MDC.remove("clientname");
-
-        }
-
-        /*
-         * DestroyAdmin
-         */
-
-        @Override
-        public void destroy() {
-
-            server.runShutdown(true/* destroy */);
-
-        }
-
-        @Override
-        public void shutdown() {
-
-            server.runShutdown(false/* destroy */);
-
-        }
-
-        @Override
-        public void shutdownNow() {
-
-            server.runShutdown(false/* destroy */);
-
-        }
-
-//        /**
-//         * Extends the base behavior to return a {@link Name} of the service
-//         * from the {@link Configuration}. If no name was specified in the
-//         * {@link Configuration} then the value returned by the base class is
-//         * returned instead.
-//         */
-//        @Override
-//        public String getServiceName() {
+//        
+////        /**
+////         * Returns an object that implements whatever administration interfaces
+////         * are appropriate for the particular service.
+////         * 
+////         * @return an object that implements whatever administration interfaces
+////         *         are appropriate for the particular service.
+////         */
+////        public Object getAdmin() throws RemoteException {
+////
+////            if (log.isInfoEnabled())
+////                log.info("serviceID=" + server.getServiceID());
+////
+////            return server.proxy;
+////            
+////        }
+//        
+////        /**
+////         * Sets up the {@link MDC} logging context. You should do this on every
+////         * client facing point of entry and then call
+////         * {@link #clearLoggingContext()} in a <code>finally</code> clause. You
+////         * can extend this method to add additional context.
+////         * <p>
+////         * This implementation adds the following parameters to the {@link MDC}.
+////         * <dl>
+////         * <dt>serviceName</dt>
+////         * <dd>The serviceName is typically a configuration property for the
+////         * service. This datum can be injected into log messages using
+////         * <em>%X{serviceName}</em> in your log4j pattern layout.</dd>
+////         * <dt>serviceUUID</dt>
+////         * <dd>The serviceUUID is, in general, assigned asynchronously by the
+////         * service registrar. Once the serviceUUID becomes available it will be
+////         * added to the {@link MDC}. This datum can be injected into log
+////         * messages using <em>%X{serviceUUID}</em> in your log4j pattern layout.
+////         * </dd>
+////         * <dt>hostname</dt>
+////         * <dd>The hostname statically determined. This datum can be injected
+////         * into log messages using <em>%X{hostname}</em> in your log4j pattern
+////         * layout.</dd>
+////         * <dt>clientname
+////         * <dt>
+////         * <dd>The hostname or IP address of the client making the request.</dd>
+////         * </dl>
+////         * Note: {@link InetAddress#getHostName()} is used. This method makes a
+////         * one-time best effort attempt to resolve the host name from the
+////         * {@link InetAddress}.
+////         */
+////        private void setupLoggingContext() {
+////
+////            try {
+////
+////                // Note: This _is_ a local method call.
+////                final ServiceID serviceUUID = server.getServiceID();
+////
+////                // Will be null until assigned by the service registrar.
+////
+////                if (serviceUUID != null) {
+////
+////                    MDC.put("serviceUUID", serviceUUID);
+////
+////                }
+////
+////                MDC.put("serviceName", server.getServiceName());
+////
+////                MDC.put("hostname", server.getHostName());
+////
+////                try {
+////
+////                    final InetAddress clientAddr = ((ClientHost) ServerContext
+////                            .getServerContextElement(ClientHost.class))
+////                            .getClientHost();
+////
+////                    MDC.put("clientname", clientAddr.getHostName());
+////
+////                } catch (ServerNotActiveException e) {
+////
+////                    /*
+////                     * This exception gets thrown if the client has made a
+////                     * direct (vs RMI) call so we just ignore it.
+////                     */
+////
+////                }
+////
+////            } catch (Throwable t) {
+////
+////                /*
+////                 * Ignore.
+////                 */
+////
+////            }
+////
+////        }
+////
+////        /**
+////         * Clear the logging context.
+////         */
+////        protected void clearLoggingContext() {
+////            
+////            MDC.remove("serviceName");
+////
+////            MDC.remove("serviceUUID");
+////
+////            MDC.remove("hostname");
+////            
+////            MDC.remove("clientname");
+////
+////        }
 //
-//            String s = server.getServiceName();
+////        /**
+////         * Extends the base behavior to return a {@link Name} of the service
+////         * from the {@link Configuration}. If no name was specified in the
+////         * {@link Configuration} then the value returned by the base class is
+////         * returned instead.
+////         */
+////        @Override
+////        public String getServiceName() {
+////
+////            String s = server.getServiceName();
+////
+////            if (s == null)
+////                s = super.getServiceName();
+////
+////            return s;
+////
+////        }
 //
-//            if (s == null)
-//                s = super.getServiceName();
-//
-//            return s;
-//
-//        }
-
-        @Override
-        public int getNSSPort() {
-
-            final String COMPONENT = NSSConfigurationOptions.COMPONENT;
-
-            try {
-
-                final Integer port = (Integer) server.config.getEntry(
-                        COMPONENT, NSSConfigurationOptions.PORT, Integer.TYPE,
-                        NSSConfigurationOptions.DEFAULT_PORT);
-
-                return port;
-
-            } catch (ConfigurationException e) {
-
-                throw new RuntimeException(e);
-                
-            }
-
-        }
-
-        @Override
-        public RunState getRunState() {
-            
-            return server.getRunState();
-            
-        }
-        
-        @Override
-        public String getExtendedRunState() {
-
-            final HAQuorumService<HAGlue, HAJournal> quorumService = server.quorumService;
-
-            final RunStateEnum innerRunState = (quorumService == null ? null
-                    : quorumService.runStateRef.get());
-
-            final HAJournal journal = server.journal;
-            
-            final String innerRunStateStr = (innerRunState == null ? "N/A"
-                    : (innerRunState.name() + ((innerRunState == RunStateEnum.Resync && journal != null) ? (" @ " + journal
-                            .getRootBlockView().getCommitCounter()) : "")));
-
-            return "{server=" + server.getRunState() + ", quorumService="
-                    + innerRunStateStr + "}";
-
-        }
-        
-    }
+//    }
 
 }

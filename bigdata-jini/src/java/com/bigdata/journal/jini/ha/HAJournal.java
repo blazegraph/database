@@ -31,6 +31,7 @@ import java.io.Serializable;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.rmi.Remote;
+import java.rmi.RemoteException;
 import java.rmi.server.ExportException;
 import java.security.DigestException;
 import java.security.MessageDigest;
@@ -62,6 +63,7 @@ import com.bigdata.concurrent.FutureTaskMon;
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.QuorumService;
 import com.bigdata.ha.QuorumServiceBase;
+import com.bigdata.ha.RunState;
 import com.bigdata.ha.halog.HALogReader;
 import com.bigdata.ha.halog.HALogWriter;
 import com.bigdata.ha.halog.IHALogReader;
@@ -97,11 +99,15 @@ import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.WriteExecutorService;
 import com.bigdata.journal.jini.ha.HAJournalServer.HAQuorumService;
+import com.bigdata.journal.jini.ha.HAJournalServer.NSSConfigurationOptions;
+import com.bigdata.journal.jini.ha.HAJournalServer.RunStateEnum;
 import com.bigdata.quorum.AsynchronousQuorumCloseException;
 import com.bigdata.quorum.Quorum;
 import com.bigdata.quorum.zk.ZKQuorumImpl;
 import com.bigdata.service.AbstractTransactionService;
 import com.bigdata.service.jini.JiniClient;
+import com.bigdata.service.jini.RemoteAdministrable;
+import com.bigdata.service.jini.RemoteDestroyAdmin;
 import com.bigdata.service.proxy.ClientFuture;
 import com.bigdata.service.proxy.RemoteFuture;
 import com.bigdata.service.proxy.RemoteFutureImpl;
@@ -170,6 +176,11 @@ public class HAJournal extends Journal {
     }
     
     /**
+     * The {@link HAJournalServer} instance that is managing this {@link HAJournal}.
+     */
+    private final HAJournalServer server;
+    
+    /**
      * @see HAJournalServer.ConfigurationOptions#WRITE_PIPELINE_ADDR
      */
     private final InetSocketAddress writePipelineAddr;
@@ -229,6 +240,16 @@ public class HAJournal extends Journal {
     }
 
     /**
+     * The {@link HAJournalServer} instance that is managing this
+     * {@link HAJournal}.
+     */
+    protected HAJournalServer getHAJournalServer() {
+        
+        return server;
+        
+    }
+    
+    /**
      * {@inheritDoc}
      * <p>
      * Overridden to strengthen the return type.
@@ -241,12 +262,15 @@ public class HAJournal extends Journal {
     }
 
     /**
-     * 
+     * @param server
+     *            The {@link HAJournalServer} instance.
      * @param config
+     *            The {@link Configuration} object.
      * @param quorum
+     *            The {@link Quorum} implementation.
      * 
      * @throws ConfigurationException
-     * @throws IOException 
+     * @throws IOException
      */
     public HAJournal(final HAJournalServer server, final Configuration config,
             final Quorum<HAGlue, QuorumService<HAGlue>> quorum)
@@ -278,6 +302,8 @@ public class HAJournal extends Journal {
 
         super(checkProperties(properties), quorum);
 
+        this.server = server;
+        
         {
 
             // The address at which this service exposes its write pipeline.
@@ -398,6 +424,10 @@ public class HAJournal extends Journal {
 
     }
     
+    /*
+     * Note: The HAJournal and HAGlueService MAY be subclassed. Therefore, do
+     * not perform any initialization in this factory method.
+     */
     @Override
     protected HAGlue newHAGlue(final UUID serviceId) {
 
@@ -425,11 +455,15 @@ public class HAJournal extends Journal {
              * observes a quorum break or similar event. This is just being
              * proactive.
              * 
-             * TODO Lift into HAJournalServer.quorumBreak() handler?
-             * 
              * FIXME This will not be called if the quorum remains met but the
              * local service leaves the quorum. However, we should still cancel
-             * a running snapshot if that occurs.
+             * a running snapshot if that occurs (if we add a serviceLeave()
+             * handle then this will fix that).
+             * 
+             * FIXME We MUST ensure that the snapshot is terminated based on the
+             * clear of the haReadyToken. Even if the quorumToken does not
+             * change, the haReadyToken can be cleared if a serviceLeave() is
+             * performed by this service.
              */
             
             final Future<IHASnapshotResponse> ft = getSnapshotManager()
@@ -605,7 +639,8 @@ public class HAJournal extends Journal {
     /**
      * Extended implementation supports RMI.
      */
-    protected class HAGlueService extends BasicHA {
+    protected class HAGlueService extends BasicHA implements
+            RemoteAdministrable, RemoteDestroyAdmin {
 
         protected HAGlueService(final UUID serviceId) {
 
@@ -1442,7 +1477,7 @@ public class HAJournal extends Journal {
          * @return The {@link Exporter}.
          */
         protected Exporter getExporter(final boolean enableDGC) {
-            
+            // TODO This should be based on the Configuration object (EXPORTER field). See AbstractServer.
             return new BasicJeriExporter(TcpServerEndpoint
                     .getInstance(0/* port */), invocationLayerFactory, enableDGC,
                     false/* keepAlive */);
@@ -1523,6 +1558,122 @@ public class HAJournal extends Journal {
 
         }
 
-    }
+        /*
+         * 
+         */
+        
+        /**
+         * Returns an object that implements whatever administration interfaces
+         * are appropriate for the particular service.
+         * 
+         * @return an object that implements whatever administration interfaces
+         *         are appropriate for the particular service.
+         */
+        public Object getAdmin() throws RemoteException {
 
+            if (log.isInfoEnabled())
+                log.info("serviceID=" + server.getServiceID());
+
+            return server.proxy;
+
+        }
+                
+        /*
+         * DestroyAdmin
+         */
+
+        @Override
+        public void destroy() {
+
+            server.runShutdown(true/* destroy */);
+
+        }
+
+        @Override
+        public void shutdown() {
+
+            server.runShutdown(false/* destroy */);
+
+        }
+
+        @Override
+        public void shutdownNow() {
+
+            server.runShutdown(false/* destroy */);
+
+        }
+
+        /*
+         * Misc.
+         */
+        
+        @Override
+        public int getNSSPort() {
+
+            final String COMPONENT = NSSConfigurationOptions.COMPONENT;
+
+            try {
+
+                final Integer port = (Integer) server.config.getEntry(
+                        COMPONENT, NSSConfigurationOptions.PORT, Integer.TYPE,
+                        NSSConfigurationOptions.DEFAULT_PORT);
+
+                return port;
+
+            } catch (ConfigurationException e) {
+
+                throw new RuntimeException(e);
+                
+            }
+
+        }
+
+        @Override
+        public RunState getRunState() {
+            
+            return server.getRunState();
+            
+        }
+
+        /**
+         * Return this quorum member, appropriately cast.
+         * 
+         * @return The quorum member -or- <code>null</code> if the quorum is not
+         *         running.
+         */
+        protected HAQuorumService<HAGlue, HAJournal> getQuorumService() {
+
+            // This quorum member.
+            @SuppressWarnings("unchecked")
+            final HAQuorumService<HAGlue, HAJournal> quorumService = (HAQuorumService<HAGlue, HAJournal>) getQuorum()
+                    .getClient();
+
+            return quorumService;
+
+        }
+        
+        @Override
+        public String getExtendedRunState() {
+
+            final HAJournalServer server = getHAJournalServer();
+            
+            // This quorum member.
+            final HAQuorumService<HAGlue, HAJournal> quorumService = getQuorumService();
+
+            final RunStateEnum innerRunState = (quorumService == null ? null
+                    : quorumService.getRunStateEnum());
+
+            final HAJournal journal = HAJournal.this;
+            
+            final String innerRunStateStr = (innerRunState == null ? "N/A"
+                    : (innerRunState.name() + ((innerRunState == RunStateEnum.Resync && journal != null) ? (" @ " + journal
+                            .getRootBlockView().getCommitCounter()) : "")));
+
+            return "{server=" + server.getRunState() + ", quorumService="
+                    + innerRunStateStr + "}";
+
+        }
+
+    }
+    
 }
