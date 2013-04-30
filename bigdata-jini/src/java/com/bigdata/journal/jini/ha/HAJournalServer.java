@@ -301,6 +301,27 @@ public class HAJournalServer extends AbstractServer {
         String HA_JOURNAL_CLASS = "HAJournalClass";
 
         String DEFAULT_HA_JOURNAL_CLASS = HAJournal.class.getName();
+        
+        /**
+         * When <code>true</code> the service will automatically perform online
+         * disaster recovery (REBUILD). When <code>false</code>, it will enter
+         * the OPERATOR state instead (human intervention required).
+         */
+        String ONLINE_DISASTER_RECOVERY = "onlineDisasterRecovery";
+
+        /**
+         * TODO This feature is disabled by default. We want to develop more
+         * experience with the online disaster recovery and snapshot / restore
+         * mechanisms before putting enabling it in a release. There are two
+         * possible downsides to enabling this feature: (1) REBUILD should not
+         * trigger unless it is necessary so we need to make sure that spurious
+         * and curable errors do not result in a REBUILD; (2) The current
+         * REBUILD implementation does not replicate the pinned HALogs from the
+         * leader. This means that the rebuilt service is not as robust since it
+         * can not replicate the missing HALogs to another service if that
+         * service should then require disaster recovery as well.
+         */
+        boolean DEFAULT_ONLINE_DISASTER_RECOVERY = false;
 
     }
     
@@ -334,6 +355,11 @@ public class HAJournalServer extends AbstractServer {
     
     private UUID serviceUUID;
 
+    /**
+     * @see ConfigurationOptions#ONLINE_DISASTER_RECOVERY
+     */
+    private boolean onelineDisasterRecovery;
+    
     private ZookeeperClientConfig zkClientConfig;
     
     private ZooKeeperAccessor zka;
@@ -388,13 +414,48 @@ public class HAJournalServer extends AbstractServer {
      * state.
      */
     static enum RunStateEnum {
-        Restore, // apply local HALog files GT current commit point.
-        SeekConsensus, // seek consensus.
-        RunMet, // run while joined with met quorum.
-        Resync, // only resynchronization
-        Rebuild, // online disaster recovery
-        Error, // error state.
-        Shutdown; // TODO SHUTDOWN: We are not using this systematically (no ShutdownTask for this run state).
+        /**
+         * Roll forward the database by applying local HALog files GT current
+         * commit point.
+         */
+        Restore,
+        /**
+         * Seek a consensus with the other quorum members regarding the most
+         * recent commit point on the database. If a consensus is established
+         * then the quorum will meet. If the quorum is already met, then this
+         * service must {@link RunStateEnum#Resync}.
+         */
+        SeekConsensus,
+        /** Run while joined with met quorum. */
+        RunMet,
+        /**
+         * Resynchronize with the leader of a met quorum, replicating and
+         * applying HALogs and rolling forward the database until it catches up
+         * with the quorum and joins.
+         */
+        Resync,
+        /**
+         * Online disaster recovery. The backing store is replicated from the
+         * quorum leader and then the service enters {@link RunStateEnum#Resync}
+         * to catch up with any missed writes since the start of the replication
+         * procedure.
+         */
+        Rebuild,
+        /**
+         * Error state. This state should be self correcting.
+         */
+        Error,
+        /**
+         * Shutdown.
+         * 
+         * TODO SHUTDOWN: We are not using this systematically (no ShutdownTask
+         * for this run state).
+         */
+        Shutdown,
+        /**
+         * Operator intervention required - service can not proceed.
+         */
+        Operator;
     }
     
     /**
@@ -411,7 +472,31 @@ public class HAJournalServer extends AbstractServer {
         super(args, lifeCycle);
 
     }
+
+    /*
+     * Operator alerts.
+     * 
+     * TODO If we keep this abstraction, then extract an interface for operator
+     * alerts. However, this could also be captured as Entry[] attributes that
+     * are published on the service registrar. Once those attributes are
+     * published, it is easy enough to write utilities to monitor those Entry[]
+     * attributes and then execute appropriate business logic.
+     */
     
+    private final AtomicReference<String> operatorAlert = new AtomicReference<String>();
+
+    protected void sendOperatorAlert(final String msg) {
+        operatorAlert.set(msg);
+    }
+
+    protected void clearOperatorAlert() {
+        operatorAlert.set(null);
+    }
+
+    protected String getOperatorAlert() {
+        return operatorAlert.get();
+    }
+
     @Override
     protected void terminate() {
 
@@ -477,7 +562,15 @@ public class HAJournalServer extends AbstractServer {
         
         // UUID variant of that ServiceID.
         serviceUUID = JiniUtil.serviceID2UUID(serviceID);
-        
+
+        /*
+         * Extract various configuration options.
+         */
+        onelineDisasterRecovery = (Boolean) config.getEntry(
+                ConfigurationOptions.COMPONENT,
+                ConfigurationOptions.ONLINE_DISASTER_RECOVERY, Boolean.TYPE,
+                ConfigurationOptions.DEFAULT_ONLINE_DISASTER_RECOVERY);
+
         /*
          * Setup the Quorum / HAJournal.
          */
@@ -1649,6 +1742,46 @@ public class HAJournalServer extends AbstractServer {
         } // class RunMetTask
 
         /**
+         * While the quorum is met, accept replicated writes, laying them down
+         * on the HALog and the backing store, and participate in the 2-phase
+         * commit protocol.
+         */
+        private class OperatorTask extends RunStateCallable<Void> {
+
+            final String msg;
+
+            public OperatorTask(final String msg) {
+
+                super(RunStateEnum.Operator);
+
+                this.msg = msg;
+
+            }
+
+            @Override
+            public Void doRun() throws Exception {
+
+                try {
+
+                    server.sendOperatorAlert(msg);
+                    
+                    // Block until this run state gets interrupted.
+                    blockInterruptably();
+
+                    // Done.
+                    return null;
+                    
+                } finally {
+                    
+                    server.clearOperatorAlert();
+                    
+                }
+                
+            } // call()
+            
+        } // class OperatorTask
+
+        /**
          * Run state responsible for replaying local HALog files during service
          * startup. This allows an offline restore of the backing journal file
          * (a full backup) and zero or more HALog files (each an incremental
@@ -2145,11 +2278,15 @@ public class HAJournalServer extends AbstractServer {
 
                 log.error(msg);
 
-                enterRunState(new RebuildTask(token));
+                if (server.onelineDisasterRecovery) {
+                    enterRunState(new RebuildTask(token));
+                } else {
+                    enterRunState(new OperatorTask(msg));
+                }
 
                 // Force immediate exit of the resync protocol.
                 throw new InterruptedException(msg);
-                
+
             }
 
             // root block when the quorum started that write set.

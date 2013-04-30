@@ -1664,11 +1664,26 @@ public class HAJournal extends Journal {
                     : quorumService.getRunStateEnum());
 
             final HAJournal journal = HAJournal.this;
-            
-            final String innerRunStateStr = (innerRunState == null ? "N/A"
-                    : (innerRunState.name() + ((innerRunState == RunStateEnum.Resync && journal != null) ? (" @ " + journal
-                            .getRootBlockView().getCommitCounter()) : "")));
 
+            final StringBuilder innerRunStateStr = new StringBuilder();
+            if (innerRunState != null) {
+                innerRunStateStr.append(innerRunState.name());
+                switch (innerRunState) {
+                case Resync:
+                    innerRunStateStr.append(" @ "
+                            + journal.getRootBlockView().getCommitCounter());
+                    break;
+                case Operator: {
+                    final String msg = server.getOperatorAlert();
+                    innerRunStateStr.append("msg=" + msg);
+                    break;
+                }
+                default:
+                    break;
+                }
+            } else {
+                innerRunStateStr.append("N/A");
+            }
             return "{server=" + server.getRunState() + ", quorumService="
                     + innerRunStateStr + "}";
 
