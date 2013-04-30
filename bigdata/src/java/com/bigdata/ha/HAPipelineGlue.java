@@ -95,7 +95,7 @@ public interface HAPipelineGlue extends Remote {
      *       leave without a service leave, if services which are joined always
      *       rejoin the write pipeline when the observe a pipeline leave, and if
      *       we can force a service leave (by instructing the service to
-     *       {@link #bounceZookeeperConnection()}) if the service fails to
+     *       bounce the zookeeper connection) if the service fails to
      *       rejoin the pipeline, then it would be easier to reorganize the
      *       pipeline. [This would still make it possible for services to add
      *       themselves to the pipeline without being joined with the quorum but

@@ -33,7 +33,7 @@ import net.jini.config.Configuration;
 
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.HAStatusEnum;
-import com.bigdata.journal.jini.ha.MyHAJournal.MyHAGlue;
+import com.bigdata.journal.jini.ha.HAJournalTest.HAGlueTest;
 
 /**
  * Unit test of the ability to override the {@link HAJournal} implementation
@@ -63,7 +63,7 @@ public class TestHAJournalServerOverride extends AbstractHA3JournalServerTestCas
         return new String[]{
                 "com.bigdata.journal.jini.ha.HAJournalServer.restorePolicy=new com.bigdata.journal.jini.ha.DefaultRestorePolicy(0L,1,0)",
                 "com.bigdata.journal.jini.ha.HAJournalServer.snapshotPolicy=new com.bigdata.journal.jini.ha.NoSnapshotPolicy()",
-                "com.bigdata.journal.jini.ha.HAJournalServer.HAJournalClass=\"com.bigdata.journal.jini.ha.MyHAJournal\""
+                "com.bigdata.journal.jini.ha.HAJournalServer.HAJournalClass=\""+HAJournalTest.class.getName()+"\""
         };
         
     }
@@ -115,7 +115,7 @@ public class TestHAJournalServerOverride extends AbstractHA3JournalServerTestCas
         assertTrue(getSnapshotDirA().exists());
         
         // Verify that we can invoke extension methods on the service.
-        ((MyHAGlue)serverA).helloWorld();
+        ((HAGlueTest)serverA).helloWorld();
         
 //        serverA.enterErrorState().get();
 //        

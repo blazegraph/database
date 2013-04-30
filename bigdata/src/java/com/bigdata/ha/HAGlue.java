@@ -74,28 +74,6 @@ public interface HAGlue extends HAGlueBase, HAPipelineGlue, HAReadGlue,
      */
     
     /**
-     * This method may be issued to force the service to close and then reopen
-     * its zookeeper connection. This is a drastic action which will cause all
-     * <i>ephemeral</i> tokens for that service to be retracted from zookeeper.
-     * When the service reconnects, it will reestablish those connections.
-     * <p>
-     * Note: This method is intended primarily as an aid in writing various HA
-     * unit tests.
-     * 
-     * @see http://wiki.apache.org/hadoop/ZooKeeper/FAQ#A4
-     */
-    public Future<Void> bounceZookeeperConnection() throws IOException;
-    
-    /**
-     * Force the end point to enter into an error state from which it will
-     * naturally move back into a consistent state.
-     * <p>
-     * Note: This method is intended primarily as an aid in writing various HA
-     * unit tests.
-     */
-    public Future<Void> enterErrorState() throws IOException;
-    
-    /**
      * Await the service being ready to partitipate in an HA quorum. The
      * preconditions include:
      * <ol>

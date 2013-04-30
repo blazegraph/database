@@ -37,6 +37,7 @@ import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.HAStatusEnum;
 import com.bigdata.ha.msg.HARootBlockRequest;
 import com.bigdata.journal.IRootBlockView;
+import com.bigdata.journal.jini.ha.HAJournalTest.HAGlueTest;
 import com.bigdata.quorum.Quorum;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
 
@@ -66,7 +67,8 @@ public class TestHA2JournalServer extends AbstractHA3JournalServerTestCase {
         
         return new String[]{
                 "com.bigdata.journal.jini.ha.HAJournalServer.restorePolicy=new com.bigdata.journal.jini.ha.DefaultRestorePolicy(0L,1,0)",
-                "com.bigdata.journal.jini.ha.HAJournalServer.snapshotPolicy=new com.bigdata.journal.jini.ha.NoSnapshotPolicy()"
+                "com.bigdata.journal.jini.ha.HAJournalServer.snapshotPolicy=new com.bigdata.journal.jini.ha.NoSnapshotPolicy()",
+                "com.bigdata.journal.jini.ha.HAJournalServer.HAJournalClass=\""+HAJournalTest.class.getName()+"\""
         };
         
     }
@@ -74,7 +76,7 @@ public class TestHA2JournalServer extends AbstractHA3JournalServerTestCase {
     public TestHA2JournalServer() {
     }
 
-    public TestHA2JournalServer(String name) {
+    public TestHA2JournalServer(final String name) {
         super(name);
     }
     
@@ -214,11 +216,11 @@ public class TestHA2JournalServer extends AbstractHA3JournalServerTestCase {
             
             if (leader.equals(serverA)) {
 
-                serverB.bounceZookeeperConnection().get();
+                ((HAGlueTest) serverB).bounceZookeeperConnection().get();
 
             } else {
 
-                serverA.bounceZookeeperConnection().get();
+                ((HAGlueTest) serverA).bounceZookeeperConnection().get();
 
             }
             
@@ -317,7 +319,7 @@ public class TestHA2JournalServer extends AbstractHA3JournalServerTestCase {
 
 //            final UUID leaderId1 = leader.getServiceId();
             
-            leader.bounceZookeeperConnection().get();
+            ((HAGlueTest)leader).bounceZookeeperConnection().get();
 
             // Wait for the quorum to break and then meet again.
             final long token2 = awaitNextQuorumMeet(token1);

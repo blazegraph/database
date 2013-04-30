@@ -103,7 +103,6 @@ import com.bigdata.journal.jini.ha.HAJournalServer.NSSConfigurationOptions;
 import com.bigdata.journal.jini.ha.HAJournalServer.RunStateEnum;
 import com.bigdata.quorum.AsynchronousQuorumCloseException;
 import com.bigdata.quorum.Quorum;
-import com.bigdata.quorum.zk.ZKQuorumImpl;
 import com.bigdata.service.AbstractTransactionService;
 import com.bigdata.service.jini.JiniClient;
 import com.bigdata.service.jini.RemoteAdministrable;
@@ -1375,84 +1374,6 @@ public class HAJournal extends Journal {
 
         }
         
-        @Override
-        public Future<Void> bounceZookeeperConnection() {
-
-            final FutureTask<Void> ft = new FutureTaskMon<Void>(
-                    new BounceZookeeperConnectionTask(), null/* result */);
-
-            ft.run();
-            
-            return getProxy(ft);
-
-        }
-
-        private class BounceZookeeperConnectionTask implements Runnable {
-
-            @SuppressWarnings("rawtypes")
-            public void run() {
-
-                if (getQuorum() instanceof ZKQuorumImpl) {
-
-                    // Note: Local method call on AbstractJournal.
-                    final UUID serviceId = getServiceId();
-                    
-                    try {
-
-                        haLog.warn("BOUNCING ZOOKEEPER CONNECTION: "
-                                + serviceId);
-
-                        // Close the current connection (if any).
-                        ((ZKQuorumImpl) getQuorum()).getZookeeper().close();
-
-                        // Obtain a new connection.
-                        ((ZKQuorumImpl) getQuorum()).getZookeeper();
-
-                        haLog.warn("RECONNECTED TO ZOOKEEPER: " + serviceId);
-
-                    } catch (InterruptedException e) {
-
-                        // Propagate the interrupt.
-                        Thread.currentThread().interrupt();
-
-                    }
-
-                }
-            }
-
-        }
-
-        @Override
-        public Future<Void> enterErrorState() {
-
-            final FutureTask<Void> ft = new FutureTaskMon<Void>(
-                    new EnterErrorStateTask(), null/* result */);
-
-            ft.run();
-
-            return getProxy(ft);
-
-        }
-
-        private class EnterErrorStateTask implements Runnable {
-
-            public void run() {
-
-                @SuppressWarnings("unchecked")
-                final HAQuorumService<HAGlue, HAJournal> service = (HAQuorumService<HAGlue, HAJournal>) getQuorum()
-                        .getClient();
-
-                // Note: Local method call on AbstractJournal.
-                final UUID serviceId = getServiceId();
-
-                haLog.warn("ENTERING ERROR STATE: " + serviceId);
-
-                service.enterErrorState();
-
-            }
-
-        }
-
         /**
          * Note: The invocation layer factory is reused for each exported proxy (but
          * the exporter itself is paired 1:1 with the exported proxy).
