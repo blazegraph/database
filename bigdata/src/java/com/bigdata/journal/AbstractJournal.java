@@ -6558,27 +6558,27 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
         }
 
-        @Override
-        public Future<Void> bounceZookeeperConnection() {
-            final FutureTask<Void> ft = new FutureTaskMon<Void>(new Runnable() {
-                public void run() {
-                    // NOP (not implemented at this layer).
-                }
-            }, null);
-            ft.run();
-            return getProxy(ft);
-        }
-
-        @Override
-        public Future<Void> enterErrorState() {
-            final FutureTask<Void> ft = new FutureTaskMon<Void>(new Runnable() {
-                public void run() {
-                    // NOP (not implemented at this layer).
-                }
-            }, null);
-            ft.run();
-            return getProxy(ft);
-        }
+//        @Override
+//        public Future<Void> bounceZookeeperConnection() {
+//            final FutureTask<Void> ft = new FutureTaskMon<Void>(new Runnable() {
+//                public void run() {
+//                    // NOP (not implemented at this layer).
+//                }
+//            }, null);
+//            ft.run();
+//            return getProxy(ft);
+//        }
+//
+//        @Override
+//        public Future<Void> enterErrorState() {
+//            final FutureTask<Void> ft = new FutureTaskMon<Void>(new Runnable() {
+//                public void run() {
+//                    // NOP (not implemented at this layer).
+//                }
+//            }, null);
+//            ft.run();
+//            return getProxy(ft);
+//        }
 
         /**
          * {@inheritDoc}
