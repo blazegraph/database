@@ -2201,6 +2201,9 @@ public class AbstractHA3JournalServerTestCase extends
             // Verify quorum is still valid.
             quorum.assertQuorum(token);
             
+            if(log.isInfoEnabled())
+                log.info("Done with load.");
+            
             // Done.
             return null;
 

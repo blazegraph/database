@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.journal.jini.ha;
 
 import java.io.File;
+import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.UUID;
@@ -1493,111 +1494,247 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
     }
     
     public void testABCMultiTransactionFollowerReads() throws Exception {
-    	// doABCMultiTransactionFollowerReads(2000/*nTransactions*/, 20/*delay per transaction*/); // STRESS
-    	doABCMultiTransactionFollowerReads(200/*nTransactions*/, 20/*delay per transaction*/);
+     // doABCMultiTransactionFollowerReads(2000/*nTransactions*/, 20/*delay per transaction*/); // STRESS
+        doABCMultiTransactionFollowerReads(200/*nTransactions*/, 20/*delay per transaction*/);
     }
     
     /**
-     * Tests multiple concurrent reads on followers in presence of multiple updates.
-     * @throws Exception 
+     * Tests multiple concurrent reads on followers in presence of multiple
+     * updates.
+     * 
+     * @param nTransactions
+     *            The #of UPDATE transactions to execute.
+     * @param transactionDelay
+     *            The delay between the UPDATE transactions.
      */
-    protected void doABCMultiTransactionFollowerReads(final int nTransactions, final long transactionDelay) throws Exception {
+    protected void doABCMultiTransactionFollowerReads(final int nTransactions,
+            final long transactionDelay) throws Exception {
 
         final long timeout = TimeUnit.MINUTES.toMillis(4);
         try {
-            
-			// Start all services.
+
+            // Start all services.
             final ABC services = new ABC(true/* sequential */);
 
+            // Wait for a quorum meet.
+            final long token = quorum.awaitQuorum(awaitQuorumTimeout,
+                    TimeUnit.MILLISECONDS);
 
-			// Wait for a quorum meet.
-			final long token = quorum.awaitQuorum(awaitQuorumTimeout,
-					TimeUnit.MILLISECONDS);
+            assertEquals(token, awaitFullyMetQuorum());
 
-			awaitFullyMetQuorum();
-			
             final HAGlue leader = quorum.getClient().getLeader(token);
 
             // Verify assumption in this test.
             assertEquals(leader, services.serverA);
 
-            // Wait until leader is ready.
+            // Wait until all services are "HA" ready.
             leader.awaitHAReady(awaitQuorumTimeout, TimeUnit.MILLISECONDS);
+            services.serverB.awaitHAReady(awaitQuorumTimeout, TimeUnit.MILLISECONDS);
+            services.serverC.awaitHAReady(awaitQuorumTimeout, TimeUnit.MILLISECONDS);
+
+            /*
+             * Start a long running long. This gives us enough data to make the
+             * query we run have a little latency.  We need that query to cross
+             * a commit boundary when it is executed.
+             */
+            {
+                
+                final FutureTask<Void> ft = new FutureTask<Void>(
+                        new LargeLoadTask(token, true/* reallyLargeLoad */));
+                
+                try {
+
+                    // Start the LOAD task.
+                    executorService.submit(ft);
+
+                    // Wait for the LOAD task.
+                    ft.get(timeout, TimeUnit.MILLISECONDS);
+
+                } finally {
+                    
+                    ft.cancel(true/* mayInterruptIfRunning */);
+                    
+                }
+                
+            }
             
-			// start concurrent task to load for specified transactions
-			final Callable<Void> task = new Callable<Void>() {
-				public Void call() throws Exception {
-						for (int n = 0; n < nTransactions; n++) {
+            /**
+             * Class will issue a series of UPDATE requests.
+             * <p>
+             * Note: We need to actually modify the KB for each UPDATE but not
+             * drop all the statemets each time.
+             */
+            class UpdateTask implements Callable<Void> {
 
-							final StringBuilder sb = new StringBuilder();
-							sb.append("PREFIX dc: <http://purl.org/dc/elements/1.1/>\n");
-							sb.append("INSERT DATA {\n");
-							sb.append("  <http://example/book" + n
-									+ "> dc:title \"A new book\" ;\n");
-							sb.append("  dc:creator \"A.N.Other\" .\n");
-							sb.append("}\n");
+                private final RemoteRepository remoteRepo;
 
-							final String updateStr = sb.toString();
+                public UpdateTask() throws IOException {
 
-							final HAGlue leader = quorum.getClient().getLeader(
-									token);
+                    remoteRepo = getRemoteRepository(leader);
 
-							// Verify quorum is still valid.
-							quorum.assertQuorum(token);
+                }
 
-								getRemoteRepository(leader).prepareUpdate(
-										updateStr).evaluate();
-								log.warn("COMPLETED TRANSACTION " + n);
+                public Void call() throws Exception {
+                    
+                    for (int n = 0; n < nTransactions; n++) {
 
-								Thread.sleep(transactionDelay);
-						}
-						// done.
-						return null;
-				}
-			};
-			final FutureTask<Void> load = new FutureTask<Void>(task);
+                        // Verify quorum is still valid.
+                        quorum.assertQuorum(token);
 
-			executorService.submit(load);
-			
-			// Now create a Callable for the final followes to repeatedly query against the current commit point
-			final Callable<Void> query = new Callable<Void>() {
-				public Void call() throws Exception {
-						int queryCount = 0;
-						SimpleDateFormat df = new SimpleDateFormat("hh:mm:ss,SSS");
-						while (!load.isDone()) {
+                        // Do a simple UPDATE transaction.
+                        final StringBuilder sb = new StringBuilder();
+                        sb.append("PREFIX dc: <http://purl.org/dc/elements/1.1/>\n");
+                        sb.append("INSERT DATA {\n");
+                        sb.append("  <http://example/book" + n // Note: distinct triple!
+                                + "> dc:title \"A new book\" ;\n");
+                        sb.append("  dc:creator \"A.N.Other\" .\n");
+                        sb.append("}\n");
 
-							final StringBuilder sb = new StringBuilder();
-							sb.append("SELECT (COUNT(*) AS ?count) WHERE { ?s ?p ?o }\n");
+                        final String updateStr = sb.toString();
 
-							final String query = sb.toString();
+                        remoteRepo.prepareUpdate(updateStr).evaluate();
+                        
+                        if(log.isInfoEnabled())
+                            log.info("COMPLETED TRANSACTION " + n);
 
-							// final RemoteRepository follower = getRemoteRepository(services.serverA); // try with Leader to see difference! 6537 queries (less than for follower)
-							final RemoteRepository follower = getRemoteRepository(services.serverC); // 10109 queries for 2000 transact	ons
+                        Thread.sleep(transactionDelay);
 
-							// Verify quorum is still valid.
-							quorum.assertQuorum(token);
+                    }
+                    
+                    // done.
+                    return null;
+                    
+                }
 
-							follower.prepareTupleQuery(query).evaluate();
-							
-							// add date time format to support comparison with HA logs
-							log.info(df.format(new Date()) + " - completed query: " + ++queryCount);
-						}
-						// done.
-						return null;
-				}
-			};
-			
-			final FutureTask<Void> queries = new FutureTask<Void>(query);
-			
-			executorService.submit(queries);
-			
-			// Now wait for query completion!
-			queries.get();
-			
-			assertTrue(load.isDone());
-			
-		} finally {
-			destroyAll();
+            };
+            
+            /*
+             * Future for the task executing a series of UPDATES.
+             * 
+             * Note: The task is not running yet, but we will pass the Future
+             * into the QueryTask so it can monitor the UpdateTask.
+             */
+            final FutureTask<Void> updateTaskFuture = new FutureTask<Void>(new UpdateTask());
+
+            /*
+             * Now create a Callable for the final followes to repeatedly query
+             * against the then current commit point. The task returns the #of
+             * queries that were executed. The task will run until we stop
+             * issuing UPDATE requests.
+             */
+            class QueryTask implements Callable<Long> {
+                
+//                /** The service to query. */
+//                final HAGlue haGlue;
+                
+                /**
+                 * The SPARQL end point for that service.
+                 */
+                final RemoteRepository remoteRepo;
+
+                /**
+                 * Format for timestamps that may be used to correlate with the
+                 * HA log messages.
+                 */
+                final SimpleDateFormat df = new SimpleDateFormat("hh:mm:ss,SSS");
+
+                /**
+                 * @param haGlue
+                 *            The service to query.
+                 *            
+                 * @throws IOException 
+                 */
+                public QueryTask(final HAGlue haGlue) throws IOException {
+                
+//                    this.haGlue = haGlue;
+                    
+                    /*
+                     * Run query against one of the followers.
+                     * 
+                     * 6537 queries for 2000 transactions (leader)
+                     * 
+                     * 10109 queries for 2000 transactions (follower)
+                     */
+                    remoteRepo = getRemoteRepository(haGlue);
+
+                }
+
+                public Long call() throws Exception {
+                    
+                    long queryCount = 0;
+                    
+                    while (!updateTaskFuture.isDone()) {
+
+                        final String query;
+                        if (queryCount % 2 == 0) {
+                            // Shorter query. Counts all tuples.
+                            query = "SELECT (COUNT(*) AS ?count) WHERE { ?s ?p ?o }";
+                        } else {
+                            // Longer query. Materializies up to N tuples.
+                            query = "SELECT * WHERE { ?s ?p ?o } LIMIT 100000";
+                        }
+
+                        // Verify quorum is still valid.
+                        quorum.assertQuorum(token);
+
+                        // Run query.
+                        final long nresults = countResults(remoteRepo
+                                .prepareTupleQuery(query).evaluate());
+
+                        queryCount++;
+
+                        // add date time format for comparison with HA logs
+                        if (log.isInfoEnabled())
+                            log.info(df.format(new Date())
+                                    + " - completed query: " + queryCount
+                                    + ", nresults=" + nresults);
+                        
+                    }
+ 
+                    // done.
+                    return queryCount;
+                    
+                }
+  
+            };
+
+            final FutureTask<Long> queryTaskFuture = new FutureTask<Long>(
+                    new QueryTask(services.serverC));
+
+            /*
+             * Start the tasks to run the UPDATES (against the leader) and the
+             * QUERIES (against a follower).
+             */
+
+            try {
+
+                // Start the UPDATE task.  Runs many updates.
+                executorService.submit(updateTaskFuture);
+
+                // Start the QUERY task. Runs many queries.
+                executorService.submit(queryTaskFuture);
+
+                // Wait for QueryTask : ends once UPDATE task is done.
+                queryTaskFuture.get(timeout, TimeUnit.MINUTES);
+
+                // Verify update task is done.
+                assertTrue(updateTaskFuture.isDone());
+                
+                // Check Future for errors (task is already done).
+                updateTaskFuture.get();
+ 
+            } finally {
+            
+                updateTaskFuture.cancel(true/* mayInterruptIfRunning */);
+
+                queryTaskFuture.cancel(true/* mayInterruptIfRunning */);
+
+            }
+
+        } finally {
+		
+            destroyAll();
+            
 		}
 	    	
     }
