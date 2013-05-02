@@ -165,7 +165,16 @@ public class ASTSparql11SubqueryOptimizer implements IASTOptimizer {
                 liftSubqueries(context, sa,
                         ((GraphPatternGroup<IGroupMemberNode>) child));
 
-            } else if (child instanceof ServiceNode) {
+            } else if (child instanceof SubqueryRoot) {
+
+                // Recursion into subqueries.
+
+                final SubqueryRoot subqueryRoot = (SubqueryRoot) child;
+
+                liftSubqueries(context, sa,
+                        subqueryRoot.getWhereClause());
+
+            }else if (child instanceof ServiceNode) {
             
                 // Do not rewrite things inside of a SERVICE node.
                 continue;
