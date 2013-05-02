@@ -1715,7 +1715,7 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
                 executorService.submit(queryTaskFuture);
 
                 // Wait for QueryTask : ends once UPDATE task is done.
-                queryTaskFuture.get(timeout, TimeUnit.MINUTES);
+                queryTaskFuture.get(timeout, TimeUnit.MILLISECONDS);
 
                 // Verify update task is done.
                 assertTrue(updateTaskFuture.isDone());
