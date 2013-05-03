@@ -177,7 +177,7 @@ public class CommitRecordIndex extends BTree {
      * @return The {@link ICommitRecord} index or <code>null</code> iff there
      *         is no {@link ICommitTimestamp} for that commit time.
      */
-    synchronized public ICommitRecord get(long commitTime) {
+    synchronized public ICommitRecord get(final long commitTime) {
 
         ICommitRecord commitRecord;
 
@@ -371,7 +371,7 @@ public class CommitRecordIndex extends BTree {
      *         <code>-1</code> iff there are no {@link ICommitRecord}s
      *         defined.
      */
-    synchronized public long findIndexOf(long timestamp) {
+    synchronized public long findIndexOf(final long timestamp) {
         
         long pos = super.indexOf(getKey(timestamp));
         

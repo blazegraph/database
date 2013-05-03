@@ -431,20 +431,26 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
             // The services joined with the met quorum, in their join order.
             joinedServiceIds = getQuorum().getJoined();
 
+            leadersValue = ((InnerJournalTransactionService) getTransactionService())
+                    .newHANotifyReleaseTimeRequest(quorumService.getServiceId());
+
             // Note: Local method call.
-            timestampOnLeader = getTransactionManager().nextTimestamp();
+            timestampOnLeader = leadersValue.getTimestamp();
 
-            final ICommitRecord commitRecord = getEarliestVisibleCommitRecord();
-
-            final long commitTime = commitRecord == null ? 0L : commitRecord
-                    .getTimestamp();
-
-            final long commitCounter  = commitRecord == null ? 0L : commitRecord
-                    .getCommitCounter();
-            
-            this.leadersValue = new HANotifyReleaseTimeRequest(
-                    quorumService.getServiceId(), commitTime, commitCounter,
-                    timestampOnLeader);
+//            final long effectiveReleaseTimeForHA = getTransactionService()
+//                    .getEffectiveReleaseTimeForHA();
+//            
+//            final ICommitRecord commitRecord = getEarliestVisibleCommitRecordForHA(effectiveReleaseTimeForHA);
+//
+//            final long commitTime = commitRecord == null ? 0L : commitRecord
+//                    .getTimestamp();
+//
+//            final long commitCounter  = commitRecord == null ? 0L : commitRecord
+//                    .getCommitCounter();
+//            
+//            this.leadersValue = new HANotifyReleaseTimeRequest(
+//                    quorumService.getServiceId(), commitTime, commitCounter,
+//                    timestampOnLeader);
 
             /*
              * Only the followers will countDown() at the barrier. The leader
@@ -463,6 +469,9 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
         @Override
         public void run() {
 
+            if (log.isTraceEnabled())
+                log.trace("leader: " + leadersValue);
+            
             // This is the timestamp from the BarrierState ctor.
             final long timeLeader = leadersValue.getTimestamp();
             
@@ -470,6 +479,9 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
             minimumResponse = leadersValue;
 
             for (IHANotifyReleaseTimeRequest response : responses.values()) {
+
+                if (log.isTraceEnabled())
+                    log.trace("follower: " + response);
 
                 if (minimumResponse.getCommitCounter() > response
                         .getCommitCounter()) {
@@ -490,6 +502,9 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
             consensus = new HANotifyReleaseTimeResponse(
                     minimumResponse.getCommitTime(),
                     minimumResponse.getCommitCounter());
+
+            if (log.isTraceEnabled())
+                log.trace("consensus: " + consensus);
 
         }
 
@@ -678,7 +693,14 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
                  * Notify the transaction service on startup so it can set the
                  * effective release time based on the last commit time for the
                  * store.
+                 * 
+                 * [TODO HA TXS: Review startup and serviceJoin() conditions to
+                 * set the releaseTime.]
                  */
+                
+                if (log.isInfoEnabled())
+                    log.info("Startup: lastCommitTime=" + lastCommitTime);
+                
                 updateReleaseTimeForBareCommit(lastCommitTime);
 
             }
@@ -804,7 +826,41 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
         /**
          * {@inheritDoc}
          * <p>
-         * Overridden to take the necessary lock.
+         * Note: When we are using a 2-phase commit, the leader can not update
+         * the release time from commit() using this methods. It must rely on
+         * the consensus protocol to update the release time instead.
+         * 
+         * @see <a href=
+         *      "https://sourceforge.net/apps/trac/bigdata/ticket/530#comment:116">
+         *      Journal HA </a>
+         */
+        @Override
+        protected void updateReleaseTimeForBareCommit(final long commitTime) {
+
+            final HAStatusEnum haStatus = getHAStatus();
+            
+            if (haStatus == null || haStatus == HAStatusEnum.NotReady) {
+            
+                super.updateReleaseTimeForBareCommit(commitTime);
+                
+            } else {
+                
+                /*
+                 * Note: When we are using a 2-phase commit, the leader can not
+                 * update the release time from commit() using this methods. It
+                 * must rely on the consensus protocol to update the release
+                 * time instead.
+                 */
+                
+            }
+
+        }
+
+        /**
+         * {@inheritDoc}
+         * <p>
+         * Overridden to take the necessary lock since we are invoking this
+         * method from contexts in which the lock would not otherwise be held.
          */
         @Override
         protected void setReleaseTime(final long newValue) {
@@ -816,25 +872,6 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
             
             try {
             
-                final long oldValue = super.getReleaseTime();
-                
-                if (newValue < oldValue) {
-                    
-                    /*
-                     * Note: We might have to allow this to roll back the
-                     * release time if a commit fails.
-                     */
-
-//                    throw new IllegalStateException("oldValue=" + oldValue
-//                            + ", newValue=" + newValue);
-
-                    // FIXME HA TXS : Observe newV = oldV - 1?
-                    log.error("oldValue=" + oldValue + ", newValue=" + newValue);
-
-                    return;
-
-                }
-
                 super.setReleaseTime(newValue);
                 
             } finally {
@@ -842,6 +879,44 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
                 lock.unlock();
                 
             }
+
+        }
+
+        /**
+         * Factory for {@link IHANotifyReleaseTimeRequest} messages. This is
+         * used by both the leader and the followers.
+         * 
+         * @param serviceId
+         *            The {@link UUID} for this service.
+         * @return The new message.
+         */
+        protected IHANotifyReleaseTimeRequest newHANotifyReleaseTimeRequest(
+                final UUID serviceId) {
+            
+            // On AbstractTransactionService.
+            final long effectiveReleaseTimeForHA = getEffectiveReleaseTimeForHA();
+
+            // On AbstractJournal
+            final ICommitRecord commitRecord = getEarliestVisibleCommitRecordForHA(effectiveReleaseTimeForHA);
+
+            final long commitCounter = commitRecord == null ? 0
+                    : commitRecord.getCommitCounter();
+
+            final long commitTime = commitRecord == null ? 0
+                    : commitRecord.getTimestamp();
+
+            final long now = getLocalTransactionManager().nextTimestamp();
+
+            final IHANotifyReleaseTimeRequest req = new HANotifyReleaseTimeRequest(
+                    serviceId, commitTime, commitCounter, now);
+
+            if (log.isTraceEnabled())
+                log.trace("releaseTime=" + getReleaseTime()
+                        + ", effectiveReleaseTimeForHA="
+                        + effectiveReleaseTimeForHA + ",rootBlock="
+                        + getRootBlockView() + ", req=" + req);
+            
+            return req;
 
         }
 
@@ -916,21 +991,33 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
 
                     final HAGlue leader = quorumService.getLeader(token);
 
-                    final ICommitRecord commitRecord = getEarliestVisibleCommitRecord();
-
-                    final long commitCounter = commitRecord == null ? 0
-                            : commitRecord.getCommitCounter();
-
-                    final long commitTime = commitRecord == null ? 0
-                            : commitRecord.getTimestamp();
-
-                    final long timestampOnFollower = getLocalTransactionManager()
-                            .nextTimestamp();
-
-                    final IHANotifyReleaseTimeRequest req2 = new HANotifyReleaseTimeRequest(
-                            quorumService.getServiceId(), commitTime,
-                            commitCounter, timestampOnFollower);
-
+                    final IHANotifyReleaseTimeRequest req2 = newHANotifyReleaseTimeRequest(quorumService
+                            .getServiceId());
+                    
+//                    final long effectiveReleaseTimeForHA = getEffectiveReleaseTimeForHA();
+//
+//                    final ICommitRecord commitRecord = getEarliestVisibleCommitRecordForHA(effectiveReleaseTimeForHA);
+//
+//                    final long commitCounter = commitRecord == null ? 0
+//                            : commitRecord.getCommitCounter();
+//
+//                    final long commitTime = commitRecord == null ? 0
+//                            : commitRecord.getTimestamp();
+//
+//                    final long timestampOnFollower = getLocalTransactionManager()
+//                            .nextTimestamp();
+//
+//                    final IHANotifyReleaseTimeRequest req2 = new HANotifyReleaseTimeRequest(
+//                            quorumService.getServiceId(), commitTime,
+//                            commitCounter, timestampOnFollower);
+//
+//                    if (log.isTraceEnabled())
+//                        log.trace("releaseTime=" + getReleaseTime()
+//                                + ", effectiveReleaseTimeForHA="
+//                                + effectiveReleaseTimeForHA 
+//                                + ",rootBlock=" + getRootBlockView()
+//                                + ", req=" + req);
+//
                     /*
                      * RMI to leader.
                      * 
@@ -1004,9 +1091,11 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
 
         /**
          * Helper method returns the {@link HAStatusEnum} -or- <code>null</code>
-         * if this is not HA. This is a <em>low latency local</em> method call.
-         * The code path is against the local (non-remote) HAGlue obeject. It is
-         * NOT an RMI.
+         * if this is not HA or if the {@link Quorum} is not running. This is a
+         * <em>low latency local</em> method call. The code path is against the
+         * local (non-remote) HAGlue object. It is NOT an RMI.
+         * 
+         * @return The {@link HAStatusEnum} or <code>null</code>.
          */
         private final HAStatusEnum getHAStatus() {
             
@@ -1020,10 +1109,24 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
                 
             }
             
+            // Note: This is the local service interface.
+            final HAGlue localService;
+            try {
+
+                localService = quorum.getClient().getService();
+                
+            } catch (IllegalStateException ex) {
+                /*
+                 * Quorum client is not running (not started or terminated).
+                 */
+                return null;
+
+            }
+            
             // Note: Invocation against local HAGlue object (NOT RMI).
             try {
 
-                return quorum.getClient().getService().getHAStatus();
+                return localService.getHAStatus();
                 
             } catch (IOException ex) {
                 
@@ -1257,7 +1360,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
             return super.commit(tx);
 
         }
-                
+        @Override
         protected void activateTx(final TxState state) {
             if (txLog.isInfoEnabled())
                 txLog.info("OPEN : txId=" + state.tx
@@ -1272,7 +1375,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
             }
             super.activateTx(state);
         }
-
+        @Override
         protected void deactivateTx(final TxState state) {
             if (txLog.isInfoEnabled())
                 txLog.info("CLOSE: txId=" + state.tx
@@ -2367,6 +2470,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
         
     }
 
+    @SuppressWarnings("rawtypes")
     public List<Future> invokeAll(
             Collection<? extends AbstractTask> tasks, long timeout,
             TimeUnit unit) throws InterruptedException {
