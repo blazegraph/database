@@ -907,13 +907,124 @@ abstract public class AbstractTransactionService extends AbstractService
      */
     protected void setReleaseTime(final long newValue) {
 
-        if(!lock.isHeldByCurrentThread())
+        if (!lock.isHeldByCurrentThread())
             throw new IllegalMonitorStateException();
+
+        /*
+         * FIXME HA TXS: The HA release time consensus protocol relies on the
+         * evolving release time on each joined service. This means that the
+         * release times on a joined service can increase until we hit the next
+         * commit point on the leader. At that point, we look at the pinned
+         * history (minReleaseAge) and the earliest visible commit point (taking
+         * into account the local releaseTime) on each joined service. This
+         * gives us a consensus value for the earliest visible commit record on
+         * any service. That new release time is then propagated to the
+         * services. This CAN result in historical state being "invisible" on a
+         * follower and then "reappearing" after a commit since either the
+         * leader or another follower still has an earlier commit point pinned.
+         * 
+         * This should be modified such that the releaseTime is ONLY updated in
+         * HA each time we go through a commit point. This means that the
+         * consensus protocol must discover the earliest active tx and its
+         * readsOnCommitTime rather than relying on the then current
+         * releaseTime. This is the only way to have a tx on one TXS in an HA
+         * replication cluster pin the history of all TXS services in that
+         * cluster.
+         * 
+         * The necessary changes are to:
+         * 
+         * - Journal.InnerJournalTransactionService.GatherTask.call(). This is
+         * where we decide the earliest visible commit record on the follower.
+         * 
+         * - AbstractJournal.getEarliestVisibleCommitRecord(). This must use
+         * getEarliestActiveTx() while holding the TXS lock, so this method
+         * needs to be lifted onto the InnerJournalTransactionService.
+         * 
+         * FIXME - AbstractTransactionService.updateReleaseTime(). This must not
+         * advance the releaseTime in HA unless it is done as part of the
+         * consensus protocol. Note: I have already modified
+         * updateReleaseTimeForBareCommit() which was having some similar
+         * issues. However, I do not believe that my changes are yet coherent or
+         * sufficient.
+         */
+
+        final long oldValue = releaseTime;
         
+        if (newValue < oldValue) {
+            
+//            throw new IllegalStateException("oldValue=" + oldValue
+//                    + ", newValue=" + newValue);
+
+            // FIXME HA TXS : Observe newV = oldV - 1?
+            final String msg = "oldValue=" + oldValue + ", newValue="
+                    + newValue;
+
+            log.error(msg, new RuntimeException(msg));
+
+            return;
+
+        }
+
         if (log.isInfoEnabled())
             log.info("newValue=" + newValue);
-        
+
         this.releaseTime = newValue;
+
+    }
+    
+    /**
+     * This method was introduced to compute the effective timestamp of the
+     * pinned history in support of the HA TXS. It <strong>ignores</strong> the
+     * <code>releaseTime</code> and reports the minimum of
+     * <code>now - minReleaseAge</code> and the readsOnCommitTime of the
+     * earliest active Tx. If the value would be negative, then ZERO (0L) is
+     * reported instead.
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/623"> HA
+     *      TXS </a>
+     */
+    protected long getEffectiveReleaseTimeForHA() {
+
+        lock.lock();
+
+        try {
+
+            final long now = _nextTimestamp();
+
+            // Find the earliest commit time pinned by an active tx.
+            final long readsOnCommitTime;
+
+            final TxState txState = getEarlestActiveTx();
+            
+            if (txState == null) {
+                
+                // No active tx. Use now.
+                readsOnCommitTime = now;
+                
+            } else {
+                
+                // Earliest active tx.
+                readsOnCommitTime = txState.readsOnCommitTime;
+                
+            }
+
+            final long effectiveReleaseTimeForHA = Math.min(
+                    readsOnCommitTime - 1, now - minReleaseAge);
+
+            if (log.isDebugEnabled())
+                log.debug("releaseTime=" + releaseTime + ", earliestActiveTx="
+                        + txState + ", readsOnCommitTime=" + readsOnCommitTime
+                        + ", (now-minReleasAge)=" + (now - minReleaseAge)
+                        + ", effectiveReleaseTimeForHA="
+                        + effectiveReleaseTimeForHA);
+
+            return effectiveReleaseTimeForHA;
+
+        } finally {
+        
+            lock.unlock();
+            
+        }
         
     }
     
@@ -1337,7 +1448,7 @@ abstract public class AbstractTransactionService extends AbstractService
         }
 
     }
-    
+
     /**
      * Return the minimum #of milliseconds of history that must be preserved.
      * 

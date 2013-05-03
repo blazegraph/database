@@ -3509,9 +3509,16 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
     /**
      * Resolve the {@link ICommitRecord} for the earliest visible commit point
-     * based on the current {@link ITransactionService#getReleaseTime()}.
+     * based on the caller's <i>releaseTime</i>.
+     * <p>
+     * Note: This method is used for HA. The caller provides a releaseTime based
+     * on the readsOnCommitTime of the earliestActiveTx and the minReleaseAge
+     * rather than {@link ITransactionService#getReleaseTime()} since the latter
+     * is only updated by the release time consensus protocol during a 2-phase
+     * commit.
      */
-    protected ICommitRecord getEarliestVisibleCommitRecord() {
+    protected ICommitRecord getEarliestVisibleCommitRecordForHA(
+            final long releaseTime) {
 
         final ReadLock lock = _fieldReadWriteLock.readLock();
 
@@ -3519,10 +3526,10 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
         try {
 
-            final long releaseTime = getLocalTransactionManager()
-                    .getTransactionService().getReleaseTime();
+            if (_rootBlock.getCommitCounter() == 0L) {
 
-            if (releaseTime == 0) {
+                if (log.isTraceEnabled())
+                    log.trace("No commit points");
 
                 // Nothing committed yet.
                 return null;
@@ -3534,22 +3541,35 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
             if (commitRecordIndex == null)
                 throw new AssertionError();
 
+            /*
+             * Note: The commitRecordIndex does not allow us to probe with a
+             * commitTime of ZERO. Therefore, when the releaseTime is ZERO, we
+             * probe with a commitTime of ONE. Since the commitTimes are
+             * timestamps, there will never be a record with a commitTime of ONE
+             * and this will return us the first record in the
+             * CommitRecordIndex.
+             */
             final ICommitRecord commitRecord = commitRecordIndex
-                    .findNext(releaseTime);
+                    .findNext(releaseTime == 0L ? 1 : releaseTime);
+
+            if (log.isTraceEnabled())
+                log.trace("releaseTime=" + releaseTime + ",commitRecord="
+                        + commitRecord);
 
             return commitRecord;
 
-        } catch (IOException e) {
-
-            // Note: Should not be thrown. Local method call.
-            throw new RuntimeException(e);
+//        } catch (IOException e) {
+//
+//            // Note: Should not be thrown. Local method call.
+//            throw new RuntimeException(e);
 
         } finally {
 
             lock.unlock();
             
         }
-	}
+
+    }
 	
 	/**
 	 * Returns a read-only view of the most recently committed
