@@ -46,9 +46,8 @@ import org.openrdf.rio.helpers.RDFHandlerBase;
 import org.openrdf.sail.SailException;
 
 import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
-import com.bigdata.rdf.sail.webapp.client.EncodeDecodeValue;
-import com.bigdata.rdf.sail.webapp.client.MiniMime;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
+import com.bigdata.rdf.sail.webapp.client.MiniMime;
 
 /**
  * Handler for INSERT operations.
@@ -205,7 +204,7 @@ public class InsertServlet extends BigdataRDFServlet {
             final String[] s = req.getParameterValues("context-uri");
             if (s != null && s.length > 0) {
                 try {
-                	defaultContext = EncodeDecodeValue.decodeResources(s);
+                	defaultContext = toURIs(s);
                 } catch (IllegalArgumentException ex) {
                     buildResponse(resp, HTTP_INTERNALERROR, MIME_TEXT_PLAIN,
                             ex.getLocalizedMessage());
@@ -354,7 +353,7 @@ public class InsertServlet extends BigdataRDFServlet {
             final String[] s = req.getParameterValues("context-uri");
             if (s != null && s.length > 0) {
                 try {
-                	defaultContext = EncodeDecodeValue.decodeResources(s);
+                	defaultContext = toURIs(s);
                 } catch (IllegalArgumentException ex) {
                     buildResponse(resp, HTTP_INTERNALERROR, MIME_TEXT_PLAIN,
                             ex.getLocalizedMessage());
