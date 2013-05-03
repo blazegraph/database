@@ -45,6 +45,7 @@ import org.apache.log4j.Logger;
 import org.openrdf.model.Graph;
 import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
+import org.openrdf.model.impl.URIImpl;
 import org.openrdf.repository.RepositoryException;
 import org.openrdf.repository.RepositoryResult;
 import org.openrdf.rio.RDFFormat;
@@ -58,7 +59,6 @@ import com.bigdata.rdf.properties.PropertiesWriter;
 import com.bigdata.rdf.properties.PropertiesWriterRegistry;
 import com.bigdata.rdf.rules.ConstraintViolationException;
 import com.bigdata.rdf.sail.webapp.XMLBuilder.Node;
-import com.bigdata.rdf.sail.webapp.client.EncodeDecodeValue;
 import com.bigdata.util.InnerCause;
 
 /**
@@ -415,7 +415,7 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
         final Node root = t.root("contexts");
         while (contexts.hasNext()) {
         	root.node("context")
-        		.attr("uri", EncodeDecodeValue.encodeValue(contexts.next()))
+        		.attr("uri", contexts.next())
         		.close();
         }
         root.close();
@@ -537,6 +537,29 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
             return false;
         }
         return true;
+    }
+    
+    /**
+     * Convert an array of URI strings to an array of URIs.
+     */
+    protected Resource[] toURIs(final String[] s) {
+    	
+    	if (s == null)
+    		return null;
+    	
+    	if (s.length == 0)
+    		return new Resource[0];
+
+    	final Resource[] uris = new Resource[s.length];
+    	
+    	for (int i = 0; i < s.length; i++) {
+    		
+    		uris[i] = new URIImpl(s[i]);
+    		
+    	}
+    	
+    	return uris;
+    	
     }
     
 }
