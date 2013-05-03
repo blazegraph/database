@@ -294,6 +294,7 @@ public class TestASTSubGroupJoinVarOptimizer extends
                             "_var9"), null/* c */, Scope.DEFAULT_CONTEXTS));
             whereClause.addChild(simpleOptGroup);
             simpleOptGroup.setJoinVars(joinVars);
+            simpleOptGroup.setProjectInVars(joinVars);
 
             final JoinGroupNode complexOptGroup = new JoinGroupNode(true/* optional */);
             whereClause.addChild(complexOptGroup);
@@ -307,6 +308,7 @@ public class TestASTSubGroupJoinVarOptimizer extends
                         "_var2"), null/* c */, Scope.DEFAULT_CONTEXTS));
                 
                 complexOptGroup.setJoinVars(joinVars);
+                complexOptGroup.setProjectInVars(joinVars);
             }
 
             final GroupByNode groupByNode = new GroupByNode();
