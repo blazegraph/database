@@ -1506,6 +1506,8 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
      *            The #of UPDATE transactions to execute.
      * @param transactionDelay
      *            The delay between the UPDATE transactions.
+     *            
+     * TODO Modify to run a lot of concurrent fast queries (multiple threads) on one follower and slow queries on the other (one thread).  Parameterize for stress test scenarios.
      */
     protected void doABCMultiTransactionFollowerReads(final int nTransactions,
             final long transactionDelay) throws Exception {
