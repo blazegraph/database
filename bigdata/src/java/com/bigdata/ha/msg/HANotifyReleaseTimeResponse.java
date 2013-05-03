@@ -41,6 +41,12 @@ public class HANotifyReleaseTimeResponse implements
     }
 
     @Override
+    public String toString() {
+        return super.toString() + "{commitTime=" + commitTime
+                + ",commitCounter=" + commitCounter + "}";
+    }
+
+    @Override
     public long getCommitTime() {
         return commitTime;
     }

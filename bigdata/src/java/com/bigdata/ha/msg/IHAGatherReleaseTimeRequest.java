@@ -41,12 +41,6 @@ public interface IHAGatherReleaseTimeRequest extends IHAMessage {
      */
     public long token();
     
-//    /**
-//     * The timestamp associated with the earliest pinned commit point on the
-//     * leader.
-//     */
-//    public long getLeadersValue();
-
     /**
      * A timestamp on the leader at the start of the protocol used to agree on
      * the new release time (this can be the commitTime that will be assigned by

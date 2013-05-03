@@ -63,9 +63,9 @@ public interface IHANotifyReleaseTimeRequest extends IHAMessage {
 //    public long getMinReleaseAge();
 
     /**
-     * A timestamp on the follower taken during the protocol used to agree on
-     * the new release time. This is used to detect problems where the clocks
-     * are not synchronized on the services.
+     * A timestamp taken during the protocol used to agree on the new release
+     * time. This is used to detect problems where the clocks are not
+     * synchronized on the services.
      */
     public long getTimestamp();
 

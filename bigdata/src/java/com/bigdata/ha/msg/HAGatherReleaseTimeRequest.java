@@ -41,6 +41,12 @@ public class HAGatherReleaseTimeRequest implements
     }
 
     @Override
+    public String toString() {
+        return super.toString() + "{token=" + token + ",timestampOnLeader="
+                + timestampOnLeader + "}";
+    }
+    
+    @Override
     public long token() {
         return token;
     }
