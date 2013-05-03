@@ -62,6 +62,13 @@ public abstract class GroupNodeBase<E extends IGroupMemberNode> extends
 		return (Iterator) argIterator();
 		
 	}
+	
+	@SuppressWarnings({ "unchecked", "rawtypes" })
+	public List<E> getChildren() {
+		
+		return (List) args();
+		
+	}
 
 //	/**
 //	 * {@inheritDoc}
