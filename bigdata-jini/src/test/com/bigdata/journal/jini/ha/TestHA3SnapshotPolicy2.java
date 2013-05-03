@@ -107,7 +107,8 @@ public class TestHA3SnapshotPolicy2 extends AbstractHA3BackupTestCase {
         
         return new String[]{
                 "com.bigdata.journal.jini.ha.HAJournalServer.restorePolicy=new com.bigdata.journal.jini.ha.DefaultRestorePolicy(0L,1,0)",
-                "com.bigdata.journal.jini.ha.HAJournalServer.snapshotPolicy=new com.bigdata.journal.jini.ha.DefaultSnapshotPolicy("+neverRun+",0)"
+                "com.bigdata.journal.jini.ha.HAJournalServer.snapshotPolicy=new com.bigdata.journal.jini.ha.DefaultSnapshotPolicy("+neverRun+",0)",
+                "com.bigdata.journal.jini.ha.HAJournalServer.onlineDisasterRecovery=true"
         };
         
     }
