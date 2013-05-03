@@ -35,17 +35,24 @@ public class HANotifyReleaseTimeRequest implements IHANotifyReleaseTimeRequest {
     private final UUID serviceUUID;
     private final long commitTime;
     private final long commitCounter;
-    private final long timestampOnFollower;
+    private final long timestamp;
 
     public HANotifyReleaseTimeRequest(final UUID serviceUUID,
             final long commitTime, final long commitCounter,
-            final long timestampOnFollower) {
+            final long timestamp) {
         this.serviceUUID = serviceUUID;
         this.commitTime = commitTime;
         this.commitCounter = commitCounter;
-        this.timestampOnFollower = timestampOnFollower;
+        this.timestamp = timestamp;
     }
 
+    @Override
+    public String toString() {
+        return super.toString() + "{serviceUUID=" + serviceUUID
+                + ",commitTime=" + commitTime + ",commitCounter="
+                + commitCounter + ",timestamp=" + timestamp + "}";
+    }
+    
     @Override
     public UUID getServiceUUID() {
         return serviceUUID;
@@ -63,7 +70,7 @@ public class HANotifyReleaseTimeRequest implements IHANotifyReleaseTimeRequest {
 
     @Override
     public long getTimestamp() {
-        return timestampOnFollower;
+        return timestamp;
     }
 
 }
