@@ -134,10 +134,17 @@ public class ASTComplexOptionalOptimizer implements IASTOptimizer {
 //    private static final Logger log = Logger
 //            .getLogger(ASTComplexOptionalOptimizer.class);
 	
-	/**
-	 * Set this to false to only optimize the top level group.
-	 */
-	private static boolean recurse = true;
+    /**
+     * Set this to <code>false</code> to only optimize the top level group.
+     * <p>
+     * Note: We have confirm that this change does not have a negative impact on
+     * either govtrack or BSBM. The change also fixes a known problem with some
+     * customer queries.
+     * 
+     * @see <a href="http://sourceforge.net/apps/trac/bigdata/ticket/668" > Join
+     *      Group Optimization </a>
+     */
+	private static boolean recurse = false;
     
     @Override
     public IQueryNode optimize(final AST2BOpContext context,
