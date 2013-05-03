@@ -39,6 +39,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock.ReadLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock.WriteLock;
 
 import com.bigdata.LRUNexus;
 import com.bigdata.btree.BTree.Counter;
@@ -192,9 +194,11 @@ public class WORMStrategy extends AbstractBufferStrategy implements
 //    private final AtomicReference<Quorum<?,?>> quorumRef;
 
     /**
-     * This lock is used to exclude readers when the extent of the backing file
-     * is about to be changed. This is a workaround for an old (an unresolved as
-     * of February 2010) Sun bug.
+     * This lock is used to exclude readers/writers performing IOs against the
+     * backing file when the extent of the backing file is about to be changed.
+     * Readers and writers take the {@link ReadLock}. The {@link WriteLock} is
+     * taken when the file extent must be changed. This is a workaround for an
+     * old (an unresolved as of February 2010) Sun bug.
      * 
      * @see http://bugs.sun.com/bugdatabase/view_bug.do?bug_id=6371642
      */
