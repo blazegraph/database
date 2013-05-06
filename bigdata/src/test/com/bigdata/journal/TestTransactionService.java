@@ -36,6 +36,7 @@ import junit.framework.TestCase2;
 
 import com.bigdata.service.AbstractFederation;
 import com.bigdata.service.AbstractTransactionService;
+import com.bigdata.service.AbstractTransactionService.TxState;
 import com.bigdata.service.CommitTimeIndex;
 import com.bigdata.service.TxServiceRunState;
 
@@ -263,12 +264,14 @@ public class TestTransactionService extends TestCase2 {
         }
 
         /**
-         * FIXME This currently waits until at least two milliseconds have
+         * Note: This currently waits until at least two milliseconds have
          * elapsed. This is a workaround for
-         * {@link TestTransactionService#test_newTx_readOnly()} until <a href=
-         * "https://sourceforge.net/apps/trac/bigdata/ticket/145" >ISSUE#145
-         * </a> is resolved.  This override of {@link #nextTimestamp()} should
-         * be removed once that issue is fixed.
+         * {@link TestTransactionService#test_newTx_readOnly()} until (if) <a
+         * href= "https://sourceforge.net/apps/trac/bigdata/ticket/145"
+         * >ISSUE#145 </a> is resolved.
+         * 
+         * TODO This override of {@link #nextTimestamp()} should be removed once
+         * that issue is fixed.
          */
         @Override
         public long nextTimestamp() {
@@ -281,6 +284,44 @@ public class TestTransactionService extends TestCase2 {
              * the private [lastTimestamp] method.
              */
             return super.nextTimestamp();
+            
+        }
+
+        /**
+         * {@inheritDoc}
+         * <p>
+         * Exposed to the test suite.
+         * <p>
+         * This version takes the lock since we are controlling concurrency
+         * explicitly in the test suite. This makes it easier to write the
+         * tests.
+         */
+        @Override
+        protected TxState getEarliestActiveTx() {
+
+            lock.lock();
+            
+            try {
+            
+                return super.getEarliestActiveTx();
+                
+            } finally {
+                
+                lock.unlock();
+                
+            }
+
+        }
+
+        /**
+         * {@inheritDoc}
+         * <p>
+         * Exposed to the test suite.
+         */
+        @Override
+        protected TxState getTxState(final long txId) {
+            
+            return super.getTxState(txId);
             
         }
 
@@ -304,6 +345,12 @@ public class TestTransactionService extends TestCase2 {
 
             assertEquals(0, service.getActiveCount());
 
+            assertEquals(0, service.getReadWriteActiveCount());
+
+            assertEquals(0, service.getReadOnlyActiveCount());
+            
+            assertNull(service.getEarliestActiveTx());
+
             final long t0 = service.nextTimestamp();
 
             final long tx = service.newTx(ITx.UNISOLATED);
@@ -320,10 +367,32 @@ public class TestTransactionService extends TestCase2 {
             assertTrue(Math.abs(tx) < t1);
 
             assertEquals(1, service.getActiveCount());
-            
+
             assertEquals(1, service.getReadWriteActiveCount());
 
             assertEquals(0, service.getReadOnlyActiveCount());
+
+            assertNotNull(service.getEarliestActiveTx());
+
+            assertEquals(tx, service.getEarliestActiveTx().tx);
+
+            // TxState object.
+            final TxState txState = service.getTxState(tx);
+            {
+
+                assertNotNull(txState);
+
+                assertEquals(tx, txState.tx);
+
+                assertTrue(txState.isActive());
+
+                assertFalse(txState.isReadOnly());
+
+                assertFalse(txState.isPrepared());
+                
+                assertFalse(txState.isComplete());
+                
+            }
 
             service.abort(tx);
 
@@ -339,6 +408,25 @@ public class TestTransactionService extends TestCase2 {
 
             assertEquals(0, service.getReadOnlyActiveCount());
 
+            assertNull(service.getEarliestActiveTx());
+
+            // TxState object.
+            {
+            
+                assertNull(service.getTxState(tx));
+
+                assertFalse(txState.isActive());
+
+                assertTrue(txState.isAborted());
+
+                assertFalse(txState.isCommitted());
+
+                assertFalse(txState.isPrepared());
+                
+                assertTrue(txState.isComplete());
+
+            }
+            
         } finally {
 
             service.destroy();
@@ -358,6 +446,12 @@ public class TestTransactionService extends TestCase2 {
 
             assertEquals(0, service.getActiveCount());
 
+            assertEquals(0, service.getReadWriteActiveCount());
+
+            assertEquals(0, service.getReadOnlyActiveCount());
+            
+            assertNull(service.getEarliestActiveTx());
+
             final long t0 = service.nextTimestamp();
 
             final long tx = service.newTx(ITx.UNISOLATED);
@@ -379,6 +473,27 @@ public class TestTransactionService extends TestCase2 {
 
             assertEquals(0, service.getReadOnlyActiveCount());
 
+            assertNotNull(service.getEarliestActiveTx());
+
+            assertEquals(tx, service.getEarliestActiveTx().tx);
+
+            final TxState txState = service.getTxState(tx);
+            {
+
+                assertNotNull(txState);
+
+                assertEquals(tx, txState.tx);
+
+                assertTrue(txState.isActive());
+
+                assertFalse(txState.isReadOnly());
+
+                assertFalse(txState.isPrepared());
+                
+                assertFalse(txState.isComplete());
+                
+            }
+            
             service.commit(tx);
 
             assertEquals(0, service.getActiveCount());
@@ -391,6 +506,25 @@ public class TestTransactionService extends TestCase2 {
 
             assertEquals(0, service.getReadOnlyActiveCount());
 
+            assertNull(service.getEarliestActiveTx());
+            
+            // TxState object.
+            {
+            
+                assertNull(service.getTxState(tx));
+
+                assertFalse(txState.isActive());
+
+                assertFalse(txState.isAborted());
+
+                assertTrue(txState.isCommitted());
+
+                assertFalse(txState.isPrepared());
+                
+                assertTrue(txState.isComplete());
+
+            }
+            
         } finally {
 
             service.destroy();
@@ -410,11 +544,59 @@ public class TestTransactionService extends TestCase2 {
 
             assertEquals(0, service.getActiveCount());
 
+            assertEquals(0, service.getReadWriteActiveCount());
+
+            assertEquals(0, service.getReadOnlyActiveCount());
+
+            assertNull(service.getEarliestActiveTx());
+
             final long tx1 = service.newTx(ITx.UNISOLATED);
+
+            assertEquals(tx1, service.getEarliestActiveTx().tx);
+
+            final TxState txState1 = service.getTxState(tx1);
+            {
+
+                assertNotNull(txState1);
+
+                assertEquals(tx1, txState1.tx);
+
+                assertTrue(txState1.isActive());
+
+                assertFalse(txState1.isReadOnly());
+
+                assertFalse(txState1.isPrepared());
+                
+                assertFalse(txState1.isComplete());
+                
+            }
 
             final long tx2 = service.newTx(ITx.UNISOLATED);
 
             assertTrue(Math.abs(tx1) < Math.abs(tx2));
+
+            /*
+             * Note: tx1<tx2 so tx1 remains "earliestActive" even though both
+             * have the same readsOnCommitTime.
+             */
+            assertEquals(tx1, service.getEarliestActiveTx().tx);
+
+            final TxState txState2 = service.getTxState(tx2);
+            {
+
+                assertNotNull(txState2);
+
+                assertEquals(tx2, txState2.tx);
+
+                assertTrue(txState2.isActive());
+
+                assertFalse(txState2.isReadOnly());
+
+                assertFalse(txState2.isPrepared());
+                
+                assertFalse(txState2.isComplete());
+                
+            }
 
             assertEquals(2, service.getActiveCount());
 
@@ -423,15 +605,51 @@ public class TestTransactionService extends TestCase2 {
             assertEquals(0, service.getReadOnlyActiveCount());
 
             service.commit(tx2);
+            
+            // TxState object.
+            {
+            
+                assertNull(service.getTxState(tx2));
 
+                assertFalse(txState2.isActive());
+
+                assertFalse(txState2.isAborted());
+
+                assertTrue(txState2.isCommitted());
+
+                assertFalse(txState2.isPrepared());
+                
+                assertTrue(txState2.isComplete());
+
+            }
+            
             assertEquals(1, service.getActiveCount());
 
             assertEquals(1, service.getReadWriteActiveCount());
 
             assertEquals(0, service.getReadOnlyActiveCount());
 
+            assertEquals(tx1, service.getEarliestActiveTx().tx);
+
             service.commit(tx1);
 
+            // TxState object.
+            {
+            
+                assertNull(service.getTxState(tx1));
+
+                assertFalse(txState1.isActive());
+
+                assertFalse(txState1.isAborted());
+
+                assertTrue(txState1.isCommitted());
+
+                assertFalse(txState1.isPrepared());
+                
+                assertTrue(txState1.isComplete());
+
+            }
+            
             assertEquals(0, service.getActiveCount());
 
             assertEquals(2, service.getStartCount());
@@ -441,6 +659,8 @@ public class TestTransactionService extends TestCase2 {
             assertEquals(0, service.getReadWriteActiveCount());
 
             assertEquals(0, service.getReadOnlyActiveCount());
+
+            assertNull(service.getEarliestActiveTx());
 
         } finally {
 
@@ -463,21 +683,32 @@ public class TestTransactionService extends TestCase2 {
 
             final long tx = service.newTx(ITx.UNISOLATED);
 
+            final TxState txState = service.getTxState(tx);
+            
             service.commit(tx);
+
+            assertFalse(txState.isPrepared());
+            assertTrue(txState.isCommitted());
             
             try {
                 service.commit(tx);
                 fail("Expecting: "+IllegalStateException.class);
             } catch(IllegalStateException ex) {
-                log.info("Ignoring expected exception: "+ex);
+                if (log.isInfoEnabled())
+                    log.info("Ignoring expected exception: " + ex);
             }
 
             try {
                 service.abort(tx);
                 fail("Expecting: "+IllegalStateException.class);
             } catch(IllegalStateException ex) {
-                log.info("Ignoring expected exception: "+ex);
+                if (log.isInfoEnabled())
+                    log.info("Ignoring expected exception: " + ex);
             }
+            
+            // Unchanged by the failed abort.
+            assertFalse(txState.isPrepared());
+            assertTrue(txState.isCommitted());
 
         } finally {
 
@@ -628,18 +859,15 @@ public class TestTransactionService extends TestCase2 {
      * The transaction start time is then chosen from the half-open interval
      * <i>commitTime</i> (inclusive lower bound) : <i>nextCommitTime</i>
      * (exclusive upper bound).
-     * 
-     * @throws IOException
-     * 
-     * @todo This test fails occasionally. This occurs if the timestamps
-     *       assigned by the {@link MockTransactionService} are only 1 unit
-     *       apart. When that happens, there are not enough distinct values
-     *       available to allow 2 concurrent read-only transactions. See <a
-     *       href=
-     *       "https://sourceforge.net/apps/trac/bigdata/ticket/145">ISSUE#145
-     *       </a>.  Also see {@link MockTransactionService#nextTimestamp()}
-     *       which has been overridden to guarantee that there are at least
-     *       two distinct values such that this test will pass.
+     * <P>
+     * Note: This test (used to) fail occasionally. This occured if the
+     * timestamps assigned by the {@link MockTransactionService} are only 1 unit
+     * apart. When that happens, there are not enough distinct values available
+     * to allow 2 concurrent read-only transactions. See <a href=
+     * "https://sourceforge.net/apps/trac/bigdata/ticket/145">ISSUE#145 </a>.
+     * Also see {@link MockTransactionService#nextTimestamp()} which has been
+     * overridden to guarantee that there are at least two distinct values such
+     * that this test will pass.
      */
     public void test_newTx_readOnly() throws IOException {
 
@@ -662,39 +890,78 @@ public class TestTransactionService extends TestCase2 {
             
             service.notifyCommit(commitTime);
             
-            assertEquals(commitTime,service.getLastCommitTime());
-            
-            service.notifyCommit(nextCommitTime);
-            
-            assertEquals(nextCommitTime,service.getLastCommitTime());
+            assertEquals(commitTime, service.getLastCommitTime());
 
-            // a tx for the commit point whose commitTime is 10.
+            service.notifyCommit(nextCommitTime);
+
+            assertEquals(nextCommitTime, service.getLastCommitTime());
+
+            // a read-only tx for the 1st commit point .
             final long tx1 = service.newTx(commitTime);
             
-            System.err.println("tx1="+tx1);
+            if (log.isInfoEnabled())
+                log.info("tx1=" + tx1);
             
             assertFalse(TimestampUtility.isReadWriteTx(tx1));
 
             assertTrue(tx1 >= commitTime && tx1 < nextCommitTime);
 
-            // another tx for the same commit point.
+            final TxState txState1 = service.getTxState(tx1);
+            {
+                assertEquals(tx1, txState1.getStartTimestamp());
+                assertTrue(txState1.isActive());
+                assertTrue(txState1.isReadOnly());
+                assertFalse(txState1.isPrepared());
+                assertFalse(txState1.isCommitted());
+                assertFalse(txState1.isComplete());
+            }
+
+            assertEquals(tx1, service.getEarliestActiveTx().tx);
+
+            // another read-only tx for the same commit point.
             final long tx2 = service.newTx(commitTime);
 
-            System.err.println("tx2="+tx2);
-            
+            if (log.isInfoEnabled())
+                log.info("tx2=" + tx2);
+
             assertFalse(TimestampUtility.isReadWriteTx(tx2));
 
             assertTrue(tx2 >= commitTime && tx2 < nextCommitTime);
             
             assertNotSame(tx1, tx2);
 
+            final TxState txState2 = service.getTxState(tx2);
+            {
+                assertEquals(tx2, txState2.getStartTimestamp());
+                assertTrue(txState2.isActive());
+                assertTrue(txState2.isReadOnly());
+                assertFalse(txState2.isPrepared());
+                assertFalse(txState2.isCommitted());
+                assertFalse(txState2.isComplete());
+            }
+
+            // earliest active tx is unchanged.
+            assertEquals(tx1, service.getEarliestActiveTx().tx);
+
             // commit tx1 (releases its start time so that it may be reused).
             service.commit(tx1);
             
-            // another tx for the same commit point.
+            // no longer in the [activeTx] map.
+            assertNull(service.getTxState(tx1));
+
+            // earliest active tx was changed.
+            assertEquals(tx2, service.getEarliestActiveTx().tx);
+
+            /*
+             * Another tx for the same commit point.
+             * 
+             * Note: This will wind up assigning the same txId that was in use
+             * by tx1 (the first available txId).
+             */
             final long tx3 = service.newTx(commitTime);
 
-            System.err.println("tx3=" + tx3);
+            if (log.isInfoEnabled())
+                log.info("tx3=" + tx3);
 
             assertFalse(TimestampUtility.isReadWriteTx(tx3));
 
@@ -705,6 +972,9 @@ public class TestTransactionService extends TestCase2 {
 
             // but in fact we should have recycled tx1!
             assertEquals(tx1, tx3);
+
+            // earliest active tx was changed again (back to tx1's startTime).
+            assertEquals(tx3, service.getEarliestActiveTx().tx);
 
         } finally {
 
@@ -742,15 +1012,17 @@ public class TestTransactionService extends TestCase2 {
             // a tx for the commit point whose commitTime is 10.
             final long tx1 = service.newTx(commitTime);
             
-            System.err.println("tx1="+tx1);
+            if (log.isInfoEnabled())
+                log.info("tx1="+tx1);
             
             assertTrue(tx1 >= commitTime && tx1 < nextCommitTime);
 
             // another tx for the same commit point.
             final long tx2 = service.newTx(commitTime);
 
-            System.err.println("tx2="+tx2);
-            
+            if (log.isInfoEnabled())
+                log.info("tx2=" + tx2);
+
             assertTrue(tx2 >= commitTime && tx2 < nextCommitTime);
             
             assertNotSame(tx1, tx2);
@@ -924,7 +1196,12 @@ public class TestTransactionService extends TestCase2 {
              * which cover that timestamp since there are no commit points in
              * the database.
              */
-            service.newTx(timestamp - 1);
+            final long tx = service.newTx(timestamp - 1);
+
+            final TxState txState = service.getTxState(tx);
+
+            assertTrue(txState.isReadOnly());
+            assertTrue(txState.isActive());
             
         } finally {
 
@@ -949,8 +1226,13 @@ public class TestTransactionService extends TestCase2 {
             /*
              * Note: The commit time log is empty.
              */
-            service.newTx(ITx.UNISOLATED);
+            final long tx = service.newTx(ITx.UNISOLATED);
             
+            final TxState txState = service.getTxState(tx);
+
+            assertFalse(txState.isReadOnly());
+            assertTrue(txState.isActive());
+
         } finally {
 
             service.destroy();
@@ -982,10 +1264,13 @@ public class TestTransactionService extends TestCase2 {
 //            try {
                 // request a timestamp in the future.
             final long tx = service.newTx(timestamp1 * 2);
+            final TxState txState = service.getTxState(tx);
             if (log.isInfoEnabled()) {
                 log.info("ts=" + timestamp1);
                 log.info("tx=" + tx);
             }
+            assertTrue(txState.isReadOnly());
+            assertEquals(timestamp1, txState.getReadsOnCommitTime());
 //                fail("Expecting: "+IllegalStateException.class);
 //            } catch(IllegalStateException ex) {
 //                log.info("Ignoring expected exception: "+ex);
@@ -1031,6 +1316,8 @@ public class TestTransactionService extends TestCase2 {
             // this will be the earliest running tx until it completes.
             final long tx0 = service.newTx(ITx.UNISOLATED);
 
+            final TxState txState0 = service.getTxState(tx0);
+            
             // timestamp GT [abs(tx0)] and LT [abs(tx1)].
             final long ts = service.nextTimestamp();
             
@@ -1039,11 +1326,17 @@ public class TestTransactionService extends TestCase2 {
             // this will become the earliest running tx if tx0 completes first.
             final long tx1 = service.newTx(ITx.UNISOLATED);
             
+            final TxState txState1 = service.getTxState(tx0);
+
             assertTrue(ts < Math.abs(tx1));
+
+            // The transactions are reading on the same commit point.
+            assertEquals(txState0.getReadsOnCommitTime(),
+                    txState1.getReadsOnCommitTime());
             
             // commit tx0
 //            final long commitTime0 = 
-                service.commit(tx0);
+            service.commit(tx0);
             
             final long newReleaseTime = service.getReleaseTime();
             
@@ -1169,9 +1462,6 @@ public class TestTransactionService extends TestCase2 {
             /*
              * Start another transaction. This should read from the commitTime
              * for tx0.
-             * 
-             * TODO Do an alternative test where we do not obtain tx2. How does
-             * that play out.
              */
             final long tx2 = service.newTx(ITx.UNISOLATED);
 
@@ -1217,7 +1507,8 @@ public class TestTransactionService extends TestCase2 {
                 service.newTx(ts1);
                 fail("Expecting: " + IllegalStateException.class);
             } catch (IllegalStateException ex) {
-                log.info("Ignoring expected exception: " + ex);
+                if (log.isInfoEnabled())
+                    log.info("Ignoring expected exception: " + ex);
             }
 
             try {
@@ -1231,7 +1522,8 @@ public class TestTransactionService extends TestCase2 {
                 service.newTx(ts2);
                 fail("Expecting: " + IllegalStateException.class);
             } catch (IllegalStateException ex) {
-                log.info("Ignoring expected exception: " + ex);
+                if (log.isInfoEnabled())
+                    log.info("Ignoring expected exception: " + ex);
             }
             
             /*
@@ -1474,10 +1766,12 @@ public class TestTransactionService extends TestCase2 {
             // verify that releaseTime was updated.
             final long releaseTime = service.getReleaseTime();
             final long lastCommitTime = service.getLastCommitTime();
-            System.err.println("tx0=" + tx0);
-            System.err.println("tx1=" + tx1);
-            System.err.println("releaseTime=" + releaseTime);
-            System.err.println("lastCommitTime=" + lastCommitTime);
+            if (log.isInfoEnabled()) {
+                log.info("tx0=" + tx0);
+                log.info("tx1=" + tx1);
+                log.info("releaseTime=" + releaseTime);
+                log.info("lastCommitTime=" + lastCommitTime);
+            }
             assertNotSame(0L, releaseTime);
 
             /*
@@ -1620,7 +1914,12 @@ public class TestTransactionService extends TestCase2 {
             
             final long tx = service.newTx(10);
 
+            final TxState txState = service.getTxState(tx);
+            
             service.commit(tx);
+
+            assertTrue(txState.isCommitted());
+            assertTrue(txState.isComplete());
             
             try {
                 service.commit(tx);
@@ -1636,6 +1935,10 @@ public class TestTransactionService extends TestCase2 {
                 log.info("Ignoring expected exception: "+ex);
             }
 
+            // Verify unchanged by failed abort.
+            assertTrue(txState.isCommitted());
+            assertTrue(txState.isComplete());
+            
         } finally {
 
             service.destroy();
@@ -1678,12 +1981,23 @@ public class TestTransactionService extends TestCase2 {
 
             final long tx = service.newTx(ITx.UNISOLATED);
 
+            final TxState txState = service.getTxState(tx);
+            
+            assertFalse(txState.isReadOnly());
+            assertTrue(txState.isActive());
+            
             final Thread t = new Thread() {
             
                 public void run() {
 
                     service.shutdown();
-                    
+
+                    // Tx is still running.
+                    assertTrue(txState.isActive());
+
+                    // Still visible & active.
+                    assertTrue(txState == service.getTxState(tx));
+
                 }
                 
             };
@@ -1694,10 +2008,21 @@ public class TestTransactionService extends TestCase2 {
 
             service.awaitRunState( TxServiceRunState.Shutdown);
 
+            // Tx is still running.
+            assertTrue(txState.isActive());
+
+            // Still visible & active.
+            assertTrue(txState == service.getTxState(tx));
+
             // commit the running tx.
             service.commit(tx);
 
             service.awaitRunState( TxServiceRunState.Halted);
+
+            // Tx is done.
+            assertFalse(txState.isActive());
+            assertTrue(txState.isCommitted());
+            assertTrue(txState.isComplete());
 
         } finally {
 
@@ -1721,12 +2046,23 @@ public class TestTransactionService extends TestCase2 {
 
             final long tx = service.newTx(ITx.UNISOLATED);
 
+            final TxState txState = service.getTxState(tx);
+            
+            assertFalse(txState.isReadOnly());
+            assertTrue(txState.isActive());
+            
             final Thread t = new Thread() {
             
                 public void run() {
 
                     service.shutdown();
                     
+                    // Tx is still running.
+                    assertTrue(txState.isActive());
+
+                    // Still visible & active.
+                    assertTrue(txState == service.getTxState(tx));
+
                 }
                 
             };
@@ -1741,6 +2077,11 @@ public class TestTransactionService extends TestCase2 {
             service.abort(tx);
 
             service.awaitRunState( TxServiceRunState.Halted);
+
+            // Tx is done.
+            assertFalse(txState.isActive());
+            assertFalse(txState.isCommitted());
+            assertTrue(txState.isComplete());
 
         } finally {
 
@@ -1763,6 +2104,12 @@ public class TestTransactionService extends TestCase2 {
         try {
 
             final long tx = service.newTx(ITx.UNISOLATED);
+            
+
+            final TxState txState = service.getTxState(tx);
+            
+            assertFalse(txState.isReadOnly());
+            assertTrue(txState.isActive());
 
             final Thread t = new Thread() {
             
@@ -1770,6 +2117,9 @@ public class TestTransactionService extends TestCase2 {
                     
                     service.shutdown();
                     
+                    // Still running.
+                    assertTrue(txState.isActive());
+
                 }
                 
             };
@@ -1781,6 +2131,9 @@ public class TestTransactionService extends TestCase2 {
             // verify service is shutting down.
             service.awaitRunState( TxServiceRunState.Shutdown);
 
+            // Still running.
+            assertTrue(txState.isActive());
+
             // verify newTx() is disallowed during shutdown.
             try {
 
@@ -1790,8 +2143,9 @@ public class TestTransactionService extends TestCase2 {
                 
             } catch (IllegalStateException ex) {
                 
-                log.info("Ignoring expected exception: " + ex);
-                
+                if (log.isInfoEnabled())
+                    log.info("Ignoring expected exception: " + ex);
+
             }
 
             // one tx left.
@@ -1800,6 +2154,9 @@ public class TestTransactionService extends TestCase2 {
             // abort the last running tx.
             service.abort(tx);
 
+            // done.
+            assertFalse(txState.isActive());
+            
             // no tx left.
             assertEquals(0,service.getActiveCount());
             
@@ -1826,11 +2183,19 @@ public class TestTransactionService extends TestCase2 {
 
             final long tx = service.newTx(ITx.UNISOLATED);
 
+            final TxState txState = service.getTxState(tx);
+            
+            assertFalse(txState.isReadOnly());
+            assertTrue(txState.isActive());
+
             final Thread t = new Thread() {
 
                 public void run() {
 
                     service.shutdown();
+
+                    // Still running.
+                    assertTrue(txState.isActive());
 
                 }
 
@@ -1842,11 +2207,22 @@ public class TestTransactionService extends TestCase2 {
 
             service.awaitRunState( TxServiceRunState.Shutdown);
 
+            // Tx is still running.
+            assertTrue(txState.isActive());
+
+            // Still visible & active.
+            assertTrue(txState == service.getTxState(tx));
+
             // commit the running tx.
             service.commit(tx);
 
             service.awaitRunState( TxServiceRunState.Halted);
 
+            // Tx is done.
+            assertFalse(txState.isActive());
+            assertTrue(txState.isCommitted());
+            assertTrue(txState.isComplete());
+            
         } finally {
 
             service.destroy();
@@ -1867,11 +2243,19 @@ public class TestTransactionService extends TestCase2 {
 
             final long tx = service.newTx(ITx.UNISOLATED);
 
+            final TxState txState = service.getTxState(tx);
+            
+            assertFalse(txState.isReadOnly());
+            assertTrue(txState.isActive());
+
             final Thread t = new Thread() {
 
                 public void run() {
 
                     service.shutdown();
+
+                    // Still running.
+                    assertTrue(txState.isActive());
 
                 }
 
@@ -1883,8 +2267,20 @@ public class TestTransactionService extends TestCase2 {
 
             service.awaitRunState( TxServiceRunState.Shutdown);
 
+            // Tx is still running.
+            assertTrue(txState.isActive());
+
+            // Still visible & active.
+            assertTrue(txState == service.getTxState(tx));
+
             // abort the running tx.
             service.abort(tx);
+
+            // Tx is done.
+            assertFalse(txState.isActive());
+            assertTrue(txState.isAborted());
+            assertFalse(txState.isCommitted());
+            assertTrue(txState.isComplete());
 
             service.awaitRunState( TxServiceRunState.Halted);
 
@@ -1908,15 +2304,22 @@ public class TestTransactionService extends TestCase2 {
 
         try {
 
-//            final long tx = 
-                service.newTx(ITx.UNISOLATED);
+            final long tx = service.newTx(ITx.UNISOLATED);
+
+            final TxState txState = service.getTxState(tx);
+            
+            assertFalse(txState.isReadOnly());
+            assertTrue(txState.isActive());
 
             final Thread t = new Thread() {
 
                 public void run() {
 
                     service.shutdown();
-                    
+
+                    // Verify still active.
+                    assertTrue(txState.isActive());
+
                 }
 
             };
@@ -1927,10 +2330,83 @@ public class TestTransactionService extends TestCase2 {
 
             service.awaitRunState( TxServiceRunState.Shutdown);
 
+            // Verify still active.
+            assertTrue(txState.isActive());
+
             // interrupt the thread running shutdown().
             t.interrupt();
 
             service.awaitRunState( TxServiceRunState.Halted);
+
+            // Tx is done (was terminated when shutdownNow() ran).
+            assertFalse(txState.isActive());
+            assertTrue(txState.isAborted());
+            assertFalse(txState.isCommitted());
+            assertTrue(txState.isComplete());
+            
+        } finally {
+
+            service.destroy();
+
+        }
+
+    }
+
+    /**
+     * Test for {@link AbstractTransactionService#abortAllTx()}.
+     */
+    public void test_abortAll() throws InterruptedException {
+
+        final MockTransactionService service = newFixture();
+
+        try {
+
+            // read-write tx.
+            final long tx0 = service.newTx(ITx.UNISOLATED);
+            final TxState txState0 = service.getTxState(tx0);
+            assertFalse(txState0.isReadOnly());
+            assertTrue(txState0.isActive());
+
+            assertEquals(tx0, service.getEarliestActiveTx().getStartTimestamp());
+            
+            // read-only tx.
+            final long tx1 = service.newTx(ITx.READ_COMMITTED);
+            final TxState txState1 = service.getTxState(tx1);
+            assertTrue(txState1.isReadOnly());
+            assertTrue(txState1.isActive());
+
+            // unchanged.
+            assertEquals(tx0, service.getEarliestActiveTx().getStartTimestamp());
+
+            // abort the running transactions.
+            service.abortAllTx();
+
+            // Tx is done.
+            assertFalse(txState0.isActive());
+            assertTrue(txState0.isAborted());
+            assertFalse(txState0.isCommitted());
+            assertTrue(txState0.isComplete());
+
+            // Tx is done.
+            assertFalse(txState1.isActive());
+            assertTrue(txState1.isAborted());
+            assertFalse(txState1.isCommitted());
+            assertTrue(txState1.isComplete());
+
+            // Nothing active.
+            assertNull(service.getEarliestActiveTx());
+
+            /*
+             * Verify we can start new transactions.
+             */
+            final long tx2 = service.newTx(ITx.UNISOLATED);
+
+            final TxState txState2 = service.getTxState(tx2);
+            assertFalse(txState2.isReadOnly());
+            assertTrue(txState2.isActive());
+
+            // earliest active tx was updated.
+            assertEquals(tx2, service.getEarliestActiveTx().getStartTimestamp());
 
         } finally {
 

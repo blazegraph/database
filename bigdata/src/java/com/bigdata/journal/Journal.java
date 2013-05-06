@@ -437,21 +437,6 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
             // Note: Local method call.
             timestampOnLeader = leadersValue.getTimestamp();
 
-//            final long effectiveReleaseTimeForHA = getTransactionService()
-//                    .getEffectiveReleaseTimeForHA();
-//            
-//            final ICommitRecord commitRecord = getEarliestVisibleCommitRecordForHA(effectiveReleaseTimeForHA);
-//
-//            final long commitTime = commitRecord == null ? 0L : commitRecord
-//                    .getTimestamp();
-//
-//            final long commitCounter  = commitRecord == null ? 0L : commitRecord
-//                    .getCommitCounter();
-//            
-//            this.leadersValue = new HANotifyReleaseTimeRequest(
-//                    quorumService.getServiceId(), commitTime, commitCounter,
-//                    timestampOnLeader);
-
             /*
              * Only the followers will countDown() at the barrier. The leader
              * will await() until the barrier breaks.
@@ -511,30 +496,22 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
         /**
          * Send an {@link IHAGatherReleaseTimeRequest} message to each follower.
          * Block until the responses are received.
-         * 
-         * TODO Timeout on duration that we will wait for the followers to
-         * response? (Probably not, this is very similar to the 2-phase commit).
-         * 
-         * FIXME HA TXS: Like the 2-phase commit, the overall protocol should
-         * succeed if we can get ((k+1)/2) services that do not fail this step.
-         * Thus for HA3, we should allow one error on a follower, the leader is
-         * sending the messages and is presumed to succeed, and one follower
-         * COULD fail without failing the protocol. If the protocol does fail we
-         * have to fail the commit, to getting this right is NECESSARY. At a
-         * mimimum, we must not fail if all joined services on entry to this
-         * method respond without failing (that is, succeed if no services fail
-         * during this protocol). [Review further whether we can allow the
-         * 2-phase commit to rely on a service that was not joined when we took
-         * this step. We probably can given that the serviceJoin() code path of
-         * the follower is MUTEX with the negotiation of the consensus
-         * releaseTime value so long as the service uses an appropriate
-         * releaseTime when it joins. Which it should do, but review this
-         * closely.]
+         * <p>
+         * Note: Like the 2-phase commit, the overall protocol should succeed if
+         * we can get <code>((k+1)/2)</code> services that do not fail this
+         * step. Thus for HA3, we should allow one error on a follower, the
+         * leader is sending the messages and is presumed to succeed, and one
+         * follower COULD fail without failing the protocol. If the protocol
+         * does fail we have to fail the commit, so getting this right is
+         * NECESSARY. At a mimimum, we must not fail if all joined services on
+         * entry to this method respond without failing (that is, succeed if no
+         * services fail during this protocol) - this is implemented.
          */
         private void messageFollowers(final long token) throws IOException {
 
             getQuorum().assertLeader(token);
 
+            // Future for gather task for each follower.
             final List<Future<Void>> remoteFutures = new LinkedList<Future<Void>>();
             
             try {
@@ -600,16 +577,15 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
                      * 
                      * FIXME HA TXS: A reset() here does not allow us to proceed
                      * with the consensus protocol unless all services
-                     * "vote yes".
+                     * "vote yes". Thus, a single node failure during the
+                     * release time consensus protocol will cause the commit to
+                     * fail.
                      */
                     barrier.reset();
                 }
 
                 /*
                  * If there were any errors, then throw an exception listing them.
-                 * 
-                 * FIXME But only throw the exception if the errors were for a joined
-                 * service. Otherwise just log.
                  */
                 if (!causes.isEmpty()) {
                     // Cancel remote futures.
@@ -694,8 +670,13 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
                  * effective release time based on the last commit time for the
                  * store.
                  * 
-                 * [TODO HA TXS: Review startup and serviceJoin() conditions to
-                 * set the releaseTime.]
+                 * Note: For HA, the releaseTime is updated by the consensus
+                 * protocol once a quorum is met. Before the quorum meets (and
+                 * before a service joins with a met quorum) each service will
+                 * track its own releaseTime. Therefore, during startup, the
+                 * quorum will be null or HAStatusEnum will be NotReady so the
+                 * TXS will automatically track the release time until the
+                 * service joins with a met quorum.
                  */
                 
                 if (log.isInfoEnabled())
@@ -813,7 +794,13 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
                 final long consensusValue = barrierState.consensus
                         .getCommitTime();
 
-                setReleaseTime(Math.max(0L, consensusValue - 1));
+                final long newReleaseTime = Math.max(0L, consensusValue - 1);
+                
+                if (log.isInfoEnabled())
+                    log.info("Advancing releaseTime on leader: "
+                            + newReleaseTime);
+
+                setReleaseTime(newReleaseTime);
 
             } finally {
 
@@ -822,39 +809,87 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
             }
 
         }
-
+        
         /**
          * {@inheritDoc}
          * <p>
-         * Note: When we are using a 2-phase commit, the leader can not update
-         * the release time from commit() using this methods. It must rely on
-         * the consensus protocol to update the release time instead.
+         * Overridden to notice whether this service is using the consensus
+         * protocol to update the releaseTime or updating it automatically as
+         * transactions complete.
          * 
          * @see <a href=
          *      "https://sourceforge.net/apps/trac/bigdata/ticket/530#comment:116">
          *      Journal HA </a>
          */
         @Override
-        protected void updateReleaseTimeForBareCommit(final long commitTime) {
+        protected boolean isReleaseTimeConsensusProtocol() {
 
             final HAStatusEnum haStatus = getHAStatus();
             
             if (haStatus == null || haStatus == HAStatusEnum.NotReady) {
             
-                super.updateReleaseTimeForBareCommit(commitTime);
-                
-            } else {
-                
                 /*
-                 * Note: When we are using a 2-phase commit, the leader can not
-                 * update the release time from commit() using this methods. It
-                 * must rely on the consensus protocol to update the release
-                 * time instead.
+                 * Since we are not HA or this service is not HAReady, we will
+                 * not use the consensus protocol to update the releaseTime.
+                 * 
+                 * Therefore the releaseTime is updated here since we will not
+                 * (actually, did not) run the consensus protocol to update it.
                  */
+
+                return false;
                 
             }
+            
+            /*
+             * Note: When we are using a 2-phase commit, the leader can not
+             * update the release time from commit() using this methods. It
+             * must rely on the consensus protocol to update the release
+             * time instead.
+             */
+
+            return true;
 
         }
+        
+//        /**
+//         * {@inheritDoc}
+//         * <p>
+//         * Note: When we are using a 2-phase commit, the leader can not update
+//         * the release time from commit() using this methods. It must rely on
+//         * the consensus protocol to update the release time instead.
+//         * 
+//         * @see <a href=
+//         *      "https://sourceforge.net/apps/trac/bigdata/ticket/530#comment:116">
+//         *      Journal HA </a>
+//         */
+//        @Override
+//        protected void updateReleaseTimeForBareCommit(final long commitTime) {
+//
+//            final HAStatusEnum haStatus = getHAStatus();
+//            
+//            if (haStatus == null || haStatus == HAStatusEnum.NotReady) {
+//
+//                /*
+//                 * Since we are not HA or this service is not HAReady, we will
+//                 * not use the consensus protocol to update the releaseTime.
+//                 * 
+//                 * Therefore the releaseTime is updated here since we will not
+//                 * (actually, did not) run the consensus protocol to update it.
+//                 */
+//                super.updateReleaseTimeForBareCommit(commitTime);
+//                
+//            } else {
+//                
+//                /*
+//                 * Note: When we are using a 2-phase commit, the leader can not
+//                 * update the release time from commit() using this methods. It
+//                 * must rely on the consensus protocol to update the release
+//                 * time instead.
+//                 */
+//            
+//            }
+//            
+//        }
 
         /**
          * {@inheritDoc}
@@ -892,7 +927,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
          */
         protected IHANotifyReleaseTimeRequest newHANotifyReleaseTimeRequest(
                 final UUID serviceId) {
-            
+
             // On AbstractTransactionService.
             final long effectiveReleaseTimeForHA = getEffectiveReleaseTimeForHA();
 
@@ -911,11 +946,13 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
                     serviceId, commitTime, commitCounter, now);
 
             if (log.isTraceEnabled())
-                log.trace("releaseTime=" + getReleaseTime()
-                        + ", effectiveReleaseTimeForHA="
-                        + effectiveReleaseTimeForHA + ",rootBlock="
-                        + getRootBlockView() + ", req=" + req);
-            
+                log.trace("releaseTime=" + getReleaseTime()//
+                        + ",effectiveReleaseTimeForHA="
+                        + effectiveReleaseTimeForHA //
+                        + ",rootBlock=" + getRootBlockView() //
+                        + ",req=" + req//
+                        );
+
             return req;
 
         }
@@ -994,30 +1031,6 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
                     final IHANotifyReleaseTimeRequest req2 = newHANotifyReleaseTimeRequest(quorumService
                             .getServiceId());
                     
-//                    final long effectiveReleaseTimeForHA = getEffectiveReleaseTimeForHA();
-//
-//                    final ICommitRecord commitRecord = getEarliestVisibleCommitRecordForHA(effectiveReleaseTimeForHA);
-//
-//                    final long commitCounter = commitRecord == null ? 0
-//                            : commitRecord.getCommitCounter();
-//
-//                    final long commitTime = commitRecord == null ? 0
-//                            : commitRecord.getTimestamp();
-//
-//                    final long timestampOnFollower = getLocalTransactionManager()
-//                            .nextTimestamp();
-//
-//                    final IHANotifyReleaseTimeRequest req2 = new HANotifyReleaseTimeRequest(
-//                            quorumService.getServiceId(), commitTime,
-//                            commitCounter, timestampOnFollower);
-//
-//                    if (log.isTraceEnabled())
-//                        log.trace("releaseTime=" + getReleaseTime()
-//                                + ", effectiveReleaseTimeForHA="
-//                                + effectiveReleaseTimeForHA 
-//                                + ",rootBlock=" + getRootBlockView()
-//                                + ", req=" + req);
-//
                     /*
                      * RMI to leader.
                      * 
@@ -1026,8 +1039,58 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
                     final IHANotifyReleaseTimeResponse resp = leader
                             .notifyEarliestCommitTime(req2);
 
-                    // Update the release time on the follower
-                    setReleaseTime(Math.max(0L, resp.getCommitTime() - 1));
+                    /*
+                     * Now spot check the earliest active tx on this follower.
+                     * We want to make sure that this tx is not reading against
+                     * a commit point whose state would be released by the new
+                     * consensus releaseTime.
+                     * 
+                     * If everything is Ok, we update the releaseTime on the
+                     * follower.
+                     */
+
+                    lock.lock();
+                    
+                    try {
+                    
+                        final TxState txState = getEarliestActiveTx();
+
+                        if (txState != null
+                                && txState.getReadsOnCommitTime() > resp
+                                        .getCommitTime()) {
+
+                            /*
+                             * At least one transaction exists on the follower
+                             * that is reading on a commit point which would be
+                             * released by the new releaseTime. This is either a
+                             * failure in the logic to compute the consensus
+                             * releaseTime or a failure to exclude new
+                             * transaction starts on the follower while
+                             * computing the new consensus releaseTime.
+                             */
+
+                            throw new AssertionError(
+                                    "The releaseTime consensus would release an in use commit point"
+                                            + ": consensus=" + resp
+                                            + ", earliestActiveTx=" + txState);
+
+                        }
+
+                        final long newReleaseTime = Math.max(0L,
+                                resp.getCommitTime() - 1);
+
+                        if (log.isInfoEnabled())
+                            log.info("Advancing releaseTime on follower: "
+                                    + newReleaseTime);
+
+                        // Update the releaseTime on the follower
+                        setReleaseTime(newReleaseTime);
+
+                    } finally {
+                        
+                        lock.unlock();
+                        
+                    }
 
                     // Done.
                     return null;
@@ -1204,17 +1267,6 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
 
                 final long now = nextTimestamp();
 
-                /*
-                 * TODO Should we reject tx starts against future history? The
-                 * AbstractTransactionService used to reject this case but that
-                 * code has been commented out. Perhaps because of minor clock
-                 * differences that could arise?
-                 */
-//                if (timestamp > now) {
-//                    // Timestamp is in the future.
-//                    throw new IllegalArgumentException();
-//                }
-                
                 final long minReleaseAge = getMinReleaseAge();
 
                 final long ageOfTxView = now - timestamp;
@@ -1232,9 +1284,9 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
                  */
                 {
 
-                    final TxState state = getEarlestActiveTx();
+                    final TxState state = getEarliestActiveTx();
 
-                    if (state != null && state.readsOnCommitTime <= timestamp) {
+                    if (state != null && state.getReadsOnCommitTime() <= timestamp) {
 
                         // Start Tx. Commit point pinned by earliestActiveTx.
                         return _newTx(timestamp);
@@ -1364,7 +1416,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
         protected void activateTx(final TxState state) {
             if (txLog.isInfoEnabled())
                 txLog.info("OPEN : txId=" + state.tx
-                        + ", readsOnCommitTime=" + state.readsOnCommitTime);
+                        + ", readsOnCommitTime=" + state.getReadsOnCommitTime());
             final IBufferStrategy bufferStrategy = Journal.this.getBufferStrategy();
             if (bufferStrategy instanceof IHistoryManager) {
                 final IRawTx tx = ((IHistoryManager)bufferStrategy).newTx();
@@ -1379,7 +1431,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
         protected void deactivateTx(final TxState state) {
             if (txLog.isInfoEnabled())
                 txLog.info("CLOSE: txId=" + state.tx
-                        + ", readsOnCommitTime=" + state.readsOnCommitTime);
+                        + ", readsOnCommitTime=" + state.getReadsOnCommitTime());
             /*
              * Note: We need to deactivate the tx before RawTx.close() is
              * invoked otherwise the activeTxCount will never be zero inside

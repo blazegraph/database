@@ -23,10 +23,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.journal;
 
-import java.util.Date;
-
 import com.bigdata.btree.ILocalBTreeView;
 import com.bigdata.btree.isolation.IsolatedFusedView;
+import com.bigdata.service.ITxState;
 
 /**
  * <p>
@@ -36,7 +35,7 @@ import com.bigdata.btree.isolation.IsolatedFusedView;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface ITx {
+public interface ITx extends ITxState {
 
     /**
      * The constant that SHOULD used as the timestamp for an <em>unisolated</em>
@@ -82,37 +81,37 @@ public interface ITx {
      */
     public static final long READ_COMMITTED = -1L;
     
-    /**
-     * The start time for the transaction as assigned by a centralized
-     * transaction manager service. Transaction start times are unique and also
-     * serve as transaction identifiers. Note that this is NOT the time at which
-     * a transaction begins executing on a specific journal as the same
-     * transaction may start at different moments on different journals and
-     * typically will only start on some journals rather than all.
-     * 
-     * @return The transaction start time.
-     * 
-     * @todo rename since the sign indicates read-only vs read-write?
-     */
-    public long getStartTimestamp();
-
-    /**
-     * The timestamp of the commit point against which this transaction is
-     * reading.
-     * <p>
-     * Note: This is not currently available on a cluster. In that context, we
-     * wind up with the same timestamp for {@link #startTime} and
-     * {@link #readsOnCommitTime} which causes cache pollution for things which
-     * cache based on {@link #readsOnCommitTime}.
-     * 
-     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/266">
-     *      Refactor native long tx id to thin object</a>
-     * 
-     * @see <a href="http://sourceforge.net/apps/trac/bigdata/ticket/546" > Add
-     *      cache for access to historical index views on the Journal by name
-     *      and commitTime. </a>
-     */
-    public long getReadsOnCommitTime();
+//    /**
+//     * The start time for the transaction as assigned by a centralized
+//     * transaction manager service. Transaction start times are unique and also
+//     * serve as transaction identifiers. Note that this is NOT the time at which
+//     * a transaction begins executing on a specific journal as the same
+//     * transaction may start at different moments on different journals and
+//     * typically will only start on some journals rather than all.
+//     * 
+//     * @return The transaction start time.
+//     * 
+//     * @todo rename since the sign indicates read-only vs read-write?
+//     */
+//    public long getStartTimestamp();
+//
+//    /**
+//     * The timestamp of the commit point against which this transaction is
+//     * reading.
+//     * <p>
+//     * Note: This is not currently available on a cluster. In that context, we
+//     * wind up with the same timestamp for {@link #startTime} and
+//     * {@link #readsOnCommitTime} which causes cache pollution for things which
+//     * cache based on {@link #readsOnCommitTime}.
+//     * 
+//     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/266">
+//     *      Refactor native long tx id to thin object</a>
+//     * 
+//     * @see <a href="http://sourceforge.net/apps/trac/bigdata/ticket/546" > Add
+//     *      cache for access to historical index views on the Journal by name
+//     *      and commitTime. </a>
+//     */
+//    public long getReadsOnCommitTime();
     
 //    /**
 //     * Return the timestamp assigned to this transaction by a centralized
@@ -184,47 +183,47 @@ public interface ITx {
      */
     public boolean isEmptyWriteSet();
     
-    /**
-     * A transaction is "active" when it is created and remains active until it
-     * prepares or aborts.  An active transaction accepts READ, WRITE, DELETE,
-     * PREPARE and ABORT requests.
-     * 
-     * @return True iff the transaction is active.
-     */
-    public boolean isActive();
-
-    /**
-     * A transaction is "prepared" once it has been successfully validated and
-     * has fulfilled its pre-commit contract for a multi-stage commit protocol.
-     * An prepared transaction accepts COMMIT and ABORT requests.
-     * 
-     * @return True iff the transaction is prepared to commit.
-     */
-    public boolean isPrepared();
-
-    /**
-     * A transaction is "complete" once has either committed or aborted. A
-     * completed transaction does not accept any requests.
-     * 
-     * @return True iff the transaction is completed.
-     */
-    public boolean isComplete();
-
-    /**
-     * A transaction is "committed" iff it has successfully committed. A
-     * committed transaction does not accept any requests.
-     * 
-     * @return True iff the transaction is committed.
-     */
-    public boolean isCommitted();
-
-    /**
-     * A transaction is "aborted" iff it has successfully aborted. An aborted
-     * transaction does not accept any requests.
-     * 
-     * @return True iff the transaction is aborted.
-     */
-    public boolean isAborted();
+//    /**
+//     * A transaction is "active" when it is created and remains active until it
+//     * prepares or aborts.  An active transaction accepts READ, WRITE, DELETE,
+//     * PREPARE and ABORT requests.
+//     * 
+//     * @return True iff the transaction is active.
+//     */
+//    public boolean isActive();
+//
+//    /**
+//     * A transaction is "prepared" once it has been successfully validated and
+//     * has fulfilled its pre-commit contract for a multi-stage commit protocol.
+//     * An prepared transaction accepts COMMIT and ABORT requests.
+//     * 
+//     * @return True iff the transaction is prepared to commit.
+//     */
+//    public boolean isPrepared();
+//
+//    /**
+//     * A transaction is "complete" once has either committed or aborted. A
+//     * completed transaction does not accept any requests.
+//     * 
+//     * @return True iff the transaction is completed.
+//     */
+//    public boolean isComplete();
+//
+//    /**
+//     * A transaction is "committed" iff it has successfully committed. A
+//     * committed transaction does not accept any requests.
+//     * 
+//     * @return True iff the transaction is committed.
+//     */
+//    public boolean isCommitted();
+//
+//    /**
+//     * A transaction is "aborted" iff it has successfully aborted. An aborted
+//     * transaction does not accept any requests.
+//     * 
+//     * @return True iff the transaction is aborted.
+//     */
+//    public boolean isAborted();
 
     /**
      * Return an isolated view onto a named index. The index will be isolated at
