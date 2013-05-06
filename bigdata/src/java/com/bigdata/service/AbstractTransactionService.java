@@ -43,10 +43,13 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.btree.ITuple;
+import com.bigdata.btree.ITupleIterator;
 import com.bigdata.config.LongValidator;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.ICounterSetAccess;
 import com.bigdata.counters.Instrument;
+import com.bigdata.ha.HAStatusEnum;
 import com.bigdata.journal.ITransactionService;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
@@ -220,7 +223,7 @@ abstract public class AbstractTransactionService extends AbstractService
     /**
      * A hash map containing all active transactions. A transaction that is
      * preparing will remain in this collection until it has completed (aborted
-     * or committed).
+     * or committed). The key is the txId of the transaction. 
      * 
      * @todo config param for the initial capacity of the map.
      * @todo config for the concurrency rating of the map.
@@ -235,12 +238,13 @@ abstract public class AbstractTransactionService extends AbstractService
      * internal synchronization APIs for the transaction service.
      * 
      * @param tx
-     *            The transaction identifier.
+     *            The transaction identifier (the signed value, NOT the absolute
+     *            value).
      * 
      * @return The {@link TxState} -or- <code>null</code> if there is no such
      *         active transaction.
      */
-    final protected TxState getTxState(final long tx) {
+    protected TxState getTxState(final long tx) {
 
         return activeTx.get(tx);
 
@@ -278,6 +282,7 @@ abstract public class AbstractTransactionService extends AbstractService
     /**
      * Any state other than {@link TxServiceRunState#Halted}.
      */
+    @Override
     public boolean isOpen() {
 
         return runState != TxServiceRunState.Halted;
@@ -339,6 +344,7 @@ abstract public class AbstractTransactionService extends AbstractService
      * until existing transactions (both read-write and read-only) are complete
      * (either aborted or committed).
      */
+    @Override
     public void shutdown() {
 
         if(log.isInfoEnabled()) 
@@ -489,6 +495,7 @@ abstract public class AbstractTransactionService extends AbstractService
      * exceptions from various methods, including {@link #nextTimestamp()})
      * when the service halts.
      */
+    @Override
     public void shutdownNow() {
 
         if(log.isInfoEnabled()) 
@@ -578,7 +585,7 @@ abstract public class AbstractTransactionService extends AbstractService
                      * Note: We are already holding the outer lock so we do not
                      * need to acquire it here.
                      */
-                    updateReleaseTime(Math.abs(state.tx));
+                    updateReleaseTime(Math.abs(state.tx), null/* deactivatedTx */);
 
                 }
 
@@ -607,6 +614,7 @@ abstract public class AbstractTransactionService extends AbstractService
      * Immediate/fast shutdown of the service and then destroys any persistent
      * state associated with the service.
      */
+    @Override
     synchronized public void destroy() {
 
         log.warn("");
@@ -678,7 +686,7 @@ abstract public class AbstractTransactionService extends AbstractService
      * {@link #nextTimestamp()}.
      * <p>
      * Note: The transaction service will refuse to start new transactions whose
-     * timestamps are LTE to {@link #earliestOpenTxId}.
+     * timestamps are LTE to {@link #getReleaseTime()}.
      * 
      * @throws RuntimeException
      *             Wrapping {@link TimeoutException} if a timeout occurs
@@ -722,14 +730,11 @@ abstract public class AbstractTransactionService extends AbstractService
 
             try {
 
-                final AtomicLong readCommitTime = new AtomicLong();
+                final TxState txState = assignTransactionIdentifier(timestamp);
 
-                final long tx = assignTransactionIdentifier(timestamp,
-                        readCommitTime);
+                activateTx(txState);
 
-                activateTx(new TxState(tx, readCommitTime.get()));
-
-                return tx;
+                return txState.tx;
 
             } catch(TimeoutException ex) {
                 
@@ -838,33 +843,37 @@ abstract public class AbstractTransactionService extends AbstractService
      * <p>
      * Note: The {@link #lock} is required in order to make atomic decisions
      * about the earliest active tx. Without the {@link #lock}, the tx could
-     * stop or a new tx could start, thereby invalidating the "easliest active"
+     * stop or a new tx could start, thereby invalidating the "earliest active"
      * guarantee.
      * 
      * @throws IllegalMonitorStateException
      *             unless the {@link #lock} is held by the caller.
      */
-    protected TxState getEarlestActiveTx() {
+    protected TxState getEarliestActiveTx() {
         
         if (!lock.isHeldByCurrentThread())
             throw new IllegalMonitorStateException();
         
-        final TxState state = getTxState(earliestOpenTxId);
+//        final TxState state = getTxState(earliestOpenTxId);
+//
+//        return state;
 
-        return state;
+        return earliestOpenTx;
         
     }
     
     /**
-     * The minimum over the absolute values of the active transactions and ZERO
-     * (0) if there are no open transactions.
+     * The earliest open transaction.
      * <p>
-     * Note: This is a transaction identifier. It is NOT the commitTime on which
-     * that transaction is reading.
+     * Note: This field is guarded by the {@link #lock}. However, it is declared
+     * <code>volatile</code> to provide visibility to {@link #getCounters()}
+     * without taking the lock.
      * 
-     * @see https://sourceforge.net/apps/trac/bigdata/ticket/467
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/467" >
+     *      IllegalStateException trying to access lexicon index using RWStore
+     *      with recycling </a>
      */
-    private volatile long earliestOpenTxId = 0L;
+    private volatile TxState earliestOpenTx = null;
     
     /**
      * {@inheritDoc}
@@ -873,8 +882,8 @@ abstract public class AbstractTransactionService extends AbstractService
      */
     public long getReleaseTime() {
 
-        if (log.isDebugEnabled())
-            log.debug("releaseTime=" + releaseTime + ", lastKnownCommitTime="
+        if (log.isTraceEnabled())
+            log.trace("releaseTime=" + releaseTime + ", lastKnownCommitTime="
                     + getLastCommitTime());
         
         return releaseTime;
@@ -901,52 +910,22 @@ abstract public class AbstractTransactionService extends AbstractService
     
     /**
      * Sets the new release time.
+     * <p>
+     * Note: For a joined service in HA (the leader or a follower), the release
+     * time is set by the consensus protocol. Otherwise it is automatically
+     * maintained by {@link #updateReleaseTime(long, TxState)} and
+     * {@link #updateReleaseTimeForBareCommit(long)}.
      * 
      * @param newValue
      *            The new value.
+     *            
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/671">
+     *      Query on follower fails during UPDATE on leader </a>
      */
     protected void setReleaseTime(final long newValue) {
 
         if (!lock.isHeldByCurrentThread())
             throw new IllegalMonitorStateException();
-
-        /*
-         * FIXME HA TXS: The HA release time consensus protocol relies on the
-         * evolving release time on each joined service. This means that the
-         * release times on a joined service can increase until we hit the next
-         * commit point on the leader. At that point, we look at the pinned
-         * history (minReleaseAge) and the earliest visible commit point (taking
-         * into account the local releaseTime) on each joined service. This
-         * gives us a consensus value for the earliest visible commit record on
-         * any service. That new release time is then propagated to the
-         * services. This CAN result in historical state being "invisible" on a
-         * follower and then "reappearing" after a commit since either the
-         * leader or another follower still has an earlier commit point pinned.
-         * 
-         * This should be modified such that the releaseTime is ONLY updated in
-         * HA each time we go through a commit point. This means that the
-         * consensus protocol must discover the earliest active tx and its
-         * readsOnCommitTime rather than relying on the then current
-         * releaseTime. This is the only way to have a tx on one TXS in an HA
-         * replication cluster pin the history of all TXS services in that
-         * cluster.
-         * 
-         * The necessary changes are to:
-         * 
-         * - Journal.InnerJournalTransactionService.GatherTask.call(). This is
-         * where we decide the earliest visible commit record on the follower.
-         * 
-         * - AbstractJournal.getEarliestVisibleCommitRecord(). This must use
-         * getEarliestActiveTx() while holding the TXS lock, so this method
-         * needs to be lifted onto the InnerJournalTransactionService.
-         * 
-         * FIXME - AbstractTransactionService.updateReleaseTime(). This must not
-         * advance the releaseTime in HA unless it is done as part of the
-         * consensus protocol. Note: I have already modified
-         * updateReleaseTimeForBareCommit() which was having some similar
-         * issues. However, I do not believe that my changes are yet coherent or
-         * sufficient.
-         */
 
         final long oldValue = releaseTime;
         
@@ -955,7 +934,6 @@ abstract public class AbstractTransactionService extends AbstractService
 //            throw new IllegalStateException("oldValue=" + oldValue
 //                    + ", newValue=" + newValue);
 
-            // FIXME HA TXS : Observe newV = oldV - 1?
             final String msg = "oldValue=" + oldValue + ", newValue="
                     + newValue;
 
@@ -979,12 +957,29 @@ abstract public class AbstractTransactionService extends AbstractService
      * <code>now - minReleaseAge</code> and the readsOnCommitTime of the
      * earliest active Tx. If the value would be negative, then ZERO (0L) is
      * reported instead.
+     * <p>
+     * Note: This duplicates logic in {@link #updateReleaseTime(long)}, but
+     * handles the special case in HA where the releaseTime is not being updated
+     * by {@link #updateReleaseTimeForBareCommit(long)}.
+     * 
+     * @return The effective release time.
      * 
      * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/623"> HA
      *      TXS </a>
+     * 
+     * @see #updateReleaseTime(long)
      */
     protected long getEffectiveReleaseTimeForHA() {
 
+        if (minReleaseAge == Long.MAX_VALUE) {
+
+            // All history is pinned.
+            return 0L;
+
+        }
+        
+        final long lastCommitTime = getLastCommitTime();
+        
         lock.lock();
 
         try {
@@ -992,31 +987,53 @@ abstract public class AbstractTransactionService extends AbstractService
             final long now = _nextTimestamp();
 
             // Find the earliest commit time pinned by an active tx.
-            final long readsOnCommitTime;
+            final long earliestTxReadsOnCommitTime;
 
-            final TxState txState = getEarlestActiveTx();
+            final TxState txState = getEarliestActiveTx();
             
             if (txState == null) {
                 
                 // No active tx. Use now.
-                readsOnCommitTime = now;
+                earliestTxReadsOnCommitTime = now;
                 
             } else {
                 
                 // Earliest active tx.
-                readsOnCommitTime = txState.readsOnCommitTime;
+                earliestTxReadsOnCommitTime = txState.readsOnCommitTime;
                 
             }
 
+            /*
+             * The release time will be the minimum of:
+             * 
+             * a) The timestamp BEFORE the lastCommitTime.
+             * 
+             * b) The timestamp BEFORE the earliestTxStartTime.
+             * 
+             * c) minReleaseAge milliseconds in the past.
+             * 
+             * Note: NEVER let go of the last commit time!
+             * 
+             * @todo there is a fence post here for [now-minReleaseAge] when
+             * minReleaseAge is very large, e.g., Long#MAX_VALUE. This is caught
+             * above for that specific value, but other very large values could
+             * also cause problems.
+             * 
+             * @see https://sourceforge.net/apps/trac/bigdata/ticket/467
+             */
             final long effectiveReleaseTimeForHA = Math.min(
-                    readsOnCommitTime - 1, now - minReleaseAge);
+                    lastCommitTime - 1,
+                    Math.min(earliestTxReadsOnCommitTime - 1, now
+                            - minReleaseAge));
 
             if (log.isDebugEnabled())
-                log.debug("releaseTime=" + releaseTime + ", earliestActiveTx="
-                        + txState + ", readsOnCommitTime=" + readsOnCommitTime
-                        + ", (now-minReleasAge)=" + (now - minReleaseAge)
-                        + ", effectiveReleaseTimeForHA="
-                        + effectiveReleaseTimeForHA);
+                log.debug("releaseTime=" + releaseTime //
+                        + ", lastCommitTime=" + lastCommitTime
+                        + ", earliestActiveTx=" + txState//
+                        + ", readsOnCommitTime=" + earliestTxReadsOnCommitTime//
+                        + ", (now-minReleaseAge)=" + (now - minReleaseAge)//
+                        + ": effectiveReleaseTimeForHA=" + effectiveReleaseTimeForHA//
+                        );
 
             return effectiveReleaseTimeForHA;
 
@@ -1045,6 +1062,22 @@ abstract public class AbstractTransactionService extends AbstractService
         
             if (!state.isActive())
                 throw new IllegalArgumentException();
+
+            if (this.earliestOpenTx == null
+                    || Math.abs(state.tx) < Math.abs(this.earliestOpenTx.tx)) {
+
+                /*
+                 * This is the earliest open transaction. This is defined as the
+                 * transaction whose readsOnCommitTime is LTE all other
+                 * transactions and whose absolute txId value is LT all other
+                 * transactions. Since we assign the txIds in intervals GTE the
+                 * readsOnCommitTime and LT the next possible commit point, we
+                 * can maintain this invariant by only comparing abs(txId).
+                 */
+
+                this.earliestOpenTx = state;
+
+            }
             
             activeTx.put(state.tx, state);
             
@@ -1057,7 +1090,8 @@ abstract public class AbstractTransactionService extends AbstractService
                  * otherwise this will throw out an exception.
                  */
 
-                startTimeIndex.add(Math.abs(state.tx), state.readsOnCommitTime);
+//                startTimeIndex.add(Math.abs(state.tx), state.readsOnCommitTime);
+                startTimeIndex.add(state);
                 
             }
             
@@ -1074,7 +1108,7 @@ abstract public class AbstractTransactionService extends AbstractService
             }
             
             if (log.isInfoEnabled())
-                log.info(state.toString() + ", startCount=" + startCount
+                log.info(state.toString() + ", releaseTime="+releaseTime+", earliestActiveTx="+earliestOpenTx+", startCount=" + startCount
                         + ", abortCount=" + abortCount + ", commitCount="
                         + commitCount + ", readOnlyActiveCount="
                         + readOnlyActiveCount + ", readWriteActiveCount="
@@ -1186,31 +1220,65 @@ abstract public class AbstractTransactionService extends AbstractService
 //        }
 
     }
+    
+    /**
+     * Return <code>true</code> iff the release time consensus protocol is being
+     * used to update the releaseTime (HA and this service is either a leader or
+     * a follower). Return <code>false</code> iff the service should locally
+     * manage its own release time (non-HA and HA when the service is
+     * {@link HAStatusEnum#NotReady}).
+     * <p>
+     * Note: When we are using a 2-phase commit, the leader can not update the
+     * release time from commit() using this methods. It must rely on the
+     * consensus protocol to update the release time instead.
+     * 
+     * @see <a href=
+     *      "https://sourceforge.net/apps/trac/bigdata/ticket/530#comment:116">
+     *      Journal HA </a>
+     */
+    protected boolean isReleaseTimeConsensusProtocol() {
+
+        return false;
+        
+    }
    
     /**
      * This method MUST be invoked each time a transaction completes with the
      * absolute value of the transaction identifier that has just been
      * deactivated. The method will remove the transaction entry in the ordered
-     * set of running transactions ({@link #startTimeIndex}). If the specified
-     * timestamp corresponds to the earliest running transaction, then the
-     * <code>releaseTime</code> will be updated and the new releaseTime will be
-     * set using {@link #setReleaseTime(long)}.
+     * set of running transactions ({@link #startTimeIndex}).
      * <p>
-     * Note that the {@link #startTimeIndex} keys are the absolute value of the
-     * transaction identifiers! The values are the commit times on which the
-     * corresponding transaction is reading.
+     * If the specified timestamp corresponds to the earliest running
+     * transaction, then the <code>releaseTime</code> will be updated and the
+     * new releaseTime will be set using {@link #setReleaseTime(long)}. For HA,
+     * the releaseTime is updated by a consensus protocol and the individual
+     * services MUST NOT advance their releaseTime as transactions complete.
+     * <p>
+     * Note: When we are using a 2-phase commit, the leader can not update the
+     * release time from commit() using this methods. It must rely on the
+     * consensus protocol to update the release time instead.
      * 
      * @param timestamp
      *            The absolute value of a transaction identifier that has just
      *            been deactivated.
+     * @param deactivatedTx
+     *            The transaction object that has been deactivated -or-
+     *            <code>null</code> if there are known to be no active
+     *            transactions remaining (e.g., startup and abortAll()).
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/467" >
+     *      IllegalStateException trying to access lexicon index using RWStore
+     *      with recycling </a>
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/671">
+     *      Query on follower fails during UPDATE on leader </a>
      * 
      * @todo the {@link #startTimeIndex} could be used by
      *       {@link #findUnusedTimestamp(long, long)} so that it could further
      *       constrain its search within the half-open interval.
-     * 
-     @see https://sourceforge.net/apps/trac/bigdata/ticket/467
      */
-    final protected void updateReleaseTime(final long timestamp) {
+    final protected void updateReleaseTime(final long timestamp,
+            final TxState deactivatedTx) {
 
         if (timestamp <= 0)
             throw new IllegalArgumentException();
@@ -1234,24 +1302,26 @@ abstract public class AbstractTransactionService extends AbstractService
 
         // current value for the releaseTime.
         final long oldReleaseTime = this.releaseTime;
-
+        
         /*
          * true iff the tx specified by the caller was the earliest running
          * transaction.
          */
         final boolean isEarliestTx;
 
-        /*
-         * The earliest tx remaining now that the caller's tx is complete and
-         * [now] if there are no more running transactions.
-         */
-        final long earliestTxStartTime;
-        /*
-         * The commit time on which the earliest remaining tx is reading and
-         * [now] if there are no more running transactions.
-         */
-        final long earliestTxReadsOnCommitTime;
+//        /*
+//         * The earliest tx remaining now that the caller's tx is complete and
+//         * [now] if there are no more running transactions.
+//         */
+//        final long earliestTxStartTimeX;
+//        /*
+//         * The commit time on which the earliest remaining tx is reading and
+//         * [now] if there are no more running transactions.
+//         */
+//        final long earliestTxReadsOnCommitTimeX;
 
+        TxState earliestActiveTx = null;
+        
         synchronized (startTimeIndex) {
 
             // Note: ZERO (0) is the first tuple in the B+Tree.
@@ -1264,35 +1334,89 @@ abstract public class AbstractTransactionService extends AbstractService
             if (indexOf != -1)
                 startTimeIndex.remove(timestamp);
 
-            if (!isEarliestTx) {
-
-                // No change unless earliest tx terminates.
-                return;
-
-            }
+//            if (!isEarliestTx) {
+//
+//                // No change unless earliest tx terminates.
+//                return;
+//
+//            }
 
             if (startTimeIndex.getEntryCount() > 0) {
-
-                /*
-                 * The start time associated with the earliest remaining tx.
-                 */
-                final byte[] key = startTimeIndex.keyAt(0L);
-                
-                earliestTxStartTime = startTimeIndex.decodeKey(key);
-
-                /*
-                 * The commit point on which that tx is reading.
+                /* There are remaining entries in the [startTimeIndex]. Scan it for the earliestActiveTx remaining. 
                  * 
-                 * @see https://sourceforge.net/apps/trac/bigdata/ticket/467
+                 * Note: We need to handle a data race where the earliest active
+                 * tx in the [startTimeIndex] has been concurrently deactivated
+                 * (and removed from the [activeTx] map). This is done by
+                 * scanning until we find the first active tx in the
+                 * [startTimeIndex]. It will typically be the first entry.
+                 * 
+                 * Note: transactions can not start or end while we are
+                 * synchronized the [startTimeIndex].
                  */
 
-                final byte[] val = startTimeIndex.valueAt(0L);
-                
-                earliestTxReadsOnCommitTime = startTimeIndex.decodeVal(val);
-                
-                // The earliest open transaction identifier.
-                this.earliestOpenTxId = earliestTxStartTime;
+                @SuppressWarnings("rawtypes")
+                final ITupleIterator titr = startTimeIndex.rangeIterator();
 
+                while (titr.hasNext()) {
+
+                    @SuppressWarnings("rawtypes")
+                    final ITuple t = titr.next();
+
+                    final ITxState0 x = (ITxState0) t.getObject();
+
+                    // Lookup the [activeTx] map.
+                    final TxState tmp = getTxState(x.getStartTimestamp());
+
+                    if (tmp == null) {
+                        
+                        /*
+                         * Transaction is no longer active (and no longer in the
+                         * activeTx map).
+                         */
+
+                        continue;
+                        
+                    }
+
+                    if (!tmp.isActive()) {
+
+                        // Transaction is no longer active.
+                        continue;
+                        
+                    }
+
+                    // Must not be the tx that we just deactivated.
+                    assert tmp != deactivatedTx;
+                    
+                    earliestActiveTx = tmp;
+                 
+                    break;
+                    
+                }
+
+//                /*
+//                 * The start time associated with the earliest remaining tx.
+//                 */
+//                final byte[] key = startTimeIndex.keyAt(0L);
+//                
+//                earliestTxStartTime = startTimeIndex.decodeKey(key);
+//
+//                /*
+//                 * The commit point on which that tx is reading.
+//                 * 
+//                 * @see https://sourceforge.net/apps/trac/bigdata/ticket/467
+//                 */
+//
+//                final byte[] val = startTimeIndex.valueAt(0L);
+//                
+//                earliestTxReadsOnCommitTime = startTimeIndex.decodeVal(val);
+//                
+//                // The earliest open transaction identifier.
+//                this.earliestOpenTxId = earliestTxStartTime;
+//
+//                if (log.isTraceEnabled())
+//                    log.trace("earliestOpenTxId=" + earliestTxStartTime);                   
+                
             } else {
 
                 /*
@@ -1300,12 +1424,21 @@ abstract public class AbstractTransactionService extends AbstractService
                  * transactions.
                  */
 
-                earliestTxStartTime = earliestTxReadsOnCommitTime = now;
+//                earliestTxStartTime = earliestTxReadsOnCommitTime = now;
 
                 // There are no open transactions.
-                this.earliestOpenTxId = 0L;
+                earliestActiveTx = null;
+
+//                if (log.isTraceEnabled())
+//                    log.trace("earliestOpenTxId=[noActiveTx]");
 
             }
+
+            // Update the field [volatile write].
+            this.earliestOpenTx = earliestActiveTx;
+            
+            if (log.isTraceEnabled())
+                log.trace("earliestActiveTx=" + earliestActiveTx);
 
         } // synchronized(startTimeIndex)
 
@@ -1314,8 +1447,18 @@ abstract public class AbstractTransactionService extends AbstractService
             return;
             
         }
-        
-        if (isEarliestTx) {
+
+        if (isEarliestTx && !isReleaseTimeConsensusProtocol()) {
+
+            /*
+             * The transaction that just finished was the earliest activeTx.
+             */
+            
+            final long earliestTxStartTime = earliestActiveTx == null ? now
+                    : earliestActiveTx.tx;
+            
+            final long earliestTxReadsOnCommitTime = earliestActiveTx == null ? now
+                    : earliestActiveTx.readsOnCommitTime;
 
             // last commit time on the database.
             final long lastCommitTime = getLastCommitTime();
@@ -1404,47 +1547,54 @@ abstract public class AbstractTransactionService extends AbstractService
      * Note: This method was historically part of {@link #notifyCommit(long)}.
      * It was moved into its own method so it can be overridden for some unit
      * tests.
-     * 
-     * @throws IllegalMonitorStateException
-     *             unless the caller is holding the lock.
+     * <p>
+     * Note: When we are using a 2-phase commit, the leader can not update the
+     * release time from commit() using this methods. It must rely on the
+     * consensus protocol to update the release time instead.
      */
     protected void updateReleaseTimeForBareCommit(final long commitTime) {
-
+        
 //      if(!lock.isHeldByCurrentThread())
 //          throw new IllegalMonitorStateException();
 
         lock.lock();
-        try {       
-        synchronized (startTimeIndex) {
+        try {
 
-            if (this.releaseTime < (commitTime - 1)
-                    && startTimeIndex.getEntryCount() == 0) {
+            synchronized (startTimeIndex) {
 
-                final long lastCommitTime = commitTime;
+                if (!isReleaseTimeConsensusProtocol()
+                        && this.releaseTime < (commitTime - 1)
+                        && startTimeIndex.getEntryCount() == 0) {
 
-                final long now = _nextTimestamp();
+                    final long lastCommitTime = commitTime;
 
-                final long releaseTime = Math.min(lastCommitTime - 1, now
-                        - minReleaseAge);
+                    final long now = _nextTimestamp();
 
-                if (this.releaseTime < releaseTime) {
+                    final long releaseTime = Math.min(lastCommitTime - 1, now
+                            - minReleaseAge);
 
-                    if (log.isInfoEnabled())
-                        log.info("Advancing releaseTime (no active tx)"
-                                + ": lastCommitTime=" + lastCommitTime
-                                + ", minReleaseAge=" + minReleaseAge + ", now="
-                                + now + ", releaseTime(" + this.releaseTime
-                                + "->" + releaseTime + ")");
+                    if (this.releaseTime < releaseTime) {
 
-                    setReleaseTime(releaseTime);
+                        if (log.isInfoEnabled())
+                            log.info("Advancing releaseTime (no active tx)"
+                                    + ": lastCommitTime=" + lastCommitTime
+                                    + ", minReleaseAge=" + minReleaseAge
+                                    + ", now=" + now + ", releaseTime("
+                                    + this.releaseTime + "->" + releaseTime
+                                    + ")");
+
+                        setReleaseTime(releaseTime);
+
+                    }
 
                 }
 
             }
 
-        }
         } finally {
+        
             lock.unlock();
+            
         }
 
     }
@@ -1491,11 +1641,8 @@ abstract public class AbstractTransactionService extends AbstractService
      * 
      * @param timestamp
      *            The timestamp.
-     * @param readCommitTime
-     *            The commit point against which the transaction will read. This
-     *            is set as a side-effect on the caller's argument.
      *            
-     * @return The assigned transaction identifier.
+     * @return The new transaction object.
      * 
      * @throws InterruptedException
      *             if interrupted while awaiting a start time which would
@@ -1504,8 +1651,7 @@ abstract public class AbstractTransactionService extends AbstractService
      *             if a timeout occurs while awaiting a start time which would
      *             satisfy the request.
      */
-    final protected long assignTransactionIdentifier(final long timestamp,
-            final AtomicLong readCommitTime)
+    final protected TxState assignTransactionIdentifier(final long timestamp)
             throws InterruptedException, TimeoutException {
         
         final long lastCommitTime = getLastCommitTime();
@@ -1526,9 +1672,7 @@ abstract public class AbstractTransactionService extends AbstractService
              */
 
             // The transaction will read from the most recent commit point.
-            readCommitTime.set(lastCommitTime);
-            
-            return -nextTimestamp();
+            return new TxState(-nextTimestamp(), lastCommitTime);
 
         }
 
@@ -1555,9 +1699,7 @@ abstract public class AbstractTransactionService extends AbstractService
              */
             
             // The transaction will read from the most recent commit point.
-            readCommitTime.set(lastCommitTime);
-            
-            return nextTimestamp();
+            return new TxState(nextTimestamp(), lastCommitTime);
             
         }
         
@@ -1575,9 +1717,7 @@ abstract public class AbstractTransactionService extends AbstractService
              */
 
             // The transaction will read from the most recent commit point.
-            readCommitTime.set(lastCommitTime);
-
-            return nextTimestamp();
+            return new TxState(nextTimestamp(), lastCommitTime);
             
         }
         
@@ -1599,7 +1739,7 @@ abstract public class AbstractTransactionService extends AbstractService
             
         }
         
-        return getStartTime(timestamp, readCommitTime);
+        return getStartTime(timestamp);
 
     }
 
@@ -1613,15 +1753,11 @@ abstract public class AbstractTransactionService extends AbstractService
      * 
      * @param timestamp
      *            The timestamp (identifies the desired commit point).
-     * @param readCommitTime
-     *            The commit point against which the transaction will read. This
-     *            is set as a side-effect on the caller's argument.
      * 
-     * @return A distinct timestamp not in use by any transaction that will read
-     *         from the same commit point.
+     * @return A new transaction object using a distinct timestamp not in use by
+     *         any transaction that will read from the same commit point.
      */
-    final protected long getStartTime(final long timestamp,
-            final AtomicLong readCommitTime)
+    final private TxState getStartTime(final long timestamp)
             throws InterruptedException, TimeoutException {
 
         /*
@@ -1631,7 +1767,7 @@ abstract public class AbstractTransactionService extends AbstractService
         final long commitTime = findCommitTime(timestamp);
 
         // The transaction will read from this commit point.
-        readCommitTime.set(commitTime == -1 ? 0 : commitTime);
+        final long readsOnCommitTime = commitTime == -1 ? 0 : commitTime;
         
         if (commitTime == -1L) {
 
@@ -1643,7 +1779,7 @@ abstract public class AbstractTransactionService extends AbstractService
              * commit point.
              */
 
-            return nextTimestamp();
+            return new TxState(nextTimestamp(),readsOnCommitTime);
 
 //            /*
 //             * Note: I believe that this can only arise when there are no commit
@@ -1669,13 +1805,15 @@ abstract public class AbstractTransactionService extends AbstractService
              * case is in fact handled above so you should not get here.]
              */
 
-            return nextTimestamp();
+            return new TxState(nextTimestamp(), readsOnCommitTime);
 
         }
 
         // Find a valid, unused timestamp.
-        return findUnusedTimestamp(commitTime, nextCommitTime,
+        final long txId = findUnusedTimestamp(commitTime, nextCommitTime,
                 1000/* timeout */, TimeUnit.MILLISECONDS);
+        
+        return new TxState(txId, readsOnCommitTime);
 
     }
 
@@ -1772,7 +1910,7 @@ abstract public class AbstractTransactionService extends AbstractService
             
             nanos -= (System.nanoTime() - begin);
 
-            if(!txDeactivate.await(nanos, TimeUnit.NANOSECONDS)) {
+            if (!txDeactivate.await(nanos, TimeUnit.NANOSECONDS)) {
 
                 throw new TimeoutException();
                 
@@ -1931,7 +2069,7 @@ abstract public class AbstractTransactionService extends AbstractService
                     if (wasActive) {
                         lock.lock();
                         try {
-                            updateReleaseTime(Math.abs(state.tx));
+                            updateReleaseTime(Math.abs(state.tx), state/*deactivatedTx*/);
                             /*
                              * Note: signalAll() is required. See code that
                              * searches the half-open range for a
@@ -2032,13 +2170,13 @@ abstract public class AbstractTransactionService extends AbstractService
                     if (wasActive) {
                         lock.lock();
                         try {
-                            updateReleaseTime(Math.abs(state.tx));
+                            updateReleaseTime(Math.abs(state.tx),state/*deactivatedTx*/);
                             /*
                              * Note: signalAll() is required. See code that
                              * searches the half-open range for a
                              * read-historical timestamp. It waits on this
                              * signal, but there can be more than one request
-                             * waiting an requests can be waiting on different
+                             * waiting and requests can be waiting on different
                              * half-open ranges.
                              */
                             txDeactivate.signalAll();
@@ -2065,11 +2203,8 @@ abstract public class AbstractTransactionService extends AbstractService
      * transaction manager for single phase commits, which means that this class
      * could only know their values for a distributed transaction commit. Hence
      * they are not represented here.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
-    protected class TxState {
+    public class TxState implements ITxState {
 
         /**
          * The transaction identifier.
@@ -2082,18 +2217,21 @@ abstract public class AbstractTransactionService extends AbstractService
          * commit points yet. Otherwise it is a real commit time associated with
          * some existing commit point.
          */
-        public final long readsOnCommitTime;
+        private final long readsOnCommitTime;
         
         /**
          * <code>true</code> iff the transaction is read-only.
          */
-        public final boolean readOnly;
+        private final boolean readOnly;
 
         /**
-         * The run state of the transaction (only accessible while you are
-         * holding the {@link #lock}.
+         * The run state of the transaction
+         * <p>
+         * Note: This field is guarded by the {@link #lock}. It is [volatile] to
+         * make the state visible using a volatile write for the methods on the
+         * {@link ITxState} interface (isActive(), etc).
          */
-        private RunState runState = RunState.Active;
+        private volatile RunState runState = RunState.Active;
         
         /**
          * Change the {@link RunState}.
@@ -2126,10 +2264,26 @@ abstract public class AbstractTransactionService extends AbstractService
             this.runState = newval;
             
         }
+
+        @Override
+        final public long getStartTimestamp() {
+
+            return tx;
+            
+        }
+
+        @Override
+        final public long getReadsOnCommitTime() {
+            
+            return readsOnCommitTime;
+            
+        }
         
         /**
          * The commit time assigned to a distributed read-write transaction
          * during the commit protocol and otherwise ZERO (0L).
+         * <p>
+         * Note: This field is guarded by the {@link #lock}.
          */
         private long commitTime = 0L;
         
@@ -2332,9 +2486,17 @@ abstract public class AbstractTransactionService extends AbstractService
          * @param o
          *            Another transaction object.
          */
-        final public boolean equals(ITx o) {
+        final public boolean equals(final Object o) {
 
-            return this == o || tx == o.getStartTimestamp();
+            if (this == o)
+                return true;
+
+            if (!(o instanceof ITx))
+                return false;
+
+            final ITx t = (ITx) o;
+
+            return tx == t.getStartTimestamp();
 
         }
 
@@ -2449,62 +2611,72 @@ abstract public class AbstractTransactionService extends AbstractService
              * lock!
              */
             
-//            return Long.toString(tx);
-            
             return "GlobalTxState{tx=" + tx + ",readsOnCommitTime="
                     + readsOnCommitTime + ",readOnly=" + readOnly
                     + ",runState=" + runState + "}";
 
         }
 
+        @Override
         final public boolean isReadOnly() {
 
             return readOnly;
 
         }
 
+        @Override
         final public boolean isActive() {
 
-            if(!lock.isHeldByCurrentThread())
-                throw new IllegalMonitorStateException();
+//            if(!lock.isHeldByCurrentThread())
+//                throw new IllegalMonitorStateException();
 
+            // volatile read.
             return runState == RunState.Active;
 
         }
 
+        @Override
         final public boolean isPrepared() {
 
-            if(!lock.isHeldByCurrentThread())
-                throw new IllegalMonitorStateException();
+//            if(!lock.isHeldByCurrentThread())
+//                throw new IllegalMonitorStateException();
 
+            // volatile read.
             return runState == RunState.Prepared;
 
         }
 
+        @Override
         final public boolean isComplete() {
 
-            if(!lock.isHeldByCurrentThread())
-                throw new IllegalMonitorStateException();
+//            if(!lock.isHeldByCurrentThread())
+//                throw new IllegalMonitorStateException();
 
-            return runState == RunState.Committed
-                    || runState == RunState.Aborted;
+            // volatile read.
+            final RunState tmp = runState;
+
+            return tmp == RunState.Committed || tmp == RunState.Aborted;
 
         }
 
+        @Override
         final public boolean isCommitted() {
 
-            if(!lock.isHeldByCurrentThread())
-                throw new IllegalMonitorStateException();
+//            if(!lock.isHeldByCurrentThread())
+//                throw new IllegalMonitorStateException();
 
+            // volatile read.
             return runState == RunState.Committed;
 
         }
 
+        @Override
         final public boolean isAborted() {
 
-            if(!lock.isHeldByCurrentThread())
-                throw new IllegalMonitorStateException();
+//            if(!lock.isHeldByCurrentThread())
+//                throw new IllegalMonitorStateException();
 
+            // volatile read.
             return runState == RunState.Aborted;
 
         }
@@ -2552,7 +2724,7 @@ abstract public class AbstractTransactionService extends AbstractService
              * any possible transaction identifier (since there are no running
              * transactions).
              */
-            updateReleaseTime(timestamp);
+            updateReleaseTime(timestamp, null/* deactivatedTx */);
 
             setRunState(TxServiceRunState.Running);
 
@@ -2566,6 +2738,7 @@ abstract public class AbstractTransactionService extends AbstractService
         
     }
 
+    @SuppressWarnings("rawtypes")
     public Class getServiceIface() {
 
         return ITransactionService.class;
@@ -2577,100 +2750,89 @@ abstract public class AbstractTransactionService extends AbstractService
     /**
      * Return the {@link CounterSet}.
      */
-//    synchronized
     public CounterSet getCounters() {
         
-//        if (countersRoot == null) {
-
         final CounterSet countersRoot = new CounterSet();
 
-            countersRoot.addCounter("runState", new Instrument<String>() {
-                protected void sample() {
-                    setValue(runState.toString());
-                }
-            });
+        countersRoot.addCounter("runState", new Instrument<String>() {
+            protected void sample() {
+                setValue(runState.toString());
+            }
+        });
 
-            countersRoot.addCounter("#active", new Instrument<Integer>() {
-                protected void sample() {
-                    setValue(getActiveCount());
-                }
-            });
+        countersRoot.addCounter("#active", new Instrument<Integer>() {
+            protected void sample() {
+                setValue(getActiveCount());
+            }
+        });
 
-            countersRoot.addCounter("lastCommitTime", new Instrument<Long>() {
-                protected void sample() {
-                    setValue(getLastCommitTime());
-                }
-            });
+        countersRoot.addCounter("lastCommitTime", new Instrument<Long>() {
+            protected void sample() {
+                setValue(getLastCommitTime());
+            }
+        });
 
-            countersRoot.addCounter("minReleaseAge", new Instrument<Long>() {
-                protected void sample() {
-                    setValue(getMinReleaseAge());
-                }
-            });
+        countersRoot.addCounter("minReleaseAge", new Instrument<Long>() {
+            protected void sample() {
+                setValue(getMinReleaseAge());
+            }
+        });
 
-            countersRoot.addCounter("releaseTime", new Instrument<Long>() {
-                protected void sample() {
-                    setValue(getReleaseTime());
-                }
-            });
+        countersRoot.addCounter("releaseTime", new Instrument<Long>() {
+            protected void sample() {
+                setValue(getReleaseTime());
+            }
+        });
 
-            countersRoot.addCounter("startCount", new Instrument<Long>() {
-                protected void sample() {
-                    setValue(getStartCount());
-                }
-            });
-            
-            countersRoot.addCounter("abortCount", new Instrument<Long>() {
-                protected void sample() {
-                    setValue(getAbortCount());
-                }
-            });
-            
-            countersRoot.addCounter("commitCount", new Instrument<Long>() {
-                protected void sample() {
-                    setValue(getCommitCount());
-                }
-            });
-            
-            countersRoot.addCounter("readOnlyActiveCount", new Instrument<Long>() {
-                protected void sample() {
-                    setValue(getReadOnlyActiveCount());
-                }
-            });
-            
-            countersRoot.addCounter("readWriteActiveCount", new Instrument<Long>() {
-                protected void sample() {
-                    setValue(getReadWriteActiveCount());
-                }
-            });
+        countersRoot.addCounter("startCount", new Instrument<Long>() {
+            protected void sample() {
+                setValue(getStartCount());
+            }
+        });
 
-            /*
-             * Reports the earliest transaction identifier -or- ZERO (0L) if
-             * there are no active transactions.
-             * 
-             * Note: This is a txId. It is NOT the commitTime on which that tx
-             * is reading.
-             */
-            countersRoot.addCounter("earliestTx", new Instrument<Long>() {
-                protected void sample() {
-                    setValue(earliestOpenTxId);
-//                    synchronized (startTimeIndex) {
-//                        if (startTimeIndex.getEntryCount() == 0) {
-//                            // i.e., nothing running.
-//                            setValue(0L);
-//                        }
-//                        final long tx = startTimeIndex.find(1L);
-//                        setValue(tx);
-//                    }
-                }
-            });
+        countersRoot.addCounter("abortCount", new Instrument<Long>() {
+            protected void sample() {
+                setValue(getAbortCount());
+            }
+        });
 
-//        }
-        
+        countersRoot.addCounter("commitCount", new Instrument<Long>() {
+            protected void sample() {
+                setValue(getCommitCount());
+            }
+        });
+
+        countersRoot.addCounter("readOnlyActiveCount", new Instrument<Long>() {
+            protected void sample() {
+                setValue(getReadOnlyActiveCount());
+            }
+        });
+
+        countersRoot.addCounter("readWriteActiveCount", new Instrument<Long>() {
+            protected void sample() {
+                setValue(getReadWriteActiveCount());
+            }
+        });
+
+        /*
+         * Reports the earliest transaction identifier -or- ZERO (0L) if there
+         * are no active transactions.
+         * 
+         * Note: This is a txId. It is NOT the commitTime on which that tx is
+         * reading.
+         */
+        countersRoot.addCounter("earliestReadsOnCommitTime",
+                new Instrument<Long>() {
+                    protected void sample() {
+                        final TxState tmp = earliestOpenTx;
+                        if (tmp != null)
+                            setValue(tmp.readsOnCommitTime);
+                    }
+                });
+
         return countersRoot;
         
     }
-//    protected CounterSet countersRoot;
 
 
 }

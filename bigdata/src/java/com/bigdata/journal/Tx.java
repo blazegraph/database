@@ -198,15 +198,14 @@ public class Tx implements ITx {
         
     }
 
+    @Override
     public long getReadsOnCommitTime() {
 
         return readsOnCommitTime;
         
     }
-    
-    /**
-     * Return <code>true</code> iff this is a read-only transaction.
-     */
+
+    @Override
     public boolean isReadOnly() {
         
         return readOnly;

@@ -82,7 +82,7 @@ abstract public class JournalTransactionService extends
              */
 
             new Tx(journal.getLocalTransactionManager(), journal, state.tx,
-                    state.readsOnCommitTime);
+                    state.getReadsOnCommitTime());
 
         }
 

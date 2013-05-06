@@ -3526,7 +3526,11 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
         try {
 
-            if (_rootBlock.getCommitCounter() == 0L) {
+            final long commitCounter = _rootBlock.getCommitCounter();
+
+            final long lastCommitTime = _rootBlock.getLastCommitTime();
+            
+            if (commitCounter == 0L) {
 
                 if (log.isTraceEnabled())
                     log.trace("No commit points");
@@ -3534,6 +3538,19 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                 // Nothing committed yet.
                 return null;
                 
+            }
+
+            if (releaseTime >= lastCommitTime) {
+
+                /*
+                 * The caller is querying with an effective releaseTime GTE the
+                 * lastCommitTime. It is not valid to have a releaseTime GTE the
+                 * current committed state.
+                 */
+                
+                throw new IllegalArgumentException("releaseTime(" + releaseTime
+                        + ") >= lastCommitTime(" + lastCommitTime + ")");
+
             }
             
             final CommitRecordIndex commitRecordIndex = _commitRecordIndex;
@@ -3549,8 +3566,17 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
              * and this will return us the first record in the
              * CommitRecordIndex.
              */
+
+            final long effectiveTimestamp = releaseTime == 0L ? 1 : releaseTime;
+            
             final ICommitRecord commitRecord = commitRecordIndex
-                    .findNext(releaseTime == 0L ? 1 : releaseTime);
+                    .findNext(effectiveTimestamp);
+
+            if (commitRecord == null)
+                throw new AssertionError("commitCounter=" + commitCounter
+                        + " but no commitRecord for releaseTime=" + releaseTime
+                        + ", effectiveTimestamp=" + effectiveTimestamp + " :: "
+                        + commitRecordIndex);
 
             if (log.isTraceEnabled())
                 log.trace("releaseTime=" + releaseTime + ",commitRecord="
@@ -6210,11 +6236,35 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
                 try {
 
+                    final IHA2PhasePrepareMessage prepareMessage = prepareRequest
+                            .get();
+
+                    if (prepareMessage == null)
+                        throw new IllegalStateException();
+
+                    // Note: Could throw ChecksumError.
+                    final IRootBlockView rootBlock = prepareMessage == null ? null
+                            : prepareMessage.getRootBlock();
+
                     final long commitTime = commitMessage.getCommitTime();
-                    
+
+                    if (rootBlock == null)
+                        throw new IllegalStateException();
+
                     if (haLog.isInfoEnabled())
-                        haLog.info("commitTime=" + commitTime + ", vote="
-                                + vote);
+                        haLog.info("commitTime="
+                                + commitTime
+                                + ", commitCounter="
+                                + prepareMessage.getRootBlock()
+                                        .getCommitCounter() + ", vote=" + vote);
+
+                    if (rootBlock.getLastCommitTime() != commitTime) {
+                        /*
+                         * The commit time does not agree with the root
+                         * block from the prepare message.
+                         */
+                        throw new IllegalStateException();
+                    }
 
                     if (!vote.get()) {
                         
@@ -6227,25 +6277,6 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                     
                     }
                     
-                    final IHA2PhasePrepareMessage prepareMessage = prepareRequest.get();
-
-                    if (prepareMessage == null)
-                        throw new IllegalStateException();
-
-                    final IRootBlockView rootBlock = prepareMessage
-                            .getRootBlock();
-
-                    if (rootBlock == null)
-                        throw new IllegalStateException();
-
-                    if (rootBlock.getLastCommitTime() != commitTime) {
-                        /*
-                         * The commit time does not agree with the root
-                         * block from the prepare message.
-                         */
-                        throw new IllegalStateException();
-                    }
-
                     // verify that the qourum has not changed.
                     quorum.assertQuorum(rootBlock.getQuorumToken());
 
@@ -6299,13 +6330,31 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
                     localService.purgeHALogs(rootBlock.getQuorumToken());
 
-                } catch(Throwable t) {
-                    
-                    haLog.error("ERROR IN 2-PHASE COMMIT: " + t
-                            + ", rootBlock=" + prepareRequest.get(), t);
+                } catch (Throwable t) {
 
-                    quorum.getActor().serviceLeave();
+                    try {
 
+                        haLog.error("ERROR IN 2-PHASE COMMIT: " + t
+                                + ", rootBlock="
+                                + prepareRequest.get().getRootBlock(), t);
+
+                    } catch (Throwable t2) {
+
+                        log.error(t2, t2);
+
+                    }
+
+                    try {
+
+                        quorum.getActor().serviceLeave();
+
+                    } catch (Throwable t2) {
+
+                        log.error(t2, t2);
+
+                    }
+
+                    // always rethrow the root cause exception.
                     throw new RuntimeException(t);
                     
                 } finally {

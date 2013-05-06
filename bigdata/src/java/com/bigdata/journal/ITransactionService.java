@@ -134,15 +134,22 @@ public interface ITransactionService extends ITimestampService {
      *            <li>A timestamp (GT ZERO), which will result in a
      *            read-historical (read-only) transaction that reads from the
      *            most recent committed state whose commit timestamp is less
-     *            than or equal to <i>timestamp</i>.</li>
-     *            <li>The symbolic constant {@link ITx#READ_COMMITTED} to
-     *            obtain a read-historical transaction reading from the most
-     *            recently committed state of the database. The transaction will
-     *            be assigned a start time corresponding to the most recent
-     *            commit point of the database and will be a fully isolated
-     *            read-only view of the state of the database as of that start
-     *            time. (This is an atomic shorthand for
-     *            newTx(getLastCommitTime())).</li>
+     *            than or equal to <i>timestamp</i>. (As a special case, a
+     *            timestamp that is GT the <code>lastCommitTime</code> will
+     *            produce a read-only transaction that is reading on the
+     *            <code>lastCommitTime</code> with snapshot isolation (new
+     *            writes will not become visible in the view). This is basically
+     *            the same behavior as specifying {@link ITx#READ_COMMITTED}.
+     *            While perhaps counter-intuitive, this behavior is preferred to
+     *            throwing an exception when a user attempts to read from a
+     *            commit time GT the most recent commit point.).</li>
+     *            <li>The symbolic constant {@link ITx#READ_COMMITTED} to obtain
+     *            a read-historical transaction reading from the most recently
+     *            committed state of the database. The transaction will be
+     *            assigned a start time corresponding to the most recent commit
+     *            point of the database and will be a fully isolated read-only
+     *            view of the state of the database as of that start time. (This
+     *            is an atomic shorthand for newTx(getLastCommitTime())).</li>
      *            <li>{@link ITx#UNISOLATED} for a read-write transaction.</li>
      *            </ul>
      * 

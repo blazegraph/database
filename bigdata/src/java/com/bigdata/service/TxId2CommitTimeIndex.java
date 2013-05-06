@@ -1,3 +1,26 @@
+/**
+
+Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
+
+Contact:
+     SYSTAP, LLC
+     4501 Tower Road
+     Greensboro, NC 27410
+     licenses@bigdata.com
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; version 2 of the License.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+*/
 package com.bigdata.service;
 
 import java.io.IOException;
@@ -16,22 +39,15 @@ import com.bigdata.btree.keys.IKeyBuilderFactory;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
+import com.bigdata.service.AbstractTransactionService.TxState;
 
 /**
- * {@link BTree} whose keys are commit times. No values are stored in the
- * {@link BTree}.
- * 
- * @todo Subclass {@link BTree} for long keys and arbitrary values and move the
- *       find() and findNext() methods onto that class and make the value type
- *       generic. That same logic is replicated right now in several places and
- *       there is no reason for that. Allow 0L for {@link #find(long)}, but
- *       check all callers first to see who might use that for error checking
- *       and then modify callers using 1L to use 0L. In fact,
- *       {@link #find(long)} should probably accept the value to be returned in
- *       case there is no LTE entry (that is, in case the index is empty).
+ * {@link BTree} whose keys are the absolute value of the txIds and whose values
+ * are {@link ITxState0} tuples for the transaction.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
+ * @version $Id: TxId2CommitTimeIndex.java 5948 2012-02-02 20:16:05Z thompsonbry
+ *          $
  */
 public class TxId2CommitTimeIndex extends BTree {
 
@@ -52,7 +68,7 @@ public class TxId2CommitTimeIndex extends BTree {
         metadata.setBTreeClassName(TxId2CommitTimeIndex.class.getName());
 
         metadata.setTupleSerializer(new TupleSerializer(
-                new ASCIIKeyBuilderFactory(Bytes.SIZEOF_LONG)));
+                new ASCIIKeyBuilderFactory(Bytes.SIZEOF_LONG * 2)));
 
         return (TxId2CommitTimeIndex) BTree.createTransient(/* store, */metadata);
 
@@ -76,31 +92,58 @@ public class TxId2CommitTimeIndex extends BTree {
     }
     
     /**
-     * Encodes the commit time into a key.
+     * Encodes the txId into a key.
      * 
-     * @param commitTime
-     *            The commit time.
+     * @param txId
+     *            The transaction start time (may be negative).
      * 
      * @return The corresponding key.
      */
-    protected byte[] encodeKey(final long commitTime) {
+    private byte[] encodeKey(final long startTime) {
 
-        return keyBuilder.reset().append(commitTime).getKey();
+        // Note: absolute value of the start time!
+        final long tmp = Math.abs(startTime);
+
+        return keyBuilder.reset().append(tmp).getKey();
 
     }
 
-    protected long decodeKey(final byte[] key) {
+    final static private long decodeKey(final byte[] key) {
 
         return KeyBuilder.decodeLong(key, 0);
 
     }
 
-    protected long decodeVal(final byte[] val) {
+    private static class MyTxState implements ITxState0 {
 
-        return KeyBuilder.decodeLong(val, 0);
+        private final long txId;
+        private final long readsOnCommitTime;
+        
+        private MyTxState(final long txId, final long readsOnCommitTime) {
+            
+            this.txId = txId;
+            
+            
+            this.readsOnCommitTime = readsOnCommitTime;
+            
+        }
+        
+        @Override
+        final public long getStartTimestamp() {
 
+            return txId;
+            
+        }
+
+        @Override
+        final public long getReadsOnCommitTime() {
+
+            return readsOnCommitTime;
+            
+        }
+        
     }
-
+    
     /**
      * Return the largest key that is less than or equal to the given timestamp.
      * This is used primarily to locate the commit point that will serve as the
@@ -219,39 +262,44 @@ public class TxId2CommitTimeIndex extends BTree {
     }
     
     /**
-     * Add an entry for the commitTime.
+     * Add an entry.
      * 
-     * @param txId
-     *            A timestamp representing a transaction identifier (normally
-     *            the absolute value of the transaction identifier per
-     *            {@link AbstracTransactionService}).
-     * @param txId
-     *            A timestamp representing a commit time.
+     * @param txState
+     *            The transaction object.
      * 
      * @exception IllegalArgumentException
-     *                if <i>commitTime</i> is <code>0L</code>.
+     *                if <i>txState</i> is <code>null</code>.
      */
 //    * @exception IllegalArgumentException
 //    *                if there is already an entry registered under for the
 //    *                given timestamp.
-    public void add(final long txId, final long commitTime) {
+    public void add(final TxState txState) {
 
-        if (txId == 0L)
-            throw new IllegalArgumentException();
-        
-        if (commitTime < 0L)
+//        if (txId == 0L)
+//            throw new IllegalArgumentException();
+
+        if (txState == null)
             throw new IllegalArgumentException();
 
-        final byte[] key = encodeKey(txId);
+        if (txState.tx == 0L)
+            throw new IllegalArgumentException();
+
+        if (txState.getReadsOnCommitTime() < 0L)
+            throw new IllegalArgumentException();
+
+        final TupleSerializer tupleSer = (TupleSerializer) getIndexMetadata()
+                .getTupleSerializer();
         
-        if(super.contains(key)) {
-            
-            throw new IllegalArgumentException("entry exists: timestamp="
-                    + commitTime);
-            
+        final byte[] key = tupleSer.serializeKey(txState);
+
+        if (super.contains(key)) {
+
+            throw new IllegalArgumentException("entry exists: key=" + key
+                    + ", newValue=" + txState);
+
         }
 
-        final byte[] val = encodeKey(commitTime);
+        final byte[] val = tupleSer.serializeVal(txState);
 
         super.insert(key, val);
         
@@ -263,7 +311,7 @@ public class TxId2CommitTimeIndex extends BTree {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      */
     static protected class TupleSerializer extends
-            DefaultTupleSerializer<Long, Long> {
+            DefaultTupleSerializer<Long, ITxState0> {
 
         /**
          * 
@@ -290,10 +338,37 @@ public class TxId2CommitTimeIndex extends BTree {
 
         }
         
+        @Override
+        public byte[] serializeKey(final Object obj) {
+
+            final long txId;
+
+            if (obj instanceof ITxState0) {
+
+                txId = ((ITxState) obj).getStartTimestamp();
+
+            } else if (obj instanceof Long) {
+
+                txId = ((Long) obj).longValue();
+
+            } else {
+
+                throw new IllegalArgumentException("class=" + obj.getClass());
+                
+            }
+
+            // Note: absolute value of the start time!
+            final long tmp = Math.abs(txId);
+
+            return getKeyBuilder().reset().append(tmp).getKey();
+
+        }
+        
         /**
          * Decodes the key as a transaction identifier.
          */
         @Override
+        @SuppressWarnings("rawtypes")
         public Long deserializeKey(final ITuple tuple) {
 
             final byte[] key = tuple.getKeyBuffer().array();
@@ -307,14 +382,26 @@ public class TxId2CommitTimeIndex extends BTree {
         /**
          * Decodes the value as a commit time.
          */
-        public Long deserialize(final ITuple tuple) {
-            
+        @SuppressWarnings("rawtypes")
+        public ITxState0 deserialize(final ITuple tuple) {
+
             final byte[] val = tuple.getValueBuffer().array();
 
-            final long id = KeyBuilder.decodeLong(val, 0);
+            final long txId = KeyBuilder.decodeLong(val, 0/*off*/);
 
-            return id;
+            final long readsOnCommitTime = KeyBuilder.decodeLong(val,
+                    Bytes.SIZEOF_LONG/* off */);
+
+            return new MyTxState(txId,readsOnCommitTime);
             
+        }
+        
+        @Override
+        public byte[] serializeVal(final ITxState0 val) {
+
+            return getKeyBuilder().reset().append(val.getStartTimestamp())
+                    .append(val.getReadsOnCommitTime()).getKey();
+
         }
         
         /**
