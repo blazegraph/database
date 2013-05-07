@@ -31,14 +31,12 @@ import com.bigdata.ha.msg.IHAWriteMessage;
 import com.bigdata.journal.IRootBlockView;
 
 /**
- * A constrained interface to a new HALogFile to allow
- * writing.
- * 
- * In order to write to an HALogFile, a writer must be
- * requested.  The implementation is private to the HALogFile.
+ * A constrained interface to a new HALogFile to allow writing.
+ * <p>
+ * In order to write to an HALogFile, a writer must be requested. The
+ * implementation is private to the HALogFile.
  * 
  * @author Martyn Cutcher
- *
  */
 public interface IHALogWriter {
 
