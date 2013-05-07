@@ -31,7 +31,6 @@ import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.security.DigestException;
 import java.security.MessageDigest;
-import java.util.Formatter;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
@@ -854,7 +853,8 @@ public class HALogWriter {
 
 		@Override
 		public IRootBlockView getClosingRootBlock() throws IOException {
-			final RootBlockUtility tmp = new RootBlockUtility(m_state.reopener,
+
+		    final RootBlockUtility tmp = new RootBlockUtility(m_state.reopener,
 					m_state.m_haLogFile, true/* validateChecksum */,
 					false/* alternateRootBlock */, false/* ignoreBadRootBlock */);
 
