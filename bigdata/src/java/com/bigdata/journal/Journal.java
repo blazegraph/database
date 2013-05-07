@@ -1036,7 +1036,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
                      * 
                      * Note: Will block until barrier breaks on the leader.
                      */
-                    final IHANotifyReleaseTimeResponse resp = leader
+                    final IHANotifyReleaseTimeResponse consensusReleaseTime = leader
                             .notifyEarliestCommitTime(req2);
 
                     /*
@@ -1053,16 +1053,19 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
                     
                     try {
                     
+                        // the earliest active tx on this follower.
                         final TxState txState = getEarliestActiveTx();
 
+                        // Consensus for new earliest visible commit time.
+                        final long t2 = consensusReleaseTime.getCommitTime();
+
                         if (txState != null
-                                && txState.getReadsOnCommitTime() > resp
-                                        .getCommitTime()) {
+                                && txState.getReadsOnCommitTime() < t2) {
 
                             /*
                              * At least one transaction exists on the follower
-                             * that is reading on a commit point which would be
-                             * released by the new releaseTime. This is either a
+                             * that is reading on a commit point LT the commit
+                             * point which would be released. This is either a
                              * failure in the logic to compute the consensus
                              * releaseTime or a failure to exclude new
                              * transaction starts on the follower while
@@ -1071,13 +1074,13 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
 
                             throw new AssertionError(
                                     "The releaseTime consensus would release an in use commit point"
-                                            + ": consensus=" + resp
+                                            + ": consensus=" + consensusReleaseTime
                                             + ", earliestActiveTx=" + txState);
 
                         }
 
                         final long newReleaseTime = Math.max(0L,
-                                resp.getCommitTime() - 1);
+                                consensusReleaseTime.getCommitTime() - 1);
 
                         if (log.isInfoEnabled())
                             log.info("Advancing releaseTime on follower: "
