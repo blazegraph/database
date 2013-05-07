@@ -278,7 +278,8 @@ public class TestHALogWriter extends TestCase {
 				
 				try {
 					while (reader.hasMoreBuffers()) {
-						IHAWriteMessage rmsg = reader.processNextBuffer(rbuf);
+                        final IHAWriteMessage rmsg = reader
+                                .processNextBuffer(rbuf);
 
 //						System.out.println("Read message: " + rmsg.getSequence()
 //								+ ", size: " + rmsg.getSize());
