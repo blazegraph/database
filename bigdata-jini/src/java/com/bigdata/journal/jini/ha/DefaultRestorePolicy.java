@@ -279,7 +279,7 @@ public class DefaultRestorePolicy implements IRestorePolicy {
      * returns its commit counter. If there is no such snapshot, then this
      * returns ZERO (0).
      */
-    private long getEarliestRestorableCommitCounterByHALogs(
+    private long getEarliestRestorableCommitCounterByCommitPoints(
             final HAJournal jnl, final long commitCounterOnJournal) {
 
         // The commit point that is [minRestorePoints] old.
@@ -329,7 +329,7 @@ public class DefaultRestorePolicy implements IRestorePolicy {
         final long commitCounterRetainedBySnapshotCount = getEarliestRestorableCommitCounterBySnapshots(
                 jnl, commitCounterOnJournal);
 
-        final long commitCounterRetainedByHALogCount = getEarliestRestorableCommitCounterByHALogs(
+        final long commitCounterRetainedByHALogCount = getEarliestRestorableCommitCounterByCommitPoints(
                 jnl, commitCounterOnJournal);
 
         /*

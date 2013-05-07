@@ -870,9 +870,8 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
         
         // now remove the halog files ensuring a RESYNC is not possible
         // but MUST leave currently open file!!
-        final String openLog = HALogWriter.getHALogFileName(lastCommitCounter2 + 1);
-        removeFiles(getHALogDirA(), openLog);
-        removeFiles(getHALogDirB(), openLog);
+        removeFiles(getHALogDirA(), HALogWriter.getHALogFileName(getHALogDirA(), lastCommitCounter2 + 1));
+        removeFiles(getHALogDirB(), HALogWriter.getHALogFileName(getHALogDirB(), lastCommitCounter2 + 1));
 
         // Now Start 3rd service.
         final HAGlue serverC = startC();

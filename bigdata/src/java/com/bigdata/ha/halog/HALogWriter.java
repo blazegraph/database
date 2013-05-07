@@ -45,6 +45,7 @@ import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.RootBlockUtility;
 import com.bigdata.journal.RootBlockView;
 import com.bigdata.journal.StoreTypeEnum;
+import com.bigdata.journal.jini.ha.CommitCounterUtility;
 import com.bigdata.rawstore.Bytes;
 
 /**
@@ -177,37 +178,44 @@ public class HALogWriter {
 
 	}
 
-	/**
-	 * Return the local name of the HA Log file associated with the
-	 * 
-	 * @param commitCounter
-	 * @return
-	 */
-	public static String getHALogFileName(final long commitCounter) {
+    /**
+     * Return the HA Log file associated with the commit counter.
+     * 
+     * @param dir
+     *            The HALog directory.
+     * @param commitCounter
+     *            The commit counter.
+     * 
+     * @return The HALog {@link File}.
+     */
+    public static File getHALogFileName(final File dir,
+            final long commitCounter) {
 
-		/*
-		 * Format the name of the log file.
-		 * 
-		 * Note: The commit counter in the file name should be zero filled to 20
-		 * digits so we have the files in lexical order in the file system (for
-		 * convenience).
-		 */
-		final String logFile;
-		{
-
-			final StringBuilder sb = new StringBuilder();
-
-			final Formatter f = new Formatter(sb);
-
-			f.format("%020d" + IHALogReader.HA_LOG_EXT, commitCounter);
-			f.flush();
-			f.close();
-
-			logFile = sb.toString();
-
-		}
-
-		return logFile;
+        return CommitCounterUtility.getCommitCounterFile(dir, commitCounter,
+                IHALogReader.HA_LOG_EXT);
+//		/*
+//		 * Format the name of the log file.
+//		 * 
+//		 * Note: The commit counter in the file name should be zero filled to 20
+//		 * digits so we have the files in lexical order in the file system (for
+//		 * convenience).
+//		 */
+//		final String logFile;
+//		{
+//
+//			final StringBuilder sb = new StringBuilder();
+//
+//			final Formatter f = new Formatter(sb);
+//
+//			f.format("%020d" + IHALogReader.HA_LOG_EXT, commitCounter);
+//			f.flush();
+//			f.close();
+//
+//			logFile = sb.toString();
+//
+//		}
+//
+//		return logFile;
 
 	}
 
@@ -267,9 +275,12 @@ public class HALogWriter {
 
 		final long commitCounter = rootBlock.getCommitCounter();
 
-		final String logFile = getHALogFileName(commitCounter + 1);
+//        final String logFile = getHALogFileName(commitCounter + 1);
+//
+//        final File log = new File(m_haLogDir, logFile);
+        final File log = getHALogFileName(m_haLogDir, commitCounter + 1);
 
-		final File log = new File(m_haLogDir, logFile);
+//        final File log = new File(m_haLogDir, logFile);
 
 		// Must delete file if it exists.
 		if (log.exists() && !log.delete()) {
@@ -678,8 +689,8 @@ public class HALogWriter {
     public IHALogReader getReader(final long commitCounter)
             throws FileNotFoundException, IOException {
 
-        final File logFile = new File(m_haLogDir,
-                HALogWriter.getHALogFileName(commitCounter));
+        final File logFile = //new File(m_haLogDir,
+                HALogWriter.getHALogFileName(m_haLogDir, commitCounter);
 
         final Lock lock = m_stateLock.readLock();
         lock.lock();

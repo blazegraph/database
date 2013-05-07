@@ -2286,11 +2286,11 @@ public class AbstractHA3JournalServerTestCase extends
      * @param openFile
      *            The name of the open log file.
      */
-    protected void removeFiles(final File dir, final String openFile) {
+    protected void removeFiles(final File dir, final File openFile) {
         final File[] files = dir.listFiles();
         if (files != null)
             for (File file: files) {
-                if (!file.getName().equals(openFile)) {
+                if (!file.equals(openFile)) {
                     log.warn("removing file " + file.getName());
                     
                     file.delete();
@@ -2298,13 +2298,17 @@ public class AbstractHA3JournalServerTestCase extends
             }
     }
 
-    protected void copyFiles(File src, File dst) throws IOException {
+    protected void copyFiles(final File src, final File dst) throws IOException {
         final File[] files = src.listFiles();
-        log.warn("Copying " + src.getAbsolutePath() + " to " + dst.getAbsolutePath() + ", files: " + files.length);
+        if(log.isInfoEnabled())
+                log.info("Copying " + src.getAbsolutePath() + " to "
+                + dst.getAbsolutePath() + ", files: " + files.length);
         if (files != null) {
             for (File srcFile: files) {
                 final File dstFile = new File(dst, srcFile.getName());
-                log.info("Copying " + srcFile.getAbsolutePath() + " to " + dstFile.getAbsolutePath());
+                if (log.isInfoEnabled())
+                    log.info("Copying " + srcFile.getAbsolutePath() + " to "
+                            + dstFile.getAbsolutePath());
                 final FileInputStream instr = new FileInputStream(srcFile);
                 final FileOutputStream outstr = new FileOutputStream(dstFile);
                 

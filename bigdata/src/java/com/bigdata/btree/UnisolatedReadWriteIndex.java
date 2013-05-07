@@ -121,7 +121,7 @@ import cutthecrap.utils.striterators.IFilter;
  * @version $Id: UnisolatedReadWriteIndex.java 4054 2011-01-05 13:51:25Z
  *          thompsonbry $
  */
-public class UnisolatedReadWriteIndex implements IIndex {
+public class UnisolatedReadWriteIndex implements IIndex, ILinearList {
 
     private static final Logger log = Logger.getLogger(UnisolatedReadWriteIndex.class);
   
@@ -189,7 +189,7 @@ public class UnisolatedReadWriteIndex implements IIndex {
      * 
      * @return The acquired lock.
      */
-    protected Lock readLock() {
+    public Lock readLock() {
         
         final Lock readLock = readWriteLock.readLock();
 
@@ -861,6 +861,36 @@ public class UnisolatedReadWriteIndex implements IIndex {
 
         return new ScanCostReport(rangeCount, cost);
 
+    }
+
+    @Override
+    public long indexOf(final byte[] key) {
+        final Lock lock = readLock();
+        try {
+            return ndx.indexOf(key);
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    @Override
+    public byte[] keyAt(final long index) {
+        final Lock lock = readLock();
+        try {
+            return ndx.keyAt(index);
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    @Override
+    public byte[] valueAt(final long index) {
+        final Lock lock = readLock();
+        try {
+            return ndx.valueAt(index);
+        } finally {
+            lock.unlock();
+        }
     }
 
 }

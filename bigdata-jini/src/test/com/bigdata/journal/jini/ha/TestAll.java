@@ -81,6 +81,10 @@ public class TestAll extends TestCase {
 
         final TestSuite suite = new TestSuite("HAJournalServer");
 
+        // commitTime => (HALog|Snapshot)Record test suites.
+        suite.addTestSuite(TestHALogIndex.class);
+        suite.addTestSuite(TestSnapshotIndex.class);
+        
         // Basic tests for a single HAJournalServer (quorum does not meet)
         suite.addTestSuite(TestHAJournalServer.class);
 
@@ -94,7 +98,6 @@ public class TestAll extends TestCase {
         suite.addTestSuite(TestHA3JournalServer.class);
 
         // HA3 snapshot policy test suite.
-        suite.addTestSuite(TestSnapshotIndex.class);
         suite.addTestSuite(TestHA3SnapshotPolicy.class);
         suite.addTestSuite(TestHA3SnapshotPolicy2.class);
 

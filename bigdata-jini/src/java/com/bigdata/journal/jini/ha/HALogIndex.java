@@ -43,98 +43,69 @@ import com.bigdata.journal.AbstractCommitTimeIndex;
 import com.bigdata.journal.ICommitTimeEntry;
 import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.RootBlockView;
-import com.bigdata.journal.jini.ha.SnapshotIndex.ISnapshotRecord;
+import com.bigdata.journal.jini.ha.HALogIndex.IHALogRecord;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.util.ChecksumUtility;
 
 /**
  * {@link BTree} mapping <em>commitTime</em> (long integers) to
- * {@link ISnapshotRecord} records.
+ * {@link IHALogRecord} records for each closed HALog file. HALog files are
+ * added to this index when their closing {@link IRootBlockView} is applied.
+ * Thus, the live HALog is not entered into this index until it the closing
+ * {@link IRootBlockView} has been applied.
  * <p>
  * This object is thread-safe for concurrent readers and writers.
  * <p>
  * Note: This is used as a transient data structure that is populated from the
- * file system by the {@link HAJournalServer}. 
+ * file system by the {@link HAJournalServer}.
  */
-public class SnapshotIndex extends AbstractCommitTimeIndex<ISnapshotRecord> {
-    
-//    /**
-//     * The underlying index. Access to this is NOT thread safe unless you take
-//     * the appropriate lock on the {@link #readWriteLock}.
-//     */
-//    private final BTree btree;
+public class HALogIndex extends AbstractCommitTimeIndex<IHALogRecord> {
 
     /**
      * Create a transient instance.
      * 
      * @return The new instance.
      */
-    static public SnapshotIndex createTransient() {
+    static public HALogIndex createTransient() {
     
         final IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
         
-//        metadata.setBTreeClassName(SnapshotIndex.class.getName());
-
         metadata.setTupleSerializer(new TupleSerializer(
                 new ASCIIKeyBuilderFactory(Bytes.SIZEOF_LONG)));
 
         final BTree ndx = BTree.createTransient(/*store, */metadata);
         
-        return new SnapshotIndex(ndx);
+        return new HALogIndex(ndx);
         
     }
 
-    private SnapshotIndex(final BTree ndx) {
+    private HALogIndex(final BTree ndx) {
 
-        // Wrap B+Tree for read/write thread safety.
         super(ndx);
         
-//        this.btree = ndx;
-//        
-////        this.delegate = new UnisolatedReadWriteIndex(ndx);
-//        
-//        // Save reference to lock for extended synchronization patterns.
-//        this.readWriteLock = UnisolatedReadWriteIndex.getReadWriteLock(ndx);
-        
     }
     
-//    /**
-//     * Load from the store.
-//     * 
-//     * @param store
-//     *            The backing store.
-//     * @param checkpoint
-//     *            The {@link Checkpoint} record.
-//     * @param metadata
-//     *            The metadata record for the index.
-//     */
-//    public SnapshotIndex(final IRawStore store, final Checkpoint checkpoint,
-//            final IndexMetadata metadata, final boolean readOnly) {
-//
-//        super(store, checkpoint, metadata, readOnly);
-//
-//    }
-    
     /**
-     * Interface for access to the snapshot metadata.
+     * Interface for access to the HALog metadata.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      */
-    public static interface ISnapshotRecord extends ICommitTimeEntry{
+    public static interface IHALogRecord extends ICommitTimeEntry {
     
 //        /**
-//         * Return the bytes on the disk for the snapshot file.
+//         * Return the bytes on the disk for the HALog file.
 //         */
 //        public long sizeOnDisk();
-//        
-//        /**
-//         * Return the {@link IRootBlockView} of the snapshot.
-//         */
-//        public IRootBlockView getRootBlock();
+        
+        /**
+         * Return the closing {@link IRootBlockView} of the HALog file.
+         */
+        @Override
+        public IRootBlockView getRootBlock();
         
     }
     
-    public static class SnapshotRecord implements ISnapshotRecord,
+    public static class HALogRecord implements IHALogRecord,
             Externalizable {
 
         private static final int VERSION0 = 0x0;
@@ -151,10 +122,10 @@ public class SnapshotIndex extends AbstractCommitTimeIndex<ISnapshotRecord> {
         /**
          * De-serialization constructor.
          */
-        public SnapshotRecord() {
+        public HALogRecord() {
         }
         
-        public SnapshotRecord(final IRootBlockView rootBlock,
+        public HALogRecord(final IRootBlockView rootBlock,
                 final long sizeOnDisk) {
 
             if (rootBlock == null)
@@ -183,9 +154,9 @@ public class SnapshotIndex extends AbstractCommitTimeIndex<ISnapshotRecord> {
         public boolean equals(final Object o) {
             if (this == o)
                 return true;
-            if (!(o instanceof ISnapshotRecord))
+            if (!(o instanceof IHALogRecord))
                 return false;
-            final ISnapshotRecord t = (ISnapshotRecord) o;
+            final IHALogRecord t = (IHALogRecord) o;
             if (sizeOnDisk() != t.sizeOnDisk())
                 return false;
             if (!getRootBlock().equals(t.getRootBlock()))
@@ -251,7 +222,7 @@ public class SnapshotIndex extends AbstractCommitTimeIndex<ISnapshotRecord> {
             return getRootBlock().getLastCommitTime();
         }
         
-    } // SnapshotRecord
+    } // HALogRecord
     
     /**
      * Encapsulates key and value formation.
@@ -259,7 +230,7 @@ public class SnapshotIndex extends AbstractCommitTimeIndex<ISnapshotRecord> {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      */
     static protected class TupleSerializer extends
-            DefaultTupleSerializer<Long, ISnapshotRecord> {
+            DefaultTupleSerializer<Long, IHALogRecord> {
 
         /**
          * 
@@ -302,7 +273,7 @@ public class SnapshotIndex extends AbstractCommitTimeIndex<ISnapshotRecord> {
 //         * De-serializes an object from the {@link ITuple#getValue() value} stored
 //         * in the tuple (ignores the key stored in the tuple).
 //         */
-//        public ISnapshotRecord deserialize(final ITuple tuple) {
+//        public IHALogRecord deserialize(final ITuple tuple) {
 //
 //            if (tuple == null)
 //                throw new IllegalArgumentException();

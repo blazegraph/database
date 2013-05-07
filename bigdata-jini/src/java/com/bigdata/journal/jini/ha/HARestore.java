@@ -127,8 +127,7 @@ public class HARestore {
 
             }
 
-            final File logFile = new File(haLogDir,
-                    HALogWriter.getHALogFileName(cc));
+            final File logFile = HALogWriter.getHALogFileName(haLogDir, cc);
 
             if (!logFile.exists()) {
 

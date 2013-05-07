@@ -55,7 +55,7 @@ public interface IHALogReader {
     static public final FileFilter HALOG_FILTER = new FileFilter() {
 
         @Override
-        public boolean accept(File f) {
+        public boolean accept(final File f) {
 
             if (f.isDirectory()) {
 

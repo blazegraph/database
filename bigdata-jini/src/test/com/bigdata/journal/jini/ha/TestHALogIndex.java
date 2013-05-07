@@ -36,8 +36,8 @@ import com.bigdata.io.SerializerUtil;
 import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.RootBlockView;
 import com.bigdata.journal.StoreTypeEnum;
-import com.bigdata.journal.jini.ha.SnapshotIndex.ISnapshotRecord;
-import com.bigdata.journal.jini.ha.SnapshotIndex.SnapshotRecord;
+import com.bigdata.journal.jini.ha.HALogIndex.IHALogRecord;
+import com.bigdata.journal.jini.ha.HALogIndex.HALogRecord;
 import com.bigdata.quorum.Quorum;
 import com.bigdata.rawstore.TestWormAddressManager;
 import com.bigdata.rawstore.WormAddressManager;
@@ -45,17 +45,17 @@ import com.bigdata.util.ChecksumUtility;
 import com.bigdata.util.MillisecondTimestampFactory;
 
 /**
- * Test suite for the {@link SnapshotIndex}.
+ * Test suite for the {@link HALogIndex}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
-public class TestSnapshotIndex extends TestCase2 {
+public class TestHALogIndex extends TestCase2 {
 
-    public TestSnapshotIndex() {
+    public TestHALogIndex() {
         super();
     }
     
-    public TestSnapshotIndex(final String name) {
+    public TestHALogIndex(final String name) {
         super(name);
     }
 
@@ -159,13 +159,13 @@ public class TestSnapshotIndex extends TestCase2 {
     /**
      * Verify field access methods.
      */
-    public void test_SnapshotRecordClass_getters() {
+    public void test_HALogRecordClass_getters() {
 
         final IRootBlockView rb = newNonEmptyRootBlock();
         
         final long sizeOnDisk = 12L;
 
-        final ISnapshotRecord sr0 = new SnapshotRecord(rb, sizeOnDisk);
+        final IHALogRecord sr0 = new HALogRecord(rb, sizeOnDisk);
 
         assertEquals(rb, sr0.getRootBlock());
 
@@ -176,17 +176,17 @@ public class TestSnapshotIndex extends TestCase2 {
     /**
      * Verify serializable.
      */
-    public void test_SnapshotRecordClass_Serializable() {
+    public void test_HALogRecordClass_Serializable() {
 
         final IRootBlockView rb = newNonEmptyRootBlock();
         
         final long sizeOnDisk = 12L;
 
-        final ISnapshotRecord sr0 = new SnapshotRecord(rb, sizeOnDisk);
+        final IHALogRecord sr0 = new HALogRecord(rb, sizeOnDisk);
 
         final byte[] a = SerializerUtil.serialize(sr0);
         
-        final ISnapshotRecord sr1 = (ISnapshotRecord) SerializerUtil
+        final IHALogRecord sr1 = (IHALogRecord) SerializerUtil
                 .deserialize(a);
 
         assertEquals(rb, sr1.getRootBlock());
@@ -201,7 +201,7 @@ public class TestSnapshotIndex extends TestCase2 {
      */
     public void test_emptyIndex() {
 
-        final SnapshotIndex ndx = SnapshotIndex.createTransient();
+        final HALogIndex ndx = HALogIndex.createTransient();
 
         // index is empty.
         assertEquals(0L, ndx.getEntryCount());
@@ -280,13 +280,13 @@ public class TestSnapshotIndex extends TestCase2 {
     }
 
     /**
-     * Verify methods to add/remove a snapshot/
+     * Verify methods to add/remove an index entry.
      */
     public void test_addRemove() {
 
-        final SnapshotIndex ndx = SnapshotIndex.createTransient();
+        final HALogIndex ndx = HALogIndex.createTransient();
 
-        final ISnapshotRecord sr0 = new SnapshotRecord(newNonEmptyRootBlock(),
+        final IHALogRecord sr0 = new HALogRecord(newNonEmptyRootBlock(),
                 12L/* bytesOnDisk */);
 
         // index is empty.
@@ -309,18 +309,18 @@ public class TestSnapshotIndex extends TestCase2 {
      */
     public void test_nonEmptyIndex() {
         
-        final SnapshotIndex ndx = SnapshotIndex.createTransient();
+        final HALogIndex ndx = HALogIndex.createTransient();
 
-        final ISnapshotRecord sr0 = new SnapshotRecord(newNonEmptyRootBlock(),
+        final IHALogRecord sr0 = new HALogRecord(newNonEmptyRootBlock(),
                 12L/* bytesOnDisk */);
         assertTrue(sr0.getRootBlock().getLastCommitTime() > 0);
 
-        final ISnapshotRecord sr1 = new SnapshotRecord(newNonEmptyRootBlock(),
+        final IHALogRecord sr1 = new HALogRecord(newNonEmptyRootBlock(),
                 22L/* bytesOnDisk */);
         assertTrue(sr1.getRootBlock().getLastCommitTime() > sr0.getRootBlock()
                 .getLastCommitTime());
 
-        final ISnapshotRecord sr2 = new SnapshotRecord(newNonEmptyRootBlock(),
+        final IHALogRecord sr2 = new HALogRecord(newNonEmptyRootBlock(),
                 32L/* bytesOnDisk */);
         assertTrue(sr2.getRootBlock().getLastCommitTime() > sr1.getRootBlock()
                 .getLastCommitTime());
@@ -394,7 +394,7 @@ public class TestSnapshotIndex extends TestCase2 {
         // test iterator.
         {
             @SuppressWarnings("unchecked")
-            final ITupleIterator<ISnapshotRecord> itr = ndx.rangeIterator();
+            final ITupleIterator<IHALogRecord> itr = ndx.rangeIterator();
 
             assertTrue(itr.hasNext());
 

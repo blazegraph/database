@@ -174,7 +174,7 @@ public class HALogManager {
 			m_currentLock.unlock();
 		}
 		
-		final File file = new File(m_halogdir, HALogFile.getHALogFileName(commitCounter));
+		final File file = HALogFile.getHALogFileName(m_halogdir, commitCounter);
 		final HALogFile halog = new HALogFile(file);
 		
 		return halog.getReader();
@@ -192,7 +192,7 @@ public class HALogManager {
 		/*
 		 * Check the file exists first
 		 */
-		final File file = new File(m_halogdir, HALogFile.getHALogFileName(commitCounter));
+		final File file = HALogFile.getHALogFileName(m_halogdir, commitCounter);
 		if (!file.exists())
 			throw new FileNotFoundException();
 		

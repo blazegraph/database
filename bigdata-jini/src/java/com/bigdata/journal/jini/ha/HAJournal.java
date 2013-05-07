@@ -540,18 +540,7 @@ public class HAJournal extends Journal {
 
         super.deleteResources();
 
-        recursiveDelete(getHALogDir(), new FileFilter() {
-
-            @Override
-            public boolean accept(File f) {
-        
-                if (f.isDirectory())
-                    return true;
-                
-                return f.getName().endsWith(IHALogReader.HA_LOG_EXT);
-            }
-
-        });
+        recursiveDelete(getHALogDir(), IHALogReader.HALOG_FILTER);
         
         recursiveDelete(getSnapshotManager().getSnapshotDir(),
                 SnapshotManager.SNAPSHOT_FILTER);
@@ -662,8 +651,8 @@ public class HAJournal extends Journal {
                 // The commit counter of the desired closing root block.
                 final long commitCounter = msg.getCommitCounter();
 
-                final File logFile = new File(getHALogDir(),
-                        HALogWriter.getHALogFileName(commitCounter));
+                final File logFile = HALogWriter.getHALogFileName(
+                        getHALogDir(), commitCounter);
 
                 if (!logFile.exists()) {
 

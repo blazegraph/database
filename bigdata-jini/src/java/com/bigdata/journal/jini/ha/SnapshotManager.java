@@ -513,7 +513,7 @@ public class SnapshotManager {
      */
     public ISnapshotRecord getOldestSnapshot() {
 
-        return snapshotIndex.getOldestSnapshot();
+        return snapshotIndex.getOldestEntry();
 
     }
 
@@ -525,7 +525,7 @@ public class SnapshotManager {
      */
     public ISnapshotRecord getNewestSnapshot() {
         
-        return snapshotIndex.getNewestSnapshot();
+        return snapshotIndex.getNewestEntry();
         
     }
     
@@ -596,7 +596,7 @@ public class SnapshotManager {
      */
     public ISnapshotRecord getSnapshotByReverseIndex(final int index) {
         
-        return snapshotIndex.getSnapshotByReverseIndex(index);
+        return snapshotIndex.getEntryByReverseIndex(index);
         
     }
     
@@ -763,7 +763,7 @@ public class SnapshotManager {
 
         // The earliest remaining snapshot.
         final ISnapshotRecord oldestSnapshot = snapshotIndex
-                .getOldestSnapshot();
+                .getOldestEntry();
 
         /*
          * The commit counter for the earliest remaining snapshot and 0L if
@@ -1067,7 +1067,7 @@ public class SnapshotManager {
             throw new IllegalArgumentException();
 
         final ISnapshotRecord newestSnapshot = snapshotIndex
-                .getNewestSnapshot();
+                .getNewestEntry();
 
         final IRootBlockView snapshotRootBlock = newestSnapshot == null ? null
                 : newestSnapshot.getRootBlock();
@@ -1115,8 +1115,8 @@ public class SnapshotManager {
                     + journalSize//
                     + ", percentLogSize="
                     + actualPercentLogSize//
-                    + "%, takeSnapshot=" + (takeSnapshot ? "" : " not")
-                    + " be taken");
+                    + "%, takeSnapshot=" + takeSnapshot //
+                    );
 
         }
         return takeSnapshot;
