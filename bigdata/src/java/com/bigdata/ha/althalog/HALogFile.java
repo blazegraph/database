@@ -33,7 +33,6 @@ import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.security.DigestException;
 import java.security.MessageDigest;
-import java.util.Formatter;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
@@ -41,7 +40,6 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.btree.BytesUtil;
 import com.bigdata.ha.althalog.HALogManager.IHALogManagerCallback;
 import com.bigdata.ha.msg.IHAWriteMessage;
 import com.bigdata.io.DirectBufferPool;
@@ -53,6 +51,7 @@ import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.RootBlockUtility;
 import com.bigdata.journal.RootBlockView;
 import com.bigdata.journal.StoreTypeEnum;
+import com.bigdata.journal.jini.ha.CommitCounterUtility;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.util.ChecksumError;
 import com.bigdata.util.ChecksumUtility;
@@ -173,9 +172,8 @@ public class HALogFile {
 	public HALogFile(final IRootBlockView rbv,
 			final IHALogManagerCallback callback) throws IOException {
 		m_callback = callback;
-		final File hadir = m_callback.getHALogDir();
-		m_haLogFile = new File(hadir, getHALogFileName(rbv.getCommitCounter())
-				+ IHALogReader.HA_LOG_EXT);
+        m_haLogFile = getHALogFileName(m_callback.getHALogDir(),
+                rbv.getCommitCounter());
 
 		if (m_haLogFile.exists())
 			throw new IllegalStateException("File already exists: "
@@ -659,31 +657,33 @@ public class HALogFile {
 	 * @param commitCounter
 	 * @return
 	 */
-	public static String getHALogFileName(final long commitCounter) {
+	public static File getHALogFileName(final File dir, final long commitCounter) {
 
-		/*
-		 * Format the name of the log file.
-		 * 
-		 * Note: The commit counter in the file name should be zero filled to 20
-		 * digits so we have the files in lexical order in the file system (for
-		 * convenience).
-		 */
-		final String logFile;
-		{
-
-			final StringBuilder sb = new StringBuilder();
-
-			final Formatter f = new Formatter(sb);
-
-			f.format("%020d" + IHALogReader.HA_LOG_EXT, commitCounter);
-			f.flush();
-			f.close();
-
-			logFile = sb.toString();
-
-		}
-
-		return logFile;
+        return CommitCounterUtility.getCommitCounterFile(dir, commitCounter,
+                IHALogReader.HA_LOG_EXT);
+//		/*
+//		 * Format the name of the log file.
+//		 * 
+//		 * Note: The commit counter in the file name should be zero filled to 20
+//		 * digits so we have the files in lexical order in the file system (for
+//		 * convenience).
+//		 */
+//		final String logFile;
+//		{
+//
+//			final StringBuilder sb = new StringBuilder();
+//
+//			final Formatter f = new Formatter(sb);
+//
+//			f.format("%020d" + IHALogReader.HA_LOG_EXT, commitCounter);
+//			f.flush();
+//			f.close();
+//
+//			logFile = sb.toString();
+//
+//		}
+//
+//		return logFile;
 
 	}
 

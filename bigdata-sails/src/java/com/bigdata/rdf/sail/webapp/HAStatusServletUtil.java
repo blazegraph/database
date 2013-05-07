@@ -255,8 +255,15 @@ public class HAStatusServletUtil {
                 }
             }
 
-            /*
+            /**
              * Report #of files and bytes in the HALog directory.
+             * 
+             * FIXME Use efficient index to compute the #of bytes (scan with
+             * sum) and the #of files (range count).
+             * 
+             * @see <a
+             *      href="https://sourceforge.net/apps/trac/bigdata/ticket/670">
+             *      Accumulating HALog files cause latency for HA commit</a>
              */
             {
                 final File haLogDir = quorumService.getHALogDir();
