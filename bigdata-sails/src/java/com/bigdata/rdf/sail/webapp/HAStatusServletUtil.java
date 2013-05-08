@@ -660,19 +660,19 @@ public class HAStatusServletUtil {
 
     }
 
-    /**
-     * Impose a lexical ordering on the file names. This is used for the HALog
-     * and snapshot file names. The main component of those file names is the
-     * commit counter, so this places the files into order by commit counter.
-     */
-    private static class FilenameComparator implements Comparator<File> {
-
-        @Override
-        public int compare(File o1, File o2) {
-            
-            return o1.getName().compareTo(o2.getName());
-        }
-        
-    }
+//    /**
+//     * Impose a lexical ordering on the file names. This is used for the HALog
+//     * and snapshot file names. The main component of those file names is the
+//     * commit counter, so this places the files into order by commit counter.
+//     */
+//    private static class FilenameComparator implements Comparator<File> {
+//
+//        @Override
+//        public int compare(File o1, File o2) {
+//            
+//            return o1.getName().compareTo(o2.getName());
+//        }
+//        
+//    }
     
 }
