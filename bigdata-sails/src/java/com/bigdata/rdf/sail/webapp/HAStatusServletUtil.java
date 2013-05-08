@@ -23,7 +23,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sail.webapp;
 
 import java.io.File;
-import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.math.BigInteger;
@@ -31,7 +30,6 @@ import java.net.InetSocketAddress;
 import java.security.DigestException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.util.Arrays;
 import java.util.Comparator;
 import java.util.Iterator;
 import java.util.UUID;
@@ -45,13 +43,14 @@ import org.apache.zookeeper.KeeperException;
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.HAStatusEnum;
 import com.bigdata.ha.QuorumService;
-import com.bigdata.ha.halog.HALogReader;
 import com.bigdata.ha.halog.IHALogReader;
 import com.bigdata.ha.msg.HASnapshotRequest;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.RootBlockView;
 import com.bigdata.journal.jini.ha.HAJournal;
+import com.bigdata.journal.jini.ha.HALogIndex.IHALogRecord;
+import com.bigdata.journal.jini.ha.HALogNexus;
 import com.bigdata.journal.jini.ha.ISnapshotPolicy;
 import com.bigdata.journal.jini.ha.SnapshotIndex.ISnapshotRecord;
 import com.bigdata.journal.jini.ha.SnapshotManager;
@@ -258,49 +257,54 @@ public class HAStatusServletUtil {
             /**
              * Report #of files and bytes in the HALog directory.
              * 
-             * FIXME Use efficient index to compute the #of bytes (scan with
-             * sum) and the #of files (range count).
-             * 
              * @see <a
              *      href="https://sourceforge.net/apps/trac/bigdata/ticket/670">
              *      Accumulating HALog files cause latency for HA commit</a>
              */
             {
-                final File haLogDir = quorumService.getHALogDir();
-                final File[] a = haLogDir
-                        .listFiles(new FilenameFilter() {
-                            @Override
-                            public boolean accept(File dir, String name) {
-                                return name
-                                        .endsWith(IHALogReader.HA_LOG_EXT);
-                            }
-                        });
+                final HALogNexus nexus = journal.getHALogNexus();
                 {
+                    /*
+                     * Use efficient index to compute the #of bytes (scan with
+                     * sum) and the #of files.
+                     */
                     int nfiles = 0;
                     long nbytes = 0L;
-                    for (File file : a) {
-                        nbytes += file.length();
+                    final Iterator<IHALogRecord> itr = nexus.getHALogs();
+                    while (itr.hasNext()) {
+                        final IHALogRecord r = itr.next();
+                        nbytes += r.sizeOnDisk();
+                        nfiles++;
+                    }
+                    /*
+                     * Add in the current HALog file (if any).
+                     */
+                    final File currentFile = nexus.getHALogWriter().getFile();
+                    if (currentFile != null) {
+                        nbytes += currentFile.length();
                         nfiles++;
                     }
                     p.text("HALogDir: nfiles=" + nfiles + ", nbytes=" + nbytes
-                            + ", path=" + haLogDir).node("br").close();
+                            + ", path=" + nexus.getHALogDir()).node("br")
+                            .close();
                 }
                 if (digests) {
                     /*
-                     * List each HALog file together with its digest.
+                     * List each historical HALog file together with its digest.
                      * 
-                     * FIXME We need to request the live log differently and use
-                     * the lock for it. That makes printing the HALog digests
-                     * here potentially probemantic if there are outstanding
-                     * writes.
+                     * Note: This can be VERY expensive.
                      */
-                    // Note: sort to order by increasing commit counter.
-                    Arrays.sort(a, 0/* fromIndex */, a.length,
-                            new FilenameComparator());
-                    for (File file : a) {
-                        final long nbytes = file.length();
+                    final Iterator<IHALogRecord> itr = nexus.getHALogs();
+                    while (itr.hasNext()) {
+                        final IHALogRecord rec = itr.next();
+                        final long nbytes = rec.sizeOnDisk();
+                        final long closingCommitCounter = rec.getRootBlock()
+                                .getCommitCounter();
+                        final IHALogReader r = nexus.getHALogWriter()
+                                .getReader(closingCommitCounter);
+                        final File file = nexus
+                                .getHALogFile(closingCommitCounter);
                         String digestStr = null;
-                        final IHALogReader r = new HALogReader(file);
                         try {
                             if (digests && !r.isEmpty()) {
                                 try {
@@ -319,11 +323,11 @@ public class HAStatusServletUtil {
                             r.close();
                         }
                         p.text("HALogFile: closingCommitCounter="
-                                + r.getClosingRootBlock().getCommitCounter()
+                                + closingCommitCounter//
                                 + ", file="
-                                + file
+                                + file//
                                 + ", nbytes="
-                                + nbytes
+                                + nbytes//
                                 + (digestStr == null ? "" : ", md5="
                                         + digestStr)).node("br").close();
                     }

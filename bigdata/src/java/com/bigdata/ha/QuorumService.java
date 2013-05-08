@@ -80,10 +80,10 @@ public interface QuorumService<S extends HAGlue> extends QuorumMember<S>,
      */
     File getServiceDir();
 
-    /**
-     * Return the directory in which we are logging the write blocks.
-     */
-    File getHALogDir();
+//    /**
+//     * Return the directory in which we are logging the write blocks.
+//     */
+//    File getHALogDir();
 
     /**
      * Return the best guess at the process identifier for this process.

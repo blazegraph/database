@@ -138,7 +138,7 @@ import com.bigdata.io.IDataRecord;
 import com.bigdata.io.IDataRecordAccess;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.journal.Name2Addr.Entry;
-import com.bigdata.journal.jini.ha.HAJournal;
+import com.bigdata.journal.jini.ha.HAJournalServer;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.JournalMetadata;
 import com.bigdata.quorum.AsynchronousQuorumCloseException;
@@ -1713,24 +1713,24 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
     }
 
-    /**
-     * The HA log directory.
-     * 
-     * @see HAJournal.Options#HA_LOG_DIR
-     * 
-     * @throws UnsupportedOperationException
-     *             always.
-     */
-    public File getHALogDir() {
-	    
-	    throw new UnsupportedOperationException();
-
-	}
+//    /**
+//     * The HA log directory.
+//     * 
+//     * @see HAJournal.Options#HA_LOG_DIR
+//     * 
+//     * @throws UnsupportedOperationException
+//     *             always.
+//     */
+//    public File getHALogDir() {
+//	    
+//	    throw new UnsupportedOperationException();
+//
+//	}
 
     /**
      * The HA timeout in milliseconds for a 2-phase prepare.
      * 
-     * @see HAJournal.Options#HA_PREPARE_TIMEOUT
+     * @see HAJournalServer.ConfigurationOptions#HA_PREPARE_TIMEOUT
      * 
      * @throws UnsupportedOperationException
      *             always.

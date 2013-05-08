@@ -428,6 +428,12 @@ public class AbstractCommitTimeIndex<T extends ICommitTimeEntry> extends
      * 
      * @throws IllegalArgumentException
      *             if <code>commitCounter LT ZERO (0)</code>
+     * 
+     *             TODO It is possible to improve the performance for this for
+     *             large indices using a binary search. Each time we probe the
+     *             index we discover a specific commit counter value. If the
+     *             value is LT the target, we need to search above that probe.
+     *             If GT the target, we need to search below that problem.
      */
     public T findByCommitCounter(final long commitCounter) {
 
@@ -524,6 +530,24 @@ public class AbstractCommitTimeIndex<T extends ICommitTimeEntry> extends
 
         } finally {
             
+            lock.unlock();
+            
+        }
+
+    }
+
+    public void removeAll() {
+
+        final Lock lock = writeLock();
+
+        lock.lock();
+
+        try {
+
+            btree.removeAll();
+
+        } finally {
+
             lock.unlock();
             
         }
