@@ -27,7 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.ha;
 
-import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Set;
@@ -356,12 +355,12 @@ abstract public class QuorumServiceBase<S extends HAGlue, L extends AbstractJour
         
     }
 
-    @Override
-    final public File getHALogDir() {
-
-        return getLocalService().getHALogDir();
-        
-    }
+//    @Override
+//    final public File getHALogDir() {
+//
+//        return getLocalService().getHALogDir();
+//        
+//    }
     
     @Override
     public long getPrepareTimeout() {

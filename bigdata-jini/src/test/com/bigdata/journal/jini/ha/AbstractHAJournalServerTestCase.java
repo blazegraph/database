@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.journal.jini.ha;
 
 import java.io.File;
+import java.io.FileFilter;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.PrintWriter;
@@ -54,6 +55,7 @@ import org.openrdf.query.TupleQueryResult;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.HAStatusEnum;
+import com.bigdata.ha.halog.IHALogReader;
 import com.bigdata.ha.msg.HADigestRequest;
 import com.bigdata.ha.msg.HALogDigestRequest;
 import com.bigdata.ha.msg.HARootBlockRequest;
@@ -897,4 +899,51 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
 
     }
 
+    /**
+     * Recursively count any files matching the filter.
+     * 
+     * @param f
+     *            A file or directory.
+     */
+    protected long recursiveCount(final File f, final FileFilter fileFilter) {
+       
+        return recursiveCount(f, fileFilter, 0/* initialValue */);
+
+    }
+    
+    private long recursiveCount(final File f, final FileFilter fileFilter,
+            long n) {
+
+        if (f.isDirectory()) {
+
+            final File[] children = f.listFiles(fileFilter);
+
+            for (int i = 0; i < children.length; i++) {
+
+                n = recursiveCount(children[i], fileFilter, n);
+
+            }
+
+        } else {
+
+            n++;
+
+        }
+
+        return n;
+
+    }
+
+    protected void assertLogCount(final File logDir, final long count) {
+
+        final long actual = recursiveCount(logDir, IHALogReader.HALOG_FILTER);
+        
+        if (actual != count) {
+        
+            fail("Actual log files: " + actual + ", expected: " + count);
+            
+        }
+
+    }
+    
 }

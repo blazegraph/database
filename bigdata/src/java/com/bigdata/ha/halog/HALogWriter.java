@@ -40,11 +40,11 @@ import com.bigdata.ha.msg.IHAWriteMessage;
 import com.bigdata.io.FileChannelUtility;
 import com.bigdata.io.IReopenChannel;
 import com.bigdata.io.SerializerUtil;
+import com.bigdata.journal.CommitCounterUtility;
 import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.RootBlockUtility;
 import com.bigdata.journal.RootBlockView;
 import com.bigdata.journal.StoreTypeEnum;
-import com.bigdata.journal.jini.ha.CommitCounterUtility;
 import com.bigdata.rawstore.Bytes;
 
 /**
@@ -58,7 +58,7 @@ import com.bigdata.rawstore.Bytes;
  * 
  * @author Martyn Cutcher
  */
-public class HALogWriter {
+public class HALogWriter implements IHALogWriter {
 
 	/**
 	 * Logger for HA events.
@@ -97,12 +97,12 @@ public class HALogWriter {
 	/**
 	 * Magic value for HA Log (the root blocks have their own magic value).
 	 */
-	static final int MAGIC = 0x83d9b735;
+	static public final int MAGIC = 0x83d9b735;
 
 	/**
 	 * HA log version number (version 1).
 	 */
-	static final int VERSION1 = 0x1;
+	static public final int VERSION1 = 0x1;
 
 	/** HA log directory. */
 	private final File m_haLogDir;
@@ -152,6 +152,10 @@ public class HALogWriter {
 
 	}
 
+    /**
+     * @throws IllegalStateException
+     *             if the HALog is not open.
+     */
 	private void assertOpen() {
 
 		if (m_state == null)
@@ -159,8 +163,10 @@ public class HALogWriter {
 
 	}
 	
-	public boolean isOpen() {
+	public boolean isHALogOpen() {
+	  
 	    return m_state != null && !m_state.isCommitted();
+	    
 	}
 
 	/**
@@ -178,12 +184,14 @@ public class HALogWriter {
 	}
 
     /**
-     * Return the HA Log file associated with the commit counter.
+     * Return the HALog file associated with the commit counter.
      * 
      * @param dir
      *            The HALog directory.
      * @param commitCounter
-     *            The commit counter.
+     *            The closing commit counter (the HALog file is named for the
+     *            commit counter that will be associated with the closing root
+     *            block).
      * 
      * @return The HALog {@link File}.
      */
@@ -294,6 +302,14 @@ public class HALogWriter {
 
 		}
 
+		final File parentDir = log.getParentFile();
+		
+        // Make sure the parent directory(ies) exist.
+        if (!parentDir.exists())
+            if (!parentDir.mkdirs())
+                throw new IOException("Could not create directory: "
+                        + parentDir);
+
 		final Lock lock = m_stateLock.writeLock();
 		lock.lock();
 		try {
@@ -347,17 +363,16 @@ public class HALogWriter {
 		}
 	};
 
-	/**
-	 * Write the final root block on the HA log and close the file. This "seals"
-	 * the file, which now represents the entire write set associated with the
-	 * commit point in the given root block.
-	 * 
-	 * @param rootBlock
-	 *            The final root block for the write set.
-	 * @throws FileNotFoundException
-	 * @throws IOException
-	 */
-	public void closeLog(final IRootBlockView rootBlock)
+    /**
+     * Write the final root block on the HA log and close the file. This "seals"
+     * the file, which now represents the entire write set associated with the
+     * commit point in the given root block.
+     * 
+     * @param rootBlock
+     *            The final root block for the write set.
+     * @throws IOException
+     */
+	public void closeHALog(final IRootBlockView rootBlock)
 			throws FileNotFoundException, IOException {
 
 		final Lock lock = m_stateLock.writeLock();
@@ -443,11 +458,18 @@ public class HALogWriter {
 	}
 
 	/**
-	 * 
-	 * @param msg
-	 * @param data
+     * Write the message and the data on the live HALog.
+     * 
+     * @param msg
+     *            The message.
+     * @param data
+     *            The data.
+     * @throws IllegalStateException
+     *             if the message is not appropriate for the state of the log.
+     * @throws IOException
+     *             if we can not write on the log.
 	 */
-	public void write(final IHAWriteMessage msg, final ByteBuffer data)
+	public void writeOnHALog(final IHAWriteMessage msg, final ByteBuffer data)
 			throws IOException, IllegalStateException {
 
 		final Lock lock = m_stateLock.readLock();
@@ -628,9 +650,9 @@ public class HALogWriter {
 	}
 
 	/**
-	 * Disable the current log file if one is open.
+	 * Disable (and remove) the current log file if one is open.
 	 */
-	public void disable() throws IOException {
+	public void disableHALog() throws IOException {
 
 		if (haLog.isInfoEnabled())
 			haLog.info("");
@@ -917,4 +939,5 @@ public class HALogWriter {
         }
 
 	}
+
 }

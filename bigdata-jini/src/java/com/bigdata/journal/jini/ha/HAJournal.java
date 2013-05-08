@@ -47,7 +47,6 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
 
 import net.jini.config.Configuration;
 import net.jini.config.ConfigurationException;
@@ -62,7 +61,6 @@ import org.apache.log4j.Logger;
 import com.bigdata.concurrent.FutureTaskMon;
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.QuorumService;
-import com.bigdata.ha.QuorumServiceBase;
 import com.bigdata.ha.RunState;
 import com.bigdata.ha.halog.HALogReader;
 import com.bigdata.ha.halog.HALogWriter;
@@ -86,12 +84,12 @@ import com.bigdata.ha.msg.IHASnapshotDigestRequest;
 import com.bigdata.ha.msg.IHASnapshotDigestResponse;
 import com.bigdata.ha.msg.IHASnapshotRequest;
 import com.bigdata.ha.msg.IHASnapshotResponse;
-import com.bigdata.ha.msg.IHASyncRequest;
 import com.bigdata.ha.msg.IHAWriteMessage;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.IBufferAccess;
 import com.bigdata.io.writecache.WriteCache;
 import com.bigdata.journal.BufferMode;
+import com.bigdata.journal.CommitCounterUtility;
 import com.bigdata.journal.FileMetadata;
 import com.bigdata.journal.IHABufferStrategy;
 import com.bigdata.journal.IRootBlockView;
@@ -189,39 +187,39 @@ public class HAJournal extends Journal {
      */
     private final long haPrepareTimeout;
     
-    /**
-     * @see HAJournalServer.ConfigurationOptions#HA_LOG_DIR
-     */
-    private final File haLogDir;
-    
-    /**
-     * Write ahead log for replicated writes used to resynchronize services that
-     * are not in the met quorum.
-     * 
-     * @see HAJournalServer.ConfigurationOptions#HA_LOG_DIR
-     * @see HALogWriter
-     */
-    private final HALogWriter haLogWriter;
-    
-    /**
-     * Lock to guard the HALogWriter.
-     */// FIXME logLock: Refactor visibility and initialization in HAQuorumService.
-    final Lock logLock = new ReentrantLock(); 
-    
-    /**
-     * The most recently observed *live* {@link IHAWriteMessage}.
-     * <p>
-     * Note: The {@link HALogWriter} will log live messages IFF they are
-     * consistent with the state of the {@link HAJournalServer} when they are
-     * received. In contrast, this field notices each *live* message that is
-     * replicated along the HA pipline.
-     * <p>
-     * Note: package private - exposed to {@link HAJournalServer}.
-     * 
-     * @see QuorumServiceBase#handleReplicatedWrite(IHASyncRequest,
-     *      IHAWriteMessage, ByteBuffer)
-     */
-    volatile IHAWriteMessage lastLiveHAWriteMessage = null;
+//    /**
+//     * @see HAJournalServer.ConfigurationOptions#HA_LOG_DIR
+//     */
+//    private final File haLogDir;
+//    
+//    /**
+//     * Write ahead log for replicated writes used to resynchronize services that
+//     * are not in the met quorum.
+//     * 
+//     * @see HAJournalServer.ConfigurationOptions#HA_LOG_DIR
+//     * @see HALogWriter
+//     */
+//    private final HALogWriter haLogWriter;
+//    
+//    /**
+//     * Lock to guard the HALogWriter.
+//     */
+//    final Lock logLock = new ReentrantLock(); 
+//    
+//    /**
+//     * The most recently observed *live* {@link IHAWriteMessage}.
+//     * <p>
+//     * Note: The {@link HALogWriter} will log live messages IFF they are
+//     * consistent with the state of the {@link HAJournalServer} when they are
+//     * received. In contrast, this field notices each *live* message that is
+//     * replicated along the HA pipline.
+//     * <p>
+//     * Note: package private - exposed to {@link HAJournalServer}.
+//     * 
+//     * @see QuorumServiceBase#handleReplicatedWrite(IHASyncRequest,
+//     *      IHAWriteMessage, ByteBuffer)
+//     */
+//    volatile IHAWriteMessage lastLiveHAWriteMessage = null;
 
     /**
      * Manager for journal snapshots.
@@ -229,12 +227,17 @@ public class HAJournal extends Journal {
     private final SnapshotManager snapshotManager;
     
     /**
-     * The {@link HALogWriter} for this {@link HAJournal} and never
+     * Manager for HALog files.
+     */
+    private final HALogNexus haLogNexus;
+    
+    /**
+     * The manager for HALog files for this {@link HAJournal} and never
      * <code>null</code>.
      */
-    HALogWriter getHALogWriter() {
-
-        return haLogWriter;
+    public HALogNexus getHALogNexus() {
+        
+        return haLogNexus;
         
     }
 
@@ -332,36 +335,10 @@ public class HAJournal extends Journal {
 
         }
         
-        // Note: This is the effective service directory.
-        final File serviceDir = server.getServiceDir(); 
-
-        {
-
-            // Note: Default is relative to the serviceDir.
-            haLogDir = (File) config
-                    .getEntry(
-                            HAJournalServer.ConfigurationOptions.COMPONENT,
-                            HAJournalServer.ConfigurationOptions.HA_LOG_DIR,
-                            File.class,//
-                            new File(
-                                    serviceDir,
-                                    HAJournalServer.ConfigurationOptions.DEFAULT_HA_LOG_DIR)//
-                    );
-
-            if (!haLogDir.exists()) {
-
-                // Create the directory.
-                if (!haLogDir.mkdirs())
-                    throw new IOException("Could not create directory: "
-                            + haLogDir);
-
-            }
-
-            // Set up the HA log writer.
-            haLogWriter = new HALogWriter(haLogDir);
-
-        }
-
+        // HALog manager.
+        haLogNexus = new HALogNexus(server, this, config);
+        
+        // Snapshot manager.
         snapshotManager = new SnapshotManager(server, this, config);
 
     }
@@ -499,12 +476,12 @@ public class HAJournal extends Journal {
         
     }
 
-    @Override
-    public final File getHALogDir() {
-
-        return haLogDir;
-        
-    }
+//    @Override
+//    public final File getHALogDir() {
+//
+//        return haLogNexus.getHALogDir();
+//        
+//    }
 
     public SnapshotManager getSnapshotManager() {
         
@@ -521,7 +498,7 @@ public class HAJournal extends Journal {
     protected void _close() {
     
         try {
-            haLogWriter.disable();
+            haLogNexus.getHALogWriter().disableHALog();
         } catch (IOException e) {
             haLog.error(e, e);
         }
@@ -540,7 +517,8 @@ public class HAJournal extends Journal {
 
         super.deleteResources();
 
-        recursiveDelete(getHALogDir(), IHALogReader.HALOG_FILTER);
+        recursiveDelete(getHALogNexus().getHALogDir(),
+                IHALogReader.HALOG_FILTER);
         
         recursiveDelete(getSnapshotManager().getSnapshotDir(),
                 SnapshotManager.SNAPSHOT_FILTER);
@@ -560,8 +538,8 @@ public class HAJournal extends Journal {
     private void recursiveDelete(final File f, final FileFilter fileFilter) {
 
         try {
-            CommitCounterUtility.recursiveDelete(false/* errorIfDeleteFails */, f,
-                    fileFilter);
+            CommitCounterUtility.recursiveDelete(false/* errorIfDeleteFails */,
+                    f, fileFilter);
         } catch (IOException e) {
             /*
              * Note: IOException is not thrown here since
@@ -618,7 +596,7 @@ public class HAJournal extends Journal {
     protected void doLocalAbort() {
 
         // Clear the last live message out.
-        this.lastLiveHAWriteMessage = null;
+        haLogNexus.lastLiveHAWriteMessage = null;
         
         super.doLocalAbort();
 
@@ -645,14 +623,15 @@ public class HAJournal extends Journal {
              * for the HALog file atomic with respect to other operations on the
              * HALog. This lock is shared by the HAQuorumService.
              */
+            final Lock logLock = getHALogNexus().getLogLock();
             logLock.lock();
             try {
             
                 // The commit counter of the desired closing root block.
                 final long commitCounter = msg.getCommitCounter();
 
-                final File logFile = HALogWriter.getHALogFileName(
-                        getHALogDir(), commitCounter);
+                final File logFile = getHALogNexus()
+                        .getHALogFile(commitCounter);
 
                 if (!logFile.exists()) {
 
@@ -694,7 +673,7 @@ public class HAJournal extends Journal {
              * file needs to be an atomic decision and thus MUST be made by the
              * HALogManager.
              */
-            final IHALogReader r = getHALogWriter().getReader(commitCounter);
+            final IHALogReader r = getHALogNexus().getReader(commitCounter);
 
             // Task sends an HALog file along the pipeline.
             final FutureTask<Void> ft = new FutureTaskMon<Void>(
@@ -1013,7 +992,7 @@ public class HAJournal extends Journal {
              * file needs to be an atomic decision and thus MUST be made by the
              * HALogManager.
              */
-            final IHALogReader r = getHALogWriter().getReader(commitCounter);
+            final IHALogReader r = getHALogNexus().getReader(commitCounter);
 
             final MessageDigest digest = MessageDigest.getInstance("MD5");
 
@@ -1377,17 +1356,20 @@ public class HAJournal extends Journal {
          * <p>
          * Note: This uses [port := 0], which means a random port is assigned.
          * <p>
-         * Note: The VM WILL NOT be kept alive by the exported proxy (keepAlive is
-         * <code>false</code>).
+         * Note: The VM WILL NOT be kept alive by the exported proxy (keepAlive
+         * is <code>false</code>).
          * 
          * @param enableDGC
          *            if distributed garbage collection should be used for the
          *            object to be exported.
          * 
          * @return The {@link Exporter}.
+         * 
+         *         TODO This should be based on the {@link Configuration} object
+         *         (the EXPORTER field). See AbstractServer.
          */
         protected Exporter getExporter(final boolean enableDGC) {
-            // TODO This should be based on the Configuration object (EXPORTER field). See AbstractServer.
+
             return new BasicJeriExporter(TcpServerEndpoint
                     .getInstance(0/* port */), invocationLayerFactory, enableDGC,
                     false/* keepAlive */);

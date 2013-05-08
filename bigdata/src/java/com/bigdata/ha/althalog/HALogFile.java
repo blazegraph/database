@@ -47,11 +47,11 @@ import com.bigdata.io.FileChannelUtility;
 import com.bigdata.io.IBufferAccess;
 import com.bigdata.io.IReopenChannel;
 import com.bigdata.io.SerializerUtil;
+import com.bigdata.journal.CommitCounterUtility;
 import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.RootBlockUtility;
 import com.bigdata.journal.RootBlockView;
 import com.bigdata.journal.StoreTypeEnum;
-import com.bigdata.journal.jini.ha.CommitCounterUtility;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.util.ChecksumError;
 import com.bigdata.util.ChecksumUtility;
@@ -179,7 +179,15 @@ public class HALogFile {
 			throw new IllegalStateException("File already exists: "
 					+ m_haLogFile.getAbsolutePath());
 
-		m_raf = new RandomAccessFile(m_haLogFile, "rw");
+        final File parentDir = m_haLogFile.getParentFile();
+
+        // Make sure the parent directory(ies) exist.
+        if (!parentDir.exists())
+            if (!parentDir.mkdirs())
+                throw new IOException("Could not create directory: "
+                        + parentDir);
+
+        m_raf = new RandomAccessFile(m_haLogFile, "rw");
 		m_channel = m_raf.getChannel();
 		m_storeType = rbv.getStoreType();
 

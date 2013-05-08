@@ -41,6 +41,7 @@ import com.bigdata.btree.BytesUtil;
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.msg.HADigestRequest;
 import com.bigdata.ha.msg.HARootBlockRequest;
+import com.bigdata.journal.CommitCounterUtility;
 import com.bigdata.journal.IHABufferStrategy;
 import com.bigdata.journal.Journal;
 import com.bigdata.rdf.sail.webapp.client.ConnectOptions;
@@ -299,41 +300,6 @@ public class AbstractHA3BackupTestCase extends AbstractHA3JournalServerTestCase 
         
         assertEquals(commitCounters.length,
                 recursiveCount(snapshotDir, SnapshotManager.SNAPSHOT_FILTER));
-
-    }
-
-    /**
-     * Recursively count any files matching the filter.
-     * 
-     * @param f
-     *            A file or directory.
-     */
-    protected long recursiveCount(final File f, final FileFilter fileFilter) {
-       
-        return recursiveCount(f, fileFilter, 0/* initialValue */);
-
-    }
-    
-    private long recursiveCount(final File f, final FileFilter fileFilter,
-            long n) {
-
-        if (f.isDirectory()) {
-
-            final File[] children = f.listFiles(fileFilter);
-
-            for (int i = 0; i < children.length; i++) {
-
-                n = recursiveCount(children[i], fileFilter, n);
-
-            }
-
-        } else {
-
-            n++;
-
-        }
-
-        return n;
 
     }
 

@@ -45,6 +45,7 @@ import net.jini.config.Configuration;
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.HAStatusEnum;
 import com.bigdata.ha.halog.HALogWriter;
+import com.bigdata.ha.halog.IHALogReader;
 import com.bigdata.ha.msg.HARootBlockRequest;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.quorum.Quorum;
@@ -1022,13 +1023,14 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
     }
     
     /**
-     * Test Restore by:
+     * Test automatic restore of HALog files on restart by:
      * <pre>starting ABC
      * 	drop C
      *  run transaction through AB
      *  drop A
+     *  copy HALog files from A to C.
      *  start C
-     *  Restore
+     *  C shoudl restore (replay any new HALog files on startup).
      *  Meet on BC
      *  start A
      *  Fully Meet</pre>
@@ -1036,16 +1038,7 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
      */
     public void testABC_Restore() throws Exception {
 
-//        final ABC startup = 
         new ABC(true/* sequential */);
-
-//        // Wait for a quorum meet.
-//        final long token = quorum.awaitQuorum(awaitQuorumTimeout,
-//                TimeUnit.MILLISECONDS);
-//
-//        // Verify KB exists        
-//        awaitKBExists(startup.serverA);
-//
     
         /*
          * Now go through a commit point with a met quorum. The HALog
@@ -1056,7 +1049,7 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
         // now shutdown C (not destroy)
         shutdownC();
         
-        log.warn("CHECK OPEN LOGS ON A B");
+//        log.warn("CHECK OPEN LOGS ON A B");
         
         /*
          * Now go through a commit point with a met quorum. The HALog
@@ -1066,22 +1059,23 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
 
             simpleTransaction();
             
-            // and a second one?
-            // getRemoteRepository(leader).prepareUpdate(updateStr).evaluate();
-                       
         }
-        log.warn("CHECK LOGS ON A B");
+
+//        log.warn("CHECK LOGS ON A B");
         
         // now shutdown A (not destroy)
         shutdownA();
         
         // copy log files from A to C
-        final File serviceDir = getTestDir();
-        copyFiles(new File(serviceDir, "A/HALog"), new File(serviceDir, "C/HALog"));
-                      
+        copyFiles(getHALogDirA(), getHALogDirC());
+
+        /*
+         * Restart C. C should apply the new HALog file that was copied over
+         * from A.
+         */
         startC();
         
-        log.warn("CHECK LOGS HAVE BEEN COPIED TO C");
+//        log.warn("CHECK LOGS HAVE BEEN COPIED TO C");
         
         // new C should Restore and Meet as Follower with B as leader
         this.awaitMetQuorum();
@@ -1243,11 +1237,8 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
         shutdownB();
         
         // check that logfiles exist
-        final File logsA = getHALogDirA();
-        final File logsB = getHALogDirB();
-        
-        assertEquals(logsA.listFiles().length, 2);
-        assertEquals(logsB.listFiles().length, 2);
+        assertEquals(2L, recursiveCount(getHALogDirA(),IHALogReader.HALOG_FILTER));
+        assertEquals(2L, recursiveCount(getHALogDirB(),IHALogReader.HALOG_FILTER));
         
     }
     
@@ -1275,14 +1266,10 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
         // Run through transaction
         simpleTransaction();
         
-        // check that logfiles exist
-        final File logsA = getHALogDirA();
-        final File logsB = getHALogDirB();
-        
-        // There should be 3 halog files from 2 commit points and newly open
-        assertEquals(logsA.listFiles().length, 3);
-        assertEquals(logsB.listFiles().length, 3);
-        
+        // There should be 3 halog files from 2 commit points and one newly open
+        assertEquals(3L, recursiveCount(getHALogDirA(),IHALogReader.HALOG_FILTER));
+        assertEquals(3L, recursiveCount(getHALogDirB(),IHALogReader.HALOG_FILTER));
+
         // now just restart to help teardown
         startC();
         
@@ -1292,10 +1279,9 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
         simpleTransaction();
 
         // all committed logs should be removed with only open log remaining
-        final File logsC = getHALogDirC();
-        assertEquals(logsA.listFiles().length, 1);
-        assertEquals(logsB.listFiles().length, 1);
-        assertEquals(logsC.listFiles().length, 1);
+        assertEquals(1L, recursiveCount(getHALogDirA(),IHALogReader.HALOG_FILTER));
+        assertEquals(1L, recursiveCount(getHALogDirB(),IHALogReader.HALOG_FILTER));
+        assertEquals(1L, recursiveCount(getHALogDirC(),IHALogReader.HALOG_FILTER));
 	}
     
     /**
@@ -1349,6 +1335,9 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
         assertLogCount(logsA, 1);
         assertLogCount(logsB, 1);
         assertLogCount(logsC, 1);
+        assertEquals(1L, recursiveCount(getHALogDirA(),IHALogReader.HALOG_FILTER));
+        assertEquals(1L, recursiveCount(getHALogDirB(),IHALogReader.HALOG_FILTER));
+        assertEquals(1L, recursiveCount(getHALogDirC(),IHALogReader.HALOG_FILTER));
 
         // Now run several transactions
         for (int i = 0; i < 5; i++)
@@ -1485,13 +1474,6 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
         assertLogCount(logsC, 1);
     }
 
-    private void assertLogCount(final File logdir, final int count) {
-        final int actual = logdir.listFiles().length;
-        if (actual != count) {
-            fail("Actual log files: " + actual + ", expected: " + count);
-        }
-    }
-    
     public void testABCMultiTransactionFollowerReads() throws Exception {
      // doABCMultiTransactionFollowerReads(2000/*nTransactions*/, 20/*delay per transaction*/); // STRESS
         doABCMultiTransactionFollowerReads(200/*nTransactions*/, 20/*delay per transaction*/);
@@ -1787,7 +1769,7 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
         
         // Now run several transactions
         for (int i = 0; i < 5; i++)
-        	simpleTransaction();
+            simpleTransaction();
 
         // and check that only open log files remaining
         assertLogCount(logsA, 1);

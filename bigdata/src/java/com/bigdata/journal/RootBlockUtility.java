@@ -129,6 +129,13 @@ public class RootBlockUtility {
         this.rootBlock = chooseRootBlock(rootBlock0, rootBlock1,
                 ignoreBadRootBlock, alternateRootBlock);
     }
+    
+    public RootBlockUtility(final IRootBlockView rb0, final IRootBlockView rb1) {
+        this.rootBlock0 = rb0;
+        this.rootBlock1 = rb1;
+        this.rootBlock = chooseRootBlock(rootBlock0, rootBlock1,
+                false/* ignoreBadRootBlock */, false/* alternateRootBlock */);
+    }
 
     /**
      * Return the chosen root block. The root block having the greater

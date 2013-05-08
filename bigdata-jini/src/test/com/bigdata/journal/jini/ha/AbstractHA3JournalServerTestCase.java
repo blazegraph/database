@@ -2298,31 +2298,49 @@ public class AbstractHA3JournalServerTestCase extends
             }
     }
 
+    /**
+     * Recursive copy.
+     * 
+     * @param src
+     *            The source (file or directory).
+     * @param dst
+     *            The destination (file or directory, as per source).
+     * @throws IOException
+     */
     protected void copyFiles(final File src, final File dst) throws IOException {
+        final byte[] buf = new byte[8192];
         final File[] files = src.listFiles();
-        if(log.isInfoEnabled())
-                log.info("Copying " + src.getAbsolutePath() + " to "
-                + dst.getAbsolutePath() + ", files: " + files.length);
+        if (log.isInfoEnabled())
+            log.info("Copying " + src.getAbsolutePath() + " to "
+                    + dst.getAbsolutePath() + ", files: " + files.length);
         if (files != null) {
-            for (File srcFile: files) {
+            for (File srcFile : files) {
                 final File dstFile = new File(dst, srcFile.getName());
                 if (log.isInfoEnabled())
-                    log.info("Copying " + srcFile.getAbsolutePath() + " to "
-                            + dstFile.getAbsolutePath());
-                final FileInputStream instr = new FileInputStream(srcFile);
-                final FileOutputStream outstr = new FileOutputStream(dstFile);
-                
-                final byte[] buf = new byte[8192];
-                while (true) {
-                    final int len = instr.read(buf);
-                    if (len == -1)
-                        break;
-                    
-                    outstr.write(buf, 0, len);
+                    log.info("Copying " + srcFile.getAbsolutePath()
+                            + " to " + dstFile.getAbsolutePath());
+                if (srcFile.isDirectory()) {
+                    if (!dstFile.exists() && !dstFile.mkdirs())
+                        throw new IOException("Could not create directory: "
+                                + dstFile);
+                    // Recursive copy.
+                    copyFiles(srcFile, dstFile);
+                } else {
+                    final FileInputStream instr = new FileInputStream(srcFile);
+                    final FileOutputStream outstr = new FileOutputStream(
+                            dstFile);
+
+                    while (true) {
+                        final int len = instr.read(buf);
+                        if (len == -1)
+                            break;
+
+                        outstr.write(buf, 0, len);
+                    }
+
+                    outstr.close();
+                    instr.close();
                 }
-                
-                outstr.close();
-                instr.close();
             }
         }
     }

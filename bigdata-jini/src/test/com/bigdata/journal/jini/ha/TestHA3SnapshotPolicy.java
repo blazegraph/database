@@ -37,7 +37,6 @@ import net.jini.config.Configuration;
 
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.HAStatusEnum;
-import com.bigdata.ha.halog.IHALogReader;
 import com.bigdata.ha.msg.HARootBlockRequest;
 import com.bigdata.ha.msg.HASnapshotRequest;
 import com.bigdata.ha.msg.IHASnapshotResponse;

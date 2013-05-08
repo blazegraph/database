@@ -121,9 +121,9 @@ public class TestHALogWriter extends TestCase {
 				.checksum(data), rbv.getStoreType(), rbv.getQuorumToken(),
 				1000, 0);
 
-		writer.write(msg, data);
+		writer.writeOnHALog(msg, data);
 
-		writer.closeLog(closeRBV(rbv));
+		writer.closeHALog(closeRBV(rbv));
 
 		// for sanity, let's run through the standard reader
 		try {
@@ -162,7 +162,7 @@ public class TestHALogWriter extends TestCase {
 				.checksum(data), rbv.getStoreType(), rbv.getQuorumToken(),
 				1000, 0);
 
-		writer.write(msg, data);
+		writer.writeOnHALog(msg, data);
 
 		final IHALogReader reader = writer.getReader();
 
@@ -174,7 +174,7 @@ public class TestHALogWriter extends TestCase {
 		assertTrue(rmsg.getSize() == msg.getSize());
 
 		// commit the log file
-		writer.closeLog(closeRBV(rbv));
+		writer.closeHALog(closeRBV(rbv));
 
 		// the writer should have closed the file, so the reader should return
 		// immediately to report no more buffers
@@ -221,17 +221,17 @@ public class TestHALogWriter extends TestCase {
 									.checksum(data), rbv.getStoreType(),
 							rbv.getQuorumToken(), 1000, 0);
 
-					writer.write(msg, data);
+					writer.writeOnHALog(msg, data);
 					if (((i+1) % (1 + r.nextInt(count/3))) == 0) {
 						System.out.println("Cycling HALog after " + sequence + " records");
 						rbv = closeRBV(rbv);
-						writer.closeLog(rbv);
+						writer.closeHALog(rbv);
 						sequence = 0;
 						writer.createLog(rbv);
 					}
 				}
 				rbv = closeRBV(rbv);
-				writer.closeLog(rbv);
+				writer.closeHALog(rbv);
 			} catch (FileNotFoundException e) {
 				e.printStackTrace();
 			} catch (IOException e) {

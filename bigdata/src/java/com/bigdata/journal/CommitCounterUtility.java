@@ -21,7 +21,7 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
-package com.bigdata.journal.jini.ha;
+package com.bigdata.journal;
 
 import java.io.File;
 import java.io.FileFilter;
@@ -49,6 +49,7 @@ public class CommitCounterUtility {
      *            The commit counter for the current root block on the journal.
      * @param ext
      *            The filename extension.
+     *            
      * @return The name of the corresponding snapshot file.
      */
     public static File getCommitCounterFile(final File dir,
@@ -59,25 +60,48 @@ public class CommitCounterUtility {
          * 
          * Note: The commit counter in the file name should be zero filled to 20
          * digits so we have the files in lexical order in the file system (for
-         * convenience).
+         * convenience). [I have changed this to 21 digits since that can be
+         * broken up into groups of three per below.]
+         * 
+         * Note: The files are placed into a recursive directory structure with
+         * 1000 files per directory. This is done by taking the lexical form of
+         * the file name and then partitioning it into groups of THREE (3)
+         * digits.
          */
-        final String file;
+        final String basename;
         {
 
             final StringBuilder sb = new StringBuilder();
 
             final Formatter f = new Formatter(sb);
 
-            f.format("%020d" + ext, commitCounter);
+            f.format("%021d", commitCounter);
             f.flush();
             f.close();
 
-            file = sb.toString();
+            basename = sb.toString();
 
         }
 
-        return new File(dir, file);
+        /*
+         * Now figure out the recursive directory name.
+         */
+        File t = dir;
 
+        if (true) {
+
+            for (int i = 0; i < (21 - 3); i += 3) {
+
+                t = new File(t, basename.substring(i, i + 3));
+
+            }
+            
+        }
+
+        final File file = new File(t, basename + ext);
+
+        return file;
+        
     }
 
     /**
@@ -133,7 +157,7 @@ public class CommitCounterUtility {
         return basename;
 
     }
-
+    
     /**
      * Recursively removes any files and subdirectories and then removes the
      * file (or directory) itself. Only files recognized by
@@ -176,21 +200,36 @@ public class CommitCounterUtility {
 
         }
 
+        if (!f.exists())
+            return;
+
         if (log.isInfoEnabled())
             log.info("Removing: " + f);
 
-        if (f.exists() && !f.delete()) {
+        final boolean deleted = f.delete();
+
+        if (!deleted) {
+        
             if (f.isDirectory() && f.list().length != 0) {
+
                 // Ignore non-empty directory.
                 return;
+                
             }
+            
             final String msg = "Could not remove file: " + f;
+            
             if (errorIfDeleteFails) {
+            
                 // Complete if we can not delete a file.
                 throw new IOException(msg);
+
             } else {
+                
                 log.warn(msg);
+
             }
+        
         }
 
     }

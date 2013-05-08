@@ -30,7 +30,6 @@ import java.io.FileFilter;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
-import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -59,10 +58,10 @@ import com.bigdata.concurrent.FutureTaskMon;
 import com.bigdata.concurrent.NamedLock;
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.QuorumService;
-import com.bigdata.ha.halog.IHALogReader;
 import com.bigdata.ha.msg.HASnapshotResponse;
 import com.bigdata.ha.msg.IHASnapshotRequest;
 import com.bigdata.ha.msg.IHASnapshotResponse;
+import com.bigdata.journal.CommitCounterUtility;
 import com.bigdata.journal.FileMetadata;
 import com.bigdata.journal.IHABufferStrategy;
 import com.bigdata.journal.IRootBlockView;
@@ -76,6 +75,7 @@ import com.bigdata.quorum.QuorumException;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.striterator.Resolver;
 import com.bigdata.striterator.Striterator;
+import com.bigdata.util.ChecksumError;
 import com.bigdata.util.ChecksumUtility;
 
 /**
@@ -307,7 +307,7 @@ public class SnapshotManager {
          */
         CommitCounterUtility.recursiveDelete(false/* errorIfDeleteFails */,
                 getSnapshotDir(), TEMP_FILE_FILTER);
- 
+
         // Make sure the snapshot directory exists.
         ensureSnapshotDirExists();
         
@@ -366,11 +366,19 @@ public class SnapshotManager {
      *            the file.
      * @return The current root block from that file.
      * 
+     * @throws IllegalArgumentException
+     *             if argument is <code>null</code>.
      * @throws IOException
+     *             if the file can not be read.
+     * @throws ChecksumError
+     *             if there is a checksum problem with the root blocks.
      */
     static public IRootBlockView getRootBlockForSnapshot(final File file)
             throws IOException {
 
+        if(file == null)
+            throw new IllegalArgumentException();
+        
         final byte[] b0 = new byte[RootBlockView.SIZEOF_ROOT_BLOCK];
         final byte[] b1 = new byte[RootBlockView.SIZEOF_ROOT_BLOCK];
         
@@ -414,23 +422,39 @@ public class SnapshotManager {
 
     }
 
-    void addSnapshot(final File file) throws IOException {
+    /**
+     * Add a snapshot to the {@link #snapshotIndex}.
+     * 
+     * @param file
+     *            The snapshot file.
+     * 
+     * @throws IllegalArgumentException
+     *             if argument is <code>null</code>.
+     * @throws IOException
+     *             if the file can not be read.
+     * @throws ChecksumError
+     *             if there is a checksum problem with the root blocks.
+     * 
+     *             TODO If the root blocks are bad, then this will throw an
+     *             IOException and that will prevent the startup of the
+     *             HAJournalServer. However, if we start up the server with a
+     *             known bad snapshot *and* the snapshot is the earliest
+     *             snapshot, then we can not restore commit points which depend
+     *             on that earliest snapshot (we can still restore commit points
+     *             that are GTE the first useable snapshot).
+     * 
+     *             TODO A similar problem exists if any of the HALog files GTE
+     *             the earliest snapshot are missing, have bad root blocks, etc.
+     *             We will not be able to restore the commit point associated
+     *             with that HALog file unless it also happens to correspond to
+     *             a snapshot.
+     */
+    private void addSnapshot(final File file) throws IOException {
 
-        /*
-         * Validate the snapshot.
-         * 
-         * TODO If the root blocks are bad, then this will throw an IOException
-         * and that will prevent the startup of the HAJournalServer. However, if
-         * we start up the server with a known bad snapshot *and* the snapshot
-         * is the earliest snapshot, then we can not restore commit points which
-         * depend on that earliest snapshot (we can still restore commit points
-         * that are GTE the first useable snapshot).
-         * 
-         * TODO A similar problem exists if any of the HALog files GTE the
-         * earliest snapshot are missing, have bad root blocks, etc. We will not
-         * be able to restore the commit point associated with that HALog file
-         * unless it also happens to correspond to a snapshot.
-         */
+        if (file == null)
+            throw new IllegalArgumentException();
+        
+        // Validate the snapshot.
         final IRootBlockView currentRootBlock = getRootBlockForSnapshot(file);
 
         final long sizeOnDisk = file.length();
@@ -439,7 +463,21 @@ public class SnapshotManager {
 
     }
 
-    boolean removeSnapshot(final File file) {
+    /**
+     * Remove an snapshot from the file system and the {@link #snapshotIndex}.
+     * 
+     * @param file
+     *            The snapshot file.
+     *            
+     * @return <code>true</code> iff it was removed.
+     * 
+     * @throws IllegalArgumentException
+     *             if argument is <code>null</code>.
+     */
+    private boolean removeSnapshot(final File file) {
+
+        if (file == null)
+            throw new IllegalArgumentException();
 
         final IRootBlockView currentRootBlock;
         try {
@@ -601,12 +639,9 @@ public class SnapshotManager {
     }
     
     /**
-     * Return a list of all known snapshots. The list consists of the
-     * {@link IRootBlockView} for each snapshot. The list will be in order of
-     * increasing <code>commitTime</code>. This should also correspond to
-     * increasing <code>commitCounter</code>.
-     * 
-     * @return A list of the {@link IRootBlockView} for the known snapshots.
+     * Return an iterator that will visit all known snapshots. The list will be
+     * in order of increasing <code>commitTime</code>. This should also
+     * correspond to increasing <code>commitCounter</code>.
      */
     @SuppressWarnings({ "unchecked", "rawtypes" })
     public Iterator<ISnapshotRecord> getSnapshots() {
@@ -633,12 +668,22 @@ public class SnapshotManager {
      */
     public void deleteAllSnapshots() throws IOException {
 
-        final File snapshotDir = journal.getSnapshotManager().getSnapshotDir();
+        lock.lock();
 
-        CommitCounterUtility.recursiveDelete(true/* errorIfDeleteFails */,
-                snapshotDir, SNAPSHOT_FILTER);
+        try {
 
-        ensureSnapshotDirExists();
+            CommitCounterUtility.recursiveDelete(true/* errorIfDeleteFails */,
+                    snapshotDir, SNAPSHOT_FILTER);
+
+            snapshotIndex.removeAll();
+
+            ensureSnapshotDirExists();
+
+        } finally {
+
+            lock.unlock();
+
+        }
 
     }
 
@@ -979,35 +1024,6 @@ public class SnapshotManager {
 
     }
 
-//    public static File getCommitCounterFile(final File dir,
-//            final long commitCounter, final String ext) {
-//
-//        /*
-//         * Format the name of the file.
-//         * 
-//         * Note: The commit counter in the file name should be zero filled to 20
-//         * digits so we have the files in lexical order in the file system (for
-//         * convenience).
-//         */
-//        final String file;
-//        {
-//
-//            final StringBuilder sb = new StringBuilder();
-//
-//            final Formatter f = new Formatter(sb);
-//
-//            f.format("%020d" + ext, commitCounter);
-//            f.flush();
-//            f.close();
-//
-//            file = sb.toString();
-//
-//        }
-//
-//        return new File(dir, file);
-//
-//    }
-
     /**
      * Parse out the commitCounter from the file name.
      */
@@ -1017,42 +1033,6 @@ public class SnapshotManager {
         return CommitCounterUtility.parseCommitCounterFile(name, SNAPSHOT_EXT);
 
     }
-    
-//    /**
-//     * Parse out the commitCounter from the file name.
-//     * 
-//     * @param name
-//     *            The file name
-//     * @param ext
-//     *            The expected file extension.
-//     * 
-//     * @return The commit counter from the file name.
-//     * 
-//     * @throws IllegalArgumentException
-//     *             if either argument is <code>null</code>
-//     * @throws NumberFormatException
-//     *             if the file name can not be interpreted as a commit counter.
-//     */
-//    public static long parseCommitCounterFile(final String name,
-//            final String ext) throws NumberFormatException {
-//
-//        if (name == null)
-//            throw new IllegalArgumentException();
-//
-//        if (ext == null)
-//            throw new IllegalArgumentException();
-//
-//        // Strip off the filename extension.
-//        final int len = name.length() - ext.length();
-//
-//        final String fileBaseName = name.substring(0, len);
-//
-//        // Closing commitCounter for snapshot file.
-//        final long commitCounter = Long.parseLong(fileBaseName);
-//
-//        return commitCounter;
-//        
-//    }
     
     /**
      * Find the commit counter for the most recent snapshot (if any). Count up
@@ -1089,7 +1069,8 @@ public class SnapshotManager {
                 : snapshotRootBlock.getCommitCounter();
 
         // Get HALog bytes on disk since that commit counter (strictly GT).
-        final long haLogBytesOnDisk = getHALogFileBytesSinceCommitCounter(sinceCommitCounter);
+        final long haLogBytesOnDisk = journal.getHALogNexus()
+                .getHALogFileBytesSinceCommitCounter(sinceCommitCounter);
 
         /*
          * Figure out the size of the HALog files written since the last
@@ -1123,112 +1104,6 @@ public class SnapshotManager {
 
     }
 
-    /**
-     * Return the #of bytes in the HALog files since a given commit point.
-     * <p>
-     * Note: The current (live) HALog file is NOT in the reported total. The
-     * total only reports the bytes on disk for the committed transactions.
-     * 
-     * @param sinceCommitCounter
-     *            The exclusive lower bound and <code>-1L</code> if the total
-     *            bytes on disk for ALL HALog files should be reported.
-     *            
-     * @return The #of bytes in those HALog files.
-     */
-    public long getHALogFileBytesSinceCommitCounter(final long sinceCommitCounter) {
-
-        /*
-         * List the HALog files for this service.
-         */
-        final File[] files;
-        {
-
-//            // most recent snapshot commit counter or -1L if no snapshots exist.
-//            final long snapshotCommitCounter = snapshotRootBlock == null ? -1L
-//                    : snapshotRootBlock.getCommitCounter();
-            
-            final File currentLogFile = journal.getHALogWriter().getFile();
-
-            final String currentLogFileName = currentLogFile == null ? null
-                    : currentLogFile.getName();
-
-            final File logDir = journal.getHALogDir();
-
-            files = logDir.listFiles(new FilenameFilter() {
-
-                /**
-                 * Return <code>true</code> iff the file is an HALog file
-                 * associated with a commit counter GTE the commit counter of
-                 * the most recent snaphot.
-                 * 
-                 * @param name
-                 *            The name of that HALog file (encodes the
-                 *            commitCounter).
-                 */
-                @Override
-                public boolean accept(final File dir, final String name) {
-
-                    if (!name.endsWith(IHALogReader.HA_LOG_EXT)) {
-                        // Not an HALog file.
-                        return false;
-                    }
-
-                    if (currentLogFile != null
-                            && name.equals(currentLogFileName)) {
-                        // filter out the current log file
-                        return false;
-                    }
-
-                    // Strip off the filename extension.
-                    final String logFileBaseName = name.substring(0,
-                            name.length() - IHALogReader.HA_LOG_EXT.length());
-
-                    // Closing commitCounter for HALog file.
-                    final long logCommitCounter = Long
-                            .parseLong(logFileBaseName);
-
-                    if (logCommitCounter > sinceCommitCounter) {
-                        /*
-                         * HALog is more recent than the current snapshot
-                         * 
-                         * Note: We do not include the HALog file if it was for
-                         * the commit point of the snapshot. We are only
-                         * counting HALog file bytes that have NOT yet been
-                         * incorporated into a snapshot.
-                         */
-                        return true;
-                    }
-
-                    return false;
-
-                }
-            });
-            
-        }
-
-        /*
-         * Count up the bytes in those HALog files.
-         */
-
-        long totalBytes = 0L;
-
-        for (File file : files) {
-
-            // #of bytes in that file.
-            final long len = file.length();
-
-            totalBytes += len;
-
-        }
-
-        if (haLog.isInfoEnabled())
-            haLog.info("sinceCommitCounter=" + sinceCommitCounter + ", files="
-                    + files.length + ", bytesOnDisk=" + totalBytes);
-
-        return totalBytes;
-        
-    }
-    
     /**
      * Take a snapshot.
      * 
@@ -1333,6 +1208,14 @@ public class SnapshotManager {
 
             }
 
+            final File parentDir = file.getParentFile();
+
+            // Make sure the parent directory(ies) exist.
+            if (!parentDir.exists())
+                if (!parentDir.mkdirs())
+                    throw new IOException("Could not create directory: "
+                            + parentDir);
+            
             /*
              * Create a temporary file. We will write the snapshot here. The
              * file will be renamed onto the target file name iff the snapshot
@@ -1340,7 +1223,7 @@ public class SnapshotManager {
              */
             final File tmp = File.createTempFile(
                     SnapshotManager.SNAPSHOT_TMP_PREFIX,
-                    SnapshotManager.SNAPSHOT_TMP_SUFFIX, file.getParentFile());
+                    SnapshotManager.SNAPSHOT_TMP_SUFFIX, parentDir);
 
             DataOutputStream os = null;
             boolean success = false;
@@ -1503,10 +1386,10 @@ public class SnapshotManager {
      * @throws DigestException
      * 
      *             TODO We should pin the snapshot if we are reading it to
-     *             compute its digest. Right now we have the {@link #lock} and
-     *             {@link SnapshotIndex#readLock()}. We probably want a
-     *             {@link NamedLock} specific to the commit counter for each
-     *             snapshot index.
+     *             compute its digest. Right now we could use either the
+     *             {@link #lock} and/or the {@link SnapshotIndex#readLock()}.
+     *             However if we are going to pin a specific file then we
+     *             probably want a {@link NamedLock} for that file. 
      */
     static public void getSnapshotDigest(final File file,
             final MessageDigest digest) throws FileNotFoundException,

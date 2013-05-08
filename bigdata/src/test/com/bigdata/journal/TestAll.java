@@ -72,7 +72,10 @@ public class TestAll extends TestCase {
 
         // tests of the index used to access historical commit records
         suite.addTestSuite( TestCommitRecordIndex.class );
-        
+
+        // test suites for file names based on commit counters.
+        suite.addTestSuite( TestCommitCounterUtility.class );
+
         /*
          * Test a scalable temporary store (uses the transient and disk-only
          * buffer modes).

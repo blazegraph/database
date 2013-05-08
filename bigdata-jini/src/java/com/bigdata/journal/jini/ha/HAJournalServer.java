@@ -24,9 +24,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.journal.jini.ha;
 
 import java.io.File;
-import java.io.FileFilter;
 import java.io.FileNotFoundException;
-import java.io.FilenameFilter;
 import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
@@ -44,7 +42,6 @@ import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
 
@@ -67,6 +64,7 @@ import com.bigdata.ha.QuorumService;
 import com.bigdata.ha.QuorumServiceBase;
 import com.bigdata.ha.halog.HALogWriter;
 import com.bigdata.ha.halog.IHALogReader;
+import com.bigdata.ha.halog.IHALogWriter;
 import com.bigdata.ha.msg.HALogRequest;
 import com.bigdata.ha.msg.HALogRootBlocksRequest;
 import com.bigdata.ha.msg.HARebuildRequest;
@@ -113,6 +111,10 @@ import com.sun.jini.start.LifeCycle;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/530"> Journal
  *      HA </a>
+ * 
+ *      TODO It would be nice if we could roll an {@link HAJournalServer} back
+ *      (or forward) to a specific commit point while it was running (but
+ *      naturally not while it was joined with a met quorum).
  */
 public class HAJournalServer extends AbstractServer {
 
@@ -262,26 +264,6 @@ public class HAJournalServer extends AbstractServer {
         String SNAPSHOT_POLICY = "snapshotPolicy";
 
         ISnapshotPolicy DEFAULT_SNAPSHOT_POLICY = new DefaultSnapshotPolicy();
-
-//        /**
-//         * <strong>TEST SUITE OPTION ONLY!</strong>
-//         * <p>
-//         * By default, a snapshot will be taken the first time the quorum meets
-//         * for each service. This provide the initial restore point, which
-//         * corresponds to an empty {@link HAJournal} with the correct root
-//         * blocks for the quorum.
-//         * <p>
-//         * This option MAY be used to suppress this behavior. This is used by
-//         * the test suite to avoid the creation of the initial snapshot. In
-//         * combination with an {@link DefaultRestorePolicy} which specifies
-//         * <code>minRestorePoints:=0</code>, this has the effect that we do not
-//         * hold onto HALog files (other than the current HALog file) until a
-//         * snapshot has been taken. The test suites control when snapshots are
-//         * taken and are thus able to test a variety of backup scenarios.
-//         */
-//        String SNAPSHOT_ON_FIRST_MEET = "snapshotOnFirstMeet";
-//
-//        boolean DEFAULT_SNAPSHOT_ON_FIRST_MEET = true;
 
         /**
          * The policy identifies the first commit point whose backups MUST NOT
@@ -1263,7 +1245,7 @@ public class HAJournalServer extends AbstractServer {
             super(logicalServiceZPath, serviceId, remoteServiceImpl, store);
 
             this.journal = store;
-            this.logLock = store.logLock;
+            this.logLock = store.getHALogNexus().getLogLock();
             this.server = server;
 
         }
@@ -1339,10 +1321,10 @@ public class HAJournalServer extends AbstractServer {
                      */
                     logLock.lock();
                     try {
-                        final HALogWriter logWriter = journal.getHALogWriter();
-                        if (!logWriter.isOpen()) {
-                            logWriter.disable();
-                            logWriter.createLog(journal.getRootBlockView());
+                        if (!journal.getHALogNexus().isHALogOpen()) {
+                            journal.getHALogNexus().disableHALog();
+                            journal.getHALogNexus().createHALog(
+                                    journal.getRootBlockView());
                         }
                     } finally {
                         logLock.unlock();
@@ -1375,7 +1357,7 @@ public class HAJournalServer extends AbstractServer {
             	
                 journal.setQuorumToken(Quorum.NO_QUORUM);
                 try {
-                    journal.getHALogWriter().disable();
+                    journal.getHALogNexus().disableHALog();
                 } catch (IOException e) {
                     haLog.error(e, e);
                 }
@@ -1414,7 +1396,7 @@ public class HAJournalServer extends AbstractServer {
                  */
                 journal.setQuorumToken(getQuorum().token());
                 try {
-                    journal.getHALogWriter().disable();
+                    journal.getHALogNexus().disableHALog();
                 } catch (IOException e) {
                     haLog.error(e, e);
                 }
@@ -1508,13 +1490,13 @@ public class HAJournalServer extends AbstractServer {
 //                server.haGlueService.bounceZookeeperConnection();
                 logLock.lock();
                 try {
-                    if (journal.getHALogWriter().isOpen()) {
+                    if (journal.getHALogNexus().isHALogOpen()) {
                         /*
                          * Note: Closing the HALog is necessary for us to be
                          * able to re-enter SeekConsensus without violating a
                          * pre-condition for that run state.
                          */
-                        journal.getHALogWriter().disable();
+                        journal.getHALogNexus().disableHALog();
                     }
                 } finally {
                     logLock.unlock();
@@ -1558,7 +1540,7 @@ public class HAJournalServer extends AbstractServer {
                         throw new IllegalStateException("Vote already cast.");
                     }
 
-                    if (journal.getHALogWriter().isOpen())
+                    if (journal.getHALogNexus().isHALogOpen())
                         throw new IllegalStateException("HALogWriter is open.");
 
                 }
@@ -1820,7 +1802,7 @@ public class HAJournalServer extends AbstractServer {
 
                     try {
 
-                        final IHALogReader r = journal.getHALogWriter()
+                        final IHALogReader r = journal.getHALogNexus()
                                 .getReader(commitCounter + 1);
 
                         if (r.isEmpty()) {
@@ -2330,9 +2312,8 @@ public class HAJournalServer extends AbstractServer {
             // TODO Replace with pipelineSetup()?
             logLock.lock();
             try {
-                final HALogWriter logWriter = journal.getHALogWriter();
-                logWriter.disable();
-                logWriter.createLog(openRootBlock);
+                journal.getHALogNexus().disableHALog();
+                journal.getHALogNexus().createHALog(openRootBlock);
             } finally {
                 logLock.unlock();
             }
@@ -2393,8 +2374,7 @@ public class HAJournalServer extends AbstractServer {
             // Close out the current HALog writer.
             logLock.lock();
             try {
-                final HALogWriter logWriter = journal.getHALogWriter();
-                logWriter.closeLog(closeRootBlock);
+                journal.getHALogNexus().closeHALog(closeRootBlock);
             } finally {
                 logLock.unlock();
             }
@@ -2569,7 +2549,7 @@ public class HAJournalServer extends AbstractServer {
 
             try {
 
-                final IHAWriteMessage lastLiveMsg = journal.lastLiveHAWriteMessage;
+                final IHAWriteMessage lastLiveMsg = journal.getHALogNexus().lastLiveHAWriteMessage;
 
                 if (lastLiveMsg != null
                         && lastLiveMsg.getCommitCounter() >= currentWriteSetStateOnLeader
@@ -2588,7 +2568,7 @@ public class HAJournalServer extends AbstractServer {
 
                 }
                 
-                final HALogWriter logWriter = journal.getHALogWriter();
+                final IHALogWriter logWriter = journal.getHALogNexus();
 
                 if (haLog.isDebugEnabled())
                     haLog.debug("HALog.commitCounter="
@@ -2668,9 +2648,7 @@ public class HAJournalServer extends AbstractServer {
             
             try {
 
-                final HALogWriter logWriter = journal.getHALogWriter();
-
-                if (!logWriter.isOpen()) {
+                if (!journal.getHALogNexus().isHALogOpen()) {
              
                     /*
                      * Open the HALogWriter for our current root blocks.
@@ -2681,7 +2659,7 @@ public class HAJournalServer extends AbstractServer {
                      * leader to send us a prior commit point in RESYNC.
                      */
                     
-                    journal.getHALogWriter().createLog(
+                    journal.getHALogNexus().createHALog(
                             journal.getRootBlockView());
                     
                 }
@@ -2734,7 +2712,7 @@ public class HAJournalServer extends AbstractServer {
                 if (req == null) {
 
                     // Save off reference to most recent *live* message.
-                    journal.lastLiveHAWriteMessage = msg;
+                    journal.getHALogNexus().lastLiveHAWriteMessage = msg;
                     
                 }
                 
@@ -2773,9 +2751,9 @@ public class HAJournalServer extends AbstractServer {
 
                 }
 
-                final HALogWriter logWriter = journal.getHALogWriter();
+                final IHALogWriter logWriter = journal.getHALogNexus();
 
-                assert logWriter.isOpen();
+                assert logWriter.isHALogOpen();
                 
                 if (msg.getCommitCounter() == logWriter.getCommitCounter()
                         && msg.getSequence() == (logWriter.getSequence() - 1)) {
@@ -2910,7 +2888,7 @@ public class HAJournalServer extends AbstractServer {
 
             try {
 
-                final HALogWriter logWriter = journal.getHALogWriter();
+                final IHALogWriter logWriter = journal.getHALogNexus();
 
                 if (req == null) {
                     
@@ -2992,7 +2970,7 @@ public class HAJournalServer extends AbstractServer {
         private void resyncTransitionToMetQuorum(final IHAWriteMessage msg,
                 final ByteBuffer data) throws IOException, InterruptedException {
 
-            final HALogWriter logWriter = journal.getHALogWriter();
+            final IHALogWriter logWriter = journal.getHALogNexus();
             
             final IRootBlockView rootBlock = journal.getRootBlockView();
 
@@ -3124,9 +3102,8 @@ public class HAJournalServer extends AbstractServer {
         private void acceptHAWriteMessage(final IHAWriteMessage msg,
                 final ByteBuffer data) throws IOException, InterruptedException {
 
-            final HALogWriter logWriter = journal.getHALogWriter();
-
-            if (msg.getCommitCounter() != logWriter.getCommitCounter()) {
+            if (msg.getCommitCounter() != journal.getHALogNexus()
+                    .getCommitCounter()) {
 
                 throw new AssertionError();
 
@@ -3179,7 +3156,7 @@ public class HAJournalServer extends AbstractServer {
                  * problems where the message state is not consistent with the
                  * log state.
                  */
-                journal.getHALogWriter().write(msg, data);
+                journal.getHALogNexus().writeOnHALog(msg, data);
                 
             } catch(RuntimeException ex) {
                 
@@ -3257,8 +3234,6 @@ public class HAJournalServer extends AbstractServer {
 
             try {
 
-                final HALogWriter logWriter = journal.getHALogWriter();
-
                 if (!isJoinedService) {//FIXME logRootBlock()
 
                     /*
@@ -3275,10 +3250,10 @@ public class HAJournalServer extends AbstractServer {
                 }
 
                 // Close off the old log file with the root block.
-                logWriter.closeLog(rootBlock);
+                journal.getHALogNexus().closeHALog(rootBlock);
 
                 // Open up a new log file with this root block.
-                logWriter.createLog(rootBlock);
+                journal.getHALogNexus().createHALog(rootBlock);
 
             } finally {
 
@@ -3332,7 +3307,8 @@ public class HAJournalServer extends AbstractServer {
                                 earliestRestorableCommitPoint);
 
                 // Delete HALogs not retained by that snapshot.
-                deleteHALogs(token, earliestRetainedSnapshotLastCommitCounter);
+                journal.getHALogNexus().deleteHALogs(token,
+                        earliestRetainedSnapshotLastCommitCounter);
 
             } finally {
 
@@ -3342,133 +3318,6 @@ public class HAJournalServer extends AbstractServer {
 
         }
 
-        /**
-         * Delete HALogs that are no longer required.
-         * 
-         * @param earliestRetainedSnapshotCommitCounter
-         *            The commit counter on the current root block of the
-         *            earliest retained snapshot. We need to retain any HALogs
-         *            that are GTE this commit counter since they will be
-         *            applied to that snapshot.
-         */
-        private void deleteHALogs(final long token,
-                final long earliestRetainedSnapshotCommitCounter) {
-            /*
-             * List the HALog files for this service.
-             */
-            final File[] logFiles;
-            // #of HALog files found. Set during scan.
-            final AtomicLong nfound = new AtomicLong(); 
-            {
-
-                final File currentLogFile = journal.getHALogWriter()
-                        .getFile();
-
-                final String currentLogFileName = currentLogFile == null ? null
-                        : currentLogFile.getName();
-
-                final File logDir = journal.getHALogDir();
-
-                logFiles = logDir.listFiles(new FilenameFilter() {
-
-                    /**
-                     * Return <code>true</code> iff the file is an HALog
-                     * file that should be deleted.
-                     * 
-                     * @param name
-                     *            The name of that HALog file (encodes the
-                     *            commitCounter).
-                     */
-                    @Override
-                    public boolean accept(final File dir, final String name) {
-
-                        if (!name.endsWith(IHALogReader.HA_LOG_EXT)) {
-                            // Not an HALog file.
-                            return false;
-                        }
-
-                        // track #of HALog files in the directory.
-                        nfound.incrementAndGet();
-                        
-                        // filter out the current log file
-                        if (currentLogFile != null
-                                && name.equals(currentLogFileName)) {
-                            /*
-                             * This is the current HALog. We never purge it.
-                             */
-                            return false;
-                        }
-
-                        // Strip off the filename extension.
-                        
-                        final int len = name.length()
-                                - IHALogReader.HA_LOG_EXT.length();
-                        
-                        final String fileBaseName = name.substring(0, len);
-
-                        // Closing commitCounter for HALog file.
-                        final long logCommitCounter = Long
-                                .parseLong(fileBaseName);
-
-                        final boolean deleteFile = logCommitCounter < earliestRetainedSnapshotCommitCounter;
-                        
-                        if (haLog.isInfoEnabled())
-                            haLog.info("logFile="
-                                    + name//
-                                    + ", delete="
-                                    + deleteFile//
-                                    + ", logCommitCounter="
-                                    + logCommitCounter//
-                                    + ", earliestRestoreableCommitPoint="
-                                    + earliestRetainedSnapshotCommitCounter);
-
-                        return deleteFile;
-
-                    }
-                });
-                
-            }
-
-            int ndeleted = 0;
-            long totalBytes = 0L;
-
-            for (File logFile : logFiles) {
-
-                // #of bytes in that HALog file.
-                final long len = logFile.length();
-
-                if (!getQuorum().isQuorumFullyMet(token)) {
-                    /*
-                     * Halt operation.
-                     * 
-                     * Note: This is not an error, but we can not remove
-                     * snapshots or HALogs if this invariant is violated.
-                     */
-                    break;
-                }
-
-                if (!logFile.delete()) {
-
-                    haLog.warn("COULD NOT DELETE FILE: " + logFile);
-
-                    continue;
-
-                }
-
-                ndeleted++;
-
-                totalBytes += len;
-
-            }
-
-            if (haLog.isInfoEnabled())
-                haLog.info("PURGED LOGS: nfound=" + nfound + ", ndeleted="
-                        + ndeleted + ", totalBytes=" + totalBytes
-                        + ", earliestRetainedSnapshotCommitCounter="
-                        + earliestRetainedSnapshotCommitCounter);
-
-        }
-        
         /**
          * We need to destroy the local backups if we do a REBUILD. Those files
          * are no longer guaranteed to be consistent with the history of the
@@ -3492,9 +3341,14 @@ public class HAJournalServer extends AbstractServer {
 
                 // Delete all snapshots.
                 journal.getSnapshotManager().deleteAllSnapshots();
-                
-                // Delete all HALogs (except the current one).
-                deleteAllHALogsExceptCurrent();
+
+                /*
+                 * Delete all HALogs (except the current one).
+                 * 
+                 * Note: The current HALog will wind up being disabled (and
+                 * destroyed) and a new one created at an appropriate time.
+                 */
+                journal.getHALogNexus().deleteAllHALogsExceptCurrent();
                                 
             } finally {
 
@@ -3504,49 +3358,6 @@ public class HAJournalServer extends AbstractServer {
             
         }
 
-        /**
-         * Delete all HALog files (except the current one).
-         * 
-         * @throws IOException
-         */
-        private void deleteAllHALogsExceptCurrent() throws IOException {
-        
-            final File currentLogFile = journal.getHALogWriter()
-                    .getFile();
-
-            final String currentLogFileName = currentLogFile == null ? null
-                    : currentLogFile.getName();
-
-            final File logDir = journal.getHALogDir();
-
-            CommitCounterUtility.recursiveDelete(true/* errorIfDeleteFails */,
-                    logDir, new FileFilter() {
-
-                        @Override
-                        public boolean accept(final File f) {
-
-                            if (f.isDirectory())
-                                return true;
-
-                            final String name = f.getName();
-
-                            // filter out the current log file
-                            if (currentLogFile != null
-                                    && name.equals(currentLogFileName)) {
-                                /*
-                                 * This is the current HALog. We never purge it.
-                                 */
-                                return false;
-                            }
-
-                            return name.endsWith(IHALogReader.HA_LOG_EXT);
-
-                        }
-
-                    });
-            
-        }
-        
         @Override
         public void installRootBlocks(final IRootBlockView rootBlock0,
                 final IRootBlockView rootBlock1) {
