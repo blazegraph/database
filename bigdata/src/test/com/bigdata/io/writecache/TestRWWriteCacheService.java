@@ -198,9 +198,10 @@ public class TestRWWriteCacheService extends TestCase3 {
     }
 
     private void randomizeArray(ArrayList<AllocView> allocs) {
-        for (int i = 0; i < 5000; i++) {
-            int swap1 = r.nextInt(10000);
-            int swap2 = r.nextInt(10000);
+    	final int slots = allocs.size();
+        for (int i = 0; i < slots/2; i++) {
+            int swap1 = r.nextInt(slots);
+            int swap2 = r.nextInt(slots);
             AllocView v1 = allocs.get(swap1);
             AllocView v2 = allocs.get(swap2);
             allocs.set(swap1, v2);
@@ -223,10 +224,12 @@ public class TestRWWriteCacheService extends TestCase3 {
          * positions and lengths
          */
         final ByteBuffer srcBuf = getRandomData(4096);
+        
+        final int totalAllocs = 10000;
 
         ArrayList<AllocView> allocs = new ArrayList<AllocView>();
         int curAddr = 0;
-        for (int i = 0; i < 10000; i++) {
+        for (int i = 0; i < totalAllocs; i++) {
             int pos = r.nextInt(3072);
             int size = r.nextInt(1023) + 1;
             allocs.add(new AllocView(curAddr, pos, size, srcBuf));
@@ -292,12 +295,12 @@ public class TestRWWriteCacheService extends TestCase3 {
             }
         }
         /*
-         * Now reset and write full 10000 records, checking for write success
+         * Now write remaining records, checking for write success
          * and if fail then flush/reset and resubmit, asserting that
          * resubmission is successful
          */
         // writeCache.reset();
-        for (int i = 1000; i < 10000; i++) {
+        for (int i = 1000; i < totalAllocs; i++) {
             AllocView v = allocs.get(i);
             if (!writeCache.write(v.addr, v.buf.asReadOnlyBuffer(), checker
                     .checksum(v.buf))) {
@@ -313,7 +316,7 @@ public class TestRWWriteCacheService extends TestCase3 {
          * Now flush and check if we can read in all records
          */
         writeCache.flush(true);
-        for (int i = 0; i < 10000; i++) {
+        for (int i = 0; i < totalAllocs; i++) {
             AllocView v = allocs.get(i);
             assertEquals(v.buf, opener.read(v.addr, v.buf.capacity())); // expected,
             // actual
@@ -323,38 +326,29 @@ public class TestRWWriteCacheService extends TestCase3 {
          * Now reset, reshuffle and write full 10000 records, checking for write
          * success and if fail then flush/reset and resubmit, asserting that
          * resubmission is successful
-         */
-        // writeCache.reset();
+         */        
+        for (int i = 0; i < totalAllocs; i++) {
+            AllocView v = allocs.get(i);
+        	// must ensure any existing write is removed first (alternative to resetting the cache)
+        	writeCache.clearWrite(v.addr, 0);
+        }
+
         randomizeArray(allocs);
         int duplicates = 0;
-        for (int i = 0; i < 10000; i++) {
+        for (int i = 0; i < totalAllocs; i++) {
             AllocView v = allocs.get(i);
             v.buf.reset();
 
-            try {
-                writeCache.write(v.addr, v.buf.asReadOnlyBuffer(), checker
-                        .checksum(v.buf));
-            } catch (Throwable t) {
-                /**
-                 * FIXME This test is broken both here and at the following
-                 * flush().
-                 * 
-                 * @see https://sourceforge.net/apps/trac/bigdata/ticket/651
-                 *      (RWS test failure)
-                 */
-//                if(!InnerCause.isInnerCause(t, AssertionError.class)) {
-                if (!(t instanceof AssertionError)) {
-                    fail("Expecting " + AssertionError.class.getName()
-                            + ", not " + t, t);
-                }
-            }
+            // Any exception is an error!
+            writeCache.write(v.addr, v.buf.asReadOnlyBuffer(), checker
+                    .checksum(v.buf));
         }
 
         /*
          * Now flush and check if we can read in all records
          */
         writeCache.flush(true);
-        for (int i = 0; i < 10000; i++) {
+        for (int i = 0; i < totalAllocs; i++) {
             AllocView v = allocs.get(i);
             v.buf.position(0);
             assertEquals(v.buf, opener.read(v.addr, v.buf.capacity())); // expected,
