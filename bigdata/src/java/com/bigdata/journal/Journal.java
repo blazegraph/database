@@ -27,7 +27,6 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Collection;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -36,16 +35,15 @@ import java.util.concurrent.BrokenBarrierException;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CyclicBarrier;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-import java.util.concurrent.FutureTask;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -98,7 +96,6 @@ import com.bigdata.sparse.GlobalRowStoreHelper;
 import com.bigdata.sparse.SparseRowStore;
 import com.bigdata.util.ClocksNotSynchronizedException;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
-import com.bigdata.util.concurrent.ExecutionExceptions;
 import com.bigdata.util.concurrent.LatchedExecutor;
 import com.bigdata.util.concurrent.ShutdownHelper;
 import com.bigdata.util.concurrent.ThreadPoolExecutorBaseStatisticsTask;
@@ -338,10 +335,9 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
          * atomic consensus on the new <i>releaseTime</i> for the services
          * joined with a met quorum.
          * <p>
-         * Note: The {@link #barrier}
-         *  provides visibilty for the fields that are modified by {@link #run()}
-         *  so we do not need additional locks or atomics for synchronizing these
-         *  state updates.
+         * Note: The {@link #barrier} provides visibilty for the fields that are
+         * modified by {@link #run()} so we do not need additional locks or
+         * atomics for synchronizing these state updates.
          */
         final private CyclicBarrier barrier;
 
@@ -392,32 +388,32 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
             
         }
 
-        /**
-         * Cancel the requests on the remote services (RMI). This is a best effort
-         * implementation. Any RMI related errors are trapped and ignored in order
-         * to be robust to failures in RMI when we try to cancel the futures.
-         */
-        private <F extends Future<T>, T> void cancelRemoteFutures(
-                final List<F> remoteFutures) {
-
-            if (log.isInfoEnabled())
-                log.info("");
-
-            for (F rf : remoteFutures) {
-
-                try {
-
-                    rf.cancel(true/* mayInterruptIfRunning */);
-
-                } catch (Throwable t) {
-
-                    // ignored (to be robust).
-
-                }
-
-            }
-
-        }
+//        /**
+//         * Cancel the requests on the remote services (RMI). This is a best effort
+//         * implementation. Any RMI related errors are trapped and ignored in order
+//         * to be robust to failures in RMI when we try to cancel the futures.
+//         */
+//        private <F extends Future<T>, T> void cancelRemoteFutures(
+//                final F[] remoteFutures) {
+//
+//            if (log.isInfoEnabled())
+//                log.info("");
+//
+//            for (F rf : remoteFutures) {
+//
+//                try {
+//
+//                    rf.cancel(true/* mayInterruptIfRunning */);
+//
+//                } catch (Throwable t) {
+//
+//                    // ignored (to be robust).
+//
+//                }
+//
+//            }
+//
+//        }
 
         public BarrierState() {
 
@@ -437,11 +433,11 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
             // Note: Local method call.
             timestampOnLeader = leadersValue.getTimestamp();
 
-            /*
-             * Only the followers will countDown() at the barrier. The leader
-             * will await() until the barrier breaks.
-             */
-            final int nparties = joinedServiceIds.length - 1;
+//            /*
+//             * Only the followers will countDown() at the barrier. The leader
+//             * will await() until the barrier breaks.
+//             */
+            final int nparties = joinedServiceIds.length;// - 1;
 
             barrier = new CyclicBarrier(nparties, this);
 
@@ -506,13 +502,38 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
          * NECESSARY. At a mimimum, we must not fail if all joined services on
          * entry to this method respond without failing (that is, succeed if no
          * services fail during this protocol) - this is implemented.
+         * 
+         * @throws InterruptedException
+         * @throws BrokenBarrierException
+         * @throws TimeoutException 
+         * 
+         * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/673" >
+         *      Native thread leak in HAJournalServer process </a>
          */
-        private void messageFollowers(final long token) throws IOException {
+        private void messageFollowers(final long token) throws IOException,
+                InterruptedException, BrokenBarrierException, TimeoutException {
 
             getQuorum().assertLeader(token);
 
-            // Future for gather task for each follower.
-            final List<Future<Void>> remoteFutures = new LinkedList<Future<Void>>();
+//            /*
+//             * Future for gather task for each follower.
+//             * 
+//             * Note: These are asynchronous remote Futures. They must not escape
+//             * the local scope and must be cancelled regardless of the outcome.
+//             * 
+//             * Note: DGC for these remote causes a native thread leak on the
+//             * followers. To avoid that, I am attempting to rely on proxies for
+//             * remote futures that do not use DGC. In this case, I believe that
+//             * it will work since the Future is in scope on the follower (it is
+//             * the future for the GatherTask running on the follower) and thus
+//             * we should not need DGC to keep the follower from finalizing the
+//             * remote futures on which this method is relying.
+//             * 
+//             * @see https://sourceforge.net/apps/trac/bigdata/ticket/673
+//             */
+//            @SuppressWarnings("unchecked")
+//            final Future<Void>[] remoteFutures = new Future[joinedServiceIds.length];
+//            final boolean[] remoteDone = new boolean[joinedServiceIds.length];
             
             try {
 
@@ -528,41 +549,98 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
                      * Runnable which will execute this message on the remote
                      * service.
                      */
+                    
+                    // Resolve joined service.
                     final HATXSGlue service = getService(serviceId);
-                    final Future<Void> rf = service.gatherMinimumVisibleCommitTime(msg);
+                    
+                    // Message joined service (can throw NPE if service is gone).
+                    service.gatherMinimumVisibleCommitTime(msg);
 
-                    // add to list of futures we will check.
-                    remoteFutures.add(rf);
+//                    // add to list of futures we will check.
+//                    remoteFutures[i] = rf;
 
                 }
 
-                /*
-                 * Check the futures for the other services in the quorum.
-                 */
-                final List<Throwable> causes = new LinkedList<Throwable>();
-                for (Future<Void> rf : remoteFutures) {
-                    boolean success = false;
-                    try {
-                        rf.get();
-                        success = true;
-                    } catch (InterruptedException ex) {
-                        log.error(ex, ex);
-                        causes.add(ex);
-                    } catch (ExecutionException ex) {
-                        log.error(ex, ex);
-                        causes.add(ex);
-                    } finally {
-                        if (!success) {
-                            // Cancel the request on the remote service (RMI).
-                            try {
-                                rf.cancel(true/* mayInterruptIfRunning */);
-                            } catch (Throwable t) {
-                                // ignored.
-                            }
-                        }
-                    }
-                }
+//                /*
+//                 * Check the futures for the other services in the quorum.
+//                 */
+//                final List<Throwable> causes = new LinkedList<Throwable>();
+//                for (int i = 1; i < remoteFutures.length; i++) {
+//                    final Future<Void> rf = remoteFutures[i];
+//                    boolean success = false;
+//                    try {
+//                        rf.get();
+//                        success = true;
+//                        remoteDone[i] = true;
+//                    } catch (InterruptedException ex) {
+//                        log.error(ex, ex);
+//                        causes.add(ex);
+//                    } catch (ExecutionException ex) {
+//                        log.error(ex, ex);
+//                        causes.add(ex);
+//                        remoteDone[i] = true;
+//                    } catch (RuntimeException ex) {
+//                        /*
+//                         * Note: ClientFuture.get() can throw a RuntimeException
+//                         * if there is a problem with the RMI call. In this case
+//                         * we do not know whether the Future is done.
+//                         */
+//                        log.error(ex, ex);
+//                        causes.add(ex);
+//                    } finally {
+//                        if (!success) {
+//                            // Cancel the request on the remote service (RMI).
+//                            try {
+//                                rf.cancel(true/* mayInterruptIfRunning */);
+//                            } catch (Throwable t) {
+//                                // ignored.
+//                            }
+//                            remoteDone[i] = true;
+//                        }
+//                    }
+//                }
                 
+                try { // FIXME HA TXS : Configuration option for timeout (lift into caller, config @ HAJournal(Server) similar to other timeout. Could be total timeout across 2-phase commit protocol).
+                    barrier.await(20, TimeUnit.SECONDS);
+                    // fall through.
+                } catch (TimeoutException e) {
+                    throw e;
+                } catch (InterruptedException e) {
+                    throw e;
+                } catch (BrokenBarrierException e) {
+                    throw e;
+                }
+
+//                /*
+//                 * If there were any errors, then throw an exception listing them.
+//                 */
+//                if (!causes.isEmpty()) {
+//                    // Note: Cancelled below.
+////                    // Cancel remote futures.
+////                    cancelRemoteFutures(remoteFutures);
+//                    // Throw exception back to the leader.
+//                    if (causes.size() == 1)
+//                        throw new RuntimeException(causes.get(0));
+//                    throw new RuntimeException("remote errors: nfailures="
+//                            + causes.size(), new ExecutionExceptions(causes));
+//                }
+
+            } finally {
+//                /*
+//                 * Regardless of outcome or errors above, ensure that all remote
+//                 * futures are cancelled.
+//                 */
+//                for (int i = 0; i < remoteFutures.length; i++) {
+//                    final Future<Void> rf = remoteFutures[i];
+//                    if (!remoteDone[i]) {
+//                        // Cancel the request on the remote service (RMI).
+//                        try {
+//                            rf.cancel(true/* mayInterruptIfRunning */);
+//                        } catch (Throwable t) {
+//                            // ignored.
+//                        }
+//                    }
+//                }
                 if (!barrier.isBroken()) {
                     /*
                      * If there were any followers that did not message the
@@ -579,37 +657,17 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
                      * with the consensus protocol unless all services
                      * "vote yes". Thus, a single node failure during the
                      * release time consensus protocol will cause the commit to
-                     * fail.
+                     * fail. [Actually, we could use getNumberWaiting(). If it
+                     * is a bare majority, then we could force the barrier to
+                     * meet break (either with reset or with running an await()
+                     * in other threads) and take the barrier break action
+                     * ourselves. E.g., in the thread that calls
+                     * barrier.reset()].
                      */
                     barrier.reset();
                 }
 
-                /*
-                 * If there were any errors, then throw an exception listing them.
-                 */
-                if (!causes.isEmpty()) {
-                    // Cancel remote futures.
-                    cancelRemoteFutures(remoteFutures);
-                    // Throw exception back to the leader.
-                    throw new RuntimeException("remote errors: nfailures="
-                            + causes.size(), new ExecutionExceptions(causes));
-                }
-
-            } finally {
-                /*
-                 * Ensure that all futures are cancelled.
-                 */
-                for (Future<Void> rf : remoteFutures) {
-                    if (!rf.isDone()) {
-                        // Cancel the request on the remote service (RMI).
-                        try {
-                            rf.cancel(true/* mayInterruptIfRunning */);
-                        } catch (Throwable t) {
-                            // ignored.
-                        }
-                    }
-                }
-            }
+            }// finally
 
         }
         
@@ -746,10 +804,12 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
          * node, etc.
          * 
          * @throws IOException
+         * @throws BrokenBarrierException
          */
         // Note: Executed on the leader.
         @Override
-        public void updateReleaseTimeConsensus() throws IOException {
+        public void updateReleaseTimeConsensus() throws IOException,
+                InterruptedException, TimeoutException, BrokenBarrierException {
 
             final long token = getQuorum().token();
             
@@ -958,26 +1018,33 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
         }
 
         /**
-         * {@inheritDoc}
-         * <p>
-         * "Gather" runs on the follower.
+         * Return the {@link GatherTask} that will be executed by the follower.
          */
         @Override
-        public Future<Void> gatherMinimumVisibleCommitTime(
-                final IHAGatherReleaseTimeRequest req) throws IOException {
+        public Callable<Void> newGatherMinimumVisibleCommitTimeTask(
+                final IHAGatherReleaseTimeRequest req) {
 
-            final FutureTask<Void> ft = new FutureTask<Void>(
-                    new GatherTask(req));
-
-            getExecutorService().submit(ft);
-
-            /*
-             * Note: This MUST be an ASYNC Future.
-             */
-            return ft;
+            return new GatherTask(req);
 
         }
 
+        /**
+         * {@inheritDoc}
+         * <p>
+         * Note: This method is implemented by {@link AbstractJournal.BasicHA}
+         * which calls through to
+         * {@link #newGatherMinimumVisibleCommitTimeTask(IHAGatherReleaseTimeRequest)}
+         * 
+         * @throws UnsupportedOperationException
+         */
+        @Override
+        public void gatherMinimumVisibleCommitTime(
+                final IHAGatherReleaseTimeRequest req) throws IOException {
+
+            throw new UnsupportedOperationException();
+            
+        }
+        
         /**
          * "Gather" task runs on the followers.
          * <p>

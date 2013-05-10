@@ -29,9 +29,11 @@ package com.bigdata.service;
 
 import java.io.IOException;
 import java.util.Properties;
+import java.util.concurrent.Callable;
 import java.util.concurrent.TimeoutException;
 
 import com.bigdata.ha.HATXSGlue;
+import com.bigdata.ha.msg.IHAGatherReleaseTimeRequest;
 import com.bigdata.journal.ITransactionService;
 
 /**
@@ -47,13 +49,27 @@ abstract public class AbstractHATransactionService extends
         super(properties);
         
     }
+    
+    /**
+     * Factory for the Gather task on the follower.
+     * 
+     * @param req
+     *            The request.
+     * 
+     * @return The task to run on the follower.
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/673" >
+     *      Native thread leak in HAJournalServer process </a>
+     */
+    abstract public Callable<Void> newGatherMinimumVisibleCommitTimeTask(
+            final IHAGatherReleaseTimeRequest req);
 
     /**
      * Coordinate the update of the <i>releaseTime</i> on each service that is
      * joined with the met quorum.
      */
     abstract public void updateReleaseTimeConsensus() throws IOException,
-            TimeoutException, InterruptedException;
+            TimeoutException, InterruptedException, Exception;
 
     /**
      * Used to make a serviceJoin() MUTEX with the consensus protocol.

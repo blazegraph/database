@@ -20,10 +20,11 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-*/
+ */
 package com.bigdata.ha;
 
 import java.io.IOException;
+import java.rmi.Remote;
 import java.util.concurrent.BrokenBarrierException;
 import java.util.concurrent.Future;
 
@@ -40,11 +41,11 @@ import com.bigdata.journal.ITransactionService;
  * @see <a
  *      href="https://docs.google.com/document/d/14FO2yJFv_7uc5N0tvYboU-H6XbLEFpvu-G8RhAzvxrk/edit?pli=1#"
  *      > HA TXS Design Document </a>
- *      
+ * 
  * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/623" > HA TXS
  *      / TXS Bottleneck </a>
  */
-public interface HATXSGlue {
+public interface HATXSGlue extends Remote {
 
     /**
      * Message used to request information about the earliest commit point that
@@ -56,13 +57,29 @@ public interface HATXSGlue {
      * point pinned by either a transaction or the minReleaseAge of their
      * {@link ITransactionService} using
      * {@link #notifyEarliestCommitTime(IHANotifyReleaseTimeResponse)}.
+     * <p>
+     * The message is a sync RMI call. The follower will clear an outcome and
+     * execute a task which runs asynchronously and messages back to the leader
+     * with its {@link IHANotifyReleaseTimeResponse}. The leader will report
+     * back the consensus release time. The outcome of these on the follower is
+     * not directly reported back to the leader, e.g., through a remote
+     * {@link Future} because this causes a DGC thread leak on the follower. See
+     * the ticket below. Instead, the follower notes the outcome of the gather
+     * operation and will vote "NO" in
+     * {@link HACommitGlue#prepare2Phase(IHA2PhasePrepareMessage)} unless it
+     * completes its side of the release time consensus protocol without error
+     * (that is, the otherwise unmonitored outcome of the asynchronous task for
+     * {@link #gatherMinimumVisibleCommitTime(IHAGatherReleaseTimeRequest)}).
      * 
      * @param req
      *            The request from the leader.
      * 
      * @see #notifyEarliestCommitTime(IHANotifyReleaseTimeResponse)
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/673" >
+     *      Native thread leak in HAJournalServer process </a>
      */
-    Future<Void> gatherMinimumVisibleCommitTime(IHAGatherReleaseTimeRequest req)
+    void gatherMinimumVisibleCommitTime(IHAGatherReleaseTimeRequest req)
             throws IOException;
 
     /**
