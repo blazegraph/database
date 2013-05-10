@@ -315,6 +315,14 @@ public class QuorumCommitImpl<S extends HACommitGlue> extends
                      * non-joined service has been violated.
                      */
                     log.error(ex, ex);
+                    done = true; // Note: ExecutionException indicates isDone().
+                } catch (RuntimeException ex) {
+                    /*
+                     * Note: ClientFuture.get() can throw a RuntimeException
+                     * if there is a problem with the RMI call. In this case
+                     * we do not know whether the Future is done.
+                     */
+                    log.error(ex, ex);
                 } finally {
                     if (!done) {
                         // Cancel the request on the remote service (RMI).
@@ -446,6 +454,15 @@ public class QuorumCommitImpl<S extends HACommitGlue> extends
                 } catch (ExecutionException ex) {
                     log.error(ex, ex);
                     causes.add(ex);
+                    done = true; // Note: ExecutionException indicates isDone().
+                } catch (RuntimeException ex) {
+                    /*
+                     * Note: ClientFuture.get() can throw a RuntimeException
+                     * if there is a problem with the RMI call. In this case
+                     * we do not know whether the Future is done.
+                     */
+                    log.error(ex, ex);
+                    causes.add(ex);
                 } finally {
                     if (!done) {
                         // Cancel the request on the remote service (RMI).
@@ -468,6 +485,8 @@ public class QuorumCommitImpl<S extends HACommitGlue> extends
                 // Cancel remote futures.
                 cancelRemoteFutures(remoteFutures);
                 // Throw exception back to the leader.
+                if (causes.size() == 1)
+                    throw new RuntimeException(causes.get(0));
                 throw new RuntimeException("remote errors: nfailures="
                         + causes.size(), new ExecutionExceptions(causes));
             }
@@ -557,6 +576,15 @@ public class QuorumCommitImpl<S extends HACommitGlue> extends
                 } catch (ExecutionException ex) {
                     log.error(ex, ex);
                     causes.add(ex);
+                    done = true; // Note: ExecutionException indicates isDone().
+                } catch (RuntimeException ex) {
+                    /*
+                     * Note: ClientFuture.get() can throw a RuntimeException
+                     * if there is a problem with the RMI call. In this case
+                     * we do not know whether the Future is done.
+                     */
+                    log.error(ex, ex);
+                    causes.add(ex);
                 } finally {
                     if (!done) {
                         // Cancel the request on the remote service (RMI).
@@ -579,6 +607,8 @@ public class QuorumCommitImpl<S extends HACommitGlue> extends
                 // Cancel remote futures.
                 cancelRemoteFutures(remoteFutures);
                 // Throw exception back to the leader.
+                if (causes.size() == 1)
+                    throw new RuntimeException(causes.get(0));
                 throw new RuntimeException("remote errors: nfailures="
                         + causes.size(), new ExecutionExceptions(causes));
             }

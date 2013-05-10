@@ -1409,7 +1409,7 @@ public class HAJournal extends Journal {
                 return new ThickFuture<E>(future);
             }
 
-            /*
+            /**
              * Setup the Exporter for the Future.
              * 
              * Note: Distributed garbage collection is enabled since the proxied
@@ -1417,8 +1417,26 @@ public class HAJournal extends Journal {
              * can get() the result. Distributed garbage collection handles this
              * for us and automatically unexports the proxied iterator once it
              * is no longer strongly referenced by the client.
+             * 
+             * Note: DGC is observed to leak native threads and should not be
+             * used for any common operations.
+             * 
+             * @see <a
+             *      href="https://sourceforge.net/apps/trac/bigdata/ticket/433"
+             *      > Cluster leaks threads under read-only index operations
+             *      </a>
+             * @see <a
+             *      href="https://sourceforge.net/apps/trac/bigdata/ticket/437"
+             *      > Thread-local cache combined with unbounded thread pools
+             *      causes effective memory leak </a>
+             * @see <a
+             *      href="https://sourceforge.net/apps/trac/bigdata/ticket/673"
+             *      >Native thread leak in HAJournalServer process</a>
              */
-            final Exporter exporter = getExporter(true/* enableDGC */);
+            
+            final boolean enableDGC = true;
+            
+            final Exporter exporter = getExporter(enableDGC);
 
             // wrap the future in a proxyable object.
             final RemoteFuture<E> impl = new RemoteFutureImpl<E>(future);

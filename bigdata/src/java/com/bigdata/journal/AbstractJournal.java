@@ -51,6 +51,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.BrokenBarrierException;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
@@ -2468,7 +2469,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
 		assert commitTime > 0L;
 
-		int ncommitters = 0;
+//		int ncommitters = 0;
 
 		final long[] rootAddrs = new long[_committers.length];
 
@@ -2483,7 +2484,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
 			rootAddrs[i] = addr;
 
-			ncommitters++;
+//			ncommitters++;
 
 		}
 
@@ -2567,6 +2568,9 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
 			if (log.isInfoEnabled())
 				log.info("start");
+
+            // Clear
+            gatherFuture.set(null/* newValue */);
 
 			if (_bufferStrategy == null) {
 
@@ -5690,6 +5694,19 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 	private final Quorum<HAGlue,QuorumService<HAGlue>> quorum;
 
     /**
+     * Used to pin the {@link Future} of the gather operation on the client
+     * to prevent it from being finalized while the leader is still running
+     * its side of the consensus protocol to update the release time for the
+     * replication cluster.
+     * 
+     * @see #gatherMinimumVisibleCommitTime(IHAGatherReleaseTimeRequest)
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/673" >
+     *      Native thread leak in HAJournalServer process </a>
+     */
+    private final AtomicReference<Future<Void>> gatherFuture = new AtomicReference<Future<Void>>();
+    
+    /**
      * The {@link Quorum} for this service -or- <code>null</code> if the service
      * is not running with a quorum.
      */
@@ -5995,7 +6012,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
 			// Save off a reference to the prepare request.
 			prepareRequest.set(prepareMessage);
-			
+
             // Clear vote (assume NO unless proven otherwise).
             vote.set(false);
 
@@ -6024,8 +6041,8 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                  * met quorum.
                  */
 
-                ft = new FutureTaskMon<Boolean>(new Prepare2PhaseTask(
-                        prepareMessage) {
+                ft = new FutureTaskMon<Boolean>(new Prepare2PhaseTask(isJoined,
+                        isLeader, prepareMessage) {
                 });
 
             }
@@ -6094,13 +6111,21 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
          */
         private class Prepare2PhaseTask implements Callable<Boolean> {
 
+            private final boolean isJoined;
+            private final boolean isLeader;
             private final IHA2PhasePrepareMessage prepareMessage;
 
-            public Prepare2PhaseTask(final IHA2PhasePrepareMessage prepareMessage) {
+            public Prepare2PhaseTask(final boolean isJoined,
+                    final boolean isLeader,
+                    final IHA2PhasePrepareMessage prepareMessage) {
 
                 if (prepareMessage == null)
                     throw new IllegalArgumentException();
+
+                this.isJoined = isJoined;
                 
+                this.isLeader = isLeader;
+
                 this.prepareMessage = prepareMessage;
                 
             }
@@ -6157,6 +6182,53 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
                 quorum.assertQuorum(prepareToken);
 
+                /*
+                 * if(follower) {...}
+                 */
+                if (isJoined && !isLeader) {
+
+                    /**
+                     * This is a follower.
+                     * 
+                     * Validate the release time consensus protocol was
+                     * completed successfully on the follower.
+                     * 
+                     * @see <a
+                     *      href="https://sourceforge.net/apps/trac/bigdata/ticket/673"
+                     *      > Native thread leak in HAJournalServer process </a>
+                     */
+
+                    final Future<Void> oldFuture = gatherFuture
+                            .getAndSet(null/* newValue */);
+
+                    if (oldFuture == null) {
+
+                        throw new IllegalStateException(
+                                "Follower did not execute consensus protocol");
+                    }
+
+                    if (!oldFuture.isDone()) {
+                        // Ensure cancelled.
+                        oldFuture.cancel(true/* mayInterruptIfRunning */);
+                    }
+
+                    try {
+                        oldFuture.get();
+                        // Gather was successful - fall through.
+                    } catch (InterruptedException e) {
+                        // Note: Future isDone(). Caller will not block.
+                        throw new AssertionError();
+                    } catch (ExecutionException e) {
+                        /*
+                         * Gather failed on the follower.
+                         */
+                        haLog.error("Gather failed on follower: serviceId="
+                                + getServiceId() + " : " + e, e);
+                        return vote.get();
+                    }
+
+                }
+                
                 /*
                  * Call to ensure strategy does everything required for itself
                  * before final root block commit. At a minimum it must flush
@@ -6670,30 +6742,78 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
         }
 
         /*
-         * ITransactionService.
+         * HATXSGlue.
          * 
          * Note: API is mostly implemented by Journal/HAJournal.
-         * 
-         * Note: We should either not expose the ITransactionService or we
-         * should delegate the rest of this API. I am leaning toward NOT
-         * exposing the ITransactionService interface since (a) it does not
-         * appear to be necessary to start transactions on a specific service;
-         * and (b) if we do, then we really need to track remote transactions
-         * (by the remote Service UUID) and cancel them if the remote service
-         * leaves the met quorum. All we really need to expose here is the
-         * HATXSGlue interface and that DOES NOT need to extend the
-         * ITransactionService interface.
          */
         
+//        /**
+//         * Clear the {@link #gatherFuture} and return <code>true</code> iff the
+//         * {@link Future} was available, was already done, and the computation
+//         * did not result in an error. Othewise return <code>false</code>.
+//         * <p>
+//         * Note: This is invoked from
+//         * {@link #prepare2Phase(IHA2PhasePrepareMessage)} to determine whether
+//         * the gather operation on the follower completed normally. It is also
+//         * invoked from {@link AbstractJournal#doLocalAbort()} and from
+//         * {@link #gatherMinimumVisibleCommitTime(IHAGatherReleaseTimeRequest)}
+//         * to ensure that the outcome from a previous gather is cleared before a
+//         * new one is attempted.
+//         * 
+//         * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/673" >
+//         *      Native thread leak in HAJournalServer process </a>
+//         */
+//        private boolean clearGatherOutcome() {
+//            final Future<Void> oldFuture = gatherFuture
+//                    .getAndSet(null/* newValue */);
+//            if (oldFuture != null) {
+//                if(!oldFuture.isDone()) {
+//                    // Ensure cancelled.
+//                    oldFuture.cancel(true/*mayInterruptIfRunning*/);
+//                }
+//                try {
+//                    oldFuture.get();
+//                    // Gather was successful.
+//                    return true;
+//                } catch (InterruptedException e) {
+//                    // Note: Future isDone(). Caller will not block.
+//                    throw new AssertionError();
+//                } catch (ExecutionException e) {
+//                    haLog.error("Gather failed on follower: serviceId="
+//                            + getServiceId() + " : " + e, e);
+//                    return false;
+//                }
+//            }
+//            // Outcome was not available.
+//            return false;
+//        }
+        
+        /**
+         * {@inheritDoc}
+         * 
+         * @see <a
+         *      href="https://sourceforge.net/apps/trac/bigdata/ticket/673"
+         *      > Native thread leak in HAJournalServer process </a>
+         */
         @Override
-        public Future<Void> gatherMinimumVisibleCommitTime(
+        public void gatherMinimumVisibleCommitTime(
                 final IHAGatherReleaseTimeRequest req) throws IOException {
 
-            final Future<Void> ft = ((HATXSGlue) AbstractJournal.this
-                    .getLocalTransactionManager().getTransactionService())
-                    .gatherMinimumVisibleCommitTime(req);
+            // Clear the old outcome.
+            gatherFuture.set(null);
             
-            return getProxy(ft, true/* asynchFuture */);
+            final Callable<Void> task = ((AbstractHATransactionService) AbstractJournal.this
+                    .getLocalTransactionManager()
+                    .getTransactionService())
+                    .newGatherMinimumVisibleCommitTimeTask(req);
+
+            final FutureTask<Void> ft = new FutureTask<Void>(task);
+
+            gatherFuture.set(ft);
+            // Fire and forget. The Future is checked by prepare2Phase.
+            getExecutorService().execute(ft);
+
+            return;
             
         }
 
@@ -6708,19 +6828,6 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
         }
 
-//        @Override
-//        public Future<Void> getTXSCriticalSectionLockOnLeader(
-//                final IHATXSLockRequest req) throws IOException {
-//
-//            final Future<Void> f = ((HATXSGlue) AbstractJournal.this
-//                    .getLocalTransactionManager().getTransactionService())
-//                    .getTXSCriticalSectionLockOnLeader(req);
-//            
-//            // Note: MUST be an asynchronous Future!!!
-//            return getProxy(f, true/* asynchronousFuture */);
-//
-//        }
-
         /*
          * IService
          */
@@ -6732,6 +6839,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
             
         }
 
+        @SuppressWarnings("rawtypes")
         @Override
         public Class getServiceIface() throws IOException {
             

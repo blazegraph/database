@@ -289,6 +289,8 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
      * used to export more than one object at a time! Therefore the
      * {@link Configuration} entry for the <code>exporter</code> only effects
      * how <em>this</em> server exports its service.
+     * 
+     * @see ConfigurationOptions#EXPORTER
      */
     private Exporter exporter;
 
