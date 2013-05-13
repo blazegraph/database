@@ -126,11 +126,15 @@ public class LogUtil {
                                     log4jConfig.endsWith(".logging"))) {
 
             PropertyConfigurator.configureAndWatch(log4jConfig);
-        
-        } else if ( log4jConfig != null && log4jConfig.endsWith(".xml") ) {
-        
+            System.out.println("INFO: " + LogUtil.class.getName()
+                    + ": Configure and watch: " + log4jConfig);
+
+        } else if (log4jConfig != null && log4jConfig.endsWith(".xml")) {
+
             DOMConfigurator.configureAndWatch(log4jConfig);
-            
+            System.out.println("INFO: " + LogUtil.class.getName()
+                    + ": Configure and watch: " + log4jConfig);
+
         } else {
             
             /*
@@ -145,11 +149,15 @@ public class LogUtil {
                     )) {
 
                 PropertyConfigurator.configure(log4jUrl);
-                
+                System.out.println("INFO: " + LogUtil.class.getName()
+                        + ": Configure: " + log4jUrl);
+
             } else if (log4jUrl != null && log4jUrl.getFile().endsWith(".xml")) {
 
                 DOMConfigurator.configure(log4jUrl);
-                
+                System.out.println("INFO: " + LogUtil.class.getName()
+                        + ": Configure: " + log4jUrl);
+
             } else {
                 
                 /*
