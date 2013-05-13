@@ -47,6 +47,7 @@ import org.apache.system.SystemUtil;
 import com.bigdata.Depends.Dependency;
 import com.bigdata.counters.AbstractStatisticsCollector;
 import com.bigdata.util.InnerCause;
+import com.bigdata.util.config.LogUtil;
 
 /**
  * Class has a static method which writes a copyright banner on stdout once per
@@ -200,7 +201,9 @@ public class Banner {
      */
     private static void setDefaultLogLevel(final boolean quiet) {
 
-        final Logger defaultLog = Logger.getLogger("com.bigdata");
+        final Logger defaultLog = 
+                LogUtil.getLog4jLogger("com.bigdata");
+//                Logger.getLogger("com.bigdata");
 
         if (defaultLog.getLevel() == null) {
 
