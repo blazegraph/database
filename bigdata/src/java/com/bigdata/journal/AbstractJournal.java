@@ -139,7 +139,6 @@ import com.bigdata.io.IDataRecord;
 import com.bigdata.io.IDataRecordAccess;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.journal.Name2Addr.Entry;
-import com.bigdata.journal.jini.ha.HAJournalServer;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.JournalMetadata;
 import com.bigdata.quorum.AsynchronousQuorumCloseException;
@@ -1731,8 +1730,6 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
     /**
      * The HA timeout in milliseconds for a 2-phase prepare.
      * 
-     * @see HAJournalServer.ConfigurationOptions#HA_PREPARE_TIMEOUT
-     * 
      * @throws UnsupportedOperationException
      *             always.
      */
@@ -1742,7 +1739,19 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
     }
 
-	/**
+    /**
+     * The HA timeout in milliseconds for the release time consensus protocol.
+     * 
+     * @throws UnsupportedOperationException
+     *             always.
+     */
+    public long getHAReleaseTimeConsensusTimeout() {
+
+        throw new UnsupportedOperationException();
+    
+    }
+
+    /**
 	 * Core implementation of immediate shutdown handles event reporting.
 	 */
 	protected void _close() {
@@ -2923,8 +2932,10 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                     
                     ((AbstractHATransactionService) getLocalTransactionManager()
                             .getTransactionService())
-                            .updateReleaseTimeConsensus();
-                    
+                            .updateReleaseTimeConsensus(
+                                    getHAReleaseTimeConsensusTimeout(),
+                                    TimeUnit.MILLISECONDS);
+
                 } catch (Exception ex) {
 
                     // Wrap and rethrow.
@@ -6140,47 +6151,8 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                 if (rootBlock == null)
                     throw new IllegalStateException();
 
-                if (!rootBlock.getUUID().equals(
-                        AbstractJournal.this._rootBlock.getUUID())) {
-
-                    /*
-                     * The root block has a different UUID. We can not accept this
-                     * condition.
-                     */
-
-                    throw new IllegalStateException();
-
-                }
-
-                if (rootBlock.getLastCommitTime() <= AbstractJournal.this._rootBlock
-                        .getLastCommitTime()) {
-
-                    /*
-                     * The root block has a commit time that is LTE the most recent
-                     * commit on this Journal. We can not accept this condition.
-                     */
-
-                    throw new IllegalStateException();
-
-                }
-
-                if (rootBlock.getCommitCounter() <= AbstractJournal.this._rootBlock
-                        .getCommitCounter()) {
-
-                    /*
-                     * The root block has a commit counter that is LTE the most
-                     * recent commit counter on this Journal. We can not accept this
-                     * condition.
-                     */
-
-                    throw new IllegalStateException();
-                    
-                }
-
-                // the quorum token from the leader is in the root block.
-                final long prepareToken = rootBlock.getQuorumToken();
-
-                quorum.assertQuorum(prepareToken);
+                // Validate the new root block against the current root block.
+                validateNewRootBlock(isJoined, isLeader, AbstractJournal.this._rootBlock, rootBlock);
 
                 /*
                  * if(follower) {...}
@@ -6266,6 +6238,93 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
         }
 
+        /**
+         * Validate the new root block against the current root block. This
+         * method checks a variety of invariants:
+         * <ul>
+         * <li>The UUID of the store must be the same.</li>
+         * <li>The commitTime must be strictly increasing.</li>
+         * <li>The commitCounter must increase by ONE (1).</li>
+         * <li></li>
+         * </ul>
+         * 
+         * @param isJoined
+         *            iff this service was joined at the atomic decision point
+         *            in the 2-phase commit protocol.
+         * @param isLeader
+         *            iff this service is the leader for this commit.
+         * @param oldRB
+         *            the old (aka current) root block.
+         * @param newRB
+         *            the new (aka proposed) root block.
+         */
+        protected void validateNewRootBlock(final boolean isJoined,
+                final boolean isLeader, final IRootBlockView oldRB,
+                final IRootBlockView newRB) {
+
+            if (oldRB == null)
+                throw new IllegalStateException();
+
+            if (newRB == null)
+                throw new IllegalStateException();
+
+            // Validate UUID of store is consistent.
+            if (!newRB.getUUID().equals(oldRB.getUUID())) {
+
+                /*
+                 * The root block has a different UUID. We can not accept this
+                 * condition.
+                 */
+
+                throw new IllegalStateException("Store UUID: old="
+                        + oldRB.getUUID() + " != new=" + newRB.getUUID());
+
+            }
+
+            // Validate commit time is strictly increasing.
+            if (newRB.getLastCommitTime() <= oldRB.getLastCommitTime()) {
+
+                /*
+                 * The root block has a commit time that is LTE the most recent
+                 * commit on this Journal. We can not accept this condition.
+                 */
+
+                throw new IllegalStateException("lastCommitTime: old="
+                        + oldRB.getLastCommitTime() + " > new="
+                        + newRB.getLastCommitTime());
+
+            }
+
+            // Validate the new commit counter.
+            {
+
+                final long newcc = newRB.getCommitCounter();
+
+                final long oldcc = oldRB.getCommitCounter();
+
+                if (newcc != (oldcc + 1)) {
+
+                    /*
+                     * The new root block MUST have a commit counter that is ONE
+                     * more than the current commit counter on this Journal. We
+                     * can not accept any other value for the commit counter.
+                     */
+
+                    throw new IllegalStateException("commitCounter: ( old="
+                            + oldcc + " + 1 ) != new=" + newcc);
+
+                }
+
+                // The quorum token from the leader is in the root block.
+                final long prepareToken = newRB.getQuorumToken();
+
+                // Verify that the same quorum is still met.
+                quorum.assertQuorum(prepareToken);
+
+            }
+
+        }
+        
         @Override
         public Future<Void> commit2Phase(
                 final IHA2PhaseCommitMessage commitMessage) {
@@ -6361,7 +6420,13 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                          * Only the services that are joined go through the
                          * commit protocol.
                          */
-
+                        if (localService == null) {
+                            /*
+                             * The quorum has been terminated. We can't go
+                             * through the 2-phase commit.
+                             */
+                            throw new IllegalStateException();
+                        }
                         AbstractJournal.this.doLocalCommit(localService,
                                 rootBlock);
 

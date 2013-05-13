@@ -183,9 +183,14 @@ public class HAJournal extends Journal {
     private final InetSocketAddress writePipelineAddr;
 
     /**
-     * @see Options#HA_PREPARE_TIMEOUT
+     * @see HAJournalServer.ConfigurationOptions#HA_PREPARE_TIMEOUT
      */
     private final long haPrepareTimeout;
+    
+    /**
+     * @see HAJournalServer.ConfigurationOptions#HA_RELEASE_TIME_CONSENSUS_TIMEOUT
+     */
+    private final long haReleaseTimeConsensusTimeout;
     
 //    /**
 //     * @see HAJournalServer.ConfigurationOptions#HA_LOG_DIR
@@ -335,6 +340,25 @@ public class HAJournal extends Journal {
 
         }
         
+        {
+            haReleaseTimeConsensusTimeout = (Long) config
+                    .getEntry(
+                            HAJournalServer.ConfigurationOptions.COMPONENT,
+                            HAJournalServer.ConfigurationOptions.HA_RELEASE_TIME_CONSENSUS_TIMEOUT,
+                            Long.TYPE,
+                            HAJournalServer.ConfigurationOptions.DEFAULT_HA_RELEASE_TIME_CONSENSUS_TIMEOUT);
+
+            if (haReleaseTimeConsensusTimeout < HAJournalServer.ConfigurationOptions.MIN_HA_RELEASE_TIME_CONSENSUS_TIMEOUT) {
+                throw new ConfigurationException(
+                        HAJournalServer.ConfigurationOptions.HA_RELEASE_TIME_CONSENSUS_TIMEOUT
+                                + "="
+                                + haReleaseTimeConsensusTimeout
+                                + " : must be GTE "
+                                + HAJournalServer.ConfigurationOptions.MIN_HA_RELEASE_TIME_CONSENSUS_TIMEOUT);
+            }
+
+        }
+        
         // HALog manager.
         haLogNexus = new HALogNexus(server, this, config);
         
@@ -469,10 +493,27 @@ public class HAJournal extends Journal {
 
     }
     
+    /**
+     * {@inheritDoc}
+     * 
+     * @see HAJournalServer.ConfigurationOptions#HA_PREPARE_TIMEOUT
+     */
     @Override
     public final long getHAPrepareTimeout() {
 
         return haPrepareTimeout;
+        
+    }
+
+    /**
+     * {@inheritDoc}
+     * 
+     * @see HAJournalServer.ConfigurationOptions#HA_RELEASE_TIME_CONSENSUS_TIMEOUT
+     */
+    @Override
+    public final long getHAReleaseTimeConsensusTimeout() {
+
+        return haReleaseTimeConsensusTimeout;
         
     }
 
@@ -614,6 +655,95 @@ public class HAJournal extends Journal {
             
         }
 
+        @Override
+        protected void validateNewRootBlock(final boolean isJoined,
+                final boolean isLeader, final IRootBlockView oldRB,
+                final IRootBlockView newRB) {
+
+            super.validateNewRootBlock(isJoined, isLeader, oldRB, newRB);
+
+            if (isJoined && !isLeader) {
+                
+                /*
+                 * Verify that the [lastLiveHAWriteMessage] is consisent with
+                 * the proposed new root block.
+                 * 
+                 * Note: The [lastLiveHAWriteMessage] is only tracked on the
+                 * followers. Hence we do not use this code path for the leader.
+                 */
+                
+                final IHAWriteMessage msg = getHALogNexus().lastLiveHAWriteMessage;
+
+                if (msg == null) {
+
+                    /*
+                     * We should not go through a 2-phase commit without a write
+                     * set. If there is a write set, then the
+                     * lastLiveHAWriteMessage will not be null.
+                     * 
+                     * Note: One possible explanation of this exception would be
+                     * a concurrent local abort. That could discard the
+                     * lastLiveHAWriteMessage.
+                     */
+
+                    throw new IllegalStateException("Commit without write set?");
+
+                }
+
+                if (!msg.getUUID().equals(newRB.getUUID())) {
+
+                    /*
+                     * The root block has a different UUID. We can not accept
+                     * this condition.
+                     */
+
+                    throw new IllegalStateException("Store UUID: lastLiveMsg="
+                            + msg.getUUID() + " != newRB=" + newRB.getUUID());
+
+                }
+
+                // Validate the new commit counter.
+                if ((msg.getCommitCounter() + 1) != newRB.getCommitCounter()) {
+
+                    /*
+                     * Each message is tagged with the commitCounter for the
+                     * last commit point on the disk. The new root block must
+                     * have a commit counter is that PLUS ONE when compared to
+                     * the last live message.
+                     */
+
+                    throw new IllegalStateException(
+                            "commitCounter: ( lastLiveMsg="
+                                    + msg.getCommitCounter()
+                                    + " + 1 ) != newRB="
+                                    + newRB.getCommitCounter());
+
+                }
+
+                // Validate the write cache block sequence.
+                if ((msg.getSequence() + 1) != newRB.getBlockSequence()) {
+
+                    /*
+                     * This checks two conditions:
+                     * 
+                     * 1. The new root block must reflect each live
+                     * HAWriteMessage received.
+                     * 
+                     * 2. The service must not PREPARE until all expected
+                     * HAWriteMessages have been received.
+                     */
+
+                    throw new IllegalStateException(
+                            "blockSequence: lastLiveMsg=" + msg.getSequence()
+                                    + " + 1 != newRB="
+                                    + newRB.getBlockSequence());
+
+                }
+
+            }
+            
+        }
+        
         @Override
         public IHALogRootBlocksResponse getHALogRootBlocksForWriteSet(
                 final IHALogRootBlocksRequest msg) throws IOException {
@@ -1578,22 +1708,27 @@ public class HAJournal extends Journal {
             final StringBuilder innerRunStateStr = new StringBuilder();
             if (innerRunState != null) {
                 innerRunStateStr.append(innerRunState.name());
-                switch (innerRunState) {
-                case Resync:
-                    innerRunStateStr.append(" @ "
-                            + journal.getRootBlockView().getCommitCounter());
-                    break;
-                case Operator: {
-                    final String msg = server.getOperatorAlert();
-                    innerRunStateStr.append("msg=" + msg);
-                    break;
-                }
-                default:
-                    break;
-                }
+//                switch (innerRunState) {
+//                case Resync:
+//                    innerRunStateStr.append(" @ "
+//                            + journal.getRootBlockView().getCommitCounter());
+//                    break;
+//                case Operator: {
+//                    final String msg = server.getOperatorAlert();
+//                    innerRunStateStr.append("msg=" + msg);
+//                    break;
+//                }
+//                default:
+//                    break;
+//                }
             } else {
                 innerRunStateStr.append("N/A");
             }
+            innerRunStateStr.append(" @ "
+                    + journal.getRootBlockView().getCommitCounter());
+            final String msg = server.getOperatorAlert();
+            if (msg != null)
+                innerRunStateStr.append(", msg=[" + msg + "]");
             return "{server=" + server.getRunState() + ", quorumService="
                     + innerRunStateStr + "}";
 
