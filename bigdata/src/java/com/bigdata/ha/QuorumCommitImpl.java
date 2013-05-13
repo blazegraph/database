@@ -25,6 +25,7 @@ package com.bigdata.ha;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
@@ -155,7 +156,11 @@ public class QuorumCommitImpl<S extends HACommitGlue> extends
         final boolean isRootBlock0 = rootBlock.isRootBlock0();
 
         if (log.isInfoEnabled())
-            log.info("isRootBlock0=" + isRootBlock0 + "rootBlock=" + rootBlock
+            log.info("isRootBlock0=" + isRootBlock0 + ", rootBlock="
+                    + rootBlock + ", #joined=" + joinedServiceIds.length
+                    + ", #nonJoined=" + nonJoinedPipelineServiceIds.size()
+                    + ", joinedServices=" + Arrays.toString(joinedServiceIds)
+                    + ", nonJoined=" + nonJoinedPipelineServiceIds
                     + ", timeout=" + timeout + ", unit=" + unit);
 
         /*
@@ -371,7 +376,11 @@ public class QuorumCommitImpl<S extends HACommitGlue> extends
             InterruptedException {
 
         if (log.isInfoEnabled())
-            log.info("token=" + token + ", commitTime=" + commitTime);
+            log.info("token=" + token + ", commitTime=" + commitTime
+                    + ", #joined=" + joinedServiceIds.length + ", #nonJoined="
+                    + nonJoinedPipelineServiceIds.size() + ", joinedServices="
+                    + Arrays.toString(joinedServiceIds) + ", nonJoined="
+                    + nonJoinedPipelineServiceIds);
 
         /*
          * To minimize latency, we first submit the futures for the other
