@@ -33,39 +33,40 @@ public class HANotifyReleaseTimeRequest implements IHANotifyReleaseTimeRequest {
     private static final long serialVersionUID = 1L;
 
     private final UUID serviceUUID;
-    private final long commitTime;
-    private final long commitCounter;
+    private final long pinnedCommitTime;
+    private final long pinnedCommitCounter;
     private final long timestamp;
 
     public HANotifyReleaseTimeRequest(final UUID serviceUUID,
-            final long commitTime, final long commitCounter,
+            final long pinnedCommitTime, final long pinnedCommitCounter,
             final long timestamp) {
         this.serviceUUID = serviceUUID;
-        this.commitTime = commitTime;
-        this.commitCounter = commitCounter;
+        this.pinnedCommitTime = pinnedCommitTime;
+        this.pinnedCommitCounter = pinnedCommitCounter;
         this.timestamp = timestamp;
     }
 
     @Override
     public String toString() {
         return super.toString() + "{serviceUUID=" + serviceUUID
-                + ",commitTime=" + commitTime + ",commitCounter="
-                + commitCounter + ",timestamp=" + timestamp + "}";
+                + ",pinnedCommitTime=" + pinnedCommitTime
+                + ",pinnedCommitCounter=" + pinnedCommitCounter + ",timestamp="
+                + timestamp + "}";
     }
-    
+
     @Override
     public UUID getServiceUUID() {
         return serviceUUID;
     }
 
     @Override
-    public long getCommitTime() {
-        return commitTime;
+    public long getPinnedCommitTime() {
+        return pinnedCommitTime;
     }
 
     @Override
-    public long getCommitCounter() {
-        return commitCounter;
+    public long getPinnedCommitCounter() {
+        return pinnedCommitCounter;
     }
 
     @Override

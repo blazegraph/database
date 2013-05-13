@@ -464,8 +464,8 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
                 if (log.isTraceEnabled())
                     log.trace("follower: " + response);
 
-                if (minimumResponse.getCommitCounter() > response
-                        .getCommitCounter()) {
+                if (minimumResponse.getPinnedCommitCounter() > response
+                        .getPinnedCommitCounter()) {
 
                     minimumResponse = response;
 
@@ -481,8 +481,8 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
 
             // Restate the consensus as an appropriate message object.
             consensus = new HANotifyReleaseTimeResponse(
-                    minimumResponse.getCommitTime(),
-                    minimumResponse.getCommitCounter());
+                    minimumResponse.getPinnedCommitTime(),
+                    minimumResponse.getPinnedCommitCounter());
 
             if (log.isTraceEnabled())
                 log.trace("consensus: " + consensus);
@@ -510,8 +510,9 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
          * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/673" >
          *      Native thread leak in HAJournalServer process </a>
          */
-        private void messageFollowers(final long token) throws IOException,
-                InterruptedException, BrokenBarrierException, TimeoutException {
+        private void messageFollowers(final long token, final long timeout,
+                final TimeUnit units) throws IOException, InterruptedException,
+                BrokenBarrierException, TimeoutException {
 
             getQuorum().assertLeader(token);
 
@@ -600,8 +601,8 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
 //                    }
 //                }
                 
-                try { // FIXME HA TXS : Configuration option for timeout (lift into caller, config @ HAJournal(Server) similar to other timeout. Could be total timeout across 2-phase commit protocol).
-                    barrier.await(20, TimeUnit.SECONDS);
+                try {
+                    barrier.await(timeout, units);
                     // fall through.
                 } catch (TimeoutException e) {
                     throw e;
@@ -808,8 +809,9 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
          */
         // Note: Executed on the leader.
         @Override
-        public void updateReleaseTimeConsensus() throws IOException,
-                InterruptedException, TimeoutException, BrokenBarrierException {
+        public void updateReleaseTimeConsensus(final long timeout,
+                final TimeUnit units) throws IOException, InterruptedException,
+                TimeoutException, BrokenBarrierException {
 
             final long token = getQuorum().token();
             
@@ -833,7 +835,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
                     /*
                      * Message the followers and block until the barrier breaks.
                      */
-                    barrierState.messageFollowers(token);
+                    barrierState.messageFollowers(token,timeout,units);
 
                 } finally {
 

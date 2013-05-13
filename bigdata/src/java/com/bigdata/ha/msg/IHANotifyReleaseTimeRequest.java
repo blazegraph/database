@@ -44,12 +44,12 @@ public interface IHANotifyReleaseTimeRequest extends IHAMessage {
     /**
      * The earliest pinned commit time on the follower.
      */
-    public long getCommitTime();
+    public long getPinnedCommitTime();
 
     /**
      * The earliest pinned commit counter on the follower.
      */
-    public long getCommitCounter();
+    public long getPinnedCommitCounter();
 
 //    /**
 //     * The readsOnCommitTime of the earliest active transaction on the follower.
