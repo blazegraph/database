@@ -49,7 +49,6 @@ import com.bigdata.jini.start.IServiceListener;
 import com.bigdata.jini.start.process.JiniCoreServicesProcessHelper;
 import com.bigdata.service.jini.JiniClientConfig;
 import com.bigdata.service.jini.util.LookupStarter;
-import com.bigdata.service.jini.util.LookupStarter;
 import com.sun.jini.start.NonActivatableServiceDescriptor;
 import com.sun.jini.start.ServiceStarter;
 
@@ -308,7 +307,7 @@ public class JiniCoreServicesConfiguration extends ServiceConfiguration {
 
             final long begin = System.nanoTime();
             
-            long nanos = unit.toNanos(timeout);
+            final long nanos = unit.toNanos(timeout);
             
             /*
              * The #of registrars that we can locate on this host within a
@@ -332,7 +331,7 @@ public class JiniCoreServicesConfiguration extends ServiceConfiguration {
             final LookupLocator locators[] = lst.toArray(new LookupLocator[0]);
             
             // adjust for elapsed time.
-            nanos -= (System.nanoTime() - begin);
+            final long remaining = nanos - (System.nanoTime() - begin);
 
             /*
              * Look for at least one registrar on the local host using the
@@ -341,13 +340,10 @@ public class JiniCoreServicesConfiguration extends ServiceConfiguration {
             final ServiceRegistrar[] registrars = 
                     getServiceRegistrars(1/* maxCount */,
                             clientConfig.groups, /* clientConfig. */locators,
-                            nanos, TimeUnit.NANOSECONDS);
+                            remaining, TimeUnit.NANOSECONDS);
 
             // elapsed time (ns).
             final long elapsed = (System.nanoTime() - begin);
-            
-            // adjust for elapsed time.
-            nanos -= elapsed;
 
             if (log.isInfoEnabled())
                 log
@@ -389,10 +385,6 @@ public class JiniCoreServicesConfiguration extends ServiceConfiguration {
             long timeout, final TimeUnit unit) throws InterruptedException,
             IOException {
         
-        final long begin = System.nanoTime();
-
-        timeout = unit.toNanos(timeout);
-
         final Object signal = new Object();
 
         final LookupDiscoveryManager discovery = new LookupDiscoveryManager(groups,
@@ -428,20 +420,29 @@ public class JiniCoreServicesConfiguration extends ServiceConfiguration {
                 
         try {
 
-            long elapsed;
-
             // demand some results.
             ServiceRegistrar[] registrars = new ServiceRegistrar[0];
 
-            while ((timeout -= (elapsed = (System.nanoTime() - begin))) > 0
-                    && registrars.length < maxCount) {
+            final long begin = System.nanoTime();
 
+            final long nanos = unit.toNanos(timeout);
+
+            long remaining = nanos;
+            
+            while (remaining > 0 && registrars.length < maxCount) {
+
+                remaining = nanos - (System.nanoTime() - begin);
+                
                 synchronized (signal) {
 
                     try {
-                        signal.wait(TimeUnit.NANOSECONDS.toMillis(timeout));
+
+                        signal.wait(TimeUnit.NANOSECONDS.toMillis(remaining));
+
                     } catch(InterruptedException ex) {
+
                         // fall through
+                        
                     }
 
                     if(log.isDebugEnabled())
@@ -453,9 +454,14 @@ public class JiniCoreServicesConfiguration extends ServiceConfiguration {
 
             }
 
-            if (log.isInfoEnabled())
+            if (log.isInfoEnabled()) {
+
+                final long elapsed = System.nanoTime() - begin;
+                
                 log.info("Found " + registrars.length + " registrars in "
                         + TimeUnit.NANOSECONDS.toMillis(elapsed) + "ms.");
+                
+            }
 
             return registrars;
 

@@ -763,21 +763,23 @@ abstract public class JiniServiceConfiguration extends
 
             final long begin = System.nanoTime();
             
-            long nanos = unit.toNanos(timeout);
+            final long nanos = unit.toNanos(timeout);
+
+            long remaining = nanos;
             
             // wait for the service to be discovered
             final ServiceItem serviceItem = awaitServiceDiscoveryOrDeath(
-                    processHelper, nanos, TimeUnit.NANOSECONDS);
+                    processHelper, remaining, TimeUnit.NANOSECONDS);
 
             // proxy will be used for destroy().
             processHelper.setServiceItem(serviceItem);
             
             // subtract out the time we already waited.
-            nanos -= (System.nanoTime() - begin);
+            remaining = nanos - (System.nanoTime() - begin);
 
             // wait for the ephemeral znode for the service to be created
             awaitZNodeCreatedOrDeath(serviceItem, processHelper,
-                    nanos, TimeUnit.NANOSECONDS);
+                    remaining, TimeUnit.NANOSECONDS);
 
         }
 

@@ -697,7 +697,7 @@ public class ZookeeperServerConfiguration extends JavaServiceConfiguration {
 
             final long begin = System.nanoTime();
             
-            long nanos = unit.toNanos(timeout);
+            final long nanos = unit.toNanos(timeout);
             
             try {
 
@@ -721,9 +721,6 @@ public class ZookeeperServerConfiguration extends JavaServiceConfiguration {
                 
             }
 
-            // adjust for time remaining.
-            nanos = (System.nanoTime() - begin);
-
             /*
              * Verify that an instance is up and running by connecting to the
              * client port on the local host.
@@ -740,12 +737,11 @@ public class ZookeeperServerConfiguration extends JavaServiceConfiguration {
 
             ZooHelper.ruok(thisInetAddr, clientPort);
 
-            // adjust for time remaining.
-            nanos = (System.nanoTime() - begin);
+            final long elapsed = (System.nanoTime() - begin);
 
             log.warn("Started zookeeper: elapsed="
-                    + TimeUnit.NANOSECONDS.toMillis(nanos));
-            
+                    + TimeUnit.NANOSECONDS.toMillis(elapsed));
+
         }
 
         /**

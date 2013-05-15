@@ -1737,6 +1737,8 @@ abstract public class WriteCache implements IWriteCache {
         /**
          * Called by WriteCacheService to process a direct write for large
          * blocks and also to flush data from dirty caches.
+         * 
+         * TODO The [nanos] parameter is ignored.
          */
         protected boolean writeOnChannel(final ByteBuffer data,
                 final long firstOffsetIgnored,

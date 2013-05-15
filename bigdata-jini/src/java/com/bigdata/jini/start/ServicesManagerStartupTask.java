@@ -169,10 +169,11 @@ public class ServicesManagerStartupTask implements Callable<Void> {
 
             final long begin = System.nanoTime();
 
-            long nanos = selfConfig.zookeeperDiscoveryTimeoutNanos;
+            final long nanos = selfConfig.zookeeperDiscoveryTimeoutNanos;
+            long remaining = nanos;
 
             // await zookeeper connection.
-            if (!fed.getZookeeperAccessor().awaitZookeeperConnected(nanos,
+            if (!fed.getZookeeperAccessor().awaitZookeeperConnected(remaining,
                     TimeUnit.NANOSECONDS)) {
 
                 throw new Exception(
@@ -180,7 +181,7 @@ public class ServicesManagerStartupTask implements Callable<Void> {
 
             }
 
-            nanos -= (System.nanoTime() - begin);
+            remaining = nanos - (System.nanoTime() - begin);
 
             /*
              * @todo Should have its own timeout value (using zk's). Or just get
@@ -188,7 +189,7 @@ public class ServicesManagerStartupTask implements Callable<Void> {
              * discovered and you can kill it if there is a problem.
              */
             // await jini registrar(s)
-            if (!fed.awaitJiniRegistrars(nanos, TimeUnit.NANOSECONDS)) {
+            if (!fed.awaitJiniRegistrars(remaining, TimeUnit.NANOSECONDS)) {
 
                 throw new Exception(
                         "No jini registrars: startup sequence aborted.");

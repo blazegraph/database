@@ -3145,14 +3145,16 @@ public class AsynchronousOverflowTask implements Callable<Object> {
             final long begin = System.nanoTime();
             
             // remaining nanoseconds in which to execute overflow tasks.
-            long nanos = TimeUnit.MILLISECONDS
+            final long nanos = TimeUnit.MILLISECONDS
                     .toNanos(resourceManager.overflowTimeout);
+            
+            long remaining = nanos;
             
             final Iterator<AbstractTask> titr = tasks.iterator();
 
             int ndone = 0;
             
-            while (titr.hasNext() && nanos > 0) {
+            while (titr.hasNext() && remaining > 0) {
                 
                 final boolean shouldOverflow = resourceManager
                         .isOverflowEnabled()
@@ -3182,10 +3184,10 @@ public class AsynchronousOverflowTask implements Callable<Object> {
                 final Future<? extends Object> f = resourceManager
                         .getConcurrencyManager().submit(task);
 
-                getFutureForTask(f, task, nanos, TimeUnit.NANOSECONDS);
+                getFutureForTask(f, task, remaining, TimeUnit.NANOSECONDS);
                 
-                nanos -= (System.nanoTime() - begin);
-                
+                remaining = nanos - (System.nanoTime() - begin);
+
                 ndone++;
                 
             }

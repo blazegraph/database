@@ -165,12 +165,12 @@ public class ProcessHelper {
      *             if the caller's thread was interrupted awaiting the exit
      *             value.
      */
-    public int exitValue(long timeout, final TimeUnit unit)
+    public int exitValue(final long timeout, final TimeUnit unit)
             throws TimeoutException, InterruptedException {
 
         final long begin = System.nanoTime();
 
-        timeout = unit.toNanos(timeout);
+        final long nanos = unit.toNanos(timeout);
 
         lock.lock();
 
@@ -192,14 +192,12 @@ public class ProcessHelper {
 
                 }
 
-                final long elapsed = System.nanoTime() - begin;
-
-                timeout -= elapsed;
-
-                if (timeout <= 0)
+                final long remaining = nanos - (System.nanoTime() - begin);
+                
+                if (remaining <= 0)
                     throw new TimeoutException();
 
-                dead.await(timeout, TimeUnit.NANOSECONDS);
+                dead.await(remaining, TimeUnit.NANOSECONDS);
                 
             }
             

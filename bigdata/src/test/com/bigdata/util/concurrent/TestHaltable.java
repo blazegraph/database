@@ -29,6 +29,8 @@ package com.bigdata.util.concurrent;
 
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import junit.framework.TestCase2;
 
@@ -120,4 +122,45 @@ public class TestHaltable extends TestCase2 {
 
     }
 
+    public void test_get_timeout() throws InterruptedException, ExecutionException {
+
+        final Haltable<Long> f = new Haltable<Long>();
+
+        assertFalse(f.isDone());
+        assertFalse(f.isCancelled());
+        assertNull(f.getCause());
+
+        final Long result = Long.valueOf(12);
+
+        {
+            final long timeout = TimeUnit.SECONDS.toNanos(1L);
+            final long begin = System.nanoTime();
+            try {
+                f.get(timeout, TimeUnit.NANOSECONDS);
+                fail("Expecting: " + TimeoutException.class);
+            } catch (TimeoutException e) {
+                // ignore
+            }
+            final long elapsed = System.nanoTime() - begin;
+            if (elapsed < timeout || (elapsed > (2 * timeout))) {
+                fail("elapsed=" + elapsed + ", timeout=" + timeout);
+            }
+        }
+
+        // set the result.
+        f.halt(result);
+
+        assertTrue(result == f.get());
+
+        assertTrue(f.isDone());
+        assertFalse(f.isCancelled());
+        assertNull(f.getCause());
+        assertNull(f.getAsThrownCause());
+
+        assertFalse(f.cancel(true/*mayInterruptIfRunning*/));
+
+        assertTrue(result == f.get());
+
+    }
+    
 }

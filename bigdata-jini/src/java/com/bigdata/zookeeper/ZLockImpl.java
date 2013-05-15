@@ -567,20 +567,21 @@ public class ZLockImpl implements ZLock {
          *             {@link ZooKeeper} client, but it can be handled at the
          *             application layer in a number of ways.
          */
-        protected boolean awaitZLockNanos(long nanos)
+        protected boolean awaitZLockNanos(final long nanos)
                 throws InterruptedException, SessionExpiredException {
 
             final long begin = System.nanoTime();
+            long remaining = nanos;
 
             lock.lockInterruptibly();
             try {
 
-                while ((nanos -= (System.nanoTime() - begin)) > 0
+                while ((remaining = nanos - (System.nanoTime() - begin)) > 0
                         && !zlockGranted && !cancelled) {
 
                     if (log.isDebugEnabled())
                         log.debug("remaining="
-                                + TimeUnit.NANOSECONDS.toMillis(nanos) + "ms");
+                                + TimeUnit.NANOSECONDS.toMillis(remaining) + "ms");
 
                     try {
 
@@ -634,7 +635,9 @@ public class ZLockImpl implements ZLock {
                      * is granted to the caller.
                      */
 
-                    zlock.awaitNanos((nanos -= (System.nanoTime() - begin)));
+                    remaining = nanos - (System.nanoTime() - begin);
+                    
+                    zlock.awaitNanos(remaining);
                     
                 } // while 
 
@@ -645,10 +648,10 @@ public class ZLockImpl implements ZLock {
                 }
 
                 if (log.isDebugEnabled())
-                    log.debug("nanos remaining=" + nanos);
+                    log.debug("nanos remaining=" + remaining);
                 
                 // lock granted iff nanos remaining is GT zero.
-                return nanos > 0;
+                return remaining > 0;
 
             } finally {
                 
@@ -965,7 +968,8 @@ public class ZLockImpl implements ZLock {
 
             final long begin = System.nanoTime();
 
-            long nanos = unit.toNanos(timeout);
+            final long nanos = unit.toNanos(timeout);
+            long remaining = nanos;
 
             /*
              * Ensure that the lock node exists.
@@ -996,14 +1000,14 @@ public class ZLockImpl implements ZLock {
 
             this.watcher = new ZLockWatcher(zchild);
 
-            nanos -= (System.nanoTime() - begin);
+            remaining = nanos - (System.nanoTime() - begin);
 
             try {
                 /* Note: The state reported here is incomplete since [priorZChild] is not set until we test things in awaitZLockNanos(). */
-                if(log.isInfoEnabled())
-                    log.info("Will await zlock: "+this);
+                if (log.isInfoEnabled())
+                    log.info("Will await zlock: " + this);
                 
-                if(!watcher.awaitZLockNanos(nanos)) {
+                if(!watcher.awaitZLockNanos(remaining)) {
 
                     // timeout (lock not granted).
                     throw new TimeoutException();

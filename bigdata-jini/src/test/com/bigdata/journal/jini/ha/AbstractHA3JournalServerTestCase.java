@@ -31,9 +31,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.PrintWriter;
-import java.io.RandomAccessFile;
 import java.io.StringWriter;
-import java.nio.channels.FileLock;
 import java.rmi.Remote;
 import java.util.Arrays;
 import java.util.LinkedList;
@@ -1731,9 +1729,9 @@ public class AbstractHA3JournalServerTestCase extends
                     final long timeout, final TimeUnit unit) throws Exception,
                     TimeoutException, InterruptedException {
 
-                final long begin = System.nanoTime();
+//                final long begin = System.nanoTime();
 
-                long nanos = unit.toNanos(timeout);
+                final long nanos = unit.toNanos(timeout);
 
                 // wait for the service to be discovered
                 serviceItem = awaitServiceDiscoveryOrDeath(processHelper,
@@ -1742,9 +1740,9 @@ public class AbstractHA3JournalServerTestCase extends
 //                // proxy will be used for destroy().
 //                processHelper.setServiceItem(serviceItem);
 
-                // subtract out the time we already waited.
-                nanos -= (System.nanoTime() - begin);
-
+//                // subtract out the time we already waited.
+//                final long remaining = nanos - (System.nanoTime() - begin);
+//
 //                // TODO (restore) wait for the ephemeral znode for the service to be created
 //                awaitZNodeCreatedOrDeath(serviceItem, processHelper, nanos,
 //                        TimeUnit.NANOSECONDS);

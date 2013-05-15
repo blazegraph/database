@@ -468,19 +468,20 @@ public class JiniFederation<T> extends AbstractDistributedFederation<T> implemen
         final long begin = System.nanoTime();
         
         // nanoseconds remaining.
-        long nanos = unit.toNanos(timeout);
+        final long nanos = unit.toNanos(timeout);
+        long remaining = nanos;
 
         ServiceRegistrar[] registrars = null;
 
         while (((registrars = lookupDiscoveryManager.getRegistrars()).length == 0)
-                && (nanos -= (System.nanoTime() - begin)) > 0) {
+                && ((remaining = nanos - (System.nanoTime() - begin)) > 0)) {
 
             discoveryEventLock.lockInterruptibly();
             try {
                 
                 // await another discovery event, but not more than the time
                 // remaining.
-                discoveryEvent.awaitNanos(nanos);
+                discoveryEvent.awaitNanos(remaining);
 
             } finally {
             
@@ -488,6 +489,8 @@ public class JiniFederation<T> extends AbstractDistributedFederation<T> implemen
                 
             }
 
+            remaining = nanos - (System.nanoTime() - begin);
+            
         }
 
         if (registrars.length == 0) {

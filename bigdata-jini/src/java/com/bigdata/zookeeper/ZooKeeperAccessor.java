@@ -446,11 +446,12 @@ public class ZooKeeperAccessor {
         final long begin = System.nanoTime();
         
         // nanoseconds remaining.
-        long nanos = unit.toNanos(timeout);
+        final long nanos = unit.toNanos(timeout);
+        long remaining = nanos;
 
         ZooKeeper.States state = null;
 
-        while ((nanos -= (System.nanoTime() - begin)) > 0) {
+        while ((remaining = nanos - (System.nanoTime() - begin)) > 0) {
 
             switch (state = getZookeeper().getState()) {
 
@@ -469,7 +470,8 @@ public class ZooKeeperAccessor {
                 // wait a bit, but not more than the time remaining.
                 lock.lockInterruptibly();
                 try {
-                    event.awaitNanos(nanos);
+                    remaining = nanos - (System.nanoTime() - begin);
+                    event.awaitNanos(remaining);
                 } finally {
                     lock.unlock();
                 }
