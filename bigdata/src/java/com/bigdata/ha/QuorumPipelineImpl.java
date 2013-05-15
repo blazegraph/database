@@ -892,7 +892,116 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> extends
 //            }
 
         }
-        
+
+        /**
+         * Robust replication of a write cache block along the pipeline.
+         * <p>
+         * Note: {@link Future} for {@link #call()} is [WCS.remoteWriteFuture].
+         * <p>
+         * Note: In order for replication from the leader to be robust while
+         * still permitting the WCS to shutdown, we need to distinguish two
+         * different ways in which replication can be interrupted/cancelled:
+         * <p>
+         * 1. WCS.close()/reset() => throw;
+         * <p>
+         * 2. pipelineChange() => retrySend()
+         * <p>
+         * If the WCS is being shutdown, then we MUST NOT attempt to cure the
+         * exception thrown out of innerReplicate(). This will show up as an
+         * {@link InterruptedException} if the interrupt is encountered in this
+         * thread (call()).
+         * <p>
+         * 
+         * If there is a {@link QuorumPipelineImpl#pipelineChange(UUID, UUID)},
+         * then that method will cause {@link SendBufferTask} and/or
+         * {@link ReceiveAndReplicateTask} to be cancelled. {@link Future#get()}
+         * for those tasks thus can report a {@link CancellationException}.
+         * <p>
+         * If we fail to distinguish these cases, then a pipelineChange() can
+         * cause the {@link RobustReplicateTask} to fail, which is precisely
+         * what it should not do. Instead the pipeline should be re-established
+         * and the writes replicated by the leader along the new pipeline order.
+         * <p>
+         * The following stack traces are illustrative of a problem when the
+         * pipeline is [A,C] and [B] joins while a write is being replicated
+         * from [A] to [C]. The join of [B] triggers pipelineChange() which
+         * causes the {@link SendBufferTask} to be cancelled. The untrapped
+         * {@link CancellationException} propagates from this method to
+         * WCS.WriteTask.writeCacheBlock() to fail, failing the transaction. The
+         * correct behavior in this case is to enter retrySend() to cure the
+         * pipelineChange().
+         * 
+         * <pre>
+         * Leader(A):
+         * ERROR: 10:47:39,027 29698      com.bigdata.rwstore.RWStore$11 com.bigdata.io.writecache.WriteCacheService$WriteTask.call(WriteCacheService.java:937): java.util.concurrent.ExecutionException: java.lang.RuntimeException: java.util.concurrent.CancellationException
+         * java.util.concurrent.ExecutionException: java.lang.RuntimeException: java.util.concurrent.CancellationException
+         *     at java.util.concurrent.FutureTask$Sync.innerGet(FutureTask.java:252)
+         *     at java.util.concurrent.FutureTask.get(FutureTask.java:111)
+         *     at com.bigdata.io.writecache.WriteCacheService$WriteTask.writeCacheBlock(WriteCacheService.java:1466)
+         *     at com.bigdata.io.writecache.WriteCacheService$WriteTask.doRun(WriteCacheService.java:1015)
+         *     at com.bigdata.io.writecache.WriteCacheService$WriteTask.call(WriteCacheService.java:884)
+         *     at com.bigdata.io.writecache.WriteCacheService$WriteTask.call(WriteCacheService.java:1)
+         *     at java.util.concurrent.FutureTask$Sync.innerRun(FutureTask.java:334)
+         *     at java.util.concurrent.FutureTask.run(FutureTask.java:166)
+         *     at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1110)
+         *     at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:603)
+         *     at java.lang.Thread.run(Thread.java:722)
+         * Caused by: java.lang.RuntimeException: java.util.concurrent.CancellationException
+         *     at com.bigdata.ha.QuorumPipelineImpl$RobustReplicateTask.call(QuorumPipelineImpl.java:912)
+         *     at com.bigdata.ha.QuorumPipelineImpl$RobustReplicateTask.call(QuorumPipelineImpl.java:1)
+         *     ... 5 more
+         * Caused by: java.util.concurrent.CancellationException
+         *     at java.util.concurrent.FutureTask$Sync.innerGet(FutureTask.java:250)
+         *     at java.util.concurrent.FutureTask.get(FutureTask.java:111)
+         *     at com.bigdata.service.proxy.ThickFuture.<init>(ThickFuture.java:66)
+         *     at com.bigdata.journal.jini.ha.HAJournal$HAGlueService.getProxy(HAJournal.java:1539)
+         *     at com.bigdata.journal.AbstractJournal$BasicHA.getProxy(AbstractJournal.java:5976)
+         *     at com.bigdata.journal.AbstractJournal$BasicHA.receiveAndReplicate(AbstractJournal.java:6718)
+         *     at com.bigdata.journal.jini.ha.HAJournalTest$HAGlueTestImpl.receiveAndReplicate(HAJournalTest.java:757)
+         *     at sun.reflect.GeneratedMethodAccessor7.invoke(Unknown Source)
+         *     at sun.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+         *     at java.lang.reflect.Method.invoke(Method.java:601)
+         *     at net.jini.jeri.BasicInvocationDispatcher.invoke(BasicInvocationDispatcher.java:1126)
+         *     at net.jini.jeri.BasicInvocationDispatcher.dispatch(BasicInvocationDispatcher.java:608)
+         *     at com.sun.jini.jeri.internal.runtime.Target$2.run(Target.java:487)
+         *     at net.jini.export.ServerContext.doWithServerContext(ServerContext.java:103)
+         *     at com.sun.jini.jeri.internal.runtime.Target.dispatch(Target.java:484)
+         *     at com.sun.jini.jeri.internal.runtime.Target.access$000(Target.java:57)
+         *     at com.sun.jini.jeri.internal.runtime.Target$1.run(Target.java:464)
+         *     at java.security.AccessController.doPrivileged(Native Method)
+         *     at com.sun.jini.jeri.internal.runtime.Target.dispatch(Target.java:461)
+         *     at com.sun.jini.jeri.internal.runtime.Target.dispatch(Target.java:426)
+         *     at com.sun.jini.jeri.internal.runtime.DgcRequestDispatcher.dispatch(DgcRequestDispatcher.java:210)
+         *     at net.jini.jeri.connection.ServerConnectionManager$Dispatcher.dispatch(ServerConnectionManager.java:147)
+         *     at com.sun.jini.jeri.internal.mux.MuxServer$1$1.run(MuxServer.java:244)
+         *     at java.security.AccessController.doPrivileged(Native Method)
+         *     at com.sun.jini.jeri.internal.mux.MuxServer$1.run(MuxServer.java:241)
+         *     at com.sun.jini.thread.ThreadPool$Worker.run(ThreadPool.java:136)
+         *     at java.lang.Thread.run(Thread.java:722)
+         *     at com.sun.jini.jeri.internal.runtime.Util.__________EXCEPTION_RECEIVED_FROM_SERVER__________(Util.java:108)
+         *     at com.sun.jini.jeri.internal.runtime.Util.exceptionReceivedFromServer(Util.java:101)
+         *     at net.jini.jeri.BasicInvocationHandler.unmarshalThrow(BasicInvocationHandler.java:1303)
+         *     at net.jini.jeri.BasicInvocationHandler.invokeRemoteMethodOnce(BasicInvocationHandler.java:832)
+         *     at net.jini.jeri.BasicInvocationHandler.invokeRemoteMethod(BasicInvocationHandler.java:659)
+         *     at net.jini.jeri.BasicInvocationHandler.invoke(BasicInvocationHandler.java:528)
+         *     at $Proxy2.receiveAndReplicate(Unknown Source)
+         *     at com.bigdata.ha.QuorumPipelineImpl$SendBufferTask.doRunWithLock(QuorumPipelineImpl.java:1127)
+         *     at com.bigdata.ha.QuorumPipelineImpl$SendBufferTask.call(QuorumPipelineImpl.java:1105)
+         *     at com.bigdata.ha.QuorumPipelineImpl$RobustReplicateTask.innerReplicate(QuorumPipelineImpl.java:967)
+         *     at com.bigdata.ha.QuorumPipelineImpl$RobustReplicateTask.call(QuorumPipelineImpl.java:906)
+         *     ... 6 more
+         * </pre>
+         * 
+         * <pre>
+         * First follower (C):
+         * WARN : 10:47:39,002 14879      com.bigdata.ha.pipeline.HAReceiveService@705072408{addrSelf=localhost/127.0.0.1:9092} com.bigdata.ha.pipeline.HAReceiveService.runNoBlock(HAReceiveService.java:547): java.util.concurrent.CancellationException
+         * java.util.concurrent.CancellationException
+         *     at java.util.concurrent.FutureTask$Sync.innerGet(FutureTask.java:250)
+         *     at java.util.concurrent.FutureTask.get(FutureTask.java:111)
+         *     at com.bigdata.ha.pipeline.HAReceiveService.runNoBlock(HAReceiveService.java:545)
+         *     at com.bigdata.ha.pipeline.HAReceiveService.run(HAReceiveService.java:431)
+         * </pre>
+         */
         public Void call() throws Exception {
 
             /*
@@ -907,8 +1016,11 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> extends
                 
             } catch (Throwable t) {
 
-                if (InnerCause.isInnerCause(t, InterruptedException.class)||InnerCause.isInnerCause(t, CancellationException.class)) {
-                 
+                // Note: Also see retrySend()'s catch block.
+                if (InnerCause.isInnerCause(t, InterruptedException.class)
+//               || InnerCause.isInnerCause(t, CancellationException.class)
+                        ) {
+
                     throw new RuntimeException(t);
                     
                 }
@@ -1003,7 +1115,7 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> extends
             for (; tryCount < RETRY_SLEEP.length; tryCount++) {
 
                 // Sleep before each retry (including the first).
-                Thread.sleep(RETRY_SLEEP[tryCount-1]/* ms */);
+                Thread.sleep(RETRY_SLEEP[tryCount - 1]/* ms */);
 
                 /*
                  * Note: Tested OUTSIDE of the try/catch so a quorum break will
@@ -1021,7 +1133,10 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> extends
                     
                 } catch (Throwable t) {
                     
-                    if (InnerCause.isInnerCause(t, InterruptedException.class)||InnerCause.isInnerCause(t, CancellationException.class)) {
+                    // Note: Also see call()'s catch block.
+                    if (InnerCause.isInnerCause(t, InterruptedException.class)
+//                   || InnerCause.isInnerCause(t, CancellationException.class)
+                     ) {
                         
                         throw new RuntimeException( t );
                         
@@ -1219,7 +1334,7 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> extends
             
             final HAReceiveService<HAMessageWrapper> receiveService = getHAReceiveService();
 
-         	if (downstream == null) {
+            if (downstream == null) {
 
                 /*
                  * This is the last service in the write pipeline, so just receive

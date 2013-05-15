@@ -96,9 +96,12 @@ import com.bigdata.config.LongValidator;
 import com.bigdata.counters.AbstractStatisticsCollector;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
+import com.bigdata.ha.CommitRequest;
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.HAStatusEnum;
 import com.bigdata.ha.HATXSGlue;
+import com.bigdata.ha.PrepareRequest;
+import com.bigdata.ha.PrepareResponse;
 import com.bigdata.ha.QuorumService;
 import com.bigdata.ha.RunState;
 import com.bigdata.ha.msg.HAReadResponse;
@@ -2999,11 +3002,12 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
             final long commitRecordIndexAddr = _commitRecordIndex
                     .writeCheckpoint();
 
+            final long commitToken = quorumToken;
             if (quorum != null) {
                 /*
                  * Verify that the last negotiated quorum is still valid.
                  */
-                quorum.assertLeader(quorumToken);
+                quorum.assertLeader(commitToken);
             }
 
             /*
@@ -3087,7 +3091,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                         .getOffsetBits(), nextOffset, firstCommitTime,
                         lastCommitTime, newCommitCounter, commitRecordAddr,
                         commitRecordIndexAddr, old.getUUID(), //
-                        blockSequence, quorumToken,//
+                        blockSequence, commitToken,//
                         metaStartAddr, metaBitsAddr, old.getStoreType(),
                         old.getCreateTime(), old.getCloseTime(), 
                         old.getVersion(), checker);
@@ -3181,8 +3185,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                 boolean didVoteYes = false;
                 try {
 
-                    // issue prepare request.
-                    final int nyes = quorumService.prepare2Phase(//
+                    final PrepareRequest req = new PrepareRequest(
                             joinedServiceIds,//
                             nonJoinedPipelineServiceIds,//
 //                            !old.isRootBlock0(),//
@@ -3191,26 +3194,23 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                             TimeUnit.MILLISECONDS//
                             );
 
-                    final boolean willCommit = quorum.isQuorum(nyes);
-                    
-                    if (haLog.isInfoEnabled())
-                        haLog.info("Will " + (willCommit ? "" : "not ")
-                                + "commit: " + nyes + " out of "
-                                + quorum.replicationFactor()
-                                + " services voted yes.");
+                    // issue prepare request.
+                    final PrepareResponse resp = quorumService
+                            .prepare2Phase(req);
 
-                    if (willCommit) {
+                    if (haLog.isInfoEnabled())
+                        haLog.info(resp.toString());
+
+                    if (resp.willCommit()) {
 
                         didVoteYes = true;
 
-                        quorumService.commit2Phase(
-                                joinedServiceIds,//
-                                nonJoinedPipelineServiceIds, quorumToken,
-                                commitTime);
+                        quorumService
+                                .commit2Phase(new CommitRequest(req, resp));
 
                     } else {
 
-                        quorumService.abort2Phase(quorumToken);
+                        quorumService.abort2Phase(commitToken);
 
                     }
 
@@ -3228,7 +3228,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                          */
                         if (quorumService != null) {
                             try {
-                                quorumService.abort2Phase(quorumToken);
+                                quorumService.abort2Phase(commitToken);
                             } catch (Throwable t) {
                                 log.warn(t, t);
                             }
@@ -5807,8 +5807,17 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
          */
         private final AtomicBoolean vote = new AtomicBoolean(false);
 
+        /**
+         * Return the backing {@link IIndexManager} (non-RMI method).
+         */
+        public AbstractJournal getIndexManager() {
+
+            return AbstractJournal.this;
+            
+        }
+        
         @Override
-        final public UUID getServiceId() {
+        public UUID getServiceId() {
 
             return serviceId;
             
@@ -6050,15 +6059,16 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                 /*
                  * A task to flush and sync if the service is joined with the
                  * met quorum.
+                 * 
+                 * Note: This code path is only when [isJoined := true].
                  */
 
-                ft = new FutureTaskMon<Boolean>(new Prepare2PhaseTask(isJoined,
-                        isLeader, prepareMessage) {
-                });
+                ft = new FutureTaskMon<Boolean>(new Prepare2PhaseTask(//isJoined,
+                        isLeader, prepareMessage));
 
             }
 
-			if(isLeader) {
+            if (isLeader) {
 
 	            /*
 	             * Run in the caller's thread.
@@ -6090,7 +6100,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 			return getProxy(ft);
 			
         }
-
+        
         /**
          * Task votes NO (unconditional).
          * <p>
@@ -6103,8 +6113,12 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
          * Note: The vote of a service that was not joined with the met quorum
          * at the time that we begin the 2-phase commit protocol is ignored.
          */
-        private class VoteNoTask implements Callable<Boolean>{
+        protected class VoteNoTask implements Callable<Boolean>{
 
+            public VoteNoTask() {
+                
+            }
+            
             public Boolean call() throws Exception {
 
                 // Vote NO.
@@ -6119,28 +6133,33 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
         /**
          * Task prepares for a 2-phase commit (syncs to the disk) and votes YES
          * iff if is able to prepare successfully.
+         * 
+         * Note: This code path is only when [isJoined := true].
          */
         private class Prepare2PhaseTask implements Callable<Boolean> {
 
-            private final boolean isJoined;
+//            private final boolean isJoined;
             private final boolean isLeader;
             private final IHA2PhasePrepareMessage prepareMessage;
 
-            public Prepare2PhaseTask(final boolean isJoined,
+            public Prepare2PhaseTask(//final boolean isJoined,
                     final boolean isLeader,
                     final IHA2PhasePrepareMessage prepareMessage) {
 
                 if (prepareMessage == null)
                     throw new IllegalArgumentException();
 
-                this.isJoined = isJoined;
+//                this.isJoined = isJoined;
                 
                 this.isLeader = isLeader;
 
                 this.prepareMessage = prepareMessage;
                 
             }
-            
+
+            /**
+             * Note: This code path is only when [isJoined := true].
+             */
             public Boolean call() throws Exception {
 
                 final IRootBlockView rootBlock = prepareMessage.getRootBlock();
@@ -6152,12 +6171,12 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                     throw new IllegalStateException();
 
                 // Validate the new root block against the current root block.
-                validateNewRootBlock(isJoined, isLeader, AbstractJournal.this._rootBlock, rootBlock);
+                validateNewRootBlock(/*isJoined,*/ isLeader, AbstractJournal.this._rootBlock, rootBlock);
 
                 /*
                  * if(follower) {...}
                  */
-                if (isJoined && !isLeader) {
+                if (/*isJoined &&*/ !isLeader) {
 
                     /**
                      * This is a follower.
@@ -6247,10 +6266,10 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
          * <li>The commitCounter must increase by ONE (1).</li>
          * <li></li>
          * </ul>
+         * Note: This code path is only when [isJoined := true] (that is, the
+         * service was joined with the met quorum at the atomic decision point
+         * for the joined set for the 2-phase commit).
          * 
-         * @param isJoined
-         *            iff this service was joined at the atomic decision point
-         *            in the 2-phase commit protocol.
          * @param isLeader
          *            iff this service is the leader for this commit.
          * @param oldRB
@@ -6258,7 +6277,10 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
          * @param newRB
          *            the new (aka proposed) root block.
          */
-        protected void validateNewRootBlock(final boolean isJoined,
+//        * @param isJoined
+//        *            iff this service was joined at the atomic decision point
+//        *            in the 2-phase commit protocol.
+        protected void validateNewRootBlock(//final boolean isJoined,
                 final boolean isLeader, final IRootBlockView oldRB,
                 final IRootBlockView newRB) {
 
@@ -6315,14 +6337,47 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
                 }
 
-                // The quorum token from the leader is in the root block.
-                final long prepareToken = newRB.getQuorumToken();
-
-                // Verify that the same quorum is still met.
-                quorum.assertQuorum(prepareToken);
-
             }
 
+            // The quorum token from the leader is in the root block.
+            final long prepareToken = newRB.getQuorumToken();
+
+            // Verify that the same quorum is still met.
+            quorum.assertQuorum(prepareToken);
+
+            if (!isLeader) {// && isJoined) {
+
+                /*
+                 * Verify still a follower.
+                 */
+                final QuorumService<HAGlue> localService = quorum.getClient();
+                
+                if (localService == null)
+                    throw new IllegalStateException("Quorum terminated.");
+                
+                if(!localService.isFollower(prepareToken))
+                    throw new IllegalStateException("Not follower.");
+
+                final long tmp = getHAReady();
+                
+                if (prepareToken != tmp) {
+                
+                    throw new IllegalStateException("HAReadyToken: expected="
+                            + prepareToken + ", actual=" + tmp);
+                    
+                }
+                
+                final HAStatusEnum st = getHAStatus();
+
+                if (!HAStatusEnum.Follower.equals(st)) {
+
+                    throw new IllegalStateException("HAStatusEnum: expected="
+                            + HAStatusEnum.Follower + ", actual=" + st);
+
+                }
+
+            }
+            
         }
         
         @Override

@@ -33,6 +33,11 @@ public class ClientFuture<T> implements Future<T>, Serializable {
     private final RemoteFuture<T> proxy;
 
     /**
+     * Set <code>true</code> once we know the Future to be done.
+     */
+    private volatile transient boolean done = false;
+
+    /**
      * 
      * @param proxy
      *            A proxy for the {@link RemoteFuture}.
@@ -165,6 +170,9 @@ public class ClientFuture<T> implements Future<T>, Serializable {
             /*
              * Return false since not provably cancelled in response to this
              * request.
+             * 
+             * Note: if the object is gone, then a likely explanation is that
+             * the Future completed and has been finalized.
              */
             
             return false;
@@ -180,7 +188,9 @@ public class ClientFuture<T> implements Future<T>, Serializable {
     public T get() throws InterruptedException, ExecutionException {
 
         try {
-            return proxy.get();
+            final T t = proxy.get();
+            done = true;
+            return t;
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -191,7 +201,9 @@ public class ClientFuture<T> implements Future<T>, Serializable {
             ExecutionException, TimeoutException {
 
         try {
-            return proxy.get(timeout, unit);
+            final T t = proxy.get(timeout, unit);
+            done = true;
+            return t;
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -201,7 +213,12 @@ public class ClientFuture<T> implements Future<T>, Serializable {
     public boolean isCancelled() {
 
         try {
-            return proxy.isCancelled();
+            final boolean t = proxy.isCancelled();
+            if (t) {
+                // If cancelled, then also done.
+                done = true;
+            }
+            return t;
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -211,7 +228,10 @@ public class ClientFuture<T> implements Future<T>, Serializable {
     public boolean isDone() {
 
         try {
-            return proxy.isDone();
+            if (done)
+                return done;
+            done = proxy.isDone();
+            return done;
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
