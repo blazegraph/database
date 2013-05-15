@@ -966,79 +966,79 @@ public class AbstractHA3JournalServerTestCase extends
          *     at com.bigdata.journal.jini.ha.HAJournalServer.main(HAJournalServer.java:3602)
          * </pre>
          */
-        if(false)
-        assertCondition(new Runnable() {
-            public void run() {
-                try {
-                    
-                    final File lockFile = new File(serviceDir, ".lock");
-                    
-                    if (!lockFile.exists()) {
-                    
-                        // Lock file is gone.
-                        return;
-                        
-                    }
-
-                    RandomAccessFile lockFileRAF = new RandomAccessFile(
-                            lockFile, "rw");
-                    FileLock fileLock = null;
-                    try {
-
-                        fileLock = lockFileRAF.getChannel().tryLock();
-
-                        if (fileLock == null) {
-
-                            /*
-                             * Note: A null return indicates that someone else
-                             * holds the lock.
-                             */
-
-                            try {
-                                lockFileRAF.close();
-                            } catch (Throwable t) {
-                                // ignore.
-                            } finally {
-                                lockFileRAF = null;
-                            }
-
-                            throw new RuntimeException(
-                                    "Service still running: file=" + lockFile);
-
-                        }
-
-                    } catch (IOException ex) {
-
-                        /*
-                         * Note: This is true of NFS volumes.
-                         */
-
-                        log.warn("FileLock not supported: file=" + lockFile, ex);
-
-                    } finally {
-                        if (fileLock != null) {
-                            try {
-                                fileLock.close();
-                            } finally {
-                                fileLock = null;
-                            }
-                        }
-                        if (lockFileRAF != null) {
-                            try {
-                                lockFileRAF.close();
-                            } finally {
-                                lockFileRAF = null;
-                            }
-                        }
-                    }
-
-                    fail();// lock file still exists or is still locked.
-                } catch (IOException e) {
-                    // Service is down.
-                    return;
-                }
-            }
-        });
+//        if(false)
+//        assertCondition(new Runnable() {
+//            public void run() {
+//                try {
+//                    
+//                    final File lockFile = new File(serviceDir, ".lock");
+//                    
+//                    if (!lockFile.exists()) {
+//                    
+//                        // Lock file is gone.
+//                        return;
+//                        
+//                    }
+//
+//                    RandomAccessFile lockFileRAF = new RandomAccessFile(
+//                            lockFile, "rw");
+//                    FileLock fileLock = null;
+//                    try {
+//
+//                        fileLock = lockFileRAF.getChannel().tryLock();
+//
+//                        if (fileLock == null) {
+//
+//                            /*
+//                             * Note: A null return indicates that someone else
+//                             * holds the lock.
+//                             */
+//
+//                            try {
+//                                lockFileRAF.close();
+//                            } catch (Throwable t) {
+//                                // ignore.
+//                            } finally {
+//                                lockFileRAF = null;
+//                            }
+//
+//                            throw new RuntimeException(
+//                                    "Service still running: file=" + lockFile);
+//
+//                        }
+//
+//                    } catch (IOException ex) {
+//
+//                        /*
+//                         * Note: This is true of NFS volumes.
+//                         */
+//
+//                        log.warn("FileLock not supported: file=" + lockFile, ex);
+//
+//                    } finally {
+//                        if (fileLock != null) {
+//                            try {
+//                                fileLock.close();
+//                            } finally {
+//                                fileLock = null;
+//                            }
+//                        }
+//                        if (lockFileRAF != null) {
+//                            try {
+//                                lockFileRAF.close();
+//                            } finally {
+//                                lockFileRAF = null;
+//                            }
+//                        }
+//                    }
+//
+//                    fail();// lock file still exists or is still locked.
+//                } catch (IOException e) {
+//                    // Service is down.
+//                    return;
+//                }
+//            }
+//        });
 
     }
 
