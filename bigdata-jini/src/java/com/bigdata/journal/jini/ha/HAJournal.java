@@ -1726,6 +1726,8 @@ public class HAJournal extends Journal {
             }
             innerRunStateStr.append(" @ "
                     + journal.getRootBlockView().getCommitCounter());
+            innerRunStateStr.append(", haReady=" + getHAReady());
+            innerRunStateStr.append(", haStatus=" + getHAStatus());
             final String msg = server.getOperatorAlert();
             if (msg != null)
                 innerRunStateStr.append(", msg=[" + msg + "]");
