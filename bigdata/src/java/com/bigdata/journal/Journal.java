@@ -95,6 +95,7 @@ import com.bigdata.service.IBigdataFederation;
 import com.bigdata.sparse.GlobalRowStoreHelper;
 import com.bigdata.sparse.SparseRowStore;
 import com.bigdata.util.ClocksNotSynchronizedException;
+import com.bigdata.util.InnerCause;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 import com.bigdata.util.concurrent.LatchedExecutor;
 import com.bigdata.util.concurrent.ShutdownHelper;
@@ -315,10 +316,11 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
         /**
          * The token that must remain valid.
          * 
-         * TODO We should also verify that the responses we collect are for the
-         * same request. This could be done using a request UUID or one-up
-         * request counter. That would guard against having a service reconnect
-         * and respond late once the leader had gotten to another commit point.
+         * TODO HA TXS: We should also verify that the responses we collect are
+         * for the same request. This could be done using a request UUID or
+         * one-up request counter. That would guard against having a service
+         * reconnect and respond late once the leader had gotten to another
+         * commit point.
          */
         final private long token;
         
@@ -450,8 +452,8 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
         @Override
         public void run() {
 
-            if (log.isTraceEnabled())
-                log.trace("leader: " + leadersValue);
+            if (log.isInfoEnabled())
+                log.info("leader: " + leadersValue);
             
             // This is the timestamp from the BarrierState ctor.
             final long timeLeader = leadersValue.getTimestamp();
@@ -484,8 +486,8 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
                     minimumResponse.getPinnedCommitTime(),
                     minimumResponse.getPinnedCommitCounter());
 
-            if (log.isTraceEnabled())
-                log.trace("consensus: " + consensus);
+            if (log.isInfoEnabled())
+                log.info("consensus: " + consensus);
 
         }
 
@@ -600,16 +602,106 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
 //                        }
 //                    }
 //                }
+
+//                spinWaitBarrier(getQuorum(), barrier, token, timeout, units);
                 
-                try {
-                    barrier.await(timeout, units);
-                    // fall through.
-                } catch (TimeoutException e) {
-                    throw e;
-                } catch (InterruptedException e) {
-                    throw e;
-                } catch (BrokenBarrierException e) {
-                    throw e;
+                /*
+                 * This sets up a task that will monitor the quorum state and
+                 * then interrupt this Thread if it is blocked at the barrier
+                 * [actually, it uses barrier.reset(), which appears to be a
+                 * litle safer].
+                 * 
+                 * If this service is no longer the quorum leader or if any of
+                 * the services leave that were joined with the met quorum when
+                 * we started the release time consensus protocol, then we have
+                 * to reset() the barrier. We achieve this by interrupting the
+                 * Thread (actually it now uses barrier.reset()).
+                 * 
+                 * Note: CyclicBarrier.await(timeout,unit) causes the barrier to
+                 * break if the timeout is exceeded. Therefore is CAN NOT be
+                 * used in preference to this pattern.
+                 */
+                {
+//                    final Thread blockedAtBarrier = Thread.currentThread();
+
+                    final Quorum<HAGlue, QuorumService<HAGlue>> quorum = getQuorum();
+
+                    final long initialDelay = 100; // milliseconds.
+                    final long delay = initialDelay;
+
+                    final ScheduledFuture<?> scheduledFuture = scheduledExecutorService
+                            .scheduleWithFixedDelay(new Runnable() {
+                                public void run() {
+                                    try {
+                                        
+                                        // Verify service is still leader.
+                                        quorum.assertLeader(token);
+
+                                        // Verify service self-recognizes as leader.
+                                        if (getHAStatus() != HAStatusEnum.Leader) {
+
+                                            throw new QuorumException();
+
+                                        }
+
+                                        // Verify messaged services still
+                                        // joined.
+                                        assertServicesStillJoined(quorum);
+                                        
+                                    } catch (QuorumException ex) {
+
+                                        if (!barrier.isBroken()) {
+
+                                            barrier.reset();
+                                            
+                                        }
+                                        
+                                    } catch (RuntimeException ex) {
+
+                                        if (InnerCause.isInnerCause(ex,
+                                                InterruptedException.class)) {
+
+                                            // Normal termination.
+                                            return;
+                                            
+                                        }
+
+                                        /*
+                                         * Something went wrong in the
+                                         * monitoring code. 
+                                         */
+                                        
+                                        log.error(ex, ex);
+
+                                        if (!barrier.isBroken()) {
+
+                                            /*
+                                             * Force the barrier to break since
+                                             * we will no longer be monitoring
+                                             * the quorum state.
+                                             */
+                                            barrier.reset();
+
+                                        }
+
+                                    }
+
+                                }
+                            }, initialDelay, delay, TimeUnit.MILLISECONDS);
+
+                    try {
+
+                        /*
+                         * Throws InterruptedException, BrokenBarrierException.
+                         */
+                        barrier.await();
+
+                    } finally {
+
+                        scheduledFuture.cancel(true/* mayInterruptIfRunning */);
+
+                    }
+
                 }
 
 //                /*
@@ -671,7 +763,143 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
             }// finally
 
         }
+
+//        /**
+//         * Wait on the {@link CyclicBarrier}, but do this in a loop so we can
+//         * watch for a quorum break or service leave.
+//         * 
+//         * @param quorum
+//         * @param barrier
+//         * @param timeout
+//         * @param units
+//         * 
+//         * @throws BrokenBarrierException
+//         * @throws InterruptedException
+//         * @throws TimeoutException
+//         */
+//        private void spinWaitBarrier(
+//                final Quorum<HAGlue, QuorumService<HAGlue>> quorum,
+//                final CyclicBarrier barrier, final long token,
+//                final long timeout, final TimeUnit unit)
+//                throws BrokenBarrierException, InterruptedException,
+//                TimeoutException {
+//
+//            if (log.isInfoEnabled())
+//                log.info("Waiting at barrier: #parties=" + barrier.getParties()
+//                        + ", #waiting=" + barrier.getNumberWaiting()
+//                        + ", isBroken=" + barrier.isBroken() + ", token="
+//                        + token + ", timeout=" + timeout + ", unit=" + unit);
+//
+//            // How lock to block in each iteration.
+//            final long blockNanos = TimeUnit.MILLISECONDS.toNanos(10000);
+//
+//            final long begin = System.nanoTime();
+//            final long nanos = unit.toNanos(timeout);
+//            long remaining = nanos;
+//            long nspin = 0L;
+//
+//            try {
+//
+//                while (remaining > 0) {
+//
+//                    nspin++;
+//
+//                    remaining = nanos - (System.nanoTime() - begin);
+//
+//                    try {
+//
+//                        // Verify that this service remains the leader.
+//                        quorum.assertLeader(token);
+//
+//                        // Verify messaged services are still joined.
+//                        assertServicesStillJoined(quorum);
+//                        
+//                        /*
+//                         * If we observe a serviceLeave for any service that we
+//                         * are awaiting, then we need to stop waiting on that
+//                         * service. This could be achieved by running a Thread
+//                         * that did a barrier.await() on the behalf of that
+//                         * service, but only if that service has not yet
+//                         * responded with its input for the consensus protocol
+//                         * [if it has responded then it is probably already at
+//                         * barrier.await() in a Thread on the leader for that
+//                         * follower.]
+//                         */
+//                        final long awaitNanos = Math.min(blockNanos, remaining);
+//
+//                        /*
+//                         * Await barrier, up to the timeout.
+//                         * 
+//                         * Note: Contrary to the javadoc, barrier.await(timeout)
+//                         * will break the barrier if the timeout is exceeded!!!
+//                         */
+//                        barrier.await(awaitNanos, TimeUnit.NANOSECONDS);
+//
+//                        // Done.
+//                        return;
+//
+//                    } catch (TimeoutException e) {
+//                        // Spin.
+//                        continue;
+//                    } catch (InterruptedException e) {
+//                        throw e;
+//                    } catch (BrokenBarrierException e) {
+//                        throw e;
+//                    }
+//
+//                }
+//
+//            } finally {
+//
+//                /*
+//                 * Note: On exit, the caller must reset() the barrier if it is
+//                 * not yet broken.
+//                 */
+//
+//                if (log.isInfoEnabled())
+//                    log.info("barrier: #parties=" + barrier.getParties()
+//                            + ", #waiting=" + barrier.getNumberWaiting()
+//                            + ", isBroken=" + barrier.isBroken() + ", #spin="
+//                            + nspin);
+//
+//            }
+//
+//        }
         
+        /**
+         * Verify that the services that were messaged for the release time
+         * consensus protocol are still joined with the met quorum.
+         * 
+         * @throws QuorumException
+         *             if one of the joined services leaves.
+         */
+        private void assertServicesStillJoined(
+                final Quorum<HAGlue, QuorumService<HAGlue>> quorum)
+                throws QuorumException {
+
+            final UUID[] tmp = quorum.getJoined();
+
+            for (UUID serviceId : joinedServiceIds) {
+
+                boolean found = false;
+                for (UUID t : tmp) {
+                    if (serviceId.equals(t)) {
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found) {
+
+                    throw new QuorumException(
+                            "Service leave during consensus protocol: "
+                                    + serviceId);
+
+                }
+
+            }
+
+        }
+
     }
 
 //    /**
@@ -835,7 +1063,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
                     /*
                      * Message the followers and block until the barrier breaks.
                      */
-                    barrierState.messageFollowers(token,timeout,units);
+                    barrierState.messageFollowers(token, timeout, units);
 
                 } finally {
 
@@ -852,9 +1080,16 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
                 /*
                  * Update the release time on the leader
                  */
+                
+                final IHANotifyReleaseTimeResponse consensus = barrierState.consensus;
 
-                final long consensusValue = barrierState.consensus
-                        .getCommitTime();
+                if (consensus == null) {
+
+                    throw new RuntimeException("No consensus");
+
+                }
+                
+                final long consensusValue = consensus.getCommitTime();
 
                 final long newReleaseTime = Math.max(0L, consensusValue - 1);
                 
@@ -1075,17 +1310,25 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
             }
             
             public Void call() throws Exception {
+
+                if (log.isInfoEnabled())
+                    log.info("Running gather on follower: " + getServiceUUID());
+
+                HAGlue leader = null;
                 
-                final long now = nextTimestamp();
-
-                // Verify event on leader occurs before event on follower.
-                assertBefore(req.getTimestampOnLeader(), now);
-
-                final long token = req.token();
-
+                boolean didNotifyLeader = false;
+                
                 barrierLock.lock(); // take lock on follower!
 
                 try {
+
+                    // This timestamp is used to help detect clock skew.
+                    final long now = nextTimestamp();
+
+                    // Verify event on leader occurs before event on follower.
+                    assertBefore(req.getTimestampOnLeader(), now);
+
+                    final long token = req.token();
 
                     getQuorum().assertQuorum(token);
 
@@ -1095,7 +1338,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
                     if (!quorumService.isFollower(token))
                         throw new QuorumException();
 
-                    final HAGlue leader = quorumService.getLeader(token);
+                    leader = quorumService.getLeader(token);
 
                     final IHANotifyReleaseTimeRequest req2 = newHANotifyReleaseTimeRequest(quorumService
                             .getServiceId());
@@ -1105,6 +1348,9 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
                      * 
                      * Note: Will block until barrier breaks on the leader.
                      */
+                    
+                    didNotifyLeader = true;
+
                     final IHANotifyReleaseTimeResponse consensusReleaseTime = leader
                             .notifyEarliestCommitTime(req2);
 
@@ -1142,7 +1388,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
                              */
 
                             throw new AssertionError(
-                                    "The releaseTime consensus would release an in use commit point"
+                                    "The releaseTime consensus would release a commit point with active readers"
                                             + ": consensus=" + consensusReleaseTime
                                             + ", earliestActiveTx=" + txState);
 
@@ -1166,7 +1412,28 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
 
                     // Done.
                     return null;
+                    
+                } catch (Throwable t) {
 
+                    log.error(t, t);
+                    
+                    if (!didNotifyLeader && leader != null) {
+
+                        /*
+                         * Send a [null] to the leader so it does not block
+                         * forever waiting for our response.
+                         */
+                        
+                        try {
+                            leader.notifyEarliestCommitTime(null/* resp */);
+                        } catch (Throwable t2) {
+                            log.error(t2, t2);
+                        }
+
+                    }
+
+                    throw new Exception(t);
+                    
                 } finally {
 
                     barrierLock.unlock();
@@ -1180,7 +1447,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
         /**
          * {@inheritDoc}
          * <p>
-         * Note: Message sent by follower. Method executes on leader.
+         * Note: Message sent by follower (RMI). Method executes on leader.
          * <p>
          * We pass the message through to the {@link BarrierState} object.
          * <p>
@@ -1188,10 +1455,12 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
          * lock is held by the Thread that invoked
          * {@link #updateReleaseTimeConsensus()}.
          * 
-         * TODO We should ensure that the [req] is for the same gather() request
-         * as this barrier instance. That will let us detect a service that
-         * responds late (after a transient disconnect) when the leader has
+         * TODO HA TXS: We should ensure that the [req] is for the same gather()
+         * request as this barrier instance. That will let us detect a service
+         * that responds late (after a transient disconnect) when the leader has
          * moved on to another commit. See BarrierState#token for more on this.
+         * [Note that [req] can be [null if the follower was unable to produce a
+         * valid response.]
          */
         @Override
         public IHANotifyReleaseTimeResponse notifyEarliestCommitTime(
@@ -1203,22 +1472,39 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
             if (barrierState == null)
                 throw new IllegalStateException();
 
-            getQuorum().assertLeader(barrierState.token);
+            try {
 
-            // ServiceId of the follower.
-            final UUID followerId = req.getServiceUUID();
-            
-            // Make a note of the message from this follower.
-            barrierState.responses.put(followerId, req);
-            
-            // Block until barrier breaks.
-            barrierState.barrier.await();
+                getQuorum().assertLeader(barrierState.token);
+
+                // ServiceId of the follower (NPE if req is null).
+                final UUID followerId = req.getServiceUUID();
+
+                // Make a note of the message from this follower.
+                barrierState.responses.put(followerId, req);
+                
+            } finally {
+                
+                /*
+                 * Block until barrier breaks.
+                 * 
+                 * Note: We want to await() on the barrier even if there is an
+                 * error in the try{} block. This is necessary to decrement the
+                 * barrier count down to zero.
+                 */
+
+                // follower blocks on Thread on the leader here.
+                barrierState.barrier.await();
+                
+            }
 
             // Return the consensus.
             final IHANotifyReleaseTimeResponse resp = barrierState.consensus;
 
-            if (resp == null)
-                throw new AssertionError();
+            if (resp == null) {
+
+                throw new RuntimeException("No consensus");
+
+            }
 
             return resp;
   

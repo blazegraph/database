@@ -291,7 +291,7 @@ public class QuorumCommitImpl<S extends HACommitGlue> extends
                     throw new AssertionError("null @ index=" + i);
                 boolean done = false;
                 try {
-                    remaining = nanos - (begin - System.nanoTime());
+                    remaining = nanos - (System.nanoTime() - begin);
                     final boolean vote = rf
                             .get(remaining, TimeUnit.NANOSECONDS);
                     votes[i] = vote;

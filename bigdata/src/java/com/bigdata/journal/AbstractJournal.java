@@ -2941,6 +2941,8 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
                 } catch (Exception ex) {
 
+                    log.error(ex, ex);
+                    
                     // Wrap and rethrow.
                     throw new RuntimeException(ex);
                     
@@ -5462,6 +5464,30 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
         return haReadyToken;
         
     }
+
+    /**
+     * A simplified summary of the HA status of the service. This may be used to
+     * reliably decide whether the service is the {@link HAStatusEnum#Leader}, a
+     * {@link HAStatusEnum#Follower}, or {@link HAStatusEnum#NotReady}. This is
+     * exposed both here (an RMI interface) and by the REST API.
+     * 
+     * @return The {@link HAStatusEnum} or <code>null</code> if the store is not
+     *         associated with a {@link Quorum}.
+     * 
+     * @see HAGlue#getHAStatus()
+     */
+    final protected HAStatusEnum getHAStatus() {
+
+        if (quorum == null) {
+
+            // Not HA.
+            return null;
+
+        }
+
+        return haStatus;
+        
+    }
     
     /**
      * Install identical root blocks on the journal. This is used for a few
@@ -5854,61 +5880,8 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
         @Override
         public HAStatusEnum getHAStatus() {
 
-            final Quorum<HAGlue, QuorumService<HAGlue>> quorum = getQuorum();
-
-            if (quorum == null) {
-
-                // Not HA.
-                return null;
-
-            }
-  
-            return haStatus;
+            return AbstractJournal.this.getHAStatus();
             
-//            final QuorumService<HAGlue> quorumService = quorum.getClient();
-//
-//            // check, but do not wait.
-//            final long haReadyToken = AbstractJournal.this.getHAReady();
-//
-//            final HAStatusEnum status;
-//            
-//            if (haReadyToken == Quorum.NO_QUORUM) {
-//            
-//                // Quorum is not met (as percieved by the HAJournal).
-//                status = HAStatusEnum.NotReady;
-//                
-//            } else {
-//                
-//                if (quorumService.isLeader(haReadyToken)) {
-//                
-//                    // Service is leader.
-//                    status = HAStatusEnum.Leader;
-//                    
-//                } else if (quorumService.isFollower(haReadyToken)) {
-//                    
-//                    // Service is follower.
-//                    status = HAStatusEnum.Follower;
-//                    
-//                } else {
-//                    
-//                    /*
-//                     * awaitHAReady() should only return successfully (and hence
-//                     * haReadyToken should only be a valid token) if the service was
-//                     * elected as either a leader or a follower. However, it is
-//                     * possible for the service to have concurrently left the met
-//                     * quorum, in which case the if/then/else pattern will fall
-//                     * through to this code path.
-//                     */
-//                    
-//                    // Quorum is not met (as percieved by the HAJournal).
-//                    status = HAStatusEnum.NotReady;
-//                    
-//                }
-//                
-//            }
-//
-//            return status;
-
         }
         
         @Override
@@ -6919,6 +6892,9 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
         public void gatherMinimumVisibleCommitTime(
                 final IHAGatherReleaseTimeRequest req) throws IOException {
 
+            if (haLog.isInfoEnabled())
+                haLog.info("req=" + req);
+
             // Clear the old outcome.
             gatherFuture.set(null);
             
@@ -6929,7 +6905,9 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
             final FutureTask<Void> ft = new FutureTask<Void>(task);
 
+            // Save reference to the gather Future.
             gatherFuture.set(ft);
+
             // Fire and forget. The Future is checked by prepare2Phase.
             getExecutorService().execute(ft);
 
