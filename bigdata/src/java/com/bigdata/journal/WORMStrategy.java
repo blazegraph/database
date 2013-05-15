@@ -1066,7 +1066,7 @@ public class WORMStrategy extends AbstractBufferStrategy implements
             
             try {
 
-                remaining -= (System.nanoTime() - begin);
+                remaining = nanos - (System.nanoTime() - begin);
 
                 final int dpos = data.position();
                 final int nbytes = data.remaining();

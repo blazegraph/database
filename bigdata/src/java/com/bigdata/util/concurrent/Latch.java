@@ -339,56 +339,35 @@ public class Latch {
     public boolean await(final long timeout, final TimeUnit unit)
             throws InterruptedException {
 
-        long nanos = unit.toNanos(timeout);
         final long start = System.nanoTime();
+        final long nanos = unit.toNanos(timeout);
+        long remaining = nanos;
         
-        if (lock.tryLock(nanos, TimeUnit.NANOSECONDS)) {
+        if (lock.tryLock(remaining, TimeUnit.NANOSECONDS)) {
 
             try {
 
                 // subtract out the lock waiting time.
-                nanos -= (System.nanoTime() - start);
+                remaining = nanos - (System.nanoTime() - start);
 
                 long c;
                 while ((c = counter.get()) != 0) {
                     if (c < 0)
                         throw new IllegalStateException(toString());
-                    if (nanos > 0)
-                        nanos = cond.awaitNanos(nanos);
+                    if (remaining > 0)
+                        remaining = cond.awaitNanos(remaining);
                     else
                         return false;
                 }
                 
                 return true;
                 
-//                if (counter.get() == 0) {
-//
-//                    if (log.isInfoEnabled())
-//                        log.info("Done waiting (true).");
-//
-//                    // don't wait.
-//                    return true;
-//
-//                }
-//
-//                if (cond.await(nanos, TimeUnit.NANOSECONDS)) {
-//
-//                    if (log.isInfoEnabled())
-//                        log.info("Done waiting (true)");
-//
-//                    return true;
-//
-//                }
-
             } finally {
 
                 lock.unlock();
 
             }
         }
-
-//        if (log.isInfoEnabled())
-//            log.info("Timeout (false) : counter" + counter);
 
         // Timeout.
         return false;

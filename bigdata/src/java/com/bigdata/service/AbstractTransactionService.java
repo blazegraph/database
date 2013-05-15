@@ -1861,11 +1861,11 @@ abstract public class AbstractTransactionService extends AbstractService
             final long nextCommitTime, final long timeout, final TimeUnit unit)
             throws InterruptedException, TimeoutException {
 
-        long nanos = unit.toNanos(timeout);
-
         final long begin = System.nanoTime();
+        final long nanos = unit.toNanos(timeout);
+        long remaining = nanos;
         
-        while (nanos >= 0) {
+        while (remaining >= 0) {
 
             for (long t = commitTime; t < nextCommitTime; t++) {
 
@@ -1908,15 +1908,15 @@ abstract public class AbstractTransactionService extends AbstractService
              * Note: throws InterruptedException
              */
             
-            nanos -= (System.nanoTime() - begin);
+            remaining = nanos - (System.nanoTime() - begin);
 
-            if (!txDeactivate.await(nanos, TimeUnit.NANOSECONDS)) {
+            if (!txDeactivate.await(remaining, TimeUnit.NANOSECONDS)) {
 
                 throw new TimeoutException();
                 
             }
 
-            nanos -= (System.nanoTime() - begin);
+            remaining = nanos - (System.nanoTime() - begin);
 
         }
 

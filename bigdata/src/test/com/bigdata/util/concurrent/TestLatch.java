@@ -34,7 +34,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 
 import junit.framework.TestCase2;
 
@@ -111,8 +110,8 @@ public class TestLatch extends TestCase2 {
 
                 latch.inc();
 
-                if(!latch.await(100, TimeUnit.MILLISECONDS))
-                    throw new TimeoutException();
+                if (!latch.await(100, TimeUnit.MILLISECONDS))
+                    fail("Expecting latch to decrement to zero.");
 
                 return null;
 
@@ -132,7 +131,8 @@ public class TestLatch extends TestCase2 {
 
             latch.dec();
 
-            future.get();
+            // Verify normal return.
+            assertNull(future.get());
 
         } finally {
 
@@ -212,6 +212,49 @@ public class TestLatch extends TestCase2 {
 
         assertEquals(0, latch.addAndGet(-1));
         
+    }
+
+    /**
+     * Test of {@link Latch#await(long, TimeUnit)}.
+     * @throws InterruptedException 
+     */
+    public void test5() throws InterruptedException {
+
+        final Latch latch = new Latch();
+
+        assertEquals(latch.get(), 0);
+
+        assertEquals(latch.inc(), 1);
+
+        assertEquals(latch.get(), 1);
+
+        {
+            final long timeout = TimeUnit.SECONDS.toNanos(1L);
+            final long begin = System.nanoTime();
+            // await latch to decrement to zero.
+            assertFalse(latch.await(timeout, TimeUnit.NANOSECONDS));
+            final long elapsed = System.nanoTime() - begin;
+            if (elapsed < timeout || (elapsed > (2 * timeout))) {
+                fail("elapsed=" + elapsed + ", timeout=" + timeout);
+            }
+        }
+
+        assertEquals(latch.get(), 1);
+
+        assertEquals(latch.dec(), 0);
+
+        assertTrue(latch.await(1, TimeUnit.SECONDS));
+
+        try {
+            latch.dec();
+            fail("Expecting: " + IllegalStateException.class);
+        } catch (IllegalStateException ex) {
+            if (log.isInfoEnabled())
+                log.info("Ignoring expected error: " + ex);
+        }
+
+        assertEquals(latch.get(), 0);
+
     }
     
 }

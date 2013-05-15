@@ -258,14 +258,15 @@ public class Haltable<V> implements IHaltable<V> {
     final public V get(final long timeout, final TimeUnit unit)
             throws InterruptedException, ExecutionException, TimeoutException {
         final long begin = System.nanoTime();
-        long nanos = unit.toNanos(timeout);
-        if (lock.tryLock(nanos, TimeUnit.NANOSECONDS)) {
+        final long nanos = unit.toNanos(timeout);
+        long remaining = nanos;
+        if (lock.tryLock(remaining, TimeUnit.NANOSECONDS)) {
             try {
                 // subtract out the elapsed time
-                nanos -= (System.nanoTime() - begin);
+                remaining = nanos - (System.nanoTime() - begin);
                 while (!halt) {
-                    if (nanos > 0)
-                        nanos = halted.awaitNanos(nanos);
+                    if (remaining > 0)
+                        remaining = halted.awaitNanos(remaining);
                     else
                         throw new TimeoutException();
                 }
