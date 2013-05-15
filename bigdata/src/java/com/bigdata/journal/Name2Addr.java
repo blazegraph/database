@@ -33,14 +33,21 @@ import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
 import java.lang.ref.WeakReference;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Locale;
 import java.util.Properties;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.log4j.Logger;
 
@@ -248,6 +255,7 @@ public class Name2Addr extends BTree {
 
             assert btree == this.btree;
 
+            @SuppressWarnings("unused")
             final boolean added;
             
             synchronized(Name2Addr.this) {
@@ -368,8 +376,8 @@ public class Name2Addr extends BTree {
      * @param metadata
      *            The metadata record for the index.
      */
-	public Name2Addr(final IRawStore store, final Checkpoint checkpoint,
-			final IndexMetadata metadata, final boolean readOnly) {
+    public Name2Addr(final IRawStore store, final Checkpoint checkpoint,
+            final IndexMetadata metadata, final boolean readOnly) {
 
         super(store, checkpoint, metadata, readOnly);
         
@@ -434,8 +442,8 @@ public class Name2Addr extends BTree {
         // indexCache = new WeakValueCache<String, BTree>(
         // new LRUCache<String, BTree>(cacheCapacity));
 
-		indexCache = new ConcurrentWeakValueCacheWithTimeout<String, ICheckpointProtocol>(
-				cacheCapacity, TimeUnit.MILLISECONDS.toNanos(cacheTimeout));
+        indexCache = new ConcurrentWeakValueCacheWithTimeout<String, ICheckpointProtocol>(
+                cacheCapacity, TimeUnit.MILLISECONDS.toNanos(cacheTimeout));
 
     }
     
@@ -491,83 +499,59 @@ public class Name2Addr extends BTree {
     }
     
     /**
-	 * Commit processing for named indices.
-	 * <p>
-	 * This method applies the {@link #commitList} and then flushes the backing
-	 * {@link ICheckpointProtocol} object to the store. The {@link #commitList}
-	 * consists of {@link DirtyListener}s. If the listener has its
-	 * {@link DirtyListener#needsCheckpoint} flag set, then the
-	 * {@link ICheckpointProtocol} implementation to which that listener is
-	 * attached will have its {@link BTree#writeCheckpoint() checkpoint written}
-	 * . Otherwise the current {@link Checkpoint} address is recovered. Either
-	 * way, the {@link Entry} in {@link Name2Addr}s backing {@link BTree} is
-	 * updated to reflect the <i>commitTime</i> and {@link Checkpoint} address
-	 * for the index.
-	 * <p>
-	 * Finally {@link Name2Addr} {@link Checkpoint}s itself using
-	 * {@link ICommitter#handleCommit(long)} and returns the address from which
-	 * {@link Name2Addr} may be reloaded.
-	 * <p>
-	 * Note: The {@link #commitList} MUST be protected against concurrent
-	 * modification during the commit otherwise concurrent tasks could be
-	 * reporting dirty objects while we are doing a commit and those notices
-	 * would be lost. Persistence capable objects ({@link ICheckpointProtocol}
-	 * implementations) get onto the {@link #commitList} via the
-	 * {@link DirtyListener}, so it is also synchronized.
-	 * <p>
-	 * Note: {@link Name2Addr} DOES NOT obtain a resource lock on the
-	 * {@link ICheckpointProtocol} implementation. Therefore it MUST NOT
-	 * checkpoint an index on which an {@link AbstractTask} has obtained a
-	 * resource lock. Otherwise we have concurrent writers on the {@link BTree}
-	 * and the {@link BTree} is not thread-safe for concurrent writers. Instead,
-	 * the {@link AbstractTask} checkpoints the {@link BTree} itself while it is
-	 * holding the resource lock and then sets
-	 * {@link DirtyListener#needsCheckpoint} to <code>false</code> using
-	 * {@link #putOnCommitList(String, ICheckpointProtocol, boolean)} as an
-	 * indication to {@link Name2Addr} that it MUST persist the current
-	 * checkpointAddr for the {@link BTree} on its next commit (and MUST NOT
-	 * write on the index when it does that commit).
-	 */
-    synchronized
-    public long handleCommit(final long commitTime) {
-
-        assertUnisolatedInstance();
-
-        // snapshot the commit list
-        final DirtyListener[] a = commitList.values().toArray(new DirtyListener[] {});
+     * Flush a dirty index to the disk. This is used to flush each dirty index
+     * in parallel, providing increased IO throughput and reduced latency during
+     * the commit.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+     *         Thompson</a>
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/675"
+     *      >Flush indices in parallel during checkpoint to reduce IO
+     *      latency</a>
+     */
+    private static class CommitIndexTask implements Callable<CommitIndexTask> {
+     
+        private final DirtyListener l;
         
-        // clear the commit list.
-        commitList.clear();
+        private final long commitTime;
+        
+        private final AtomicLong checkpointAddr = new AtomicLong(0L);
 
-        /*
-         * Place into sorted order as an aid to debugging when examining the
-         * commit list.
-         * 
-         * Note: This also approximates the order of the generated keys for the
-         * indices which makes the operations on the underlying BTree somewhat
-         * more efficient as they are more or less in key order. (The order is
-         * only approximate since a Unicode collator determines the real order
-         * for the sort keys generated from the index names).
+        /**
+         * Return the address of the {@link Checkpoint} record.
          */
-        Arrays.sort(a);
+        public long getCheckpointAddr() {
         
-        if (log.isInfoEnabled()) {
-            
-            log.info("Store file="+getStore().getFile());
-            
-            log.info("There are " + a.length + " dirty indices : "
-                    + Arrays.toString(a));
+            return checkpointAddr.get();
             
         }
 
-        // for each entry in the snapshot of the commit list.
-        for (int i = 0; i < a.length; i++) {
+        /**
+         * 
+         * @param l
+         *            The {@link DirtyListener}.
+         * @param commitTime
+         *            The commitTime associated with the commitPoint.
+         */
+        public CommitIndexTask(final DirtyListener l, final long commitTime) {
+
+            if (l == null)
+                throw new IllegalArgumentException();
             
-            final DirtyListener l = a[i];
+            this.l = l;
             
+            this.commitTime = commitTime;
+            
+        }
+
+        /**
+         * @return <i>self</i>
+         */
+        public CommitIndexTask call() throws Exception {
+
             if (log.isInfoEnabled())
                 log.info("Will commit: " + l.name);
-            
+
             final long checkpointAddr;
             if (l.needsCheckpoint) {
 
@@ -577,7 +561,7 @@ public class Name2Addr extends BTree {
                  * order to avoid the possibility of a concurrent modification
                  * by this code during commit processing.
                  */
-                
+
                 try {
 
                     // checkpoint the index.
@@ -590,7 +574,7 @@ public class Name2Addr extends BTree {
 
                     // adds the name to the stack trace.
                     throw new RuntimeException("Could not commit index: name="
-                            + l.name + ", commitList=" + Arrays.toString(a), t);
+                            + l.name, t);
 
                 }
                 
@@ -628,30 +612,235 @@ public class Name2Addr extends BTree {
             // set commitTime on the btree (transient field).
             l.btree.setLastCommitTime(commitTime);
             
-            // encode the index name as a key.
-            final byte[] key = getKey(l.name);
+            // publish the checkpoint address.
+            this.checkpointAddr.set(checkpointAddr);
+            
+            // Done.
+            return this;
+            
+        }
+        
+    } // CommitIndexTask
+    
+    /**
+     * Commit processing for named indices.
+     * <p>
+     * This method applies the {@link #commitList} and then flushes the backing
+     * {@link ICheckpointProtocol} object to the store. The {@link #commitList}
+     * consists of {@link DirtyListener}s. If the listener has its
+     * {@link DirtyListener#needsCheckpoint} flag set, then the
+     * {@link ICheckpointProtocol} implementation to which that listener is
+     * attached will have its {@link BTree#writeCheckpoint() checkpoint written}
+     * . Otherwise the current {@link Checkpoint} address is recovered. Either
+     * way, the {@link Entry} in {@link Name2Addr}s backing {@link BTree} is
+     * updated to reflect the <i>commitTime</i> and {@link Checkpoint} address
+     * for the index.
+     * <p>
+     * Finally {@link Name2Addr} {@link Checkpoint}s itself using
+     * {@link ICommitter#handleCommit(long)} and returns the address from which
+     * {@link Name2Addr} may be reloaded.
+     * <p>
+     * Note: The {@link #commitList} MUST be protected against concurrent
+     * modification during the commit otherwise concurrent tasks could be
+     * reporting dirty objects while we are doing a commit and those notices
+     * would be lost. Persistence capable objects ({@link ICheckpointProtocol}
+     * implementations) get onto the {@link #commitList} via the
+     * {@link DirtyListener}, so it is also synchronized.
+     * <p>
+     * Note: {@link Name2Addr} DOES NOT obtain a resource lock on the
+     * {@link ICheckpointProtocol} implementation. Therefore it MUST NOT
+     * checkpoint an index on which an {@link AbstractTask} has obtained a
+     * resource lock. Otherwise we have concurrent writers on the {@link BTree}
+     * and the {@link BTree} is not thread-safe for concurrent writers. Instead,
+     * the {@link AbstractTask} checkpoints the {@link BTree} itself while it is
+     * holding the resource lock and then sets
+     * {@link DirtyListener#needsCheckpoint} to <code>false</code> using
+     * {@link #putOnCommitList(String, ICheckpointProtocol, boolean)} as an
+     * indication to {@link Name2Addr} that it MUST persist the current
+     * checkpointAddr for the {@link BTree} on its next commit (and MUST NOT
+     * write on the index when it does that commit).
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/675"
+     *      >Flush indices in parallel during checkpoint to reduce IO
+     *      latency</a>
+     */
+    synchronized
+    public long handleCommit(final long commitTime) {
 
-            // lookup the current entry (if any) for that index.
-            final byte[] val = lookup(key);
+        assertUnisolatedInstance();
 
-            // de-serialize iff entry was found.
-            final Entry oldEntry = (val == null ? null
-                    : EntrySerializer.INSTANCE.deserialize(new DataInputBuffer(
-                            val)));
+        // snapshot the commit list
+        final DirtyListener[] a = commitList.values().toArray(new DirtyListener[] {});
+        
+        // clear the commit list.
+        commitList.clear();
 
+        /*
+         * Place into sorted order as an aid to debugging when examining the
+         * commit list.
+         * 
+         * Note: This also approximates the order of the generated keys for the
+         * indices which makes the operations on the underlying BTree somewhat
+         * more efficient as they are more or less in key order. (The order is
+         * only approximate since a Unicode collator determines the real order
+         * for the sort keys generated from the index names).
+         */
+        Arrays.sort(a);
+        
+        if (log.isInfoEnabled()) {
+            
+            log.info("Store file="+getStore().getFile());
+            
+            log.info("There are " + a.length + " dirty indices : "
+                    + Arrays.toString(a));
+            
+        }
+
+        // for each entry in the snapshot of the commit list.
+        final List<CommitIndexTask> tasks = new ArrayList<CommitIndexTask>(a.length);
+        for (int i = 0; i < a.length; i++) {
+            
+            final DirtyListener l = a[i];
+            
+            if (log.isInfoEnabled())
+                log.info("Will commit: " + l.name);
+            
+            tasks.add(new CommitIndexTask(l, commitTime));
+
+        }
+
+        /*
+         * Submit checkpoint tasks in parallel.
+         * 
+         * Note: This relies on getStore() providing access to the IIndexManager
+         * interface.
+         */
+        final List<Future<CommitIndexTask>> futures;
+        try {
+
+            final ExecutorService executorService = ((IIndexManager) getStore())
+                    .getExecutorService();
+            
             /*
-             * Update if there is no existing entry or if the checkpointAddr has
-             * changed or if there was no commit time on the old entry.
+             * Invoke tasks.
+             * 
+             * Note: Blocks until all tasks are done. Hence we do NOT have to
+             * cancel these Futures. If we obtain them, then they are already
+             * done.
              */
-
-            if (oldEntry == null || oldEntry.checkpointAddr != checkpointAddr
-                    || oldEntry.commitTime == 0L) {
-
-                final Entry entry = new Entry(l.name, checkpointAddr, commitTime);
+            futures = executorService.invokeAll(tasks);
+            
+        } catch (InterruptedException e) {
+            
+            // Interrupted while awaiting checkpoint(s).
+            throw new RuntimeException(e);
+            
+        }
+        
+        // for each entry in the snapshot of the commit list.
+        for (Future<CommitIndexTask> f : futures) {
+            
+            try {
                 
-                // update persistent mapping.
-                insert(key, EntrySerializer.INSTANCE.serialize( entry ));
+                final CommitIndexTask task = f.get();
+                
+                final DirtyListener l = task.l;
+                
+                final long checkpointAddr = task.getCheckpointAddr();
+                
+                // encode the index name as a key.
+                final byte[] key = getKey(l.name);
+
+                // lookup the current entry (if any) for that index.
+                final byte[] val = lookup(key);
+
+                // de-serialize iff entry was found.
+                final Entry oldEntry = (val == null ? null
+                        : EntrySerializer.INSTANCE.deserialize(new DataInputBuffer(
+                                val)));
+
+                /*
+                 * Update if there is no existing entry or if the checkpointAddr has
+                 * changed or if there was no commit time on the old entry.
+                 */
+
+                if (oldEntry == null || oldEntry.checkpointAddr != checkpointAddr
+                        || oldEntry.commitTime == 0L) {
+
+                    final Entry entry = new Entry(l.name, checkpointAddr, commitTime);
+                    
+                    // update persistent mapping.
+                    insert(key, EntrySerializer.INSTANCE.serialize( entry ));
+                }
+                
+            } catch (InterruptedException e) {
+
+                throw new RuntimeException(e);
+                
+            } catch (ExecutionException e) {
+                
+                throw new RuntimeException(e);
+                
             }
+            
+//            if (l.needsCheckpoint) {
+//
+//                /*
+//                 * Note: AbstractTask flags [needsCheckpoint := false] on the
+//                 * DirtyListener and handles the BTree checkpoint itself in
+//                 * order to avoid the possibility of a concurrent modification
+//                 * by this code during commit processing.
+//                 */
+//                
+//                try {
+//
+//                    // checkpoint the index.
+//                    checkpointAddr = l.btree.handleCommit(commitTime);
+//
+//                    // we just did the checkpoint.
+//                    l.needsCheckpoint = false;
+//
+//                } catch (Throwable t) {
+//
+//                    // adds the name to the stack trace.
+//                    throw new RuntimeException("Could not commit index: name="
+//                            + l.name + ", commitList=" + Arrays.toString(a), t);
+//
+//                }
+//                
+//            } else {
+//
+//                /*
+//                 * Note: AbstractTask avoids concurrent modification of the
+//                 * BTree checkpoint record during a commit by synchronizing on
+//                 * Name2Addr.
+//                 * 
+//                 * Note: The DirtyListener grabs the current checkpointAddr from
+//                 * the BTree when [needsCheckpoint := false]. This allows us to
+//                 * have asynchronous checkpoints of the BTree (by concurrent
+//                 * tasks) without causing the checkpoint address on the
+//                 * commitList to be advanced until the next atomic transfer of
+//                 * state from a completed AbstractTask down to Name2Addr.
+//                 * (Without this, the checkpointAddr on the BTree winds up
+//                 * updated concurrently but we only notice the problem when it
+//                 * happens to be 0L because the BTree is in the midst of
+//                 * updating its checkpoint!)
+//                 */
+//                
+//                // use last recorded checkpoint.
+//                checkpointAddr = l.checkpointAddr;
+//
+//                if (checkpointAddr == 0L) {
+//
+//                    throw new RuntimeException(
+//                            "Checkpoint address not written: name=" + l.name);
+//                    
+//                }
+//                                
+//            }
+//            
+//            // set commitTime on the btree (transient field).
+//            l.btree.setLastCommitTime(commitTime);
             
         }
         
@@ -681,24 +870,24 @@ public class Name2Addr extends BTree {
     }
 
     /**
-	 * Return the {@link ITx#UNISOLATED} view of the named persistence capable
-	 * data structure - this method tests a cache of the named persistence
-	 * capable data structures and will return the existing instance if the
-	 * index is found in the cache and will otherwise load the
-	 * {@link ITx#UNISOLATED} view of the data structure from the backing store.
-	 * 
-	 * @param name
-	 *            The index name.
-	 * 
-	 * @return The named index or <code>null</code> iff there is no index with
-	 *         that name.
-	 * 
-	 * @throws IllegalArgumentException
-	 *             if <i>name</i> is <code>null</code>.
-	 * @throws IllegalStateException
-	 *             if this is not the {@link ITx#UNISOLATED} {@link Name2Addr}
-	 *             instance.
-	 */
+     * Return the {@link ITx#UNISOLATED} view of the named persistence capable
+     * data structure - this method tests a cache of the named persistence
+     * capable data structures and will return the existing instance if the
+     * index is found in the cache and will otherwise load the
+     * {@link ITx#UNISOLATED} view of the data structure from the backing store.
+     * 
+     * @param name
+     *            The index name.
+     * 
+     * @return The named index or <code>null</code> iff there is no index with
+     *         that name.
+     * 
+     * @throws IllegalArgumentException
+     *             if <i>name</i> is <code>null</code>.
+     * @throws IllegalStateException
+     *             if this is not the {@link ITx#UNISOLATED} {@link Name2Addr}
+     *             instance.
+     */
     public ICheckpointProtocol getIndex(final String name) {
 
         assertUnisolatedInstance();
@@ -758,10 +947,10 @@ public class Name2Addr extends BTree {
         
         // deserialize entry.
 //        final Entry entry = EntrySerializer.INSTANCE.deserialize(new DataInputBuffer(val));
-		final Entry entry = EntrySerializer.INSTANCE
-				.deserialize(new DataInputStream(new ByteArrayInputStream(val)));
+        final Entry entry = EntrySerializer.INSTANCE
+                .deserialize(new DataInputStream(new ByteArrayInputStream(val)));
 
-		// Load from the backing store.
+        // Load from the backing store.
         ndx = Checkpoint.loadFromCheckpoint(store, entry.checkpointAddr,
                 false/* readOnly */);
 
@@ -832,8 +1021,8 @@ public class Name2Addr extends BTree {
      * @exception IndexExistsException
      *                if there is already an index registered under that name.
      */
-	synchronized public void registerIndex(final String name,
-			final ICheckpointProtocol btree) {
+    synchronized public void registerIndex(final String name,
+            final ICheckpointProtocol btree) {
 
         assertUnisolatedInstance();
 
@@ -875,21 +1064,21 @@ public class Name2Addr extends BTree {
     }
 
     /**
-	 * Adds the named index to the commit list and sets a {@link DirtyListener}
-	 * on the {@link ICheckpointProtocol} so that this {@link Name2Addr} object
-	 * will be informed if the associated persistent data structure becomes
-	 * dirty.
-	 * 
-	 * @param name
-	 *            The index name.
-	 * @param btree
-	 *            The persistence capable data structure.
-	 * @param needsCheckpoint
-	 *            Specify <code>true</code> if {@link Name2Addr} should invoke
-	 *            {@link ICheckpointProtocol#writeCheckpoint()} rather than just
-	 *            updating the {@link Entry} for the persistenc capable data
-	 *            structure using {@link ICheckpointProtocol#getCheckpoint()}
-	 */
+     * Adds the named index to the commit list and sets a {@link DirtyListener}
+     * on the {@link ICheckpointProtocol} so that this {@link Name2Addr} object
+     * will be informed if the associated persistent data structure becomes
+     * dirty.
+     * 
+     * @param name
+     *            The index name.
+     * @param btree
+     *            The persistence capable data structure.
+     * @param needsCheckpoint
+     *            Specify <code>true</code> if {@link Name2Addr} should invoke
+     *            {@link ICheckpointProtocol#writeCheckpoint()} rather than just
+     *            updating the {@link Entry} for the persistenc capable data
+     *            structure using {@link ICheckpointProtocol#getCheckpoint()}
+     */
     synchronized protected void putOnCommitList(final String name,
             final ICheckpointProtocol btree, final boolean needsCheckpoint) {
 
@@ -923,16 +1112,16 @@ public class Name2Addr extends BTree {
     }
 
     /**
-	 * Adds the named index to the {@link ITx#UNISOLATED} index cache.
-	 * 
-	 * @param name
-	 *            The index name.
-	 * @param btree
-	 *            The {@link ITx#UNISOLATED} view of the persistence capable
-	 *            data structure.
-	 * @param replace
-	 *            If an existing entry for that name may be replaced.
-	 */
+     * Adds the named index to the {@link ITx#UNISOLATED} index cache.
+     * 
+     * @param name
+     *            The index name.
+     * @param btree
+     *            The {@link ITx#UNISOLATED} view of the persistence capable
+     *            data structure.
+     * @param replace
+     *            If an existing entry for that name may be replaced.
+     */
     synchronized protected void putIndexCache(final String name,
             final ICheckpointProtocol btree, final boolean replace) {
 
@@ -1099,7 +1288,7 @@ public class Name2Addr extends BTree {
                 
             }
             
-			final IndexMetadata md = btree.getIndexMetadata();
+            final IndexMetadata md = btree.getIndexMetadata();
 
             final LocalPartitionMetadata pmd = md.getPartitionMetadata();
 
@@ -1135,7 +1324,7 @@ public class Name2Addr extends BTree {
                 found.add(name);
                 
             }
-			
+            
         }
         
         return tmp;
@@ -1335,6 +1524,7 @@ public class Name2Addr extends BTree {
 
         }
 
+        @SuppressWarnings("rawtypes")
         @Override
         public Entry deserialize(final ITuple tuple) {
 
@@ -1483,6 +1673,8 @@ public class Name2Addr extends BTree {
              */
             
             sitr = sitr.addFilter(new Filter() {
+
+                private static final long serialVersionUID = 1L;
 
                 @Override
                 public boolean isValid(final Object obj) {

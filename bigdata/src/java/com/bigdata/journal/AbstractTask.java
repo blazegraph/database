@@ -34,6 +34,8 @@ import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
@@ -635,7 +637,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
                  * isolated. [Also, we do not want N2A to cache references to a
                  * B+Tree backed by a different shadow journal.]
                  */
-                            	
+                                
                 if ((resourceManager.getLiveJournal().getBufferStrategy() instanceof IRWStrategy)) {
                     /*
                      * Note: Do NOT use the name2Addr cache for the RWStore.
@@ -649,7 +651,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
 
                     final BTree tmpbtree = (BTree) name2Addr.getIndexCache(name);
                     if (tmpbtree != null)
-                    	checkpointAddr = tmpbtree.getCheckpoint().getCheckpointAddr();
+                        checkpointAddr = tmpbtree.getCheckpoint().getCheckpointAddr();
                     
                 } else {
                     // recover from unisolated index cache.
@@ -953,6 +955,48 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
     }
 
     /**
+     * {@link Callable} checkpoints an index.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+     *         Thompson</a>
+     *         
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/675" >
+     *      Flush indices in parallel during checkpoint to reduce IO latency</a>
+     */
+    private class CheckpointIndexTask implements Callable<Void> {
+
+        private final DirtyListener l;
+        
+        public CheckpointIndexTask(final DirtyListener l) {
+        
+            this.l = l;
+            
+        }
+        
+        public Void call() throws Exception {
+
+            if(log.isInfoEnabled())
+                log.info("Writing checkpoint: "+l.name);
+            
+            try {
+
+                l.btree.writeCheckpoint();
+                
+            } catch (Throwable t) {
+                
+                // adds the name to the stack trace.
+                throw new RuntimeException("Could not commit index: name="
+                        + l.name, t);
+                
+            }
+
+            // Done.
+            return null;
+        }
+
+    }
+    
+    /**
      * Flushes any writes on unisolated indices touched by the task (those found
      * on the {@link #commitList}) and reconciles {@link #n2a} (our isolated
      * view of {@link Name2Addr}) with the {@link ITx#UNISOLATED}
@@ -962,6 +1006,10 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
      * successfully completed its work, but while the task still has its locks.
      * 
      * @return The elapsed time in nanoseconds for this operation.
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/675"
+     *      >Flush indices in parallel during checkpoint to reduce IO
+     *      latency</a>
      */
     private long checkpointTask() {
 
@@ -976,26 +1024,83 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
         
         final long begin = System.nanoTime();
         
-        if (INFO) {
+        if (log.isInfoEnabled()) {
 
             log.info("There are " + ndirty + " dirty indices "
                     + commitList.keySet() + " : " + this);
                      
         }
 
+        /*
+         * Create task to checkpoint each entry in the snapshot of the commit
+         * list.
+         */
+        final List<CheckpointIndexTask> tasks = new LinkedList<CheckpointIndexTask>();
+
         for (final DirtyListener l : commitList.values()) {
 
             assert indexCache.containsKey(l.name) : "Index not in cache? name="
                     + l.name;
+        
+            tasks.add(new CheckpointIndexTask(l));
             
-            if(INFO)
-                log.info("Writing checkpoint: "+l.name);
-            
-            l.btree.writeCheckpoint();
-
         }
         
-        if(INFO) { 
+        /*
+         * Submit checkpoint tasks in parallel.
+         * 
+         * This is done for each entry in the snapshot of the commit list.
+         * 
+         * Note: This relies on getResourceManager() providing access to the
+         * IIndexManager interface.
+         */
+        final List<Future<Void>> futures;
+        try {
+
+            final ExecutorService executorService = resourceManager
+                    .getLiveJournal().getExecutorService();
+            
+            /*
+             * Invoke tasks.
+             * 
+             * Note: Blocks until all tasks are done. Hence we do NOT have to
+             * cancel these Futures. If we obtain them, then they are already
+             * done.
+             */
+            futures = executorService.invokeAll(tasks);
+            
+        } catch (InterruptedException e) {
+            
+            // Interrupted while awaiting checkpoint(s).
+            throw new RuntimeException(e);
+            
+        }
+
+        /*
+         * Check Futures.
+         * 
+         * Note: Per above, the Futures are done. We are just checking them for
+         * errors.
+         */
+        for (Future<Void> f : futures) {
+
+            try {
+
+                f.get();
+                
+            } catch (InterruptedException e) {
+                
+                throw new RuntimeException(e);
+                
+            } catch (ExecutionException e) {
+                
+                throw new RuntimeException(e);
+                
+            }
+
+        }
+
+        if(log.isInfoEnabled()) { 
 
             final long elapsed = System.nanoTime() - begin;
 
@@ -1042,13 +1147,16 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
 
                 if(entry.droppedIndex) {
                     
-                    if(INFO) log.info("Dropping index on Name2Addr: "+entry.name);
+                    if (log.isInfoEnabled())
+                        log.info("Dropping index on Name2Addr: " + entry.name);
                     
                     name2Addr.dropIndex(entry.name);
                     
                 } else if(entry.registeredIndex) {
 
-                    if(INFO) log.info("Registering index on Name2Addr: "+entry.name);
+                    if (log.isInfoEnabled())
+                        log.info("Registering index on Name2Addr: "
+                                + entry.name);
 
                     name2Addr.registerIndex(entry.name, (BTree)commitList
                             .get(entry.name).btree);
@@ -1077,8 +1185,9 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
                          * concurrent modification problem.
                          */
 
-                        if(INFO) log.info("Transferring to Name2Addr commitList: "
-                                + entry.name);
+                        if (log.isInfoEnabled())
+                            log.info("Transferring to Name2Addr commitList: "
+                                    + entry.name);
 
                         name2Addr
                                 .putOnCommitList(l.name, l.btree, false/*needsCheckpoint*/);
@@ -1102,13 +1211,13 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
         commitList.clear();
 
         // Detach the allocation context used by the operation, but increment
-        //	txCount
+        //  txCount
         
         ((IsolatedActionJournal) getJournal()).prepareCommit();
         
         final long elapsed = System.nanoTime() - begin;
         
-        if(INFO) { 
+        if (log.isInfoEnabled()) {
 
             log.info("End task checkpoint after "
                     + TimeUnit.NANOSECONDS.toMillis(elapsed) + "ms");
@@ -2249,18 +2358,18 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
 //            }
             // now detach!
             detachContext();
-		}
+        }
 
-		// RawTx encapsulates the transaction protocol to prevent multiple calls to close()
-		private final IRawTx m_rawTx;
-		
-		public void completeTask() {
+        // RawTx encapsulates the transaction protocol to prevent multiple calls to close()
+        private final IRawTx m_rawTx;
+        
+        public void completeTask() {
             if (m_rawTx != null) {
                 m_rawTx.close();
             }
-		}
+        }
 
-		/**
+        /**
          * This class prevents {@link ITx#UNISOLATED} tasks from having direct
          * access to the {@link AbstractJournal} using
          * {@link AbstractTask#getJournal()}.
@@ -2290,13 +2399,13 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
 
             final IBufferStrategy bufferStrategy = source.getBufferStrategy();
             if (bufferStrategy instanceof IRWStrategy) {
-            	// must grab the tx BEFORE registering the context to correctly
-            	//	bracket, since the tx count is decremented AFTER the
-            	//	context is released
+                // must grab the tx BEFORE registering the context to correctly
+                //  bracket, since the tx count is decremented AFTER the
+                //  context is released
                 m_rawTx = ((IRWStrategy) bufferStrategy).newTx();
                 ((IRWStrategy) bufferStrategy).registerContext(this);
             } else {
-            	m_rawTx = null;
+                m_rawTx = null;
             }
         }
 
@@ -2663,31 +2772,31 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
 //        }
 
 
-    	@Override
-    	public IPSOutputStream getOutputStream() {
-    		return delegate.getOutputStream(this);
-    	}
+        @Override
+        public IPSOutputStream getOutputStream() {
+            return delegate.getOutputStream(this);
+        }
 
-    	@Override
-    	public InputStream getInputStream(long addr) {
-    		return delegate.getInputStream(addr);
-    	}
+        @Override
+        public InputStream getInputStream(long addr) {
+            return delegate.getInputStream(addr);
+        }
 
-    	public void delete(final long addr) {
+        public void delete(final long addr) {
             delegate.delete(addr, this);
         }
 
-//		public void delete(long addr, IAllocationContext context) {
-//			delegate.delete(addr, context);
-//		}
+//      public void delete(long addr, IAllocationContext context) {
+//          delegate.delete(addr, context);
+//      }
 //
-//		public long write(ByteBuffer data, IAllocationContext context) {
-//			return delegate.write(data, context);
-//		}
+//      public long write(ByteBuffer data, IAllocationContext context) {
+//          return delegate.write(data, context);
+//      }
 //
-//		public long write(ByteBuffer data, long oldAddr, IAllocationContext context) {
-//			return delegate.write(data, oldAddr, context);
-//		}
+//      public long write(ByteBuffer data, long oldAddr, IAllocationContext context) {
+//          return delegate.write(data, oldAddr, context);
+//      }
 
         public void detachContext() {
             delegate.detachContext(this);
@@ -2699,32 +2808,32 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
             completeTask();
         }
 
-		public ScheduledFuture<?> addScheduledTask(final Runnable task,
-				final long initialDelay, final long delay, final TimeUnit unit) {
-			return delegate.addScheduledTask(task, initialDelay, delay, unit);
-		}
+        public ScheduledFuture<?> addScheduledTask(final Runnable task,
+                final long initialDelay, final long delay, final TimeUnit unit) {
+            return delegate.addScheduledTask(task, initialDelay, delay, unit);
+        }
 
-		public boolean getCollectPlatformStatistics() {
-			return delegate.getCollectPlatformStatistics();
-		}
+        public boolean getCollectPlatformStatistics() {
+            return delegate.getCollectPlatformStatistics();
+        }
 
-		public boolean getCollectQueueStatistics() {
-			return delegate.getCollectQueueStatistics();
-		}
+        public boolean getCollectQueueStatistics() {
+            return delegate.getCollectQueueStatistics();
+        }
 
-		public int getHttpdPort() {
-			return delegate.getHttpdPort();
-		}
+        public int getHttpdPort() {
+            return delegate.getHttpdPort();
+        }
 
         @Override
         public Iterator<String> indexNameScan(String prefix, long timestamp) {
             throw new UnsupportedOperationException();
         }
 
-		@Override
-		public boolean isDirty() {
-			return delegate.isDirty();
-		}
+        @Override
+        public boolean isDirty() {
+            return delegate.isDirty();
+        }
 
     } // class IsolatatedActionJournal
 
@@ -3148,45 +3257,45 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
             return delegate.toString(addr);
         }
 
-		public IRootBlockView getRootBlock(long commitTime) {
-			return delegate.getRootBlock(commitTime);
-		}
+        public IRootBlockView getRootBlock(long commitTime) {
+            return delegate.getRootBlock(commitTime);
+        }
 
-		public Iterator<IRootBlockView> getRootBlocks(long startTime) {
-			return delegate.getRootBlocks(startTime);
-		}
+        public Iterator<IRootBlockView> getRootBlocks(long startTime) {
+            return delegate.getRootBlocks(startTime);
+        }
 
-		public ScheduledFuture<?> addScheduledTask(Runnable task,
-				long initialDelay, long delay, TimeUnit unit) {
-			return delegate.addScheduledTask(task, initialDelay, delay, unit);
-		}
+        public ScheduledFuture<?> addScheduledTask(Runnable task,
+                long initialDelay, long delay, TimeUnit unit) {
+            return delegate.addScheduledTask(task, initialDelay, delay, unit);
+        }
 
-		public boolean getCollectPlatformStatistics() {
-			return delegate.getCollectPlatformStatistics();
-		}
+        public boolean getCollectPlatformStatistics() {
+            return delegate.getCollectPlatformStatistics();
+        }
 
-		public boolean getCollectQueueStatistics() {
-			return delegate.getCollectQueueStatistics();
-		}
+        public boolean getCollectQueueStatistics() {
+            return delegate.getCollectQueueStatistics();
+        }
 
-		public int getHttpdPort() {
-			return delegate.getHttpdPort();
-		}
+        public int getHttpdPort() {
+            return delegate.getHttpdPort();
+        }
 
-		@Override
-		public IPSOutputStream getOutputStream() {
+        @Override
+        public IPSOutputStream getOutputStream() {
             throw new UnsupportedOperationException();
-		}
+        }
 
-		@Override
-		public InputStream getInputStream(long addr) {
-			return delegate.getInputStream(addr);
-		}
+        @Override
+        public InputStream getInputStream(long addr) {
+            return delegate.getInputStream(addr);
+        }
 
-		@Override
-		public boolean isDirty() {
-			return false; // it's readOnly - cannot be dirty
-		}
+        @Override
+        public boolean isDirty() {
+            return false; // it's readOnly - cannot be dirty
+        }
     } // class ReadOnlyJournal
 
     /**
@@ -3250,22 +3359,22 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
             return delegate.getTempStore();
         }
 
-		public ScheduledFuture<?> addScheduledTask(Runnable task,
-				long initialDelay, long delay, TimeUnit unit) {
-			return delegate.addScheduledTask(task, initialDelay, delay, unit);
-		}
+        public ScheduledFuture<?> addScheduledTask(Runnable task,
+                long initialDelay, long delay, TimeUnit unit) {
+            return delegate.addScheduledTask(task, initialDelay, delay, unit);
+        }
 
-		public boolean getCollectPlatformStatistics() {
-			return delegate.getCollectPlatformStatistics();
-		}
+        public boolean getCollectPlatformStatistics() {
+            return delegate.getCollectPlatformStatistics();
+        }
 
-		public boolean getCollectQueueStatistics() {
-			return delegate.getCollectQueueStatistics();
-		}
+        public boolean getCollectQueueStatistics() {
+            return delegate.getCollectQueueStatistics();
+        }
 
-		public int getHttpdPort() {
-			return delegate.getHttpdPort();
-		}
+        public int getHttpdPort() {
+            return delegate.getHttpdPort();
+        }
 
         @Override
         public Iterator<String> indexNameScan(String prefix, long timestamp) {

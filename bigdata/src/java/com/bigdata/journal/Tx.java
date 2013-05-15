@@ -29,8 +29,13 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.journal;
 
 import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -834,6 +839,91 @@ public class Tx implements ITx {
     }
     
     /**
+     * {@link Callable} checkpoints an index.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+     *         Thompson</a>
+     *         
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/675" >
+     *      Flush indices in parallel during checkpoint to reduce IO latency</a>
+     */
+    private class CheckpointIndexTask implements Callable<Void> {
+
+        private final String name;
+        private final IsolatedFusedView isolated;
+
+        public CheckpointIndexTask(final String name,
+                final IsolatedFusedView isolated) {
+
+            if (name == null)
+                throw new IllegalArgumentException();
+
+            if (isolated == null)
+                throw new IllegalArgumentException();
+
+            this.name = name;
+            this.isolated = isolated;
+            
+        }
+        
+        public Void call() throws Exception {
+
+            if(log.isInfoEnabled())
+                log.info("Writing checkpoint: "+name);
+            
+            try {
+
+                /*
+                 * Note: this is the live version of the named index. We need to
+                 * merge down onto the live version of the index, not onto some
+                 * historical state.
+                 */
+
+                final AbstractBTree[] sources = resourceManager.getIndexSources(
+                        name, UNISOLATED);
+
+                if (sources == null) {
+
+                    /*
+                     * Note: This should not happen since we just validated the
+                     * index.
+                     */
+
+                    throw new AssertionError();
+
+                }
+
+                /*
+                 * Copy the validated write set for this index down onto the
+                 * corresponding unisolated index, updating version counters, delete
+                 * markers, and values as necessary in the unisolated index.
+                 */
+
+                isolated.mergeDown(revisionTime, sources);
+
+                /*
+                 * Write a checkpoint so that everything is on the disk. This
+                 * reduces both the latency for the commit and the possibilities for
+                 * error.
+                 */
+                
+                isolated.getWriteSet().writeCheckpoint();
+                
+            } catch (Throwable t) {
+                
+                // adds the name to the stack trace.
+                throw new RuntimeException("Could not commit index: name="
+                        + name, t);
+                
+            }
+
+            // Done.
+            return null;
+        }
+
+    }
+
+    /**
      * Invoked during commit processing to merge down the write set from each
      * index isolated by this transactions onto the corresponding unisolated
      * index on the database. This method invoked iff a transaction has
@@ -841,58 +931,73 @@ public class Tx implements ITx {
      * The default implementation is a NOP.
      *
      * @param revisionTime
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/675"
+     *      >Flush indices in parallel during checkpoint to reduce IO
+     *      latency</a>
      */
     protected void mergeOntoGlobalState(final long revisionTime) {
-        
+
         this.revisionTime = revisionTime;
+
+        // Create tasks to checkpoint the indices.
+        final List<Callable<Void>> tasks = new LinkedList<Callable<Void>>();
+        {
+            
+            final Iterator<Map.Entry<String, ILocalBTreeView>> itr = indices
+                    .entrySet().iterator();
+
+            while (itr.hasNext()) {
+
+                final Map.Entry<String, ILocalBTreeView> entry = itr.next();
+
+                final String name = entry.getKey();
+
+                final IsolatedFusedView isolated = (IsolatedFusedView) entry
+                        .getValue();
+
+                tasks.add(new CheckpointIndexTask(name, isolated));
+
+            }
         
-        final Iterator<Map.Entry<String, ILocalBTreeView>> itr = indices.entrySet()
-                .iterator();
+        }
+        
+        /*
+         * Submit checkpoint tasks.
+         * 
+         * Note: Method blocks until all tasks are done.
+         */
+        final List<Future<Void>> futures;
+        try {
 
-        while (itr.hasNext()) {
+            futures = resourceManager.getLiveJournal().getExecutorService()
+                    .invokeAll(tasks);
 
-            final Map.Entry<String, ILocalBTreeView> entry = itr.next();
+        } catch (InterruptedException ex) {
 
-            final String name = entry.getKey();
+            throw new RuntimeException(ex);
 
-            final IsolatedFusedView isolated = (IsolatedFusedView) entry.getValue();
+        }
 
-            /*
-             * Note: this is the live version of the named index. We need to
-             * merge down onto the live version of the index, not onto some
-             * historical state.
-             */
+        /*
+         * Check Futures for errors.
+         * 
+         * Note: Per above, all futures are known to be done.
+         */
+        for (Future<Void> f : futures) {
 
-            final AbstractBTree[] sources = resourceManager.getIndexSources(
-                    name, UNISOLATED);
+            try {
+                f.get();
+            } catch (InterruptedException e) {
 
-            if (sources == null) {
+                throw new RuntimeException(e);
 
-                /*
-                 * Note: This should not happen since we just validated the
-                 * index.
-                 */
+            } catch (ExecutionException e) {
 
-                throw new AssertionError();
+                throw new RuntimeException(e);
 
             }
 
-            /*
-             * Copy the validated write set for this index down onto the
-             * corresponding unisolated index, updating version counters, delete
-             * markers, and values as necessary in the unisolated index.
-             */
-
-            isolated.mergeDown(revisionTime, sources);
-
-            /*
-             * Write a checkpoint so that everything is on the disk. This
-             * reduces both the latency for the commit and the possibilities for
-             * error.
-             */
-            
-            isolated.getWriteSet().writeCheckpoint();
-            
         }
 
     }
