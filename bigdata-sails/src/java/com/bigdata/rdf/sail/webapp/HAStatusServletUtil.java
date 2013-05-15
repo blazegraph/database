@@ -30,7 +30,6 @@ import java.net.InetSocketAddress;
 import java.security.DigestException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.util.Comparator;
 import java.util.Iterator;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
@@ -231,8 +230,8 @@ public class HAStatusServletUtil {
                             // ignore
                         }
                     }
-                    final long commitCounter = journal.getRootBlockView()
-                            .getCommitCounter();
+                    final IRootBlockView rb = journal.getRootBlockView();
+                    final long commitCounter = rb.getCommitCounter();
 //                    // Move this stuff to a TXS Status section?
 //                    long releaseTime = -1;
 //                    try {
@@ -251,6 +250,8 @@ public class HAStatusServletUtil {
 //                                    + RootBlockView.toString(releaseTime)//
 //                            : "")//
                     ).node("br").close();
+                    // Show the current root block.
+                    current.node("pre", rb.toString());
                 }
             }
 

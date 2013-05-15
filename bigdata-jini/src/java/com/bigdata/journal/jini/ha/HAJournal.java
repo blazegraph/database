@@ -322,25 +322,6 @@ public class HAJournal extends Journal {
         }
 
         {
-            haPrepareTimeout = (Long) config
-                    .getEntry(
-                            HAJournalServer.ConfigurationOptions.COMPONENT,
-                            HAJournalServer.ConfigurationOptions.HA_PREPARE_TIMEOUT,
-                            Long.TYPE,
-                            HAJournalServer.ConfigurationOptions.DEFAULT_HA_PREPARE_TIMEOUT);
-
-            if (haPrepareTimeout < HAJournalServer.ConfigurationOptions.MIN_HA_PREPARE_TIMEOUT) {
-                throw new ConfigurationException(
-                        HAJournalServer.ConfigurationOptions.HA_PREPARE_TIMEOUT
-                                + "="
-                                + haPrepareTimeout
-                                + " : must be GTE "
-                                + HAJournalServer.ConfigurationOptions.MIN_HA_PREPARE_TIMEOUT);
-            }
-
-        }
-        
-        {
             haReleaseTimeConsensusTimeout = (Long) config
                     .getEntry(
                             HAJournalServer.ConfigurationOptions.COMPONENT,
@@ -355,6 +336,25 @@ public class HAJournal extends Journal {
                                 + haReleaseTimeConsensusTimeout
                                 + " : must be GTE "
                                 + HAJournalServer.ConfigurationOptions.MIN_HA_RELEASE_TIME_CONSENSUS_TIMEOUT);
+            }
+
+        }
+        
+        {
+            haPrepareTimeout = (Long) config
+                    .getEntry(
+                            HAJournalServer.ConfigurationOptions.COMPONENT,
+                            HAJournalServer.ConfigurationOptions.HA_PREPARE_TIMEOUT,
+                            Long.TYPE,
+                            HAJournalServer.ConfigurationOptions.DEFAULT_HA_PREPARE_TIMEOUT);
+
+            if (haPrepareTimeout < HAJournalServer.ConfigurationOptions.MIN_HA_PREPARE_TIMEOUT) {
+                throw new ConfigurationException(
+                        HAJournalServer.ConfigurationOptions.HA_PREPARE_TIMEOUT
+                                + "="
+                                + haPrepareTimeout
+                                + " : must be GTE "
+                                + HAJournalServer.ConfigurationOptions.MIN_HA_PREPARE_TIMEOUT);
             }
 
         }
@@ -656,13 +656,13 @@ public class HAJournal extends Journal {
         }
 
         @Override
-        protected void validateNewRootBlock(final boolean isJoined,
+        protected void validateNewRootBlock(//final boolean isJoined,
                 final boolean isLeader, final IRootBlockView oldRB,
                 final IRootBlockView newRB) {
 
-            super.validateNewRootBlock(isJoined, isLeader, oldRB, newRB);
+            super.validateNewRootBlock(/*isJoined,*/ isLeader, oldRB, newRB);
 
-            if (isJoined && !isLeader) {
+            if (/*isJoined &&*/ !isLeader) {
                 
                 /*
                  * Verify that the [lastLiveHAWriteMessage] is consisent with

@@ -165,21 +165,6 @@ public class HAJournalServer extends AbstractServer {
         
         /**
          * The timeout in milliseconds that the leader will await the followers
-         * to prepare for a 2-phase commit.
-         * <p>
-         * Note: The timeout must be set with a realistic expectation concerning
-         * the possibility of garbage collection. A long GC pause could
-         * otherwise cause the 2-phase commit to fail. With this in mind, a
-         * reasonable timeout is on the order of 10 seconds.
-         */
-        String HA_PREPARE_TIMEOUT = "haPrepareTimeout";
-
-        long DEFAULT_HA_PREPARE_TIMEOUT = 10000; // milliseconds.
-        
-        long MIN_HA_PREPARE_TIMEOUT = 100; // milliseconds.
-        
-        /**
-         * The timeout in milliseconds that the leader will await the followers
          * during the release time consensus protocol.
          * <p>
          * Note: The timeout must be set with a realistic expectation concerning
@@ -192,9 +177,24 @@ public class HAJournalServer extends AbstractServer {
          */
         String HA_RELEASE_TIME_CONSENSUS_TIMEOUT = "haReleaseTimeConsensusTimeout";
 
-        long DEFAULT_HA_RELEASE_TIME_CONSENSUS_TIMEOUT = 10000; // milliseconds.
+        long DEFAULT_HA_RELEASE_TIME_CONSENSUS_TIMEOUT = Long.MAX_VALUE; // milliseconds.
         
         long MIN_HA_RELEASE_TIME_CONSENSUS_TIMEOUT = 100; // milliseconds.
+        
+        /**
+         * The timeout in milliseconds that the leader will await the followers
+         * to prepare for a 2-phase commit.
+         * <p>
+         * Note: The timeout must be set with a realistic expectation concerning
+         * the possibility of garbage collection. A long GC pause could
+         * otherwise cause the 2-phase commit to fail. With this in mind, a
+         * reasonable timeout is on the order of 10 seconds.
+         */
+        String HA_PREPARE_TIMEOUT = "haPrepareTimeout";
+
+        long DEFAULT_HA_PREPARE_TIMEOUT = Long.MAX_VALUE; // milliseconds.
+        
+        long MIN_HA_PREPARE_TIMEOUT = 100; // milliseconds.
         
         /**
          * The property whose value is the name of the directory in which write

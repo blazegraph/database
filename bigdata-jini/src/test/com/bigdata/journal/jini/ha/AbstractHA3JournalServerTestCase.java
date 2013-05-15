@@ -31,7 +31,9 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.PrintWriter;
+import java.io.RandomAccessFile;
 import java.io.StringWriter;
+import java.nio.channels.FileLock;
 import java.rmi.Remote;
 import java.util.Arrays;
 import java.util.LinkedList;
@@ -370,31 +372,38 @@ public class AbstractHA3JournalServerTestCase extends
 
     }
 
-    protected void destroyAll() throws AsynchronousQuorumCloseException, InterruptedException, TimeoutException {
+    protected void destroyAll() throws AsynchronousQuorumCloseException,
+            InterruptedException, TimeoutException {
         /**
          * The most reliable tear down is in reverse pipeline order.
          * 
          * This may not be necessary long term but for now we want to avoid
-         * destroying the leader first since it can lead to problems as followers
-         * attempt to reform
+         * destroying the leader first since it can lead to problems as
+         * followers attempt to reform
          */
         final HAGlue leader;
+        final File leaderServiceDir;
         final ServiceListener leaderListener;
         if (quorum.isQuorumMet()) {
-        	final long token = quorum.awaitQuorum(awaitQuorumTimeout,
-                TimeUnit.MILLISECONDS);
-        	leader = quorum.getClient().getLeader(token);
-        	if (leader.equals(serverA))
-        		leaderListener = serviceListenerA;
-        	else if (leader.equals(serverB))
-        		leaderListener = serviceListenerB;
-        	else if (leader.equals(serverC))
-        		leaderListener = serviceListenerC;
-        	else 
-        		throw new IllegalStateException();
+            final long token = quorum.awaitQuorum(awaitQuorumTimeout,
+                    TimeUnit.MILLISECONDS);
+            leader = quorum.getClient().getLeader(token);
+            if (leader.equals(serverA)) {
+                leaderServiceDir = getServiceDirA();
+                leaderListener = serviceListenerA;
+            } else if (leader.equals(serverB)) {
+                leaderServiceDir = getServiceDirB();
+                leaderListener = serviceListenerB;
+            } else if (leader.equals(serverC)) {
+                leaderServiceDir = getServiceDirC();
+                leaderListener = serviceListenerC;
+            } else {
+                throw new IllegalStateException();
+            }
         } else {
-        	leader = null;
-        	leaderListener = null;
+            leader = null;
+            leaderServiceDir = null;
+            leaderListener = null;
         }
         
         if (serverA != null && !serverA.equals(leader)) {
@@ -411,7 +420,7 @@ public class AbstractHA3JournalServerTestCase extends
         
         // Destroy leader last
         if (leader != null) {
-            safeDestroy(leader, leaderListener);
+            safeDestroy(leader, leaderServiceDir, leaderListener);
             
             serverA = serverB = serverC = null;
             serviceListenerA = serviceListenerC =serviceListenerB = null;
@@ -526,40 +535,52 @@ public class AbstractHA3JournalServerTestCase extends
         
     }
 
+    protected File getServiceDirA() {
+        return new File(getTestDir(), "A");
+    }
+    
+    protected File getServiceDirB() {
+        return new File(getTestDir(), "B");
+    }
+    
+    protected File getServiceDirC() {
+        return new File(getTestDir(), "C");
+    }
+    
     protected File getHAJournalFileA() {
-        return new File(getTestDir(), "A/bigdata-ha.jnl");
+        return new File(getServiceDirA(), "bigdata-ha.jnl");
     }
 
     protected File getHAJournalFileB() {
-        return new File(getTestDir(), "B/bigdata-ha.jnl");
+        return new File(getServiceDirB(), "bigdata-ha.jnl");
     }
 
     protected File getHAJournalFileC() {
-        return new File(getTestDir(), "C/bigdata-ha.jnl");
+        return new File(getServiceDirC(), "bigdata-ha.jnl");
     }
 
     protected File getHALogDirA() {
-        return new File(getTestDir(), "A/HALog");
+        return new File(getServiceDirA(), "HALog");
     }
 
     protected File getHALogDirB() {
-        return new File(getTestDir(), "B/HALog");
+        return new File(getServiceDirB(), "HALog");
     }
 
     protected File getHALogDirC() {
-        return new File(getTestDir(), "C/HALog");
+        return new File(getServiceDirC(), "HALog");
     }
 
     protected File getSnapshotDirA() {
-        return new File(getTestDir(), "A/snapshot");
+        return new File(getServiceDirA(), "snapshot");
     }
 
     protected File getSnapshotDirB() {
-        return new File(getTestDir(), "B/snapshot");
+        return new File(getServiceDirB(), "snapshot");
     }
 
     protected File getSnapshotDirC() {
-        return new File(getTestDir(), "C/snapshot");
+        return new File(getServiceDirC(), "snapshot");
     }
     
    /**
@@ -624,14 +645,14 @@ public class AbstractHA3JournalServerTestCase extends
      * @param haGlue
      *            The service.
      */
-    protected void safeDestroy(final HAGlue haGlue,
+    protected void safeDestroy(final HAGlue haGlue, final File serviceDir,
             final ServiceListener serviceListener) {
 
         if (haGlue == null)
             return;
 
         try {
-        
+
             if (log.isInfoEnabled())
                 log.info("Destroying service: " + haGlue);
 
@@ -639,7 +660,7 @@ public class AbstractHA3JournalServerTestCase extends
 
             haGlue.destroy();
 
-            awaitServiceGone(serviceId, haGlue, serviceListener);
+            awaitServiceGone(serviceId, haGlue, serviceDir, serviceListener);
 
         } catch (Throwable t) {
             
@@ -659,39 +680,39 @@ public class AbstractHA3JournalServerTestCase extends
     }
     
     protected void destroyA() {
-    	safeDestroy(serverA, serviceListenerA);
+    	safeDestroy(serverA, getServiceDirA(), serviceListenerA);
     	serverA = null;
     	serviceListenerA = null;
     }
 
     protected void destroyB() {
-    	safeDestroy(serverB, serviceListenerB);
+    	safeDestroy(serverB, getServiceDirB(), serviceListenerB);
     	serverB = null;
     	serviceListenerB = null;
     }
 
     protected void destroyC() {
-    	safeDestroy(serverC, serviceListenerC);
+    	safeDestroy(serverC, getServiceDirC(), serviceListenerC);
     	serverC = null;
     	serviceListenerC = null;
     }
 
     protected void shutdownA() throws IOException {
-    	safeShutdown(serverA, serviceListenerA, true);
+    	safeShutdown(serverA, getServiceDirA(), serviceListenerA, true);
     	
     	serverA = null;
     	serviceListenerA = null;
     }
     
     protected void shutdownB() throws IOException {
-    	safeShutdown(serverB, serviceListenerB, true);
+    	safeShutdown(serverB, getServiceDirB(), serviceListenerB, true);
     	
     	serverB = null;
     	serviceListenerB = null;
     }
     
     protected void shutdownC() throws IOException {
-    	safeShutdown(serverC, serviceListenerC, true);
+    	safeShutdown(serverC, getServiceDirC(), serviceListenerC, true);
     	
     	serverC = null;
     	serviceListenerC = null;
@@ -732,20 +753,22 @@ public class AbstractHA3JournalServerTestCase extends
     protected class SafeShutdownTask implements Callable<Void> {
 
         private final HAGlue haGlue;
+        private final File serviceDir;
         private final ServiceListener serviceListener;
         private final boolean now;
 
-        public SafeShutdownTask(final HAGlue haGlue,
+        public SafeShutdownTask(final HAGlue haGlue, final File serviceDir,
                 final ServiceListener serviceListener) {
 
-            this(haGlue, serviceListener, false/* now */);
-            
+            this(haGlue, serviceDir, serviceListener, false/* now */);
+
         }
 
-        public SafeShutdownTask(final HAGlue haGlue,
+        public SafeShutdownTask(final HAGlue haGlue, final File serviceDir,
                 final ServiceListener serviceListener, final boolean now) {
 
             this.haGlue = haGlue;
+            this.serviceDir = serviceDir;
             this.serviceListener = serviceListener;
             this.now = now;
             
@@ -753,7 +776,7 @@ public class AbstractHA3JournalServerTestCase extends
         
         public Void call() {
             
-            safeShutdown(haGlue, serviceListener, now);
+            safeShutdown(haGlue, serviceDir, serviceListener, now);
             
             return null;
             
@@ -768,7 +791,7 @@ public class AbstractHA3JournalServerTestCase extends
         }
 
         public SafeShutdownATask(final boolean now) {
-            super(serverA, serviceListenerA, now);
+            super(serverA, getServiceDirA(), serviceListenerA, now);
         }
 
     }
@@ -780,7 +803,7 @@ public class AbstractHA3JournalServerTestCase extends
         }
 
         public SafeShutdownBTask(final boolean now) {
-            super(serverB, serviceListenerB, now);
+            super(serverB, getServiceDirB(), serviceListenerB, now);
         }
 
     }
@@ -792,19 +815,19 @@ public class AbstractHA3JournalServerTestCase extends
         }
 
         public SafeShutdownCTask(final boolean now) {
-            super(serverC, serviceListenerC, now);
+            super(serverC, getServiceDirC(), serviceListenerC, now);
         }
 
     }
 
-    private void safeShutdown(final HAGlue haGlue,
+    private void safeShutdown(final HAGlue haGlue, final File serviceDir,
             final ServiceListener serviceListener) {
 
-        safeShutdown(haGlue, serviceListener, false/* now */);
+        safeShutdown(haGlue, serviceDir, serviceListener, false/* now */);
 
     }
     
-    private void safeShutdown(final HAGlue haGlue,
+    private void safeShutdown(final HAGlue haGlue, final File serviceDir,
             final ServiceListener serviceListener, final boolean now) {
 
         if (haGlue == null)
@@ -816,11 +839,11 @@ public class AbstractHA3JournalServerTestCase extends
             
             // Shutdown the remote service.
             if (now)
-            ((RemoteDestroyAdmin) haGlue).shutdownNow();
+                ((RemoteDestroyAdmin) haGlue).shutdownNow();
             else
                 ((RemoteDestroyAdmin) haGlue).shutdown();
             
-            awaitServiceGone(serviceId, haGlue, serviceListener);
+            awaitServiceGone(serviceId, haGlue, serviceDir, serviceListener);
             
         } catch (Throwable t) {
             
@@ -853,7 +876,7 @@ public class AbstractHA3JournalServerTestCase extends
      * process failing to terminate normally.
      */
     private void awaitServiceGone(final UUID serviceId, final HAGlue haGlue,
-            final ServiceListener serviceListener) {
+            final File serviceDir, final ServiceListener serviceListener) {
 
         assertCondition(new Runnable() {
             public void run() {
@@ -927,6 +950,96 @@ public class AbstractHA3JournalServerTestCase extends
 
         }
         
+        /**
+         * Wait until the lock file is gone or is no longer locked.
+         * 
+         * FIXME try waiting for the .lock file to be unlocked. This might fix
+         * the bounce and fail leader / follower tests. They test to fail with
+         * traces like this
+         * 
+         * <pre>
+         * ERROR: 09:01:34,209 334      main com.bigdata.Banner$1.uncaughtException(Banner.java:111): Uncaught exception in thread
+         * java.lang.RuntimeException: Service already running: file=/Users/bryan/Documents/workspace/BIGDATA_READ_CACHE_HEAD/benchmark/CI-HAJournal-1/B/.lock
+         *     at com.bigdata.journal.jini.ha.AbstractServer.acquireFileLock(AbstractServer.java:1118)
+         *     at com.bigdata.journal.jini.ha.AbstractServer.<init>(AbstractServer.java:681)
+         *     at com.bigdata.journal.jini.ha.HAJournalServer.<init>(HAJournalServer.java:472)
+         *     at com.bigdata.journal.jini.ha.HAJournalServer.main(HAJournalServer.java:3602)
+         * </pre>
+         */
+        if(false)
+        assertCondition(new Runnable() {
+            public void run() {
+                try {
+                    
+                    final File lockFile = new File(serviceDir, ".lock");
+                    
+                    if (!lockFile.exists()) {
+                    
+                        // Lock file is gone.
+                        return;
+                        
+                    }
+
+                    RandomAccessFile lockFileRAF = new RandomAccessFile(
+                            lockFile, "rw");
+                    FileLock fileLock = null;
+                    try {
+
+                        fileLock = lockFileRAF.getChannel().tryLock();
+
+                        if (fileLock == null) {
+
+                            /*
+                             * Note: A null return indicates that someone else
+                             * holds the lock.
+                             */
+
+                            try {
+                                lockFileRAF.close();
+                            } catch (Throwable t) {
+                                // ignore.
+                            } finally {
+                                lockFileRAF = null;
+                            }
+
+                            throw new RuntimeException(
+                                    "Service still running: file=" + lockFile);
+
+                        }
+
+                    } catch (IOException ex) {
+
+                        /*
+                         * Note: This is true of NFS volumes.
+                         */
+
+                        log.warn("FileLock not supported: file=" + lockFile, ex);
+
+                    } finally {
+                        if (fileLock != null) {
+                            try {
+                                fileLock.close();
+                            } finally {
+                                fileLock = null;
+                            }
+                        }
+                        if (lockFileRAF != null) {
+                            try {
+                                lockFileRAF.close();
+                            } finally {
+                                lockFileRAF = null;
+                            }
+                        }
+                    }
+
+                    fail();// lock file still exists or is still locked.
+                } catch (IOException e) {
+                    // Service is down.
+                    return;
+                }
+            }
+        });
+
     }
 
     /**
@@ -1106,7 +1219,7 @@ public class AbstractHA3JournalServerTestCase extends
 
             if (restart) {
 
-                safeShutdown(serverA, serviceListenerA);
+                safeShutdown(serverA, getServiceDirA(), serviceListenerA);
                 
                 serverA = null;
                 
@@ -1131,7 +1244,7 @@ public class AbstractHA3JournalServerTestCase extends
 
             if (restart) {
 
-                safeShutdown(serverB, serviceListenerB);
+                safeShutdown(serverB, getServiceDirB(), serviceListenerB);
                 
                 serverB = null;
                 
@@ -1156,7 +1269,7 @@ public class AbstractHA3JournalServerTestCase extends
 
             if (restart) {
 
-                safeShutdown(serverC, serviceListenerC);
+                safeShutdown(serverC, getServiceDirC(), serviceListenerC);
                 
                 serverC = null;
                 

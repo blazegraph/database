@@ -25,11 +25,10 @@ package com.bigdata.ha;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
@@ -139,30 +138,23 @@ public class QuorumCommitImpl<S extends HACommitGlue> extends
      * from the prepare message. This metadata is used to decide how the service
      * will handle the prepare, commit, and abort messages.
      */
-    public int prepare2Phase(//
-            final UUID[] joinedServiceIds, //
-            final Set<UUID> nonJoinedPipelineServiceIds,//
-            final IRootBlockView rootBlock,//
-            final long timeout, final TimeUnit unit//
-            )
-            throws InterruptedException, TimeoutException, IOException {
-
-        if (rootBlock == null)
-            throw new IllegalArgumentException();
-
-        if (unit == null)
-            throw new IllegalArgumentException();
-        
-        final boolean isRootBlock0 = rootBlock.isRootBlock0();
+    public PrepareResponse prepare2Phase(final PrepareRequest req)
+            throws InterruptedException, IOException {
 
         if (log.isInfoEnabled())
-            log.info("isRootBlock0=" + isRootBlock0 + ", rootBlock="
-                    + rootBlock + ", #joined=" + joinedServiceIds.length
-                    + ", #nonJoined=" + nonJoinedPipelineServiceIds.size()
-                    + ", joinedServices=" + Arrays.toString(joinedServiceIds)
-                    + ", nonJoined=" + nonJoinedPipelineServiceIds
-                    + ", timeout=" + timeout + ", unit=" + unit);
+            log.info("req=" + req);
 
+        final IRootBlockView rootBlock = req.getRootBlock();
+
+        final UUID[] joinedServiceIds = req.getJoinedServiceIds();
+        
+//        final Set<UUID> nonJoinedPipelineServiceIds = req
+//                .getNonJoinedPipelineServiceIds();
+        
+        final long timeout = req.getTimeout();
+        
+        final TimeUnit unit = req.getUnit();
+        
         /*
          * The token of the quorum for which the leader issued this prepare
          * message.
@@ -187,12 +179,12 @@ public class QuorumCommitImpl<S extends HACommitGlue> extends
         // #of remote followers (joined services, excluding the leader).
         final int nfollowers = (joinedServiceIds.length - 1);
 
-        // #of non-joined services in the pipeline.
-        final int nNonJoinedPipelineServices = nonJoinedPipelineServiceIds
-                .size();
+//        // #of non-joined services in the pipeline.
+//        final int nNonJoinedPipelineServices = nonJoinedPipelineServiceIds
+//                .size();
 
         // #of remote services (followers plus others in the pipeline).
-        final int remoteServiceCount = nfollowers + nNonJoinedPipelineServices;
+        final int remoteServiceCount = nfollowers;// + nNonJoinedPipelineServices;
 
         // Random access list of futures.
         final ArrayList<Future<Boolean>> remoteFutures = new ArrayList<Future<Boolean>>(
@@ -238,29 +230,29 @@ public class QuorumCommitImpl<S extends HACommitGlue> extends
 
                 }
 
-                // Next, message the pipeline services NOT met with the quorum.
-                {
-
-                    // message for non-joined services.
-                    final IHA2PhasePrepareMessage msg = new HA2PhasePrepareMessage(
-                            false/* isJoinedService */, rootBlock, timeout, unit);
-
-                    for (UUID serviceId : nonJoinedPipelineServiceIds) {
-
-                        /*
-                         * Runnable which will execute this message on the
-                         * remote service.
-                         */
-                        final Future<Boolean> rf = getService(serviceId)
-                                .prepare2Phase(msg);
-
-                        // add to list of futures we will check.
-                        remoteFutures.set(i, rf);
-
-                        i++;
-
-                    }
-                }
+//                // Next, message the pipeline services NOT met with the quorum.
+//                {
+//
+//                    // message for non-joined services.
+//                    final IHA2PhasePrepareMessage msg = new HA2PhasePrepareMessage(
+//                            false/* isJoinedService */, rootBlock, timeout, unit);
+//
+//                    for (UUID serviceId : nonJoinedPipelineServiceIds) {
+//
+//                        /*
+//                         * Runnable which will execute this message on the
+//                         * remote service.
+//                         */
+//                        final Future<Boolean> rf = getService(serviceId)
+//                                .prepare2Phase(msg);
+//
+//                        // add to list of futures we will check.
+//                        remoteFutures.set(i, rf);
+//
+//                        i++;
+//
+//                    }
+//                }
 
                 /*
                  * Finally, run the operation on the leader using local method
@@ -292,6 +284,7 @@ public class QuorumCommitImpl<S extends HACommitGlue> extends
              */
             int nyes = 0;
             assert remoteFutures.size() == remoteServiceCount + 1;
+            final boolean[] votes = new boolean[remoteServiceCount + 1];
             for (int i = 0; i <= remoteServiceCount; i++) {
                 final Future<Boolean> rf = remoteFutures.get(i);
                 if (rf == null)
@@ -301,6 +294,7 @@ public class QuorumCommitImpl<S extends HACommitGlue> extends
                     remaining = nanos - (begin - System.nanoTime());
                     final boolean vote = rf
                             .get(remaining, TimeUnit.NANOSECONDS);
+                    votes[i] = vote;
                     if (i < joinedServiceIds.length) {
                         // Only the leader and the followers get a vote.
                         nyes += vote ? 1 : 0;
@@ -311,21 +305,27 @@ public class QuorumCommitImpl<S extends HACommitGlue> extends
                         }
                     }
                     done = true;
+                } catch (CancellationException ex) {
+                    // This Future was cancelled.
+                    log.error(ex, ex);
+                    done = true; // CancellationException indicates isDone().
+                } catch (TimeoutException ex) {
+                    // Timeout on this Future.
+                    log.error(ex, ex);
+                    done = false;
                 } catch (ExecutionException ex) {
                     /*
-                     * TODO prepare2Phase() is throwing exceptions if
-                     * preconditions are violated. Unless if is a joined
-                     * service, it probably should just vote "no" instead. We do
-                     * not need to log @ ERROR when a precondition for a
-                     * non-joined service has been violated.
+                     * Note: prepare2Phase() is throwing exceptions if
+                     * preconditions are violated. These thrown exceptions are
+                     * interpreted as a "NO" vote.
                      */
                     log.error(ex, ex);
-                    done = true; // Note: ExecutionException indicates isDone().
+                    done = true; // ExecutionException indicates isDone().
                 } catch (RuntimeException ex) {
                     /*
-                     * Note: ClientFuture.get() can throw a RuntimeException
-                     * if there is a problem with the RMI call. In this case
-                     * we do not know whether the Future is done.
+                     * Note: ClientFuture.get() can throw a RuntimeException if
+                     * there is a problem with the RMI call. In this case we do
+                     * not know whether the Future is done.
                      */
                     log.error(ex, ex);
                 } finally {
@@ -340,15 +340,26 @@ public class QuorumCommitImpl<S extends HACommitGlue> extends
                 }
             }
 
+            // The quorum replication factor.
             final int k = getQuorum().replicationFactor();
 
-            if (!getQuorum().isQuorum(nyes)) {
+            /*
+             * Note: The leader MUST vote YES in order for the commit to
+             * continue. In addition, we need a majority of the joined services.
+             * In practice, for an HA3 configuration, this means that up to one
+             * follower could fail and the commit would still go through.
+             * However, if the leader fails then the commit will fail as well.
+             */
+            final boolean willCommit = votes[0] && getQuorum().isQuorum(nyes);
 
-                log.error("prepare rejected: nyes=" + nyes + " out of " + k);
+            if (!willCommit) {
+
+                log.error("prepare rejected: leader=" + votes[0] + ", nyes="
+                        + nyes + " out of " + k);
 
             }
 
-            return nyes;
+            return new PrepareResponse(k, nyes, willCommit, votes);
 
         } finally {
             /*
@@ -370,24 +381,45 @@ public class QuorumCommitImpl<S extends HACommitGlue> extends
 
     }
 
-    public void commit2Phase(final UUID[] joinedServiceIds, //
-            final Set<UUID> nonJoinedPipelineServiceIds,//
-            final long token, final long commitTime) throws IOException,
+    public void commit2Phase(final CommitRequest req) throws IOException,
             InterruptedException {
 
         if (log.isInfoEnabled())
-            log.info("token=" + token + ", commitTime=" + commitTime
-                    + ", #joined=" + joinedServiceIds.length + ", #nonJoined="
-                    + nonJoinedPipelineServiceIds.size() + ", joinedServices="
-                    + Arrays.toString(joinedServiceIds) + ", nonJoined="
-                    + nonJoinedPipelineServiceIds);
+            log.info("req=" + req);
 
         /*
          * To minimize latency, we first submit the futures for the other
          * services and then do f.run() on the leader. This will allow the other
          * services to commit concurrently with the leader's IO.
+         * 
+         * Note: Only services that voted "YES" will get a commit2Phase message.
+         * 
+         * Note: Do NOT message the services that voted NO. [At one point the
+         * code was modified to message each joined and non-joined service. That
+         * change was introduced to support services that join during the
+         * 2-phase commit. However, we have since resolved the service join by
+         * relying on the service blocking the pipeline writes in
+         * handleReplicatedWrite(). Since we can reliably know that there will
+         * not be a concurrent commit, we can atomically join an existing quorum
+         * and we do not need to make the 2-phase commit protocol visible to the
+         * non-joined services. Thus we do not need to push the 2-phase commit
+         * protocol to a service that is not joined with the met quorum at the
+         * atomic decision point concerning such things in commitNow().]
          */
+        
+        final PrepareRequest preq = req.getPrepareRequest();
 
+        final UUID[] joinedServiceIds = preq.getJoinedServiceIds();
+
+//        final Set<UUID> nonJoinedPipelineServiceIds = preq
+//                .getNonJoinedPipelineServiceIds();
+
+        final long token = preq.getRootBlock().getQuorumToken();
+        
+        final long commitTime = preq.getRootBlock().getLastCommitTime();
+
+        final PrepareResponse presp = req.getPrepareResponse();
+        
         member.assertLeader(token);
 
         final List<Future<Void>> remoteFutures = new LinkedList<Future<Void>>();
@@ -401,6 +433,13 @@ public class QuorumCommitImpl<S extends HACommitGlue> extends
 
                 final UUID serviceId = joinedServiceIds[i];
 
+                if (!presp.getVote(i)) {
+
+                    // Skip services that did not vote YES in PREPARE.
+                    continue;
+                    
+                }
+                
                 /*
                  * Runnable which will execute this message on the remote
                  * service.
@@ -413,26 +452,26 @@ public class QuorumCommitImpl<S extends HACommitGlue> extends
 
             }
 
-            if (!nonJoinedPipelineServiceIds.isEmpty()) {
-
-                final IHA2PhaseCommitMessage msgNonJoinedService = new HA2PhaseCommitMessage(
-                        false/* isJoinedService */, commitTime);
-
-                for (UUID serviceId : nonJoinedPipelineServiceIds) {
-
-                    /*
-                     * Runnable which will execute this message on the remote
-                     * service.
-                     */
-                    final Future<Void> rf = getService(serviceId).commit2Phase(
-                            msgNonJoinedService);
-
-                    // add to list of futures we will check.
-                    remoteFutures.add(rf);
-
-                }
-
-            }
+//            if (!nonJoinedPipelineServiceIds.isEmpty()) {
+//
+//                final IHA2PhaseCommitMessage msgNonJoinedService = new HA2PhaseCommitMessage(
+//                        false/* isJoinedService */, commitTime);
+//
+//                for (UUID serviceId : nonJoinedPipelineServiceIds) {
+//
+//                    /*
+//                     * Runnable which will execute this message on the remote
+//                     * service.
+//                     */
+//                    final Future<Void> rf = getService(serviceId).commit2Phase(
+//                            msgNonJoinedService);
+//
+//                    // add to list of futures we will check.
+//                    remoteFutures.add(rf);
+//
+//                }
+//
+//            }
 
             {
                 /*
@@ -455,11 +494,18 @@ public class QuorumCommitImpl<S extends HACommitGlue> extends
             for (Future<Void> rf : remoteFutures) {
                 boolean done = false;
                 try {
-                    rf.get();
+                    rf.get(); // TODO Timeout to await followers in commit2Phase().
                     done = true;
-                } catch (InterruptedException ex) {
+//                } catch (TimeoutException ex) {
+//                    // Timeout on this Future.
+//                    log.error(ex, ex);
+//                    causes.add(ex);
+//                    done = false;
+                } catch (CancellationException ex) {
+                    // Future was cancelled.
                     log.error(ex, ex);
                     causes.add(ex);
+                    done = true; // Future is done since cancelled.
                 } catch (ExecutionException ex) {
                     log.error(ex, ex);
                     causes.add(ex);
@@ -486,9 +532,6 @@ public class QuorumCommitImpl<S extends HACommitGlue> extends
 
             /*
              * If there were any errors, then throw an exception listing them.
-             * 
-             * FIXME But only throw the exception if the errors were for a joined
-             * service. Otherwise just log.
              */
             if (!causes.isEmpty()) {
                 // Cancel remote futures.
@@ -518,6 +561,11 @@ public class QuorumCommitImpl<S extends HACommitGlue> extends
 
     }
 
+    /**
+     * FIXME Only issue abort to services that voted YES in prepare? [We have
+     * that information in commitNow(), but we do not have the atomic set of
+     * joined services in AbstractJournal.abort())].
+     */
     public void abort2Phase(final long token) throws IOException,
             InterruptedException {
 

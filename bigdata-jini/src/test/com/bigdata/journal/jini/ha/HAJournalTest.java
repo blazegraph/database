@@ -1,6 +1,6 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2007.  All rights reservesuper.
 
 Contact:
      SYSTAP, LLC
@@ -20,17 +20,28 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-*/
+ */
 /*
  * Created on Oct 31, 2012
  */
 package com.bigdata.journal.jini.ha;
 
 import java.io.IOException;
+import java.lang.reflect.Method;
+import java.net.InetSocketAddress;
 import java.rmi.Remote;
+import java.security.DigestException;
+import java.security.NoSuchAlgorithmException;
+import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.BrokenBarrierException;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import net.jini.config.Configuration;
 import net.jini.config.ConfigurationException;
@@ -39,10 +50,43 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.concurrent.FutureTaskMon;
 import com.bigdata.ha.HAGlue;
+import com.bigdata.ha.HAStatusEnum;
 import com.bigdata.ha.QuorumService;
+import com.bigdata.ha.RunState;
+import com.bigdata.ha.msg.IHA2PhaseAbortMessage;
+import com.bigdata.ha.msg.IHA2PhaseCommitMessage;
+import com.bigdata.ha.msg.IHA2PhasePrepareMessage;
+import com.bigdata.ha.msg.IHADigestRequest;
+import com.bigdata.ha.msg.IHADigestResponse;
+import com.bigdata.ha.msg.IHAGatherReleaseTimeRequest;
+import com.bigdata.ha.msg.IHAGlobalWriteLockRequest;
+import com.bigdata.ha.msg.IHALogDigestRequest;
+import com.bigdata.ha.msg.IHALogDigestResponse;
+import com.bigdata.ha.msg.IHALogRequest;
+import com.bigdata.ha.msg.IHALogRootBlocksRequest;
+import com.bigdata.ha.msg.IHALogRootBlocksResponse;
+import com.bigdata.ha.msg.IHANotifyReleaseTimeRequest;
+import com.bigdata.ha.msg.IHANotifyReleaseTimeResponse;
+import com.bigdata.ha.msg.IHAReadRequest;
+import com.bigdata.ha.msg.IHAReadResponse;
+import com.bigdata.ha.msg.IHARebuildRequest;
+import com.bigdata.ha.msg.IHARootBlockRequest;
+import com.bigdata.ha.msg.IHARootBlockResponse;
+import com.bigdata.ha.msg.IHASendStoreResponse;
+import com.bigdata.ha.msg.IHASnapshotDigestRequest;
+import com.bigdata.ha.msg.IHASnapshotDigestResponse;
+import com.bigdata.ha.msg.IHASnapshotRequest;
+import com.bigdata.ha.msg.IHASnapshotResponse;
+import com.bigdata.ha.msg.IHASyncRequest;
+import com.bigdata.ha.msg.IHAWriteMessage;
+import com.bigdata.ha.msg.IHAWriteSetStateRequest;
+import com.bigdata.ha.msg.IHAWriteSetStateResponse;
+import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.jini.ha.HAJournalServer.HAQuorumService;
+import com.bigdata.quorum.AsynchronousQuorumCloseException;
 import com.bigdata.quorum.Quorum;
 import com.bigdata.quorum.zk.ZKQuorumImpl;
+import com.bigdata.service.jini.RemoteDestroyAdmin;
 
 /**
  * Class extends {@link HAJournal} and allows the unit tests to play various
@@ -66,10 +110,10 @@ public class HAJournalTest extends HAJournal {
     @Override
     protected HAGlue newHAGlue(final UUID serviceId) {
 
-        return new HAGlueTestService(serviceId);
-      
+        return new HAGlueTestImpl(serviceId);
+
     }
-    
+
     /**
      * A {@link Remote} interface for new methods published by the service.
      */
@@ -79,45 +123,308 @@ public class HAJournalTest extends HAJournal {
          * Logs a "hello world" message.
          */
         public void helloWorld() throws IOException;
-        
+
         /**
          * Force the end point to enter into an error state from which it will
          * naturally move back into a consistent state.
          * <p>
-         * Note: This method is intended primarily as an aid in writing various HA
-         * unit tests.
+         * Note: This method is intended primarily as an aid in writing various
+         * HA unit tests.
          */
         public Future<Void> enterErrorState() throws IOException;
-        
+
         /**
-         * This method may be issued to force the service to close and then reopen
-         * its zookeeper connection. This is a drastic action which will cause all
-         * <i>ephemeral</i> tokens for that service to be retracted from zookeeper.
-         * When the service reconnects, it will reestablish those connections.
+         * This method may be issued to force the service to close and then
+         * reopen its zookeeper connection. This is a drastic action which will
+         * cause all <i>ephemeral</i> tokens for that service to be retracted
+         * from zookeeper. When the service reconnects, it will reestablish
+         * those connections.
          * <p>
-         * Note: This method is intended primarily as an aid in writing various HA
-         * unit tests.
+         * Note: This method is intended primarily as an aid in writing various
+         * HA unit tests.
          * 
          * @see http://wiki.apache.org/hadoop/ZooKeeper/FAQ#A4
          */
         public Future<Void> bounceZookeeperConnection() throws IOException;
-        
+
+        /**
+         * Set a fail point on a future invocation of the specified methosuper. The
+         * method must be declared by the {@link HAGlue} interface or by one of
+         * the interfaces which it extends. The method will throw a
+         * {@link SpuriousTestException} when the failure criteria are
+         * satisifiesuper.
+         * 
+         * @param name
+         *            The name method to fail.
+         * @param parameterTypes
+         *            The parameter types for that methosuper.
+         * @param nwait
+         *            The #of invocations to wait before failing the methosuper.
+         * @param nfail
+         *            The #of times to fail the methosuper.
+         */
+        public void failNext(final String name,
+                final Class<?>[] parameterTypes, final int nwait,
+                final int nfail) throws IOException;
+
+        /**
+         * Clear any existing fail request for the specified methosuper.
+         * 
+         * @param name
+         *            The name method to fail.
+         * @param parameterTypes
+         *            The parameter types for that methosuper.
+         */
+        public void clearFail(final String name, final Class<?>[] parameterTypes)
+                throws IOException;
+
+        /**
+         * Instruct the service to vote "NO" on the next 2-phase PREPARE
+         * request.
+         */
+        public void voteNo() throws IOException;
+
     }
-    
+
     /**
-     * Class extends the public RMI interface of the {@link HAJournal}.
+     * Identifies a method to be failed and tracks the #of invocations of that
+     * methosuper.
+     */
+    private static class MethodData {
+        @SuppressWarnings("unused")
+        public final Method m;
+        public final int nwait;
+        public final int nfail;
+        final AtomicInteger ncall = new AtomicInteger();
+
+        public MethodData(final Method m, final int nwait, final int nfail) {
+            if (m == null)
+                throw new IllegalArgumentException("method not specified");
+            if (nwait < 0)
+                throw new IllegalArgumentException("nwait must be GTE ZERO");
+            if (nfail < 1)
+                throw new IllegalArgumentException("nfail must be GTE ONE");
+            this.m = m;
+            this.nwait = nwait;
+            this.nfail = nfail;
+        }
+    };
+
+    /**
+     * Lookup a method on the {@link HAGlue} interface.
+     * <p>
+     * Note: Any method lookup failures are logged @ ERROR. All of the
+     * {@link HAGlue} methods on {@link HAGlueTestImpl} are annotated with this
+     * methosuper. If any of them can not resolve itself, then the method will fail,
+     * which is why we log all such method resolution failures here.
+     * 
+     * @param name
+     *            The name of the methosuper.
+     * @param parameterTypes
+     *            The parameter types of the methosuper.
+     * 
+     * @return The {@link Method} and never <code>null</code>.
+     * 
+     * @throws RuntimeException
+     *             if anything goes wrong.
+     */
+    static protected Method getMethod(final String name,
+            final Class<?>[] parameterTypes) {
+
+        try {
+
+            if (name == null)
+                throw new IllegalArgumentException();
+
+            if (parameterTypes == null)
+                throw new IllegalArgumentException();
+
+            final Method m = HAGlue.class.getMethod(name, parameterTypes);
+
+            return m;
+
+        } catch (RuntimeException e) {
+
+            log.error(e, e);
+
+            throw e;
+
+        } catch (NoSuchMethodException e) {
+
+            log.error(e, e);
+
+            throw new RuntimeException(e);
+
+            // } catch (SecurityException e) {
+            //
+            // log.error(e, e);
+            //
+            // throw new RuntimeException(e);
+
+        }
+
+    }
+
+    /**
+     * Exception thrown under test harness control.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+     *         Thompson</a>
+     */
+    static public class SpuriousTestException extends RuntimeException {
+
+        private static final long serialVersionUID = 1L;
+
+        public SpuriousTestException(final String msg) {
+
+            super(msg);
+
+        }
+
+    }
+
+    /**
+     * Class implements the public RMI interface of the {@link HAJournal} using
+     * a delegation pattern.
      * <p>
      * Note: Any new RMI methods must be (a) declared on an interface; and (b)
      * must throw {@link IOException}.
+     * 
+     * @see HAJournal.HAGlueService
      */
-    protected class HAGlueTestService extends HAJournal.HAGlueService implements
-            HAGlueTest {
+    private class HAGlueTestImpl extends HAJournal.HAGlueService
+            implements HAGlue, HAGlueTest, RemoteDestroyAdmin {
 
-        protected HAGlueTestService(final UUID serviceId) {
+        /**
+         * Collection of configured RMI method failures setup under test
+         * control.
+         * 
+         * TODO If we send the desired outcome then we could have it return that
+         * outcome or throw that exception. This could also let us setup a
+         * failure on the reporting of the value (the method executes, but the
+         * result is replaced by an exception). We might also try a stochastic
+         * interrupt of the delegate method run as a Callable or Runnable.
+         */
+        private final Map<Method, MethodData> failSet = new ConcurrentHashMap<Method, MethodData>();
+
+        /**
+         * Flag used to force the service to vote "NO" on the next two-phase
+         * commit.
+         */
+        private final AtomicBoolean voteNo = new AtomicBoolean(false);
+
+        private HAGlueTestImpl(final UUID serviceId) {
 
             super(serviceId);
 
         }
+
+        /**
+         * 
+         * @see AbstractJournal#getQuorum()
+         */
+        protected Quorum<HAGlue, QuorumService<HAGlue>> getQuorum() {
+
+            return super.getIndexManager().getQuorum();
+
+        }
+
+        @Override
+        public void failNext(final String name,
+                final Class<?>[] parameterTypes, final int nwait,
+                final int nfail) {
+
+            final Method m = getMethod(name, parameterTypes);
+
+            final Class<?> declClass = m.getDeclaringClass();
+
+            if (!declClass.isAssignableFrom(HAGlue.class)) {
+
+                throw new RuntimeException("Method not declared by "
+                        + HAGlue.class + " : declClass=" + declClass
+                        + ", method=" + m);
+
+            }
+
+            failSet.put(m, new MethodData(m, nwait, nfail));
+
+            /*
+             * Verify we can find the method in the map.
+             * 
+             * Note: This is a cross check on Methosuper.hashCode() and
+             * Methosuper.equals(), not a data race check on the CHM.
+             */
+            if (failSet.get(m) == null) {
+
+                throw new AssertionError("Could not find method in map: " + m);
+
+            }
+
+        }
+
+        @Override
+        public void clearFail(final String name, final Class<?>[] parameterTypes) {
+
+            failSet.remove(getMethod(name, parameterTypes));
+
+        }
+
+        @Override
+        public void voteNo() throws IOException {
+            voteNo.set(true);
+        }
+
+        /**
+         * Conditionally fail the method if (a) it is registered in the
+         * {@link #failSet} and (b) it is due to fail on this invocation.
+         * 
+         * @param name
+         *            The name of the methosuper.
+         * @param parameterTypes
+         *            The parameter types for the methosuper.
+         */
+        protected void checkMethod(final String name,
+                final Class<?>[] parameterTypes) {
+
+            final Method m = getMethod(name, parameterTypes);
+
+            final MethodData d = failSet.get(m);
+
+            if (d == null)
+                return;
+
+            // increment, noting old value.
+            final int n = d.ncall.getAndIncrement();
+
+            // Determine whether method will fail on this invocation.
+            final boolean willFail = n >= d.nwait && n < (d.nwait + d.nfail);
+
+            // Check conditions for failing the methosuper.
+            if (willFail) {
+
+                /*
+                 * Fail the methosuper.
+                 */
+
+                log.error("Will fail HAGlue method: m=" + m + ", n=" + n
+                        + ", nwait=" + d.nwait + ", nfail=" + d.nfail);
+
+                throw new SpuriousTestException(m.toString() + " : n=" + n);
+
+            }
+
+            // Method will run normally.
+
+        }
+
+        // /**
+        // * Set a fail point on the next invocation of the specified methosuper.
+        // */
+        // public void failNext(final Method m) {
+        //
+        // failNext(m, 0/* nwait */, 1/* nfail */);
+        //
+        // }
 
         @Override
         public void helloWorld() throws IOException {
@@ -125,7 +432,7 @@ public class HAJournalTest extends HAJournal {
             log.warn("Hello world!");
 
         }
-        
+
         @Override
         public Future<Void> enterErrorState() {
 
@@ -134,7 +441,7 @@ public class HAJournalTest extends HAJournal {
 
             ft.run();
 
-            return getProxy(ft);
+            return super.getProxy(ft);
 
         }
 
@@ -164,8 +471,8 @@ public class HAJournalTest extends HAJournal {
                     new BounceZookeeperConnectionTask(), null/* result */);
 
             ft.run();
-            
-            return getProxy(ft);
+
+            return super.getProxy(ft);
 
         }
 
@@ -178,7 +485,7 @@ public class HAJournalTest extends HAJournal {
 
                     // Note: Local method call on AbstractJournal.
                     final UUID serviceId = getServiceId();
-                    
+
                     try {
 
                         haLog.warn("BOUNCING ZOOKEEPER CONNECTION: "
@@ -204,6 +511,363 @@ public class HAJournalTest extends HAJournal {
 
         }
 
-    } // HAGlueTestService
+        /*
+         * Delegate methods
+         */
 
-}
+        /*
+         * IService
+         */
+
+        @Override
+        public UUID getServiceUUID() throws IOException {
+
+            checkMethod("getServiceUUID", new Class[] {});
+
+            return super.getServiceUUID();
+
+        }
+
+        @Override
+        public UUID getServiceId() {
+
+            checkMethod("getServiceId", new Class[] {});
+
+            return super.getServiceId();
+
+        }
+
+        @SuppressWarnings("rawtypes")
+        @Override
+        public Class getServiceIface() throws IOException {
+
+            checkMethod("getServiceIface", new Class[] {});
+
+            return super.getServiceIface();
+        }
+
+        @Override
+        public String getHostname() throws IOException {
+
+            checkMethod("getHostname", new Class[] {});
+
+            return super.getHostname();
+        }
+
+        @Override
+        public String getServiceName() throws IOException {
+
+            checkMethod("getServiceName", new Class[] {});
+
+            return super.getServiceName();
+
+        }
+
+        @Override
+        public void destroy() {
+
+            checkMethod("destroy", new Class[] {});
+
+            super.destroy();
+
+        }
+
+        @Override
+        public long awaitHAReady(long timeout, TimeUnit unit)
+                throws InterruptedException, TimeoutException,
+                AsynchronousQuorumCloseException {
+
+            checkMethod("awaitHAReady",
+                    new Class[] { Long.TYPE, TimeUnit.class });
+
+            return super.awaitHAReady(timeout, unit);
+
+        }
+
+        @Override
+        public IHARootBlockResponse getRootBlock(IHARootBlockRequest msg) {
+
+            checkMethod("getRootBlock",
+                    new Class[] { IHARootBlockRequest.class });
+
+            return super.getRootBlock(msg);
+        }
+
+        @Override
+        public int getNSSPort() {
+
+            checkMethod("getNSSPort", new Class[] {});
+
+            return super.getNSSPort();
+
+        }
+
+        @Override
+        public RunState getRunState() {
+
+            checkMethod("getRunState", new Class[] {});
+
+            return super.getRunState();
+        }
+
+        @Override
+        public String getExtendedRunState() {
+
+            checkMethod("getExtendedRunState", new Class[] {});
+
+            return super.getExtendedRunState();
+
+        }
+
+        @Override
+        public HAStatusEnum getHAStatus() {
+
+            checkMethod("getHAStatus", new Class[] {});
+
+            return super.getHAStatus();
+
+        }
+
+        @Override
+        public IHADigestResponse computeDigest(IHADigestRequest req)
+                throws IOException, NoSuchAlgorithmException, DigestException {
+
+            checkMethod("computeDigest", new Class[] { IHADigestRequest.class });
+
+            return super.computeDigest(req);
+
+        }
+
+        @Override
+        public IHALogDigestResponse computeHALogDigest(IHALogDigestRequest req)
+                throws IOException, NoSuchAlgorithmException, DigestException {
+
+            checkMethod("computeHALogDigest",
+                    new Class[] { IHALogDigestRequest.class });
+
+            return super.computeHALogDigest(req);
+
+        }
+
+        @Override
+        public IHASnapshotDigestResponse computeHASnapshotDigest(
+                IHASnapshotDigestRequest req) throws IOException,
+                NoSuchAlgorithmException, DigestException {
+
+            checkMethod("computeHASnapshotDigest",
+                    new Class[] { IHASnapshotDigestRequest.class });
+
+            return super.computeHASnapshotDigest(req);
+
+        }
+
+        @Override
+        public Future<IHASnapshotResponse> takeSnapshot(IHASnapshotRequest req)
+                throws IOException {
+
+            checkMethod("takeSnapshot",
+                    new Class[] { IHASnapshotRequest.class });
+
+            return super.takeSnapshot(req);
+
+        }
+
+        @Override
+        public Future<Void> globalWriteLock(IHAGlobalWriteLockRequest req)
+                throws IOException, TimeoutException, InterruptedException {
+
+            checkMethod("globalWriteLock",
+                    new Class[] { IHAGlobalWriteLockRequest.class });
+
+            return super.globalWriteLock(req);
+
+        }
+
+        /*
+         * HATXSGlue
+         */
+
+        @Override
+        public void gatherMinimumVisibleCommitTime(
+                IHAGatherReleaseTimeRequest req) throws IOException {
+
+            checkMethod("gatherMinimumVisibleCommitTime",
+                    new Class[] { IHAGatherReleaseTimeRequest.class });
+
+            super.gatherMinimumVisibleCommitTime(req);
+
+        }
+
+        @Override
+        public IHANotifyReleaseTimeResponse notifyEarliestCommitTime(
+                IHANotifyReleaseTimeRequest req) throws IOException,
+                InterruptedException, BrokenBarrierException {
+
+            checkMethod("notifyEarliestCommitTime",
+                    new Class[] { IHANotifyReleaseTimeRequest.class });
+
+            return super.notifyEarliestCommitTime(req);
+
+        }
+
+        /*
+         * HACommitGlue
+         */
+
+        @Override
+        public Future<Boolean> prepare2Phase(
+                IHA2PhasePrepareMessage prepareMessage) {
+
+            checkMethod("prepare2Phase",
+                    new Class[] { IHA2PhasePrepareMessage.class });
+
+            if (voteNo.compareAndSet(true/* expect */, false/* update */)) {
+
+                final FutureTask<Boolean> ft = new FutureTask<Boolean>(
+                        new VoteNoTask());
+
+                super.getIndexManager().getExecutorService().submit(ft);
+
+                return super.getProxy(ft);
+
+            }
+
+            return super.prepare2Phase(prepareMessage);
+
+        }
+
+        @Override
+        public Future<Void> commit2Phase(IHA2PhaseCommitMessage commitMessage) {
+
+            checkMethod("commit2Phase",
+                    new Class[] { IHA2PhaseCommitMessage.class });
+
+            return super.commit2Phase(commitMessage);
+
+        }
+
+        @Override
+        public Future<Void> abort2Phase(IHA2PhaseAbortMessage abortMessage) {
+
+            checkMethod("abort2Phase",
+                    new Class[] { IHA2PhaseAbortMessage.class });
+
+            return super.abort2Phase(abortMessage);
+
+        }
+
+        /*
+         * HAReadGlue
+         */
+
+        @Override
+        public Future<IHAReadResponse> readFromDisk(IHAReadRequest readMessage) {
+
+            checkMethod("readFromDisk", new Class[] { IHAReadResponse.class });
+
+            return super.readFromDisk(readMessage);
+
+        }
+
+        /*
+         * HAPipelineGlue
+         */
+
+        @Override
+        public InetSocketAddress getWritePipelineAddr() {
+
+            checkMethod("getWritePipelineAddr", new Class[] {});
+
+            return super.getWritePipelineAddr();
+        }
+
+        @Override
+        public Future<Void> moveToEndOfPipeline() {
+
+            checkMethod("moveToEndOfPipeline", new Class[] {});
+
+            return super.moveToEndOfPipeline();
+        }
+
+        @Override
+        public Future<Void> receiveAndReplicate(IHASyncRequest req,
+                IHAWriteMessage msg) throws IOException {
+
+            checkMethod("receiveAndReplicate", new Class[] {
+                    IHASyncRequest.class, IHAWriteMessage.class });
+
+            return super.receiveAndReplicate(req, msg);
+
+        }
+
+        @Override
+        public IHAWriteSetStateResponse getHAWriteSetState(
+                IHAWriteSetStateRequest req) {
+
+            checkMethod("getHAWriteSetState",
+                    new Class[] { IHAWriteSetStateRequest.class });
+
+            return super.getHAWriteSetState(req);
+
+        }
+
+        @Override
+        public IHALogRootBlocksResponse getHALogRootBlocksForWriteSet(
+                IHALogRootBlocksRequest msg) throws IOException {
+
+            checkMethod("getHALogRootBlocksForWriteSet",
+                    new Class[] { IHALogRootBlocksRequest.class });
+
+            return super.getHALogRootBlocksForWriteSet(msg);
+
+        }
+
+        @Override
+        public Future<Void> sendHALogForWriteSet(IHALogRequest msg)
+                throws IOException {
+
+            checkMethod("sendHALogForWriteSet",
+                    new Class[] { IHALogRequest.class });
+
+            return super.sendHALogForWriteSet(msg);
+
+        }
+
+        @Override
+        public Future<IHASendStoreResponse> sendHAStore(IHARebuildRequest msg)
+                throws IOException {
+
+            checkMethod("sendHAStore", new Class[] { IHARebuildRequest.class });
+
+            return super.sendHAStore(msg);
+
+        }
+
+        /*
+         * RemoteDestroyAdmin
+         * 
+         * Note: This interface is not part of the HAGlue interface. Hence you
+         * can not fail these methods (checkMethod() will fail).
+         */
+
+        @Override
+        public void shutdown() {
+
+            // checkMethod("shutdown", new Class[] {});
+
+            super.shutdown();
+
+        }
+
+        @Override
+        public void shutdownNow() {
+
+            // checkMethod("shutdownNow", new Class[] {});
+
+            super.shutdown();
+
+        }
+
+    } // class HAGlueTestImpl
+
+} // class HAJournalTest
