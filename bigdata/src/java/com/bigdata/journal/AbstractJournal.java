@@ -51,6 +51,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.BrokenBarrierException;
 import java.util.concurrent.Callable;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
@@ -6157,6 +6158,10 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                      * Validate the release time consensus protocol was
                      * completed successfully on the follower.
                      * 
+                     * Note: We need to block here (on oldFuture.get()) in case
+                     * the follower has not finished applying the updated
+                     * release time.
+                     * 
                      * @see <a
                      *      href="https://sourceforge.net/apps/trac/bigdata/ticket/673"
                      *      > Native thread leak in HAJournalServer process </a>
@@ -6166,26 +6171,29 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                             .getAndSet(null/* newValue */);
 
                     if (oldFuture == null) {
-
                         throw new IllegalStateException(
                                 "Follower did not execute consensus protocol");
                     }
 
-                    if (!oldFuture.isDone()) {
-                        // Ensure cancelled.
-                        oldFuture.cancel(true/* mayInterruptIfRunning */);
-                    }
+//                    if (!oldFuture.isDone()) {
+//                        // Ensure cancelled.
+//                        haLog.error("Gather not done on follower: serviceId=" + getServiceId()+ " : will cancel.");
+//                        oldFuture.cancel(true/* mayInterruptIfRunning */);
+//                    }
 
                     try {
                         oldFuture.get();
                         // Gather was successful - fall through.
                     } catch (InterruptedException e) {
-                        // Note: Future isDone(). Caller will not block.
+                        // Note: Future isDone(). Caller should not block.
                         throw new AssertionError();
+                    } catch (CancellationException e) {
+                        // Gather cancelled on the follower (e.g., immediately above).
+                        haLog.error("Gather cancelled on follower: serviceId="
+                                + getServiceId() + " : " + e, e);
+                        return vote.get();
                     } catch (ExecutionException e) {
-                        /*
-                         * Gather failed on the follower.
-                         */
+                        // Gather failed on the follower.
                         haLog.error("Gather failed on follower: serviceId="
                                 + getServiceId() + " : " + e, e);
                         return vote.get();
@@ -6892,11 +6900,11 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
         public void gatherMinimumVisibleCommitTime(
                 final IHAGatherReleaseTimeRequest req) throws IOException {
 
-            if (haLog.isInfoEnabled())
-                haLog.info("req=" + req);
+            if (haLog.isInfoEnabled()) haLog.info("req=" + req);
 
-            // Clear the old outcome.
-            gatherFuture.set(null);
+            // Clear the old outcome. Reference SHOULD be null. Ensure not running.
+            final Future<Void> oldFuture = gatherFuture.getAndSet(null);
+            if(oldFuture!=null&&!oldFuture.isDone()) oldFuture.cancel(true/*mayInterruptIfRunning*/);
             
             final Callable<Void> task = ((AbstractHATransactionService) AbstractJournal.this
                     .getLocalTransactionManager()

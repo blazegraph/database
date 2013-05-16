@@ -512,9 +512,13 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
          * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/673" >
          *      Native thread leak in HAJournalServer process </a>
          */
-        private void messageFollowers(final long token, final long timeout,
-                final TimeUnit units) throws IOException, InterruptedException,
+        private void messageFollowers(final long token, final long timeoutNanos)
+                throws IOException, InterruptedException,
                 BrokenBarrierException, TimeoutException {
+
+            final long begin = System.nanoTime();
+            final long nanos = timeoutNanos;
+            long remaining = nanos;
 
             getQuorum().assertLeader(token);
 
@@ -689,12 +693,19 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
                                 }
                             }, initialDelay, delay, TimeUnit.MILLISECONDS);
 
+                    // Update time remaining.
+                    remaining = nanos - (System.nanoTime() - begin);
+                    
                     try {
 
                         /*
-                         * Throws InterruptedException, BrokenBarrierException.
+                         * Throws InterruptedException, BrokenBarrierException,
+                         * TimeoutException.
+                         * 
+                         * Note: If TimeoutException is thrown, then the barrier
+                         * will be broken.
                          */
-                        barrier.await();
+                        barrier.await(remaining, TimeUnit.NANOSECONDS);
 
                     } finally {
 
@@ -993,6 +1004,11 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
          * determined by the releaseTime on the transaction service).</li>
          * </ul>
          * Any of these actions must contend for the {@link #barrierLock}.
+         * 
+         * @see #updateReleaseTimeConsensus(long, TimeUnit)
+         * @see GatherTask#call()
+         * @see #newTx(long)
+         * @see #runWithBarrierLock(Runnable)
          */
         final private ReentrantLock barrierLock = new ReentrantLock();
         
@@ -1041,6 +1057,10 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
                 final TimeUnit units) throws IOException, InterruptedException,
                 TimeoutException, BrokenBarrierException {
 
+            final long begin = System.nanoTime();
+            final long nanos = units.toNanos(timeout);
+            long remaining = nanos;
+
             final long token = getQuorum().token();
             
             final BarrierState barrierState;
@@ -1063,7 +1083,11 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
                     /*
                      * Message the followers and block until the barrier breaks.
                      */
-                    barrierState.messageFollowers(token, timeout, units);
+
+                    // Update time remaining.
+                    remaining = nanos - (System.nanoTime() - begin);
+                    
+                    barrierState.messageFollowers(token, remaining);
 
                 } finally {
 
@@ -1077,8 +1101,22 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
 
                 }
 
-                /*
-                 * Update the release time on the leader
+                /**
+                 * Update the release time on the leader.
+                 * 
+                 * Note: The follower has the new release time, but it is
+                 * running asynchronously and might not have updated its release
+                 * time locally by the time the leader leaves the consensus
+                 * protocol. prepare2Phase() (on the follower) will check the
+                 * Future of the GatherTask and block until it is complete. Thus
+                 * all services will be in a state where they are known to have
+                 * updated their release time (based on the consensus protocol)
+                 * before we finish prepare2Phase() and hence before we run
+                 * commit2Phase().
+                 * 
+                 * @see <a
+                 *      href="https://sourceforge.net/apps/trac/bigdata/ticket/673"
+                 *      > Native thread leak in HAJournalServer process </a>
                  */
                 
                 final IHANotifyReleaseTimeResponse consensus = barrierState.consensus;
@@ -1312,7 +1350,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
             public Void call() throws Exception {
 
                 if (log.isInfoEnabled())
-                    log.info("Running gather on follower: " + getServiceUUID());
+                    log.info("Running gather on follower");
 
                 HAGlue leader = null;
                 
@@ -1358,7 +1396,8 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
                      * Now spot check the earliest active tx on this follower.
                      * We want to make sure that this tx is not reading against
                      * a commit point whose state would be released by the new
-                     * consensus releaseTime.
+                     * [consensusReleaseTime] that we just obtained from the
+                     * leader.
                      * 
                      * If everything is Ok, we update the releaseTime on the
                      * follower.
@@ -1367,7 +1406,11 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
                     lock.lock();
                     
                     try {
-                    
+
+                        if (log.isInfoEnabled())
+                            log.info("Validating consensus releaseTime on follower: consensus="
+                                    + consensusReleaseTime);
+                        
                         // the earliest active tx on this follower.
                         final TxState txState = getEarliestActiveTx();
 
@@ -1683,7 +1726,10 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
             
             try {
 
-                return this._newTx(timestamp);
+                if (log.isInfoEnabled())
+                    log.info("NewTx with barrierLock");
+                
+                return _newTx(timestamp);
                                 
             } finally {
                 

@@ -668,7 +668,10 @@ abstract public class AbstractTransactionService extends AbstractService
     
     /**
      * Private version is also used by {@link #start()}.
-     */
+     * 
+     * TODO Why is this synchronized(this)? The timestamp factory is
+     * synchronized internally and {@link #lastTimestamp} is volatile.
+     */ 
     synchronized private final long _nextTimestamp() {
 
         return lastTimestamp = MillisecondTimestampFactory.nextMillis();
