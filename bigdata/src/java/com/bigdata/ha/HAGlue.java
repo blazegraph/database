@@ -37,6 +37,7 @@ import com.bigdata.ha.msg.IHADigestResponse;
 import com.bigdata.ha.msg.IHAGlobalWriteLockRequest;
 import com.bigdata.ha.msg.IHALogDigestRequest;
 import com.bigdata.ha.msg.IHALogDigestResponse;
+import com.bigdata.ha.msg.IHARemoteRebuildRequest;
 import com.bigdata.ha.msg.IHARootBlockRequest;
 import com.bigdata.ha.msg.IHARootBlockResponse;
 import com.bigdata.ha.msg.IHASnapshotDigestRequest;
@@ -45,6 +46,7 @@ import com.bigdata.ha.msg.IHASnapshotRequest;
 import com.bigdata.ha.msg.IHASnapshotResponse;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.Journal;
+import com.bigdata.journal.jini.ha.HAJournalServer;
 import com.bigdata.quorum.AsynchronousQuorumCloseException;
 import com.bigdata.quorum.QuorumException;
 import com.bigdata.service.IService;
@@ -230,6 +232,33 @@ public interface HAGlue extends HAGlueBase, HAPipelineGlue, HAReadGlue,
      *         snapshot is running and none will be taken for that request.
      */
     Future<IHASnapshotResponse> takeSnapshot(IHASnapshotRequest req)
+            throws IOException;
+
+    /**
+     * Disaster recovery (REBUILD) of the local database instance from the
+     * leader of a met quorum.
+     * 
+     * There are several preconditions:
+     * <ul>
+     * 
+     * <li>The quorum must be met and there must be an
+     * {@link HAStatusEnum#Ready} leader.</li>
+     * 
+     * <li>This service must be {@link HAStatusEnum#NotReady}.</li>
+     * 
+     * <li>This service MUST NOT be at the same commit point as the leader (if
+     * it is, then the service could meet in a data race with the met quorum and
+     * we do not permit RESTORE if the service is joined with the met quorum).</li>
+     * 
+     * <li>The {@link HAJournalServer} must not be running a RESTORE (we don't
+     * want it to accidentally interrupt a RESTORE that is in progress).</li>
+     * 
+     * </ul>
+     * 
+     * @return The (asynchronous) {@link Future} of the REBUILD operation -or-
+     *         <code>null</code> if any of the pre-conditions were violated.
+     */
+    Future<Void> rebuildFromLeader(IHARemoteRebuildRequest req)
             throws IOException;
 
 }

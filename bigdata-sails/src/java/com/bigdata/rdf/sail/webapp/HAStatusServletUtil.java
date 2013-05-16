@@ -43,7 +43,9 @@ import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.HAStatusEnum;
 import com.bigdata.ha.QuorumService;
 import com.bigdata.ha.halog.IHALogReader;
+import com.bigdata.ha.msg.HARemoteRebuildRequest;
 import com.bigdata.ha.msg.HASnapshotRequest;
+import com.bigdata.ha.msg.IHARemoteRebuildRequest;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.RootBlockView;
@@ -69,6 +71,17 @@ import com.bigdata.zookeeper.DumpZookeeper;
  *      depends on zookeper)
  */
 public class HAStatusServletUtil {
+
+    /**
+     * Disaster recover of this service from the leader (REBUILD).
+     * 
+     * @see HAGlue#rebuildFromLeader(IHARemoteRebuildRequest)
+     * 
+     * TODO Move this declaration to {@link StatusServlet} once we are done
+     * reconciling between the 1.2.x maintenance branch and the READ_CACHE
+     * branch.
+     */
+    static final String REBUILD = "rebuild";
 
     final private IIndexManager indexManager;
 
@@ -117,6 +130,7 @@ public class HAStatusServletUtil {
         
         final int njoined = quorum.getJoined().length;
 
+        // Note: This is the *local* HAGlueService.
         final QuorumService<HAGlue> quorumService = quorum.getClient();
 
         final boolean digests = req.getParameter(StatusServlet.DIGESTS) != null;
@@ -421,7 +435,7 @@ public class HAStatusServletUtil {
             }
 
             /*
-             * If requested, conditional start a snapshot.
+             * If requested, conditionally start a snapshot.
              */
             {
                 final String val = req.getParameter(StatusServlet.SNAPSHOT);
@@ -446,12 +460,12 @@ public class HAStatusServletUtil {
                         // ignore.
                     }
 
-                    ((HAJournal) journal).getSnapshotManager().takeSnapshot(
+                    journal.getSnapshotManager().takeSnapshot(
                             new HASnapshotRequest(percentLogSize));
 
                 }
                 
-             }
+            }
             
             /*
              * Report if a snapshot is currently running.
@@ -468,6 +482,36 @@ public class HAStatusServletUtil {
 
         }
 
+        /**
+         * If requested, conditionally REBUILD the service from the leader
+         * (disaster recover).
+         * 
+         * FIXME This should only be triggered by a POST (it is modestly safe
+         * since a REBUILD can not be triggered if the service is joined, at the
+         * same commit point as the leader, or already running, but it is not so
+         * safe that you should be able to use a GET to demand a REBUILD).
+         */
+        {
+            
+            final String val = req.getParameter(HAStatusServletUtil.REBUILD);
+
+            if (val != null) {
+
+                // Local HAGlue interface for this service (not proxy).
+                final HAGlue haGlue = quorumService.getService();
+
+                // Request RESTORE.
+                if (haGlue.rebuildFromLeader(new HARemoteRebuildRequest()) != null) {
+
+                    current.node("h2",
+                            "Running Disaster Recovery for this service (REBUILD).");
+
+                }
+
+            }
+
+        }
+        
         /*
          * Display the NSS port, host, and leader/follower/not-joined
          * status for each service in the quorum.
