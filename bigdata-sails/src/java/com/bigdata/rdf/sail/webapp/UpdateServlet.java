@@ -49,7 +49,6 @@ import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
 import com.bigdata.rdf.sail.webapp.BigdataRDFContext.AbstractQueryTask;
 import com.bigdata.rdf.sail.webapp.DeleteServlet.RemoveStatementHandler;
 import com.bigdata.rdf.sail.webapp.InsertServlet.AddStatementHandler;
-import com.bigdata.rdf.sail.webapp.client.EncodeDecodeValue;
 import com.bigdata.rdf.sail.webapp.client.MiniMime;
 
 /**
@@ -168,7 +167,7 @@ public class UpdateServlet extends BigdataRDFServlet {
             final String[] s = req.getParameterValues("context-uri-insert");
             if (s != null && s.length > 0) {
                 try {
-                    defaultContextInsert = EncodeDecodeValue.decodeResources(s);
+                    defaultContextInsert = toURIs(s);
                 } catch (IllegalArgumentException ex) {
                     buildResponse(resp, HTTP_INTERNALERROR, MIME_TEXT_PLAIN,
                             ex.getLocalizedMessage());
@@ -187,7 +186,7 @@ public class UpdateServlet extends BigdataRDFServlet {
             final String[] s = req.getParameterValues("context-uri-delete");
             if (s != null && s.length > 0) {
                 try {
-                	defaultContextDelete = EncodeDecodeValue.decodeResources(s);
+                	defaultContextDelete = toURIs(s);
                 } catch (IllegalArgumentException ex) {
                     buildResponse(resp, HTTP_INTERNALERROR, MIME_TEXT_PLAIN,
                             ex.getLocalizedMessage());
@@ -420,7 +419,7 @@ public class UpdateServlet extends BigdataRDFServlet {
             final String[] s = req.getParameterValues("context-uri-insert");
             if (s != null && s.length > 0) {
                 try {
-                    defaultContextInsert = EncodeDecodeValue.decodeResources(s);
+                    defaultContextInsert = toURIs(s);
                 } catch (IllegalArgumentException ex) {
                     buildResponse(resp, HTTP_INTERNALERROR, MIME_TEXT_PLAIN,
                             ex.getLocalizedMessage());
@@ -439,7 +438,7 @@ public class UpdateServlet extends BigdataRDFServlet {
             final String[] s = req.getParameterValues("context-uri-delete");
             if (s != null && s.length > 0) {
                 try {
-                	defaultContextDelete = EncodeDecodeValue.decodeResources(s);
+                	defaultContextDelete = toURIs(s);
                 } catch (IllegalArgumentException ex) {
                     buildResponse(resp, HTTP_INTERNALERROR, MIME_TEXT_PLAIN,
                             ex.getLocalizedMessage());

@@ -429,6 +429,12 @@ public class DefaultOptimizerList extends ASTOptimizerList {
          * then cause them to be attached to the JOIN when we generate the JOIN.
          */
         add(new ASTSimpleOptionalOptimizer());
+        
+        /**
+         * Flattens non-optional, non-minus JoinGroupNodes with their parent
+         * JoinGroupNode, eliminating unnecessary hash joins.
+         */
+        add(new ASTFlattenJoinGroupsOptimizer());
 
         /*
          * Join Order Optimization

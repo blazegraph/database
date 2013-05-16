@@ -105,6 +105,24 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
 		
 	}
 	
+	public long count(final Resource s, final URI p, final Value o, 
+			final Resource... c) 
+			throws RepositoryException {
+
+		try {
+		
+			final RemoteRepository remote = repo.getRemoteRepository();
+	
+			return remote.rangeCount(s, p, o, c);
+			
+		} catch (Exception ex) {
+			
+			throw new RepositoryException(ex);
+			
+		}
+		
+	}
+	
 	@Override
 	public RepositoryResult<Statement> getStatements(Resource s, URI p,
 			Value o, boolean includeInferred, Resource... c)

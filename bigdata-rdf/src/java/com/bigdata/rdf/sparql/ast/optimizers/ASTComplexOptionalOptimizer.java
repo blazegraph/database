@@ -133,6 +133,18 @@ public class ASTComplexOptionalOptimizer implements IASTOptimizer {
 
 //    private static final Logger log = Logger
 //            .getLogger(ASTComplexOptionalOptimizer.class);
+	
+    /**
+     * Set this to <code>false</code> to only optimize the top level group.
+     * <p>
+     * Note: We have confirm that this change does not have a negative impact on
+     * either govtrack or BSBM. The change also fixes a known problem with some
+     * customer queries.
+     * 
+     * @see <a href="http://sourceforge.net/apps/trac/bigdata/ticket/668" > Join
+     *      Group Optimization </a>
+     */
+	private static boolean recurse = false;
     
     @Override
     public IQueryNode optimize(final AST2BOpContext context,
@@ -201,8 +213,12 @@ public class ASTComplexOptionalOptimizer implements IASTOptimizer {
                 @SuppressWarnings("unchecked")
                 final GraphPatternGroup<IGroupMemberNode> childGroup = (GraphPatternGroup<IGroupMemberNode>) child;
 
-                convertComplexOptionalGroups(context, sa, query, childGroup,
-                        exogenousVars);
+                if (recurse) {
+                
+	                convertComplexOptionalGroups(context, sa, query, childGroup,
+	                        exogenousVars);
+	                
+                }
 
                 if (childGroup.isOptional()
                         && (!(childGroup.arity() == 1 && childGroup.get(0) instanceof NamedSubqueryInclude))) {
@@ -223,8 +239,12 @@ public class ASTComplexOptionalOptimizer implements IASTOptimizer {
 
                 final SubqueryRoot subqueryRoot = (SubqueryRoot) child;
 
-                convertComplexOptionalGroups(context, sa, query,
-                        subqueryRoot.getWhereClause(), exogenousVars);
+                if (recurse) {
+                
+	                convertComplexOptionalGroups(context, sa, query,
+	                        subqueryRoot.getWhereClause(), exogenousVars);
+	                
+                }
 
             }
 

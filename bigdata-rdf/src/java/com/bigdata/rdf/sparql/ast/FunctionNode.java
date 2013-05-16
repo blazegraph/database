@@ -8,6 +8,7 @@ import org.openrdf.model.URI;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IValueExpression;
+import com.bigdata.bop.NV;
 
 /**
  * AST node for anything which is neither a constant nor a variable, including
@@ -48,17 +49,24 @@ public class FunctionNode extends ValueExpressionNode {
      *            One or more scalar values that are passed to the function
      * @param args
      *            the arguments to the function.
+     *            
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/672">
+     *      Occasional error on BSBM Explore query</a>
      */
 	public FunctionNode(// 
 			final URI functionURI, 
 	        final Map<String,Object> scalarValues,
 			final ValueExpressionNode... args) {
-		
-		super(args, null/*anns*/);
-		
-		super.setProperty(Annotations.SCALAR_VALS, scalarValues);
-		
-		super.setProperty(Annotations.FUNCTION_URI, functionURI);
+
+	    super(args, NV.asMap(new NV[] {
+                new NV(Annotations.SCALAR_VALS, scalarValues),
+                new NV(Annotations.FUNCTION_URI, functionURI), }));
+	    
+//		super(args, null/*anns*/);
+//		
+//		super.setProperty(Annotations.SCALAR_VALS, scalarValues);
+//		
+//		super.setProperty(Annotations.FUNCTION_URI, functionURI);
 		
 	}
 	

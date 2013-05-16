@@ -2877,6 +2877,13 @@ abstract public class AbstractTripleStore extends
 
     }
 
+    public IPredicate<ISPO> getPredicate(final Resource s, final URI p,
+            final Value o, final Resource c) {
+
+        return getPredicate(s, p, o, c, null/* filter */, null/* range */);
+
+    }
+
     /**
      * Convert a Sesame Value based triple pattern into a bigdata Predicate.
      * Will return null if any of the Sesame Values are not present in the

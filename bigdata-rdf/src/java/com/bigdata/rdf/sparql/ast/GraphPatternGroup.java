@@ -63,6 +63,15 @@ abstract public class GraphPatternGroup<E extends IGroupMemberNode> extends
          */
         String JOIN_VARS = "joinVars";
         
+        /**
+         * An {@link IVariable}[] of the variables that are used by the 
+         * group and that have already appeared in the query up to this point 
+         * (and thus may be bound and should be projected into the group).
+         * 
+         * @see ASTSubGroupJoinVarOptimizer
+         */
+        String PROJECT_IN_VARS = "projectInVars";
+        
     }
     
     /**
@@ -100,6 +109,19 @@ abstract public class GraphPatternGroup<E extends IGroupMemberNode> extends
 
     public void setJoinVars(final IVariable<?>[] joinVars) {
         setProperty(Annotations.JOIN_VARS, joinVars);
+    }
+    
+    /**
+     * The variables that should be projected into the group.
+     * 
+     * @see Annotations#PROJECT_IN_VARS
+     */
+    public IVariable<?>[] getProjectInVars() {
+        return (IVariable[]) getProperty(Annotations.PROJECT_IN_VARS);
+    }
+
+    public void setProjectInVars(final IVariable<?>[] projectInVars) {
+        setProperty(Annotations.PROJECT_IN_VARS, projectInVars);
     }
     
 }

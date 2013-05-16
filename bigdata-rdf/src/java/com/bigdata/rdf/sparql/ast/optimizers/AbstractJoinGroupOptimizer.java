@@ -45,6 +45,7 @@ import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.StaticAnalysis;
 import com.bigdata.rdf.sparql.ast.SubqueryFunctionNodeBase;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
+import com.bigdata.rdf.sparql.ast.service.ServiceNode;
 
 /**
  * This makes it easier to sit down and write an optimizer that operates on
@@ -54,12 +55,15 @@ public abstract class AbstractJoinGroupOptimizer implements IASTOptimizer {
 
 	private final boolean childFirst;
 	
+	private final boolean optimizeServiceNodes;
+	
 	public AbstractJoinGroupOptimizer() {
-		this(false);
+		this(false, false);
 	}
 	
-	protected AbstractJoinGroupOptimizer(final boolean childFirst) {
+	protected AbstractJoinGroupOptimizer(final boolean childFirst, final boolean optimizeServiceNodes) {
 		this.childFirst = childFirst;
+		this.optimizeServiceNodes = optimizeServiceNodes;
 	}
 	
 	/**
@@ -242,6 +246,9 @@ public abstract class AbstractJoinGroupOptimizer implements IASTOptimizer {
             	}
             	
             	optimize(ctx, sa, bSets2, alpNode.subgroup());
+            	
+            } else if (child instanceof ServiceNode && optimizeServiceNodes) {
+            	
             	
             }
             

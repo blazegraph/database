@@ -51,7 +51,7 @@ public class ASTCardinalityOptimizer extends AbstractJoinGroupOptimizer
 		 * {@link IBindingProducerNode} children have a known cardinality.
 		 * Thus we must go depth first. 
 		 */
-		super(true /* childFirst */);
+		super(true /* childFirst */, false /* optimizeServiceNodes */);
 	}
 	
     /**
