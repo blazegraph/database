@@ -163,7 +163,7 @@ abstract public class SolutionSetHashJoinOp extends PipelineOp {
         
     }
 
-    public SolutionSetHashJoinOp(final BOp[] args, NV... annotations) {
+    public SolutionSetHashJoinOp(final BOp[] args, final NV... annotations) {
 
         this(args, NV.asMap(annotations));
         
@@ -176,7 +176,7 @@ abstract public class SolutionSetHashJoinOp extends PipelineOp {
     }
 
     @Override
-    public FutureTask<Void> eval(BOpContext<IBindingSet> context) {
+    public FutureTask<Void> eval(final BOpContext<IBindingSet> context) {
 
         return new FutureTask<Void>(new ChunkTask<IBindingSet>(context, this));
         

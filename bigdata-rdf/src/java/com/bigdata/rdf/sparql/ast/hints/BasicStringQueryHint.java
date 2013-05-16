@@ -28,33 +28,22 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sparql.ast.hints;
 
 import com.bigdata.rdf.sparql.ast.ASTBase;
-import com.bigdata.rdf.sparql.ast.QueryHints;
-import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 
 /**
- * Limit the input into joins by limiting the number of elements read
- * from an access path.  Not exactly a cutoff join, which limits output
- * from the join rather than input into it.
+ * Basic string query hint.
  */
-final class CutoffLimitHint extends AbstractLongQueryHint {
+public class BasicStringQueryHint extends AbstractStringQueryHint {
 
-    protected CutoffLimitHint() {
-        super(QueryHints.CUTOFF_LIMIT, Long.MAX_VALUE);
+    public BasicStringQueryHint(final String name, final String defaultValue) {
+        super(name, defaultValue);
     }
 
     @Override
     public void handle(final AST2BOpContext context,
-            final QueryHintScope scope, final ASTBase op,
-            final Long value) {
+            final QueryHintScope scope, final ASTBase op, final String value) {
 
-        if (op instanceof StatementPatternNode) {
-
-            _setQueryHint(context, scope, op, getName(), value);
-
-            return;
-
-        }
+        _setQueryHint(context, scope, op, getName(), value);
 
     }
 

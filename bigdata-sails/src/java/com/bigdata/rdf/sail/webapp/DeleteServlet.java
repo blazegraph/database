@@ -323,7 +323,7 @@ public class DeleteServlet extends BigdataRDFServlet {
                 final String[] s = req.getParameterValues("context-uri");
                 if (s != null && s.length > 0) {
                     try {
-                    	defaultContext = EncodeDecodeValue.decodeResources(s);
+                    	defaultContext = toURIs(s);
                     } catch (IllegalArgumentException ex) {
                         buildResponse(resp, HTTP_INTERNALERROR, MIME_TEXT_PLAIN,
                                 ex.getLocalizedMessage());

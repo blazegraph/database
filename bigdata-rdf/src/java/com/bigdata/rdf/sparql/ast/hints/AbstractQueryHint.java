@@ -36,7 +36,7 @@ import com.bigdata.rdf.sparql.ast.optimizers.IASTOptimizer;
 /**
  * Base class for query hints.
  */
-abstract class AbstractQueryHint<T> implements IQueryHint<T> {
+public abstract class AbstractQueryHint<T> implements IQueryHint<T> {
 
     private final String name;
 

@@ -1,29 +1,47 @@
+/**
+
+Copyright (C) SYSTAP, LLC 2006-2010.  All rights reserved.
+
+Contact:
+     SYSTAP, LLC
+     4501 Tower Road
+     Greensboro, NC 27410
+     licenses@bigdata.com
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; version 2 of the License.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+*/
 package com.bigdata.bop.solutions;
 
-import java.util.Arrays;
-import java.util.LinkedList;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.FutureTask;
-
-import org.apache.log4j.Logger;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.ConcurrentHashMapAnnotations;
 import com.bigdata.bop.IBindingSet;
-import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IQueryAttributes;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
-import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.bop.engine.BOpStats;
+import com.bigdata.bop.join.IDistinctFilter;
+import com.bigdata.bop.join.JVMDistinctFilter;
 import com.bigdata.bop.join.JVMHashJoinUtility;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
+import com.bigdata.relation.accesspath.UnsyncLocalOutputBuffer;
 import com.bigdata.striterator.ICloseableIterator;
 
 /**
@@ -31,13 +49,9 @@ import com.bigdata.striterator.ICloseableIterator;
  * <p>
  * Note: This implementation is a pipelined operator which inspects each chunk
  * of solutions as they arrive and those solutions which are distinct for each
- * chunk are passed on. It uses a {@link ConcurrentMap} and is thread-safe.
- * 
- * TODO Look into reconciling this class with {@link JVMHashJoinUtility}.
- * However, note that this implementation is thread-safe and uses a
- * {@link ConcurrentMap}. It may be better to leave things as they are since
- * this implementation may be more efficient for the special case which it
- * handles.
+ * chunk are passed on. It uses a {@link ConcurrentMap} and is thread-safe. It
+ * is significantly faster than the single-threaded hash index routines in the
+ * {@link JVMHashJoinUtility}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id: DistinctElementFilter.java 3466 2010-08-27 14:28:04Z
@@ -45,8 +59,8 @@ import com.bigdata.striterator.ICloseableIterator;
  */
 public class JVMDistinctBindingSetsOp extends PipelineOp {
 
-	private final static transient Logger log = Logger
-			.getLogger(JVMDistinctBindingSetsOp.class);
+//	private final static transient Logger log = Logger
+//			.getLogger(JVMDistinctBindingSetsOp.class);
 	
     /**
      * 
@@ -148,80 +162,24 @@ public class JVMDistinctBindingSetsOp extends PipelineOp {
     }
 
     /**
-     * Wrapper used for the as bound solutions in the {@link ConcurrentHashMap}.
-     */
-    private static class Solution {
-
-        private final int hash;
-
-        private final IConstant<?>[] vals;
-
-        public Solution(final IConstant<?>[] vals) {
-            this.vals = vals;
-            this.hash = java.util.Arrays.hashCode(vals);
-        }
-
-        public int hashCode() {
-            return hash;
-        }
-
-        public boolean equals(final Object o) {
-            if (this == o)
-                return true;
-            if (!(o instanceof Solution)) {
-                return false;
-            }
-            final Solution t = (Solution) o;
-            if (vals.length != t.vals.length)
-                return false;
-            for (int i = 0; i < vals.length; i++) {
-                // @todo verify that this allows for nulls with a unit test.
-                if (vals[i] == t.vals[i])
-                    continue;
-                if (vals[i] == null)
-                    return false;
-                if (!vals[i].equals(t.vals[i]))
-                    return false;
-            }
-            return true;
-        }
-    }
-    
-    /**
      * Task executing on the node.
      */
     static private class DistinctTask implements Callable<Void> {
 
         private final BOpContext<IBindingSet> context;
 
-        /**
-         * A concurrent map whose keys are the bindings on the specified
-         * variables (the keys and the values are the same since the map
-         * implementation does not allow <code>null</code> values).
-         * <p>
-         * Note: The map is shared state and can not be discarded or cleared
-         * until the last invocation!!!
-         */
-        private final ConcurrentHashMap<Solution, Solution> map;
-
-        /**
-         * The variables used to impose a distinct constraint.
-         */
-        private final IVariable<?>[] vars;
+        private final IDistinctFilter filter;
         
-        @SuppressWarnings("unchecked")
+        private final int chunkCapacity;
+        
         DistinctTask(final JVMDistinctBindingSetsOp op,
                 final BOpContext<IBindingSet> context) {
 
             this.context = context;
 
-            this.vars = op.getVariables();
-
-            if (vars == null)
-                throw new IllegalArgumentException();
-
-            if (vars.length == 0)
-                throw new IllegalArgumentException();
+            this.chunkCapacity = op.getChunkCapacity();
+            
+            final IVariable<?>[] vars = op.getVariables();
 
             /*
              * The map is shared state across invocations of this operator task.
@@ -232,65 +190,25 @@ public class JVMDistinctBindingSetsOp extends PipelineOp {
                 final IQueryAttributes attribs = context.getRunningQuery()
                         .getAttributes();
 
-                ConcurrentHashMap<Solution, Solution> map = (ConcurrentHashMap<Solution, Solution>) attribs
-                        .get(key);
+                IDistinctFilter filter = (IDistinctFilter) attribs.get(key);
 
-                if (map == null) {
+                if (filter == null) {
 
-                    map = new ConcurrentHashMap<Solution, Solution>(
+                    filter = new JVMDistinctFilter(vars,
                             op.getInitialCapacity(), op.getLoadFactor(),
                             op.getConcurrencyLevel());
 
-                    final ConcurrentHashMap<Solution, Solution> tmp = (ConcurrentHashMap<Solution, Solution>) attribs
-                            .putIfAbsent(key, map);
+                    final IDistinctFilter tmp = (IDistinctFilter) attribs
+                            .putIfAbsent(key, filter);
 
                     if (tmp != null)
-                        map = tmp;
+                        filter = tmp;
 
                 }
 
-                this.map = map;
+                this.filter = filter;
 
             }
-
-        }
-
-        /**
-         * If the bindings are distinct for the configured variables then return
-         * those bindings.
-         * 
-         * @param bset
-         *            The binding set to be filtered.
-         * 
-         * @return The distinct as bound values -or- <code>null</code> if the
-         *         binding set duplicates a solution which was already accepted.
-         */
-        private IConstant<?>[] accept(final IBindingSet bset) {
-
-            final IConstant<?>[] r = new IConstant<?>[vars.length];
-
-            for (int i = 0; i < vars.length; i++) {
-
-                /*
-                 * Note: This allows null's.
-                 * 
-                 * @todo write a unit test when some variables are not bound.
-                 */
-                r[i] = bset.get(vars[i]);
-
-            }
-
-            final Solution s = new Solution(r);
-            
-			if (log.isTraceEnabled())
-				log.trace("considering: " + Arrays.toString(r));
-
-            final boolean distinct = map.putIfAbsent(s, s) == null;
-
-			if (distinct && log.isDebugEnabled())
-				log.debug("accepted: " + Arrays.toString(r));
-
-            return distinct ? r : null;
 
         }
 
@@ -298,107 +216,31 @@ public class JVMDistinctBindingSetsOp extends PipelineOp {
 
             final BOpStats stats = context.getStats();
 
-            final ICloseableIterator<IBindingSet[]> itr = context
-                    .getSource();
+            final ICloseableIterator<IBindingSet[]> itr = context.getSource();
 
             final IBlockingBuffer<IBindingSet[]> sink = context.getSink();
 
             try {
 
-                while (itr.hasNext()) {
-                    
-                    final IBindingSet[] a = itr.next();
+                final UnsyncLocalOutputBuffer<IBindingSet> unsyncBuffer = new UnsyncLocalOutputBuffer<IBindingSet>(
+                        chunkCapacity, sink);
 
-                    stats.chunksIn.increment();
-                    stats.unitsIn.add(a.length);
+                filter.filterSolutions(itr, stats, unsyncBuffer);
 
-                    // The distinct solutions accepted from this chunk. 
-                    final List<IBindingSet> accepted = new LinkedList<IBindingSet>();
-
-                    int naccepted = 0;
-
-                    for (IBindingSet bset : a) {
-
-						/*
-						 * Test to see if this solution is distinct from those
-						 * already seen.
-						 */
-                        final IConstant<?>[] vals = accept(bset);
-
-                        if (vals != null) {
-
-							/*
-							 * This is a distinct solution. Copy only the
-							 * variables used to select distinct solutions into
-							 * a new binding set and add that to the set of
-							 * [accepted] binding sets which will be emitted by
-							 * this operator.
-							 */
-                        	
-							final ListBindingSet tmp = new ListBindingSet();
-                        	
-							for (int i = 0; i < vars.length; i++) {
-
-                                if (vals[i] != null)
-                                    tmp.set(vars[i], vals[i]);
-
-							}
-							
-                            accepted.add(tmp);
-
-                            naccepted++;
-
-                        }
-
-                    }
-
-                    if (naccepted > 0) {
-
-						/*
-						 * At least one solution was accepted as distinct, so
-						 * copy the selected solutions to the output of the
-						 * operator.
-						 */
-                    	
-                        final IBindingSet[] b = accepted
-                                .toArray(new IBindingSet[naccepted]);
-                        
-//                        System.err.println("output: "
-//                                + Arrays.toString(b));
-
-                        // copy the distinct solutions to the output.
-                        sink.add(b);
-
-//                        stats.unitsOut.add(naccepted);
-//                        stats.chunksOut.increment();
-
-                    }
-
-                }
+                unsyncBuffer.flush();
 
                 sink.flush();
 
-                if(context.isLastInvocation()) {
-
-					/*
-					 * Discard the map.
-					 * 
-					 * Note: The map can not be discarded (or cleared) until the
-					 * last invocation. However, we only get the benefit of the
-					 * lastInvocation signal if the operator is single threaded
-					 * and running on the query controller. That is not a
-					 * requirement for this DISTINCT implementation, so the map
-					 * is not going to be cleared until the query goes out of
-					 * scope and is swept by GC.
-					 */
-                    map.clear();
-
-                }
-                
                 // done.
                 return null;
-                
+
             } finally {
+
+                if (context.isLastInvocation()) {
+
+                    filter.release();
+
+                }
 
                 sink.close();
 

@@ -164,6 +164,16 @@ public class ModifiableBOpBase extends CoreBaseBOp {
         return args.get(index);
         
     }
+    
+    /**
+     * Return the index of the bop in the args.  Returns -1 if bop is not
+     * present in the args.
+     */
+    public int indexOf(final BOp bop) {
+    	
+    	return args.indexOf(bop);
+    	
+    }
 
     /**
      * Invoked automatically any time a mutation operation occurs. The default
@@ -254,7 +264,7 @@ public class ModifiableBOpBase extends CoreBaseBOp {
      * Add a new argument (core mutation method) at the specified index.
      * 
      * @param index
-     *            The index of the child expression to be replaced.
+     *            The index at which the child expression is to be inserted.
      * @param newArg
      *            The argument.
      * 

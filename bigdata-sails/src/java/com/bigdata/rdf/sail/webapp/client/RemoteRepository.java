@@ -613,7 +613,7 @@ public class RemoteRepository {
         
         if (add.context != null && add.context.length > 0) {
             // set the default context.
-            opts.addRequestParam("context-uri", EncodeDecodeValue.encodeValues(add.context));
+            opts.addRequestParam("context-uri", toStrings(add.context));
         }
         
         HttpResponse response = null;
@@ -667,7 +667,7 @@ public class RemoteRepository {
             
             if (remove.context != null && remove.context.length > 0) {
                 // set the default context.
-                opts.addRequestParam("context-uri", EncodeDecodeValue.encodeValues(remove.context));
+                opts.addRequestParam("context-uri", toStrings(remove.context));
             }
             
         } else {
@@ -776,12 +776,12 @@ public class RemoteRepository {
         
         if (add.context != null) {
             // set the default context for insert.
-            opts.addRequestParam("context-uri-insert", EncodeDecodeValue.encodeValues(add.context));
+            opts.addRequestParam("context-uri-insert", toStrings(add.context));
         }
         
         if (remove.context != null) {
             // set the default context for delete.
-            opts.addRequestParam("context-uri-delete", EncodeDecodeValue.encodeValues(remove.context));
+            opts.addRequestParam("context-uri-delete", toStrings(remove.context));
         }
         
         HttpResponse response = null;
@@ -1877,7 +1877,7 @@ public class RemoteRepository {
                         final Attributes attributes) {
 
                     if ("context".equals(qName))
-                    	contexts.add(EncodeDecodeValue.decodeResource(attributes.getValue("uri")));
+                    	contexts.add(new URIImpl(attributes.getValue("uri")));
 
                 }
                 
@@ -1975,6 +1975,29 @@ public class RemoteRepository {
 
         return g;
 
+    }
+    
+    /**
+     * Convert an array of URIs to an array of URI strings.
+     */
+    protected String[] toStrings(final Resource[] resources) {
+    	
+    	if (resources == null)
+    		return null;
+    	
+    	if (resources.length == 0)
+    		return new String[0];
+
+    	final String[] uris = new String[resources.length];
+    	
+    	for (int i = 0; i < resources.length; i++) {
+    		
+    		uris[i] = resources[i].stringValue();
+    		
+    	}
+    	
+    	return uris;
+    	
     }
 
 }
