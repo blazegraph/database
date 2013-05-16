@@ -1235,9 +1235,17 @@ public class FullTextIndex<V extends Comparable<V>> extends AbstractRelation {
 	         */
 	        if (regex != null) {
 	        	
-	        	final Pattern pattern = Pattern.compile(regex);
+	        	final Pattern pattern = Pattern.compile(regex);//, Pattern.CASE_INSENSITIVE);
+	        	
+	        	if (log.isDebugEnabled()) {
+	        		log.debug("hits before regex: " + a.length);
+	        	}
 	        	
 	        	a = applyRegex(a, pattern);
+	        	
+	        	if (log.isDebugEnabled()) {
+	        		log.debug("hits after regex: " + a.length);
+	        	}
 	        	
 	        }
 	        
@@ -1283,11 +1291,11 @@ public class FullTextIndex<V extends Comparable<V>> extends AbstractRelation {
         
         }
         
-        if (log.isDebugEnabled()) {
-        	log.debug("before min/max cosine/rank pruning:");
-        	for (Hit<V> h : a)
-        		log.debug(h);
-        }
+//        if (log.isDebugEnabled()) {
+//        	log.debug("before min/max cosine/rank pruning:");
+//        	for (Hit<V> h : a)
+//        		log.debug(h);
+//        }
 
         /*
          * If maxCosine is specified, prune the hits that are above the max

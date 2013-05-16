@@ -60,6 +60,10 @@ public class ASTRangeOptimizer extends AbstractJoinGroupOptimizer
 
 	private static final transient Logger log = Logger.getLogger(ASTRangeOptimizer.class);
 	
+	public ASTRangeOptimizer() {
+		super(false /* childFirst */, true /* optimizeServiceNodes */);
+	}
+	
     /**
      * Optimize the join group, attach range nodes.
      */
