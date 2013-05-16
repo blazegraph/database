@@ -29,12 +29,14 @@ package com.bigdata.service;
 
 import java.io.IOException;
 import java.util.Properties;
+import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import com.bigdata.ha.HATXSGlue;
 import com.bigdata.ha.msg.IHAGatherReleaseTimeRequest;
+import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.ITransactionService;
 
 /**
@@ -69,12 +71,16 @@ abstract public class AbstractHATransactionService extends
      * Coordinate the update of the <i>releaseTime</i> on each service that is
      * joined with the met quorum.
      * 
+     * @param joinedServiceIds
+     *            The services that are joined with the met quorum as of an
+     *            atomic decision point in {@link AbstractJournal#commitNow()}.
      * @param timeout
      *            The timeout for the release time consensus protocol.
      * @param units
      *            The units for that timeout.
      */
-    abstract public void updateReleaseTimeConsensus(final long timeout,
+    abstract public void updateReleaseTimeConsensus(
+            final UUID[] joinedServiceIds, final long timeout,
             final TimeUnit units) throws IOException, TimeoutException,
             InterruptedException, Exception;
 
