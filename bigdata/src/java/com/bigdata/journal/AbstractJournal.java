@@ -2910,7 +2910,8 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                     .handleCommit(commitTime);
 
             // Local HA service implementation (non-Remote).
-            final QuorumService<HAGlue> quorumService = quorum.getClient();
+            final QuorumService<HAGlue> quorumService = quorum == null ? null
+                    : quorum.getClient();
 
             // The services joined with the met quorum, in their join order.
             final UUID[] joinedServiceIds;
