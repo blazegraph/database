@@ -35,6 +35,7 @@ import org.openrdf.model.impl.URIImpl;
 import org.openrdf.model.vocabulary.SESAME;
 
 import com.bigdata.rdf.sparql.ast.cache.DescribeServiceFactory;
+import com.bigdata.rdf.sparql.ast.eval.AbstractServiceFactory;
 
 
 /**
@@ -174,5 +175,13 @@ public interface BD {
 //     * separator) and statements to add (below the separator).
 //     */
 //    URI ATOMIC_UPDATE_SEPARATOR_KEY = new URIImpl(NAMESPACE + "atomicUpdateSeparatorKey");
+    
+    /**
+     * URI that can be used as the subject of any magic triple patterns for 
+     * bigdata services.
+     * 
+     * @see {@link AbstractServiceFactory}.
+     */
+    URI SERVICE_PARAM = new URIImpl(NAMESPACE + "serviceParam");
     
 }

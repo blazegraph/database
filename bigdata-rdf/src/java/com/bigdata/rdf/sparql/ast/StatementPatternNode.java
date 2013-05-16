@@ -18,9 +18,7 @@ import com.bigdata.rdf.sparql.ast.eval.AST2BOpBase;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpJoins;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpUtility;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTGraphGroupOptimizer;
-import com.bigdata.rdf.sparql.ast.optimizers.ASTRangeConstraintOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTSimpleOptionalOptimizer;
-import com.bigdata.rdf.sparql.ast.optimizers.ASTStaticJoinOptimizer.Annotations;
 import com.bigdata.rdf.spo.DistinctTermAdvancer;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPOAccessPath;
@@ -313,6 +311,16 @@ public class StatementPatternNode extends
 
         return (TermNode) get(3);
 
+    }
+    
+    /**
+     * Strengthen return type.
+     */
+    @Override
+    public TermNode get(final int i) {
+    	
+    	return (TermNode) super.get(i);
+    	
     }
 
 	final public void setC(final TermNode c) {

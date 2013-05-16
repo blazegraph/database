@@ -1125,6 +1125,36 @@ public class SPORelation extends AbstractRelation<ISPO> {
     }
 
     /**
+	 * Return the predicate for a triple or quad pattern filter (core
+	 * implementation). All arguments are optional. Any bound argument will
+	 * restrict the returned access path. For a triple pattern, <i>c</i> WILL BE
+	 * IGNORED as there is no index over the statement identifiers, even when
+	 * they are enabled. For a quad pattern, any argument MAY be bound.
+	 * 
+	 * @param s
+	 *            The subject position (optional).
+	 * @param p
+	 *            The predicate position (optional).
+	 * @param o
+	 *            The object position (optional).
+	 * @param c
+	 *            The context position (optional and ignored for a triple
+	 *            store).
+	 * 
+	 * @return The predicate for that triple or quad pattern.
+	 * 
+	 * @throws UnsupportedOperationException
+	 *             for a triple store without statement identifiers if the
+	 *             <i>c</i> is non-{@link #NULL}.
+	 */
+    public IPredicate<ISPO> getPredicate(final IV s, final IV p,
+            final IV o, final IV c) {
+
+    	return getPredicate(s, p, o, c, null, null);
+    	
+    }
+    
+    /**
      * Return the predicate for a triple or quad pattern with an optional
      * filter (core implementation). All arguments are optional. Any bound
      * argument will restrict the returned access path. For a triple pattern,
