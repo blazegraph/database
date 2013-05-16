@@ -417,7 +417,8 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
 //
 //        }
 
-        public BarrierState() {
+        /** The services joined with the met quorum, in their join order. */
+        public BarrierState(final UUID[] joinedServiceIds) {
 
             token = getQuorum().token();
 
@@ -426,9 +427,8 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
             // Local HA service implementation (non-Remote).
             quorumService = getQuorum().getClient();
 
-            // The services joined with the met quorum, in their join order.
-            joinedServiceIds = getQuorum().getJoined();
-
+            this.joinedServiceIds = joinedServiceIds;
+            
             leadersValue = ((InnerJournalTransactionService) getTransactionService())
                     .newHANotifyReleaseTimeRequest(quorumService.getServiceId());
 
@@ -1053,9 +1053,9 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
          */
         // Note: Executed on the leader.
         @Override
-        public void updateReleaseTimeConsensus(final long timeout,
-                final TimeUnit units) throws IOException, InterruptedException,
-                TimeoutException, BrokenBarrierException {
+        public void updateReleaseTimeConsensus(final UUID[] joinedServiceIds,
+                final long timeout, final TimeUnit units) throws IOException,
+                InterruptedException, TimeoutException, BrokenBarrierException {
 
             final long begin = System.nanoTime();
             final long nanos = units.toNanos(timeout);
@@ -1072,7 +1072,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
                 getQuorum().assertLeader(token);
 
                 if (!barrierRef.compareAndSet(null/* expectedValue */,
-                        barrierState = new BarrierState()/* newValue */)) {
+                        barrierState = new BarrierState(joinedServiceIds)/* newValue */)) {
 
                     throw new IllegalStateException();
 

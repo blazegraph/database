@@ -2909,9 +2909,31 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
             rootAddrs[PREV_ROOTBLOCK] = this.m_rootBlockCommitter
                     .handleCommit(commitTime);
 
+            // Local HA service implementation (non-Remote).
+            final QuorumService<HAGlue> quorumService = quorum.getClient();
+
+            // The services joined with the met quorum, in their join order.
+            final UUID[] joinedServiceIds;
+            
+            // The services in the write pipeline (in any order).
+            final Set<UUID> nonJoinedPipelineServiceIds;
+            
             if ((_bufferStrategy instanceof IHABufferStrategy)
                     && quorum != null && quorum.isHighlyAvailable()) {
 
+                // The services joined with the met quorum, in their join order.
+                joinedServiceIds = quorum.getJoined();
+
+                // The services in the write pipeline (in any order).
+                nonJoinedPipelineServiceIds = new LinkedHashSet<UUID>(
+                        Arrays.asList(getQuorum().getPipeline()));
+
+                // Remove all services that are joined from this collection.
+                for(UUID joinedServiceId : joinedServiceIds) {
+
+                    nonJoinedPipelineServiceIds.remove(joinedServiceId);
+                    
+                }
                 try {
                     /**
                      * CRITICAL SECTION. We need obtain a distributed consensus
@@ -2937,7 +2959,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                     
                     ((AbstractHATransactionService) getLocalTransactionManager()
                             .getTransactionService())
-                            .updateReleaseTimeConsensus(
+                            .updateReleaseTimeConsensus(joinedServiceIds,
                                     getHAReleaseTimeConsensusTimeout(),
                                     TimeUnit.MILLISECONDS);
 
@@ -2949,6 +2971,11 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                     throw new RuntimeException(ex);
                     
                 }
+                
+            } else {
+                
+                joinedServiceIds = null;
+                nonJoinedPipelineServiceIds = null;
                 
             }
 
@@ -3169,23 +3196,6 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                  * to get that metadata from zookeeper out of the Quorum..
                  */
                 
-                // Local HA service implementation (non-Remote).
-                final QuorumService<HAGlue> quorumService = quorum.getClient();
-
-                // The services joined with the met quorum, in their join order.
-                final UUID[] joinedServiceIds = getQuorum().getJoined();
-                
-                // The services in the write pipeline (in any order).
-                final Set<UUID> nonJoinedPipelineServiceIds = new LinkedHashSet<UUID>(
-                        Arrays.asList(getQuorum().getPipeline()));
-                
-                // Remove all services that are joined from this collection.
-                for(UUID joinedServiceId : joinedServiceIds) {
-
-                    nonJoinedPipelineServiceIds.remove(joinedServiceId);
-                    
-                }
-
                 boolean didVoteYes = false;
                 try {
 
