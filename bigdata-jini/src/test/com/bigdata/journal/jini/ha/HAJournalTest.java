@@ -70,6 +70,7 @@ import com.bigdata.ha.msg.IHANotifyReleaseTimeResponse;
 import com.bigdata.ha.msg.IHAReadRequest;
 import com.bigdata.ha.msg.IHAReadResponse;
 import com.bigdata.ha.msg.IHARebuildRequest;
+import com.bigdata.ha.msg.IHARemoteRebuildRequest;
 import com.bigdata.ha.msg.IHARootBlockRequest;
 import com.bigdata.ha.msg.IHARootBlockResponse;
 import com.bigdata.ha.msg.IHASendStoreResponse;
@@ -669,6 +670,16 @@ public class HAJournalTest extends HAJournal {
                     new Class[] { IHASnapshotRequest.class });
 
             return super.takeSnapshot(req);
+
+        }
+
+        @Override
+        public Future<Void> rebuildFromLeader(IHARemoteRebuildRequest req) throws IOException {
+
+            checkMethod("restoreFromLeader",
+                    new Class[] { IHARemoteRebuildRequest.class });
+
+            return super.rebuildFromLeader(req);
 
         }
 

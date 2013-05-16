@@ -126,6 +126,7 @@ import com.bigdata.ha.msg.IHANotifyReleaseTimeResponse;
 import com.bigdata.ha.msg.IHAReadRequest;
 import com.bigdata.ha.msg.IHAReadResponse;
 import com.bigdata.ha.msg.IHARebuildRequest;
+import com.bigdata.ha.msg.IHARemoteRebuildRequest;
 import com.bigdata.ha.msg.IHARootBlockRequest;
 import com.bigdata.ha.msg.IHARootBlockResponse;
 import com.bigdata.ha.msg.IHASendStoreResponse;
@@ -5477,7 +5478,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
      * 
      * @see HAGlue#getHAStatus()
      */
-    final protected HAStatusEnum getHAStatus() {
+    final public HAStatusEnum getHAStatus() {
 
         if (quorum == null) {
 
@@ -5931,6 +5932,14 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
         @Override
         public Future<IHASnapshotResponse> takeSnapshot(
                 final IHASnapshotRequest req) throws IOException {
+
+            throw new UnsupportedOperationException();
+
+        }
+        
+        @Override
+        public Future<Void> rebuildFromLeader(IHARemoteRebuildRequest req)
+                throws IOException {
 
             throw new UnsupportedOperationException();
 

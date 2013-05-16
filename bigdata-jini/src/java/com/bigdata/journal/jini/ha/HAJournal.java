@@ -68,6 +68,7 @@ import com.bigdata.ha.halog.IHALogReader;
 import com.bigdata.ha.msg.HADigestResponse;
 import com.bigdata.ha.msg.HALogDigestResponse;
 import com.bigdata.ha.msg.HALogRootBlocksResponse;
+import com.bigdata.ha.msg.HARemoteRebuildRequest;
 import com.bigdata.ha.msg.HASendStoreResponse;
 import com.bigdata.ha.msg.HASnapshotDigestResponse;
 import com.bigdata.ha.msg.IHADigestRequest;
@@ -79,6 +80,7 @@ import com.bigdata.ha.msg.IHALogRequest;
 import com.bigdata.ha.msg.IHALogRootBlocksRequest;
 import com.bigdata.ha.msg.IHALogRootBlocksResponse;
 import com.bigdata.ha.msg.IHARebuildRequest;
+import com.bigdata.ha.msg.IHARemoteRebuildRequest;
 import com.bigdata.ha.msg.IHASendStoreResponse;
 import com.bigdata.ha.msg.IHASnapshotDigestRequest;
 import com.bigdata.ha.msg.IHASnapshotDigestResponse;
@@ -1469,6 +1471,59 @@ public class HAJournal extends Journal {
                     .takeSnapshot(req);
 
             return ft == null ? null : getProxy(ft, true/* async */);
+
+        }
+        
+        @Override
+        public Future<Void> rebuildFromLeader(final IHARemoteRebuildRequest req)
+                throws IOException {
+
+            final HAQuorumService<HAGlue, HAJournal> localService = getQuorumService();
+
+            final RunStateEnum innerRunState = (localService == null ? null
+                    : localService.getRunStateEnum());
+            
+            if(innerRunState == null)
+                return null;
+
+            switch (innerRunState) {
+            case Error:
+            case SeekConsensus:
+            case Operator: {
+
+                if (localService == null)
+                    return null;
+
+                final Future<Void> f = localService
+                        .rebuildFromLeader(new HARemoteRebuildRequest());
+
+                if (f == null)
+                    return null;
+
+                haLog.warn("Started REBUILD");
+                
+                return getProxy(f, true/* async */);
+                
+            }
+            case Rebuild:
+                // Already running rebuild.
+                return null;
+            case Restore:
+                // Running restore. Can not do rebuild.
+                return null;
+            case Resync:
+                // Running resync.  Can not do rebuild.
+                return null;
+            case RunMet:
+                // RunMet.  Can not do rebuild.
+                return null;
+            case Shutdown:
+                // Shutting down.  Can not do rebuild.
+                return null;
+            default:
+                // Unknown run state.
+                throw new AssertionError("innerRunState=" + innerRunState);
+            }
 
         }
         

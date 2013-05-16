@@ -60,6 +60,7 @@ import org.eclipse.jetty.server.Server;
 import com.bigdata.concurrent.FutureTaskMon;
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.HAPipelineGlue;
+import com.bigdata.ha.HAStatusEnum;
 import com.bigdata.ha.QuorumService;
 import com.bigdata.ha.QuorumServiceBase;
 import com.bigdata.ha.halog.HALogWriter;
@@ -73,6 +74,7 @@ import com.bigdata.ha.msg.HAWriteSetStateRequest;
 import com.bigdata.ha.msg.IHALogRequest;
 import com.bigdata.ha.msg.IHALogRootBlocksResponse;
 import com.bigdata.ha.msg.IHARebuildRequest;
+import com.bigdata.ha.msg.IHARemoteRebuildRequest;
 import com.bigdata.ha.msg.IHASendStoreResponse;
 import com.bigdata.ha.msg.IHASnapshotResponse;
 import com.bigdata.ha.msg.IHASyncRequest;
@@ -1149,12 +1151,68 @@ public class HAJournalServer extends AbstractServer {
         }
         
         /**
+         * Enter RESTORE.
+         * 
+         * @return
+         * @throws IOException
+         * 
+         * @see HAGlue#rebuildFromLeader(IHARemoteRebuildRequest)
+         */
+        public Future<Void> rebuildFromLeader(final IHARemoteRebuildRequest req)
+                throws IOException {
+
+            final Quorum<HAGlue, QuorumService<HAGlue>> quorum = getQuorum();
+
+            final QuorumService<HAGlue> localService = quorum.getClient();
+
+            if (localService == null)
+                return null;
+
+            final long token = quorum.token();
+
+            if (journal.getHAStatus() != HAStatusEnum.NotReady)
+                return null;
+
+            final UUID leaderId = quorum.getLeaderId();
+
+            if (leaderId == null)
+                return null;
+
+            final HAGlue leader = localService.getService(leaderId);
+
+            if (leader.getHAStatus() != HAStatusEnum.Leader) {
+
+                return null;
+                
+            }
+                
+            final IRootBlockView leaderRB = leader.getRootBlock(
+                    new HARootBlockRequest(null/* storeUUID */)).getRootBlock();
+
+            final IRootBlockView localRB = journal.getRootBlockView();
+
+            if (leaderRB.getCommitCounter() == localRB.getCommitCounter()) {
+
+                // At the same commit point.
+                return null;
+
+            }
+
+            // Re-verify.
+            if (journal.getHAStatus() != HAStatusEnum.NotReady)
+                return null;
+
+            return enterRunState(new RebuildTask(token));
+            
+        }
+        
+        /**
          * Change the run state.
          * 
          * @param runStateTask
          *            The task for the new run state.
          */
-        private void enterRunState(final RunStateCallable<Void> runStateTask) {
+        private Future<Void> enterRunState(final RunStateCallable<Void> runStateTask) {
 
             if (runStateTask == null)
                 throw new IllegalArgumentException();
@@ -1181,6 +1239,8 @@ public class HAJournalServer extends AbstractServer {
 //                        haLog.info("Entering runState="
 //                                + runStateTask.getClass().getSimpleName());
 
+                    return ft;
+                    
                 } finally {
 
                     if (oldFuture != null) {
