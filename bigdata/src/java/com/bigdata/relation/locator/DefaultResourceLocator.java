@@ -651,6 +651,27 @@ public class DefaultResourceLocator<T extends ILocatableResource> //
 
                 final Journal journal = (Journal) indexManager;
 
+                /*
+                 * Note: Using the local transaction manager to resolve a
+                 * read-only transaction identifer to the ITx object and then
+                 * retrieving the readsOnCommitTime from that ITx is a
+                 * non-blocking code path. It is preferrable to looking up the
+                 * commitRecord in the CommitRecordIndex, which can be
+                 * contended. This non-blocking code path will handle any
+                 * read-only tx, but it will not be able to locate a timestamp
+                 * not protected by a tx.
+                 */
+
+                final ITx tx = journal.getTransactionManager().getTx(
+                        timestamp);
+
+                if (tx != null) {
+
+                // Fast path.
+                commitTime2 = readTime = tx.getReadsOnCommitTime();
+                    
+                } else {
+                
                 // find the commit record on which we need to read.
                 final ICommitRecord commitRecord = journal
                         .getCommitRecord(TimestampUtility
@@ -676,6 +697,8 @@ public class DefaultResourceLocator<T extends ILocatableResource> //
 
                 commitTime2 = readTime = commitRecord.getTimestamp();
 
+                }
+                    
             } else {
 
                 /*
