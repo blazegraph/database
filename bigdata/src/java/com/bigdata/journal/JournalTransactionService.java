@@ -127,10 +127,19 @@ abstract public class JournalTransactionService extends
     }
 
     protected long findNextCommitTime(final long commitTime) {
-        
-        final ICommitRecord commitRecord = journal.getCommitRecordIndex()
-                .findNext(commitTime);
-        
+
+        /*
+         * Note: The following code did not obtain the appropriate lock to
+         * access the CommitRecordIndex. It was replaced by the
+         * getCommitRecordStrictlyGreaterThan() call, which does take the
+         * necessary lock and does the same thing.
+         */
+//      final ICommitRecord commitRecord = journal.getCommitRecordIndex()
+//      .findNext(commitTime);
+
+        final ICommitRecord commitRecord = journal
+                .getCommitRecordStrictlyGreaterThan(commitTime);
+
         if(commitRecord == null) {
             
             return -1L;

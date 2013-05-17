@@ -447,7 +447,7 @@ public class HAJournal extends Journal {
     
         super.setQuorumToken(newValue);
 
-        if (newValue == Quorum.NO_QUORUM) {
+        if (getHAReady() == Quorum.NO_QUORUM) {
 
             /*
              * If there is a running snapshot, then cancel it since the quorum
@@ -1500,25 +1500,22 @@ public class HAJournal extends Journal {
                 if (f == null)
                     return null;
 
-                haLog.warn("Started REBUILD");
+                haLog.warn("Started REBUILD: runState=" + innerRunState);
                 
                 return getProxy(f, true/* async */);
                 
             }
             case Rebuild:
                 // Already running rebuild.
-                return null;
             case Restore:
                 // Running restore. Can not do rebuild.
-                return null;
             case Resync:
                 // Running resync.  Can not do rebuild.
-                return null;
             case RunMet:
                 // RunMet.  Can not do rebuild.
-                return null;
             case Shutdown:
                 // Shutting down.  Can not do rebuild.
+                haLog.warn("Can not REBUILD: runState=" + innerRunState);
                 return null;
             default:
                 // Unknown run state.
@@ -1730,6 +1727,21 @@ public class HAJournal extends Journal {
             
         }
 
+        /**
+         * {@inheritDoc}
+         * <p>
+         * Extended to kick the {@link HAJournalServer} into an error state. It
+         * will recover from that error state by re-entering seek consensus.
+         */
+        @Override
+        protected void doRejectedCommit() {
+        
+            super.doRejectedCommit();
+            
+            getQuorumService().enterErrorState();
+            
+        }
+        
         /**
          * Return this quorum member, appropriately cast.
          * 

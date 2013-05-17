@@ -1579,6 +1579,33 @@ public class HAJournalServer extends AbstractServer {
                 } finally {
                     logLock.unlock();
                 }
+
+                // Force a service leave.
+                getQuorum().getActor().serviceLeave();
+
+//                /*
+//                 * Set token. Journal will notice that it is no longer
+//                 * "HA Ready"
+//                 * 
+//                 * Note: AbstractJournal.setQuorumToken() will detect case where
+//                 * it transitions from a met quorum through a service leave and
+//                 * will clear its haReady token and update its haStatus field
+//                 * appropriately.
+//                 * 
+//                 * FIXME There may be a data race here. The quorum.token() might
+//                 * be be cleared by the time we call
+//                 * setQuorumToken(quorum.token()) so we may have to explicitly 
+//                 * "clear" the journal token by passing in NO_QUORUM.
+//                 */
+//                journal.setQuorumToken(Quorum.NO_QUORUM);
+//                
+//                try {
+//                    journal.getHALogNexus().disableHALog();
+//                } catch (IOException e) {
+//                    haLog.error(e, e);
+//                }
+                
+                // Seek consensus.
                 enterRunState(new SeekConsensusTask());
 
                 return null;

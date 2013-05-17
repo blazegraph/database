@@ -54,4 +54,11 @@ public interface IHA2PhaseCommitMessage extends IHAMessage {
      */
     long getCommitTime();
     
+    /**
+     * Return <code>true</code> iff all services voted "YES" for PREPARE. When
+     * <code>false</code>, not all services will participate in this commit (but
+     * the commit will still be performed).
+     */
+    boolean didAllServicesPrepare();
+    
 }

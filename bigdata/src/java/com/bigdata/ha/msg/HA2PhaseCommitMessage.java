@@ -32,12 +32,14 @@ public class HA2PhaseCommitMessage implements IHA2PhaseCommitMessage,
 
     private final boolean isJoinedService;
     private final long commitTime;
+    private final boolean didAllServicesPrepare;
 
     public HA2PhaseCommitMessage(final boolean isJoinedService,
-            final long commitTime) {
+            final long commitTime, final boolean didAllServicesPrepare) {
 
         this.isJoinedService = isJoinedService;
         this.commitTime = commitTime;
+        this.didAllServicesPrepare = didAllServicesPrepare;
 
     }
 
@@ -51,4 +53,18 @@ public class HA2PhaseCommitMessage implements IHA2PhaseCommitMessage,
         return commitTime;
     }
 
+    @Override
+    public boolean didAllServicesPrepare() {
+        return didAllServicesPrepare;
+    }
+
+    @Override
+    public String toString() {
+
+        return super.toString() + "{isJoinedService=" + isJoinedService
+                + ",commitTime=" + commitTime + ",didAllServicesPrepare="
+                + didAllServicesPrepare + "}";
+
+    }
+    
 }

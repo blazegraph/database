@@ -2746,13 +2746,13 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
             return delegate.toString(addr);
         }
 
-        public IRootBlockView getRootBlock(final long commitTime) {
-            return delegate.getRootBlock(commitTime);
-        }
-
-        public Iterator<IRootBlockView> getRootBlocks(final long startTime) {
-            return delegate.getRootBlocks(startTime);
-        }
+//        public IRootBlockView getRootBlock(final long commitTime) {
+//            return delegate.getRootBlock(commitTime);
+//        }
+//
+//        public Iterator<IRootBlockView> getRootBlocks(final long startTime) {
+//            return delegate.getRootBlocks(startTime);
+//        }
 
         /*
          * IAllocationContext
@@ -3257,13 +3257,13 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
             return delegate.toString(addr);
         }
 
-        public IRootBlockView getRootBlock(long commitTime) {
-            return delegate.getRootBlock(commitTime);
-        }
-
-        public Iterator<IRootBlockView> getRootBlocks(long startTime) {
-            return delegate.getRootBlocks(startTime);
-        }
+//        public IRootBlockView getRootBlock(long commitTime) {
+//            return delegate.getRootBlock(commitTime);
+//        }
+//
+//        public Iterator<IRootBlockView> getRootBlocks(long startTime) {
+//            return delegate.getRootBlocks(startTime);
+//        }
 
         public ScheduledFuture<?> addScheduledTask(Runnable task,
                 long initialDelay, long delay, TimeUnit unit) {

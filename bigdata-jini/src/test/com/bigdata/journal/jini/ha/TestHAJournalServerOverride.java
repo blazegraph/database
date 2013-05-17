@@ -161,18 +161,17 @@ public class TestHAJournalServerOverride extends AbstractHA3JournalServerTestCas
      * {@link HACommitGlue#prepare2Phase(IHA2PhasePrepareMessage)} to throw an
      * exeption. A simple transaction is performed. We verify that the
      * transaction completes successfully, that the quorum token is unchanged,
-     * and that [A,C] both participated in the commit.
+     * and that [A,C] both participated in the commit. We also verify that B is
+     * moved to the end of the pipeline (by doing a serviceLeave and then
+     * re-entering the pipeline) and that it resyncs with the met quorum and
+     * finally re-joins with the met quorum. The quorum should not break across
+     * this test.
      * 
-     * TODO Spot check the {@link HAStatusEnum} on all services after the B 
-     * fails the prepare2Phase request.
+     * FIXME Variant where the GATHER failed.
      * 
-     * FIXME Extend test and its variant to verify that B RESYNCs and joins the
-     * met quourum. (B should do a serviceLeave() then SeekConsensus, RESYNC,
-     * and serviceJoin()).  
-     * 
-     * FIXME Variant where B votes "NO" rather than throwing an exception.
+     * FIXME Variant where the commit2Phase fails.
      */
-    public void testStartABC_prepare2Phase_B_throws_exception()
+    public void testStartABC_prepare2Phase_B_votes_NO()
             throws Exception {
 
         // Enforce the join order.
@@ -187,11 +186,72 @@ public class TestHAJournalServerOverride extends AbstractHA3JournalServerTestCas
         // Setup B to vote "NO" on the next PREPARE request.
         ((HAGlueTest) startup.serverB).voteNo();
         
-//        // Setup B to fail the next PREPARE request.
-//        ((HAGlueTest) startup.serverB)
-//                .failNext("prepare2Phase",
-//                        new Class[] { IHA2PhasePrepareMessage.class },
-//                        0/* nwait */, 1/* nfail */);
+        // Simple transaction.
+        simpleTransaction();
+        
+        // Verify quorum is unchanged.
+        assertEquals(token, quorum.token());
+        
+        // Should be two commit points on {A,C].
+        awaitCommitCounter(2L, startup.serverA, startup.serverC);
+        
+        /*
+         * B should go into an ERROR state and then into SeekConsensus and from
+         * there to RESYNC and finally back to RunMet. We can not reliably
+         * observe the intervening states. So what we really need to do is watch
+         * for B to move to the end of the pipeline and catch up to the same
+         * commit point.
+         */
+
+        /*
+         * The pipeline should be reordered. B will do a service leave, then
+         * enter seek consensus, and then re-enter the pipeline.
+         */
+        awaitPipeline(new HAGlue[] { startup.serverA, startup.serverC,
+                startup.serverB });
+
+        /*
+         * There should be two commit points on {A,C,B} (note that this assert
+         * does not pay attention to the pipeline order).
+         */
+        awaitCommitCounter(2L, startup.serverA, startup.serverC,
+                startup.serverB);
+
+        // B should be a follower again.
+        awaitHAStatus(startup.serverB, HAStatusEnum.Follower);
+
+        // quorum token is unchanged.
+        assertEquals(token, quorum.token());
+
+    }
+    
+    /**
+     * Three services are started in [A,B,C] order. B is setup for
+     * {@link HACommitGlue#prepare2Phase(IHA2PhasePrepareMessage)} to vote "NO".
+     * A simple transaction is performed. We verify that the transaction
+     * completes successfully, that the quorum token is unchanged, and that
+     * [A,C] both participated in the commit. We also verify that B is moved to
+     * the end of the pipeline (by doing a serviceLeave and then re-entering the
+     * pipeline) and that it resyncs with the met quorum and finally re-joins
+     * with the met quorum. The quorum should not break across this test.
+     */
+    public void testStartABC_prepare2Phase_B_throws_exception()
+            throws Exception {
+
+        // Enforce the join order.
+        final ABC startup = new ABC(true /*sequential*/);
+
+        final long token = awaitFullyMetQuorum();
+
+        // Should be one commit point.
+        awaitCommitCounter(1L, startup.serverA, startup.serverB,
+                startup.serverC);
+        
+        // Setup B to fail the next PREPARE request.
+        ((HAGlueTest) startup.serverB)
+                .failNext("prepare2Phase",
+                        new Class[] { IHA2PhasePrepareMessage.class },
+                        0/* nwait */, 1/* nfail */);
 
         // Simple transaction.
         simpleTransaction();
@@ -202,6 +262,63 @@ public class TestHAJournalServerOverride extends AbstractHA3JournalServerTestCas
         // Should be two commit points on {A,C].
         awaitCommitCounter(2L, startup.serverA, startup.serverC);
         
+        /*
+         * FIXME Unlike the test above, if there is a problem making the RMI
+         * call, then B will not go through its doRejectedCommit() handler and
+         * will not enter the ERROR state directly. We need to have B notice
+         * that it is no longer at the same commit point, e.g., by observing a
+         * LIVE write cache message with an unexpected value for the
+         * commitCounter (especially, GT its current expected value). That is
+         * the indication that B needs to enter an error state. Until then it
+         * does not know that there was an attempt to PREPARE since it did not
+         * get the prepare2Phase() message.
+         * 
+         * - Modify HAJournalServer to enter the error state if we observe a
+         * live write cache block for a commitCounter != the expected
+         * commitCounter.
+         * 
+         * - Modify commit2Phase() to accept the #of services that are
+         * participating in the commit. If it is not a full quorum, then we can
+         * not purge the HA logs in commit2Phase() regardless of what the quorum
+         * state looks like.
+         * 
+         * - Modify this test to do another transaction. B can not notice the
+         * problem until there is another write cache flushed through the
+         * pipeline.
+         * 
+         * - Modify this test to await B to move to the end of the pipeline,
+         * resync, and rejoin.
+         */
+        
+        // Should be two commit points on {A,C}.
+        awaitCommitCounter(2L, startup.serverA, startup.serverC);
+
+        // Should be ONE commit points on {B}.
+        awaitCommitCounter(1L, startup.serverB);
+
+        // A commit is necessary for B to notice that it did not prepare.
+        simpleTransaction();
+        
+        /*
+         * The pipeline should be reordered. B will do a service leave, then
+         * enter seek consensus, and then re-enter the pipeline.
+         */
+        awaitPipeline(new HAGlue[] { startup.serverA, startup.serverC,
+                startup.serverB });
+
+        /*
+         * There should be three commit points on {A,C,B} (note that this assert
+         * does not pay attention to the pipeline order).
+         */
+        awaitCommitCounter(3L, startup.serverA, startup.serverC,
+                startup.serverB);
+
+        // B should be a follower again.
+        awaitHAStatus(startup.serverB, HAStatusEnum.Follower);
+
+        // quorum token is unchanged.
+        assertEquals(token, quorum.token());
+
     }
     
 }
