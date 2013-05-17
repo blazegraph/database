@@ -276,6 +276,7 @@ public class StressTestConcurrentTx extends ProxyTestCase implements IComparison
         int ncommitted = 0; // #of transactions that successfully committed.
         int nuncommitted = 0; // #of transactions that did not complete in time.
         
+        try {
         while(itr.hasNext()) {
 
             final Future<Long> future = itr.next();
@@ -333,8 +334,8 @@ public class StressTestConcurrentTx extends ProxyTestCase implements IComparison
                      * Other kinds of exceptions are errors.
                      */
                     
-                    // fail("Not expecting: "+ex, ex);
-                    log.warn("Not expecting: "+ex, ex);
+                     fail("Not expecting: "+ex, ex);
+//                    log.warn("Not expecting: "+ex, ex);
                     
                 }
                 
@@ -342,18 +343,22 @@ public class StressTestConcurrentTx extends ProxyTestCase implements IComparison
             
         }
                
-        // Now test rootBlocks
-        int rootBlockCount = 0;
-        final Iterator<IRootBlockView> rbvs = journal.getRootBlocks(10); // cannot use 0
-        while (rbvs.hasNext()) {
-        	final IRootBlockView rbv = rbvs.next();
-        	rootBlockCount++;           	
-        }
-
+        /*
+         * Note: Code was commented out (also see report below) because
+         * journal.getRootBlocks() was not implemented correctly.
+         */
+//        // Now test rootBlocks
+//        int rootBlockCount = 0;
+//        final Iterator<IRootBlockView> rbvs = journal.getRootBlocks(1);
+//        while (rbvs.hasNext()) {
+//            final IRootBlockView rbv = rbvs.next();
+//            rootBlockCount++;
+//        }
+        } finally {
         // immediately terminate any tasks that are still running.
         log.warn("Shutting down now!");
         journal.shutdownNow();
-        
+        }
         final Result ret = new Result();
         
         /*
@@ -369,7 +374,7 @@ public class StressTestConcurrentTx extends ProxyTestCase implements IComparison
         ret.put("naborted",""+naborted);
         ret.put("ncommitted",""+ncommitted);
         ret.put("nuncommitted", ""+nuncommitted);
-        ret.put("rootBlocks found", ""+rootBlockCount);
+//        ret.put("rootBlocks found", ""+rootBlockCount);
         ret.put("elapsed(ms)", ""+elapsed);
         ret.put("tps", ""+(ncommitted * 1000 / elapsed));
         ret.put("bytesWritten", ""+bytesWritten);
