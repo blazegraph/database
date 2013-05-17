@@ -81,7 +81,6 @@ import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
-import com.bigdata.btree.ReadOnlyIndex;
 import com.bigdata.btree.keys.ICUVersionRecord;
 import com.bigdata.btree.view.FusedView;
 import com.bigdata.cache.ConcurrentWeakValueCache;
@@ -395,26 +394,34 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 	 */
 	private final ReentrantReadWriteLock _fieldReadWriteLock = new ReentrantReadWriteLock(false/* fair */);
 
-	/**
-	 * Used to cache the most recent {@link ICommitRecord} -- discarded on
-	 * {@link #abort()}; set by {@link #commitNow(long)}.
-	 */
+    /**
+     * Used to cache the most recent {@link ICommitRecord} -- discarded on
+     * {@link #abort()}; set by {@link #commitNow(long)}.
+     * <p>
+     * Note: This is set in the constructor and modified by {@link #_abort()}
+     * but (once set by the constructor) it is never <code>null</code> until the
+     * store is closed.
+     */
 	private volatile ICommitRecord _commitRecord;
 
-	/**
-	 * BTree mapping commit timestamps to the address of the corresponding
-	 * {@link ICommitRecord}. The keys are timestamps (long integers). The
-	 * values are the address of the {@link ICommitRecord} with that commit
-	 * timestamp.
-	 * <p>
-	 * Note: The {@link CommitRecordIndex} object is NOT systematically
-	 * protected by <code>synchronized</code> within this class. Therefore it is
-	 * NOT safe for use by outside classes and CAN NOT be made safe simply by
-	 * synchronizing their access on the {@link CommitRecordIndex} object
-	 * itself. This is mainly for historical reasons and it may be possible to
-	 * systematically protect access to this index within a synchronized block
-	 * and then expose it to other classes.
-	 */
+    /**
+     * BTree mapping commit timestamps to the address of the corresponding
+     * {@link ICommitRecord}. The keys are timestamps (long integers). The
+     * values are the address of the {@link ICommitRecord} with that commit
+     * timestamp.
+     * <p>
+     * Note: The {@link CommitRecordIndex} object is NOT systematically
+     * protected by <code>synchronized</code> within this class. Therefore it is
+     * NOT safe for use by outside classes and CAN NOT be made safe simply by
+     * synchronizing their access on the {@link CommitRecordIndex} object
+     * itself. This is mainly for historical reasons and it may be possible to
+     * systematically protect access to this index within a synchronized block
+     * and then expose it to other classes.
+     * <p>
+     * Note: This is set in the constructor and modified by {@link #_abort()}
+     * but (once set by the constructor) it is never <code>null</code> until the
+     * store is closed.
+     */
 	private volatile CommitRecordIndex _commitRecordIndex;
 
 	/**
@@ -688,72 +695,90 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
     }
 
-	/**
-	 * Return the root block view associated with the commitRecord for the
-	 * provided commit time.  This requires accessing the next commit record
-	 * since the previous root block is stored with each record.
-	 * 
-	 * @param commitTime
-	 *            A commit time.
-	 * 
-	 * @return The root block view -or- <code>null</code> if there is no commit
-	 *         record for that commitTime.
-	 * 
-	 */
-	public IRootBlockView getRootBlock(final long commitTime) {
-
-		final ICommitRecord commitRecord = getCommitRecordIndex().findNext(commitTime);
-
-		if (commitRecord == null) {
-			return null;
-		}
-
-		final long rootBlockAddr = commitRecord.getRootAddr(PREV_ROOTBLOCK);
-		
-		if (rootBlockAddr == 0) {
-			return null;
-		} else {
-			ByteBuffer bb = read(rootBlockAddr);
-			
-			return new RootBlockView(true /* rb0 - WTH */, bb, checker);
-		}
-
-	}
-	
-	/**
-	 * 
-	 * @param startTime from which to begin iteration
-	 * 
-	 * @return an iterator over the committed root blocks
-	 */
-	public Iterator<IRootBlockView> getRootBlocks(final long startTime) {
-		return new Iterator<IRootBlockView>() {
-			ICommitRecord commitRecord = getCommitRecordIndex().findNext(startTime);
-
-			public boolean hasNext() {
-				return commitRecord != null;
-			}
-			
-			public IRootBlockView next() {
-				final long rootBlockAddr = commitRecord.getRootAddr(PREV_ROOTBLOCK);
-				
-				commitRecord = getCommitRecordIndex().findNext(commitRecord.getTimestamp());
-				
-				if (rootBlockAddr == 0) {
-					return null;
-				} else {
-					ByteBuffer bb = read(rootBlockAddr);
-					
-					return new RootBlockView(true /* rb0 - WTH */, bb, checker);
-				}
-			}
-
-			public void remove() {
-				throw new UnsupportedOperationException();
-			}
-			
-		};
-	}
+//	/**
+//	 * Return the root block view associated with the commitRecord for the
+//	 * provided commit time.  This requires accessing the next commit record
+//	 * since the previous root block is stored with each record.
+//	 * 
+//	 * @param commitTime
+//	 *            A commit time.
+//	 * 
+//	 * @return The root block view -or- <code>null</code> if there is no commit
+//	 *         record for that commitTime.
+//	 */
+//	@Deprecated // This method is unused and lacks a unit test.
+//	IRootBlockView getRootBlock(final long commitTime) {
+//
+//        /*
+//         * Note: getCommitRecordStrictlyGreaterThan() uses appropriate
+//         * synchronization for the CommitRecordIndex.
+//         */
+//        final ICommitRecord commitRecord = getCommitRecordStrictlyGreaterThan(commitTime);
+//
+//		if (commitRecord == null) {
+//
+//		    return null;
+//		    
+//		}
+//
+//		final long rootBlockAddr = commitRecord.getRootAddr(PREV_ROOTBLOCK);
+//		
+//		if (rootBlockAddr == 0) {
+//			
+//		    return null;
+//		    
+//		} else {
+//
+//		    final ByteBuffer bb = read(rootBlockAddr);
+//			
+//			return new RootBlockView(true /* rb0 - WTH */, bb, checker);
+//			
+//		}
+//
+//	}
+//	
+//	/**
+//	 * 
+//	 * @param startTime from which to begin iteration
+//	 * 
+//	 * @return an iterator over the committed root blocks
+//	 */
+//    @Deprecated
+//    /*
+//     * This is UNUSED AND NOT SAFE (used only in test suite by
+//     * StressTestConcurrentTx, which I have commented out) and not safe (because
+//     * it lacks the necessary locks to access the CommitRecordIndex). The code
+//     * is also wrong since it visits GT the commitTime when it should visit GTE
+//     * the commitTime.
+//     */
+//	Iterator<IRootBlockView> getRootBlocks(final long startTime) {
+//		return new Iterator<IRootBlockView>() {
+//			ICommitRecord commitRecord = getCommitRecordIndex().findNext(startTime);
+//
+//			public boolean hasNext() {
+//				return commitRecord != null;
+//			}
+//			
+//			public IRootBlockView next() {
+//				final long rootBlockAddr = commitRecord.getRootAddr(PREV_ROOTBLOCK);
+//				
+//				commitRecord = getCommitRecordIndex().findNext(commitRecord.getTimestamp());
+//				
+//				if (rootBlockAddr == 0) {
+//					return null;
+//				} else {
+//					ByteBuffer bb = read(rootBlockAddr);
+//					
+//					return new RootBlockView(true /* rb0 - WTH */, bb, checker);
+//				}
+//			}
+//
+//			public void remove() {
+//				throw new UnsupportedOperationException();
+//			}
+//			
+//		};
+//	}
 
 	/**
 	 * True iff the journal was opened in a read-only mode.
@@ -2924,7 +2949,25 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
                 // The services joined with the met quorum, in their join order.
                 joinedServiceIds = quorum.getJoined();
+                
+                // The UUID for this service.
+                final UUID serviceId = quorum.getClient().getServiceId();
 
+                if (joinedServiceIds.length == 0
+                        || !joinedServiceIds[0].equals(serviceId)) {
+
+                    /*
+                     * Sanity check. Verify that the first service in the join
+                     * order is *this* service. This is a precondition for the
+                     * service to be the leader.
+                     */
+                    
+                    throw new RuntimeException("Not leader: serviceId="
+                            + serviceId + ", joinedServiceIds="
+                            + Arrays.toString(joinedServiceIds));
+
+                }
+                
                 // The services in the write pipeline (in any order).
                 nonJoinedPipelineServiceIds = new LinkedHashSet<UUID>(
                         Arrays.asList(getQuorum().getPipeline()));
@@ -2935,6 +2978,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                     nonJoinedPipelineServiceIds.remove(joinedServiceId);
                     
                 }
+                
                 try {
                     /**
                      * CRITICAL SECTION. We need obtain a distributed consensus
@@ -3924,7 +3968,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
      * 
      * @return The read-only view of the {@link CommitRecordIndex}.
      */
-	public IIndex getReadOnlyCommitRecordIndex() {
+	public CommitRecordIndex getReadOnlyCommitRecordIndex() {
 
 	    final ReadLock lock = _fieldReadWriteLock.readLock();
 
@@ -3933,11 +3977,12 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
         try {
 
             assertOpen();
-            
-            final CommitRecordIndex commitRecordIndex = getCommitRecordIndex(_rootBlock
-                    .getCommitRecordIndexAddr());
 
-            return new ReadOnlyIndex(commitRecordIndex);
+            final CommitRecordIndex commitRecordIndex = getCommitRecordIndex(
+                    _rootBlock.getCommitRecordIndexAddr(), true/* readOnly */);
+
+//            return new ReadOnlyIndex(commitRecordIndex);
+            return commitRecordIndex;
 
         } finally {
 
@@ -3946,47 +3991,39 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
         }
  
 	}
-	
-	/**
-	 * Return the current state of the index that resolves timestamps to
-	 * {@link ICommitRecord}s.
-	 * <p>
-	 * Note: The returned object is NOT safe for concurrent operations and is
-	 * NOT systematically protected by the use of synchronized blocks within
-	 * this class.
-	 * 
-	 * @return The {@link CommitRecordIndex}.
-	 * 
-	 * @todo If you need access to this object in an outside class consider
-	 *       using {@link #getRootBlockView()},
-	 *       {@link IRootBlockView#getCommitRecordIndexAddr()}, and
-	 *       {@link #getCommitRecord(long)} to obtain a distinct instance
-	 *       suitable for read-only access.
-	 */
-	protected CommitRecordIndex getCommitRecordIndex() {
 
-		final ReadLock lock = _fieldReadWriteLock.readLock();
-
-		lock.lock();
-
-		try {
-
-			assertOpen();
-
-			final CommitRecordIndex commitRecordIndex = _commitRecordIndex;
-
-			if (commitRecordIndex == null)
-				throw new AssertionError();
-
-			return commitRecordIndex;
-
-		} finally {
-
-			lock.unlock();
-
-		}
-
-	}
+//    /**
+//     * I have removed this method since the returned {@link CommitRecordIndex}
+//     * was being used without appropriate synchronization. There is a
+//     * {@link #getReadOnlyCommitRecordIndex()} which may be used in place of
+//     * this method.
+//     */
+//	protected CommitRecordIndex getCommitRecordIndex() {
+//
+//		final ReadLock lock = _fieldReadWriteLock.readLock();
+//
+//		lock.lock();
+//
+//		try {
+//
+//			assertOpen();
+//
+//			final long commitRecordIndexAddr = _rootBlock.getCommitRecordIndexAddr();
+//			
+//			final CommitRecordIndex commitRecordIndex = getCommitRecordIndex(addr);
+//
+//			if (commitRecordIndex == null)
+//				throw new AssertionError();
+//
+//			return commitRecordIndex;
+//
+//		} finally {
+//
+//			lock.unlock();
+//
+//		}
+//
+//	}
 
 	/**
 	 * Read and return the {@link CommitRecordIndex} from the current root
@@ -4007,7 +4044,8 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
             if (log.isDebugEnabled())
                 log.debug("Loading from addr=" + addr);
 		    
-			return getCommitRecordIndex(addr);
+            // Load the live index from the disk.
+            return getCommitRecordIndex(addr, false/* readOnly */);
 
 		} catch (RuntimeException ex) {
 
@@ -4023,30 +4061,31 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 	}
 
     /**
-     * Create or re-load the index that resolves timestamps to
-     * {@link ICommitRecord}s.
-     * <p>
-     * Note: The returned object is NOT cached. When addr is non-{@link #NULL},
-     * each invocation will return a distinct {@link CommitRecordIndex} object.
-     * This behavior is partly for historical reasons but it does serve to
-     * protect the live {@link CommitRecordIndex} from outside access. This is
-     * important since access to the live {@link CommitRecordIndex} is NOT
-     * systematically protected by <code>synchronized</code> within this class.
+     * Create or load and return the index that resolves timestamps to
+     * {@link ICommitRecord}s. This method is capable of returning either the
+     * live {@link CommitRecordIndex} or a read-only view of any committed
+     * version of that index.
+     * 
+     * <strong>CAUTION: DO NOT EXPOSE THE LIVE COMMIT RECORD INDEX OUTSIDE OF
+     * THIS CLASS. IT IS NOT POSSIBLE TO HAVE CORRECT SYNCHRONIZATION ON THAT
+     * INDEX IN ANOTHER CLASS.</code>
      * 
      * @param addr
      *            The root address of the index -or- 0L if the index has not
-     *            been created yet.
+     *            been created yet. When addr is non-{@link #NULL}, each
+     *            invocation will return a distinct {@link CommitRecordIndex}
+     *            object.
+     * 
+     * @param readOnly
+     *            When <code>false</code> the returned is NOT cached.
      * 
      * @return The {@link CommitRecordIndex} for that address or a new index if
-     *         0L was specified as the address.
+     *         <code>0L</code> was specified as the address.
      * 
      * @see #_commitRecordIndex
-     * 
-     *      TODO We could modify getCommitRecordIndex() to accept
-     *      readOnly:boolean and let it load/create a read-only view rather than
-     *      wrapping it with a ReadOnlyIndex.
      */
-	protected CommitRecordIndex getCommitRecordIndex(final long addr) {
+    protected CommitRecordIndex getCommitRecordIndex(final long addr,
+            final boolean readOnly) {
 
 		if (log.isInfoEnabled())
 			log.info("addr=" + toString(addr));
@@ -4067,7 +4106,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 			 * Note: if the journal is not the quorum leader then it is
 			 * effectively read-only.
 			 */
-			if (isReadOnly()) {
+            if (isReadOnly() || readOnly) {
 
 				ndx = CommitRecordIndex.createTransient();
 
@@ -4079,12 +4118,26 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
 		} else {
 
-			/*
-			 * Reload the mutable btree from its root address.
-			 */
+            if (readOnly) {
 
-			ndx = (CommitRecordIndex) BTree.load(this, addr, false/* readOnly */);
+                /*
+                 * Read only view of the most CommitRecordIndex having
+                 * that checkpointAddr.
+                 */
+                
+		        ndx = (CommitRecordIndex) getIndexWithCheckpointAddr(addr);
+		        
+		    } else {
+	            
+                /*
+                 * Reload the mutable btree from its root address.
+                 * 
+                 * Note: For this code path we DO NOT cache the index view.
+                 */
 
+		        ndx = (CommitRecordIndex) BTree.load(this, addr, false/* readOnly */);
+		        
+		    }
 		}
 
 		assert ndx != null;
@@ -6118,12 +6171,24 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                 // Vote NO.
                 vote.set(false);
                 
+                doRejectedCommit();
+                
                 return vote.get();
 
             }
 
         } // class VoteNoTask
 
+        /**
+         * Method must be extended by subclass to coordinate the rejected
+         * commit.
+         */
+        protected void doRejectedCommit() {
+
+           doLocalAbort(); 
+            
+        }
+        
         /**
          * Task prepares for a 2-phase commit (syncs to the disk) and votes YES
          * iff if is able to prepare successfully.
@@ -6156,6 +6221,8 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
              */
             public Boolean call() throws Exception {
 
+                try {
+                
                 final IRootBlockView rootBlock = prepareMessage.getRootBlock();
 
                 if (haLog.isInfoEnabled())
@@ -6253,6 +6320,16 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                 vote.set(true);
 
                 return vote.get();
+
+                } finally {
+                
+                    if(!vote.get()) {
+                        
+                        doRejectedCommit();
+                        
+                    }
+                    
+                }
                 
             }
 
@@ -6515,13 +6592,26 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                                 + rootBlock);
                     }
 
-                    /*
-                     * The HA log files are purged on each node any time the
-                     * quorum is fully met and goes through a commit point.
-                     * Leaving only the current open log file.
-                     */
+                    if (commitMessage.didAllServicesPrepare()) {
 
-                    localService.purgeHALogs(rootBlock.getQuorumToken());
+                        /*
+                         * The HALog files are conditionally purged (depending
+                         * on the IRestorePolicy) on each node any time the
+                         * quorum is fully met and goes through a commit point.
+                         * The current HALog always remains open.
+                         * 
+                         * Note: This decision needs to be made in awareness of
+                         * whether all services voted to PREPARE. Otherwise we
+                         * can hit a problem where some service did not vote to
+                         * prepare, but the other services did, and we wind up
+                         * purging the HALogs even though one of the services
+                         * did not go through the commit2Phase(). This issue is
+                         * fixed by the didAllServicesPrepare() flag.
+                         */
+
+                        localService.purgeHALogs(rootBlock.getQuorumToken());
+                        
+                    }
 
                 } catch (Throwable t) {
 

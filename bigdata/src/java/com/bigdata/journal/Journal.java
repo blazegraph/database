@@ -520,6 +520,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
             final long nanos = timeoutNanos;
             long remaining = nanos;
 
+            // Verify that this service is still the leader.
             getQuorum().assertLeader(token);
 
 //            /*
@@ -2320,7 +2321,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
 
 //        final Tx tx = (Tx) (isReadWriteTx ? getConcurrencyManager()
 //                .getTransactionManager().getTx(timestamp) : null);
-        final Tx tx = (Tx) getConcurrencyManager().getTransactionManager()
+        final Tx tx = (Tx) /*getConcurrencyManager().*/getTransactionManager()
                 .getTx(timestamp);
 
         if (isReadWriteTx) {

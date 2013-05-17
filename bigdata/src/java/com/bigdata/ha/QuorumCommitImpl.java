@@ -31,6 +31,7 @@ import java.util.UUID;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
+import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
@@ -219,9 +220,30 @@ public class QuorumCommitImpl<S extends HACommitGlue> extends
                         /*
                          * Runnable which will execute this message on the
                          * remote service.
+                         * 
+                         * FIXME Because async futures cause DGC native thread
+                         * leaks this is no longer running the prepare
+                         * asynchronously on the followers. Change the code
+                         * here, and in commit2Phase and abort2Phase to use
+                         * multiple threads to run the tasks on the followers.
                          */
-                        final Future<Boolean> rf = getService(serviceId)
-                                .prepare2Phase(msgForJoinedService);
+                        
+                        final HACommitGlue service = getService(serviceId);
+                        
+                        Future<Boolean> rf = null;
+                        try {
+                            // RMI.
+                            rf = service.prepare2Phase(msgForJoinedService);
+                        } catch (final Throwable t) {
+                            // If anything goes wrong, wrap up exception as Future.
+                            final FutureTask<Boolean> ft = new FutureTask<Boolean>(new Runnable() {
+                                public void run() {
+                                    throw new RuntimeException(t);
+                                }
+                            }, Boolean.FALSE);
+                            rf = ft;
+                            ft.run(); // evaluate future. 
+                        }
 
                         // add to list of futures we will check.
                         remoteFutures.set(i, rf);
@@ -317,7 +339,9 @@ public class QuorumCommitImpl<S extends HACommitGlue> extends
                     /*
                      * Note: prepare2Phase() is throwing exceptions if
                      * preconditions are violated. These thrown exceptions are
-                     * interpreted as a "NO" vote.
+                     * interpreted as a "NO" vote. An exception can also appear
+                     * here if there is an RMI failure or even a failure on this
+                     * service when attempting to perform the RMI.
                      */
                     log.error(ex, ex);
                     done = true; // ExecutionException indicates isDone().
@@ -419,6 +443,11 @@ public class QuorumCommitImpl<S extends HACommitGlue> extends
         final long commitTime = preq.getRootBlock().getLastCommitTime();
 
         final PrepareResponse presp = req.getPrepareResponse();
+
+        // true iff we have a full complement of services that vote YES for this
+        // commit.
+        final boolean didAllServicesPrepare = presp.getYesCount() == presp
+                .replicationFactor();
         
         member.assertLeader(token);
 
@@ -427,7 +456,7 @@ public class QuorumCommitImpl<S extends HACommitGlue> extends
         try {
 
             final IHA2PhaseCommitMessage msgJoinedService = new HA2PhaseCommitMessage(
-                    true/* isJoinedService */, commitTime);
+                    true/* isJoinedService */, commitTime, didAllServicesPrepare);
 
             for (int i = 1; i < joinedServiceIds.length; i++) {
 

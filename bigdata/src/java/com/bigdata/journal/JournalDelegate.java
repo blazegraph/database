@@ -40,7 +40,6 @@ import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.mdi.IResourceMetadata;
-import com.bigdata.rawstore.IAllocationContext;
 import com.bigdata.rawstore.IPSOutputStream;
 import com.bigdata.relation.locator.IResourceLocator;
 import com.bigdata.sparse.SparseRowStore;
@@ -86,17 +85,17 @@ public class JournalDelegate implements IJournal {
 		return delegate.getRootAddr(index);
 	}
 
-	public IRootBlockView getRootBlock(long commitTime) {
-		return delegate.getRootBlock(commitTime);
-	}
-
 	public IRootBlockView getRootBlockView() {
 		return delegate.getRootBlockView();
 	}
 
-	public Iterator<IRootBlockView> getRootBlocks(long startTime) {
-		return delegate.getRootBlocks(startTime);
-	}
+//    public IRootBlockView getRootBlock(long commitTime) {
+//        return delegate.getRootBlock(commitTime);
+//    }
+//
+//	public Iterator<IRootBlockView> getRootBlocks(long startTime) {
+//		return delegate.getRootBlocks(startTime);
+//	}
 
 	public void setCommitter(int index, ICommitter committer) {
 		delegate.setCommitter(index, committer);

@@ -526,9 +526,13 @@ public class DumpJournal {
             }
             
         }
-        
-		final CommitRecordIndex commitRecordIndex = journal
-				.getCommitRecordIndex();
+
+        /*
+         * Note: A read-only view is used since the Journal could be exposed to
+         * concurrent operations through the NSS.
+         */
+        final CommitRecordIndex commitRecordIndex = journal
+                .getReadOnlyCommitRecordIndex();
 
 		out.println("There are " + commitRecordIndex.getEntryCount()
 				+ " commit points.");

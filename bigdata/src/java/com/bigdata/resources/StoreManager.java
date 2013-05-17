@@ -2556,9 +2556,10 @@ abstract public class StoreManager extends ResourceEvents implements
          * for the live journal.
          */
         @Override
-        public CommitRecordIndex getCommitRecordIndex(final long addr) {
-            
-            return super.getCommitRecordIndex(addr);
+        public CommitRecordIndex getCommitRecordIndex(final long addr,
+                final boolean readOnly) {
+
+            return super.getCommitRecordIndex(addr, readOnly);
             
         }
 
@@ -4438,7 +4439,7 @@ abstract public class StoreManager extends ResourceEvents implements
                      */
                     final CommitRecordIndex commitRecordIndex = journal
                             .getCommitRecordIndex(journal.getRootBlockView()
-                                    .getCommitRecordIndexAddr());
+                                    .getCommitRecordIndexAddr(),true/*readOnly*/);
 
                     /*
                      * A per-journal hash set of the [checkpointAddr] for the
