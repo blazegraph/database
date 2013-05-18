@@ -10,13 +10,13 @@ import org.apache.http.conn.ClientConnectionManager;
 import org.openrdf.model.URI;
 import org.openrdf.model.impl.URIImpl;
 
-import com.bigdata.bop.ap.SampleIndex;
 import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.cache.DescribeServiceFactory;
 import com.bigdata.rdf.sparql.ast.eval.SampleServiceFactory;
 import com.bigdata.rdf.sparql.ast.eval.SearchInSearchServiceFactory;
 import com.bigdata.rdf.sparql.ast.eval.SearchServiceFactory;
 import com.bigdata.rdf.sparql.ast.eval.SliceServiceFactory;
+import com.bigdata.rdf.sparql.ast.eval.ValuesServiceFactory;
 import com.bigdata.rdf.sparql.ast.service.history.HistoryServiceFactory;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BD;
@@ -88,6 +88,9 @@ public class ServiceRegistry {
 
         // Add the slice index service.
         add(SliceServiceFactory.SERVICE_KEY, new SliceServiceFactory());
+
+        // Add the values service.
+        add(ValuesServiceFactory.SERVICE_KEY, new ValuesServiceFactory());
 
         if (QueryHints.DEFAULT_DESCRIBE_CACHE) {
 
