@@ -1795,9 +1795,9 @@ public class HAJournal extends Journal {
                     + journal.getRootBlockView().getCommitCounter());
             innerRunStateStr.append(", haReady=" + getHAReady());
             innerRunStateStr.append(", haStatus=" + getHAStatus());
-            innerRunStateStr
-                    .append(", serviceId=" + quorumService == null ? "N/A"
-                            : quorumService.getServiceId());
+            innerRunStateStr.append(", serviceId="
+                    + (quorumService == null ? "N/A" : quorumService
+                            .getServiceId()));
             /*
              * TODO This is not a TXS timestamp. That would be more useful but I
              * want to avoid taking the TXS lock. [It looks like the TXS does
