@@ -362,7 +362,17 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
         
         /**
          * The message from each of those followers providing their local
-         * earliest visible commit point. 
+         * earliest visible commit point.
+         * <p>
+         * Note: The {@link ConcurrentHashMap} does NOT allow <code>null</code>
+         * values. Further the {@link IHANotifyReleaseTimeRequest} specifies the
+         * serviceId of the follower. Therefore, a follower whose
+         * {@link GatherTask} fails MUST provide a "mock"
+         * {@link IHANotifyReleaseTimeRequest} that it will use to wait at the
+         * {@link CyclicBarrier}.
+         * 
+         * @see InnerJournalTransactionService#notifyEarliestCommitTime(IHANotifyReleaseTimeRequest)
+         * @see GatherTask
          */
         final private Map<UUID, IHANotifyReleaseTimeRequest> responses = new ConcurrentHashMap<UUID, IHANotifyReleaseTimeRequest>();
 
@@ -1347,12 +1357,26 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
                 this.req = req;
 
             }
-            
+
+            /**
+             * Note: This needs to be robust to most kinds of errors. However,
+             * if the quorum breaks (leader leaves) of if a follower leaves that
+             * was joined with the met quorum as of the atomic decision point in
+             * commitNow(), then that change will be detected by the leader and
+             * it will break the {@link CyclicBarrier}.
+             */
             public Void call() throws Exception {
 
                 if (log.isInfoEnabled())
                     log.info("Running gather on follower");
 
+                /*
+                 * These variables are set in the try {} below. If we can
+                 * discover the leader, then we will eventually respond either
+                 * in the try{} or in the finally{}.
+                 */
+                long now = 0L;
+                UUID serviceId = null;
                 HAGlue leader = null;
                 
                 boolean didNotifyLeader = false;
@@ -1361,27 +1385,59 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
 
                 try {
 
-                    // This timestamp is used to help detect clock skew.
-                    final long now = nextTimestamp();
-
-                    // Verify event on leader occurs before event on follower.
-                    assertBefore(req.getTimestampOnLeader(), now);
-
                     final long token = req.token();
 
+                    /*
+                     * we do not need to handle the case where the token is
+                     * invalid. The leader will reset() the CylicBarrier for
+                     * this case.
+                     */
                     getQuorum().assertQuorum(token);
 
+                    /*
+                     * If the quorumService is null because this service is
+                     * shutting down then the leader will notice the
+                     * serviceLeave() and reset() the CyclicBarrier.
+                     */
                     final QuorumService<HAGlue> quorumService = getQuorum()
                             .getClient();
+
+                    // The serviceId for this service.
+                    serviceId = quorumService.getServiceId();
+
+                    /*
+                     * This timestamp is used to help detect clock skew.
+                     * 
+                     * Note: This deliberately uses the (non-remote)
+                     * nextTimestamp() method on BasicHA. This is being done so
+                     * we can write a unit test of the GatherTask that imposes
+                     * clock skew by overridding the next value to be returned
+                     * by that method.
+                     */
+                    now = ((BasicHA)quorumService.getService()).nextTimestamp();
+
+                    /*
+                     * If the token is invalid, making it impossible for us to
+                     * discover and message the leader, then then leader will
+                     * reset() the CyclicBarrier.
+                     */
+                    leader = quorumService.getLeader(token);
+
+                    /*
+                     * Note: At this point we have everything we need to form up
+                     * our response. If we hit an assertion, we will still
+                     * respond in the finally {} block below.
+                     */
+                    
+                    /* Verify event on leader occurs before event on follower.
+                     */
+                    assertBefore(req.getTimestampOnLeader(), now);
 
                     if (!quorumService.isFollower(token))
                         throw new QuorumException();
 
-                    leader = quorumService.getLeader(token);
+                    final IHANotifyReleaseTimeRequest req2 = newHANotifyReleaseTimeRequest(serviceId);
 
-                    final IHANotifyReleaseTimeRequest req2 = newHANotifyReleaseTimeRequest(quorumService
-                            .getServiceId());
-                    
                     /*
                      * RMI to leader.
                      * 
@@ -1464,12 +1520,16 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
                     if (!didNotifyLeader && leader != null) {
 
                         /*
-                         * Send a [null] to the leader so it does not block
-                         * forever waiting for our response.
+                         * Send mock response to the leader so it does not block
+                         * forever waiting for our response. The mock response MUST
+                         * include our correct serviceId.
                          */
                         
                         try {
-                            leader.notifyEarliestCommitTime(null/* resp */);
+                            final IHANotifyReleaseTimeRequest resp = new HANotifyReleaseTimeRequest(
+                                    serviceId, 0L/* pinnedCommitTime */,
+                                    1L/* pinnedCommitCounter */, now/* timestamp */);
+                            leader.notifyEarliestCommitTime(resp);
                         } catch (Throwable t2) {
                             log.error(t2, t2);
                         }
@@ -1503,18 +1563,33 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
          * request as this barrier instance. That will let us detect a service
          * that responds late (after a transient disconnect) when the leader has
          * moved on to another commit. See BarrierState#token for more on this.
-         * [Note that [req] can be [null if the follower was unable to produce a
-         * valid response.]
+         * [Note that [req] can not safely be [null] since the follower must
+         * self-report its serviceId.]
          */
         @Override
         public IHANotifyReleaseTimeResponse notifyEarliestCommitTime(
                 final IHANotifyReleaseTimeRequest req) throws IOException,
                 InterruptedException, BrokenBarrierException {
 
+            /*
+             * Note: Do NOT error check [req] until we are in the try{} /
+             * finally {} below that will do the CyclicBarrier.await().
+             */
+            
             final BarrierState barrierState = barrierRef.get();
 
-            if (barrierState == null)
+            if (barrierState == null) {
+                
+                /*
+                 * If the BarrierState reference has been cleared then it is not
+                 * possible for us to count down at the barrier for this message
+                 * (since the CyclicBarrier is gone). Otherwise, we will await()
+                 * at the CyclicBarrier regardless of the message.
+                 */
+
                 throw new IllegalStateException();
+                
+            }
 
             try {
 
@@ -1534,6 +1609,9 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
                  * Note: We want to await() on the barrier even if there is an
                  * error in the try{} block. This is necessary to decrement the
                  * barrier count down to zero.
+                 * 
+                 * TODO If there is an error, we could reset() the barrier
+                 * instead.
                  */
 
                 // follower blocks on Thread on the leader here.
@@ -1545,9 +1623,10 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
             final IHANotifyReleaseTimeResponse resp = barrierState.consensus;
 
             if (resp == null) {
-
-                throw new RuntimeException("No consensus");
-
+                /*
+                 * Log error, but return anyway.
+                 */
+                haLog.error("No consensus");
             }
 
             return resp;

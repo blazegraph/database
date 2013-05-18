@@ -550,6 +550,24 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
     }
 
     /**
+     * This stress test was written after seeing rare failures in
+     * testStartAB_C_MultiTransactionResync_5tx_then_200ms_delay.
+     *
+     * Currently it offers a reliable failure.
+     *
+     * @throws Exception
+     */
+    public void _testStressStartAB_C_MultiTransactionResync()
+            throws Exception {
+
+        for (int i = 0; i < 50; i++) {
+            doStartAB_C_MultiTransactionResync(200, 5);
+            destroyAll();
+        }
+
+    }
+    
+    /**
      * Test where C starts after <i>initialTransactions</i> on A+B. A series of
      * transactions are issued with the specified delay.
      * 

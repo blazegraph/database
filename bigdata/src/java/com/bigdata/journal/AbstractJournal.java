@@ -7010,11 +7010,14 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
         public void gatherMinimumVisibleCommitTime(
                 final IHAGatherReleaseTimeRequest req) throws IOException {
 
-            if (haLog.isInfoEnabled()) haLog.info("req=" + req);
+            if (haLog.isInfoEnabled())
+                haLog.info("req=" + req);
 
             // Clear the old outcome. Reference SHOULD be null. Ensure not running.
             final Future<Void> oldFuture = gatherFuture.getAndSet(null);
-            if(oldFuture!=null&&!oldFuture.isDone()) oldFuture.cancel(true/*mayInterruptIfRunning*/);
+            
+            if (oldFuture != null && !oldFuture.isDone())
+                oldFuture.cancel(true/* mayInterruptIfRunning */);
             
             final Callable<Void> task = ((AbstractHATransactionService) AbstractJournal.this
                     .getLocalTransactionManager()
@@ -7038,12 +7041,48 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                 final IHANotifyReleaseTimeRequest req) throws IOException,
                 InterruptedException, BrokenBarrierException {
 
+            /*
+             * Note: Pass through [req] without checks. We need to get this
+             * message to the CyclicBarrier regardless of whether it is
+             * well-formed or valid.
+             */
+ 
             return ((HATXSGlue) AbstractJournal.this
                     .getLocalTransactionManager().getTransactionService())
                     .notifyEarliestCommitTime(req);
 
         }
+        
+        /**
+         * This exposes the clock used to assign transaction identifiers and
+         * commit times. It is being exposed to support certain kinds of
+         * overrides for unit tests.
+         * <p>
+         * Note: This method is NOT exposed to RMI. However, it can still be
+         * overridden by the unit tests.
+         * 
+         * @return The next timestamp from that clock.
+         */
+        public long nextTimestamp() {
 
+            try {
+
+                return AbstractJournal.this.getLocalTransactionManager()
+                        .getTransactionService().nextTimestamp();
+                
+            } catch (IOException ex) {
+                
+                /*
+                 * Note: This is a local method call. IOException will not be
+                 * thrown.
+                 */
+                
+                throw new RuntimeException(ex);
+                
+            }
+     
+        }
+        
         /*
          * IService
          */

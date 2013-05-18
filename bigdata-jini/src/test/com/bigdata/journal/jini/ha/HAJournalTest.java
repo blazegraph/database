@@ -42,6 +42,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 import net.jini.config.Configuration;
 import net.jini.config.ConfigurationException;
@@ -185,6 +186,22 @@ public class HAJournalTest extends HAJournal {
          */
         public void voteNo() throws IOException;
 
+        /**
+         * Set the next value to be reported by {@link BasicHA#nextTimestamp()}.
+         * <p>
+         * Note: Only a few specific methods call against
+         * {@link BasicHA#nextTimestamp()}. They do so precisely because they
+         * were written to allow us to override the clock in the test suite
+         * using this method.
+         * 
+         * @param nextTimestamp
+         *            when <code>-1L</code> the behavior will revert to the
+         *            default. Any other value will be the next value reported
+         *            by {@link BasicHA#nextTimestamp()}, after which the
+         *            behavior will revert to the default.
+         */
+        public void setNextTimestamp(long nextTimestamp) throws IOException;
+        
     }
 
     /**
@@ -314,6 +331,8 @@ public class HAJournalTest extends HAJournal {
          */
         private final AtomicBoolean voteNo = new AtomicBoolean(false);
 
+        private final AtomicLong nextTimestamp = new AtomicLong(-1L);
+        
         private HAGlueTestImpl(final UUID serviceId) {
 
             super(serviceId);
@@ -373,6 +392,13 @@ public class HAJournalTest extends HAJournal {
         @Override
         public void voteNo() throws IOException {
             voteNo.set(true);
+        }
+        
+        @Override
+        public void setNextTimestamp(long nextTimestamp) throws IOException {
+
+            this.nextTimestamp.set(nextTimestamp);
+            
         }
 
         /**
@@ -718,6 +744,27 @@ public class HAJournalTest extends HAJournal {
                     new Class[] { IHANotifyReleaseTimeRequest.class });
 
             return super.notifyEarliestCommitTime(req);
+
+        }
+        
+        /**
+         * {@inheritDoc}
+         * <p>
+         * Note: This is NOT an RMI method, but we want to be able to override
+         * it anyway to test the releaseTime consensus protocol.
+         */
+        @Override
+        public long nextTimestamp() {
+
+            final long t = nextTimestamp.getAndSet(-1L);
+
+            if (t == -1L) {
+
+                return super.nextTimestamp();
+
+            }
+
+            return t;
 
         }
 

@@ -1795,6 +1795,16 @@ public class HAJournal extends Journal {
                     + journal.getRootBlockView().getCommitCounter());
             innerRunStateStr.append(", haReady=" + getHAReady());
             innerRunStateStr.append(", haStatus=" + getHAStatus());
+            innerRunStateStr
+                    .append(", serviceId=" + quorumService == null ? "N/A"
+                            : quorumService.getServiceId());
+            /*
+             * TODO This is not a TXS timestamp. That would be more useful but I
+             * want to avoid taking the TXS lock. [It looks like the TXS does
+             * not need that synchronized keyword on nextTimestamp(). Try
+             * removing it and then using it here.]
+             */
+            innerRunStateStr.append(", now=" + System.currentTimeMillis());
             final String msg = server.getOperatorAlert();
             if (msg != null)
                 innerRunStateStr.append(", msg=[" + msg + "]");
