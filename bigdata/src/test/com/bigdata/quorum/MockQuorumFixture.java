@@ -60,7 +60,6 @@ import com.bigdata.ha.msg.IHALogRequest;
 import com.bigdata.ha.msg.IHALogRootBlocksRequest;
 import com.bigdata.ha.msg.IHALogRootBlocksResponse;
 import com.bigdata.ha.msg.IHARebuildRequest;
-import com.bigdata.ha.msg.IHARootBlockResponse;
 import com.bigdata.ha.msg.IHASendStoreResponse;
 import com.bigdata.ha.msg.IHASyncRequest;
 import com.bigdata.ha.msg.IHAWriteMessage;
@@ -195,11 +194,11 @@ public class MockQuorumFixture {
     private final ConcurrentHashMap<UUID, QuorumMember<?>> known = new ConcurrentHashMap<UUID, QuorumMember<?>>();
     
     /**
-     * An {@link Executor} which can be used by the unit tests.
+     * An {@link ExecutorService} which can be used by the unit tests.
      * 
      * @see QuorumMember#getExecutor()
      */
-    public Executor getExecutor() {
+    public ExecutorService getExecutor() {
         return executorService;
     }
 
@@ -1208,10 +1207,12 @@ public class MockQuorumFixture {
             }
         }
         
-        public Executor getExecutor() {
+        @Override
+        public ExecutorService getExecutor() {
             return executorService;
         }
 
+        @Override
         public S getService() {
             return service;
         }

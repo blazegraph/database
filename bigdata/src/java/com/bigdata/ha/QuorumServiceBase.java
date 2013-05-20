@@ -30,7 +30,7 @@ package com.bigdata.ha;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.UUID;
-import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeoutException;
 
@@ -184,7 +184,7 @@ abstract public class QuorumServiceBase<S extends HAGlue, L extends AbstractJour
     }
     
     @Override
-    public Executor getExecutor() {
+    public ExecutorService getExecutor() {
 
         return getLocalService().getExecutorService();
         

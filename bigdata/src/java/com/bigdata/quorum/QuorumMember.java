@@ -29,7 +29,7 @@ package com.bigdata.quorum;
 
 import java.rmi.Remote;
 import java.util.UUID;
-import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
 
 import com.bigdata.ha.HACommitGlue;
 import com.bigdata.ha.QuorumCommit;
@@ -80,10 +80,10 @@ public interface QuorumMember<S extends Remote> extends QuorumClient<S>,
     S getService();
 
     /**
-     * An {@link Executor} which may be used by the {@link QuorumMember} to run
-     * various asynchronous tasks.
+     * An {@link ExecutorService} which may be used by the {@link QuorumMember}
+     * to run various asynchronous tasks.
      */
-    Executor getExecutor();
+    ExecutorService getExecutor();
 
     /**
      * Return the actor for this {@link QuorumMember}.
