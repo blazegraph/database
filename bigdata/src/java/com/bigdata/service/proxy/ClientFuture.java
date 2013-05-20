@@ -134,6 +134,17 @@ public class ClientFuture<T> implements Future<T>, Serializable {
      */
     public boolean cancel(final boolean mayInterruptIfRunning) {
 
+        if (done) {
+
+            /*
+             * The task could not be cancelled (because it is already known to
+             * be done).
+             */
+            
+            return false;
+            
+        }
+
         try {
 
             return proxy.cancel(mayInterruptIfRunning);
