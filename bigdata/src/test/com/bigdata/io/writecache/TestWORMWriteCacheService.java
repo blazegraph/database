@@ -36,7 +36,7 @@ import java.nio.channels.FileChannel;
 import java.text.NumberFormat;
 import java.util.Random;
 import java.util.UUID;
-import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.RunnableFuture;
@@ -393,7 +393,7 @@ public class TestWORMWriteCacheService extends TestCase3 {
         }
 
         @Override
-        public Executor getExecutor() {
+        public ExecutorService getExecutor() {
             
             return fixture.getExecutor();
             

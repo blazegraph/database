@@ -95,7 +95,7 @@ abstract class MockQuorumMember<S extends Remote> extends AbstractQuorumMember<S
         }
     }
     
-    public Executor getExecutor() {
+    public ExecutorService getExecutor() {
         return executorService;
     }
 
