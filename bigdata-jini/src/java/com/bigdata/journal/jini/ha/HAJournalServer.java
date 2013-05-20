@@ -1566,6 +1566,10 @@ public class HAJournalServer extends AbstractServer {
                  * yet.
                  */
 //                server.haGlueService.bounceZookeeperConnection();
+                /*
+                 * Note: Try moving to doRejectedCommit() so this will be
+                 * synchronous.
+                 */
                 logLock.lock();
                 try {
                     if (journal.getHALogNexus().isHALogOpen()) {
@@ -3525,7 +3529,8 @@ public class HAJournalServer extends AbstractServer {
                     continue;
                 }
                 if (isFollower(token)) {// if (awaitRootBlocks) { 
-                    final IRootBlockView rbSelf = journal.getRootBlockView();
+                    // Check root block, using lock for synchronization barrier.
+                    final IRootBlockView rbSelf = journal.getRootBlockViewWithLock();
                     if (rbSelf.getCommitCounter() == 0L) {
                         /*
                          * Only wait if this is an empty Journal.

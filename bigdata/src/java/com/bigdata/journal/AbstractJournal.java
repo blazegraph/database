@@ -168,6 +168,7 @@ import com.bigdata.service.AbstractTransactionService;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.stream.Stream;
 import com.bigdata.util.ChecksumUtility;
+import com.bigdata.util.ClocksNotSynchronizedException;
 import com.bigdata.util.NT;
 
 /**
@@ -2452,6 +2453,43 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 //		}
 
 	}
+	
+    /**
+     * Variant of {@link #getRootBlockView()} that takes the internal lock in
+     * order to provide an appropriate synchronization barrier when installing
+     * new root blocks onto an empty journal in HA.
+     * 
+     * @see #installRootBlocks(IRootBlockView, IRootBlockView)
+     */
+    final public IRootBlockView getRootBlockViewWithLock() {
+
+        final ReadLock lock = _fieldReadWriteLock.readLock();
+
+        lock.lock();
+
+        try {
+
+            if (_rootBlock == null) {
+
+                /*
+                 * This can happen before the journal file has been created.
+                 * Once it has been created the root block will always be
+                 * non-null when viewed while holding the lock.
+                 */
+
+                throw new IllegalStateException();
+
+            }
+
+            return _rootBlock;
+
+        } finally {
+
+            lock.unlock();
+
+        }
+
+    }
 
     final public long getLastCommitTime() {
 
@@ -2805,16 +2843,74 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
     }
 
+    /**
+     * Get timestamp that will be assigned to this commit point.
+     * <P>
+     * Note: This will spin until commit time advances over
+     * <code>lastCommitTime</code>, but not for more than N milliseconds. This
+     * will allow us to ensure that time moves forward when the leader fails
+     * over to another node with modest clock skew. If there is a large clock
+     * skew, the operator intervention will be required.
+     * <p>
+     * Note: This also makes sense for a non-HA deployment since we still want
+     * time to move forward at each commit point.
+     * 
+     * TODO This also makes sense when the Journal is opened since we often
+     * issue queries against historical commit points on the journal based on
+     * the clock. [Unit test for this in standalone and HA modes?]
+     */
+    private long nextCommitTimestamp() {
+        final IRootBlockView rootBlock = _rootBlock;
+        final long lastCommitTime = rootBlock.getLastCommitTime();
+        if (lastCommitTime < 0)
+            throw new RuntimeException(
+                    "Last commit time is invalid in rootBlock: " + rootBlock);
+        final long commitTime;
+        {
+            final ILocalTransactionManager transactionManager = getLocalTransactionManager();
+
+            boolean warned = false;
+            while (true) {
+                final long t = transactionManager.nextTimestamp();
+                if (t > lastCommitTime) {
+                    /*
+                     * We have a distinct timestamp. Time is moving forward.
+                     */
+                    commitTime = t;
+                    break;
+                }
+                /*
+                 * Time is going backwards.  Figure out by how much.
+                 * 
+                 * Note: delta is in ms.
+                 */
+                final long delta = Math.abs(t - lastCommitTime);
+                if (delta > 5000/* ms */)
+                    throw new ClocksNotSynchronizedException("Clocks off by "
+                            + delta + " ms: lastCommitTime=" + lastCommitTime
+                            + ", but localTimestamp=" + t);
+                if (!warned) {
+                    log.warn("Clocks off by " + delta + " ms: lastCommitTime="
+                            + lastCommitTime + ", but localTimestamp=" + t);
+                    warned = true;
+                }
+                try {
+                    // Wait for the delta to expire.
+                    Thread.sleep(delta/* ms */);
+                } catch (InterruptedException ex) {
+                    // Propagate interrupt.
+                    Thread.currentThread().interrupt();
+                }
+            }
+        }
+        return commitTime;
+    }
+    
     @Override
 	public long commit() {
 
-		final ILocalTransactionManager transactionManager = getLocalTransactionManager();
-
-		/*
-		 * Get timestamp that will be assigned to this commit (RMI if the
-		 * journal is part of a distributed federation).
-		 */
-		final long commitTime = transactionManager.nextTimestamp();
+		// The timestamp to be assigned to this commit point.
+		final long commitTime = nextCommitTimestamp();
 
         // do the commit.
         final IRootBlockView lastRootBlock = _rootBlock;
@@ -2845,7 +2941,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 		 * e.g., due to a service outage.
 		 */
 
-		transactionManager.notifyCommit(commitTime);
+        getLocalTransactionManager().notifyCommit(commitTime);
 
 		return commitTime;
 
