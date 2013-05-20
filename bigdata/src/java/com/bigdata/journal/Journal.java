@@ -95,7 +95,6 @@ import com.bigdata.service.DataService;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.sparse.GlobalRowStoreHelper;
 import com.bigdata.sparse.SparseRowStore;
-import com.bigdata.util.ClocksNotSynchronizedException;
 import com.bigdata.util.InnerCause;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 import com.bigdata.util.concurrent.LatchedExecutor;
@@ -357,6 +356,11 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
         final private long timestampOnLeader;
         
         /**
+         * The {@link UUID} of the quorum leader.
+         */
+        final private UUID leaderId;
+        
+        /**
          * This is the earliest visible commit point on the leader.
          */
         final private IHANotifyReleaseTimeRequest leadersValue;
@@ -446,9 +450,11 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
             quorumService = getQuorum().getClient();
 
             this.joinedServiceIds = joinedServiceIds;
+
+            this.leaderId = quorumService.getServiceId();
             
             leadersValue = ((InnerJournalTransactionService) getTransactionService())
-                    .newHANotifyReleaseTimeRequest(quorumService.getServiceId());
+                    .newHANotifyReleaseTimeRequest(leaderId);
 
             // Note: Local method call.
             timestampOnLeader = leadersValue.getTimestamp();
@@ -481,8 +487,8 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
             // This is the timestamp for right now.
             final long timeNow = newConsensusProtocolTimestamp();
             
-            // The local clock must be moving forward.
-            assertBefore(timeLeader, timeNow);
+//            // The local clock must be moving forward.
+//            assertBefore(timeLeader, timeNow);
 
             // Start with the leader's value (from ctor).
             minimumResponse = leadersValue;
@@ -492,6 +498,8 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
                 if (log.isTraceEnabled())
                     log.trace("follower: " + response);
 
+                final UUID followerId = response.getServiceUUID();
+                
                 if (minimumResponse.getPinnedCommitCounter() > response
                         .getPinnedCommitCounter()) {
 
@@ -503,14 +511,16 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
                  * Verify that the timestamp from the ctor is BEFORE the
                  * timestamp assigned by the follower in the GatherTask.
                  */
-                assertBefore(timeLeader, response.getTimestamp());
+                assertBefore(leaderId, followerId, timeLeader,
+                        response.getTimestamp());
 
                 /*
                  * Verify that the timestamp from the GatherTask on the follower
                  * is before the timestamp obtained at the top of this run()
                  * method.
                  */
-                assertBefore(response.getTimestamp(), timeNow);
+                assertBefore(followerId, leaderId, response.getTimestamp(),
+                        timeNow);
 
             }
 
@@ -965,31 +975,6 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
             }
 
         }
-
-    }
-
-//    /**
-//     * The maximum error allowed (milliseconds) in the clocks.
-//     */
-//    private static final long epsilon = 3;
-    
-    /**
-     * Assert that t1 LT t2.
-     * 
-     * @param t1
-     *            A timestamp from one service.
-     * @param t2
-     *            A timestamp from another service.
-     * 
-     * @throws ClocksNotSynchronizedException
-     */
-    private void assertBefore(final long t1, final long t2)
-            throws ClocksNotSynchronizedException {
-
-        if (t1 < t2)
-            return;
-
-        throw new ClocksNotSynchronizedException();
 
     }
 
