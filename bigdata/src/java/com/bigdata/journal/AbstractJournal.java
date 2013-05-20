@@ -1759,6 +1759,67 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 //	}
 
     /**
+     * Assert that <code>t1</code> LT <code>t2</code>, where <code>t1</code> and
+     * <code>t2</code> are timestamps obtain such that this relation will be
+     * <code>true</code> if the clocks on the nodes are synchronized.
+     * <p>
+     * Note: Clock synchronization errors can arise across nodes if the nodes
+     * are not using a common network time source.
+     * <p>
+     * Note: Synchronization errors can arise on a single node if the clock is
+     * changed on that node - specifically if the clock is move backwards to
+     * before the most recent commit timestamp. For example, if the timezone is
+     * changed.
+     * 
+     * @param serviceId1
+     *            The service that reported the timestamp <code>t1</code>.
+     * @param serviceId2
+     *            The service that reported the timestamp <code>t2</code>.
+     * @param t1
+     *            A timestamp from one service.
+     * @param t2
+     *            A timestamp from the another service.
+     * 
+     * @throws ClocksNotSynchronizedException
+     */
+    protected void assertBefore(final UUID serviceId1, final UUID serviceId2,
+            final long t1, final long t2) throws ClocksNotSynchronizedException {
+
+        // Maximum allowed clock skew.
+        final long maxSkew = getMaximumClockSkewMillis();
+
+        final long delta = Math.abs(t1 - t2);
+
+        if (delta < maxSkew)
+            return;
+
+        throw new ClocksNotSynchronizedException("service1=" + serviceId1
+                + ", serviceId2=" + serviceId2 + ", skew=" + delta
+                + "ms exceeds maximumSkew=" + maxSkew + "ms.");
+
+    }
+    
+    /**
+     * The maximum error allowed (milliseconds) in the clocks. This is used by
+     * {@link #assertBefore(UUID, UUID, long, long)} to verify that the clocks
+     * are within some acceptable skew of one another. It is also used by
+     * {@link #nextCommitTimestamp()} where it specifies the maximum clock skew
+     * that will be corrected without operator intervention.
+     * 
+     * @see #assertBefore(UUID, UUID, long, long)
+     * 
+     *      FIXME HA TXS : Configuration Option. Note: This is not just an HA
+     *      issue. We also need to be able to override this in order to write on
+     *      a journal if the local clock is wildly different from the clock on
+     *      the machine where the journal was produced.
+     */
+    protected long getMaximumClockSkewMillis() {
+
+        return 5000;
+        
+    }
+
+    /**
      * The HA timeout in milliseconds for a 2-phase prepare.
      * 
      * @throws UnsupportedOperationException
@@ -2885,7 +2946,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                  * Note: delta is in ms.
                  */
                 final long delta = Math.abs(t - lastCommitTime);
-                if (delta > 5000/* ms */)
+                if (delta > getMaximumClockSkewMillis()/* ms */)
                     throw new ClocksNotSynchronizedException("Clocks off by "
                             + delta + " ms: lastCommitTime=" + lastCommitTime
                             + ", but localTimestamp=" + t);
