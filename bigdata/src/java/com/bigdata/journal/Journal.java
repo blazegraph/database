@@ -27,6 +27,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Collection;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -359,6 +360,13 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
          * This is the earliest visible commit point on the leader.
          */
         final private IHANotifyReleaseTimeRequest leadersValue;
+
+        /**
+         * Exception is set by {@link #run()} if there is a problem when the
+         * barrier breaks. The exception is then thrown out to the thread on
+         * the leader that is running commitNow(), forcing the commit to fail.
+         */
+        volatile Throwable cause = null;
         
         /**
          * The message from each of those followers providing their local
@@ -462,12 +470,20 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
         @Override
         public void run() {
 
+            try {
+            
             if (log.isInfoEnabled())
                 log.info("leader: " + leadersValue);
             
             // This is the timestamp from the BarrierState ctor.
             final long timeLeader = leadersValue.getTimestamp();
             
+            // This is the timestamp for right now.
+            final long timeNow = newConsensusProtocolTimestamp();
+            
+            // The local clock must be moving forward.
+            assertBefore(timeLeader, timeNow);
+
             // Start with the leader's value (from ctor).
             minimumResponse = leadersValue;
 
@@ -485,9 +501,16 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
 
                 /*
                  * Verify that the timestamp from the ctor is BEFORE the
-                 * timestamp assigned by the follower for its response.
+                 * timestamp assigned by the follower in the GatherTask.
                  */
                 assertBefore(timeLeader, response.getTimestamp());
+
+                /*
+                 * Verify that the timestamp from the GatherTask on the follower
+                 * is before the timestamp obtained at the top of this run()
+                 * method.
+                 */
+                assertBefore(response.getTimestamp(), timeNow);
 
             }
 
@@ -499,6 +522,13 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
             if (log.isInfoEnabled())
                 log.info("consensus: " + consensus);
 
+            } catch(Throwable t) {
+                
+                // Set the cause.
+                cause = t;
+                
+            }
+            
         }
 
         /**
@@ -553,26 +583,46 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
 //            final Future<Void>[] remoteFutures = new Future[joinedServiceIds.length];
 //            final boolean[] remoteDone = new boolean[joinedServiceIds.length];
             
+            final List<Future<Void>> futures = new LinkedList<Future<Void>>();
+
             try {
 
                 final IHAGatherReleaseTimeRequest msg = new HAGatherReleaseTimeRequest(
                         token, timestampOnLeader);
-
+                
                 // Do not send message to self (leader is at index 0).
                 for (int i = 1; i < joinedServiceIds.length; i++) {
 
                     final UUID serviceId = joinedServiceIds[i];
 
                     /*
-                     * Runnable which will execute this message on the remote
-                     * service.
+                     * Message each follower.
+                     * 
+                     * Note: The invoked RMI method submits the GatherTask that
+                     * executes on the follower and returns. It does not block
+                     * waiting for the outcome of the task on the follower.
+                     * Instead, we wait until the barrier breaks. A thread will
+                     * monitor the quorum state and break the barrier if the
+                     * quorum breaks or if a joined service leaves during the
+                     * consensus protocol.
+                     * 
+                     * Note: This uses multiple threads to issue the requests in
+                     * parallel against the followers in order to minimize the
+                     * latency of the protocol.
                      */
-                    
-                    // Resolve joined service.
-                    final HATXSGlue service = getService(serviceId);
-                    
-                    // Message joined service (can throw NPE if service is gone).
-                    service.gatherMinimumVisibleCommitTime(msg);
+                    // Note: throws RejectedExecutionException if shutdown.
+                    futures.add(getExecutorService().submit(
+                            new Callable<Void>() {
+                                public Void call() throws Exception {
+                                    // Resolve joined service.
+                                    final HATXSGlue service = getService(serviceId);
+                                    // Message remote service. 
+                                    // Note: NPE if [service] is gone.
+                                    service.gatherMinimumVisibleCommitTime(msg);
+                                    // Done.
+                                    return null;
+                                }
+                            }));
 
 //                    // add to list of futures we will check.
 //                    remoteFutures[i] = rf;
@@ -741,21 +791,17 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
 //                }
 
             } finally {
-//                /*
-//                 * Regardless of outcome or errors above, ensure that all remote
-//                 * futures are cancelled.
-//                 */
-//                for (int i = 0; i < remoteFutures.length; i++) {
-//                    final Future<Void> rf = remoteFutures[i];
-//                    if (!remoteDone[i]) {
-//                        // Cancel the request on the remote service (RMI).
-//                        try {
-//                            rf.cancel(true/* mayInterruptIfRunning */);
-//                        } catch (Throwable t) {
-//                            // ignored.
-//                        }
-//                    }
-//                }
+                /*
+                 * Cancel local futures for RMI messages to followers.
+                 * 
+                 * Note: Regardless of outcome or errors above, ensure that the
+                 * futures used to initiate the GatherTask on the followers are
+                 * cancelled. These are local Futures that do RMIs. The RMIs
+                 * should not block when the execute on the follower.
+                 */
+                for (Future<Void> f : futures) {
+                    f.cancel(true/* mayInterruptIfRunning */);
+                }
                 if (!barrier.isBroken()) {
                     /*
                      * If there were any followers that did not message the
@@ -773,10 +819,8 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
                      * "vote yes". Thus, a single node failure during the
                      * release time consensus protocol will cause the commit to
                      * fail. [Actually, we could use getNumberWaiting(). If it
-                     * is a bare majority, then we could force the barrier to
-                     * meet break (either with reset or with running an await()
-                     * in other threads) and take the barrier break action
-                     * ourselves. E.g., in the thread that calls
+                     * is a bare majority, then we could take the barrier break
+                     * action ourselves. E.g., in the thread that calls
                      * barrier.reset()].
                      */
                     barrier.reset();
@@ -933,11 +977,14 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
      * Assert that t1 LT t2.
      * 
      * @param t1
+     *            A timestamp from one service.
      * @param t2
+     *            A timestamp from another service.
      * 
      * @throws ClocksNotSynchronizedException
      */
-    private void assertBefore(final long t1, final long t2) {
+    private void assertBefore(final long t1, final long t2)
+            throws ClocksNotSynchronizedException {
 
         if (t1 < t2)
             return;
@@ -945,7 +992,19 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
         throw new ClocksNotSynchronizedException();
 
     }
-    
+
+    /**
+     * Note: This deliberately uses the (non-remote) method
+     * {@link BasicHA#nextTimestamp()}. This is done so we can write a unit test
+     * of the {@link GatherTask} that imposes clock skew by overridding the next
+     * value to be returned by that method.
+     */
+    private long newConsensusProtocolTimestamp() {
+
+        return ((BasicHA) getQuorum().getClient().getService()).nextTimestamp();
+
+    }
+
     /**
      * {@inheritDoc}
      * <p>
@@ -1109,6 +1168,17 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
                         throw new AssertionError();
 
                     }
+
+                }
+
+                if (barrierState.cause != null) {
+
+                    /*
+                     * If an exception was recorded, re-throw it in the thread
+                     * that invoked commitNow().
+                     */
+
+                    throw new RuntimeException(barrierState.cause);
 
                 }
 
@@ -1286,7 +1356,8 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
             final long commitTime = commitRecord == null ? 0
                     : commitRecord.getTimestamp();
 
-            final long now = getLocalTransactionManager().nextTimestamp();
+//            final long now = getLocalTransactionManager().nextTimestamp();
+            final long now = newConsensusProtocolTimestamp();
 
             final IHANotifyReleaseTimeRequest req = new HANotifyReleaseTimeRequest(
                     serviceId, commitTime, commitCounter, now);
@@ -1407,14 +1478,8 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
 
                     /*
                      * This timestamp is used to help detect clock skew.
-                     * 
-                     * Note: This deliberately uses the (non-remote)
-                     * nextTimestamp() method on BasicHA. This is being done so
-                     * we can write a unit test of the GatherTask that imposes
-                     * clock skew by overridding the next value to be returned
-                     * by that method.
                      */
-                    now = ((BasicHA)quorumService.getService()).nextTimestamp();
+                    now = newConsensusProtocolTimestamp();
 
                     /*
                      * If the token is invalid, making it impossible for us to
@@ -1428,10 +1493,16 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
                      * our response. If we hit an assertion, we will still
                      * respond in the finally {} block below.
                      */
-                    
-                    /* Verify event on leader occurs before event on follower.
+
+                    /*
+                     * Note: This assert has been moved to the leader when it
+                     * analyzes the messages from the followers. This allows us
+                     * to report out the nature of the exception on the leader
+                     * and thence back to the client.
                      */
-                    assertBefore(req.getTimestampOnLeader(), now);
+//                    /* Verify event on leader occurs before event on follower.
+//                     */
+//                    assertBefore(req.getTimestampOnLeader(), now);
 
                     if (!quorumService.isFollower(token))
                         throw new QuorumException();
@@ -1601,22 +1672,51 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
                 // Make a note of the message from this follower.
                 barrierState.responses.put(followerId, req);
                 
+            } catch(RuntimeException e) {
+                
+                /*
+                 * Note: The try {} block can throw RuntimeException but not
+                 * Exception. If anything is thrown, then reset the barrier and
+                 * rethrow the exception.
+                 */
+
+                haLog.error(e, e);
+                
+                // Reset the barrier (barrier will break).
+                barrierState.barrier.reset();
+                
+                // Rethrow the exception.
+                throw new RuntimeException(e);
+                
             } finally {
                 
                 /*
                  * Block until barrier breaks.
                  * 
-                 * Note: We want to await() on the barrier even if there is an
-                 * error in the try{} block. This is necessary to decrement the
-                 * barrier count down to zero.
-                 * 
-                 * TODO If there is an error, we could reset() the barrier
-                 * instead.
+                 * Note: The barrier will break immediately if it was reset in
+                 * the catch{} block above.
                  */
 
                 // follower blocks on Thread on the leader here.
                 barrierState.barrier.await();
                 
+            }
+
+            /*
+             * Check for an error in the consensus protocol.
+             */
+            final Throwable t = barrierState.cause;
+
+            if (t != null) {
+
+                /*
+                 * Log error.
+                 */
+                haLog.error(t, t);
+
+                // rethrow cause.
+                throw new RuntimeException(t);
+
             }
 
             // Return the consensus.
@@ -1630,7 +1730,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
             }
 
             return resp;
-  
+
         }
 
         /**
