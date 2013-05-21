@@ -61,6 +61,11 @@ public class FunctionNode extends ValueExpressionNode {
 	    super(args, NV.asMap(new NV[] {
                 new NV(Annotations.SCALAR_VALS, scalarValues),
                 new NV(Annotations.FUNCTION_URI, functionURI), }));
+
+	    if (functionURI == null)
+            throw new IllegalArgumentException();
+        
+	    // scalarValues MAY be null.
 	    
 //		super(args, null/*anns*/);
 //		
@@ -73,8 +78,10 @@ public class FunctionNode extends ValueExpressionNode {
     /**
      * Required deep copy constructor.
      */
-    public FunctionNode(FunctionNode op) {
+    public FunctionNode(final FunctionNode op) {
+
         super(op);
+        
     }
 
     /**
