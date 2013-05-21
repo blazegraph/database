@@ -807,6 +807,8 @@ public class HAJournal extends Journal {
              */
             final IHALogReader r = getHALogNexus().getReader(commitCounter);
 
+            final boolean isLive = r.isLive();
+            
             // Task sends an HALog file along the pipeline.
             final FutureTask<Void> ft = new FutureTaskMon<Void>(
                     new SendHALogTask(req, r));
@@ -814,8 +816,36 @@ public class HAJournal extends Journal {
             // Run task.
             getExecutorService().submit(ft);
             
-            // Return *ASYNCHRONOUS* proxy (interruptable).
-            return getProxy(ft, true/* asynch */);
+            /**
+             * Return Future.
+             * 
+             * FIXME DGC: This leaks a thread every time we return an
+             * asynchronous proxy, but we need the ability to interrupt the
+             * transfer of an HALog file.
+             * 
+             * Look at HAJournalServer and how it manages the transition to a
+             * joined service in RESYNC and identify a different mechanism for
+             * interrupting the transfer of the HALog.
+             * 
+             * Consider using a well known exception thrown back long the write
+             * pipeline to indicate that a receiver is done recieving data for
+             * some HALog (or backing store) or sending a message which
+             * explicitly cancels a transfer using an identifier for that
+             * transfer. If this is done synchronously while in
+             * handleReplicatedWrite then we will get the same decidability as
+             * using an asyncrhonous future, but without the thread leak
+             * problem.
+             * 
+             * This issue is most pressing for sendHALogForWriteSet() since we
+             * can synchronous many 1000s of HALog files when resynchronizing a
+             * service. However, the same DGC thread leak exists for several
+             * other methods as specified on the ticket below.
+             * 
+             * @see <a
+             *      href="https://sourceforge.net/apps/trac/bigdata/ticket/678"
+             *      > DGC Thread Leak: sendHALogForWriteSet() </a>
+             */
+            return getProxy(ft, isLive/* asynch */);
 
         }
 

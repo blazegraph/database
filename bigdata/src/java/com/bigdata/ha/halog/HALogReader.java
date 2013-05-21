@@ -173,6 +173,7 @@ public class HALogReader implements IHALogReader {
 		}
 	};
 
+    @Override
 	public void close() {
 
 		if (m_channel.isOpen()) {
@@ -189,6 +190,14 @@ public class HALogReader implements IHALogReader {
 
 	}
 
+	@Override
+	public boolean isLive() {
+
+	    return false;
+	    
+	}
+	
+    @Override
 	public boolean isEmpty() {
 
 		return m_openRootBlock.getCommitCounter() == m_closeRootBlock
@@ -219,6 +228,7 @@ public class HALogReader implements IHALogReader {
 
 	}
 
+    @Override
 	public boolean hasMoreBuffers() throws IOException {
 
 		assertOpen();
@@ -260,6 +270,7 @@ public class HALogReader implements IHALogReader {
 
 	}
 
+    @Override
 	public IHAWriteMessage processNextBuffer(final ByteBuffer clientBuffer)
 			throws IOException {
 
