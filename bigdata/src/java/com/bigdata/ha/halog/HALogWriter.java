@@ -857,6 +857,13 @@ public class HALogWriter implements IHALogWriter {
 			m_state.m_accessors++;
 		}
 
+		@Override
+		public boolean isLive() {
+
+		    return true;
+		    
+		}
+		
         @Override
         public IRootBlockView getOpeningRootBlock() throws IOException {
 

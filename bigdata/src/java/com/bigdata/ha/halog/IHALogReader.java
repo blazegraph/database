@@ -126,4 +126,9 @@ public interface IHALogReader {
     void computeDigest(MessageDigest digest) throws DigestException,
             IOException;
 
+    /**
+     * Return <code>true</code> iff this is was the live HALog at the moment
+     * when it was opened.
+     */
+    boolean isLive();
 }
