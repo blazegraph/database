@@ -745,15 +745,15 @@ public class HALogFile {
 
 		}
 
-		/**
-		 * The {@link IRootBlockView} for the committed state BEFORE the write
-		 * set contained in the HA log file.
-		 */
-		public HALogFile getHALogFile() {
-
-			return HALogFile.this;
-
-		}
+//		/**
+//		 * The {@link IRootBlockView} for the committed state BEFORE the write
+//		 * set contained in the HA log file.
+//		 */
+//		public HALogFile getHALogFile() {
+//
+//			return HALogFile.this;
+//
+//		}
 
 		public boolean hasMoreBuffers() throws IOException {
 

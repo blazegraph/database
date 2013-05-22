@@ -33,6 +33,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.security.DigestException;
 import java.security.MessageDigest;
+import java.util.Arrays;
 
 import org.apache.log4j.Logger;
 
@@ -176,20 +177,29 @@ public class HALogReader implements IHALogReader {
     @Override
 	public void close() {
 
-		if (m_channel.isOpen()) {
+		if (isOpen()) {
 
 			try {
-				m_raf.close();
+                
+			    m_raf.close();
+
 			} catch (IOException e) {
-				log
-						.error("Problem closing file: file=" + m_file + " : "
-								+ e, e);
-			}
+			    
+                log.error("Problem closing file: file=" + m_file + " : " + e, e);
+                
+            }
 
 		}
 
 	}
 
+    @Override
+    public boolean isOpen() {
+
+        return m_channel.isOpen();
+        
+    }
+    
 	@Override
 	public boolean isLive() {
 
@@ -438,6 +448,17 @@ public class HALogReader implements IHALogReader {
 			}
 		});
 
+        /*
+         * Sort into lexical order to force visitation in lexical order.
+         * 
+         * Note: This should work under any OS. Files will be either directory
+         * names (3 digits) or filenames (21 digits plus the file extension).
+         * Thus the comparison centers numerically on the digits that encode
+         * either part of a commit counter (subdirectory) or an entire commit
+         * counter (HALog file).
+         */
+		Arrays.sort(files);
+		
 		for (File file : files) {
 
 			if (file.isDirectory()) {

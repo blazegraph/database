@@ -6142,13 +6142,13 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
         }
 
-        @Override
-        public Future<Void> globalWriteLock(final IHAGlobalWriteLockRequest req)
-                throws IOException, TimeoutException, InterruptedException {
-
-            throw new UnsupportedOperationException();
-
-        }
+//        @Override
+//        public Future<Void> globalWriteLock(final IHAGlobalWriteLockRequest req)
+//                throws IOException, TimeoutException, InterruptedException {
+//
+//            throw new UnsupportedOperationException();
+//
+//        }
 
         @Override
         public Future<IHASnapshotResponse> takeSnapshot(

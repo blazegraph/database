@@ -29,18 +29,116 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Random;
 import java.util.UUID;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+
+import junit.framework.TestCase2;
 
 import com.bigdata.ha.msg.HAWriteMessage;
+import com.bigdata.ha.msg.IHAMessage;
 import com.bigdata.ha.msg.IHAWriteMessage;
+import com.bigdata.io.DirectBufferPool;
+import com.bigdata.journal.CommitCounterUtility;
 import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.RootBlockView;
 import com.bigdata.journal.StoreTypeEnum;
+import com.bigdata.rawstore.Bytes;
 import com.bigdata.util.ChecksumUtility;
+import com.bigdata.util.concurrent.DaemonThreadFactory;
 
-import junit.framework.TestCase;
+/**
+ * Test suite for {@link HALogWriter} and {@link HALogReader}.
+ * 
+ * @author <a href="mailto:martyncutcher@users.sourceforge.net">Martyn Cutcher</a>
+ * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ */
+public class TestHALogWriter extends TestCase2 {
 
-public class TestHALogWriter extends TestCase {
+    private Random r;
+    private File logdir;
+    private ExecutorService executorService;
 
+    @Override
+    protected void setUp() throws Exception {
+
+        super.setUp();
+
+        // create temporary file for the test.
+        logdir = File.createTempFile(getClass().getSimpleName(), "halogdir");
+
+        // delete temp file. will recreate as a directory.
+        if (!logdir.delete())
+            throw new IOException("Could not remove: file=" + logdir);
+        
+        // re-create as a directory.
+        if (!logdir.mkdirs())
+            throw new IOException("Could not create: dir=" + logdir);
+
+        r = new Random();
+        
+        executorService = Executors.newCachedThreadPool(DaemonThreadFactory
+                .defaultThreadFactory());
+        
+    }
+    
+    @Override
+    protected void tearDown() throws Exception {
+
+        super.tearDown();
+
+        r = null;
+
+        if (logdir != null && logdir.exists()) {
+
+            recursiveDelete(logdir);
+
+        }
+
+        if (executorService != null) {
+
+            executorService.shutdownNow();
+
+            executorService = null;
+
+        }
+
+    }
+    
+    /**
+     * Recursively removes any files and subdirectories and then removes the
+     * file (or directory) itself. 
+     * 
+     * @param f
+     *            A file or directory.
+     */
+    private void recursiveDelete(final File f) {
+
+        if (f.isDirectory()) {
+
+            final File[] children = f.listFiles();
+
+            for (int i = 0; i < children.length; i++) {
+
+                recursiveDelete(children[i]);
+
+            }
+
+        }
+
+        if (log.isInfoEnabled())
+            log.info("Removing: " + f);
+
+        if (f.exists() && !f.delete()) {
+
+            log.warn("Could not remove: " + f);
+
+        }
+
+    }
+    
 	/*
 	 * Need to mock up some valid rootblocks
 	 * 
@@ -53,7 +151,7 @@ public class TestHALogWriter extends TestCase {
 	 * storeTypeEnum, // VERSION1 final long createTime, final long closeTime,
 	 * final int version, final ChecksumUtility checker)
 	 */
-	private IRootBlockView openRBV(final StoreTypeEnum st) {
+	private static IRootBlockView openRBV(final StoreTypeEnum st) {
 		return new RootBlockView(
 				//
 				true /* rb0 */, 0, 0, 0 /* commitTime */, 0,
@@ -84,235 +182,508 @@ public class TestHALogWriter extends TestCase {
 				RootBlockView.currentVersion, ChecksumUtility.getCHK());
 	}
 
-	final static Random r = new Random();
+	private ByteBuffer randomData(final int sze) {
 
-	static ByteBuffer randomData(final int sze) {
-		byte[] buf = new byte[sze];
-		r.nextBytes(buf);
+	    final byte[] buf = new byte[sze];
+		
+	    r.nextBytes(buf);
 
 		return ByteBuffer.wrap(buf, 0, sze);
+		
 	}
 
-	/**
-	 * Simple writelog test, open file, write data and commit.
-	 */
-	public void testSimpleRWWriter() throws FileNotFoundException, IOException {
-		// establish halogdir
-		File logdir = new File("/tmp/halogdir");
-		logdir.mkdirs();
+    /**
+     * Simple writelog test, open file, write data and commit.
+     */
+    public void testSimpleRWWriter() throws FileNotFoundException, IOException,
+            InterruptedException {
 
-		final ChecksumUtility checker = ChecksumUtility.getCHK();
+        final HALogWriter writer = new HALogWriter(logdir);
 
-		final HALogWriter writer = new HALogWriter(logdir);
-		final IRootBlockView rbv = openRBV(StoreTypeEnum.RW);
+        try {
 
-		assertTrue(rbv.getStoreType() == StoreTypeEnum.RW);
+            final IRootBlockView rbv = openRBV(StoreTypeEnum.RW);
 
-		writer.createLog(rbv);
+            assertEquals(StoreTypeEnum.RW, rbv.getStoreType());
 
-		int sequence = 0;
+            writer.createLog(rbv);
 
-		final ByteBuffer data = randomData(2000);
+            int sequence = 0;
 
-		final UUID storeUUID = UUID.randomUUID();
-		
-		IHAWriteMessage msg = new HAWriteMessage(storeUUID, rbv.getCommitCounter(), rbv
-				.getFirstCommitTime(), sequence, data.limit(), checker
-				.checksum(data), rbv.getStoreType(), rbv.getQuorumToken(),
-				1000, 0);
+            final ByteBuffer data = randomData(2000);
 
-		writer.writeOnHALog(msg, data);
+            final UUID storeUUID = UUID.randomUUID();
 
-		writer.closeHALog(closeRBV(rbv));
+            final IHAWriteMessage msg = new HAWriteMessage(storeUUID,
+                    rbv.getCommitCounter(), rbv.getFirstCommitTime(), sequence,
+                    data.limit()/* size */, ChecksumUtility.getCHK().checksum(
+                            data), rbv.getStoreType(), rbv.getQuorumToken(),
+                    1000/* fileExtent */, 0/* firstOffset */);
 
-		// for sanity, let's run through the standard reader
-		try {
-			HALogReader.main(new String[] { "/tmp/halogdir" });
-		} catch (InterruptedException e) {
-			// NOP
-		}
+            writer.writeOnHALog(msg, data);
+
+            writer.closeHALog(closeRBV(rbv));
+
+        } finally {
+
+            writer.disableHALog();
+
+        }
+
+        // Read all files in the test directory.
+        HALogReader.main(new String[] { logdir.toString() });
+
 	}
 
 	/**
 	 * Simple WriteReader, no concurrency, confirms non-delayed responses.
 	 */
 	public void testSimpleRWWriterReader() throws FileNotFoundException,
-			IOException {
-		// establish halogdir
-		File logdir = new File("/tmp/halogdir");
-		logdir.mkdirs();
-
-		final ChecksumUtility checker = ChecksumUtility.getCHK();
+			IOException, InterruptedException {
 
 		final HALogWriter writer = new HALogWriter(logdir);
-		final IRootBlockView rbv = openRBV(StoreTypeEnum.RW);
-
-		assertTrue(rbv.getStoreType() == StoreTypeEnum.RW);
-
-		writer.createLog(rbv);
-
-		int sequence = 0;
-
-		final ByteBuffer data = randomData(2000);
-
-		final UUID storeUUID = UUID.randomUUID();
-
-		final IHAWriteMessage msg = new HAWriteMessage(storeUUID, rbv.getCommitCounter(), rbv
-				.getFirstCommitTime(), sequence, data.limit(), checker
-				.checksum(data), rbv.getStoreType(), rbv.getQuorumToken(),
-				1000, 0);
-
-		writer.writeOnHALog(msg, data);
-
-		final IHALogReader reader = writer.getReader();
-
-		assertTrue(reader.hasMoreBuffers());
-
-		ByteBuffer rbuf = ByteBuffer.allocate(1 * 1024 * 1024); // 1 mb
-		IHAWriteMessage rmsg = reader.processNextBuffer(rbuf);
-
-		assertTrue(rmsg.getSize() == msg.getSize());
-
-		// commit the log file
-		writer.closeHALog(closeRBV(rbv));
-
-		// the writer should have closed the file, so the reader should return
-		// immediately to report no more buffers
-		assertFalse(reader.hasMoreBuffers());
-
-		// for sanity, let's run through the standard reader
+		
 		try {
-			HALogReader.main(new String[] { "/tmp/halogdir" });
-		} catch (InterruptedException e) {
-			// NOP
+
+		    // The opening root block.
+            final IRootBlockView openRB = openRBV(StoreTypeEnum.RW);
+
+            assertEquals(StoreTypeEnum.RW, openRB.getStoreType());
+
+            {
+                // should not be able to open the reader yet.
+                try {
+                    writer.getReader(openRB.getCommitCounter() + 1);
+                } catch (FileNotFoundException ex) {
+                    // Ignore expected exception.
+                    if (log.isInfoEnabled())
+                        log.info("Ignoring expected exception: " + ex);
+                }
+
+            }
+
+            // writer is not open.
+            assertFalse(writer.isHALogOpen());
+
+            // create HALog file.
+            writer.createLog(openRB);
+
+            {
+
+                // writer is open.
+                assertTrue(writer.isHALogOpen());
+             
+                // should be able to open the reader for that log now.
+                final IHALogReader reader = writer.getReader(openRB
+                        .getCommitCounter() + 1);
+
+                // This is the "live" HALog.
+                assertTrue(reader.isLive());
+
+                // The reader is open.
+                assertTrue(reader.isOpen());
+                
+                // The HALog is logically empty.
+//                assertTrue(reader.isEmpty());
+                
+                /*
+                 * Note: Don't do this here. The method will block for the live
+                 * HALog until the file is closed (sealed with the closing root
+                 * block) or destroyed.
+                 */
+//                assertTrue(reader.hasMoreBuffers());
+
+                // close the reader. should not close the writer.
+                reader.close();
+
+                // the reader is closed.
+                assertFalse(reader.isOpen());
+               
+                // once closed, this method should return immediately.
+                assertFalse(reader.hasMoreBuffers());
+                
+                // the writer is still open.
+                assertTrue(writer.isHALogOpen());
+
+                // double-close the reader. should be ignored.
+                reader.close();
+                
+                // the writer should *still* be open.
+                assertTrue(writer.isHALogOpen());
+                
+            }
+
+            /*
+             * Verify that we can open two distinct readers on the same live
+             * HALog and that closing one does not close the other and does not
+             * close the writer.
+             */
+            {
+                
+                final IHALogReader r1 = writer.getReader(openRB.getCommitCounter() + 1);
+                final IHALogReader r2 = writer.getReader(openRB.getCommitCounter() + 1);
+                
+                assertTrue(r1.isOpen());
+                assertTrue(r2.isOpen());
+
+                // close one reader.
+                r1.close();
+               
+                // one reader is closed, the other is open.
+                assertFalse(r1.isOpen());
+                assertTrue(r2.isOpen());
+
+                // the writer should *still* be open.
+                assertTrue(writer.isHALogOpen());
+
+                // close the other reader.
+                r2.close();
+
+                // Verify both are now closed.
+                assertFalse(r2.isOpen());
+                assertFalse(r2.isOpen());
+                
+                // the writer should *still* be open.
+                assertTrue(writer.isHALogOpen());
+
+            }
+            
+            int sequence = 0;
+
+            final ByteBuffer data = randomData(2000);
+
+            final UUID storeUUID = UUID.randomUUID();
+
+            final IHAWriteMessage msg = new HAWriteMessage(storeUUID,
+                    openRB.getCommitCounter(), openRB.getFirstCommitTime(), sequence,
+                    data.limit()/* size */, ChecksumUtility.getCHK().checksum(
+                            data), openRB.getStoreType(), openRB.getQuorumToken(),
+                    1000/* fileExtent */, 0/* firstOffset */);
+
+            // write a message on the HALog.
+            writer.writeOnHALog(msg, data);
+
+            // should be able to open the reader for that log now.
+            final IHALogReader reader = writer
+                    .getReader(openRB.getCommitCounter() + 1);
+
+            assertTrue(reader.hasMoreBuffers());
+
+            {
+
+                // Allocate heap byte buffer for the reader.
+                final ByteBuffer rbuf = ByteBuffer
+                        .allocate(DirectBufferPool.INSTANCE.getBufferCapacity());
+
+                final IHAWriteMessage rmsg = reader.processNextBuffer(rbuf);
+
+                assertEquals(rmsg.getSize(), msg.getSize());
+                
+            }
+
+            // commit the log file (write the closing root block).
+            writer.closeHALog(closeRBV(openRB));
+
+            /*
+             * The writer should have closed the file, so the reader should
+             * return immediately to report no more buffers.
+             */
+            assertFalse(reader.hasMoreBuffers());
+
+        } finally {
+
+		    writer.disableHALog();
+		    
 		}
+		
+        // Read all HALog files in the test directory.
+        HALogReader.main(new String[] { logdir.toString() });
+
 	}
 
 	/**
 	 * SimpleWriter writes a number of log files with a set of messages in each
 	 */
-	static class SimpleWriter implements Runnable {
-		final ByteBuffer data = randomData(2000);
+	private class SimpleWriter implements Callable<Void> {
 
-		int sequence = 0;
+		private IRootBlockView openRB;
+		private final HALogWriter writer;
+		private final int count;
 
-		private IRootBlockView rbv;
-		private HALogWriter writer;
-		private ChecksumUtility checker;
-		private int count;
+        /**
+         * 
+         * @param openRB
+         *            The opening root block.
+         * @param writer
+         *            The {@link HALogWriter}.
+         * @param count
+         *            The HALog files to write. Each will have a random #of
+         *            records.
+         */
+        SimpleWriter(final IRootBlockView openRB, final HALogWriter writer,
+                final int count) {
 
-		SimpleWriter(IRootBlockView rbv, HALogWriter writer, ChecksumUtility checker, int count) {
-			this.rbv = rbv;
+            this.openRB = openRB;
 			this.writer = writer;
-			this.checker = checker;
 			this.count = count;
+
 		}
 		
 		@Override
-		public void run() {
-	        final UUID storeUUID = UUID.randomUUID();
-			try {
-				for (int i = 0; i < count; i++) {
-					// add delay to write thread to test read thread waiting for data
-					Thread.sleep(10);
-					final IHAWriteMessage msg = new HAWriteMessage(storeUUID, rbv
-							.getCommitCounter(), rbv.getLastCommitTime(),
-							sequence++, data.limit(), checker
-									.checksum(data), rbv.getStoreType(),
-							rbv.getQuorumToken(), 1000, 0);
+		public Void call() throws Exception {
 
-					writer.writeOnHALog(msg, data);
-					if (((i+1) % (1 + r.nextInt(count/3))) == 0) {
-						System.out.println("Cycling HALog after " + sequence + " records");
-						rbv = closeRBV(rbv);
-						writer.closeHALog(rbv);
-						sequence = 0;
-						writer.createLog(rbv);
-					}
-				}
-				rbv = closeRBV(rbv);
-				writer.closeHALog(rbv);
-			} catch (FileNotFoundException e) {
-				e.printStackTrace();
-			} catch (IOException e) {
-				e.printStackTrace();
-			} catch (InterruptedException e) {
-				e.printStackTrace();
-			}
-		}
-		
+		    final UUID storeUUID = UUID.randomUUID();
+            final long fileExtent = 1000; // NB: ignored for test.
+            final long firstOffset = 0; // NB: ignored for test.
+            
+            // Note: Thread Local!  Can not be passed in by the caller.
+            final ChecksumUtility checker = ChecksumUtility.getCHK();
+			
+            for (int i = 0; i < count; i++) {
+
+                // Min of 1 message. Max of r.nextInt().
+                final long nmessages = r.nextInt(100) + 1;
+                
+                for (long sequence = 0; sequence < nmessages; sequence++) {
+                
+                    // add delay to write thread to test reader waiting
+                    Thread.sleep(10);
+
+                    // Use random data of random length.
+                    final int size = r.nextInt(4 * Bytes.kilobyte32) + 1;
+
+                    final ByteBuffer data = randomData(size);
+
+                    final IHAWriteMessage msg = new HAWriteMessage(storeUUID,
+                            openRB.getCommitCounter(),
+                            openRB.getLastCommitTime(), sequence, size,
+                            checker.checksum(data), openRB.getStoreType(),
+                            openRB.getQuorumToken(), fileExtent, firstOffset);
+
+                    writer.writeOnHALog(msg, data);
+
+                }
+
+                if (log.isInfoEnabled())
+                    log.info("Cycling HALog after " + nmessages + " records");
+
+                // close log.
+                writer.closeHALog(openRB = closeRBV(openRB));
+                
+                // open new log.
+                writer.createLog(openRB);
+
+            } // next HALog file.
+
+            // Close the last HALog.
+            writer.closeHALog(openRB = closeRBV(openRB));
+
+            // Done.
+            return null;
+
+        }
+
+    } // class SimpleWriter.
+
+    /**
+     * Reader consumes an HALog file. The file must exist before you start
+     * running the {@link ReaderTask}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+     *         Thompson</a>
+     */
+	private static class ReaderTask implements Callable<Long> {
+
+	    private final long commitCounter;
+	    private final HALogWriter writer;
+        private final Future<Void> wf;
+
+        /**
+         * 
+         * @param commitCounter
+         *            The commit counter that identifies the closing commit
+         *            point for the HALog file to be read.
+         * @param writer
+         *            The {@link HALogWriter}.
+         * @param wf
+         *            The {@link Future} for the {@link HALogWriter}. This is
+         *            used to monitor for an error in the writer so the reader
+         *            does not block the test from completing (or failing).
+         */
+        public ReaderTask(final long commitCounter, final HALogWriter writer,
+                final Future<Void> wf) {
+
+            this.commitCounter = commitCounter;
+
+            this.writer = writer;
+
+            this.wf = wf;
+
+	    }
+
+        /** Test future if done. Throws exception if writer fails. */
+        private void checkWriterFuture() throws InterruptedException,
+                ExecutionException {
+
+            if (wf.isDone()) {
+
+                wf.get();
+
+            }
+
+        }
+
+	    /**
+	     *
+	     * @return The #of {@link IHAMessage}s read from the file.
+	     */
+        @Override
+        public Long call() throws Exception {
+
+            // Allocate a heap ByteBuffer
+            final ByteBuffer rbuf = ByteBuffer
+                    .allocate(DirectBufferPool.INSTANCE.getBufferCapacity());
+
+            // Note: Throws FileNotFoundException if does not exist.
+            final IHALogReader reader = writer.getReader(commitCounter);
+
+            assertNotNull(reader);
+
+            long nread = 0L;
+            
+            try {
+
+                while (reader.hasMoreBuffers()) {
+
+                    checkWriterFuture();
+
+                    final IHAWriteMessage rmsg = reader.processNextBuffer(rbuf);
+
+                    if (log.isDebugEnabled())
+                        log.debug("Read message: " + rmsg.getSequence()
+                                + ", size: " + rmsg.getSize());
+
+                    assertEquals(nread, rmsg.getSequence());
+
+                    nread++;
+
+                    checkWriterFuture();
+
+                }
+                
+                return nread;
+                
+            } finally {
+
+                /*
+                 * Note: This should not throw an IOException.
+                 * 
+                 * Note: It it does throw an IOException, then it can also be
+                 * masking an error in the try{} above. Diagnose both if you get
+                 * anything thrown out of here.
+                 */
+ 
+                reader.close();
+                
+            }
+            
+        }
+
 	}
+	
 	/**
 	 * While a writer thread writes a number of HALogs, readers are opened
 	 * to process them.
+	 * 
+	 * @throws Exception 
 	 */
-	public void testConcurrentRWWriterReader() throws FileNotFoundException,
-			IOException {
-		// establish halogdir
-		File logdir = new File("/tmp/halogdir");
-		logdir.mkdirs();
-
-		final ChecksumUtility checker = ChecksumUtility.getCHK();
+    public void testConcurrentRWWriterReader() throws Exception {
 
 		final HALogWriter writer = new HALogWriter(logdir);
-		final IRootBlockView rbv = openRBV(StoreTypeEnum.RW);
+		
+        final IRootBlockView rbv = openRBV(StoreTypeEnum.RW);
 
-		assertTrue(rbv.getStoreType() == StoreTypeEnum.RW);
+        assertEquals(StoreTypeEnum.RW, rbv.getStoreType());
 
 		writer.createLog(rbv);
 
-//		final ByteBuffer data = randomData(2000);
+        // The #of HALog files to write. If GT 1000, then more than one
+        // subdirectory worth of files will be written.
+        final int nfiles = 100 + r.nextInt(1000);
 
-		Thread wthread = new Thread(new SimpleWriter(rbv, writer, checker, 500));
+        // Start the writer.
+        final Future<Void> wf = executorService.submit(new SimpleWriter(rbv,
+                writer, nfiles));
 
-		Runnable rreader = new Runnable() {
+        try {
 
-			ByteBuffer rbuf = ByteBuffer.allocate(1 * 1024 * 1024); // 1 mb
+            /*
+             * Now keep on opening readers for "current file" while writer
+             * continues.
+             * 
+             * Note: The writer will write multiple files. For each file that it
+             * writes, we run the reader until it is done, then we open a new
+             * reader on the next HALog file.
+             */
+            for (long commitCounter = 1L; commitCounter <= nfiles; commitCounter++) {
 
-			@Override
-			public void run() {
-				final IHALogReader reader = writer.getReader();
-				if (reader == null) {
-					return;
-				}
-				
-				try {
-					while (reader.hasMoreBuffers()) {
-                        final IHAWriteMessage rmsg = reader
-                                .processNextBuffer(rbuf);
+                /*
+                 * Note: We need to spin here in case the reader tries to open
+                 * the HALog for reading before the writer has created the HALog
+                 * for that commit point. This can be done by monitoring the
+                 * writer or the file system.
+                 */
+                final File file = CommitCounterUtility.getCommitCounterFile(
+                        logdir, commitCounter, IHALogReader.HA_LOG_EXT);
 
-//						System.out.println("Read message: " + rmsg.getSequence()
-//								+ ", size: " + rmsg.getSize());
-					}
-				} catch (IOException e) {
-					e.printStackTrace();
-				}
-			}
+                while (!file.exists()) {
 
-		};
-		
-		// start the writer first
-		wthread.start();
-		
-		// now keep on opening readers for "current file" while writer continues
-		while (wthread.isAlive()) {
-			Thread rthread = new Thread(rreader);
-			rthread.start();
-			while (rthread.isAlive()) {
-				try {
-					Thread.sleep(10);
-				} catch (InterruptedException e) {
-					break;
-				}
-			}
-		}
+                    if (wf.isDone()) {
+                        // Check writer for errors.
+                        wf.get();
+                    }
 
-		// for sanity, let's run through the standard reader
-		try {
-			HALogReader.main(new String[] { "/tmp/halogdir" });
-		} catch (InterruptedException e) {
-			// NOP
-		}
+                    if (log.isInfoEnabled())
+                        log.info("Blocked waiting on writer: commitCounter="
+                                + commitCounter + ", file=" + file);
+                    
+                    // Wait for the file.
+                    Thread.sleep(100/* ms */);
+
+                }
+
+                /*
+                 * Open and read the next HALog file, blocking until all data
+                 * has been read from that file.
+                 */
+                new ReaderTask(commitCounter, writer, wf).call();
+
+            }
+
+            // Check writer for errors. There should not be any.
+            wf.get();
+            
+        } finally {
+
+            wf.cancel(true/* mayInterruptIfRunning */);
+            
+        }
+
+        // for sanity, let's run through the standard reader
+        HALogReader.main(new String[] { logdir.toString() });
+
 	}
 
+    /**
+     * Unit test verifies that each open of an {@link IHALogReader} is distinct
+     * and the an {@link IHALogReader#close()} will not close the backing
+     * channel for a different reader instance that is reading from the same
+     * HALog file. This version of the test is for a historical (non-live) HALog
+     * file. The case for the live HALog file is tested by
+     * {@link #testSimpleRWWriterReader()}.
+     */
+    public void test_doubleOpen_close_historicalHALog() {
+        fail("write test");
+    }
+    
 }

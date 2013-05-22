@@ -70,18 +70,30 @@ public interface IHALogReader {
     };
 
     /**
-	 * Closes the Reader.
-	 * 
-	 * @throws IOException
-	 */
+     * Closes the reader iff it is open.
+     * <p>
+     * Note: Closing a reader does not have a side-effect on any open reader or
+     * writer for the same file. Specifically, if two readers are open for the
+     * same file and one is closed, then other will remain open. Likewise, if a
+     * reader is open for the live HALog file, closing the writer will not close
+     * the reader and closing the reader will not close the writer.
+     */
 	void close() throws IOException;
 	
 	/**
 	 * Return <code>true</code> if the root blocks in the log file have the same
 	 * commit counter. Such log files are logically empty regardless of their
 	 * length.
+	 * 
+	 * FIXME The code disagress and will report [false] if the live log has the
+	 * same root blocks but has not yet been closed.
 	 */
 	boolean isEmpty();
+	
+	/**
+	 * Return <code>true</code> iff the reader is open.
+	 */
+	boolean isOpen();
 	
 	/**
      * The {@link IRootBlockView} for the committed state BEFORE the write set
@@ -95,9 +107,18 @@ public interface IHALogReader {
 	 */
 	IRootBlockView getClosingRootBlock() throws IOException;
 	
-	/**
-	 * Checks whether we have reached the end of the file.
-	 */
+    /**
+     * Checks whether we have reached the end of the file (blocking).
+     * <p>
+     * Note: This method will block if this is the live HALog. This allows a
+     * process to block until the next message is made available on the live
+     * HALog by the writer.
+     * <p>
+     * Note: This method is non-blocking if this is not the live HALog since the
+     * decision can be made deterministically by inspecting the #of messages
+     * available (in the closing root block) and the #of messages consumed by
+     * the reader.
+     */
 	boolean hasMoreBuffers() throws IOException;
 	
 	/**
@@ -128,7 +149,8 @@ public interface IHALogReader {
 
     /**
      * Return <code>true</code> iff this is was the live HALog at the moment
-     * when it was opened.
+     * when it was opened (if true, then this flag will remain <code>true</code>
+     * even if the writer moves onto another HALog file).
      */
     boolean isLive();
 }

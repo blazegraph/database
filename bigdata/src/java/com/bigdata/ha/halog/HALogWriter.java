@@ -31,6 +31,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.security.DigestException;
 import java.security.MessageDigest;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
@@ -125,9 +126,6 @@ public class HALogWriter implements IHALogWriter {
 
 	/** current write point on the channel. */
 	private long m_position = headerSize0;
-
-	/** number of open readers **/
-	private int m_readers = 0;
 
 	/**
 	 * Return the commit counter that is expected for the writes that will be
@@ -349,15 +347,26 @@ public class HALogWriter implements IHALogWriter {
 
 		@Override
 		public FileChannel reopenChannel() throws IOException {
-			final Lock lock = m_stateLock.readLock();
-			lock.lock();
-			try {
-				if (m_state == null || m_state.m_channel == null)
-					throw new IOException("Closed");
 
+		    final Lock lock = m_stateLock.readLock();
+			
+		    lock.lock();
+			
+		    try {
+
+                if (m_state == null || m_state.m_channel == null
+                        || !m_state.m_channel.isOpen()) {
+
+                    throw new IOException("Closed");
+
+                }
+   
 				return m_state.m_channel;
+				
 			} finally {
-				lock.unlock();
+				
+			    lock.unlock();
+			    
 			}
 
 		}
@@ -666,29 +675,6 @@ public class HALogWriter implements IHALogWriter {
 	}
 
     /**
-     * FIXME This method is only used by the unit tests. They need to modified
-     * to use {@link #getReader(long)} instead.
-     * 
-     * @deprecated Use {@link #getReader(long)}. That code can make an atomic
-     *             decision about whether the current HALog is being request or
-     *             a historical HALog. It is not possible for the caller to make
-     *             this decision from the outside.
-     */
-	public IHALogReader getReader() {
-
-		final Lock lock = m_stateLock.readLock();
-		lock.lock();
-		try {
-			if (m_state == null)
-				return null;
-
-			return new OpenHALogReader(m_state);
-		} finally {
-			lock.unlock();
-		}
-	}
-
-    /**
      * Return the {@link IHALogReader} for the specified commit counter. If the
      * request identifies the HALog that is currently being written, then an
      * {@link IHALogReader} will be returned that will "see" newly written
@@ -756,15 +742,28 @@ public class HALogWriter implements IHALogWriter {
 	 * The FileState class encapsulates the file objects shared by the Writer
 	 * and Readers.
 	 */
-	static class FileState {
-		final StoreTypeEnum m_storeType;
-		final File m_haLogFile;
-		final FileChannel m_channel;
-		final RandomAccessFile m_raf;
-		int m_records = 0;
-		boolean m_committed = false;
+	private static class FileState {
+        private final StoreTypeEnum m_storeType;
+        private final File m_haLogFile;
+        private final FileChannel m_channel;
+        private final RandomAccessFile m_raf;
+        /*
+         * Note: Mutable fields are guarded by synchronized(this) for the
+         * FileState object.
+         */
+        /**
+         * The #of messages written onto the live HALog file.
+         */
+        private long m_records = 0;
+        /**
+         * <code>false</code> until the live HALog file has been committed (by
+         * writing the closing root block).
+         */
+		private boolean m_committed = false;
+        /** number of open writers (at most one) plus readers **/
+        private int m_accessors;
 
-		final IReopenChannel<FileChannel> reopener = new IReopenChannel<FileChannel>() {
+        private final IReopenChannel<FileChannel> reopener = new IReopenChannel<FileChannel>() {
 
 			@Override
 			public FileChannel reopenChannel() throws IOException {
@@ -777,20 +776,24 @@ public class HALogWriter implements IHALogWriter {
 			}
 		};
 
-		int m_accessors = 0;
-
-		FileState(final File file, StoreTypeEnum storeType)
-				throws FileNotFoundException {
+        private FileState(final File file, final StoreTypeEnum storeType)
+                throws FileNotFoundException {
+            
 			m_haLogFile = file;
 			m_storeType = storeType;
 			m_raf = new RandomAccessFile(m_haLogFile, "rw");
 			m_channel = m_raf.getChannel();
 			m_accessors = 1; // the writer is a reader also
+			
 		}
 
 		public void close() throws IOException {
-			if (--m_accessors == 0)
-				m_channel.close();
+            synchronized (this) {
+                if (--m_accessors == 0)
+                    m_channel.close();
+                // wake up anyone waiting.
+                this.notifyAll();
+            }
 		}
 
 		public void addRecord() {
@@ -800,7 +803,7 @@ public class HALogWriter implements IHALogWriter {
 			}
 		}
 
-		public int recordCount() {
+		public long recordCount() {
 			synchronized (this) {
 				return m_records;
 			}
@@ -825,36 +828,69 @@ public class HALogWriter implements IHALogWriter {
 			}
 		}
 
-		/**
-		 * 
-		 * @param record
-		 *            - the next sequence required
-		 */
+        /**
+         * 
+         * @param record
+         *            - the next sequence required
+         */
+        /*
+         * TODO We should support wait up to a timeout here to make the API more
+         * pleasant.
+         */
 		public void waitOnStateChange(final int record) {
-			synchronized (this) {
-				if (m_records >= record) {
-					return;
+			
+		    synchronized (this) {
+			
+		        if (m_records >= record) {
+				
+		            return;
+		            
 				}
 
 				try {
-					wait();
+
+				    wait();
+				    
 				} catch (InterruptedException e) {
-					// okay;
+				    
+				    // Propagate the interrupt.
+				    Thread.currentThread().interrupt();
+				    
+				    return;
+				    
 				}
+
 			}
 
 		}
 
-	}
+	} // class FileState
 
 	static class OpenHALogReader implements IHALogReader {
-	    private final FileState m_state;
-	    private int m_record = 0;
-	    private long m_position = headerSize0; // initial position
 
-		OpenHALogReader(final FileState state) {
-			m_state = state;
-			m_state.m_accessors++;
+	    private final FileState m_state;
+	    
+	    private int m_record = 0;
+	    
+	    private long m_position = headerSize0; // initial position
+        
+	    /** <code>true</code> iff this reader is open. */
+        private final AtomicBoolean open = new AtomicBoolean(true);
+
+        OpenHALogReader(final FileState state) {
+
+            if (state == null)
+                throw new IllegalArgumentException();
+			
+            m_state = state;
+            
+            // Note: Must be synchronized for visibility and atomicity!
+            synchronized (m_state) {
+
+                m_state.m_accessors++;
+                
+            }
+			
 		}
 
 		@Override
@@ -892,7 +928,11 @@ public class HALogWriter implements IHALogWriter {
 
 		@Override
 		public boolean hasMoreBuffers() throws IOException {
-			if (m_state.isCommitted() && m_state.recordCount() <= m_record)
+
+            if (!isOpen())
+                return false;
+		    
+		    if (m_state.isCommitted() && m_state.recordCount() <= m_record)
 				return false;
 
 			if (m_state.recordCount() > m_record)
@@ -900,12 +940,22 @@ public class HALogWriter implements IHALogWriter {
 
 			m_state.waitOnStateChange(m_record + 1);
 
-			return hasMoreBuffers();
+			return hasMoreBuffers(); // tail recursion.
+			
 		}
 
 		@Override
+		public boolean isOpen() {
+		    
+		    return open.get();
+		    
+		}
+		
+		@Override
 		public boolean isEmpty() {
-			return m_state.isEmpty();
+
+		    return m_state.isEmpty();
+		    
 		}
 
 		@Override
@@ -931,20 +981,28 @@ public class HALogWriter implements IHALogWriter {
 		}
 
 		@Override
-		public void close() throws IOException {
-			if (m_state != null) {
-				m_state.close();
-			}
+        public void close() throws IOException {
+
+		    // Note: this pattern prevents a double-close of a reader.
+		    if (open.compareAndSet(true/* expected */, false/* newValue */)) {
+            
+		        /*
+		         * Close an open reader.
+		         */
+                m_state.close();
+                
+            }
+		    
 		}
 
         @Override
-        public void computeDigest(MessageDigest digest) throws DigestException,
-                IOException {
+        public void computeDigest(final MessageDigest digest)
+                throws DigestException, IOException {
 
             HALogReader.computeDigest(m_state.reopener, digest);
-            
+
         }
 
-	}
+    } // class OpenHAReader
 
 }
