@@ -904,11 +904,13 @@ public class HAJournal extends Journal {
             public Void call() throws Exception {
 
                 try {
-                final IBufferAccess buf = DirectBufferPool.INSTANCE.acquire();
 
-                long nsent = 0;
-                boolean success = false;
-                try {
+                    long nsent = 0;
+                    boolean success = false;
+
+                    final IBufferAccess buf = DirectBufferPool.INSTANCE.acquire();
+
+                    try {
 
                     while (r.hasMoreBuffers()) {
 
@@ -964,25 +966,25 @@ public class HAJournal extends Journal {
 
                     return null;
 
+                    } finally {
+
+                        buf.release();
+
+                        if (haLog.isDebugEnabled())
+                            haLog.debug("req=" + req + ", nsent=" + nsent
+                                    + ", success=" + success);
+
+                    }
+
                 } finally {
 
-                    buf.release();
+                    // Close the open log file.
+                    r.close();
 
-                    if (haLog.isDebugEnabled())
-                        haLog.debug("req=" + req + ", nsent=" + nsent
-                                + ", success=" + success);
-                    
                 }
 
-            } finally {
-
-                // Close the open log file.
-                r.close();
-                
-            }
-
             } // call()
-                
+
         } // class SendHALogTask
 
         /*
