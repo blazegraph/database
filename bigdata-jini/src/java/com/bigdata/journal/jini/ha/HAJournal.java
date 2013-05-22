@@ -968,8 +968,6 @@ public class HAJournal extends Journal {
 
                     buf.release();
 
-                    r.close();
-                    
                     if (haLog.isDebugEnabled())
                         haLog.debug("req=" + req + ", nsent=" + nsent
                                 + ", success=" + success);
