@@ -574,13 +574,13 @@ public class HALogWriter implements IHALogWriter {
 	/**
 	 * Close the file (does not flush).
 	 */
-	private void close() throws IOException {
+	private void close() throws IOException { // Note: caller owns m_stateLock!
 		try {
 			if (m_state != null) {
 				m_state.close();
 			}
 		} finally {
-			reset();
+			reset(); // Note: reset() clears [m_state]!
 		}
 	}
 
@@ -789,10 +789,30 @@ public class HALogWriter implements IHALogWriter {
 
 		public void close() throws IOException {
             synchronized (this) {
-                if (--m_accessors == 0)
-                    m_channel.close();
-                // wake up anyone waiting.
-                this.notifyAll();
+                try {
+                    if (m_accessors == 0) {
+                        /*
+                         * Already at zero. Do not decrement further.
+                         */
+                        throw new IllegalStateException();
+                    }
+                    // One less reader/writer.
+                    --m_accessors;
+                    if (m_accessors == 0) {
+                        if (haLog.isDebugEnabled())
+                            haLog.debug("Closing file");
+                        /*
+                         * Note: Close the RandomAccessFile rather than the
+                         * FileChannel. Potential fix for leaking open file
+                         * handles.
+                         */
+                        // m_channel.close();
+                        m_raf.close();
+                    }
+                } finally {
+                    // wake up anyone waiting.
+                    this.notifyAll();
+                }
             }
 		}
 
@@ -837,7 +857,7 @@ public class HALogWriter implements IHALogWriter {
          * TODO We should support wait up to a timeout here to make the API more
          * pleasant.
          */
-		public void waitOnStateChange(final int record) {
+		public void waitOnStateChange(final long record) {
 			
 		    synchronized (this) {
 			
@@ -870,7 +890,7 @@ public class HALogWriter implements IHALogWriter {
 
 	    private final FileState m_state;
 	    
-	    private int m_record = 0;
+	    private long m_record = 0L;
 	    
 	    private long m_position = headerSize0; // initial position
         
@@ -965,14 +985,18 @@ public class HALogWriter implements IHALogWriter {
 			final IHAWriteMessage msg;
 
 			synchronized (m_state) {
-				final long savePosition = m_state.m_channel.position();
-				m_state.m_channel.position(m_position);
+
+			    final long savePosition = m_state.m_channel.position();
+				
+			    m_state.m_channel.position(m_position);
 
 				msg = HALogReader.processNextBuffer(m_state.m_raf,
 						m_state.reopener, m_state.m_storeType, clientBuffer);
 
 				m_position = m_state.m_channel.position();
+				
 				m_state.m_channel.position(savePosition);
+				
 			}
 
 			m_record++;
