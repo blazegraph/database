@@ -104,8 +104,8 @@ public class TestAll extends TestCase {
         // HA3 restore policy test suite.
         suite.addTestSuite(TestHA3RestorePolicy.class);
 
-        // Test suite for the global write lock.
-        suite.addTestSuite(TestHAJournalServerGlobalWriteLock.class);
+//        // Test suite for the global write lock.
+//        suite.addTestSuite(TestHAJournalServerGlobalWriteLock.class);
 
         // Test suite for direct IBufferStrategy data xfer tests.
         suite.addTestSuite(TestRawTransfers.class);

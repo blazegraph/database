@@ -39,13 +39,9 @@ import java.security.NoSuchAlgorithmException;
 import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Executor;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.RejectedExecutionException;
-import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.Lock;
 
 import net.jini.config.Configuration;
@@ -73,7 +69,6 @@ import com.bigdata.ha.msg.HASendStoreResponse;
 import com.bigdata.ha.msg.HASnapshotDigestResponse;
 import com.bigdata.ha.msg.IHADigestRequest;
 import com.bigdata.ha.msg.IHADigestResponse;
-import com.bigdata.ha.msg.IHAGlobalWriteLockRequest;
 import com.bigdata.ha.msg.IHALogDigestRequest;
 import com.bigdata.ha.msg.IHALogDigestResponse;
 import com.bigdata.ha.msg.IHALogRequest;
@@ -97,11 +92,9 @@ import com.bigdata.journal.IHABufferStrategy;
 import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
-import com.bigdata.journal.WriteExecutorService;
 import com.bigdata.journal.jini.ha.HAJournalServer.HAQuorumService;
 import com.bigdata.journal.jini.ha.HAJournalServer.NSSConfigurationOptions;
 import com.bigdata.journal.jini.ha.HAJournalServer.RunStateEnum;
-import com.bigdata.quorum.AsynchronousQuorumCloseException;
 import com.bigdata.quorum.Quorum;
 import com.bigdata.service.AbstractTransactionService;
 import com.bigdata.service.jini.JiniClient;
@@ -801,20 +794,62 @@ public class HAJournal extends Journal {
             final long commitCounter = req.getCommitCounter();
 
             /*
+             * Open the HALog file. If it exists, then we will run a task to
+             * send it along the pipeline.
+             * 
              * Note: The choice of the "live" versus a historical "closed" log
              * file needs to be an atomic decision and thus MUST be made by the
              * HALogManager.
+             * 
+             * Note: Once opened, the HALog file must be closed. Once we submit
+             * the task for execution, the SendHALogTask() is responsible for
+             * closing the HALog file. If we do not get that far, then the file
+             * is closed by this code block.
+             * 
+             * Note: This can leak an open file handle in the case where the
+             * ExecutorService is shutdown before the task runs, but that only
+             * occurs on Journal shutdown.
              */
-            final IHALogReader r = getHALogNexus().getReader(commitCounter);
+            final boolean isLive;
+            final FutureTask<Void> ft;
+            {
 
-            final boolean isLive = r.isLive();
-            
-            // Task sends an HALog file along the pipeline.
-            final FutureTask<Void> ft = new FutureTaskMon<Void>(
-                    new SendHALogTask(req, r));
+                IHALogReader r = null;
+                
+                try {
 
-            // Run task.
-            getExecutorService().submit(ft);
+                    // Note: open file handle - must be closed eventually.
+                    r = getHALogNexus().getReader(commitCounter);
+
+                    isLive = r.isLive();
+
+                    // Task sends an HALog file along the pipeline.
+                    ft = new FutureTaskMon<Void>(new SendHALogTask(req, r));
+
+                    // Run task.
+                    getExecutorService().submit(ft);
+
+                    // Clear reference. File handle will be closed by task.
+                    r = null;
+
+                } finally {
+
+                    if (r != null) {
+
+                        try {
+
+                            r.close();
+
+                        } catch (Throwable t) {
+
+                            log.error(t, t);
+                        }
+
+                    }
+
+                }
+                
+            }
             
             /**
              * Return Future.
@@ -868,6 +903,7 @@ public class HAJournal extends Journal {
 
             public Void call() throws Exception {
 
+                try {
                 final IBufferAccess buf = DirectBufferPool.INSTANCE.acquire();
 
                 long nsent = 0;
@@ -922,7 +958,8 @@ public class HAJournal extends Journal {
 //                            ft.cancel(true/* mayInterruptIfRunning */);
                         }
                         
-                    }
+                    } // while(hasMoreBuffers())
+
                     success = true;
 
                     return null;
@@ -931,15 +968,24 @@ public class HAJournal extends Journal {
 
                     buf.release();
 
+                    r.close();
+                    
                     if (haLog.isDebugEnabled())
                         haLog.debug("req=" + req + ", nsent=" + nsent
                                 + ", success=" + success);
                     
                 }
 
+            } finally {
+
+                // Close the open log file.
+                r.close();
+                
             }
 
-        }
+            } // call()
+                
+        } // class SendHALogTask
 
         /*
          * REBUILD: Take a read lock and send everything from the backing file,
@@ -1191,307 +1237,307 @@ public class HAJournal extends Journal {
             
         }
 
-        /**
-         * {@inheritDoc}
-         * 
-         * TODO This method relies on the unisolated semaphore. That provides a
-         * sufficient guarantee for updates that original through the NSS since
-         * all such updates will eventually require the unisolated connection to
-         * execute. However, if we support multiple concurrent unisolated
-         * connections distinct KBs per the ticket below, then we will need to
-         * have a different global write lock - perhaps via the
-         * {@link WriteExecutorService}.
-         * 
-         * @deprecated This method is no longer necessary to support backups
-         *             since we can now take snapshots without suspending
-         *             writers.
-         * 
-         * @see https://sourceforge.net/apps/trac/bigdata/ticket/566 (
-         *      Concurrent unisolated operations against multiple KBs on the
-         *      same Journal)
-         */
-        @Override
-        public Future<Void> globalWriteLock(final IHAGlobalWriteLockRequest req)
-                throws IOException, InterruptedException, TimeoutException {
-
-            if (req == null)
-                throw new IllegalArgumentException();
-
-            /*
-             * This token will be -1L if there is no met quorum. This method may
-             * only execute while there is a met quorum and this service is the
-             * leader for that met quorum.
-             * 
-             * Note: This method must stop waiting for the global lock if this
-             * service is no longer the leader (quorum break).
-             * 
-             * Note: This method must stop holding the global lock if this
-             * service is no longer the leader (quorum break).
-             */
-            final long token = getQuorum().token();
-
-            // Verify that the quorum is met and that this is the leader.
-            getQuorum().assertLeader(token);
-
-            // Set true IFF we acquire the global write lock.
-            final AtomicBoolean didAcquire = new AtomicBoolean(false);
-
-            // Task to acquire the lock
-            final FutureTask<Void> acquireLockTaskFuture = new FutureTask<Void>(
-                    new AcquireGlobalLockTask(didAcquire));
-
-            // Task used to interrupt task acquiring the lock if quorum breaks.
-            final FutureTask<Void> interruptLockTaskFuture = new FutureTask<Void>(
-                    new InterruptAcquireLockTask(token, acquireLockTaskFuture,
-                            req));
-
-            // Task to release the lock.
-            final FutureTask<Void> releaseLockTaskFuture = new FutureTask<Void>(
-                    new ReleaseGlobalLockTask(token, req));
-
-            // Service to run those tasks.
-            final Executor executor = getExecutorService();
-
-            // Set true iff we will run with the global lock.
-            boolean willRunWithLock = false;
-            try {
-
-                /*
-                 * Submit task to interrupt the task that is attempting to
-                 * acquire the lock if the quorum breaks. This prevents us
-                 * waiting for the global long beyond a quorum break.
-                 */
-                executor.execute(interruptLockTaskFuture);
-
-                /*
-                 * Submit task to acquire the lock.
-                 */
-                executor.execute(acquireLockTaskFuture);
-
-                /*
-                 * Wait for the global lock (blocks up to the timeout).
-                 */
-                acquireLockTaskFuture.get(req.getLockWaitTimeout(),
-                        req.getLockWaitUnits());
-                
-                // We will run with the global lock.
-                willRunWithLock = true;
-                
-            } catch (RejectedExecutionException ex) {
-                
-                /*
-                 * Note: This will throw a RejectedExecutionException if the
-                 * executor has been shutdown. That unchecked exception will be
-                 * thrown back to the client. Since the lock has not been
-                 * acquired if that exception is thrown, we do not need to do
-                 * anything else here.
-                 */
-                
-                haLog.warn(ex);
-                
-                throw ex;
-
-            } catch (ExecutionException e) {
-            
-                haLog.error(e, e);
-                
-                throw new RuntimeException(e);
-                
-            } finally {
-
-                /*
-                 * Make sure these tasks are cancelled.
-                 */
-
-                interruptLockTaskFuture.cancel(true/* mayInterruptIfRunning */);
-                
-                acquireLockTaskFuture.cancel(true/* mayInterruptIfRunning */);
-
-                /*
-                 * Release the global lock if we acquired it but will not run
-                 * with that lock held (e.g., due to some error).
-                 */
-
-                if (!willRunWithLock && didAcquire.get()) {
-            
-                    HAJournal.this.releaseUnisolatedConnection();
-                    
-                    log.warn(RELEASED_GLOBAL_WRITE_LOCK);
-                    
-                }
-            
-            }
-
-            if (!didAcquire.get())
-                throw new AssertionError();
-
-            if (!willRunWithLock)
-                throw new AssertionError();
-
-            try {
-                
-                // Run task that will eventually release the global lock.
-                executor.execute(releaseLockTaskFuture);
-                
-            } catch (RejectedExecutionException ex) {
-                /*
-                 * If we could not run this task, then make sure that we release
-                 * the global write lock.
-                 */
-                HAJournal.this.releaseUnisolatedConnection();
-                haLog.warn(RELEASED_GLOBAL_WRITE_LOCK);
-            }
-
-            // Return *ASYNCHRONOUS* proxy (interruptable).
-            return getProxy(releaseLockTaskFuture, true/* asynch */);
-            
-        }
-
-        /**
-         * Task interrupts the {@link AcquireGlobalLockTask} if the quorum
-         * breaks.
-         */
-        private class InterruptAcquireLockTask implements Callable<Void> {
-
-            private final long token;
-            private final Future<Void> acquireLockTaskFuture;
-            private final IHAGlobalWriteLockRequest req;
-
-            public InterruptAcquireLockTask(final long token,
-                    final FutureTask<Void> acquireLockTaskFuture,
-                    final IHAGlobalWriteLockRequest req) {
-
-                this.token = token;
-
-                this.acquireLockTaskFuture = acquireLockTaskFuture;
-
-                this.req = req;
-
-            }
-
-            public Void call() throws Exception {
-
-                try {
-
-                    // This service must be the leader.
-                    getQuorum().assertLeader(token);
-
-                    // Exit if quorum breaks before the timeout.
-                    getQuorum().awaitBreak(req.getLockWaitTimeout(),
-                            req.getLockWaitUnits());
-
-                } catch (InterruptedException ex) {
-
-                    // Ignore. Expected.
-
-                } catch (AsynchronousQuorumCloseException e) {
-
-                    // Cancel task waiting for global lock.
-                    acquireLockTaskFuture
-                            .cancel(true/* mayInterruptIfRunning */);
-
-                } catch (TimeoutException e) {
-
-                    // Cancel task waiting for global lock.
-                    acquireLockTaskFuture
-                            .cancel(true/* mayInterruptIfRunning */);
-
-                }
-                
-                // Done.
-                return null;
-
-            }
-            
-        }
-        
-        /**
-         * Task to wait up to a timeout to acquire the global write lock.
-         */
-        private class AcquireGlobalLockTask implements Callable<Void> {
-
-            private final AtomicBoolean didAcquire;
-
-            public AcquireGlobalLockTask(final AtomicBoolean didAcquire) {
-
-                this.didAcquire = didAcquire;
-
-            }
-
-            public Void call() throws Exception {
-
-                // Acquire the global lock.
-                HAJournal.this.acquireUnisolatedConnection();
-
-                didAcquire.set(true);
-
-                haLog.warn(ACQUIRED_GLOBAL_WRITE_LOCK);
-
-                // Done.
-                return null;
-
-            }
-
-        }
-
-        /**
-         * Task to hold the global write lock and release it after a timeout.
-         */
-        private class ReleaseGlobalLockTask implements Callable<Void> {
-
-            private final long token;
-            private final IHAGlobalWriteLockRequest req;
-
-            public ReleaseGlobalLockTask(final long token,
-                    final IHAGlobalWriteLockRequest req) {
-
-                this.token = token;
-                this.req = req;
-
-            }
-
-            public Void call() throws Exception {
-
-                try {
-
-                    /*
-                     * Wait up to the timeout.
-                     * 
-                     * Note: If the quorum breaks such that this service is no
-                     * longer the leader for the specified token, then this loop
-                     * will exit before the timeout would have expired.
-                     */
-
-                    // This service must be the leader.
-                    getQuorum().assertLeader(token);
-
-                    // Wait up to the timeout for a quorum break.
-                    getQuorum().awaitBreak(req.getLockHoldTimeout(),
-                            req.getLockHoldUnits());
-                    
-                } catch (InterruptedException ex) {
-                    
-                    // Ignore. Expected.
-
-                } catch (TimeoutException ex) {
-
-                    haLog.warn("Timeout.");
-                    
-                } finally {
-                    
-                    // Release the global lock.
-                    HAJournal.this.releaseUnisolatedConnection();
-                
-                    haLog.warn(RELEASED_GLOBAL_WRITE_LOCK);
-                    
-                }
-
-                // Done.
-                return null;
-
-            }
-            
-        }
+//        /**
+//         * {@inheritDoc}
+//         * 
+//         * TODO This method relies on the unisolated semaphore. That provides a
+//         * sufficient guarantee for updates that original through the NSS since
+//         * all such updates will eventually require the unisolated connection to
+//         * execute. However, if we support multiple concurrent unisolated
+//         * connections distinct KBs per the ticket below, then we will need to
+//         * have a different global write lock - perhaps via the
+//         * {@link WriteExecutorService}.
+//         * 
+//         * @deprecated This method is no longer necessary to support backups
+//         *             since we can now take snapshots without suspending
+//         *             writers.
+//         * 
+//         * @see https://sourceforge.net/apps/trac/bigdata/ticket/566 (
+//         *      Concurrent unisolated operations against multiple KBs on the
+//         *      same Journal)
+//         */
+//        @Override
+//        public Future<Void> globalWriteLock(final IHAGlobalWriteLockRequest req)
+//                throws IOException, InterruptedException, TimeoutException {
+//
+//            if (req == null)
+//                throw new IllegalArgumentException();
+//
+//            /*
+//             * This token will be -1L if there is no met quorum. This method may
+//             * only execute while there is a met quorum and this service is the
+//             * leader for that met quorum.
+//             * 
+//             * Note: This method must stop waiting for the global lock if this
+//             * service is no longer the leader (quorum break).
+//             * 
+//             * Note: This method must stop holding the global lock if this
+//             * service is no longer the leader (quorum break).
+//             */
+//            final long token = getQuorum().token();
+//
+//            // Verify that the quorum is met and that this is the leader.
+//            getQuorum().assertLeader(token);
+//
+//            // Set true IFF we acquire the global write lock.
+//            final AtomicBoolean didAcquire = new AtomicBoolean(false);
+//
+//            // Task to acquire the lock
+//            final FutureTask<Void> acquireLockTaskFuture = new FutureTask<Void>(
+//                    new AcquireGlobalLockTask(didAcquire));
+//
+//            // Task used to interrupt task acquiring the lock if quorum breaks.
+//            final FutureTask<Void> interruptLockTaskFuture = new FutureTask<Void>(
+//                    new InterruptAcquireLockTask(token, acquireLockTaskFuture,
+//                            req));
+//
+//            // Task to release the lock.
+//            final FutureTask<Void> releaseLockTaskFuture = new FutureTask<Void>(
+//                    new ReleaseGlobalLockTask(token, req));
+//
+//            // Service to run those tasks.
+//            final Executor executor = getExecutorService();
+//
+//            // Set true iff we will run with the global lock.
+//            boolean willRunWithLock = false;
+//            try {
+//
+//                /*
+//                 * Submit task to interrupt the task that is attempting to
+//                 * acquire the lock if the quorum breaks. This prevents us
+//                 * waiting for the global long beyond a quorum break.
+//                 */
+//                executor.execute(interruptLockTaskFuture);
+//
+//                /*
+//                 * Submit task to acquire the lock.
+//                 */
+//                executor.execute(acquireLockTaskFuture);
+//
+//                /*
+//                 * Wait for the global lock (blocks up to the timeout).
+//                 */
+//                acquireLockTaskFuture.get(req.getLockWaitTimeout(),
+//                        req.getLockWaitUnits());
+//                
+//                // We will run with the global lock.
+//                willRunWithLock = true;
+//                
+//            } catch (RejectedExecutionException ex) {
+//                
+//                /*
+//                 * Note: This will throw a RejectedExecutionException if the
+//                 * executor has been shutdown. That unchecked exception will be
+//                 * thrown back to the client. Since the lock has not been
+//                 * acquired if that exception is thrown, we do not need to do
+//                 * anything else here.
+//                 */
+//                
+//                haLog.warn(ex);
+//                
+//                throw ex;
+//
+//            } catch (ExecutionException e) {
+//            
+//                haLog.error(e, e);
+//                
+//                throw new RuntimeException(e);
+//                
+//            } finally {
+//
+//                /*
+//                 * Make sure these tasks are cancelled.
+//                 */
+//
+//                interruptLockTaskFuture.cancel(true/* mayInterruptIfRunning */);
+//                
+//                acquireLockTaskFuture.cancel(true/* mayInterruptIfRunning */);
+//
+//                /*
+//                 * Release the global lock if we acquired it but will not run
+//                 * with that lock held (e.g., due to some error).
+//                 */
+//
+//                if (!willRunWithLock && didAcquire.get()) {
+//            
+//                    HAJournal.this.releaseUnisolatedConnection();
+//                    
+//                    log.warn(RELEASED_GLOBAL_WRITE_LOCK);
+//                    
+//                }
+//            
+//            }
+//
+//            if (!didAcquire.get())
+//                throw new AssertionError();
+//
+//            if (!willRunWithLock)
+//                throw new AssertionError();
+//
+//            try {
+//                
+//                // Run task that will eventually release the global lock.
+//                executor.execute(releaseLockTaskFuture);
+//                
+//            } catch (RejectedExecutionException ex) {
+//                /*
+//                 * If we could not run this task, then make sure that we release
+//                 * the global write lock.
+//                 */
+//                HAJournal.this.releaseUnisolatedConnection();
+//                haLog.warn(RELEASED_GLOBAL_WRITE_LOCK);
+//            }
+//
+//            // Return *ASYNCHRONOUS* proxy (interruptable).
+//            return getProxy(releaseLockTaskFuture, true/* asynch */);
+//            
+//        }
+//
+//        /**
+//         * Task interrupts the {@link AcquireGlobalLockTask} if the quorum
+//         * breaks.
+//         */
+//        private class InterruptAcquireLockTask implements Callable<Void> {
+//
+//            private final long token;
+//            private final Future<Void> acquireLockTaskFuture;
+//            private final IHAGlobalWriteLockRequest req;
+//
+//            public InterruptAcquireLockTask(final long token,
+//                    final FutureTask<Void> acquireLockTaskFuture,
+//                    final IHAGlobalWriteLockRequest req) {
+//
+//                this.token = token;
+//
+//                this.acquireLockTaskFuture = acquireLockTaskFuture;
+//
+//                this.req = req;
+//
+//            }
+//
+//            public Void call() throws Exception {
+//
+//                try {
+//
+//                    // This service must be the leader.
+//                    getQuorum().assertLeader(token);
+//
+//                    // Exit if quorum breaks before the timeout.
+//                    getQuorum().awaitBreak(req.getLockWaitTimeout(),
+//                            req.getLockWaitUnits());
+//
+//                } catch (InterruptedException ex) {
+//
+//                    // Ignore. Expected.
+//
+//                } catch (AsynchronousQuorumCloseException e) {
+//
+//                    // Cancel task waiting for global lock.
+//                    acquireLockTaskFuture
+//                            .cancel(true/* mayInterruptIfRunning */);
+//
+//                } catch (TimeoutException e) {
+//
+//                    // Cancel task waiting for global lock.
+//                    acquireLockTaskFuture
+//                            .cancel(true/* mayInterruptIfRunning */);
+//
+//                }
+//                
+//                // Done.
+//                return null;
+//
+//            }
+//            
+//        }
+//        
+//        /**
+//         * Task to wait up to a timeout to acquire the global write lock.
+//         */
+//        private class AcquireGlobalLockTask implements Callable<Void> {
+//
+//            private final AtomicBoolean didAcquire;
+//
+//            public AcquireGlobalLockTask(final AtomicBoolean didAcquire) {
+//
+//                this.didAcquire = didAcquire;
+//
+//            }
+//
+//            public Void call() throws Exception {
+//
+//                // Acquire the global lock.
+//                HAJournal.this.acquireUnisolatedConnection();
+//
+//                didAcquire.set(true);
+//
+//                haLog.warn(ACQUIRED_GLOBAL_WRITE_LOCK);
+//
+//                // Done.
+//                return null;
+//
+//            }
+//
+//        }
+//
+//        /**
+//         * Task to hold the global write lock and release it after a timeout.
+//         */
+//        private class ReleaseGlobalLockTask implements Callable<Void> {
+//
+//            private final long token;
+//            private final IHAGlobalWriteLockRequest req;
+//
+//            public ReleaseGlobalLockTask(final long token,
+//                    final IHAGlobalWriteLockRequest req) {
+//
+//                this.token = token;
+//                this.req = req;
+//
+//            }
+//
+//            public Void call() throws Exception {
+//
+//                try {
+//
+//                    /*
+//                     * Wait up to the timeout.
+//                     * 
+//                     * Note: If the quorum breaks such that this service is no
+//                     * longer the leader for the specified token, then this loop
+//                     * will exit before the timeout would have expired.
+//                     */
+//
+//                    // This service must be the leader.
+//                    getQuorum().assertLeader(token);
+//
+//                    // Wait up to the timeout for a quorum break.
+//                    getQuorum().awaitBreak(req.getLockHoldTimeout(),
+//                            req.getLockHoldUnits());
+//                    
+//                } catch (InterruptedException ex) {
+//                    
+//                    // Ignore. Expected.
+//
+//                } catch (TimeoutException ex) {
+//
+//                    haLog.warn("Timeout.");
+//                    
+//                } finally {
+//                    
+//                    // Release the global lock.
+//                    HAJournal.this.releaseUnisolatedConnection();
+//                
+//                    haLog.warn(RELEASED_GLOBAL_WRITE_LOCK);
+//                    
+//                }
+//
+//                // Done.
+//                return null;
+//
+//            }
+//            
+//        }
         
         @Override
         public Future<IHASnapshotResponse> takeSnapshot(

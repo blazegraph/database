@@ -34,7 +34,6 @@ import java.util.concurrent.TimeoutException;
 
 import com.bigdata.ha.msg.IHADigestRequest;
 import com.bigdata.ha.msg.IHADigestResponse;
-import com.bigdata.ha.msg.IHAGlobalWriteLockRequest;
 import com.bigdata.ha.msg.IHALogDigestRequest;
 import com.bigdata.ha.msg.IHALogDigestResponse;
 import com.bigdata.ha.msg.IHARemoteRebuildRequest;
@@ -45,7 +44,6 @@ import com.bigdata.ha.msg.IHASnapshotDigestResponse;
 import com.bigdata.ha.msg.IHASnapshotRequest;
 import com.bigdata.ha.msg.IHASnapshotResponse;
 import com.bigdata.journal.AbstractJournal;
-import com.bigdata.journal.Journal;
 import com.bigdata.journal.jini.ha.HAJournalServer;
 import com.bigdata.quorum.AsynchronousQuorumCloseException;
 import com.bigdata.quorum.QuorumException;
@@ -184,39 +182,42 @@ public interface HAGlue extends HAGlueBase, HAPipelineGlue, HAReadGlue,
     IHASnapshotDigestResponse computeHASnapshotDigest(IHASnapshotDigestRequest req)
             throws IOException, NoSuchAlgorithmException, DigestException;
 
-    /**
-     * Obtain a global write lock on the leader. The lock only blocks writers.
-     * Readers may continue to execute without delay.
-     * <p>
-     * You can not obtain a coherent backup of the {@link Journal} while there
-     * are concurrent write operations. This method may be used to coordinate
-     * full backups of the {@link Journal} by suspending low level writes on the
-     * backing file.
-     * <p>
-     * This method will block until the lock is held, the lock request is
-     * interrupted, or the lock request timeout expires.
-     * 
-     * @param req
-     *            The request.
-     * 
-     * @return A {@link Future} for the lock. The lock may be released by
-     *         canceling the {@link Future}. The lock is acquired before this
-     *         method returns and is held while the {@link Future} is running.
-     *         If the {@link Future#isDone()} then the lock is no longer held.
-     * 
-     * @throws IOException
-     *             if there is an RMI problem.
-     * @throws TimeoutException
-     *             if a timeout expires while awaiting the global lock.
-     * @throws InterruptedException
-     *             if interrupted while awaiting the lock.
-     * 
-     * @deprecated This is no longer necessary to support backups since we can
-     *             now take snapshots without suspending writers.
-     */
-    @Deprecated 
-    Future<Void> globalWriteLock(IHAGlobalWriteLockRequest req)
-            throws IOException, TimeoutException, InterruptedException;
+//    /**
+//     * Obtain a global write lock on the leader. The lock only blocks writers.
+//     * Readers may continue to execute without delay.
+//     * <p>
+//     * You can not obtain a coherent backup of the {@link Journal} while there
+//     * are concurrent write operations. This method may be used to coordinate
+//     * full backups of the {@link Journal} by suspending low level writes on the
+//     * backing file.
+//     * <p>
+//     * This method will block until the lock is held, the lock request is
+//     * interrupted, or the lock request timeout expires.
+//     * 
+//     * @param req
+//     *            The request.
+//     * 
+//     * @return A {@link Future} for the lock. The lock may be released by
+//     *         canceling the {@link Future}. The lock is acquired before this
+//     *         method returns and is held while the {@link Future} is running.
+//     *         If the {@link Future#isDone()} then the lock is no longer held.
+//     * 
+//     * @throws IOException
+//     *             if there is an RMI problem.
+//     * @throws TimeoutException
+//     *             if a timeout expires while awaiting the global lock.
+//     * @throws InterruptedException
+//     *             if interrupted while awaiting the lock.
+//     * 
+//     * @deprecated This is no longer necessary to support backups since we can
+//     *             now take snapshots without suspending writers.
+//  * @see https://sourceforge.net/apps/trac/bigdata/ticket/566 (
+//  *      Concurrent unisolated operations against multiple KBs on the
+//  *      same Journal)
+//     */
+//    @Deprecated 
+//    Future<Void> globalWriteLock(IHAGlobalWriteLockRequest req)
+//            throws IOException, TimeoutException, InterruptedException;
 
     /**
      * Request that the service take a snapshot. If there is already a snapshot

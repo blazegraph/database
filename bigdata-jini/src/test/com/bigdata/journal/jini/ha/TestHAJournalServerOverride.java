@@ -27,7 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.journal.jini.ha;
 
 import java.util.UUID;
-import java.util.concurrent.BrokenBarrierException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
@@ -36,10 +35,13 @@ import net.jini.config.Configuration;
 import com.bigdata.ha.HACommitGlue;
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.HAStatusEnum;
+import com.bigdata.ha.msg.IHA2PhaseCommitMessage;
 import com.bigdata.ha.msg.IHA2PhasePrepareMessage;
 import com.bigdata.ha.msg.IHANotifyReleaseTimeRequest;
 import com.bigdata.journal.jini.ha.HAJournalTest.HAGlueTest;
 import com.bigdata.journal.jini.ha.HAJournalTest.SpuriousTestException;
+import com.bigdata.rdf.sail.webapp.client.HttpException;
+import com.bigdata.util.ClocksNotSynchronizedException;
 import com.bigdata.util.InnerCause;
 
 /**
@@ -159,6 +161,110 @@ public class TestHAJournalServerOverride extends AbstractHA3JournalServerTestCas
     }
 
     /**
+     * This test forces clock skew on one of the followers causing it to
+     * encounter an error in its GatherTask. This models the problem that was
+     * causing a deadlock in an HA3 cluster with BSBM UPDATE running on the
+     * leader (EXPLORE was running on the follower, but analysis of the root
+     * cause shows that this was not required to trip the deadlock). The
+     * deadlock was caused by clock skew resulting in an exception and either
+     * {@link IHANotifyReleaseTimeRequest} message that was <code>null</code>
+     * and thus could not be processed or a failure to send that message back to
+     * the leader.
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/677" > HA
+     *      deadlock under UPDATE + QUERY </a>
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/673" > DGC
+     *      in release time consensus protocol causes native thread leak in
+     *      HAJournalServer at each commit </a>
+     */
+    public void testStartABC_releaseTimeConsensusProtocol_clockSkew()
+            throws Exception {
+
+        // Enforce the join order.
+        final ABC startup = new ABC(true /*sequential*/);
+
+        final long token = awaitFullyMetQuorum();
+
+        // Should be one commit point.
+        awaitCommitCounter(1L, startup.serverA, startup.serverB,
+                startup.serverC);
+
+        /*
+         * Setup B with a significant clock skew to force an error during the
+         * GatherTask.
+         */
+        ((HAGlueTest) startup.serverB).setNextTimestamp(10L);
+        
+        try {
+
+            // Simple transaction.
+            simpleTransaction();
+
+        } catch (Throwable t) {
+            /*
+             * TODO This test is currently failing because the consensus
+             * releaseTime protocol will fail if one of the joined services
+             * reports an error. The protocol should be robust to an error and
+             * move forward if a consensus can be formed. If a consensus can not
+             * be formed (due to some curable error), then any queries running
+             * on that service should break (force a service leave). Else, if
+             * the remaining services were to advance the release time since
+             * otherwise the service could not get through another releaseTime
+             * consensus protocol exchange successfully if it is reading on a
+             * commit point that has been released by the other services.
+             */
+            if (!t.getMessage().contains(
+                    ClocksNotSynchronizedException.class.getName())) {
+                /*
+                 * Wrong inner cause.
+                 * 
+                 * Note: The stack trace of the local exception does not include
+                 * the remote stack trace. The cause is formatted into the HTTP
+                 * response body.
+                 */
+                fail("Expecting " + ClocksNotSynchronizedException.class, t);
+            }
+
+        } finally {
+
+            // Restore the clock.
+            ((HAGlueTest) startup.serverB).setNextTimestamp(-1L);
+
+        }
+
+        /*
+         * The quorum token was not advanced. The 2-phase commit was rejected by
+         * all services and a 2-phase abort was performed. All services are at
+         * the same commit point.
+         */
+
+        // Should be one commit point.
+        awaitCommitCounter(1L, startup.serverA, startup.serverB,
+                startup.serverC);
+
+        // The quorum token is unchanged.
+        assertEquals(token, quorum.token());
+
+        // The join order is unchanged.
+        awaitJoined(new HAGlue[] { startup.serverA, startup.serverB,
+                startup.serverC });
+
+        /*
+         * New transactions are still accepted.
+         */
+        simpleTransaction();
+
+        // Should be one commit point.
+        awaitCommitCounter(2L, startup.serverA, startup.serverB,
+                startup.serverC);
+
+        // The quorum token is unchanged.
+        assertEquals(token, quorum.token());
+
+    }
+
+    /**
      * Three services are started in [A,B,C] order. B is setup for
      * {@link HACommitGlue#prepare2Phase(IHA2PhasePrepareMessage)} to throw an
      * exeption. A simple transaction is performed. We verify that the
@@ -169,9 +275,8 @@ public class TestHAJournalServerOverride extends AbstractHA3JournalServerTestCas
      * finally re-joins with the met quorum. The quorum should not break across
      * this test.
      * 
-     * FIXME Variant where the GATHER failed.
-     * 
-     * FIXME Variant where the commit2Phase fails.
+     * TODO Test timeout scenarios (RMI is non-responsive) where we cancel the
+     * PREPARE once the timeout is elapsed.
      */
     public void testStartABC_prepare2Phase_B_votes_NO()
             throws Exception {
@@ -324,24 +429,35 @@ public class TestHAJournalServerOverride extends AbstractHA3JournalServerTestCas
     }
 
     /**
-     * This test forces clock skew on one of the followers causing it to
-     * encounter an error in its GatherTask. This models the problem that was
-     * causing a deadlock in an HA3 cluster with BSBM UPDATE running on the
-     * leader (EXPLORE was running on the follower, but analysis of the root
-     * cause shows that this was not required to trip the deadlock). The
-     * deadlock was caused by clock skew resulting in an exception and either
-     * {@link IHANotifyReleaseTimeRequest} message that was <code>null</code>
-     * and thus could not be processed or a failure to send that message back to
-     * the leader.
+     * Three services are started in [A,B,C] order. B is setup for
+     * {@link HACommitGlue#prepare2Phase(IHA2PhasePrepareMessage)} to throw an
+     * exeption. A simple transaction is performed. We verify that the
+     * transaction completes successfully, that the quorum token is unchanged,
+     * and that [A,C] both participated in the commit. We also verify that B is
+     * moved to the end of the pipeline (by doing a serviceLeave and then
+     * re-entering the pipeline) and that it resyncs with the met quorum and
+     * finally re-joins with the met quorum. The quorum should not break across
+     * this test.
      * 
-     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/677" > HA
-     *      deadlock under UPDATE + QUERY </a>
+     * FIXME Variant where the commit2Phase fails. Note: The COMMIT message is
+     * design to do as little work as possible. In practice, this requires an
+     * RMI to the followers, each follower must not encounter an error when it
+     * validates the COMMIT message, and each follower must put down its new
+     * root block (from the prepare message) and then sync the disk. Finally,
+     * the RMI response must be returned.
+     * <p>
+     * Under what conditions can a COMMIT message fail where we can still
+     * recover? Single node failure? Leader failure? (QuorumCommitImpl currently
+     * fails the commit if there is a single failure, even though the quourm
+     * might have a consensus around the new commit point.)
      * 
-     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/673" > DGC
-     *      in release time consensus protocol causes native thread leak in
-     *      HAJournalServer at each commit </a>
+     * TODO Consider leader failure scenariors in this test suite, not just
+     * scenarios where B fails. Probably we should also cover failures of C (the
+     * 2nd follower). We should also cover scenariors where the quorum is barely
+     * met and a single failure causes a rejected commit (local decision) or
+     * 2-phase abort (joined services in joint agreement).
      */
-    public void testStartABC_releaseTimeConsensusProtocol_clockSkew()
+    public void testStartABC_commit2Phase_B_fails()
             throws Exception {
 
         // Enforce the join order.
@@ -353,91 +469,67 @@ public class TestHAJournalServerOverride extends AbstractHA3JournalServerTestCas
         awaitCommitCounter(1L, startup.serverA, startup.serverB,
                 startup.serverC);
 
+        // Setup B to fail the "COMMIT" message.
+        ((HAGlueTest) startup.serverB)
+                .failNext("commit2Phase",
+                        new Class[] { IHA2PhaseCommitMessage.class },
+                        0/* nwait */, 1/* nfail */);
+
+        // Simple transaction.
+        simpleTransaction();
+        
+//        try {
+//            // Simple transaction.
+//            simpleTransaction();
+//            fail("Expecting failed transaction");
+//        } catch(HttpException ex) {
+//        if (!ex.getMessage().contains(
+//                SpuriousTestException.class.getName())) {
+//            /*
+//             * Wrong inner cause.
+//             * 
+//             * Note: The stack trace of the local exception does not include
+//             * the remote stack trace. The cause is formatted into the HTTP
+//             * response body.
+//             */
+//            fail("Expecting " + ClocksNotSynchronizedException.class, t);
+//        }
+//        }
+        
+        // Verify quorum is unchanged.
+        assertEquals(token, quorum.token());
+        
+        // Should be two commit points on {A,C].
+        awaitCommitCounter(2L, startup.serverA, startup.serverC);
+        
         /*
-         * Setup B with a significant clock skew to force an error during the
-         * GatherTask.
+         * B should go into an ERROR state and then into SeekConsensus and from
+         * there to RESYNC and finally back to RunMet. We can not reliably
+         * observe the intervening states. So what we really need to do is watch
+         * for B to move to the end of the pipeline and catch up to the same
+         * commit point.
          */
-        ((HAGlueTest) startup.serverB).setNextTimestamp(10L);
-        
-        try {
-
-            // Simple transaction.
-            simpleTransaction();
-
-        } catch (Throwable t) {
-            /*
-             * TODO This test is currently failing because the consensus
-             * releaseTime protocol will fail if one of the joined services
-             * reports an error. The protocol should be robust to an error and
-             * move forward if a consensus can be formed. If a consensus can not
-             * be formed (due to some curable error), then any queries running
-             * on that service should break (force a service leave). Else, if
-             * the remaining services were to advance the release time since
-             * otherwise the service could not get through another releaseTime
-             * consensus protocol exchange successfully if it is reading on a
-             * commit point that has been released by the other services.
-             */
-            if (!InnerCause.isInnerCause(t, BrokenBarrierException.class)) {
-                /*
-                 * Wrong inner cause.
-                 */
-                fail("Expecting " + BrokenBarrierException.class, t);
-            }
-
-        }
-        
-        // Should be one commit point.
-        awaitCommitCounter(1L, startup.serverA, startup.serverB,
-                startup.serverC);
-
-        final long token1 = awaitFullyMetQuorum();
 
         /*
-         * Should have formed a new quorum (each service should have done a
-         * rejected commit, forced a service leave, and then cured that error
-         * through seek consensus).
+         * The pipeline should be reordered. B will do a service leave, then
+         * enter seek consensus, and then re-enter the pipeline.
          */
-        assertEquals(token + 1, token1);
-        
-//        // Verify quorum is unchanged.
-//        assertEquals(token, quorum.token());
-//        
-//        // Should be two commit points on {A,C].
-//        awaitCommitCounter(2L, startup.serverA, startup.serverC);
-//
-//        // Should be ONE commit points on {B}.
-//        awaitCommitCounter(1L, startup.serverB);
-//
-//        /*
-//         * We use a simple transaction to force B to notice that it missed a
-//         * commit. B will notice that it did not join in the 2-phase commit when
-//         * the next live write cache block flows through the pipeline and it is
-//         * associated with a commitCounter that is GT the commitCounter which B
-//         * is expecting. That will force B into an Error state. From the Error
-//         * state, it will then resync and re-join the met quourm.
-//         */
-//        simpleTransaction();
-//        
-//        /*
-//         * The pipeline should be reordered. B will do a service leave, then
-//         * enter seek consensus, and then re-enter the pipeline.
-//         */
-//        awaitPipeline(new HAGlue[] { startup.serverA, startup.serverC,
-//                startup.serverB });
-//
-//        /*
-//         * There should be three commit points on {A,C,B} (note that this assert
-//         * does not pay attention to the pipeline order).
-//         */
-//        awaitCommitCounter(3L, startup.serverA, startup.serverC,
-//                startup.serverB);
-//
-//        // B should be a follower again.
-//        awaitHAStatus(startup.serverB, HAStatusEnum.Follower);
-//
-//        // quorum token is unchanged.
-//        assertEquals(token, quorum.token());
+        awaitPipeline(new HAGlue[] { startup.serverA, startup.serverC,
+                startup.serverB });
+
+        /*
+         * There should be two commit points on {A,C,B} (note that this assert
+         * does not pay attention to the pipeline order).
+         */
+        awaitCommitCounter(2L, startup.serverA, startup.serverC,
+                startup.serverB);
+
+        // B should be a follower again.
+        awaitHAStatus(startup.serverB, HAStatusEnum.Follower);
+
+        // quorum token is unchanged.
+        assertEquals(token, quorum.token());
 
     }
-
+    
 }

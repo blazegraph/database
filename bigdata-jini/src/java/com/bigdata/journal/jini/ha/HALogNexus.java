@@ -30,6 +30,7 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -279,11 +280,22 @@ public class HALogNexus implements IHALogWriter {
 
         if (f.isDirectory()) {
 
-            final File[] children = f.listFiles(fileFilter);
+            final File[] files = f.listFiles(fileFilter);
 
-            for (int i = 0; i < children.length; i++) {
+            /*
+             * Sort into lexical order to force visitation in lexical order.
+             * 
+             * Note: This should work under any OS. Files will be either
+             * directory names (3 digits) or filenames (21 digits plus the file
+             * extension). Thus the comparison centers numerically on the digits
+             * that encode either part of a commit counter (subdirectory) or an
+             * entire commit counter (HALog file).
+             */
+            Arrays.sort(files);
 
-                populateIndexRecursive(children[i], fileFilter);
+            for (int i = 0; i < files.length; i++) {
+
+                populateIndexRecursive(files[i], fileFilter);
 
             }
 

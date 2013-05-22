@@ -2471,8 +2471,10 @@ public class HAJournalServer extends AbstractServer {
              * We need to transfer and apply the write cache blocks from the HA
              * Log file on some service in the met quorum. This code works with
              * the leader, which is known to be upstream from all other services
-             * in the write pipeline. Replicating from the leader is simpler
-             * conceptually and makes for simpler code.
+             * in the write pipeline and is known to be joined with the met
+             * quorum. Replicating from the leader is simpler conceptually and
+             * makes for simpler code, but we could replicate from any upstream
+             * service that is joined with the met quorum.
              */
             final IRootBlockView closeRootBlock = replicateAndApplyHALog(
                     leader, closingCommitCounter, resp);

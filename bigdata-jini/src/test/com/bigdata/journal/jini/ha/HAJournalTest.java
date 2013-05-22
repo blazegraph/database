@@ -60,7 +60,6 @@ import com.bigdata.ha.msg.IHA2PhasePrepareMessage;
 import com.bigdata.ha.msg.IHADigestRequest;
 import com.bigdata.ha.msg.IHADigestResponse;
 import com.bigdata.ha.msg.IHAGatherReleaseTimeRequest;
-import com.bigdata.ha.msg.IHAGlobalWriteLockRequest;
 import com.bigdata.ha.msg.IHALogDigestRequest;
 import com.bigdata.ha.msg.IHALogDigestResponse;
 import com.bigdata.ha.msg.IHALogRequest;
@@ -199,6 +198,8 @@ public class HAJournalTest extends HAJournal {
          *            default. Any other value will be the next value reported
          *            by {@link BasicHA#nextTimestamp()}, after which the
          *            behavior will revert to the default.
+         * 
+         *            TODO Add a "clearNextTimestamp() method.
          */
         public void setNextTimestamp(long nextTimestamp) throws IOException;
         
@@ -709,16 +710,16 @@ public class HAJournalTest extends HAJournal {
 
         }
 
-        @Override
-        public Future<Void> globalWriteLock(IHAGlobalWriteLockRequest req)
-                throws IOException, TimeoutException, InterruptedException {
-
-            checkMethod("globalWriteLock",
-                    new Class[] { IHAGlobalWriteLockRequest.class });
-
-            return super.globalWriteLock(req);
-
-        }
+//        @Override
+//        public Future<Void> globalWriteLock(IHAGlobalWriteLockRequest req)
+//                throws IOException, TimeoutException, InterruptedException {
+//
+//            checkMethod("globalWriteLock",
+//                    new Class[] { IHAGlobalWriteLockRequest.class });
+//
+//            return super.globalWriteLock(req);
+//
+//        }
 
         /*
          * HATXSGlue
@@ -756,7 +757,7 @@ public class HAJournalTest extends HAJournal {
         @Override
         public long nextTimestamp() {
 
-            final long t = nextTimestamp.getAndSet(-1L);
+            final long t = nextTimestamp.get();
 
             if (t == -1L) {
 
