@@ -34,6 +34,8 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import junit.framework.TestCase2;
 
@@ -675,6 +677,180 @@ public class TestHALogWriter extends TestCase2 {
 	}
 
     /**
+     * A unit test where the reader is blocked awaiting more input in
+     * {@link IHALogReader#hasMoreBuffers()} on the live HALog. The writer is
+     * closed. The reader should immediately notice this event and return
+     * <code>false</code>.
+     */
+    public void test_closeLiveLogWithOpenReader() throws IOException,
+            InterruptedException, ExecutionException {
+     
+        final HALogWriter writer = new HALogWriter(logdir);
+
+        try {
+
+            final IRootBlockView openRB = openRBV(StoreTypeEnum.RW);
+
+            assertEquals(StoreTypeEnum.RW, openRB.getStoreType());
+
+            writer.createLog(openRB);
+
+            final IHALogReader reader = writer.getReader(openRB
+                    .getCommitCounter() + 1);
+
+            try {
+
+                // Allocate a heap ByteBuffer
+                final ByteBuffer rbuf = ByteBuffer
+                        .allocate(DirectBufferPool.INSTANCE.getBufferCapacity());
+
+                int sequence = 0;
+
+                final ByteBuffer data = randomData(2000);
+
+                final UUID storeUUID = UUID.randomUUID();
+
+                final IHAWriteMessage msg = new HAWriteMessage(storeUUID,
+                        openRB.getCommitCounter(), openRB.getFirstCommitTime(),
+                        sequence, data.limit()/* size */, ChecksumUtility
+                                .getCHK().checksum(data),
+                        openRB.getStoreType(), openRB.getQuorumToken(),
+                        1000/* fileExtent */, 0/* firstOffset */);
+
+                writer.writeOnHALog(msg, data);
+
+                final Future<Void> f = executorService
+                        .submit(new Callable<Void>() {
+                            public Void call() throws Exception {
+                                // should be immediately true.
+                                assertTrue(reader.hasMoreBuffers());
+                                // read data into reader's buffer.
+                                reader.processNextBuffer(rbuf);
+                                // should block until writer is closed.
+                                assertFalse(reader.hasMoreBuffers());
+                                // done - success.
+                                return (Void) null;
+                            }
+                        });
+
+                // Make sure the Futuer is blocked.
+                try {
+                    f.get(500, TimeUnit.MILLISECONDS);
+                    fail("Reader did not block");
+                } catch (TimeoutException ex) {
+                    // ignore expected exception
+                }
+
+                writer.closeHALog(closeRBV(openRB));
+
+                // Block and wait for the future. Verify no errors.
+                f.get();
+
+            } finally {
+
+                reader.close();
+
+            }
+
+        } finally {
+
+            writer.disableHALog();
+
+        }
+
+        // Read all files in the test directory.
+        HALogReader.main(new String[] { logdir.toString() });
+
+    }
+
+    /**
+     * A unit test where the reader is blocked awaiting more input in
+     * {@link IHALogReader#hasMoreBuffers()} on the live HALog. The writer is
+     * {@link HALogWriter#disableHALog() disabled}. The reader should
+     * immediately notice this event and return <code>false</code>.
+     */
+    public void test_disableLiveLogWithOpenReader() throws IOException,
+            InterruptedException, ExecutionException {
+
+        final HALogWriter writer = new HALogWriter(logdir);
+
+        try {
+
+            final IRootBlockView openRB = openRBV(StoreTypeEnum.RW);
+
+            assertEquals(StoreTypeEnum.RW, openRB.getStoreType());
+
+            writer.createLog(openRB);
+
+            final IHALogReader reader = writer.getReader(openRB
+                    .getCommitCounter() + 1);
+
+            try {
+
+                // Allocate a heap ByteBuffer
+                final ByteBuffer rbuf = ByteBuffer
+                        .allocate(DirectBufferPool.INSTANCE.getBufferCapacity());
+
+                int sequence = 0;
+
+                final ByteBuffer data = randomData(2000);
+
+                final UUID storeUUID = UUID.randomUUID();
+
+                final IHAWriteMessage msg = new HAWriteMessage(storeUUID,
+                        openRB.getCommitCounter(), openRB.getFirstCommitTime(),
+                        sequence, data.limit()/* size */, ChecksumUtility
+                                .getCHK().checksum(data),
+                        openRB.getStoreType(), openRB.getQuorumToken(),
+                        1000/* fileExtent */, 0/* firstOffset */);
+
+                writer.writeOnHALog(msg, data);
+
+                final Future<Void> f = executorService
+                        .submit(new Callable<Void>() {
+                            public Void call() throws Exception {
+                                // should be immediately true.
+                                assertTrue(reader.hasMoreBuffers());
+                                // read data into reader's buffer.
+                                reader.processNextBuffer(rbuf);
+                                // should block until writer is closed.
+                                assertFalse(reader.hasMoreBuffers());
+                                // done - success.
+                                return (Void) null;
+                            }
+                        });
+
+                // Make sure the Futuer is blocked.
+                try {
+                    f.get(500, TimeUnit.MILLISECONDS);
+                    fail("Reader did not block");
+                } catch (TimeoutException ex) {
+                    // ignore expected exception
+                }
+
+                writer.disableHALog();
+
+                // Block and wait for the future. Verify no errors.
+                f.get();
+
+            } finally {
+
+                reader.close();
+
+            }
+
+        } finally {
+
+            writer.disableHALog();
+
+        }
+
+        // Read all files in the test directory.
+        HALogReader.main(new String[] { logdir.toString() });
+
+    }
+
+    /**
      * Unit test verifies that each open of an {@link IHALogReader} is distinct
      * and the an {@link IHALogReader#close()} will not close the backing
      * channel for a different reader instance that is reading from the same
@@ -682,8 +858,248 @@ public class TestHALogWriter extends TestCase2 {
      * file. The case for the live HALog file is tested by
      * {@link #testSimpleRWWriterReader()}.
      */
-    public void test_doubleOpen_close_historicalHALog() {
-        fail("write test");
+    public void test_doubleOpen_close_historicalHALog() throws Exception {
+        
+        final HALogWriter writer = new HALogWriter(logdir);
+
+        try {
+
+            /*
+             * Generate and close (seal with a closing root block) an HALog
+             * file.
+             */
+            final IRootBlockView openRB = openRBV(StoreTypeEnum.RW);
+
+            {
+                
+                assertEquals(StoreTypeEnum.RW, openRB.getStoreType());
+
+                writer.createLog(openRB);
+
+                int sequence = 0;
+
+                final ByteBuffer data = randomData(2000);
+
+                final UUID storeUUID = UUID.randomUUID();
+
+                final IHAWriteMessage msg = new HAWriteMessage(storeUUID,
+                        openRB.getCommitCounter(), openRB.getFirstCommitTime(),
+                        sequence, data.limit()/* size */, ChecksumUtility
+                                .getCHK().checksum(data),
+                        openRB.getStoreType(), openRB.getQuorumToken(),
+                        1000/* fileExtent */, 0/* firstOffset */);
+
+                writer.writeOnHALog(msg, data);
+
+                writer.closeHALog(closeRBV(openRB));
+
+            }
+
+            /*
+             * The HALog file is now closed.
+             * 
+             * Setup two readers on that HALog file.
+             */
+            
+            final IHALogReader r1 = writer.getReader(openRB
+                    .getCommitCounter() + 1);
+
+            assertFalse(r1.isLive());
+            assertTrue(r1.isOpen());
+            assertFalse(r1.isEmpty());
+            assertTrue(r1.hasMoreBuffers());
+
+            final IHALogReader r2 = writer.getReader(openRB
+                    .getCommitCounter() + 1);
+
+            assertFalse(r2.isLive());
+            assertTrue(r2.isOpen());
+            assertFalse(r2.isEmpty());
+            assertTrue(r2.hasMoreBuffers());
+            
+            /*
+             * Close one of the readers and make sure that the other reader
+             * remains open.
+             */
+            
+            // close [r1].
+            r1.close();
+            assertFalse(r1.isLive());
+            assertFalse(r1.isOpen());
+            assertFalse(r1.isEmpty());
+            assertFalse(r1.hasMoreBuffers());
+            
+            // verify [r2] remains open.
+            assertFalse(r2.isLive());
+            assertTrue(r2.isOpen());
+            assertFalse(r2.isEmpty());
+            assertTrue(r2.hasMoreBuffers());            
+            
+            /*
+             * Now use the 2nd reader to read the data to make sure that the
+             * IHALogReader is really open and functional.
+             */
+            try {
+                
+                // Allocate a heap ByteBuffer
+                final ByteBuffer rbuf = ByteBuffer
+                        .allocate(DirectBufferPool.INSTANCE.getBufferCapacity());
+
+                while (r2.hasMoreBuffers()) {
+                    // read data into reader's buffer.
+                    r2.processNextBuffer(rbuf);
+                }
+            
+            } finally {
+                
+                r2.close();
+                
+            }
+
+            assertFalse(r2.isLive());
+            assertFalse(r2.isOpen());
+            assertFalse(r2.isEmpty());
+            assertFalse(r2.hasMoreBuffers());
+            
+        } finally {
+
+            writer.disableHALog();
+
+        }
+
+        // Read all files in the test directory.
+        HALogReader.main(new String[] { logdir.toString() });
+
     }
-    
+
+    /**
+     * Unit test for an open file leak for a historical log reader.
+     * 
+     * @see <a
+     *      href="https://sourceforge.net/apps/trac/bigdata/ticket/678#comment:4"
+     *      > DGC Thread Leak: sendHALogForWriteSet() </a>
+     */
+    public void test_fileLeak_historicalHALog() throws Exception {
+
+        /*
+         * This should be more than the #of open file handles that are supported
+         * by the OS platform / configured limits. Of course, some platforms do
+         * not have limits in which case this test can not fail on those
+         * platforms, but you could still use something like "lsof" or a heap
+         * dump / profiler to look for leaked file handles.
+         */
+        final int MAX_OPEN_FILE_HANDLES = 10000;
+        
+        final HALogWriter writer = new HALogWriter(logdir);
+
+        try {
+
+            /*
+             * Generate and close (seal with a closing root block) an HALog
+             * file.
+             */
+            final IRootBlockView openRB = openRBV(StoreTypeEnum.RW);
+
+            {
+                
+                assertEquals(StoreTypeEnum.RW, openRB.getStoreType());
+
+                writer.createLog(openRB);
+
+                int sequence = 0;
+
+                final ByteBuffer data = randomData(2000);
+
+                final UUID storeUUID = UUID.randomUUID();
+
+                final IHAWriteMessage msg = new HAWriteMessage(storeUUID,
+                        openRB.getCommitCounter(), openRB.getFirstCommitTime(),
+                        sequence, data.limit()/* size */, ChecksumUtility
+                                .getCHK().checksum(data),
+                        openRB.getStoreType(), openRB.getQuorumToken(),
+                        1000/* fileExtent */, 0/* firstOffset */);
+
+                writer.writeOnHALog(msg, data);
+
+                writer.closeHALog(closeRBV(openRB));
+
+            }
+
+            /*
+             * The HALog file is now closed.
+             * 
+             * Setup a reader on that HALog file. This reader will stay open. We
+             * then open and close and second reader a bunch of times. These
+             * readers should be completely distinct and use distinct file
+             * handles to read on the same file. Thus the #of open file handles
+             * should not grow over time.
+             */
+
+            final IHALogReader r1 = writer
+                    .getReader(openRB.getCommitCounter() + 1);
+
+            assertFalse(r1.isLive());
+            assertTrue(r1.isOpen());
+            assertFalse(r1.isEmpty());
+            assertTrue(r1.hasMoreBuffers());
+
+            for (int i = 0; i < MAX_OPEN_FILE_HANDLES; i++) {
+
+                final IHALogReader r2 = writer.getReader(openRB
+                        .getCommitCounter() + 1);
+
+                assertFalse(r2.isLive());
+                assertTrue(r2.isOpen());
+                assertFalse(r2.isEmpty());
+                assertTrue(r2.hasMoreBuffers());
+
+                /*
+                 * Now use the 2nd reader to read the data to make sure that the
+                 * IHALogReader is really open and functional.
+                 */
+                try {
+
+                    // Allocate a heap ByteBuffer
+                    final ByteBuffer rbuf = ByteBuffer
+                            .allocate(DirectBufferPool.INSTANCE
+                                    .getBufferCapacity());
+
+                    while (r2.hasMoreBuffers()) {
+
+                        // read data into reader's buffer.
+                        r2.processNextBuffer(rbuf);
+
+                    }
+
+                } finally {
+
+                    r2.close();
+
+                }
+
+                assertFalse(r2.isLive());
+                assertFalse(r2.isOpen());
+                assertFalse(r2.isEmpty());
+                assertFalse(r2.hasMoreBuffers());
+
+            }
+
+            // close [r1].
+            r1.close();
+            assertFalse(r1.isLive());
+            assertFalse(r1.isOpen());
+            assertFalse(r1.isEmpty());
+            assertFalse(r1.hasMoreBuffers());
+
+        } finally {
+
+            writer.disableHALog();
+
+        }
+
+        // Read all files in the test directory.
+        HALogReader.main(new String[] { logdir.toString() });
+
+    }
+
 }
