@@ -159,11 +159,13 @@ public class HALogReader implements IHALogReader {
 
     /**
      * {@inheritDoc}
-     * <p>
-     * Note: This was added to address a file handle leak. However, I am quite
+     * 
+     * TODO This was added to address a file handle leak. However, I am quite
      * dubious that this will fix the problem. While GC may be necessary to
      * finalize {@link HALogReader} instances during a RESYNC, we have already
-     * invoked {@link #close()} on those instances in the SendHALogTask().
+     * invoked {@link #close()} on those instances in the SendHALogTask(). It
+     * may be better to remove this since finalize() methods add overhead to 
+     * GC.
      * 
      * @see <a
      *      href="https://sourceforge.net/apps/trac/bigdata/ticket/678#comment:4"
