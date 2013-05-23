@@ -118,6 +118,15 @@ public interface IHALogReader {
      * decision can be made deterministically by inspecting the #of messages
      * available (in the closing root block) and the #of messages consumed by
      * the reader.
+     * 
+     * @return Return <code>false</code> if (a) the file is closed on entry to
+     *         this method; (b) the live HALog is closed while waiting for more
+     *         data to become available; or (c) the end of a historical HALog
+     *         file has been reached. Return <code>true</code> iff more data can
+     *         be read from the file.
+     * 
+     * @throws IOException
+     *             if there is an error reading from the backing file.
      */
 	boolean hasMoreBuffers() throws IOException;
 	

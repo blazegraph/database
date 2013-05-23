@@ -502,8 +502,8 @@ public class HALogWriter implements IHALogWriter {
 				throw new IllegalStateException("nextSequence="
 						+ m_nextSequence + ", but msg=" + msg);
 
-			if (haLog.isInfoEnabled())
-				haLog.info("msg=" + msg + ", position=" + m_position);
+			if (haLog.isDebugEnabled())
+				haLog.debug("msg=" + msg + ", position=" + m_position);
 
 			if (m_position < headerSize0)
 				throw new AssertionError("position=" + m_position
@@ -631,8 +631,7 @@ public class HALogWriter implements IHALogWriter {
 				 * Conditional remove iff file is open. Will not remove
 				 * something that has been closed.
 				 */
-
-				m_state.m_channel.close();
+			    m_state.forceCloseAll();
 
 				if (m_state.m_haLogFile.exists() && !m_state.m_haLogFile.delete()) {
 
@@ -787,6 +786,25 @@ public class HALogWriter implements IHALogWriter {
 			
 		}
 
+        /**
+         * Force an actual close of the backing file (used when we will remove a
+         * file).
+         * <p>
+         * Note: Any readers on the closed file will notice the close and fail
+         * if they are blocking on a read.
+         * 
+         * TODO In fact, we probably should have the set of
+         * {@link OpenHALogReader}s so we can explicitly close them. See
+         * {@link OpenHALogReader#close()}.
+         */
+        public void forceCloseAll() throws IOException {
+            synchronized (this) {
+                if (m_accessors > 0)
+                    m_accessors = 1;
+                close();
+            }
+        }
+        
 		public void close() throws IOException {
             synchronized (this) {
                 try {
@@ -842,12 +860,25 @@ public class HALogWriter implements IHALogWriter {
 			}
 		}
 
+        /**
+         * FIXME The API states that IHALogReader.isEmpty() reports true until
+         * the closing root block is laid down. However, this isEmpty()
+         * implementation does not adhere to those semantics. Review how (and
+         * if) isEmpty() is used for the live HALog and then fix either the API
+         * or this method.
+         */
 		public boolean isEmpty() {
 			synchronized(this) {
 				return m_committed && m_records == 0;
 			}
 		}
 
+        public boolean isOpen() {
+            synchronized (this) {
+                return m_accessors != 0 && m_raf.getChannel().isOpen();
+            }
+		}
+		
         /**
          * 
          * @param record
@@ -857,30 +888,36 @@ public class HALogWriter implements IHALogWriter {
          * TODO We should support wait up to a timeout here to make the API more
          * pleasant.
          */
-		public void waitOnStateChange(final long record) {
-			
-		    synchronized (this) {
-			
-		        if (m_records >= record) {
-				
-		            return;
-		            
-				}
+        public void waitOnStateChange(final long record) {
 
-				try {
+            synchronized (this) {
 
-				    wait();
-				    
-				} catch (InterruptedException e) {
-				    
-				    // Propagate the interrupt.
-				    Thread.currentThread().interrupt();
-				    
-				    return;
-				    
-				}
+                // Condition variable.
+                while (m_records < record && !m_committed) {
 
-			}
+                    if (!isOpen()) {
+
+                        // Provable nothing left to read.
+                        return;
+
+                    }
+
+                    try {
+
+                        wait();
+
+                    } catch (InterruptedException e) {
+
+                        // Propagate the interrupt.
+                        Thread.currentThread().interrupt();
+
+                        return;
+
+                    }
+
+                }
+
+		    }
 
 		}
 
@@ -947,18 +984,29 @@ public class HALogWriter implements IHALogWriter {
 		}
 
 		@Override
-		public boolean hasMoreBuffers() throws IOException {
+        public boolean hasMoreBuffers() {
 
             if (!isOpen())
                 return false;
-		    
-		    if (m_state.isCommitted() && m_state.recordCount() <= m_record)
-				return false;
 
-			if (m_state.recordCount() > m_record)
-				return true;
+            synchronized (m_state) {
 
-			m_state.waitOnStateChange(m_record + 1);
+                /*
+                 * Note: synchronized(FileState) makes these decisions atomic.
+                 */
+                
+                if (!m_state.isOpen())
+                    return false;
+                
+                if (m_state.isCommitted() && m_state.recordCount() <= m_record)
+                    return false;
+
+                if (m_state.recordCount() > m_record)
+                    return true;
+
+                m_state.waitOnStateChange(m_record + 1);
+
+            }
 
 			return hasMoreBuffers(); // tail recursion.
 			
@@ -978,9 +1026,9 @@ public class HALogWriter implements IHALogWriter {
 		    
 		}
 
-		@Override
-		public IHAWriteMessage processNextBuffer(ByteBuffer clientBuffer)
-				throws IOException {
+        @Override
+        public IHAWriteMessage processNextBuffer(final ByteBuffer clientBuffer)
+                throws IOException {
 
 			final IHAWriteMessage msg;
 
@@ -1013,7 +1061,30 @@ public class HALogWriter implements IHALogWriter {
 		        /*
 		         * Close an open reader.
 		         */
-                m_state.close();
+		        synchronized(m_state) {
+		            
+		            if(m_state.m_accessors == 0) {
+
+                        /**
+                         * TODO This is a bit of a hack. The problem is that
+                         * disableHALog() can force the close of all open
+                         * readers. This is noticed by the FileState, but the
+                         * OpenHALogReader itself does not know that it is
+                         * "closed" (it's open flag has not been cleared). We
+                         * could "fix" this by keeping an explicit set of the
+                         * open readers for the live HALog and then invoking
+                         * OpenHALogReader.close() on each of them in
+                         * forceCloseAll().
+                         * 
+                         * @see forceCloseAll()
+                         */
+		                return;
+		                
+		            }
+		            
+		            m_state.close();
+		            
+		        }
                 
             }
 		    
