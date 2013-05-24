@@ -30,6 +30,7 @@ import java.io.File;
 import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Executors;
@@ -50,6 +51,8 @@ import com.bigdata.ha.msg.HARootBlockRequest;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.quorum.Quorum;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
+import com.bigdata.service.jini.JiniClientConfig;
+import com.bigdata.util.NV;
 
 /**
  * Test suites for an {@link HAJournalServer} quorum with a replication factor
@@ -78,6 +81,7 @@ import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
  */
 public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
 
+
     /**
      * {@inheritDoc}
      * <p>
@@ -89,6 +93,7 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
     protected String[] getOverrides() {
         
         return new String[]{
+//        		"com.bigdata.journal.HAJournal.properties=" +TestHA3JournalServer.getTestHAJournalProperties(com.bigdata.journal.HAJournal.properties),
                 "com.bigdata.journal.jini.ha.HAJournalServer.restorePolicy=new com.bigdata.journal.jini.ha.DefaultRestorePolicy(0L,1,0)",
                 "com.bigdata.journal.jini.ha.HAJournalServer.snapshotPolicy=new com.bigdata.journal.jini.ha.NoSnapshotPolicy()",
                 "com.bigdata.journal.jini.ha.HAJournalServer.HAJournalClass=\""+HAJournalTest.class.getName()+"\"",
@@ -103,6 +108,25 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
     public TestHA3JournalServer(String name) {
         super(name);
     }
+
+    /**
+     * Complex hack to override the {@link HAJournal} properties.
+     * 
+     * @param in
+     *            The {@link NV}[] from the configuration (if you can get it).
+     *            
+     * @return The {@link NV}[] from which the {@link Properties} will be
+     *         constructed by {@link JiniClientConfig}
+     */
+    public static NV[] getTestHAJournalProperties(final NV[] in) {
+
+        return in;
+        
+    }
+    
+//    protected BufferMode getDiskMode() {
+//    	return BufferMode.DiskRW;
+//    }
 
     /**
      * Start 2 services and wait for a quorum meet. Verify that the services
@@ -694,6 +718,10 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
 			// Wait until the quorum is fully met. After RESYNC
 			assertEquals(token, awaitFullyMetQuorum(10));
 
+            awaitHAStatus(new HAStatusEnum[] { HAStatusEnum.Leader,
+                    HAStatusEnum.Follower, HAStatusEnum.Follower },
+                    new HAGlue[] { serverA, serverB, serverC });
+
 			log.info("FULLY MET");
 
 			// Wait for task to end. Check Future.
@@ -706,7 +734,14 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
 			// lastCommitCounter2,
 			// new HAGlue[] { serverA, serverB, serverC });
 
-			// Verify binary equality of ALL journals.
+            // But ONLY if fully met after load!
+            assertTrue(quorum.isQuorumFullyMet(token));
+            
+            awaitHAStatus(new HAStatusEnum[] { HAStatusEnum.Leader,
+                    HAStatusEnum.Follower, HAStatusEnum.Follower },
+                    new HAGlue[] { serverA, serverB, serverC });
+
+            // Verify binary equality of ALL journals.
 			assertDigestsEquals(new HAGlue[] { serverA, serverB, serverC });
 
 			// Now force further commit when fully met to remove log files
@@ -1493,7 +1528,7 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
     }
 
     public void testABCMultiTransactionFollowerReads() throws Exception {
-     // doABCMultiTransactionFollowerReads(2000/*nTransactions*/, 20/*delay per transaction*/); // STRESS
+    	// doABCMultiTransactionFollowerReads(20000/*nTransactions*/, 20/*delay per transaction*/); // STRESS
         doABCMultiTransactionFollowerReads(200/*nTransactions*/, 20/*delay per transaction*/);
     }
     
@@ -1511,7 +1546,8 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
     protected void doABCMultiTransactionFollowerReads(final int nTransactions,
             final long transactionDelay) throws Exception {
 
-        final long timeout = TimeUnit.MINUTES.toMillis(4);
+        // final long timeout = TimeUnit.MINUTES.toMillis(4);
+        final long timeout = (transactionDelay + 1000) * nTransactions; // allow 1 second per transaction
         try {
 
             // Start all services.
@@ -1731,6 +1767,8 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
                 queryTaskFuture.cancel(true/* mayInterruptIfRunning */);
 
             }
+
+			assertDigestsEquals(new HAGlue[] { services.serverA, services.serverB, services.serverC });
 
         } finally {
 		
@@ -2273,7 +2311,7 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
         awaitPipeline(new HAGlue[] {startup.serverA, startup.serverC, serverB2});
         
         // Await fully met quorum *before* LOAD is done.
-        assertTrue(awaitFullyMetDuringLOAD(token, ft));
+        assertTrue(awaitFullyMetDuringLOAD2(token, ft));
 
         // Verify fully met.
         assertTrue(quorum.isQuorumFullyMet(token));
@@ -2281,6 +2319,26 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
         // Await LOAD, but with a timeout.
         ft.get(longLoadTimeoutMillis, TimeUnit.MILLISECONDS);
         
+//        {
+//			final StringBuilder sb = new StringBuilder();
+//			sb.append("SELECT (COUNT(*) AS ?count) WHERE { ?s ?p ?o }\n");
+//	
+//			final String query = sb.toString();
+//	
+//			// final RemoteRepository follower = getRemoteRepository(services.serverA); // try with Leader to see difference! 6537 queries (less than for follower)
+//			final RemoteRepository follower = getRemoteRepository(serverB2); // 10109 queries for 2000 transact	ons
+//	
+//			final TupleQueryResult result = follower.prepareTupleQuery(query).evaluate();
+//			
+//			log.warn("Result Follower: " + result.next().getBinding("count"));
+//		
+//			final RemoteRepository leader = getRemoteRepository(startup.serverA); // 10109 queries for 2000 transact	ons
+//			
+//			final TupleQueryResult resultLeader = leader.prepareTupleQuery(query).evaluate();
+//			
+//			log.warn("Result Leader: " + resultLeader.next().getBinding("count"));
+//        }
+
 		// assertDigestsEquals(new HAGlue[] { startup.serverA, serverB2, startup.serverC });
     }
 

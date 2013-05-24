@@ -41,7 +41,6 @@ import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
-import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.locks.Lock;
 
 import net.jini.config.Configuration;
@@ -137,9 +136,9 @@ public class HAJournal extends Journal {
 
     private static final Logger log = Logger.getLogger(HAJournal.class);
 
-    private static final String ACQUIRED_GLOBAL_WRITE_LOCK = "Acquired global write lock.";
-
-    private static final String RELEASED_GLOBAL_WRITE_LOCK = "Released global write lock.";
+//    private static final String ACQUIRED_GLOBAL_WRITE_LOCK = "Acquired global write lock.";
+//
+//    private static final String RELEASED_GLOBAL_WRITE_LOCK = "Released global write lock.";
 
     public interface Options extends Journal.Options {
         
@@ -822,13 +821,13 @@ public class HAJournal extends Journal {
                     r = getHALogNexus().getReader(commitCounter);
 
                     isLive = r.isLive();
-
-                    // Task sends an HALog file along the pipeline.
+            
+            // Task sends an HALog file along the pipeline.
                     ft = new FutureTaskMon<Void>(new SendHALogTask(req, r));
 
-                    // Run task.
-                    getExecutorService().submit(ft);
-
+            // Run task.
+            getExecutorService().submit(ft);
+            
                     // Clear reference. File handle will be closed by task.
                     r = null;
 
@@ -905,12 +904,12 @@ public class HAJournal extends Journal {
 
                 try {
 
-                    long nsent = 0;
-                    boolean success = false;
+                long nsent = 0;
+                boolean success = false;
 
                     final IBufferAccess buf = DirectBufferPool.INSTANCE.acquire();
 
-                    try {
+                try {
 
                     while (r.hasMoreBuffers()) {
 
@@ -966,22 +965,22 @@ public class HAJournal extends Journal {
 
                     return null;
 
-                    } finally {
+                } finally {
 
-                        buf.release();
+                    buf.release();
 
-                        if (haLog.isDebugEnabled())
-                            haLog.debug("req=" + req + ", nsent=" + nsent
-                                    + ", success=" + success);
-
-                    }
+                    if (haLog.isDebugEnabled())
+                        haLog.debug("req=" + req + ", nsent=" + nsent
+                                + ", success=" + success);
+                    
+                }
 
                 } finally {
 
                     // Close the open log file.
                     r.close();
 
-                }
+            }
 
             } // call()
 

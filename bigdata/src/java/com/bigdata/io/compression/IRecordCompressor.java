@@ -40,6 +40,32 @@ import java.nio.ByteBuffer;
 public interface IRecordCompressor {
 
     /**
+     * Compresses data onto the provided ByteBuffer.
+     * 
+     * @param bin
+     *            The data. The data from the position to the limit will be
+     *            compressed. The position will be advanced to the limit as a
+     *            side effect.
+     *            
+     * @param out
+     * 			  The ByteBuffer into which the compressed data is written
+     */
+	void compress(final ByteBuffer bin, final ByteBuffer out);
+
+    /**
+     * Compresses data onto the provided ByteBuffer.
+     * 
+     * @param bin
+     *            The data. The data from the position to the limit will be
+     *            compressed. The position will be advanced to the limit as a
+     *            side effect.
+     *            
+     * @return 
+     * 			  The ByteBuffer into which the compressed data is written
+     */
+	ByteBuffer compress(final ByteBuffer bin);
+
+    /**
      * Compresses data onto the output stream.
      * 
      * @param bin

@@ -36,6 +36,8 @@ import com.bigdata.btree.keys.ICUVersionRecord;
 import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.FileLockUtility;
+import com.bigdata.io.compression.CompressorRegistry;
+import com.bigdata.io.compression.IRecordCompressor;
 import com.bigdata.io.writecache.WriteCache;
 import com.bigdata.io.writecache.WriteCache.ReadCache;
 import com.bigdata.io.writecache.WriteCacheService;
@@ -330,6 +332,21 @@ public interface Options {
 //     * @see #DEFAULT_WRITE_CACHE_CAPACITY
 //     */
 //    String WRITE_CACHE_CAPACITY = AbstractJournal.class.getName()+".writeCacheCapacity";
+
+    /**
+     * Optional {@link IRecordCompressor} strategy for the
+     * {@link WriteCacheService} in support of compressed payloads for
+     * replicated messages and compressed HALogs (default
+     * {@value #DEFAULT_HALOG_COMPRESSOR}). The value is a <code>key</code>
+     * declared to the {@link CompressorRegistry}.
+     * 
+     * @see CompressorRegistry
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/652" >
+     *      Compress write cache blocks for replication and in HALogs </a>
+     */
+    String HALOG_COMPRESSOR = "HALogCompressor";
+    String DEFAULT_HALOG_COMPRESSOR = null;//FIXME Change default: CompressorRegistry.DEFLATE_BEST_SPEED;
 
     /**
      * The initial extent of the journal (bytes). When the journal is backed by

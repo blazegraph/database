@@ -490,6 +490,11 @@ public class MemStrategy implements IBufferStrategy, IRWStrategy, IAllocationMan
 	}
 
 //	@Override
+//	public boolean isFlushed() {
+//		return true;
+//	}
+
+//	@Override
 //	public void resetFromHARootBlock(final IRootBlockView rootBlock) {
 //		throw new UnsupportedOperationException("MemStrategy cannot be used in HA pipeline");
 //	}

@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.io.compression;
 
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.Externalizable;
 import java.io.IOException;
 import java.io.ObjectInput;
@@ -41,6 +42,7 @@ import java.util.zip.InflaterInputStream;
 
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.io.ByteBufferInputStream;
+import com.bigdata.io.ByteBufferOutputStream;
 
 /**
  * Bulk data (de-)compressor used for leaves in {@link IndexSegment}s. The
@@ -114,7 +116,20 @@ public class RecordCompressor implements Externalizable, IRecordCompressor {
         
     }
 
-    public void compress(final ByteBuffer bin, final OutputStream os) {
+	public void compress(ByteBuffer bin, ByteBuffer out) {
+		compress(bin, new ByteBufferOutputStream(out));
+	}
+
+
+	public ByteBuffer compress(ByteBuffer bin) {
+		final ByteArrayOutputStream out = new ByteArrayOutputStream();
+		
+		compress(bin, out);
+		
+		return ByteBuffer.wrap(out.toByteArray());
+	}
+
+	public void compress(final ByteBuffer bin, final OutputStream os) {
 
         if (bin.hasArray() && bin.position() == 0
                 && bin.limit() == bin.capacity()) {

@@ -63,6 +63,8 @@ import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.FileChannelUtility;
 import com.bigdata.io.IBufferAccess;
 import com.bigdata.io.IReopenChannel;
+import com.bigdata.io.compression.CompressorRegistry;
+import com.bigdata.io.compression.IRecordCompressor;
 import com.bigdata.io.writecache.IBackingReader;
 import com.bigdata.io.writecache.WriteCache;
 import com.bigdata.io.writecache.WriteCacheCounters;
@@ -217,6 +219,11 @@ public class WORMStrategy extends AbstractBufferStrategy implements
      */
     private volatile WORMWriteCacheService writeCacheService;
 
+    @Override
+    public WORMWriteCacheService getWriteCacheService() {
+        return writeCacheService;
+    }
+    
     /**
      * <code>true</code> iff the backing store has record level checksums.
      */
@@ -250,6 +257,14 @@ public class WORMStrategy extends AbstractBufferStrategy implements
      * @see com.bigdata.journal.Options#HOT_CACHE_SIZE
      */
     private final int hotCacheSize;
+    
+    /**
+     * The key for the {@link CompressorRegistry} which identifies the
+     * {@link IRecordCompressor} to be applied (optional).
+     * 
+     * @see com.bigdata.journal.Options#HALOG_COMPRESSOR
+     */
+    private final String compressorKey;
     
     /**
      * <code>true</code> if the backing store will be used in an HA
@@ -951,6 +966,10 @@ public class WORMStrategy extends AbstractBufferStrategy implements
                 com.bigdata.journal.Options.HOT_CACHE_SIZE,
                 com.bigdata.journal.Options.DEFAULT_HOT_CACHE_SIZE));
         
+        this.compressorKey = fileMetadata.getProperty(
+                com.bigdata.journal.Options.HALOG_COMPRESSOR,
+                com.bigdata.journal.Options.DEFAULT_HALOG_COMPRESSOR);
+
         isHighlyAvailable = quorum != null && quorum.isHighlyAvailable();
 
         final boolean useWriteCacheService = fileMetadata.writeCacheEnabled
@@ -1002,7 +1021,8 @@ public class WORMStrategy extends AbstractBufferStrategy implements
         public WriteCacheImpl newWriteCache(final IBufferAccess buf,
                 final boolean useChecksum, final boolean bufferHasData,
                 final IReopenChannel<? extends Channel> opener,
-                final long fileExtent) throws InterruptedException {
+                final long fileExtent)
+                        throws InterruptedException {
             
             return new WriteCacheImpl(0/* baseOffset */, buf, useChecksum,
                     bufferHasData, (IReopenChannel<FileChannel>) opener,
@@ -1034,6 +1054,13 @@ public class WORMStrategy extends AbstractBufferStrategy implements
 
         }
 
+        @Override
+        protected String getCompressorKey() {
+
+            return compressorKey;
+            
+        }
+        
         /**
          * {@inheritDoc}
          * <p>
@@ -2480,12 +2507,18 @@ public class WORMStrategy extends AbstractBufferStrategy implements
     public void writeRawBuffer(final IHAWriteMessage msg, final IBufferAccess b)
             throws IOException, InterruptedException {
 
+        // FIXME Must EXPAND() iff message is compressed.
+        
         /*
          * Wrap up the data from the message as a WriteCache object. This will
          * build up a RecordMap containing the allocations to be made, and
          * including a ZERO (0) data length if any offset winds up being deleted
          * (released).
-         */
+         * 
+         * Note: We do not need to pass in the compressorKey here. It is ignored
+         * by WriteCache.flush(). We have expanded the payload above. Now we are
+         * just flushing the write cache onto the disk.
+          */
         final WriteCacheImpl writeCache = writeCacheService.newWriteCache(b,
                 useChecksums, true/* bufferHasData */, opener,
                 msg.getFileExtent());

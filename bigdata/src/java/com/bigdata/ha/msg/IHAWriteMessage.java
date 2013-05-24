@@ -23,8 +23,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.ha.msg;
 
+import java.nio.ByteBuffer;
 import java.util.UUID;
 
+import com.bigdata.io.compression.IRecordCompressor;
 import com.bigdata.journal.StoreTypeEnum;
 
 /**
@@ -50,6 +52,17 @@ public interface IHAWriteMessage extends IHAWriteMessageBase {
      * leader).
      */
     long getSequence();
+
+    /**
+     * Applies associated {@link IRecordCompressor} (if any) to decompress the
+     * data
+     */
+    ByteBuffer expand(ByteBuffer bin);
+    
+    /**
+     * Return the associated {@link IRecordCompressor} key (if any).
+     */
+    String getCompressorKey();
 
     /** The type of backing store (RW or WORM). */
     StoreTypeEnum getStoreType();

@@ -57,6 +57,14 @@ public class NOPRecordCompressor implements IRecordCompressor, Externalizable {
         
     }
     
+	public void compress(ByteBuffer bin, ByteBuffer out) {
+		out.put(bin);
+	}
+
+	public ByteBuffer compress(ByteBuffer bin) {
+		return bin;
+	}
+
     /**
      * Writes the buffer on the output stream.
      */

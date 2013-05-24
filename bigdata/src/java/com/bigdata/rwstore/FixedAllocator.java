@@ -345,7 +345,7 @@ public class FixedAllocator implements Allocator {
                     	// assert block.releaseSession(m_store.m_writeCache) == 0;
                     	
                     	// clear out writes - FIXME is releaseSession okay
-                    	block.releaseCommitWrites(m_store.m_writeCacheService);
+                    	block.releaseCommitWrites(m_store.getWriteCacheService());
                     	
                     	// Moved to postCommit()
                         // block.m_transients = block.m_live.clone();

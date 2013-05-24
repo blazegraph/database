@@ -433,5 +433,6 @@ abstract public class DiskBackedBufferStrategy extends BasicBufferStrategy
 	public void setNextOffset(long lastOffset) {
 		// void for default DiskBackedBufferStrategy
 	}
-	
+
+
 }

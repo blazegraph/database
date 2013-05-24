@@ -606,7 +606,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
         try {
 
             config = ConfigurationProvider.getInstance(args);
-
+            
             cacheMissTimeout = (Long) config.getEntry(COMPONENT,
                     ConfigurationOptions.CACHE_MISS_TIMEOUT, Long.TYPE,
                     ConfigurationOptions.DEFAULT_CACHE_MISS_TIMEOUT);

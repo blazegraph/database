@@ -676,4 +676,15 @@ public abstract class AbstractBufferStrategy extends AbstractRawWormStore implem
         return false;
     }
 
+//	
+//    /**
+//     * {@inheritDoc}
+//     * <p>
+//     * Note: By default there is no WriteCache to buffer any writes
+//     * 
+//     * @return <code>true</code> unless overridden.
+//     */
+//	public boolean isFlushed() {
+//		return true;
+//	}
 }

@@ -103,6 +103,7 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
      * Path to the directory in which the service directories exist. The
      * individual service directories are formed by adding the service name.
      */
+    // static final protected String TGT_PATH = "/Volumes/SSDData/bigdata/benchmark/CI-HAJournal-1/";
     static final protected String TGT_PATH = "benchmark/CI-HAJournal-1/";
 
     /**
@@ -260,6 +261,34 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
             public void run() {
                 try {
                     assertEquals(expected, haGlue.getHAStatus());
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+            }
+        }, 5, TimeUnit.SECONDS);
+
+    }
+
+    /**
+     * Check the {@link HAStatusEnum} of each service against the expected
+     * value.
+     * 
+     * @param expected
+     * @param haGlue
+     */
+    protected void awaitHAStatus(final HAStatusEnum[] expected,
+            final HAGlue[] haGlue) throws IOException {
+        assertEquals(expected.length, haGlue.length);
+        assertCondition(new Runnable() {
+            public void run() {
+                try {
+                    for (int i = 0; i < expected.length; i++) {
+                        final HAStatusEnum e = expected[i];
+                        final HAStatusEnum a = haGlue[i].getHAStatus();
+                        if (!e.equals(a)) {
+                            assertEquals("Service[" + i + "]", e, a);
+                        }
+                    }
                 } catch (IOException e) {
                     throw new RuntimeException(e);
                 }
@@ -605,6 +634,34 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
         }
 
     }
+
+//    protected void assertReadersEquals(final HAGlue[] services)
+//            throws NoSuchAlgorithmException, DigestException, IOException {
+//
+//        // The digest for each HALog file for each commit point.
+//        final byte[][] digests = new byte[services.length][];
+//
+//        for (int i = 0; i < services.length; i++) {
+//
+//            final HAGlue haGlue = services[i];
+//
+//            digests[i] = haGlue.computeDigest(
+//                    new HADigestRequest(null/* storeUUID */)).getDigest();
+//
+//            if (i > 0) {
+//
+//                if (!BytesUtil.bytesEqual(digests[i - 1], digests[i])) {
+//
+//                    fail("Services have different digest @ i="+i+": serviceA="
+//                            + services[i - 1] + ", serviceB=" + services[i]);
+//
+//                }
+//
+//            }
+//
+//        }
+//
+//    }
 
     /**
      * Verify that HALog files were generated and are available for the
