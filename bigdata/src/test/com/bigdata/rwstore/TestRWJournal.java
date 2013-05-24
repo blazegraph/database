@@ -171,7 +171,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
 
 		// Size of META_BITS_BLOCKS
 		properties.setProperty(com.bigdata.rwstore.RWStore.Options.DEFAULT_META_BITS_SIZE, "9");
-
+		
 		// properties.setProperty(RWStore.Options.ALLOCATION_SIZES,
 		// "1,2,3,5,8,12,16,32"); // 2K max
 		properties.setProperty(RWStore.Options.ALLOCATION_SIZES, "1,2,3,5,8,12,16"); // 1K

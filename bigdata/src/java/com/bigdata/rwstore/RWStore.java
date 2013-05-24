@@ -50,6 +50,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
@@ -81,6 +82,8 @@ import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.FileChannelUtility;
 import com.bigdata.io.IBufferAccess;
 import com.bigdata.io.IReopenChannel;
+import com.bigdata.io.compression.CompressorRegistry;
+import com.bigdata.io.compression.IRecordCompressor;
 import com.bigdata.io.writecache.BufferedWrite;
 import com.bigdata.io.writecache.IBackingReader;
 import com.bigdata.io.writecache.IBufferedWriter;
@@ -493,12 +496,35 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
     private final int m_hotCacheSize;
     
     /**
+     * The key for the {@link CompressorRegistry} which identifies the
+     * {@link IRecordCompressor} to be applied (optional).
+     * 
+     * @see com.bigdata.journal.Options#HALOG_COMPRESSOR
+     */
+    private final String m_compressorKey;
+    
+    /**
      * Note: This is not final because we replace the {@link WriteCacheService}
      * during {@link #reset(long)} in order to propagate the then current quorum
      * token to the {@link WriteCacheService}.
      */
-    RWWriteCacheService m_writeCacheService;
+    private RWWriteCacheService m_writeCacheService;
 
+    /**
+     * Return the then current {@link WriteCacheService} object.
+     * 
+     * @see IHABufferStrategy#getWriteCacheService()
+     */
+    public RWWriteCacheService getWriteCacheService() {
+        m_allocationReadLock.lock();
+        try {
+            return m_writeCacheService;
+        } finally {
+            m_allocationReadLock.unlock();
+        }
+        
+    }
+    
     /**
      * The actual allocation sizes as read from the store.
      * 
@@ -650,11 +676,14 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
     private ConcurrentHashMap<Integer, Long> m_lockAddresses = null;
 
     class WriteCacheImpl extends WriteCache.FileChannelScatteredWriteCache {
+        
+        final private String compressorKey;
+        
         public WriteCacheImpl(final IBufferAccess buf,
                 final boolean useChecksum,
                 final boolean bufferHasData,
                 final IReopenChannel<FileChannel> opener,
-                final long fileExtent)
+                final long fileExtent, final String compressorKey)
                 throws InterruptedException {
 
             super(buf, useChecksum, m_quorum != null
@@ -662,8 +691,17 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
                     fileExtent,
                     m_bufferedWrite);
 
+            this.compressorKey = compressorKey;
+            
         }
 
+        @Override
+        public String getCompressorKey() {
+
+            return compressorKey;
+            
+        }
+        
         /**
          * {@inheritDoc}
          * <p>
@@ -739,7 +777,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
         if (cDefaultMetaBitsSize < 9)
             throw new IllegalArgumentException(Options.META_BITS_SIZE
                     + " : Must be GTE 9");
-        
+                
         m_metaBitsSize = cDefaultMetaBitsSize;
 
         cDefaultFreeBitsThreshold = Integer.valueOf(fileMetadata.getProperty(
@@ -832,6 +870,14 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
             log.info(com.bigdata.journal.Options.HOT_CACHE_SIZE + "="
                     + m_hotCacheSize);
 
+        this.m_compressorKey = fileMetadata.getProperty(
+                com.bigdata.journal.Options.HALOG_COMPRESSOR,
+                com.bigdata.journal.Options.DEFAULT_HALOG_COMPRESSOR);
+
+        if (log.isInfoEnabled())
+            log.info(com.bigdata.journal.Options.HALOG_COMPRESSOR + "="
+                    + m_compressorKey);
+
         // m_writeCache = newWriteCache();
 
         try {
@@ -896,7 +942,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 
             // setup write cache AFTER init to ensure filesize is correct!
             
-            m_writeCacheService = newWriteCache();
+            m_writeCacheService = newWriteCacheService();
 
             final int maxBlockLessChk = m_maxFixedAlloc-4;
              
@@ -1030,7 +1076,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
      * is responsible for closing out the old one and must be holding the
      * appropriate locks when it switches in the new instance.
      */
-    private RWWriteCacheService newWriteCache() {
+    private RWWriteCacheService newWriteCacheService() {
         try {
 
             final boolean highlyAvailable = m_quorum != null
@@ -1053,7 +1099,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
                             return new WriteCacheImpl(buf,
                                     useChecksum, bufferHasData,
                                     (IReopenChannel<FileChannel>) opener,
-                                    fileExtent);
+                                    fileExtent, m_compressorKey);
                         }
                 };
         } catch (InterruptedException e) {
@@ -2844,7 +2890,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
                  *      HA Journal </a>
                  */
                 m_writeCacheService.close();
-                m_writeCacheService = newWriteCache();
+                m_writeCacheService = newWriteCacheService();
             } else if (m_writeCacheService != null) {
                 /*
                  * Note: We DO NOT need to reset() the WriteCacheService. If a
@@ -5556,28 +5602,57 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
     public void writeRawBuffer(final IHAWriteMessage msg, final IBufferAccess b)
             throws IOException, InterruptedException {
 
+        // expand buffer before writing on the store.
+        final ByteBuffer xb = msg.expand(b.buffer());
+
+        if (log.isTraceEnabled()) {
+            log.trace("expanded buffer, position: " + xb.position()
+                    + ", limit: " + xb.limit());
+        }
+    	
+        final IBufferAccess ba = new IBufferAccess() {
+
+			@Override
+			public ByteBuffer buffer() {
+				return xb;
+			}
+
+			@Override
+			public void release() throws InterruptedException {
+			}
+
+			@Override
+			public void release(long timeout, TimeUnit unit)
+					throws InterruptedException {
+			}
+		};
+         
         /*
          * Wrap up the data from the message as a WriteCache object. This will
          * build up a RecordMap containing the allocations to be made, and
          * including a ZERO (0) data length if any offset winds up being deleted
          * (released).
+         * 
+         * Note: We do not need to pass in the compressorKey here. It is ignored
+         * by WriteCache.flush(). We have expanded the payload above. Now we are
+         * just flushing the write cache onto the disk.
          */
-        final WriteCache writeCache = m_writeCacheService.newWriteCache(b,
+        final WriteCache writeCache = m_writeCacheService.newWriteCache(ba,
                 true/* useChecksums */, true/* bufferHasData */, m_reopener,
                 msg.getFileExtent());
         
         // Ensure that replicated buffers are not compacted.
         writeCache.closeForWrites();
         
-        /*
-         * Setup buffer for writing. We receive the buffer with pos=0,
-         * limit=#ofbyteswritten. However, flush() expects pos=limit, will
-         * clear pos to zero and then write bytes up to the limit. So,
-         * we set the position to the limit before calling flush.
-         */
-        final ByteBuffer bb = b.buffer();
-        final int limit = bb.limit();
-        bb.position(limit);
+		/*
+		 * Setup buffer for writing. We receive the buffer with pos=0,
+		 * limit=#ofbyteswritten. However, flush() expects pos=limit, will
+		 * clear pos to zero and then write bytes up to the limit. So,
+		 * we set the position to the limit before calling flush.
+		 */
+		final ByteBuffer bb = ba.buffer();
+		final int limit = bb.limit();
+		bb.position(limit);
         
         /*
          * Flush the scattered writes in the write cache to the backing store.
@@ -6110,12 +6185,26 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
                 // new metabits
                 m_metaBits = RootBlockInfo.metabits(rbv, m_reopener);
                 
+                if(log.isTraceEnabled())
+                    log.trace("Metabits length: " + m_metaBits.length);
+                
+                // Valid metabits should be multiples of default sizes
+                if (oldmetabits.length % cDefaultMetaBitsSize != 0)
+                	throw new AssertionError();
+                if (m_metaBits.length % cDefaultMetaBitsSize != 0)
+                	throw new AssertionError();
+
+                // Is it always valid to assume that:
+                //	metabits.length >= oldmetabits.length
+                if (m_metaBits.length < oldmetabits.length)
+                	throw new AssertionError();
+                
                 // need to compute modded metabits, those newly written slots by ANDing
                 // new bits with compliment of current
-                int[] moddedBits = m_metaBits.clone();
-                for (int b = 0; b < oldmetabits.length; b+=9) {
-                    // int[0] is startAddr, int[1:9] bits
-                    for (int i = 1; i < 9; i++) {
+                final int[] moddedBits = m_metaBits.clone();
+                for (int b = 0; b < oldmetabits.length; b+=cDefaultMetaBitsSize) {
+                    // int[0] is startAddr, int[1:cDefaultMetaBitsSize] bits
+                    for (int i = 1; i < cDefaultMetaBitsSize; i++) {
                         moddedBits[b+i] &= ~oldmetabits[b+i];
                     }
                 }
@@ -6136,9 +6225,9 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
                 
                 int modCount = 0;
                 int totalFreed = 0;
-                for (int i = 0; i < moddedBits.length; i+=9) {
+                for (int i = 0; i < moddedBits.length; i+=cDefaultMetaBitsSize) {
                     final long startAddr = convertAddr(m_metaBits[i]);
-                    for (int j = 1; j < 9; j++) {
+                    for (int j = 1; j < cDefaultMetaBitsSize; j++) {
                         final int chkbits = moddedBits[i+j];
                         for (int b = 0; b < 32; b++) {
                             if ((chkbits & (1 << b)) != 0) {
@@ -6150,7 +6239,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
                                     log.trace("Allocator at: " + paddr);
                                 
                                 // metaBit
-                                final int metaBit = (i * 9 * 32) + (j * 32) + b;
+                                final int metaBit = (i * cDefaultMetaBitsSize * 32) + (j * 32) + b;
                                 
                                 // Now try to read it in
                                 final FixedAllocator nalloc = readAllocator(paddr);
@@ -6795,6 +6884,16 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
         }
 
     }
+
+//    /**
+//     * 
+//     * @return whether WCS is flushed
+//     * 
+//     * @see IBufferStrategy#isFlushed()
+//     */
+//	public boolean isFlushed() {
+//		return this.m_writeCacheService.isFlushed();
+//	}
 
 //  public void prepareForRebuild(final HARebuildRequest req) {
 //      assert m_rebuildRequest == null;

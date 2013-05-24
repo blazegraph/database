@@ -61,6 +61,8 @@ import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.FileChannelUtility;
 import com.bigdata.io.IBufferAccess;
 import com.bigdata.io.IReopenChannel;
+import com.bigdata.io.compression.CompressorRegistry;
+import com.bigdata.io.compression.IRecordCompressor;
 import com.bigdata.journal.AbstractBufferStrategy;
 import com.bigdata.journal.StoreTypeEnum;
 import com.bigdata.journal.WORMStrategy;
@@ -772,6 +774,16 @@ abstract public class WriteCache implements IWriteCache {
     // package private : exposed to WriteTask.call().
     int getWholeBufferChecksum(final ByteBuffer checksumBuffer) {
 
+        final ByteBuffer src = peek().duplicate();
+        // flip(limit=pos;pos=0)
+        src.flip();
+
+        return getWholeBufferChecksum(checksumBuffer, src);
+
+    }
+
+    int getWholeBufferChecksum(final ByteBuffer checksumBuffer, final ByteBuffer src) {
+
         if (checker == null)
             throw new UnsupportedOperationException();
         
@@ -785,17 +797,13 @@ abstract public class WriteCache implements IWriteCache {
              * checksum.
              */
 
-            final ByteBuffer b = peek().duplicate();
-            // flip(limit=pos;pos=0)
-            b.flip();
-
-            assert checksumBuffer.capacity() == b.capacity() : "b.capacity="
-                    + b.capacity() + ", checksumBuffer.capacity="
+            assert checksumBuffer.capacity() == src.capacity() : "b.capacity="
+                    + src.capacity() + ", checksumBuffer.capacity="
                     + checksumBuffer.capacity();
 
             checksumBuffer.limit(checksumBuffer.capacity());
             checksumBuffer.position(0);
-            checksumBuffer.put(b);
+            checksumBuffer.put(src);
             checksumBuffer.flip();
 
             checker.reset();
@@ -1526,30 +1534,132 @@ abstract public class WriteCache implements IWriteCache {
 
     }
 
+//    /**
+//     * Return the RMI message object that will accompany the payload from the
+//     * {@link WriteCache} when it is replicated along the write pipeline.
+//     * 
+//     * @return cache A {@link WriteCache} to be replicated.
+//     */
+//    final IHAWriteMessage newHAWriteMessage(//
+//            final UUID storeUUID,
+//            final long quorumToken,
+//            final long lastCommitCounter,//
+//            final long lastCommitTime,//
+//            final long sequence,
+//            final ByteBuffer tmp
+//            ) {
+//
+//        return new HAWriteMessage(//
+//                storeUUID,//
+//                lastCommitCounter,//
+//                lastCommitTime,//
+//                sequence, //
+//                bytesWritten(), getWholeBufferChecksum(tmp),
+//                prefixWrites ? StoreTypeEnum.RW : StoreTypeEnum.WORM,
+//                quorumToken, fileExtent.get(), firstOffset.get());
+//
+//    }
+    
     /**
-     * Return the RMI message object that will accompany the payload from the
-     * {@link WriteCache} when it is replicated along the write pipeline.
-     * 
-     * @return cache A {@link WriteCache} to be replicated.
+     * Used to retrieve the {@link HAWriteMessage} AND the associated
+     * {@link ByteBuffer}.
+     * <p>
+     * This allows the {@link WriteCache} to compress the data and create the
+     * correct {@link HAWriteMessage}.
      */
-    final IHAWriteMessage newHAWriteMessage(//
-            final UUID storeUUID,
-            final long quorumToken,
+    static public class HAPackage {
+
+        /**
+         * The message as it will be sent.
+         */
+        private final IHAWriteMessage m_msg;
+        /**
+         * The data as it will be sent, with compression already applied if
+         * compression will be used.
+         */
+        private final ByteBuffer m_data;
+
+        /**
+         * 
+         * @param msg
+         *            The message as it will be sent.
+         * @param data
+         *            The data as it will be sent, with compression already
+         *            applied if compression will be used.
+         */
+        HAPackage(final IHAWriteMessage msg, final ByteBuffer data) {
+            m_msg = msg;
+            m_data = data;
+        }
+
+        public IHAWriteMessage getMessage() {
+            return m_msg;
+        }
+
+        public ByteBuffer getData() {
+            return m_data;
+        }
+    }
+    
+    /**
+     * Return the optional key for the {@link CompressorRegistry} which
+     * identifies the {@link IRecordCompressor} to be applied.
+     */
+    protected String getCompressorKey() {
+
+        // Default is NO compression.
+        return null;
+        
+    }
+    
+    /**
+     * Return the RMI message object plus the payload (the payload has been
+     * optionally compressed, depending on the configuration).
+     */
+    final HAPackage newHAPackage(//
+            final UUID storeUUID,//
+            final long quorumToken,//
             final long lastCommitCounter,//
             final long lastCommitTime,//
-            final long sequence,
-            final ByteBuffer tmp
+            final long sequence,//
+            final ByteBuffer checksumBuffer
             ) {
+    	
+        final ByteBuffer b = peek().duplicate();
+        b.flip();
 
-        return new HAWriteMessage(//
+        final ByteBuffer send;
+
+        final String compressorKey  = getCompressorKey();
+        
+        final IRecordCompressor compressor = CompressorRegistry.getInstance()
+                .get(compressorKey);
+
+        if (compressor != null) {
+        
+            // Compress current buffer
+            send = compressor.compress(b);
+
+        } else {
+            
+            send = b;
+            
+        }
+    	
+        // log.warn("Message, position: " + send.position() + ", limit: " + send.limit());
+    	
+        final HAWriteMessage msg = new HAWriteMessage(//
                 storeUUID,//
                 lastCommitCounter,//
                 lastCommitTime,//
                 sequence, //
-                bytesWritten(), getWholeBufferChecksum(tmp),
+                send.limit(), getWholeBufferChecksum(checksumBuffer, send.duplicate()),
                 prefixWrites ? StoreTypeEnum.RW : StoreTypeEnum.WORM,
-                quorumToken, fileExtent.get(), firstOffset.get());
-
+                quorumToken, fileExtent.get(), firstOffset.get(),
+                compressorKey);
+    	
+        return new HAPackage(msg, send);
+    	
     }
 
     /**
@@ -1829,6 +1939,8 @@ abstract public class WriteCache implements IWriteCache {
             recordMap.clear();
             final int limit = buf.limit(); // end position.
             int pos = buf.position(); // start position
+            
+            // log.trace("position: " + pos + ", limit: " + limit);
             while (pos < limit) {
                 buf.position(pos);
                 // 8 bytes (negative iff record is deleted)
@@ -1839,7 +1951,10 @@ abstract public class WriteCache implements IWriteCache {
                 assert recordLength != 0;
                 // 4 bytes
                 final int latchedAddr = buf.getInt();  
-//                if (sze == 0 /* old style deleted */) {
+
+                // log.trace("Record fileOffset: " + fileOffset + ", length: " + recordLength + ", latchedAddr: " + latchedAddr);
+
+                //                if (sze == 0 /* old style deleted */) {
 //                    /*
 //                     * Should only happen if a previous write was already made
 //                     * to the buffer but the allocation has since been freed.

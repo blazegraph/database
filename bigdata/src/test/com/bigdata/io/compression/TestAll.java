@@ -73,6 +73,9 @@ public class TestAll extends TestCase {
 
         suite.addTestSuite(TestRecordCompressor_BestCompression.class);
         
+        // Test suite for message compression.
+        suite.addTestSuite(TestCompressorRegistry.class);
+
         return suite;
         
     }

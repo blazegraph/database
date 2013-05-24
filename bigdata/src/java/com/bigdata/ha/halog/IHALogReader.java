@@ -77,7 +77,7 @@ public interface IHALogReader {
      * same file and one is closed, then other will remain open. Likewise, if a
      * reader is open for the live HALog file, closing the writer will not close
      * the reader and closing the reader will not close the writer.
-     */
+	 */
 	void close() throws IOException;
 	
 	/**
@@ -107,7 +107,7 @@ public interface IHALogReader {
 	 */
 	IRootBlockView getClosingRootBlock() throws IOException;
 	
-    /**
+	/**
      * Checks whether we have reached the end of the file (blocking).
      * <p>
      * Note: This method will block if this is the live HALog. This allows a
@@ -127,7 +127,7 @@ public interface IHALogReader {
      * 
      * @throws IOException
      *             if there is an error reading from the backing file.
-     */
+	 */
 	boolean hasMoreBuffers() throws IOException;
 	
 	/**

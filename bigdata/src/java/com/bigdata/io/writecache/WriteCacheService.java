@@ -62,7 +62,6 @@ import org.apache.log4j.Logger;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.ha.HAPipelineGlue;
 import com.bigdata.ha.QuorumPipeline;
-import com.bigdata.ha.msg.IHAWriteMessage;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.IBufferAccess;
 import com.bigdata.io.IReopenChannel;
@@ -544,7 +543,18 @@ abstract public class WriteCacheService implements IWriteCache {
 
         this.useChecksum = useChecksum;
 
-        this.compactionEnabled = false;//canCompact() && compactionThreshold < 100;
+        /**
+         * FIXME WCS compaction fails!
+         * 
+         * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/674" >
+         *      WCS write cache compaction causes errors in RWS postHACommit()
+         *      </a>
+         */
+        this.compactionEnabled = false; //canCompact() && compactionThreshold < 100;
+        
+        if (log.isInfoEnabled())
+            log.info("Compaction Enabled: " + compactionEnabled
+                    + " @ threshold=" + compactionThreshold);
 
 //      this.opener = opener;
 
@@ -1376,11 +1386,6 @@ abstract public class WriteCacheService implements IWriteCache {
                  * non-final follower will receiveAndReplicate the write cache
                  * buffer. The last follower will receive the buffer.
                  */
-                // duplicate the write cache's buffer.
-                final ByteBuffer b = cache.peek().duplicate();
-                // flip(limit=pos;pos=0)
-                b.flip();
-                assert b.remaining() > 0 : "Empty cache: " + cache;
 
                 // send to 1st follower.
                 @SuppressWarnings("unchecked")
@@ -1389,7 +1394,7 @@ abstract public class WriteCacheService implements IWriteCache {
 
                 assert quorumMember != null : "Not quorum member?";
 
-                final IHAWriteMessage msg = cache.newHAWriteMessage(//
+                final WriteCache.HAPackage pkg = cache.newHAPackage(//
                         quorumMember.getStoreUUID(),//
                         quorumToken,//
                         quorumMember.getLastCommitCounter(),//
@@ -1397,6 +1402,8 @@ abstract public class WriteCacheService implements IWriteCache {
                         thisSequence,//
                         checksumBuffer
                         );
+
+                assert pkg.getData().remaining() > 0 : "Empty cache: " + cache;
 
                 /*
                  * Start the remote asynchronous IO before the local synchronous
@@ -1413,11 +1420,11 @@ abstract public class WriteCacheService implements IWriteCache {
                  * then clean up the documentation here (see the commented
                  * out version of this line below).
                  */
-                quorumMember.logWriteCacheBlock(msg, b.duplicate()); 
+                quorumMember.logWriteCacheBlock(pkg.getMessage(), pkg.getData().duplicate()); 
                 
                 // ASYNC MSG RMI + NIO XFER.
-                remoteWriteFuture = quorumMember.replicate(null/* req */, msg,
-                        b.duplicate());
+                remoteWriteFuture = quorumMember.replicate(null/* req */, pkg.getMessage(),
+                		pkg.getData().duplicate());
                 
                 counters.get().nsend++;
 
@@ -1468,7 +1475,7 @@ abstract public class WriteCacheService implements IWriteCache {
             }
 
         } // writeCacheBlock()
-        
+
     } // class WriteTask
 
     /**
@@ -3832,6 +3839,23 @@ abstract public class WriteCacheService implements IWriteCache {
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
+    }
+    
+    /**
+     * Debug method to verify that the {@link WriteCacheService} has flushed all
+     * {@link WriteCache} buffers.
+     * 
+     * @return whether there are no outstanding writes buffered
+     */
+    public boolean isFlushed() {
+        
+        final boolean clear = 
+    			dirtyList.size() == 0
+    			&& compactingCacheRef.get() == null
+    			&& (current.get() == null || current.get().isEmpty());
+    	
+        return clear;
+        
     }
     
     /**

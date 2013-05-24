@@ -86,7 +86,8 @@ public class RWWriteCacheService extends WriteCacheService implements IWriteCach
         return new FileChannelScatteredWriteCache(buf, true/* useChecksum */,
                 highlyAvailable,
                 bufferHasData,
-                (IReopenChannel<FileChannel>) opener, fileExtent, null);
+                (IReopenChannel<FileChannel>) opener, fileExtent,
+                null/* BufferedWrite */);
 
     }
 

@@ -3274,12 +3274,31 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 			final long nextOffset = _bufferStrategy.getNextOffset();
 
             final long blockSequence;
+            
             if (_bufferStrategy instanceof IHABufferStrategy) {
+
                 // always available for HA.
                 blockSequence = ((IHABufferStrategy) _bufferStrategy)
                         .getBlockSequence();
+                
+                if (!((IHABufferStrategy) _bufferStrategy)
+                        .getWriteCacheService().isFlushed()) {
+ 
+                    /**
+                     * @see <a
+                     *      href="https://sourceforge.net/apps/trac/bigdata/ticket/674"
+                     *      > WCS write cache compaction causes errors in RWS
+                     *      postHACommit() </a>
+                     */
+                    
+                    throw new AssertionError();
+                    
+                }
+                
             } else {
+                
                 blockSequence = old.getBlockSequence();
+                
             }
 
             /*

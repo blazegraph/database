@@ -276,4 +276,9 @@ public interface IBufferStrategy extends IRawStore, IMRMW {
      */
     public boolean useChecksums();
 
+//    /**
+//     * Determines whether there are outstanding writes to the underlying store
+//     */
+//	public boolean isFlushed();
+
 }

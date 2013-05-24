@@ -275,4 +275,9 @@ public interface IHABufferStrategy extends IBufferStrategy {
             Quorum<HAGlue, QuorumService<HAGlue>> quorum, long token)
             throws IOException, QuorumException;
 
+    /**
+     * Return the {@link WriteCacheService} (mainly for debugging).
+     */
+    WriteCacheService getWriteCacheService();
+    
 }
