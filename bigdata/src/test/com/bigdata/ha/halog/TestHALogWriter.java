@@ -279,39 +279,54 @@ public class TestHALogWriter extends TestCase2 {
                 final IHALogReader reader = writer.getReader(openRB
                         .getCommitCounter() + 1);
 
-                // This is the "live" HALog.
-                assertTrue(reader.isLive());
+                try {
 
-                // The reader is open.
-                assertTrue(reader.isOpen());
-                
-                // The HALog is logically empty.
-//                assertTrue(reader.isEmpty());
-                
-                /*
-                 * Note: Don't do this here. The method will block for the live
-                 * HALog until the file is closed (sealed with the closing root
-                 * block) or destroyed.
-                 */
-//                assertTrue(reader.hasMoreBuffers());
+                    // This is the "live" HALog.
+                    assertTrue(reader.isLive());
 
-                // close the reader. should not close the writer.
-                reader.close();
+                    // The reader is open.
+                    assertTrue(reader.isOpen());
 
-                // the reader is closed.
-                assertFalse(reader.isOpen());
-               
-                // once closed, this method should return immediately.
-                assertFalse(reader.hasMoreBuffers());
-                
-                // the writer is still open.
-                assertTrue(writer.isHALogOpen());
+                    // The HALog is logically empty.
+                    // assertTrue(reader.isEmpty());
 
-                // double-close the reader. should be ignored.
-                reader.close();
-                
-                // the writer should *still* be open.
-                assertTrue(writer.isHALogOpen());
+                    /*
+                     * Note: Don't do this here. The method will block for the
+                     * live HALog until the file is closed (sealed with the
+                     * closing root block) or destroyed.
+                     */
+                    // assertTrue(reader.hasMoreBuffers());
+
+                    // close the reader. should not close the writer.
+                    reader.close();
+
+                    // the reader is closed.
+                    assertFalse(reader.isOpen());
+
+                    // once closed, this method should return immediately.
+                    assertFalse(reader.hasMoreBuffers());
+
+                    // the writer is still open.
+                    assertTrue(writer.isHALogOpen());
+
+                    // double-close the reader. should be ignored.
+                    reader.close();
+
+                    // the reader is closed.
+                    assertFalse(reader.isOpen());
+
+                    // the writer should *still* be open.
+                    assertTrue(writer.isHALogOpen());
+
+                } finally {
+                    
+                    if(reader.isOpen()) {
+                        
+                        reader.close();
+                        
+                    }
+                    
+                }
                 
             }
 
@@ -549,12 +564,12 @@ public class TestHALogWriter extends TestCase2 {
             // Note: Throws FileNotFoundException if does not exist.
             final IHALogReader reader = writer.getReader(commitCounter);
 
-            assertNotNull(reader);
-
-            long nread = 0L;
-            
             try {
 
+                assertNotNull(reader);
+
+                long nread = 0L;
+                
                 while (reader.hasMoreBuffers()) {
 
                     checkWriterFuture();
@@ -860,6 +875,8 @@ public class TestHALogWriter extends TestCase2 {
      */
     public void test_doubleOpen_close_historicalHALog() throws Exception {
         
+        IHALogReader r1 = null, r2 = null;
+        
         final HALogWriter writer = new HALogWriter(logdir);
 
         try {
@@ -901,16 +918,14 @@ public class TestHALogWriter extends TestCase2 {
              * Setup two readers on that HALog file.
              */
             
-            final IHALogReader r1 = writer.getReader(openRB
-                    .getCommitCounter() + 1);
+            r1 = writer.getReader(openRB.getCommitCounter() + 1);
 
             assertFalse(r1.isLive());
             assertTrue(r1.isOpen());
             assertFalse(r1.isEmpty());
             assertTrue(r1.hasMoreBuffers());
 
-            final IHALogReader r2 = writer.getReader(openRB
-                    .getCommitCounter() + 1);
+            r2 = writer.getReader(openRB.getCommitCounter() + 1);
 
             assertFalse(r2.isLive());
             assertTrue(r2.isOpen());
@@ -965,6 +980,16 @@ public class TestHALogWriter extends TestCase2 {
 
             writer.disableHALog();
 
+            if (r1 != null && r1.isOpen()) {
+                r1.close();
+                r1 = null;
+            }
+            
+            if (r2 != null && r2.isOpen()) {
+                r2.close();
+                r2 = null;
+            }
+            
         }
 
         // Read all files in the test directory.
@@ -1038,59 +1063,68 @@ public class TestHALogWriter extends TestCase2 {
             final IHALogReader r1 = writer
                     .getReader(openRB.getCommitCounter() + 1);
 
-            assertFalse(r1.isLive());
-            assertTrue(r1.isOpen());
-            assertFalse(r1.isEmpty());
-            assertTrue(r1.hasMoreBuffers());
+            try {
 
-            for (int i = 0; i < MAX_OPEN_FILE_HANDLES; i++) {
+                assertFalse(r1.isLive());
+                assertTrue(r1.isOpen());
+                assertFalse(r1.isEmpty());
+                assertTrue(r1.hasMoreBuffers());
 
-                final IHALogReader r2 = writer.getReader(openRB
-                        .getCommitCounter() + 1);
+                for (int i = 0; i < MAX_OPEN_FILE_HANDLES; i++) {
 
-                assertFalse(r2.isLive());
-                assertTrue(r2.isOpen());
-                assertFalse(r2.isEmpty());
-                assertTrue(r2.hasMoreBuffers());
+                    final IHALogReader r2 = writer.getReader(openRB
+                            .getCommitCounter() + 1);
 
-                /*
-                 * Now use the 2nd reader to read the data to make sure that the
-                 * IHALogReader is really open and functional.
-                 */
-                try {
+                    assertFalse(r2.isLive());
+                    assertTrue(r2.isOpen());
+                    assertFalse(r2.isEmpty());
+                    assertTrue(r2.hasMoreBuffers());
 
-                    // Allocate a heap ByteBuffer
-                    final ByteBuffer rbuf = ByteBuffer
-                            .allocate(DirectBufferPool.INSTANCE
-                                    .getBufferCapacity());
+                    /*
+                     * Now use the 2nd reader to read the data to make sure that
+                     * the IHALogReader is really open and functional.
+                     */
+                    try {
 
-                    while (r2.hasMoreBuffers()) {
+                        // Allocate a heap ByteBuffer
+                        final ByteBuffer rbuf = ByteBuffer
+                                .allocate(DirectBufferPool.INSTANCE
+                                        .getBufferCapacity());
 
-                        // read data into reader's buffer.
-                        r2.processNextBuffer(rbuf);
+                        while (r2.hasMoreBuffers()) {
+
+                            // read data into reader's buffer.
+                            r2.processNextBuffer(rbuf);
+
+                        }
+
+                    } finally {
+
+                        r2.close();
 
                     }
 
-                } finally {
-
-                    r2.close();
+                    assertFalse(r2.isLive());
+                    assertFalse(r2.isOpen());
+                    assertFalse(r2.isEmpty());
+                    assertFalse(r2.hasMoreBuffers());
 
                 }
 
-                assertFalse(r2.isLive());
-                assertFalse(r2.isOpen());
-                assertFalse(r2.isEmpty());
-                assertFalse(r2.hasMoreBuffers());
+                // close [r1].
+                r1.close();
+                assertFalse(r1.isLive());
+                assertFalse(r1.isOpen());
+                assertFalse(r1.isEmpty());
+                assertFalse(r1.hasMoreBuffers());
+
+            } finally {
+                
+                if (r1.isOpen())
+                    r1.close();
 
             }
-
-            // close [r1].
-            r1.close();
-            assertFalse(r1.isLive());
-            assertFalse(r1.isOpen());
-            assertFalse(r1.isEmpty());
-            assertFalse(r1.hasMoreBuffers());
-
+            
         } finally {
 
             writer.disableHALog();
