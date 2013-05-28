@@ -315,11 +315,11 @@ public class HAStatusServletUtil {
                         final long nbytes = rec.sizeOnDisk();
                         final long closingCommitCounter = rec.getRootBlock()
                                 .getCommitCounter();
-                        final IHALogReader r = nexus.getHALogWriter()
-                                .getReader(closingCommitCounter);
+                        String digestStr = null;
                         final File file = nexus
                                 .getHALogFile(closingCommitCounter);
-                        String digestStr = null;
+                        final IHALogReader r = nexus.getHALogWriter()
+                                .getReader(closingCommitCounter);
                         try {
                             if (digests && !r.isEmpty()) {
                                 try {

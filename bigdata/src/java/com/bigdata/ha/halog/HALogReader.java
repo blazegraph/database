@@ -76,6 +76,18 @@ public class HALogReader implements IHALogReader {
 	private final int magic;
 	private final int version;
 
+    /**
+     * <strong>CAUTION: This constructor should not be used in circumstances in
+     * which the {@link HALogWriter} is active since this constructor can not
+     * differentiate atomically between the live HALog and a historical HALog
+     * and will always provide a read-only view, even if the live HALog file is
+     * opened.</strong>
+     * 
+     * @param file
+     *            The HALog file.
+     *            
+     * @throws IOException
+     */
 	public HALogReader(final File file) throws IOException {
 
 		m_file = file;
@@ -157,25 +169,25 @@ public class HALogReader implements IHALogReader {
 
 	}
 
-    /**
-     * {@inheritDoc}
-     * 
-     * TODO This was added to address a file handle leak. However, I am quite
-     * dubious that this will fix the problem. While GC may be necessary to
-     * finalize {@link HALogReader} instances during a RESYNC, we have already
-     * invoked {@link #close()} on those instances in the SendHALogTask(). It
-     * may be better to remove this since finalize() methods add overhead to 
-     * GC.
-     * 
-     * @see <a
-     *      href="https://sourceforge.net/apps/trac/bigdata/ticket/678#comment:4"
-     *      > DGC Thread Leak: sendHALogForWriteSet() </a>
-     */
-	@Override
-	protected void finalize() throws Throwable {
-	    close();
-	    super.finalize();
-	}
+//    /**
+//     * {@inheritDoc}
+//     * 
+//     * TODO This was added to address a file handle leak. However, I am quite
+//     * dubious that this will fix the problem. While GC may be necessary to
+//     * finalize {@link HALogReader} instances during a RESYNC, we have already
+//     * invoked {@link #close()} on those instances in the SendHALogTask(). It
+//     * may be better to remove this since finalize() methods add overhead to 
+//     * GC.
+//     * 
+//     * @see <a
+//     *      href="https://sourceforge.net/apps/trac/bigdata/ticket/678#comment:4"
+//     *      > DGC Thread Leak: sendHALogForWriteSet() </a>
+//     */
+//	@Override
+//	protected void finalize() throws Throwable {
+//	    close();
+//	    super.finalize();
+//	}
 	
 	/**
 	 * Hook for

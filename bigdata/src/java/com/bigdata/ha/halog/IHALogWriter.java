@@ -47,6 +47,13 @@ public interface IHALogWriter {
     /**
      * Return the commit counter that is expected for the writes that will be
      * logged (the same commit counter that is on the opening root block).
+     * <p>
+     * Note: Once the HALog is sealed, the closing root block will have a
+     * commitCounter that is equal to <code>getCommitCounter() + 1</code>.
+     * <p>
+     * Note: The HALog filename contains the closing commit counter - that is,
+     * the HALog file is named for the commit counter associated with the
+     * closing root block for a given write set.
      */
     public long getCommitCounter();
 

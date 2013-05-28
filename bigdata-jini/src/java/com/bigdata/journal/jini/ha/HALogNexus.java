@@ -43,6 +43,7 @@ import org.apache.log4j.Logger;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.ha.QuorumServiceBase;
+import com.bigdata.ha.halog.HALogReader;
 import com.bigdata.ha.halog.HALogWriter;
 import com.bigdata.ha.halog.IHALogReader;
 import com.bigdata.ha.halog.IHALogWriter;
@@ -828,6 +829,60 @@ public class HALogNexus implements IHALogWriter {
         
         return haLogWriter.getReader(commitCounter);
         
+    }
+
+    /**
+     * Return the {@link IHALogReader} for the specified HALog file. If the
+     * request identifies the HALog that is currently being written, then an
+     * {@link IHALogReader} will be returned that will "see" newly written
+     * entries on the HALog. If the request identifies a historical HALog that
+     * has been closed and which exists, then a reader will be returned for that
+     * HALog file. Otherwise, an exception is thrown.
+     * 
+     * @param logFile
+     *            The HALog file.
+     * 
+     * @return The {@link IHALogReader}.
+     * 
+     * @throws IllegalArgumentException
+     *             if the argument is <code>null</code>.
+     * @throws IOException
+     *             if the HALog file does not exist or can not be read.
+     */
+    public IHALogReader getReader(final File logFile) throws IOException {
+
+        if (logFile == null)
+            throw new IllegalArgumentException();
+        
+        logLock.lock();
+
+        try {
+
+            if (haLogWriter.getFile().equals(logFile)) {
+
+                /*
+                 * This is the live HALog file.
+                 */
+
+                // The closing commit counter.
+                final long cc = haLogWriter.getCommitCounter() + 1;
+
+                return haLogWriter.getReader(cc);
+
+            }
+
+            /*
+             * This is an historical HALog file.
+             */
+
+            return new HALogReader(logFile);
+
+        } finally {
+
+            logLock.unlock();
+
+        }
+
     }
 
     /**

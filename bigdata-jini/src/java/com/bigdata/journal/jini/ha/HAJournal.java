@@ -737,7 +737,13 @@ public class HAJournal extends Journal {
             }
             
         }
-        
+
+        /**
+         * {@inheritDoc}
+         * 
+         * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/678" >
+         *      DGC Thread Leak: sendHALogForWriteSet() </a>
+         */
         @Override
         public IHALogRootBlocksResponse getHALogRootBlocksForWriteSet(
                 final IHALogRootBlocksRequest msg) throws IOException {
@@ -764,15 +770,23 @@ public class HAJournal extends Journal {
 
                 }
 
-                final HALogReader r = new HALogReader(logFile);
+                final IHALogReader r = getHALogNexus().getReader(logFile);
 
-                final HALogRootBlocksResponse resp = new HALogRootBlocksResponse(
-                        r.getOpeningRootBlock(), r.getClosingRootBlock());
+                try {
 
-                if (haLog.isDebugEnabled())
-                    haLog.debug("msg=" + msg + ", resp=" + resp);
+                    final HALogRootBlocksResponse resp = new HALogRootBlocksResponse(
+                            r.getOpeningRootBlock(), r.getClosingRootBlock());
 
-                return resp;
+                    if (haLog.isDebugEnabled())
+                        haLog.debug("msg=" + msg + ", resp=" + resp);
+
+                    return resp;
+
+                } finally {
+
+                    r.close();
+
+                }
 
             } finally {
             
@@ -820,14 +834,15 @@ public class HAJournal extends Journal {
                     // Note: open file handle - must be closed eventually.
                     r = getHALogNexus().getReader(commitCounter);
 
+                    // true iff is live log at moment reader was opened.
                     isLive = r.isLive();
-            
-            // Task sends an HALog file along the pipeline.
+
+                    // Task sends an HALog file along the pipeline.
                     ft = new FutureTaskMon<Void>(new SendHALogTask(req, r));
 
-            // Run task.
-            getExecutorService().submit(ft);
-            
+                    // Run task.
+                    getExecutorService().submit(ft);
+
                     // Clear reference. File handle will be closed by task.
                     r = null;
 

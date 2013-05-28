@@ -1909,10 +1909,10 @@ public class HAJournalServer extends AbstractServer {
                     final long commitCounter = journal.getRootBlockView()
                             .getCommitCounter();
 
-                    try {
+                    final IHALogReader r = journal.getHALogNexus().getReader(
+                            commitCounter + 1);
 
-                        final IHALogReader r = journal.getHALogNexus()
-                                .getReader(commitCounter + 1);
+                    try {
 
                         if (r.isEmpty()) {
                             
@@ -1954,6 +1954,10 @@ public class HAJournalServer extends AbstractServer {
                         
                         break;
 
+                    } finally {
+                        
+                        r.close();
+                        
                     }
 
                 }
