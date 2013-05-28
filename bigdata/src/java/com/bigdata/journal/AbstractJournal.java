@@ -5386,7 +5386,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
             didBreak = false;
             didMeet = false;
             didJoinMetQuorum = false;
-            didLeaveMetQuorum = true; // service left met quorum. quorum stil met.
+            didLeaveMetQuorum = true; // service left met quorum. quorum still met.
 
         } else {
 
