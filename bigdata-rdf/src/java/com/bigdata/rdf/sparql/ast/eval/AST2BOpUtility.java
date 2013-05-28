@@ -1191,7 +1191,7 @@ public class AST2BOpUtility extends AST2BOpJoins {
 				
 			} else {
 
-				/*
+				/**
 				 * Attempt to resolve a pre-existing named solution set.
 				 * 
 				 * If we find the named solution set, then we will handle it in
@@ -1214,6 +1214,10 @@ public class AST2BOpUtility extends AST2BOpJoins {
 				 * operator and what is known bound in the named solution set
 				 * itself. We will then do a hash join against the generated
 				 * hash index.
+				 * 
+                 * @see <a
+                 *      href="https://sourceforge.net/apps/trac/bigdata/ticket/531"
+                 *      > SPARQL UPDATE for NAMED SOLUTION SETS </a>
 				 */
 
                 final ISolutionSetStats stats = ctx.sa
