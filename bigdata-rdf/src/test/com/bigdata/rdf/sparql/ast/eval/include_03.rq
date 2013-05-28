@@ -10,10 +10,10 @@ SELECT ?x ?y WHERE {
 
    # Run joins in the given order (INCLUDE is 2nd).
    
-   # bind x => {Mike;Bryan}
+   # RANGE SCAN x => {(x=Mike);(x=Bryan)}
    ?x rdf:type foaf:Person .
    
-   # join on (x) => {(x=Mike,y=2);(x=Bryan;y=4)} 
+   # JOIN on (x) => {(x=Mike,y=2);(x=Bryan;y=4)} 
    INCLUDE %solutionSet1 .
 
 }
