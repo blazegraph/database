@@ -232,6 +232,9 @@ abstract public class QuorumServiceBase<S extends HAGlue, L extends AbstractJour
     /**
      * Core implementation handles the message and payload when received on a
      * service.
+     * <p>
+     * Note: Replication of the message and payload is handled by the caller.
+     * The implementation of this method is NOT responsible for replication.
      * 
      * @param req
      *            The synchronization request (optional). When non-
