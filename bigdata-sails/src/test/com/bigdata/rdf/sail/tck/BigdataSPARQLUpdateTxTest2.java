@@ -34,6 +34,9 @@ import com.bigdata.rdf.sail.BigdataSail.Options;
 /**
  * A variant of the test suite using full read/write transactions.
  * 
+ * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/531"> SPARQL
+ *      UPDATE Extensions (Trac) </a>
+ *      
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
