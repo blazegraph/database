@@ -1013,7 +1013,7 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
                 serverA, serverB });
 
         // C will have go through Rebuild before joining
-        assertEquals(token2, awaitFullyMetQuorum());
+        assertEquals(token2, awaitFullyMetQuorum(4/* ticks */));
 
 //        Note: I have seen this timeout. This warrants exploring. BBT.
 //        // Wait until C is fully ready.
@@ -1069,7 +1069,7 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
         final HAGlue serverC = startC();
 
         // C will have go through Rebuild before joining
-        awaitFullyMetQuorum();
+        awaitFullyMetQuorum(4/* ticks */);
 
         // Verify binary equality of ALL journals.
         assertDigestsEquals(new HAGlue[] { serverA, serverB, serverC });
@@ -1409,11 +1409,12 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
      * @throws Exception
      */
     public void testStartABC_halogRestart() throws Exception {
-        // Start 3 services, with delay to ensure clean starts
-        startA();
-        Thread.sleep(1000); // ensure A will be leader
-        startB();
-        startC();
+        // Start 3 services in strict order.
+//        startA();
+//        Thread.sleep(1000); // ensure A will be leader
+//        startB();
+//        startC();
+        new ABC(true/*sequential*/);
         
         awaitFullyMetQuorum();
         
@@ -1422,6 +1423,11 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
         final File logsB = getHALogDirB();
         final File logsC = getHALogDirC();
         
+        final long token = awaitFullyMetQuorum();
+        
+        // initial token value.
+        assertEquals(0L, token);
+
         // committed log files not purged prior to fully met commit
         assertLogCount(logsA, 2);
         assertLogCount(logsB, 2);
@@ -1449,8 +1455,11 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
         startA();
         startB();
         
-        awaitMetQuorum();
+        final long token1 = awaitMetQuorum();
         
+        // Verify new quorum token.
+        assertEquals(token + 1, token1);
+
         // and check that there are open logs
         assertLogCount(logsA, 1);
         assertLogCount(logsB, 1);
@@ -1458,7 +1467,7 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
         // add C
         startC();
         
-        awaitFullyMetQuorum();
+        assertEquals(token1, awaitFullyMetQuorum());
         
         // and check again for ABC
         assertLogCount(logsA, 1);
@@ -1470,13 +1479,16 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
      * Variant where A is shutdown first.
      */
     public void testStartABC_halogRestart2() throws Exception {
-        // Start 3 services, with delay to ensure clean starts
-        startA();
-        Thread.sleep(1000); // ensure A will be leader
-        startB();
-        startC();
+        // Start 3 services in strict order.
+//        startA();
+//        Thread.sleep(1000); // ensure A will be leader
+//        startB();
+//        startC();
+        new ABC(true/* sequential */);
         
-        awaitFullyMetQuorum();
+        final long token = awaitFullyMetQuorum();
+        
+        assertEquals(0L, token);
         
         // setup log directories
         final File logsA = getHALogDirA();
@@ -1495,6 +1507,9 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
         assertLogCount(logsA, 1);
         assertLogCount(logsB, 1);
         assertLogCount(logsC, 1);
+
+        // Verify token unchanged.
+        assertEquals(token, awaitFullyMetQuorum());
         
         // Now shutdown all servers
         shutdownA();
@@ -1510,8 +1525,14 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
         startA();
         startB();
         
-        awaitMetQuorum();
+        final long token1 = awaitMetQuorum();
         
+        /*
+         * Verify new quorum token (could be a quorum meet when the leader
+         * leaves so this might be ONE (1) or TWO (2).
+         */
+        assertTrue(token1 >= token + 1);
+
         // and check that there are open logs
         assertLogCount(logsA, 1);
         assertLogCount(logsB, 1);
@@ -1519,7 +1540,8 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
         // add C
         startC();
         
-        awaitFullyMetQuorum();
+        // Verify quorum token is unchanged.
+        assertEquals(token1, awaitFullyMetQuorum());
         
         // and check again for ABC
         assertLogCount(logsA, 1);
