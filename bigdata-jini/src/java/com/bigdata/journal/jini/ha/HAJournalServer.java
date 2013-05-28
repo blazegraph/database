@@ -1146,6 +1146,39 @@ public class HAJournalServer extends AbstractServer {
 
         void enterErrorState() {
 
+            /*
+             * Do synchronous service leave.
+             */
+            serviceLeave();
+            
+            /*
+             * Update the haReadyTokena and haStatus regardless of whether the
+             * quorum token has changed since this service is no longer joined
+             * with a met quorum.
+             */
+            journal.setQuorumToken(getQuorum().token());
+            
+            logLock.lock();
+            try {
+                if (journal.getHALogNexus().isHALogOpen()) {
+                    /*
+                     * Note: Closing the HALog is necessary for us to be able to
+                     * re-enter SeekConsensus without violating a pre-condition
+                     * for that run state.
+                     */
+                    try {
+                        journal.getHALogNexus().disableHALog();
+                    } catch (IOException e) {
+                        log.error(e, e);
+                    }
+                }
+            } finally {
+                logLock.unlock();
+            }
+
+            /*
+             * Transition into the error state.
+             */
             enterRunState(new ErrorTask());
 
         }
@@ -1566,26 +1599,26 @@ public class HAJournalServer extends AbstractServer {
                  * yet.
                  */
 //                server.haGlueService.bounceZookeeperConnection();
-                /*
-                 * Note: Try moving to doRejectedCommit() so this will be
-                 * synchronous.
-                 */
-                logLock.lock();
-                try {
-                    if (journal.getHALogNexus().isHALogOpen()) {
-                        /*
-                         * Note: Closing the HALog is necessary for us to be
-                         * able to re-enter SeekConsensus without violating a
-                         * pre-condition for that run state.
-                         */
-                        journal.getHALogNexus().disableHALog();
-                    }
-                } finally {
-                    logLock.unlock();
-                }
+//                /*
+//                 * Note: Try moving to doRejectedCommit() so this will be
+//                 * synchronous.
+//                 */
+//                logLock.lock();
+//                try {
+//                    if (journal.getHALogNexus().isHALogOpen()) {
+//                        /*
+//                         * Note: Closing the HALog is necessary for us to be
+//                         * able to re-enter SeekConsensus without violating a
+//                         * pre-condition for that run state.
+//                         */
+//                        journal.getHALogNexus().disableHALog();
+//                    }
+//                } finally {
+//                    logLock.unlock();
+//                }
 
-                // Force a service leave.
-                getQuorum().getActor().serviceLeave();
+//                // Force a service leave.
+//                getQuorum().getActor().serviceLeave();
 
 //                /*
 //                 * Set token. Journal will notice that it is no longer
@@ -1909,10 +1942,12 @@ public class HAJournalServer extends AbstractServer {
                     final long commitCounter = journal.getRootBlockView()
                             .getCommitCounter();
 
-                    final IHALogReader r = journal.getHALogNexus().getReader(
-                            commitCounter + 1);
+                    IHALogReader r = null;
 
                     try {
+
+                        r = journal.getHALogNexus()
+                                .getReader(commitCounter + 1);
 
                         if (r.isEmpty()) {
                             
@@ -1956,7 +1991,11 @@ public class HAJournalServer extends AbstractServer {
 
                     } finally {
                         
-                        r.close();
+                        if (r != null) {
+
+                            r.close();
+
+                        }
                         
                     }
 
@@ -2791,6 +2830,7 @@ public class HAJournalServer extends AbstractServer {
         protected void handleReplicatedWrite(final IHASyncRequest req,
                 final IHAWriteMessage msg, final ByteBuffer data)
                 throws Exception {
+
             if (req == null //&& journal.getQuorumToken() == Quorum.NO_QUORUM
                     && journal.getRootBlockView().getCommitCounter() == 0L
                     && (msg.getUUID() != null && !journal.getUUID().equals(msg.getUUID()))) {
@@ -2816,6 +2856,7 @@ public class HAJournalServer extends AbstractServer {
                  */
                 return;
             }
+            
             pipelineSetup();
             
             logLock.lock();
@@ -2829,9 +2870,9 @@ public class HAJournalServer extends AbstractServer {
                     // Save off reference to most recent *live* message.
                     journal.getHALogNexus().lastLiveHAWriteMessage = msg;
                     
-                }
+                } else 
                 
-                if (req != null && req instanceof IHARebuildRequest) {
+                if (/*req != null &&*/ req instanceof IHARebuildRequest) {
 
                     /*
                      * This message and payload are part of a ground up service
@@ -2906,37 +2947,86 @@ public class HAJournalServer extends AbstractServer {
                     
                     handleResyncMessage((IHALogRequest) req, msg, data);
 
-                } else if (req == null // Note: MUST be a live message!
-                        && journal.getRootBlockView().getCommitCounter() == msg
-                                .getCommitCounter()
-                        && isJoinedMember(msg.getQuorumToken())) {
+                    return;
+
+                } else if (req != null) {
 
                     /*
-                     * We are not resynchronizing this service. This is a
-                     * message for the current write set. The service is joined
-                     * with the quorum.
+                     * A historical message that is being ignored on this node.
                      */
+                    
+                    dropMessage(req, msg, data);
 
-                    // write on the log and the local store.
-                    acceptHAWriteMessage(msg, data);
-
+                    return;
+                    
                 } else {
+
+                    assert req == null; // Note: MUST be a live message!
+
+                    if (!isJoinedMember(msg.getQuorumToken())) {
+
+                        /*
+                         * If we are not joined, we can not do anything with a
+                         * live write.
+                         */
+                        
+                        dropMessage(req, msg, data);
+
+                        return;
+                        
+                    }
+
+                    try {
+
+                        /*
+                         * We are not resynchronizing this service.
+                         * 
+                         * The service is joined with the quorum.
+                         * 
+                         * The message SHOULD be for the current commit counter
+                         * and the expected next write cache block sequence. If
+                         * it is not, then we will enter error handling logic
+                         * below.
+                         */
+
+                        // write on the log and the local store.
+                        acceptHAWriteMessage(msg, data);
+
+                        return;
+
+                    } catch(Throwable t) {
+                        if (InnerCause.isInnerCause(t,
+                                InterruptedException.class)) {
+                            // propagate interrupt
+                            Thread.currentThread().interrupt();
+                            return;
+                        }
+                        /*
+                         * Error handler.
+                         * 
+                         * Live write is not for expected commit counter and
+                         * write cache block sequence.
+                         */
+                        log.error(t, t);
+                        try {
+                            enterErrorState();
+                        } catch (RuntimeException e) {
+                            // log and ignore.
+                            log.error(e, e);
+                        }
+                        // rethrow exception.
+                        throw new RuntimeException(t);
+                    }
                     
-                    if (log.isInfoEnabled())
-                        log.info("Ignoring message: " + msg);
-                    
-                    /*
-                     * Drop the pipeline message.
-                     * 
-                     * Note: There are two cases here.
-                     * 
-                     * (A) It is a historical message that is being ignored on
-                     * this node;
-                     * 
-                     * (B) It is a live message, but this node is not caught up
-                     * and therefore can not log the message yet.
-                     */
-                    
+//                    /*
+//                     * Drop the pipeline message.
+//                     * 
+//                     * Note: It is a live message, but this node is not caught
+//                     * up and therefore can not log the message yet.
+//                     */
+//
+//                    dropMessage(req, msg, data);
+
                 }
 
             } finally {
@@ -2944,6 +3034,14 @@ public class HAJournalServer extends AbstractServer {
                 logLock.unlock();
 
             }
+
+        }
+        
+        private void dropMessage(final IHASyncRequest req,
+                final IHAWriteMessage msg, final ByteBuffer data) {
+
+            if (log.isInfoEnabled())
+                log.info("Ignoring message: req=" + req + ", msg=" + msg);
 
         }
         
@@ -3217,12 +3315,21 @@ public class HAJournalServer extends AbstractServer {
         private void acceptHAWriteMessage(final IHAWriteMessage msg,
                 final ByteBuffer data) throws IOException, InterruptedException {
 
-            if (msg.getCommitCounter() != journal.getHALogNexus()
-                    .getCommitCounter()) {
+            // Note: Caller must be holding the logLock!
+            
+            final long expectedCommitCounter = journal.getHALogNexus()
+                    .getCommitCounter();
 
-                throw new AssertionError();
+            final long expectedBlockSequence = journal.getHALogNexus()
+                    .getSequence();
 
-            }
+            if (msg.getCommitCounter() != expectedCommitCounter)
+                throw new IllegalStateException("expectedCommitCounter="
+                        + expectedCommitCounter+ ", but msg=" + msg);
+            
+            if (msg.getSequence() != expectedBlockSequence)
+                throw new IllegalStateException("expectedBlockSequence="
+                        + expectedBlockSequence + ", but msg=" + msg);
 
             /*
              * Log the message and write cache block.
