@@ -327,7 +327,6 @@ public class TestInclude extends AbstractDataDrivenSPARQLTestCase {
         
     }
 
-
     /**
      * A unit test for an INCLUDE with another JOIN. For this test, the INCLUDE
      * will run first:

@@ -66,6 +66,7 @@ import com.bigdata.journal.IIndexManager;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSail.Options;
 import com.bigdata.rdf.sail.BigdataSailRepository;
+import com.bigdata.rdf.sparql.ast.QueryHints;
 
 /**
  * Test suite for BIGDATA extension to SPARQL UPDATE for NAMED SOLUTION SETS.
@@ -330,11 +331,8 @@ public class BigdataSPARQLUpdateTest2 extends TestCase2 {
     public Properties getProperties() {
 
         final Properties props = new Properties(super.getProperties());
-        
-//        final File journal = BigdataStoreTest.createTempFile();
-//        
-//        props.setProperty(BigdataSail.Options.FILE, journal.getAbsolutePath());
 
+        // Base version of the test uses the MemStore.
         props.setProperty(Options.BUFFER_MODE, BufferMode.MemStore.toString());
         
         // quads mode: quads=true, sids=false, axioms=NoAxioms, vocab=NoVocabulary
@@ -418,12 +416,35 @@ public class BigdataSPARQLUpdateTest2 extends TestCase2 {
     }
 
     /**
+     * Return <code>true</code> iff the SPARQL UPDATE for NAMED SOLUTION SETS
+     * feature is enabled.
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/531">
+     *      SPARQL UPDATE Extensions (Trac) </a>
+     * @see <a
+     *      href="https://sourceforge.net/apps/mediawiki/bigdata/index.php?title=SPARQL_Update">
+     *      SPARQL Update Extensions (Wiki) </a>
+     */
+    protected boolean isSolutionSetUpdateEnabled() {
+
+        return QueryHints.DEFAULT_SOLUTION_SET_CACHE;
+        
+    }
+    
+    /**
      * Unit test for <code>INSERT INTO ... SELECT</code>. This loads some data
      * into the end point, creates a named solution set, then verifies that the
      * solutions are present using a query and an INCLUDE join against the named
      * solution set.
      */
     public void test_insertIntoSolutions_01() throws Exception {
+
+        if (!isSolutionSetUpdateEnabled()) {
+            /*
+             * Test requires this feature.
+             */
+            return;
+        }
 
         loadDataset(packagePath + "dataset-01.trig");
 
@@ -481,6 +502,13 @@ public class BigdataSPARQLUpdateTest2 extends TestCase2 {
      * post-condition.
      */
     public void test_deleteFromSolutions_01() throws Exception {
+
+        if (!isSolutionSetUpdateEnabled()) {
+            /*
+             * Test requires this feature.
+             */
+            return;
+        }
 
         loadDataset(packagePath + "dataset-01.trig");
 
@@ -555,6 +583,13 @@ public class BigdataSPARQLUpdateTest2 extends TestCase2 {
      */
     public void test_deleteFromSolutions_02() throws Exception {
 
+        if (!isSolutionSetUpdateEnabled()) {
+            /*
+             * Test requires this feature.
+             */
+            return;
+        }
+
         loadDataset(packagePath + "dataset-01.trig");
 
         // Build the solution set.
@@ -627,6 +662,13 @@ public class BigdataSPARQLUpdateTest2 extends TestCase2 {
      * post-condition.
      */
     public void test_deleteFromSolutions_03() throws Exception {
+
+        if (!isSolutionSetUpdateEnabled()) {
+            /*
+             * Test requires this feature.
+             */
+            return;
+        }
 
         loadDataset(packagePath + "dataset-01.trig");
 
@@ -709,6 +751,13 @@ public class BigdataSPARQLUpdateTest2 extends TestCase2 {
      * @throws Exception 
 	 */
 	public void test_deleteInsertSolutions_01() throws Exception {
+
+        if (!isSolutionSetUpdateEnabled()) {
+            /*
+             * Test requires this feature.
+             */
+            return;
+        }
 
         loadDataset(packagePath + "dataset-01.trig");
 
@@ -816,6 +865,13 @@ public class BigdataSPARQLUpdateTest2 extends TestCase2 {
      */
     public void test_isolation_insertIntoSolutionsWithIncludeFromSolutions() {
 
+        if (!isSolutionSetUpdateEnabled()) {
+            /*
+             * Test requires this feature.
+             */
+            return;
+        }
+
         fail("write test");
         
     }
@@ -830,6 +886,13 @@ public class BigdataSPARQLUpdateTest2 extends TestCase2 {
      */
     public void test_createSolutionSet_01() throws UpdateExecutionException,
             RepositoryException, MalformedQueryException {
+
+        if (!isSolutionSetUpdateEnabled()) {
+            /*
+             * Test requires this feature.
+             */
+            return;
+        }
 
         // Should fail since solution set does not exist.
         try {
@@ -859,6 +922,13 @@ public class BigdataSPARQLUpdateTest2 extends TestCase2 {
     public void test_createSolutionSet_02() throws UpdateExecutionException,
             RepositoryException, MalformedQueryException {
 
+        if (!isSolutionSetUpdateEnabled()) {
+            /*
+             * Test requires this feature.
+             */
+            return;
+        }
+
         // Should succeed.
         con.prepareUpdate(QueryLanguage.SPARQL, "create solutions %namedSet1")
                 .execute();
@@ -886,6 +956,13 @@ public class BigdataSPARQLUpdateTest2 extends TestCase2 {
     public void test_dropSolutionSet_01() throws UpdateExecutionException,
             RepositoryException, MalformedQueryException {
 
+        if (!isSolutionSetUpdateEnabled()) {
+            /*
+             * Test requires this feature.
+             */
+            return;
+        }
+
         try {
             con.prepareUpdate(QueryLanguage.SPARQL, "drop solutions %namedSet1")
                     .execute();
@@ -904,6 +981,13 @@ public class BigdataSPARQLUpdateTest2 extends TestCase2 {
     public void test_dropSolutionSet_02() throws UpdateExecutionException,
             RepositoryException, MalformedQueryException {
 
+        if (!isSolutionSetUpdateEnabled()) {
+            /*
+             * Test requires this feature.
+             */
+            return;
+        }
+        
         con.prepareUpdate(QueryLanguage.SPARQL,
                 "drop silent solutions %namedSet1").execute();
 
@@ -915,6 +999,13 @@ public class BigdataSPARQLUpdateTest2 extends TestCase2 {
      */
     public void test_clearSolutionSet_01() throws UpdateExecutionException,
             RepositoryException, MalformedQueryException {
+
+        if (!isSolutionSetUpdateEnabled()) {
+            /*
+             * Test requires this feature.
+             */
+            return;
+        }
 
         try {
             con.prepareUpdate(QueryLanguage.SPARQL, "clear solutions %namedSet1")
@@ -933,6 +1024,13 @@ public class BigdataSPARQLUpdateTest2 extends TestCase2 {
      */
     public void test_clearSolutionSet_02() throws UpdateExecutionException,
             RepositoryException, MalformedQueryException {
+
+        if (!isSolutionSetUpdateEnabled()) {
+            /*
+             * Test requires this feature.
+             */
+            return;
+        }
 
         con.prepareUpdate(QueryLanguage.SPARQL,
                 "clear silent solutions %namedSet1").execute();

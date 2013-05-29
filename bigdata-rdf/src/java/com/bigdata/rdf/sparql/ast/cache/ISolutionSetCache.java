@@ -35,6 +35,14 @@ import com.bigdata.striterator.ICloseableIterator;
 /**
  * A SPARQL solution set cache or a connection to a remote SPARQL cache or cache
  * fabric.
+ * <p>
+ * Note: This is an internal interface that may evolve substantially.
+ * 
+ * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/531"> SPARQL
+ *      UPDATE Extensions (Trac) </a>
+ * @see <a
+ *      href="https://sourceforge.net/apps/mediawiki/bigdata/index.php?title=SPARQL_Update">
+ *      SPARQL Update Extensions (Wiki) </a>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

@@ -25,10 +25,12 @@ package com.bigdata.rawstore;
 
 import java.io.InputStream;
 
-
 /**
  * Interface for reading and writing streams on a persistence store.
  * 
+ * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/555" > Support
+ *      PSOutputStream/InputStream at IRawStore </a>
+ *      
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
 public interface IStreamStore {
