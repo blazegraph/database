@@ -29,6 +29,7 @@ import java.io.InputStream;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.util.UUID;
+import java.util.concurrent.locks.Lock;
 
 import com.bigdata.cache.ConcurrentWeakValueCache;
 import com.bigdata.counters.CounterSet;
@@ -158,6 +159,13 @@ public class MemStrategy implements IBufferStrategy, IRWStrategy, IAllocationMan
 		 m_mmgr.commit();
 	}
 
+	@Override
+	public Lock getCommitLock() {
+
+	    return m_mmgr.getCommitLock();
+	    
+	}
+	
 	@Override
 	public void postCommit() {
 		m_mmgr.postCommit();

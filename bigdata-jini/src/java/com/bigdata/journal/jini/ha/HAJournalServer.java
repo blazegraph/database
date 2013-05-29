@@ -1144,6 +1144,16 @@ public class HAJournalServer extends AbstractServer {
             
         } // RunStateCallable
 
+        /**
+         * Transition to {@link RunStateEnum#Error}.
+         * <p>
+         * Note: if the current {@link Thread} is a {@link Thread} executing one
+         * of the {@link RunStateCallable#doRun()} methods, then it will be
+         * <strong>interrupted</strong> when entering the new run state. Thus,
+         * the caller MAY observe an {@link InterruptedException} in their
+         * thread, but only if they are being run out of
+         * {@link RunStateCallable}.
+         */
         void enterErrorState() {
 
             /*
@@ -1178,7 +1188,11 @@ public class HAJournalServer extends AbstractServer {
 
             /*
              * Transition into the error state.
+             * 
+             * Note: This can cause the current Thread to be interrupted if it
+             * is the Thread executing one of the RunStateCallable classes.
              */
+
             enterRunState(new ErrorTask());
 
         }
@@ -3011,11 +3025,34 @@ public class HAJournalServer extends AbstractServer {
                         try {
                             enterErrorState();
                         } catch (RuntimeException e) {
-                            // log and ignore.
-                            log.error(e, e);
+                            if (InnerCause.isInnerCause(e,
+                                    InterruptedException.class)) {
+                                /*
+                                 * Propagate the interrupt.
+                                 * 
+                                 * Note: This probably does not occur in this
+                                 * context since we are not running in the
+                                 * Thread for any doRun() method.
+                                 */
+                                Thread.interrupted();
+                            } else {
+                                // log and ignore.
+                                log.error(e, e);
+                            }
                         }
-                        // rethrow exception.
-                        throw new RuntimeException(t);
+                        /*
+                         * Note: DO NOT rethrow the exception. This service will
+                         * leave the met quorum. If we rethrow the exception,
+                         * the the update operation that that generated the live
+                         * replicated write will be failed with the rethrown
+                         * exception as the root cause. However, we want the
+                         * update operation to complete successfully as long as
+                         * we can retain an met quorum (and the same leader) for
+                         * the duration of the update operation.
+                         */
+//                        // rethrow exception.
+//                        throw new RuntimeException(t);
+                        return;
                     }
                     
 //                    /*

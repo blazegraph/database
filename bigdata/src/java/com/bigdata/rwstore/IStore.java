@@ -25,6 +25,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rwstore;
 
 import java.io.File;
+import java.util.concurrent.locks.Lock;
 
 import com.bigdata.rawstore.IAllocationContext;
 import com.bigdata.rawstore.IStreamStore;
@@ -56,6 +57,13 @@ public interface IStore extends IAllocationManager, IStreamStore,
 	 *            the storage address to be freed
 	 */
 	public void free(long addr, int size);
+
+    /**
+     * Optionally return a {@link Lock} that must be used (when non-
+     * <code>null</code>) to make the {@link #commit()} / {@link #postCommit()}
+     * strategy atomic.
+     */
+    public Lock getCommitLock();
 
     /**
      * Global commit on the backing store. Previously committed data which has
