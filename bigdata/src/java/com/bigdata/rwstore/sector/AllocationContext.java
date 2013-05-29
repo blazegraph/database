@@ -29,6 +29,7 @@ import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.util.LinkedHashSet;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.log4j.Logger;
@@ -366,6 +367,11 @@ public class AllocationContext implements IMemoryManager {//, IStore {
 	public void commit() {
 		m_root.commit();
 	}
+
+    @Override
+    public Lock getCommitLock() {
+        return m_root.getCommitLock();
+    }
 
 	@Override
 	public void postCommit() {

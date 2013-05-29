@@ -34,6 +34,7 @@ import java.security.DigestException;
 import java.security.MessageDigest;
 import java.util.UUID;
 import java.util.concurrent.Future;
+import java.util.concurrent.locks.Lock;
 
 import org.apache.log4j.Logger;
 
@@ -885,6 +886,11 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy,
 //		m_rebuildSequence++;
 	}
 
+	@Override
+	public Lock getCommitLock() {
+	    return m_store.getCommitLock();
+	}
+	
 	@Override
 	public void postCommit() {
 		m_store.postCommit();

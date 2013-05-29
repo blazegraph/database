@@ -1,5 +1,7 @@
 package com.bigdata.rwstore;
 
+import java.util.concurrent.locks.Lock;
+
 import com.bigdata.journal.IBufferStrategy;
 import com.bigdata.journal.RWStrategy;
 import com.bigdata.rawstore.IAllocationManagerStore;
@@ -31,10 +33,12 @@ public interface IRWStrategy extends IBufferStrategy, IAllocationManager,
      */
     public boolean isCommitted(long addr);
 
-//    /**
-//     * Resets allocators from current rootblock
-//     */
-//	void resetFromHARootBlock(IRootBlockView rootBlock);
+    /**
+     * Optionally return a {@link Lock} that must be used (when non-
+     * <code>null</code>) to make the {@link IBufferStrategy#commit()} /
+     * {@link #postCommit()} strategy atomic.
+     */
+    public Lock getCommitLock();
     
     /**
      * Called post commit to dispose any transient commit state retained to

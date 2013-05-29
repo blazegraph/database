@@ -111,7 +111,7 @@ public class TestMemStore extends AbstractJournalTestCase {
          * Use a proxy test suite and specify the delegate.
          */
 
-        ProxyTestSuite suite = new ProxyTestSuite(delegate,
+        final ProxyTestSuite suite = new ProxyTestSuite(delegate,
                 "MemStore Test Suite");
 
         /*

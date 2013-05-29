@@ -3137,19 +3137,32 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
     }
     
     /**
+     * {@inheritDoc}
+     */
+    public Lock getCommitLock() {
+
+        return m_allocationWriteLock;
+        
+    }
+    
+    /**
+     * {@inheritDoc}
+     * <p>
      * Commits the FixedAllocator bits
      */
     public void postCommit() {
-        m_allocationWriteLock.lock();
-        try {
-            for (FixedAllocator fa : m_commitList) {
-                fa.postCommit();
-            }
+       
+        if (!m_allocationWriteLock.isHeldByCurrentThread())
+            throw new IllegalMonitorStateException();
+
+        for (FixedAllocator fa : m_commitList) {
+
+            fa.postCommit();
             
-            m_commitList.clear();
-        } finally {
-            m_allocationWriteLock.unlock();
         }
+
+        m_commitList.clear();
+
     }
 
     public int checkDeferredFrees(final AbstractJournal journal) {

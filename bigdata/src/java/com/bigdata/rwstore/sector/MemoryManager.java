@@ -39,6 +39,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.log4j.Logger;
@@ -104,6 +105,9 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
 	/**
 	 * The lock used to serialize all allocation/deallocation requests. This is
 	 * shared across all allocation contexts to avoid lock ordering problems.
+	 * 
+	 * FIXME This should be a read/write lock as per RWStore.  That will provide
+	 * better concurrency.
 	 */
     final /*private*/ ReentrantLock m_allocationLock = new ReentrantLock();
 
@@ -1196,16 +1200,22 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
 	}
 
 	@Override
+	public Lock getCommitLock() {
+	    return m_allocationLock;
+	}
+	
+	@Override
 	public void postCommit() {
-		m_allocationLock.lock();
-		try {
-			final Iterator<SectorAllocator> sectors = m_sectors.iterator();
-			while (sectors.hasNext()) {
-				sectors.next().commit();
-			}
-		} finally {
-			m_allocationLock.unlock();
-		}
+	    if(!m_allocationLock.isHeldByCurrentThread())
+	        throw new IllegalMonitorStateException();
+//		try {
+        final Iterator<SectorAllocator> sectors = m_sectors.iterator();
+        while (sectors.hasNext()) {
+            sectors.next().commit();
+        }
+//		} finally {
+//			m_allocationLock.unlock();
+//		}
 	}
 
 	private ConcurrentWeakValueCache<Long, ICommitter> m_externalCache = null;

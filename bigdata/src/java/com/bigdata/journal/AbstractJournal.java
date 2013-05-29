@@ -114,7 +114,6 @@ import com.bigdata.ha.msg.IHA2PhasePrepareMessage;
 import com.bigdata.ha.msg.IHADigestRequest;
 import com.bigdata.ha.msg.IHADigestResponse;
 import com.bigdata.ha.msg.IHAGatherReleaseTimeRequest;
-import com.bigdata.ha.msg.IHAGlobalWriteLockRequest;
 import com.bigdata.ha.msg.IHALogDigestRequest;
 import com.bigdata.ha.msg.IHALogDigestResponse;
 import com.bigdata.ha.msg.IHALogRequest;
@@ -3192,7 +3191,9 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
              * retained.
              */
             if (_bufferStrategy instanceof IHistoryManager) {
+
                 ((IHistoryManager) _bufferStrategy).checkDeferredFrees(this);
+
             }
 
             /*
@@ -3244,6 +3245,22 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
             }
 
             /*
+             * Conditionally obtain a lock that will protect the
+             * commit()/postCommit() protocol.
+             */
+            final long nextOffset;
+            final Lock commitLock;
+            if (_bufferStrategy instanceof IRWStrategy) {
+                commitLock = ((IRWStrategy) _bufferStrategy).getCommitLock();
+            } else {
+                commitLock = null;
+            }
+            if (commitLock != null) {
+                // Take the commit lock.
+                commitLock.lock();
+            }
+            try {
+            /*
              * Call commit on buffer strategy prior to retrieving root block,
              * required for RWStore since the metaBits allocations are not made
              * until commit, leading to invalid addresses for recent store
@@ -3264,14 +3281,13 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
              * does not create much latency because the WriteCacheService drains
              * the dirtyList in a seperate thread.
              */
-			_bufferStrategy.commit();
-
-			/*
-			 *  next offset at which user data would be written.
-			 *  Calculated, after commit!
-			 */
-			
-			final long nextOffset = _bufferStrategy.getNextOffset();
+            _bufferStrategy.commit();
+            
+            /*
+             * The next offset at which user data would be written.
+             * Calculated, after commit!
+             */
+			nextOffset = _bufferStrategy.getNextOffset();
 
             final long blockSequence;
             
@@ -3280,20 +3296,6 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                 // always available for HA.
                 blockSequence = ((IHABufferStrategy) _bufferStrategy)
                         .getBlockSequence();
-                
-                if (!((IHABufferStrategy) _bufferStrategy)
-                        .getWriteCacheService().isFlushed()) {
- 
-                    /**
-                     * @see <a
-                     *      href="https://sourceforge.net/apps/trac/bigdata/ticket/674"
-                     *      > WCS write cache compaction causes errors in RWS
-                     *      postHACommit() </a>
-                     */
-                    
-                    throw new AssertionError();
-                    
-                }
                 
             } else {
                 
@@ -3381,11 +3383,16 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                 // write the root block on to the backing store.
                 _bufferStrategy.writeRootBlock(newRootBlock, forceOnCommit);
 
-                // Now the root blocks are down we can commit any
-                //	transient state
-    			if (_bufferStrategy instanceof IRWStrategy) {
-    				((IRWStrategy) _bufferStrategy).postCommit();
-    			}
+                if (_bufferStrategy instanceof IRWStrategy) {
+
+                    /*
+                     * Now the root blocks are down we can commit any transient
+                     * state.
+                     */
+
+                    ((IRWStrategy) _bufferStrategy).postCommit();
+
+                }
     			
                 // set the new root block.
                 _rootBlock = newRootBlock;
@@ -3482,6 +3489,15 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                     throw new RuntimeException(e);
                 }
 
+            } // else HA mode
+
+            } finally {
+                if(commitLock != null) {
+                    /*
+                     * Release the [commitLock] iff one was taken above.
+                     */
+                    commitLock.unlock();
+                }
             }
 
 			final long elapsedNanos = System.nanoTime() - beginNanos;
@@ -5901,6 +5917,38 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
         try {
 
+            /*
+             * Note: flush() is done by prepare2Phase(). The only conditions
+             * under which it is not done already is (a) HARestore (when
+             * localService is null) and (b) during RESTORE or RESYNC for the
+             * HAJournalServer (when haStatus will be NotReady).
+             */
+            final boolean shouldFlush = localService == null
+                    || (haStatus == null || haStatus == HAStatusEnum.NotReady);
+
+            /*
+             * Force application data to stable storage _before_ we update the
+             * root blocks. This option guarantees that the application data is
+             * stable on the disk before the atomic commit. Some operating
+             * systems and/or file systems may otherwise choose an ordered write
+             * with the consequence that the root blocks are laid down on the
+             * disk before the application data and a hard failure could result
+             * in the loss of application data addressed by the new root blocks
+             * (data loss on restart).
+             * 
+             * Note: We do not force the file metadata to disk. If that is done,
+             * it will be done by a force() after we write the root block on the
+             * disk.
+             * 
+             * Note: [shouldFlush] is probably sufficient. This test uses
+             * [shouldFlush||true] to err on the side of safety.
+             */
+            if ((shouldFlush || true) && doubleSync) {
+
+                _bufferStrategy.force(false/* metadata */);
+
+            }
+            
             // The timestamp for this commit point.
             final long commitTime = rootBlock.getLastCommitTime();
 
@@ -5914,11 +5962,18 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                     .isLeader(rootBlock.getQuorumToken());
 
             if (leader) {
-                // Now the root blocks are down we can commit any
-                //	transient state
-    			if (_bufferStrategy instanceof IRWStrategy) {
-    				((IRWStrategy) _bufferStrategy).postCommit();
-    			}
+            
+                if (_bufferStrategy instanceof IRWStrategy) {
+                
+                    /*
+                     * Now the root blocks are down we can commit any transient
+                     * state.
+                     */
+                    
+                    ((IRWStrategy) _bufferStrategy).postCommit();
+                    
+                }
+
             } else {
 
                 /*

@@ -550,7 +550,7 @@ abstract public class WriteCacheService implements IWriteCache {
          *      WCS write cache compaction causes errors in RWS postHACommit()
          *      </a>
          */
-        this.compactionEnabled = false; //canCompact() && compactionThreshold < 100;
+        this.compactionEnabled = canCompact() && compactionThreshold < 100;
         
         if (log.isInfoEnabled())
             log.info("Compaction Enabled: " + compactionEnabled
@@ -2196,10 +2196,14 @@ abstract public class WriteCacheService implements IWriteCache {
                 try {
                     if(!halt) {
                         /*
-                         * Can not check assertion if there is an existing
+                         * Check assertions for clean WCS after flush().
+                         * 
+                         * Note: Can not check assertion if there is an existing
                          * exception.
                          */
+                        assert dirtyList.size() == 0;
                         assert compactingCacheRef.get() == null;
+                        assert current.get() == null;
                     }
                 } finally {
                     dirtyListLock.unlock();
@@ -3841,22 +3845,22 @@ abstract public class WriteCacheService implements IWriteCache {
         }
     }
     
-    /**
-     * Debug method to verify that the {@link WriteCacheService} has flushed all
-     * {@link WriteCache} buffers.
-     * 
-     * @return whether there are no outstanding writes buffered
-     */
-    public boolean isFlushed() {
-        
-        final boolean clear = 
-    			dirtyList.size() == 0
-    			&& compactingCacheRef.get() == null
-    			&& (current.get() == null || current.get().isEmpty());
-    	
-        return clear;
-        
-    }
+//    /**
+//     * Debug method to verify that the {@link WriteCacheService} has flushed all
+//     * {@link WriteCache} buffers.
+//     * 
+//     * @return whether there are no outstanding writes buffered
+//     */
+//    public boolean isFlushed() {
+//        
+//        final boolean clear = 
+//    			dirtyList.size() == 0
+//    			&& compactingCacheRef.get() == null
+//    			&& (current.get() == null || current.get().isEmpty());
+//    	
+//        return clear;
+//        
+//    }
     
     /**
      * An array of writeCache actions is maintained that can be used
