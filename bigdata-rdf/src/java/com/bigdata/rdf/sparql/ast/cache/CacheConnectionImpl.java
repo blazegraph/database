@@ -53,10 +53,10 @@ import com.bigdata.journal.Journal;
 import com.bigdata.journal.TemporaryStore;
 import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rawstore.Bytes;
+import com.bigdata.rawstore.IStreamStore;
 import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.relation.locator.DefaultResourceLocator;
 import com.bigdata.resources.IndexManager;
-import com.bigdata.rwstore.IRWStrategy;
 import com.bigdata.rwstore.RWStore;
 import com.bigdata.service.IDataService;
 import com.bigdata.sparse.SparseRowStore;
@@ -211,18 +211,18 @@ public class CacheConnectionImpl implements ICacheConnection {
             
         }
 
-        /*
-         * TODO Hack enables the SOLUTIONS cache.
+        /**
+         * Conditionally enable the SOLUTIONS cache.
          * 
          * Note: The SolutionSetStream has a dependency on the IPSOutputStream
          * so the solutions cache can not be enabled when that interface is not
          * available.
          * 
          * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/555" >
-         * Support PSOutputStream/InputStream at IRawStore </a>
+         *      Support PSOutputStream/InputStream at IRawStore </a>
          */
         this.enableSolutionsCache = QueryHints.DEFAULT_SOLUTION_SET_CACHE
-                && cacheStore.getBufferStrategy() instanceof IRWStrategy;
+                && cacheStore.getBufferStrategy() instanceof IStreamStore;
 
         /*
          * TODO Hack enables the DESCRIBE cache.
