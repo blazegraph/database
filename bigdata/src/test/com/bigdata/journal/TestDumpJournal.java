@@ -181,7 +181,7 @@ public class TestDumpJournal extends ProxyTestCase<Journal> {
 
             {
 
-                final HTree ndx = src.getHTree(NAME);
+                final HTree ndx = (HTree) src.getUnisolatedIndex(NAME);
 
                 final KV[] a = AbstractBTreeTestCase
                         .getRandomKeyValues(1000/* ntuples */);

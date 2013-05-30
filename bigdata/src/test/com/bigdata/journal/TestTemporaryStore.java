@@ -29,10 +29,15 @@ package com.bigdata.journal;
 
 import java.nio.ByteBuffer;
 import java.util.Random;
+import java.util.UUID;
 
 import junit.extensions.proxy.ProxyTestSuite;
 import junit.framework.Test;
 
+import com.bigdata.btree.BTree;
+import com.bigdata.btree.HTreeIndexMetadata;
+import com.bigdata.btree.IndexMetadata;
+import com.bigdata.htree.HTree;
 import com.bigdata.rawstore.AbstractRawStoreTestCase;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
@@ -598,4 +603,136 @@ public class TestTemporaryStore extends AbstractRawStoreTestCase {
 //
 //    }
     
+    /**
+     * Test the ability to register and use named {@link BTree}, including
+     * whether the named {@link BTree} is restart safe.
+     * 
+     * @see TestNamedIndices
+     */
+    public void test_registerAndUseBTree() {
+
+        TemporaryStore journal = new TemporaryStore();
+
+        try {
+
+            final String name = "abc";
+
+            final UUID indexUUID = UUID.randomUUID();
+
+            final IndexMetadata metadata = new IndexMetadata(indexUUID);
+            {
+
+
+                metadata.setBranchingFactor(3);
+
+//                btree = BTree.create(journal, metadata);
+
+            }
+
+            assertNull(journal.getIndex(name));
+
+            final BTree btree = (BTree) journal.register(name, metadata);
+
+            assertTrue(btree == journal.getIndex(name));
+
+            final byte[] k0 = new byte[] { 0 };
+            final byte[] v0 = new byte[] { 1, 2, 3 };
+
+            btree.insert(k0, v0);
+
+//            /*
+//             * commit and close the journal
+//             */
+//            journal.commit();
+//
+//            if (journal.isStable()) {
+//
+//                /*
+//                 * re-open the journal and test restart safety.
+//                 */
+//                journal = reopenStore(journal);
+//
+//                btree = (BTree) journal.getIndex(name);
+//
+//                assertNotNull("btree", btree);
+//                assertEquals("indexUUID", indexUUID, btree.getIndexMetadata()
+//                        .getIndexUUID());
+//                assertEquals("entryCount", 1, btree.getEntryCount());
+//                assertEquals(v0, btree.lookup(k0));
+//
+//            }
+
+        } finally {
+
+            journal.destroy();
+
+        }
+
+    }
+
+    /**
+     * Test the ability to register and use named {@link HTree}, including
+     * whether the named {@link HTree} is restart safe.
+     * 
+     * @see TestNamedIndices
+     */
+    public void test_registerAndUseHTree() {
+
+        final TemporaryStore journal = new TemporaryStore();
+
+        try {
+
+            final String name = "abc";
+
+            final UUID indexUUID = UUID.randomUUID();
+
+            assertNull(journal.getUnisolatedIndex(name));
+
+            final HTreeIndexMetadata metadata = new HTreeIndexMetadata(
+                        name, indexUUID);
+            
+//            final HTree htree0 = HTree.create(journal, metadata);
+
+            final HTree htree0 = (HTree) journal.register(name, metadata);
+
+            HTree htree1 = (HTree) journal.getUnisolatedIndex(name);
+            
+            // same reference.
+            assertTrue(htree0 == htree1);
+
+            final byte[] k0 = new byte[] { 0 };
+            final byte[] v0 = new byte[] { 1, 2, 3 };
+
+            htree1.insert(k0, v0);
+
+//            /*
+//             * commit and close the journal
+//             */
+//            journal.commit();
+//
+//            if (journal.isStable()) {
+//
+//                /*
+//                 * re-open the journal and test restart safety.
+//                 */
+//                journal = reopenStore(journal);
+//
+//                htree1 = (HTree) journal.getUnisolatedIndex(name);
+//
+//                assertNotNull("btree", htree1);
+//                assertEquals("indexUUID", indexUUID, htree1.getIndexMetadata()
+//                        .getIndexUUID());
+//                assertEquals("entryCount", 1, htree1.getEntryCount());
+//                assertEquals(v0, htree1.lookupFirst(k0));
+//
+//            }
+
+        } finally {
+
+            journal.destroy();
+
+        }
+
+    }
+
 }

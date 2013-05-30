@@ -389,18 +389,6 @@ public interface QueryHints {
     boolean DEFAULT_HASH_JOIN = false;
 
     /**
-     * Option controls whether or not the bigdata extension to SPARQL Update for
-     * named solution sets is enabled.
-     * 
-     * @see <a
-     *      href="https://sourceforge.net/apps/mediawiki/bigdata/index.php?title=SPARQL_Update">
-     *      SPARQL Update </a>
-     */
-    String SOLUTION_SET_CACHE = "solutionSetCache";
-
-    boolean DEFAULT_SOLUTION_SET_CACHE = false;
-
-    /**
      * When <code>true</code> a DESCRIBE cache will be maintained. This can
      * accelerate DESCRIBE queries, linked data queries (which are mapped to a
      * DESCRIBE query by the NSS), and potentially accelerate star-joins (if the
@@ -416,13 +404,11 @@ public interface QueryHints {
     boolean DEFAULT_DESCRIBE_CACHE = false;
 
     /**
-     * FIXME Hack enables the cache feature if either the describe or the
-     * solution set caches is enabled.
+     * FIXME Hack enables the cache feature if the describe cache is enabled.
      * 
      * @see CacheConnectionFactory#getCacheConnection(QueryEngine)
      */
-    boolean CACHE_ENABLED = DEFAULT_SOLUTION_SET_CACHE
-            || DEFAULT_DESCRIBE_CACHE;
+    boolean CACHE_ENABLED = DEFAULT_DESCRIBE_CACHE;
 
     /**
      * Query hint controls the manner in which a DESCRIBE query is evaluated.

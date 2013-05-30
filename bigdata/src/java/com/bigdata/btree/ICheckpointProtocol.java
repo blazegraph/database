@@ -23,6 +23,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.btree;
 
+import com.bigdata.btree.view.FusedView;
 import com.bigdata.counters.ICounterSetAccess;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.AbstractTask;
@@ -39,8 +40,13 @@ import com.bigdata.journal.Name2Addr.Entry;
  *         TODO Try to lift out an abstract implementation of this interface for
  *         HTree, BTree, and Stream. This will be another step towards GIST
  *         support. There are protected methods which are used on those classes
- *         which should be lifted into the abstract base class.
- */
+ *         which should be lifted into the abstract base class. Also, try to
+ *         reconcile this interface with {@link ILocalBTreeView} implementations
+ *         that do not implement {@link ICheckpointProtocol} ({@link FusedView},
+ *         {@link ReadCommittedView}). 
+ *         
+ * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/585" > GIST </a>
+  */
 public interface ICheckpointProtocol extends ICommitter, ICounterSetAccess,
         ISimpleIndexAccess {
 

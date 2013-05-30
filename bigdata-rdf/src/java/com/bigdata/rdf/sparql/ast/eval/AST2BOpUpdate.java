@@ -651,7 +651,7 @@ public class AST2BOpUpdate extends AST2BOpUtility {
 									+ "-" + UUID.randomUUID();
 
 							// Write solutions to be deleted onto temp set.
-							context.sparqlCache.putSolutions(
+							context.solutionSetManager.putSolutions(
 									tempSolutionSet,
 									asBigdataIterator(lexicon, chunkSize,
 											result));
@@ -713,7 +713,7 @@ public class AST2BOpUpdate extends AST2BOpUtility {
 								try {
 
 									// Write onto named solution set.
-									context.sparqlCache.putSolutions(
+									context.solutionSetManager.putSolutions(
 											solutionSet, titr);
 
 								} finally {
@@ -729,7 +729,7 @@ public class AST2BOpUpdate extends AST2BOpUtility {
 								 * around.
 								 */
 
-								context.sparqlCache
+								context.solutionSetManager
 										.clearSolutions(tempSolutionSet);
 
 							}
@@ -795,7 +795,7 @@ public class AST2BOpUpdate extends AST2BOpUtility {
 
 								// Write the solutions onto the named solution
 								// set.
-								context.sparqlCache.putSolutions(solutionSet,
+								context.solutionSetManager.putSolutions(solutionSet,
 										titr);
 
 							} finally {
@@ -901,7 +901,7 @@ public class AST2BOpUpdate extends AST2BOpUtility {
                     try {
 
                         // Write the solutions onto the named solution set.
-						context.sparqlCache.putSolutions(solutionSet, result);
+						context.solutionSetManager.putSolutions(solutionSet, result);
 
                     } finally {
 
@@ -1709,7 +1709,7 @@ public class AST2BOpUpdate extends AST2BOpUtility {
         if (solutionSet != null) {
 
             // Clear the named solution set.
-            if (!context.sparqlCache.clearSolutions(solutionSet) && !silent) {
+            if (!context.solutionSetManager.clearSolutions(solutionSet) && !silent) {
                 
                 // Named solution set does not exists, but should exist.
                 throw new SolutionSetDoesNotExistException(solutionSet);
@@ -1792,10 +1792,10 @@ public class AST2BOpUpdate extends AST2BOpUtility {
          * since the default semantics of CLEAR ALL and DROP ALL also imply all
          * named solution sets.
          */
-        if (allSolutionSets && context.sparqlCache != null) {
+        if (allSolutionSets && context.solutionSetManager != null) {
             
             // Delete all solution sets.
-            context.sparqlCache.clearAllSolutions();
+            context.solutionSetManager.clearAllSolutions();
             
         }
         
@@ -1821,7 +1821,7 @@ public class AST2BOpUpdate extends AST2BOpUtility {
 
 			final String solutionSet = op.getTargetSolutionSet();
 
-			final boolean exists = context.sparqlCache
+			final boolean exists = context.solutionSetManager
 					.existsSolutions(solutionSet);
 
 			if (!op.isSilent() && exists) {
@@ -1833,7 +1833,7 @@ public class AST2BOpUpdate extends AST2BOpUtility {
 
 			if (!exists) {
 
-				context.sparqlCache
+				context.solutionSetManager
 						.createSolutions(solutionSet, op.getParams());
 
             }

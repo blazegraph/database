@@ -49,7 +49,6 @@ import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rdf.internal.encoder.SolutionSetStreamDecoder;
 import com.bigdata.rdf.internal.encoder.SolutionSetStreamEncoder;
 import com.bigdata.rdf.sparql.ast.ISolutionSetStats;
-import com.bigdata.rdf.sparql.ast.SolutionSetStats;
 import com.bigdata.stream.Stream;
 import com.bigdata.striterator.Chunkerator;
 import com.bigdata.striterator.ICloseableIterator;
@@ -171,7 +170,7 @@ public final class SolutionSetStream extends Stream implements
      * by {@link Checkpoint#create(IRawStore, IndexMetadata)} since
      * Stream.create() is being invoked rather than SolutionSetStream.create().
      * 
-     * @see https://sourceforge.net/apps/trac/bigdata/ticket/585 (GIST)
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/585" > GIST </a>
      */
     public static SolutionSetStream create(final IRawStore store,
             final StreamIndexMetadata metadata) {
@@ -202,10 +201,10 @@ public final class SolutionSetStream extends Stream implements
     }
 
     /**
-     * Return the address of the {@link SolutionSetStats} to be written into the
+     * Return the address of the {@link ISolutionSetStats} to be written into the
      * next {@link Checkpoint} record. The caller must have {@link #flush()} the
      * {@link SolutionSetStream} as a pre-condition (to ensure that the stats
-     * have been written out). If the {@link SolutionSetStats} are not loaded,
+     * have been written out). If the {@link ISolutionSetStats} are not loaded,
      * then the address from the last {@link Checkpoint} record is returned.
      */
     public long getStatsAddr() {

@@ -27,22 +27,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.journal;
 
-import java.io.DataOutputStream;
-import java.util.Arrays;
 import java.util.UUID;
 
 import com.bigdata.btree.BTree;
-import com.bigdata.btree.BytesUtil;
-import com.bigdata.btree.Checkpoint;
 import com.bigdata.btree.HTreeIndexMetadata;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.htree.HTree;
-import com.bigdata.rawstore.IPSOutputStream;
-import com.bigdata.rawstore.IRawStore;
-import com.bigdata.stream.Stream;
-import com.bigdata.stream.Stream.StreamIndexMetadata;
-import com.bigdata.striterator.CloseableIteratorWrapper;
-import com.bigdata.striterator.ICloseableIterator;
 
 /**
  * Test suite for api supporting registration, lookup, use, and atomic commit of
@@ -74,20 +64,19 @@ public class TestNamedIndices extends ProxyTestCase<Journal> {
 
             final UUID indexUUID = UUID.randomUUID();
 
-            BTree btree;
+            final IndexMetadata metadata = new IndexMetadata(indexUUID);
+//            BTree btree;
             {
-
-                final IndexMetadata metadata = new IndexMetadata(indexUUID);
 
                 metadata.setBranchingFactor(3);
 
-                btree = BTree.create(journal, metadata);
+//                btree = BTree.create(journal, metadata);
 
             }
 
             assertNull(journal.getIndex(name));
 
-            journal.registerIndex(name, btree);
+            BTree btree = (BTree) journal.register(name, metadata);
 
             assertTrue(btree == journal.getIndex(name));
 
@@ -140,16 +129,16 @@ public class TestNamedIndices extends ProxyTestCase<Journal> {
 
 			final UUID indexUUID = UUID.randomUUID();
 
-            assertNull(journal.getHTree(name));
+            assertNull(journal.getUnisolatedIndex(name));
 
             final HTreeIndexMetadata metadata = new HTreeIndexMetadata(
                         name, indexUUID);
             
-            final HTree htree0 = HTree.create(journal, metadata);
+//            final HTree htree0 = HTree.create(journal, metadata);
 
-            journal.registerIndex(name, htree0);
+            final HTree htree0 = (HTree) journal.register(name, metadata);
 
-            HTree htree1 = journal.getHTree(name);
+            HTree htree1 = (HTree) journal.getUnisolatedIndex(name);
             
             // same reference.
             assertTrue(htree0 == htree1);
@@ -171,7 +160,7 @@ public class TestNamedIndices extends ProxyTestCase<Journal> {
 				 */
 				journal = reopenStore(journal);
 
-				htree1 = (HTree) journal.getHTree(name);
+				htree1 = (HTree) journal.getUnisolatedIndex(name);
 
 				assertNotNull("btree", htree1);
 				assertEquals("indexUUID", indexUUID, htree1.getIndexMetadata()

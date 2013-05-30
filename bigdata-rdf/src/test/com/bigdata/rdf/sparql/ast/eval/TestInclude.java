@@ -48,6 +48,7 @@ import com.bigdata.bop.join.SolutionSetHashJoinOp;
 import com.bigdata.bop.solutions.ProjectionOp;
 import com.bigdata.bop.solutions.SliceOp;
 import com.bigdata.journal.BufferMode;
+import com.bigdata.journal.IBTreeManager;
 import com.bigdata.rdf.internal.impl.literal.XSDNumericIV;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataURI;
@@ -55,9 +56,8 @@ import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.NamedSubqueryRoot;
-import com.bigdata.rdf.sparql.ast.cache.CacheConnectionFactory;
-import com.bigdata.rdf.sparql.ast.cache.ICacheConnection;
-import com.bigdata.rdf.sparql.ast.cache.ISolutionSetCache;
+import com.bigdata.rdf.sparql.ast.ssets.ISolutionSetManager;
+import com.bigdata.rdf.sparql.ast.ssets.SolutionSetManager;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rwstore.IRWStrategy;
 import com.bigdata.rwstore.sector.MemStore;
@@ -137,13 +137,11 @@ public class TestInclude extends AbstractDataDrivenSPARQLTestCase {
         
 		final QueryEngine queryEngine = QueryEngineFactory
 				.getQueryController(tripleStore.getIndexManager());
-		
-        final ICacheConnection cacheConn = CacheConnectionFactory
-                .getCacheConnection(queryEngine);
 
-        final ISolutionSetCache sparqlCache = cacheConn.getSparqlCache(
+        final ISolutionSetManager sparqlCache = new SolutionSetManager(
+                (IBTreeManager) queryEngine.getIndexManager(),
                 tripleStore.getNamespace(), tripleStore.getTimestamp());
-        
+
 		final String solutionSet = "%solutionSet1";
 		
         final IVariable<?> x = Var.var("x");
@@ -251,10 +249,8 @@ public class TestInclude extends AbstractDataDrivenSPARQLTestCase {
 		final QueryEngine queryEngine = QueryEngineFactory
 				.getQueryController(tripleStore.getIndexManager());
 		
-        final ICacheConnection cacheConn = CacheConnectionFactory
-                .getCacheConnection(queryEngine);
-
-        final ISolutionSetCache sparqlCache = cacheConn.getSparqlCache(
+        final ISolutionSetManager sparqlCache = new SolutionSetManager(
+                (IBTreeManager) queryEngine.getIndexManager(),
                 tripleStore.getNamespace(), tripleStore.getTimestamp());
 
 		final String solutionSet = "%solutionSet1";
@@ -328,12 +324,166 @@ public class TestInclude extends AbstractDataDrivenSPARQLTestCase {
     }
 
     /**
+     * A unit test for an INCLUDE with another JOIN. For this test, the INCLUDE
+     * will run first:
+     * 
+     * <pre>
+     * %solutionSet1::
+     * {x=:Mike,  y=2}
+     * {x=:Bryan, y=4}
+     * {x=:DC,    y=1}
+     * </pre>
+     * 
+     * <pre>
+     * prefix : <http://www.bigdata.com/> 
+     * prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> 
+     * prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> 
+     * prefix foaf: <http://xmlns.com/foaf/0.1/> 
+     * 
+     * SELECT ?x ?y WHERE { 
+     * 
+     *    # Turn off the join order optimizer.
+     *    hint:Query hint:optimizer "None" .
+     * 
+     *    # Run joins in the given order (INCLUDE is 1st).
+     *    
+     *    # SCAN => {(x=Mike,y=2);(x=Bryan;y=4);(x=DC,y=1)} 
+     *    INCLUDE %solutionSet1 .
+     * 
+     *    # JOIN on (x) => {(x=Mike,y=2);(x=Bryan,y=4)}
+     *    ?x rdf:type foaf:Person .
+     *    
+     * }
+     * </pre>
+     * 
+     * Note: This excercises the code path in {@link AST2BOpUtility} where we do
+     * a SCAN on the named solution set for the INCLUDE and then join with the
+     * access path.
+     * 
+     * @see #test_include_03()
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/531" >
+     *      SPARQL UPDATE for NAMED SOLUTION SETS </a>
+     */
+    public void test_include_03a() throws Exception {
+        
+        final TestHelper testHelper = new TestHelper(
+                "include_03a",// name
+                "include_03a.rq",// query URL
+                "include_03.trig",// data URL
+                "include_03.srx",// results URL
+                false,// lax cardinality
+                false // check order
+                );
+
+        final AbstractTripleStore tripleStore = testHelper.getTripleStore();
+        
+        final BigdataValueFactory vf = tripleStore.getValueFactory();
+        
+        final QueryEngine queryEngine = QueryEngineFactory
+                .getQueryController(tripleStore.getIndexManager());
+        
+        final ISolutionSetManager sparqlCache = new SolutionSetManager(
+                (IBTreeManager) queryEngine.getIndexManager(),
+                tripleStore.getNamespace(), tripleStore.getTimestamp());
+
+        final String solutionSet = "%solutionSet1";
+        
+        final IVariable<?> x = Var.var("x");
+        final IVariable<?> y = Var.var("y");
+
+        // Resolve terms pre-loaded into the kb.
+        final BigdataURI Mike = vf.createURI("http://www.bigdata.com/Mike"); 
+        final BigdataURI Bryan = vf.createURI("http://www.bigdata.com/Bryan");
+        final BigdataURI DC = vf.createURI("http://www.bigdata.com/DC");
+        {
+            tripleStore.addTerms(new BigdataValue[] { Mike, Bryan, DC });
+            assertNotNull(Mike.getIV());
+            assertNotNull(Bryan.getIV());
+            assertNotNull(DC.getIV());
+        }
+
+        final XSDNumericIV<BigdataLiteral> one = new XSDNumericIV<BigdataLiteral>(
+                1);
+        one.setValue(vf.createLiteral(1));
+        
+        final XSDNumericIV<BigdataLiteral> two = new XSDNumericIV<BigdataLiteral>(
+                2);
+        two.setValue(vf.createLiteral(2));
+        
+//      final XSDNumericIV<BigdataLiteral> three = new XSDNumericIV<BigdataLiteral>(
+//              3);
+//      three.setValue(vf.createLiteral(3));
+        
+        final XSDNumericIV<BigdataLiteral> four = new XSDNumericIV<BigdataLiteral>(
+                4);
+        four.setValue(vf.createLiteral(4));
+        
+//      final XSDNumericIV<BigdataLiteral> five = new XSDNumericIV<BigdataLiteral>(
+//              5);
+//      five.setValue(vf.createLiteral(5));
+        
+        final List<IBindingSet> bsets = new LinkedList<IBindingSet>();
+        {
+            final IBindingSet bset = new ListBindingSet();
+            bset.set(x, asConst(Mike.getIV()));
+            bset.set(y, asConst(two));
+            bsets.add(bset);
+        }
+        {
+            final IBindingSet bset = new ListBindingSet();
+            bset.set(x, asConst(Bryan.getIV()));
+            bset.set(y, asConst(four));
+            bsets.add(bset);
+        }
+        {
+            final IBindingSet bset = new ListBindingSet();
+            bset.set(x, asConst(DC.getIV()));
+            bset.set(y, asConst(one));
+            bsets.add(bset);
+        }
+
+        final IBindingSet[] bindingSets = bsets.toArray(new IBindingSet[]{});
+
+        sparqlCache.putSolutions(solutionSet,
+                BOpUtility.asIterator(bindingSets));
+
+        final ASTContainer astContainer = testHelper.runTest();
+
+        final PipelineOp queryPlan = astContainer.getQueryPlan();
+
+        // top level should be the PROJECTION operator.
+        final PipelineOp projectionOp = (PipelineOp) queryPlan;
+        assertTrue(projectionOp instanceof ProjectionOp);
+
+        // sole argument should be the PIPELINE JOIN operator.
+        final PipelineOp joinOp = (PipelineOp) projectionOp.get(0);
+        assertTrue(joinOp instanceof PipelineJoin);
+
+        /*
+         * The sole argument of JOIN should be the INCLUDE operator, which
+         * should be evaluated using a solution set SCAN. This is where we start
+         * evaluation for this query.
+         */
+        final PipelineOp includeOp = (PipelineOp) joinOp.get(0);
+        assertTrue(includeOp instanceof NestedLoopJoinOp);
+
+    }
+
+    /**
      * A unit test for an INCLUDE which is NOT the first JOIN in the WHERE
      * clause. This condition is enforced by turning off the join order
      * optimizer for this query.
      * <p>
      * Note: Since there is another JOIN in this query, there is no longer any
      * order guarantee for the resulting solutions.
+     * 
+     * <pre>
+     * %solutionSet1::
+     * {x=:Mike,  y=2}
+     * {x=:Bryan, y=4}
+     * {x=:DC,    y=1}
+     * </pre>
      * 
      * <pre>
      * prefix : <http://www.bigdata.com/> 
@@ -356,6 +506,11 @@ public class TestInclude extends AbstractDataDrivenSPARQLTestCase {
      * 
      * }
      * </pre>
+     * 
+     * @see #test_include_03a()
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/531" >
+     *      SPARQL UPDATE for NAMED SOLUTION SETS </a>
      */
     public void test_include_03() throws Exception {
     	
@@ -375,10 +530,8 @@ public class TestInclude extends AbstractDataDrivenSPARQLTestCase {
 		final QueryEngine queryEngine = QueryEngineFactory
 				.getQueryController(tripleStore.getIndexManager());
 		
-        final ICacheConnection cacheConn = CacheConnectionFactory
-                .getCacheConnection(queryEngine);
-
-        final ISolutionSetCache sparqlCache = cacheConn.getSparqlCache(
+        final ISolutionSetManager sparqlCache = new SolutionSetManager(
+                (IBTreeManager) queryEngine.getIndexManager(),
                 tripleStore.getNamespace(), tripleStore.getTimestamp());
 
 		final String solutionSet = "%solutionSet1";
@@ -417,6 +570,14 @@ public class TestInclude extends AbstractDataDrivenSPARQLTestCase {
 //				5);
 //		five.setValue(vf.createLiteral(5));
 		
+		        /**
+         * <pre>
+         * %solutionSet1::
+         * {x=:Mike,  y=2}
+         * {x=:Bryan, y=4}
+         * {x=:DC,    y=1}
+         * </pre>
+         */
         final List<IBindingSet> bsets = new LinkedList<IBindingSet>();
         {
             final IBindingSet bset = new ListBindingSet();

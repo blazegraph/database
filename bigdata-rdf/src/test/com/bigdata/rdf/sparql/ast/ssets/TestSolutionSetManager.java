@@ -25,7 +25,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Apr 10, 2012
  */
 
-package com.bigdata.rdf.sparql.ast.cache;
+package com.bigdata.rdf.sparql.ast.ssets;
 
 import java.math.BigInteger;
 import java.util.Iterator;
@@ -58,9 +58,6 @@ import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.BigdataValueFactoryImpl;
-import com.bigdata.rdf.sparql.ast.cache.CacheConnectionFactory;
-import com.bigdata.rdf.sparql.ast.cache.ICacheConnection;
-import com.bigdata.rdf.sparql.ast.cache.ISolutionSetCache;
 import com.bigdata.rdf.sparql.ast.cache.CacheConnectionImpl;
 import com.bigdata.rdf.sparql.ast.eval.IEvaluationContext;
 import com.bigdata.striterator.CloseableIteratorWrapper;
@@ -72,30 +69,23 @@ import com.bigdata.striterator.ICloseableIterator;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- *          TODO We should actually be verifying the order for those solution
- *          sets where the maintenance of the order is part of their CREATE
- *          declaration.
- *          
- *          FIXME Verfiy MVCC semantics.  Once written, a cached solution set
- *          must become visible to readers.  This will require us to commit
- *          the CacheJournal as well.
  */
-public class TestSolutionSetCache extends TestCase2 {
+public class TestSolutionSetManager extends TestCase2 {
 
-    public TestSolutionSetCache() {
+    public TestSolutionSetManager() {
     }
 
-    public TestSolutionSetCache(final String name) {
+    public TestSolutionSetManager(final String name) {
         super(name);
     }
 
     protected Journal journal;
     protected QueryEngine queryEngine;
-    protected ICacheConnection cacheConn;
-    protected ISolutionSetCache cache;
+//    protected ICacheConnection cacheConn;
+    protected ISolutionSetManager solutionSetsManager;
     
-    /** Note: Not used yet by the {@link CacheConnectionImpl}.
+    /**
+     * Note: Not used yet by the {@link CacheConnectionImpl}.
      */
     protected IEvaluationContext ctx = null;
 
@@ -160,11 +150,11 @@ public class TestSolutionSetCache extends TestCase2 {
         // Setup the QueryEngine.
         queryEngine = QueryEngineFactory.getQueryController(journal);
         
-        // Setup the solution set cache.
-        cacheConn = CacheConnectionFactory.getCacheConnection(queryEngine);
+//        // Setup the solution set cache.
+//        cacheConn = CacheConnectionFactory.getCacheConnection(queryEngine);
 
-        // FIXME MVCC VIEWS: This is ONLY using the UNISOLATED VIEW.  Test MVCC semantics.
-        cache = cacheConn == null ? null : cacheConn.getSparqlCache(namespace,
+        // TODO MVCC VIEWS: This is ONLY using the UNISOLATED VIEW.  Test MVCC semantics.
+        solutionSetsManager = new SolutionSetManager(journal, namespace,
                 ITx.UNISOLATED);
 
         /*
@@ -199,15 +189,15 @@ public class TestSolutionSetCache extends TestCase2 {
     @Override
     protected void tearDown() throws Exception {
 
-        if (cache != null) {
-            cache.close();
-            cache = null;
+        if (solutionSetsManager != null) {
+            solutionSetsManager.close();
+            solutionSetsManager = null;
         }
         
-        if (cacheConn != null) {
-            cacheConn.close();
-            cacheConn = null;
-        }
+//        if (cacheConn != null) {
+//            cacheConn.close();
+//            cacheConn = null;
+//        }
         
         if (queryEngine != null) {
             queryEngine.shutdownNow();
@@ -256,21 +246,21 @@ public class TestSolutionSetCache extends TestCase2 {
         final String solutionSet = getName();
 
         try {
-            cache.getSolutions(solutionSet);
+            solutionSetsManager.getSolutions(solutionSet);
             fail("Expecting: " + IllegalStateException.class);
         } catch (IllegalStateException ex) {
             if (log.isInfoEnabled())
                 log.info("Ignoring expected exception: " + ex);
         }
 
-        assertFalse(cache.existsSolutions(solutionSet));
+        assertFalse(solutionSetsManager.existsSolutions(solutionSet));
         
-        cache.putSolutions(solutionSet,
+        solutionSetsManager.putSolutions(solutionSet,
                 new CloseableIteratorWrapper<IBindingSet[]>(in.iterator()));
 
-        assertTrue(cache.existsSolutions(solutionSet));
+        assertTrue(solutionSetsManager.existsSolutions(solutionSet));
 
-        final ICloseableIterator<IBindingSet[]> out = cache.getSolutions(
+        final ICloseableIterator<IBindingSet[]> out = solutionSetsManager.getSolutions(
                 solutionSet);
 
         assertSameSolutionsAnyOrder(flatten(in.iterator()), out);
@@ -309,17 +299,17 @@ public class TestSolutionSetCache extends TestCase2 {
         final String solutionSet = getName();
 
         try {
-            cache.getSolutions(solutionSet);
+            solutionSetsManager.getSolutions(solutionSet);
             fail("Expecting: " + IllegalStateException.class);
         } catch (IllegalStateException ex) {
             if (log.isInfoEnabled())
                 log.info("Ignoring expected exception: " + ex);
         }
 
-        cache.putSolutions(solutionSet,
+        solutionSetsManager.putSolutions(solutionSet,
                 new CloseableIteratorWrapper<IBindingSet[]>(in.iterator()));
 
-        final ICloseableIterator<IBindingSet[]> out = cache.getSolutions(
+        final ICloseableIterator<IBindingSet[]> out = solutionSetsManager.getSolutions(
                 solutionSet);
 
         assertSameSolutionsAnyOrder(flatten(in.iterator()), out);
@@ -368,17 +358,17 @@ public class TestSolutionSetCache extends TestCase2 {
         final String solutionSet = getName();
 
         try {
-            cache.getSolutions(solutionSet);
+            solutionSetsManager.getSolutions(solutionSet);
             fail("Expecting: " + IllegalStateException.class);
         } catch (IllegalStateException ex) {
             if (log.isInfoEnabled())
                 log.info("Ignoring expected exception: " + ex);
         }
 
-        cache.putSolutions(solutionSet,
+        solutionSetsManager.putSolutions(solutionSet,
                 new CloseableIteratorWrapper<IBindingSet[]>(in.iterator()));
 
-        final ICloseableIterator<IBindingSet[]> out = cache.getSolutions(
+        final ICloseableIterator<IBindingSet[]> out = solutionSetsManager.getSolutions(
                 solutionSet);
 
         assertSameSolutionsAnyOrder(flatten(in.iterator()), out);
@@ -444,17 +434,17 @@ public class TestSolutionSetCache extends TestCase2 {
         final String solutionSet = getName();
 
         try {
-            cache.getSolutions(solutionSet);
+            solutionSetsManager.getSolutions(solutionSet);
             fail("Expecting: " + IllegalStateException.class);
         } catch (IllegalStateException ex) {
             if (log.isInfoEnabled())
                 log.info("Ignoring expected exception: " + ex);
         }
 
-        cache.putSolutions(solutionSet,
+        solutionSetsManager.putSolutions(solutionSet,
                 new CloseableIteratorWrapper<IBindingSet[]>(in.iterator()));
 
-        final ICloseableIterator<IBindingSet[]> out = cache.getSolutions(
+        final ICloseableIterator<IBindingSet[]> out = solutionSetsManager.getSolutions(
                 solutionSet);
 
         assertSameSolutionsAnyOrder(flatten(in.iterator()), out);
@@ -519,7 +509,7 @@ public class TestSolutionSetCache extends TestCase2 {
         final String solutionSet = getName();
 
         try {
-            cache.getSolutions(solutionSet);
+            solutionSetsManager.getSolutions(solutionSet);
             fail("Expecting: " + IllegalStateException.class);
         } catch (IllegalStateException ex) {
             if (log.isInfoEnabled())
@@ -527,12 +517,12 @@ public class TestSolutionSetCache extends TestCase2 {
         }
 
         // write the solution set.
-        cache.putSolutions(solutionSet,
+        solutionSetsManager.putSolutions(solutionSet,
                 new CloseableIteratorWrapper<IBindingSet[]>(in.iterator()));
 
         // read them back
         {
-            final ICloseableIterator<IBindingSet[]> out = cache.getSolutions(
+            final ICloseableIterator<IBindingSet[]> out = solutionSetsManager.getSolutions(
                     solutionSet);
 
             assertSameSolutionsAnyOrder(flatten(in.iterator()), out);
@@ -540,18 +530,18 @@ public class TestSolutionSetCache extends TestCase2 {
 
         // read them back again.
         {
-            final ICloseableIterator<IBindingSet[]> out = cache.getSolutions(
+            final ICloseableIterator<IBindingSet[]> out = solutionSetsManager.getSolutions(
                     solutionSet);
 
             assertSameSolutionsAnyOrder(flatten(in.iterator()), out);
         }
         
         // Clear the solution set.
-        cache.clearSolutions(solutionSet);
+        solutionSetsManager.clearSolutions(solutionSet);
 
         // Verify gone.
         try {
-            cache.getSolutions(solutionSet);
+            solutionSetsManager.getSolutions(solutionSet);
             fail("Expecting: " + IllegalStateException.class);
         } catch (IllegalStateException ex) {
             if (log.isInfoEnabled())
@@ -601,7 +591,7 @@ public class TestSolutionSetCache extends TestCase2 {
         final String solutionSet2 = getName() + 2;
 
         try {
-            cache.getSolutions(solutionSet1);
+            solutionSetsManager.getSolutions(solutionSet1);
             fail("Expecting: " + IllegalStateException.class);
         } catch (IllegalStateException ex) {
             if (log.isInfoEnabled())
@@ -609,7 +599,7 @@ public class TestSolutionSetCache extends TestCase2 {
         }
 
         try {
-            cache.getSolutions(solutionSet2);
+            solutionSetsManager.getSolutions(solutionSet2);
             fail("Expecting: " + IllegalStateException.class);
         } catch (IllegalStateException ex) {
             if (log.isInfoEnabled())
@@ -617,25 +607,25 @@ public class TestSolutionSetCache extends TestCase2 {
         }
 
         // write the solution sets.
-        cache.putSolutions(solutionSet1,
+        solutionSetsManager.putSolutions(solutionSet1,
                 new CloseableIteratorWrapper<IBindingSet[]>(in1.iterator()));
-        cache.putSolutions(solutionSet2,
+        solutionSetsManager.putSolutions(solutionSet2,
                 new CloseableIteratorWrapper<IBindingSet[]>(in2.iterator()));
 
         // read them back
         assertSameSolutionsAnyOrder(flatten(in1.iterator()),
-                cache.getSolutions(solutionSet1));
+                solutionSetsManager.getSolutions(solutionSet1));
         assertSameSolutionsAnyOrder(flatten(in2.iterator()),
-                cache.getSolutions(solutionSet2));
+                solutionSetsManager.getSolutions(solutionSet2));
 
         // Clear all named solution set.
-        cache.clearAllSolutions();
+        solutionSetsManager.clearAllSolutions();
 
 //        ((CacheConnectionImpl)cacheConn).getStore().commit();
         
         // Verify gone.
         try {
-            final ICloseableIterator<IBindingSet[]> itr = cache.getSolutions(solutionSet1);
+            final ICloseableIterator<IBindingSet[]> itr = solutionSetsManager.getSolutions(solutionSet1);
             try {
                 assertFalse(itr.hasNext());
             }finally {
@@ -646,17 +636,17 @@ public class TestSolutionSetCache extends TestCase2 {
             if (log.isInfoEnabled())
                 log.info("Ignoring expected exception: " + ex);
         }
-        assertFalse(cache.existsSolutions(solutionSet1));
+        assertFalse(solutionSetsManager.existsSolutions(solutionSet1));
 
         // Verify gone.
         try {
-            cache.getSolutions(solutionSet2);
+            solutionSetsManager.getSolutions(solutionSet2);
             fail("Expecting: " + IllegalStateException.class);
         } catch (IllegalStateException ex) {
             if (log.isInfoEnabled())
                 log.info("Ignoring expected exception: " + ex);
         }
-        assertFalse(cache.existsSolutions(solutionSet2));
+        assertFalse(solutionSetsManager.existsSolutions(solutionSet2));
 
     }
 

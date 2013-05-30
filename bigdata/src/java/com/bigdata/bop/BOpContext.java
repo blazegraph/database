@@ -43,17 +43,13 @@ import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.join.BaseJoinStats;
 import com.bigdata.bop.join.IHashJoinUtility;
 import com.bigdata.btree.ISimpleIndexAccess;
-import com.bigdata.journal.AbstractJournal;
-import com.bigdata.journal.IIndexManager;
-import com.bigdata.journal.ITx;
-import com.bigdata.journal.TimestampUtility;
+import com.bigdata.journal.IBTreeManager;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.impl.bnode.SidIV;
 import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.sparql.ast.QueryHints;
-import com.bigdata.rdf.sparql.ast.cache.CacheConnectionFactory;
-import com.bigdata.rdf.sparql.ast.cache.ICacheConnection;
-import com.bigdata.rdf.sparql.ast.cache.ISolutionSetCache;
+import com.bigdata.rdf.sparql.ast.ssets.ISolutionSetManager;
+import com.bigdata.rdf.sparql.ast.ssets.SolutionSetManager;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOPredicate;
@@ -61,7 +57,6 @@ import com.bigdata.relation.accesspath.AccessPath;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.rwstore.sector.IMemoryManager;
-import com.bigdata.service.IBigdataFederation;
 import com.bigdata.striterator.ChunkedFilter;
 import com.bigdata.striterator.Chunkerator;
 import com.bigdata.striterator.CloseableIteratorWrapper;
@@ -629,19 +624,19 @@ public class BOpContext<E> extends BOpContextBase {
 
             // Resolve the object which will give us access to the named
             // solution set.
-            final ICacheConnection cacheConn = CacheConnectionFactory
-                    .getExistingCacheConnection(getRunningQuery()
-                            .getQueryEngine());
+//            final ICacheConnection cacheConn = CacheConnectionFactory
+//                    .getExistingCacheConnection(getRunningQuery()
+//                            .getQueryEngine());
 
             final String namespace = namedSetRef.getNamespace();
 
             final long timestamp = namedSetRef.getTimestamp();
 
-            final ISolutionSetCache sparqlCache = cacheConn == null ? null
-                    : cacheConn.getSparqlCache(namespace, timestamp);
-
             // TODO ClassCastException is possible?
-            final AbstractJournal localIndexManager = (AbstractJournal) getIndexManager();
+            final IBTreeManager localIndexManager = (IBTreeManager) getIndexManager();
+
+            final ISolutionSetManager sparqlCache = new SolutionSetManager(
+                    localIndexManager, namespace, timestamp);
 
             return NamedSolutionSetRefUtility.getSolutionSet(//
                     sparqlCache,//

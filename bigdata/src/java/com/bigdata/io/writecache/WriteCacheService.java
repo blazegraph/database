@@ -550,7 +550,7 @@ abstract public class WriteCacheService implements IWriteCache {
          *      WCS write cache compaction causes errors in RWS postHACommit()
          *      </a>
          */
-        this.compactionEnabled = canCompact() && compactionThreshold < 100;
+        this.compactionEnabled = false;//canCompact() && compactionThreshold < 100;
         
         if (log.isInfoEnabled())
             log.info("Compaction Enabled: " + compactionEnabled
