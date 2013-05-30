@@ -165,7 +165,6 @@ import com.bigdata.rwstore.sector.MemoryManager;
 import com.bigdata.service.AbstractHATransactionService;
 import com.bigdata.service.AbstractTransactionService;
 import com.bigdata.service.IBigdataFederation;
-import com.bigdata.stream.Stream;
 import com.bigdata.util.ChecksumUtility;
 import com.bigdata.util.ClocksNotSynchronizedException;
 import com.bigdata.util.NT;
@@ -4498,6 +4497,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
      *      cache for access to historical index views on the Journal by name
      *      and commitTime. </a>
      */
+//	@Override TODO Add @Override once change in IBTreeManager merged into READ_CACHE branch.
 	final public ICheckpointProtocol getIndexLocal(final String name,
             final long commitTime) {
 
@@ -4975,6 +4975,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
      * 
      * @see Checkpoint#create(IRawStore, IndexMetadata)
      */
+//  @Override TODO Add @Override once change in IBTreeManager merged into READ_CACHE branch.
     public ICheckpointProtocol register(final String name,
             final IndexMetadata metadata) {
 
@@ -5186,30 +5187,34 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
      * 
      * @return The mutable view of the index.
      * 
-     * @see #getLiveView(String, long)
+     * @see #getUnisolatedIndex(String)
+     * 
+     * @deprecated Use {@link #getUnisolatedIndex(String)}
      */
+//  TODO Remove method once change in IBTreeManager merged into READ_CACHE branch.
+    @Deprecated
     final public HTree getHTree(final String name) {
         
         return (HTree) getUnisolatedIndex(name);
         
     }
 
-    /**
-     * Return the mutable view of the named index (aka the "live" or
-     * {@link ITx#UNISOLATED} index). This object is NOT thread-safe. You MUST
-     * NOT write on this index unless you KNOW that you are the only writer. See
-     * {@link ConcurrencyManager}, which handles exclusive locks for
-     * {@link ITx#UNISOLATED} indices.
-     * 
-     * @return The mutable view of the index.
-     * 
-     * @see #getLiveView(String, long)
-     */
-    final public Stream getStream(final String name) {
-        
-        return (Stream) getUnisolatedIndex(name);
-        
-    }
+//    /**
+//     * Return the mutable view of the named index (aka the "live" or
+//     * {@link ITx#UNISOLATED} index). This object is NOT thread-safe. You MUST
+//     * NOT write on this index unless you KNOW that you are the only writer. See
+//     * {@link ConcurrencyManager}, which handles exclusive locks for
+//     * {@link ITx#UNISOLATED} indices.
+//     * 
+//     * @return The mutable view of the index.
+//     * 
+//     * @see #getLiveView(String, long)
+//     */
+//    final public Stream getStream(final String name) {
+//        
+//        return (Stream) getUnisolatedIndex(name);
+//        
+//    }
 
     /**
      * Return the mutable view of the named persistence capable data structure
@@ -5217,6 +5222,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
      * 
      * @return The mutable view of the persistence capable data structure.
      */
+//  @Override TODO Add @Override once change in IBTreeManager merged into READ_CACHE branch.
     final public ICheckpointProtocol getUnisolatedIndex(final String name) {
 
         final ReadLock lock = _fieldReadWriteLock.readLock();
