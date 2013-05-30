@@ -18,7 +18,7 @@ https://bigdata.svn.sourceforge.net/svnroot/bigdata/tags/BIGDATA_RELEASE_1_2_3
 
 New features:
 
-- SPARQL 1.1 Update Extensions (SPARQL UPDATE for named solution sets).
+- SPARQL 1.1 Update Extensions (SPARQL UPDATE for named solution sets). See https://sourceforge.net/apps/mediawiki/bigdata/index.php?title=SPARQL_Update for more information.
 - SPARQL 1.1 Property Paths.
 - Remote Java client for Multi-Tenancy extensions NanoSparqlServer
 - Sesame 2.6.10 dependency
