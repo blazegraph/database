@@ -150,6 +150,21 @@ public class QueryServlet extends BigdataRDFServlet {
             // SPARQL 1.1 UPDATE.
             doUpdate(req, resp);
             
+        } else if (req.getParameter(ATTR_UUID) != null) {
+
+            // UUID with caching defeated.
+            doUUID(req, resp);
+            
+        } else if (req.getParameter(ATTR_ESTCARD) != null) {
+            
+            // ESTCARD with caching defeated.
+            doEstCard(req, resp);
+            
+        } else if (req.getParameter(ATTR_CONTEXTS) != null) {
+
+            // CONTEXTS with caching defeated.
+            doContexts(req, resp);
+            
         } else {
             
             // SPARQL Query.

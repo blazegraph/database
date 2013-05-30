@@ -60,8 +60,18 @@ public class RemoteServiceOptions extends ServiceOptionsBase {
 //
 //    }
     
+    /**
+     * Note: The default is <code>false</code>. This supports use cases where
+     * the end points are read/write databases and http caching must be defeated
+     * in order to gain access to the most recent committed state of the end
+     * point.
+     * 
+     * @see #isGET()
+     */
+    private final static boolean DEFAULT_IS_GET = false;
+    
     private boolean isSparql11 = true;
-    private boolean isGET = true;
+    private boolean isGET = DEFAULT_IS_GET;
     private String acceptStr = null;
 
     public RemoteServiceOptions() {
@@ -94,9 +104,14 @@ public class RemoteServiceOptions extends ServiceOptionsBase {
     }
 
     /**
-     * When <code>true</code>, use GET for query. Otherwise use POST. Note that
-     * POST can often handle larger queries than GET due to limits at the HTTP
-     * client layer, but HTTP caching only works for GET.
+     * When <code>true</code>, use GET for query and otherwise use POST (default
+     * {@value #DEFAULT_IS_GET}). POST can often handle larger queries than GET
+     * due to limits at the HTTP client layer and will defeat http caching and
+     * thus provide a current view of the committed state of the SPARQL end
+     * point when the end point is a read/write database. However, GET supports
+     * HTTP caching and can scale much better when the SPARQL end point is a
+     * read-only resource or a read-mostly resource where stale reads are
+     * acceptable.
      */
     public boolean isGET() {
 

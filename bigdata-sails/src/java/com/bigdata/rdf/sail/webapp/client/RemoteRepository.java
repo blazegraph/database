@@ -97,6 +97,8 @@ import org.openrdf.rio.RDFWriterRegistry;
 import org.xml.sax.Attributes;
 import org.xml.sax.ext.DefaultHandler2;
 
+import com.bigdata.rdf.sparql.ast.service.RemoteServiceOptions;
+
 
 /**
  * Java API to the Nano Sparql Server.
@@ -135,6 +137,29 @@ public class RemoteRepository {
     static protected final String UTF8 = "UTF-8";
 
     /**
+     * Note: The default is <code>false</code>. This supports use cases where
+     * the end points are read/write databases and http caching must be defeated
+     * in order to gain access to the most recent committed state of the end
+     * point.
+     * 
+     * @see #getQueryMethod()
+     * @see #setQueryMethod(String)
+     */
+    static private final String DEFAULT_QUERY_METHOD = "POST";
+    
+    /**
+     * The default maximum limit on a requestURL before the request is converted
+     * into a POST using a <code>application/x-www-form-urlencoded</code>
+     * request entity.
+     * <p>
+     * Note: I suspect that 2000 might be a better default limit. If the limit
+     * is 4096 bytes on the target, then, even with UTF encoding, most queries
+     * having a request URL that is 2000 characters long should go through with
+     * a GET. 1000 is a safe value but it could reduce http caching.
+     */
+    static private final int DEFAULT_MAX_REQUEST_URL_LENGTH = 1000;
+    
+    /**
      * The service end point for the default data set.
      */
     protected final String sparqlEndpointURL;
@@ -148,36 +173,84 @@ public class RemoteRepository {
      * Thread pool for processing HTTP responses in background.
      */
     protected final Executor executor;
+
+    /**
+     * The maximum requestURL length before the request is converted into a POST
+     * using a <code>application/x-www-form-urlencoded</code> request entity.
+     */
+    private volatile int maxRequestURLLength = DEFAULT_MAX_REQUEST_URL_LENGTH;
     
-//    /**
-//     * Create a connection to a remote repository using a shared
-//     * {@link ClientConnectionManager} and a {@link DefaultHttpClient}.
-//     * 
-//     * @param serviceURL
-//     *            The SPARQL http end point.
-//     * 
-//     * @see ClientConnectionManagerFactory#getInstance()
-//     */
-//    public RemoteRepository(final String serviceURL) {
-//
-//        this(serviceURL, new DefaultHttpClient(
-//                ClientConnectionManagerFactory.getInstance()));
-//
-//    }
-//
-//    /**
-//     * Create a connection to a remote repository.
-//     * 
-//     * @param serviceURL
-//     *            The SPARQL http end point.
-//     * @param httpClient
-//     *            The {@link HttpClient}.
-//     */
-//    public RemoteRepository(final String serviceURL, final HttpClient httpClient) {
-//
-//        this(serviceURL, httpClient, Executors.newCachedThreadPool());
-//        
-//    }
+    /**
+     * The HTTP verb that will be used for a QUERY (versus a UPDATE or other
+     * mutation operation).
+     */
+    private volatile String queryMethod = DEFAULT_QUERY_METHOD;
+
+    /**
+     * Return the maximum requestURL length before the request is converted into
+     * a POST using a <code>application/x-www-form-urlencoded</code> request
+     * entity.
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/619">
+     *      RemoteRepository class should use application/x-www-form-urlencoded
+     *      for large POST requests </a>
+     */
+    public int getMaxRequestURLLength() {
+
+        return maxRequestURLLength;
+        
+    }    
+
+    public void setMaxRequestURLLength(final int newVal) {
+
+        if (newVal <= 0)
+            throw new IllegalArgumentException();
+
+        this.maxRequestURLLength = newVal;
+        
+    }
+    
+    /**
+     * Return the HTTP verb that will be used for a QUERY (versus an UPDATE or
+     * other mutation operations) (default {@value #DEFAULT_IS_GET}). POST can
+     * often handle larger queries than GET due to limits at the HTTP client
+     * layer and will defeat http caching and thus provide a current view of the
+     * committed state of the SPARQL end point when the end point is a
+     * read/write database. However, GET supports HTTP caching and can scale
+     * much better when the SPARQL end point is a read-only resource or a
+     * read-mostly resource where stale reads are acceptable.
+     * 
+     * @see #setQueryMethod(String)
+     */
+    public String getQueryMethod() {
+     
+        return queryMethod;
+        
+    }
+
+    /**
+     * Set the default HTTP verb for QUERY and other idempotant operations.
+     * 
+     * @param method
+     *            The method which may be "POST" or "GET".
+     * 
+     * @see #getQueryMethod()
+     * 
+     * @see RemoteServiceOptions#setGET(boolean)
+     */
+    public void setQueryMethod(final String method) {
+
+        if ("POST".equalsIgnoreCase(method) || "GET".equalsIgnoreCase(method)) {
+
+            this.queryMethod = method.toUpperCase();
+
+        } else {
+            
+            throw new IllegalArgumentException();
+            
+        }
+
+    }
     
     /**
      * Create a connection to a remote repository. A typical invocation looks
@@ -272,7 +345,7 @@ public class RemoteRepository {
     public IPreparedTupleQuery prepareTupleQuery(final String query)
             throws Exception {
 
-        return new TupleQuery(newConnectOptions(), UUID.randomUUID(), query);
+        return new TupleQuery(newQueryConnectOptions(), UUID.randomUUID(), query);
 
     }
 
@@ -287,7 +360,7 @@ public class RemoteRepository {
     public IPreparedGraphQuery prepareGraphQuery(final String query)
             throws Exception {
 
-        return new GraphQuery(newConnectOptions(), UUID.randomUUID(), query);
+        return new GraphQuery(newQueryConnectOptions(), UUID.randomUUID(), query);
 
     }
 
@@ -302,7 +375,7 @@ public class RemoteRepository {
     public IPreparedBooleanQuery prepareBooleanQuery(final String query)
             throws Exception {
 
-        return new BooleanQuery(newConnectOptions(), UUID.randomUUID(), query);
+        return new BooleanQuery(newQueryConnectOptions(), UUID.randomUUID(), query);
 
     }
 
@@ -319,7 +392,7 @@ public class RemoteRepository {
     public IPreparedSparqlUpdate prepareUpdate(final String updateStr)
             throws Exception {
 
-        return new SparqlUpdate(newConnectOptions(), UUID.randomUUID(),
+        return new SparqlUpdate(newUpdateConnectOptions(), UUID.randomUUID(),
                 updateStr);
 
     }
@@ -454,7 +527,7 @@ public class RemoteRepository {
      */
     public void cancel(final UUID queryId) throws Exception {
         
-        final ConnectOptions opts = newConnectOptions();
+        final ConnectOptions opts = newUpdateConnectOptions();
 
         opts.addRequestParam("cancelQuery");
 
@@ -482,10 +555,8 @@ public class RemoteRepository {
     public long rangeCount(final Resource s, final URI p, final Value o, final Resource... c) 
             throws Exception {
 
-        final ConnectOptions opts = newConnectOptions();
+        final ConnectOptions opts = newQueryConnectOptions();
 
-        opts.method = "GET";
-        
         opts.addRequestParam("ESTCARD");
         if (s != null) {
             opts.addRequestParam("s", EncodeDecodeValue.encodeValue(s));
@@ -549,10 +620,8 @@ public class RemoteRepository {
      */
     public Collection<Resource> getContexts() throws Exception {
     	
-        final ConnectOptions opts = newConnectOptions();
+        final ConnectOptions opts = newQueryConnectOptions();
 
-        opts.method = "GET";
-        
         opts.addRequestParam("CONTEXTS");
 
         HttpResponse resp = null;
@@ -590,9 +659,7 @@ public class RemoteRepository {
      */
     public long add(final AddOp add) throws Exception {
         
-        final ConnectOptions opts = newConnectOptions();
-        
-        opts.method = "POST";
+        final ConnectOptions opts = newUpdateConnectOptions();
         
         add.prepareForWire();
         
@@ -650,7 +717,7 @@ public class RemoteRepository {
      */
     public long remove(final RemoveOp remove) throws Exception {
         
-        final ConnectOptions opts = newConnectOptions();
+        final ConnectOptions opts = newUpdateConnectOptions();
         
         remove.prepareForWire();
             
@@ -738,7 +805,7 @@ public class RemoteRepository {
      */
     public long update(final RemoveOp remove, final AddOp add) throws Exception {
         
-        final ConnectOptions opts = newConnectOptions();
+        final ConnectOptions opts = newUpdateConnectOptions();
         
         remove.prepareForWire();
         add.prepareForWire();
@@ -1204,6 +1271,10 @@ public class RemoteRepository {
      *            The connection options.
      * 
      * @return The connection.
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/619">
+     *      RemoteRepository class should use application/x-www-form-urlencoded
+     *      for large POST requests </a>
      */
     public HttpResponse doConnect(final ConnectOptions opts) throws Exception {
 
@@ -1214,21 +1285,41 @@ public class RemoteRepository {
         final StringBuilder urlString = new StringBuilder(opts.serviceURL);
 
         ConnectOptions.addQueryParams(urlString, opts.requestParams);
-        
-    	/*
-    	 * URL is too long.  Reset the URL to just the service endpoint
-    	 * and use application/x-www-form-urlencoded entity instead.  Only in
-    	 * cases where there is not already a request entity (SPARQL query and
-    	 * SPARQL update).
-    	 */
-        if (urlString.length() > 1000 && 
-        		opts.method.equals("POST") && opts.entity == null) {
-        	
-        	urlString.setLength(0);
-        	urlString.append(opts.serviceURL);
 
-        	opts.entity = ConnectOptions.getFormEntity(opts.requestParams);
-        	
+        final boolean isLongRequestURL = urlString.length() > getMaxRequestURLLength();
+
+        if (isLongRequestURL && opts.method.equals("POST")
+                && opts.entity == null) {
+
+            /*
+             * URL is too long. Reset the URL to just the service endpoint and
+             * use application/x-www-form-urlencoded entity instead. Only in
+             * cases where there is not already a request entity (SPARQL query
+             * and SPARQL update).
+             */
+
+            urlString.setLength(0);
+            urlString.append(opts.serviceURL);
+
+            opts.entity = ConnectOptions.getFormEntity(opts.requestParams);
+
+        } else if (isLongRequestURL && opts.method.equals("GET")
+                && opts.entity == null) {
+
+            /*
+             * Convert automatically to a POST if the request URL is too long.
+             * 
+             * Note: [opts.entity == null] should always be true for a GET so
+             * this bit is a paranoia check.
+             */
+
+            opts.method = "POST";
+
+            urlString.setLength(0);
+            urlString.append(opts.serviceURL);
+
+            opts.entity = ConnectOptions.getFormEntity(opts.requestParams);
+            
         }
 
         if (log.isDebugEnabled()) {
@@ -1928,6 +2019,34 @@ public class RemoteRepository {
 
     }
 
+    /**
+     * Return the {@link ConnectOptions} which will be used by default for the
+     * SPARQL end point for a QUERY or other idempotent operation.
+     */
+    final protected ConnectOptions newQueryConnectOptions() {
+
+        final ConnectOptions opts = newConnectOptions(sparqlEndpointURL);
+
+        opts.method = getQueryMethod();
+
+        return opts;
+
+    }
+
+    /**
+     * Return the {@link ConnectOptions} which will be used by default for the
+     * SPARQL end point for an UPDATE or other non-idempotant operation.
+     */
+    final protected ConnectOptions newUpdateConnectOptions() {
+
+        final ConnectOptions opts = newConnectOptions(sparqlEndpointURL);
+        
+        opts.method = "POST";
+        
+        return opts;
+
+    }
+    
     /**
      * Return the {@link ConnectOptions} which will be used by default for the
      * SPARQL end point.
