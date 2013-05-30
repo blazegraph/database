@@ -366,7 +366,7 @@ public class Banner {
         "\n                  Affordable"+//
         "\n      Web-Scale Computing for the Enterprise"+//
         "\n"+//
-        "\nCopyright SYSTAP, LLC 2006-2012.  All rights reserved."+//
+        "\nCopyright SYSTAP, LLC 2006-2013.  All rights reserved."+//
         "\n"+//
         "\n"+AbstractStatisticsCollector.fullyQualifiedHostName+//
         "\n"+new Date()+//
