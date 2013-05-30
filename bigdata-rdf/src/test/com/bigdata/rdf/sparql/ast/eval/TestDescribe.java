@@ -89,7 +89,7 @@ public class TestDescribe extends AbstractDataDrivenSPARQLTestCase {
         final AST2BOpContext context = new AST2BOpContext(astContainer,
                 store);
 
-        if (context.sparqlCache != null
+        if (context.describeCache != null
                 && astContainer.getOriginalAST().getQueryType() == QueryType.DESCRIBE) {
 
             /*

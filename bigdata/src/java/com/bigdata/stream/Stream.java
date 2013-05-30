@@ -63,7 +63,6 @@ import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.rawstore.IPSOutputStream;
 import com.bigdata.rawstore.IRawStore;
-import com.bigdata.rawstore.IStreamStore;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.striterator.ICloseableIterator;
 
@@ -136,14 +135,6 @@ abstract public class Stream implements ICheckpointProtocol {
      */
     protected long rootAddr;
 
-    /**
-     * {@inheritDoc}
-     * <p>
-     * Note: There is a reliance on the {@link IStreamStore} API.
-     * 
-     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/555" >
-     *      Support PSOutputStream/InputStream at IRawStore </a>
-     */
     @Override
     public IRawStore getStore() {
 

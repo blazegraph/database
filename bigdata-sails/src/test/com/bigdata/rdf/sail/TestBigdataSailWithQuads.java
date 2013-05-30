@@ -56,8 +56,10 @@ public class TestBigdataSailWithQuads extends AbstractBigdataSailTestCase {
     public TestBigdataSailWithQuads() {
     }
 
-    public TestBigdataSailWithQuads(String name) {
+    public TestBigdataSailWithQuads(final String name) {
+
         super(name);
+        
     }
     
     public static Test suite() {
@@ -171,12 +173,8 @@ public class TestBigdataSailWithQuads extends AbstractBigdataSailTestCase {
             tckSuite.addTestSuite(BigdataComplexSparqlQueryTest.class);
 
             /*
-             * SPARQL 1.1 update test suite.
-             * 
-             * FIXME Enable SPARQL 1.1 test suite once we support SPARQL Update.
-             * 
-             * FIXME This should be run for full r/w tx, the embedded federation
-             * and scale-out, not just quads.
+             * Note: The SPARQL 1.1 update test suite is run from
+             * com.bigdata.rdf.sparql.ast.eval.update.TestAll.
              */
 //            tckSuite.addTestSuite(BigdataSPARQLUpdateTest.class);
             try {

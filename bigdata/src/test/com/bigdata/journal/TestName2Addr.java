@@ -200,8 +200,8 @@ public class TestName2Addr extends ProxyTestCase<Journal> {
             assertNotNull(journal.getUnisolatedIndex(name1));
             assertNotNull(journal.getUnisolatedIndex(name2));
 
-            HTree htree1 = journal.getHTree(name1);
-            HTree htree2 = journal.getHTree(name2);
+            HTree htree1 = (HTree) journal.getUnisolatedIndex(name1);
+            HTree htree2 = (HTree) journal.getUnisolatedIndex(name2);
 
             // different reference.
             assertTrue(htree1 != htree2);

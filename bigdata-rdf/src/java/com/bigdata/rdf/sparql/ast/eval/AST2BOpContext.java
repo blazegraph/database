@@ -22,7 +22,7 @@ import com.bigdata.bop.join.HTreeSolutionSetHashJoinOp;
 import com.bigdata.bop.join.JVMSolutionSetHashJoinOp;
 import com.bigdata.bop.rdf.join.ChunkedMaterializationOp;
 import com.bigdata.htree.HTree;
-import com.bigdata.journal.AbstractJournal;
+import com.bigdata.journal.IBTreeManager;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.TimestampUtility;
@@ -39,10 +39,11 @@ import com.bigdata.rdf.sparql.ast.StaticAnalysis;
 import com.bigdata.rdf.sparql.ast.cache.CacheConnectionFactory;
 import com.bigdata.rdf.sparql.ast.cache.ICacheConnection;
 import com.bigdata.rdf.sparql.ast.cache.IDescribeCache;
-import com.bigdata.rdf.sparql.ast.cache.ISolutionSetCache;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTOptimizerList;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTQueryHintOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.DefaultOptimizerList;
+import com.bigdata.rdf.sparql.ast.ssets.ISolutionSetManager;
+import com.bigdata.rdf.sparql.ast.ssets.SolutionSetManager;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.service.IBigdataFederation;
 
@@ -75,10 +76,10 @@ public class AST2BOpContext implements IdFactory, IEvaluationContext {
 	public final QueryEngine queryEngine;
 
     /**
-     * The {@link ISolutionSetCache} -or- <code>null</code> iff that cache is not
+     * The {@link ISolutionSetManager} -or- <code>null</code> iff that cache is not
      * enabled.
      */
-    public final ISolutionSetCache sparqlCache;
+    public final ISolutionSetManager solutionSetManager;
 
     /**
      * The {@link IDescribeCache} -or- <code>null</code> iff that cache is not
@@ -392,7 +393,25 @@ public class AST2BOpContext implements IdFactory, IEvaluationContext {
                 .fromString(queryIdStr);
 
         this.queryId = queryId;
-        
+
+        // NAMED SOLUTION SETS
+        if (queryEngine.getIndexManager() instanceof IBTreeManager) {
+            this.solutionSetManager = new SolutionSetManager(
+                    (IBTreeManager) queryEngine.getIndexManager(),
+                    db.getNamespace(), db.getTimestamp());
+        } else {
+            /*
+             * FIXME Are there any code paths where the local index manager for
+             * the QueryEngine does not implement IBTreeManager? E.g., a
+             * FederatedQueryEngine?
+             * 
+             * @see QueryEngineFactory
+             * @see QueryEngine
+             * @see SolutionSetManager
+             */
+            this.solutionSetManager = null;
+        }
+
         /*
          * Connect to the cache provider.
          * 
@@ -411,8 +430,8 @@ public class AST2BOpContext implements IdFactory, IEvaluationContext {
 
             final long timestamp = db.getTimestamp();
             
-            // SOLUTIONS cache (if enabled)
-            this.sparqlCache = cacheConn.getSparqlCache(namespace, timestamp);
+//            // SOLUTIONS cache (if enabled)
+//            this.sparqlCache = cacheConn.getSparqlCache(namespace, timestamp);
 
             // DESCRIBE cache (if enabled)
             this.describeCache = cacheConn.getDescribeCache(namespace,
@@ -420,7 +439,7 @@ public class AST2BOpContext implements IdFactory, IEvaluationContext {
 
         } else {
             
-            this.sparqlCache = null;
+//            this.sparqlCache = null;
             
             this.describeCache = null;
             
@@ -522,18 +541,21 @@ public class AST2BOpContext implements IdFactory, IEvaluationContext {
         
     }
 
+    @Override
     public AbstractTripleStore getAbstractTripleStore() {
         
         return db;
         
     }
 
-    public ISolutionSetCache getSparqlCache() {
+    @Override
+    public ISolutionSetManager getSolutionSetManager() {
     	
-    		return sparqlCache;
+    		return solutionSetManager;
     	
     }
 
+    @Override
     public IDescribeCache getDescribeCache() {
 
         return describeCache;
@@ -680,10 +702,15 @@ public class AST2BOpContext implements IdFactory, IEvaluationContext {
 
         @SuppressWarnings("rawtypes")
         final IVariable[] joinVars = IVariable.EMPTY;
-        
+
+        /*
+         * Note: Will throw RuntimeException if named solution set can not be
+         * found. Handles case where [solutionSetManager == null] gracefully.
+         */
+
         return NamedSolutionSetRefUtility.getSolutionSetStats(//
-                sparqlCache,//
-                (AbstractJournal) queryEngine.getIndexManager(),// localIndexManager
+                solutionSetManager,//
+                (IBTreeManager) queryEngine.getIndexManager(),// localIndexManager
                 getNamespace(),//
                 getTimestamp(),//
                 localName,//

@@ -61,12 +61,13 @@ import org.openrdf.repository.RepositoryConnection;
 import org.openrdf.repository.RepositoryException;
 
 import com.bigdata.bop.engine.AbstractQueryEngineTestCase;
+import com.bigdata.journal.AbstractTask;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSail.Options;
 import com.bigdata.rdf.sail.BigdataSailRepository;
-import com.bigdata.rdf.sparql.ast.QueryHints;
+import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
  * Test suite for BIGDATA extension to SPARQL UPDATE for NAMED SOLUTION SETS.
@@ -417,17 +418,30 @@ public class BigdataSPARQLUpdateTest2 extends TestCase2 {
 
     /**
      * Return <code>true</code> iff the SPARQL UPDATE for NAMED SOLUTION SETS
-     * feature is enabled.
+     * test should run.
+     * 
+     * FIXME SPARQL UPDATE for NAMED SOLUTION SETS is NOT SUPPORTED for
+     * read/write transactions (against isolatable indices). This is a GIST
+     * issue. See {@link AbstractTask} and the GIST ticket for blocking issues.
      * 
      * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/531">
      *      SPARQL UPDATE Extensions (Trac) </a>
      * @see <a
      *      href="https://sourceforge.net/apps/mediawiki/bigdata/index.php?title=SPARQL_Update">
      *      SPARQL Update Extensions (Wiki) </a>
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/585"> GIST
+     *      </a>
      */
     protected boolean isSolutionSetUpdateEnabled() {
 
-        return QueryHints.DEFAULT_SOLUTION_SET_CACHE;
+        final AbstractTripleStore tripleStore = ((BigdataSailRepository) con
+                .getRepository()).getDatabase();
+        
+        final boolean isolatable = Boolean.parseBoolean(tripleStore.getProperty(
+                        BigdataSail.Options.ISOLATABLE_INDICES,
+                        BigdataSail.Options.DEFAULT_ISOLATABLE_INDICES));
+
+        return !isolatable;
         
     }
     

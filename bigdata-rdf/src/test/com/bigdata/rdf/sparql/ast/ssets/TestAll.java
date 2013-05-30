@@ -21,19 +21,18 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
-package com.bigdata.rdf.sparql.ast.cache;
+package com.bigdata.rdf.sparql.ast.ssets;
+
 
 import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
 
-import com.bigdata.rdf.sparql.ast.QueryHints;
-
 /**
  * Aggregates test suites into increasing dependency order.
  *
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
+ * @version $Id: TestAll.java 6452 2012-08-17 21:27:56Z thompsonbry $
  */
 public class TestAll extends TestCase {
 
@@ -57,22 +56,15 @@ public class TestAll extends TestCase {
     public static Test suite()
     {
 
-        final TestSuite suite = new TestSuite("Describe/Sparql Cache");
-
-        if (QueryHints.CACHE_ENABLED) {
-
-            suite.addTestSuite(TestCacheConnectionFactory.class);
-
-        }
-                
+        final TestSuite suite = new TestSuite("Solution Set Cache");
+        
+        // Test get/put/clear/etc for named solution sets.
+        suite.addTestSuite(TestSolutionSetManager.class);
+        
         /*
          * Note: Data-driven unit tests are used for the SPARQL named solution
          * set cache and the DESCRIBE cache.
          */
-        
-//        // DESCRIBE cache.
-//        suite.addTestSuite(TestDescribeCache.class);
-
         return suite;
         
     }
