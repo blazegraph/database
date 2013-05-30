@@ -29,17 +29,21 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.journal;
 
 import com.bigdata.btree.BTree;
+import com.bigdata.btree.Checkpoint;
 import com.bigdata.btree.ICheckpointProtocol;
 import com.bigdata.btree.IIndex;
+import com.bigdata.btree.ILocalBTreeView;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.view.FusedView;
 import com.bigdata.htree.HTree;
+import com.bigdata.rawstore.IRawStore;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.IMetadataService;
 import com.bigdata.service.ndx.IClientIndex;
 
 /**
- * Extended to allow direct registration of a named {@link BTree}.
+ * Interface for management of local index resources such as {@link BTree},
+ * {@link HTree}, etc.
  * 
  * @todo change registerIndex() methods to return void and have people use
  *       {@link #getIndex(String)} to obtain the view after they have registered
@@ -50,6 +54,9 @@ import com.bigdata.service.ndx.IClientIndex;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/585" > GIST
+ *      </a>
  */
 public interface IBTreeManager extends IIndexManager {
 
@@ -99,7 +106,7 @@ public interface IBTreeManager extends IIndexManager {
      * 
      * @return The object that would be returned by {@link #getIndex(String)}.
      * 
-     * @see #register(String, IndexMetadata)
+     * @see #registerIndex(String, IndexMetadata)
      * 
      * @exception IndexExistsException
      *                if there is an index already registered under that name.
@@ -125,6 +132,23 @@ public interface IBTreeManager extends IIndexManager {
     public IIndex registerIndex(String name, IndexMetadata indexMetadata);
 
     /**
+     * Variant method creates and registered a named persistence capable data
+     * structure but does not assume that the data structure will be a
+     * {@link BTree}.
+     * 
+     * @param store
+     *            The backing store.
+     * @param metadata
+     *            The metadata that describes the data structure to be created.
+     * 
+     * @return The persistence capable data structure.
+     * 
+     * @see Checkpoint#create(IRawStore, IndexMetadata)
+     */
+    public ICheckpointProtocol register(final String name,
+            final IndexMetadata metadata);
+
+    /**
      * Return the unisolated view of the named index (the mutable view of the
      * live index object).
      * 
@@ -138,5 +162,55 @@ public interface IBTreeManager extends IIndexManager {
      *                if <i>name</i> is <code>null</code>
      */
     public IIndex getIndex(String name);
+
+    /**
+     * Return the mutable view of the named persistence capable data structure
+     * (aka the "live" or {@link ITx#UNISOLATED} view).
+     * <p>
+     * Note: {@link #getIndex(String)} delegates to this method and then casts
+     * the result to an {@link IIndex}. This is the core implementation to
+     * access an existing named index.
+     * 
+     * @return The mutable view of the persistence capable data structure.
+     * 
+     * @see #getIndex(String)
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/585" >
+     *      GIST </a>
+     */
+    public ICheckpointProtocol getUnisolatedIndex(final String name);
+
+    /**
+     * Core implementation for access to historical index views.
+     * <p>
+     * Note: Transactions should pass in the timestamp against which they are
+     * reading rather than the transaction identifier (aka startTime). By
+     * providing the timestamp of the commit point, the transaction will hit the
+     * {@link #indexCache}. If the transaction passes the startTime instead,
+     * then all startTimes will be different and the cache will be defeated.
+     * 
+     * @throws UnsupportedOperationException
+     *             If you pass in {@link ITx#UNISOLATED},
+     *             {@link ITx#READ_COMMITTED}, or a timestamp that corresponds
+     *             to a read-write transaction since those are not "commit
+     *             times".
+     * 
+     * @see IIndexStore#getIndex(String, long)
+     * 
+     * @see <a href="http://sourceforge.net/apps/trac/bigdata/ticket/546" > Add
+     *      cache for access to historical index views on the Journal by name
+     *      and commitTime. </a>
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/585" >
+     *      GIST </a>
+     * 
+     *      FIXME GIST : Reconcile with
+     *      {@link IResourceManager#getIndex(String, long)}. They are returning
+     *      types that do not overlap ({@link ICheckpointProtocol} and
+     *      {@link ILocalBTreeView}). This is blocking the support of GIST in
+     *      {@link AbstractTask}.
+     */
+    public ICheckpointProtocol getIndexLocal(final String name,
+            final long commitTime);
 
 }

@@ -27,33 +27,45 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sail.tck;
 
+import java.io.File;
 import java.util.Properties;
 
+import com.bigdata.journal.BufferMode;
+import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSail.Options;
 
 /**
- * A variant of the test suite using full read/write transactions.
+ * A variant of the test suite using {@link BufferMode#DiskRW}.
  * 
- * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/531" > SPARQL
- *      UPDATE for NAMED SOLUTION SETS </a>
- *      
+ * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/531"> SPARQL
+ *      UPDATE Extensions (Trac) </a>
+ * 
+ * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/555" > Support
+ *      PSOutputStream/InputStream at IRawStore </a>
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
+ * @version $Id: BigdataSPARQLUpdateTxTest2.java 7168 2013-05-28 21:30:38Z
+ *          thompsonbry $
  */
-public class BigdataSPARQLUpdateTxTest extends BigdataSPARQLUpdateTest {
+public class BigdataSPARQLUpdateTest2DiskRW extends BigdataSPARQLUpdateTest2 {
 
     /**
      * 
      */
-    public BigdataSPARQLUpdateTxTest() {
+    public BigdataSPARQLUpdateTest2DiskRW() {
     }
 
     @Override
-    protected Properties getProperties() {
+    public Properties getProperties() {
 
-        final Properties props = super.getProperties();
+        final Properties props = new Properties(super.getProperties());
 
-        props.setProperty(Options.ISOLATABLE_INDICES, "true");
+        final File journal = BigdataStoreTest.createTempFile();
+        
+        props.setProperty(BigdataSail.Options.FILE, journal.getAbsolutePath());
+
+        props.setProperty(Options.BUFFER_MODE, BufferMode.DiskRW.toString());
+//        props.setProperty(Options.BUFFER_MODE, BufferMode.DiskWORM.toString());
 
         return props;
 

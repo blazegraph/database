@@ -190,8 +190,12 @@ public class RESTServlet extends BigdataRDFServlet {
     protected void doPost(final HttpServletRequest req,
             final HttpServletResponse resp) throws IOException {
 
-        if (req.getParameter("query") != null
-                || req.getParameter("update") != null) {
+        if (req.getParameter(QueryServlet.ATTR_QUERY) != null
+                || req.getParameter(QueryServlet.ATTR_UPDATE) != null
+                || req.getParameter(QueryServlet.ATTR_UUID) != null
+                || req.getParameter(QueryServlet.ATTR_ESTCARD) != null
+                || req.getParameter(QueryServlet.ATTR_CONTEXTS) != null
+                ) {
 
             // SPARQL QUERY -or- SPARQL UPDATE via POST
             m_queryServlet.doPost(req, resp);

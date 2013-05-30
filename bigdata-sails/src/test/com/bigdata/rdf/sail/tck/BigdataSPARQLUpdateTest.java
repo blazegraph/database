@@ -53,6 +53,9 @@ import com.bigdata.rdf.sail.BigdataSailRepository;
 /**
  * Integration with the openrdf SPARQL 1.1 update test suite.
  * 
+ * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/531" > SPARQL
+ *      UPDATE for NAMED SOLUTION SETS </a>
+ *      
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */

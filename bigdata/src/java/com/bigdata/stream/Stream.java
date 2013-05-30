@@ -63,7 +63,6 @@ import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.rawstore.IPSOutputStream;
 import com.bigdata.rawstore.IRawStore;
-import com.bigdata.rwstore.IRWStrategy;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.striterator.ICloseableIterator;
 
@@ -111,7 +110,7 @@ abstract public class Stream implements ICheckpointProtocol {
     /**
      * The backing store.
      */
-    private final IRWStrategy store;
+    private final IRawStore store;
 
     /**
      * <code>true</code> iff the view is read-only.
@@ -136,16 +135,8 @@ abstract public class Stream implements ICheckpointProtocol {
      */
     protected long rootAddr;
 
-    /**
-     * FIXME There is a reliance on the {@link IRWStrategy} right now because
-     * the {@link IPSOutputStream} API has not yet been lifted onto the
-     * {@link IRawStore} or a similar API.
-     * 
-     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/555" >
-     *      Support PSOutputStream/InputStream at IRawStore </a>
-     */
     @Override
-    public IRWStrategy getStore() {
+    public IRawStore getStore() {
 
         return store;
         
@@ -198,7 +189,7 @@ abstract public class Stream implements ICheckpointProtocol {
         // save a reference to the immutable metadata record.
         this.metadata = (StreamIndexMetadata) metadata;
 
-        this.store = (IRWStrategy) ((store instanceof AbstractJournal) ? ((AbstractJournal) store)
+        this.store = (IRawStore) ((store instanceof AbstractJournal) ? ((AbstractJournal) store)
                 .getBufferStrategy() : store);
 
         this.readOnly = readOnly;

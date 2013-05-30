@@ -45,7 +45,6 @@ import com.bigdata.btree.BTree;
 import com.bigdata.btree.Checkpoint;
 import com.bigdata.btree.ICheckpointProtocol;
 import com.bigdata.btree.IndexMetadata;
-import com.bigdata.htree.HTree;
 import com.bigdata.journal.Name2Addr.Entry;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.WormAddressManager;
@@ -67,8 +66,7 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * FIXME GIST This should support generalized indices (HTree, Stream, etc) not just
- * BTree.
+ * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/585" > GIST </a>
  */
 //* {@link #checkpoint()} may be used to checkpoint the indices and
 //* {@link #restoreLastCheckpoint()} may be used to revert to the last
@@ -100,6 +98,16 @@ public class TemporaryStore extends TemporaryRawStore implements IBTreeManager {
     private final long liveIndexCacheTimeout = Long
             .parseLong(Options.DEFAULT_LIVE_INDEX_CACHE_TIMEOUT);
     
+    /**
+     * BTree mapping index names to the last metadata record committed for the
+     * named index. The keys are index names (unicode strings). The values are
+     * the last known address of the named btree.
+     * <p>
+     * Note: This is a mutable {@link BTree} so it is NOT thread-safe. We always
+     * synchronize on this object before accessing it.
+     */
+    private final Name2Addr name2Addr;
+
     /**
      * A {@link TemporaryStore} that can scale-up. The backing file will be
      * created using the Java temporary file mechanism.
@@ -139,11 +147,14 @@ public class TemporaryStore extends TemporaryRawStore implements IBTreeManager {
      * @param file
      *            The backing file (may exist, but must be empty if it exists).
      */
+    @SuppressWarnings({ "unchecked", "rawtypes" })
     public TemporaryStore(final int offsetBits, final File file) {
 
         super(0L/* maximumExtent */, offsetBits, file);
 
-        setupName2AddrBTree();
+        name2Addr = Name2Addr.create(this);
+
+        name2Addr.setupCache(liveIndexCacheCapacity, liveIndexCacheTimeout);
 
         executorService = Executors.newCachedThreadPool(new DaemonThreadFactory
                 (getClass().getName()+".executorService"));
@@ -155,28 +166,18 @@ public class TemporaryStore extends TemporaryRawStore implements IBTreeManager {
         
     }
     
-    /**
-     * BTree mapping index names to the last metadata record committed for the
-     * named index. The keys are index names (unicode strings). The values are
-     * the last known address of the named btree.
-     * <p>
-     * Note: This is a mutable {@link BTree} so it is NOT thread-safe. We always
-     * synchronize on this object before accessing it.
-     */
-    private Name2Addr name2Addr;
-
-    /**
-     * Setup the btree that resolved named btrees.
-     */
-    private void setupName2AddrBTree() {
-
-        assert name2Addr == null;
-        
-        name2Addr = Name2Addr.create(this);
-
-        name2Addr.setupCache(liveIndexCacheCapacity, liveIndexCacheTimeout);
-        
-    }
+//    /**
+//     * Setup the btree that resolved named btrees.
+//     */
+//    private void setupName2AddrBTree() {
+//
+//        assert name2Addr == null;
+//        
+//        name2Addr = Name2Addr.create(this);
+//
+//        name2Addr.setupCache(liveIndexCacheCapacity, liveIndexCacheTimeout);
+//        
+//    }
     
 //    /**
 //     * The address of the last checkpoint written. When ZERO(0L) no checkpoint
@@ -252,12 +253,14 @@ public class TemporaryStore extends TemporaryRawStore implements IBTreeManager {
 //        
 //    }
 
+    @Override
     public void registerIndex(final IndexMetadata metadata) {
         
         registerIndex(metadata.getName(), metadata);
         
     }
     
+    @Override
     public BTree registerIndex(final String name, final IndexMetadata metadata) {
 
         return (BTree) register(name, metadata);
@@ -278,6 +281,7 @@ public class TemporaryStore extends TemporaryRawStore implements IBTreeManager {
      * 
      * @see Checkpoint#create(IRawStore, IndexMetadata)
      */
+    @Override
     public ICheckpointProtocol register(final String name,
             final IndexMetadata metadata) {
 
@@ -289,6 +293,7 @@ public class TemporaryStore extends TemporaryRawStore implements IBTreeManager {
 
     }
 
+    @Override
     final public BTree registerIndex(final String name, final BTree btree) {
 
         registerIndex(name, btree);
@@ -305,7 +310,7 @@ public class TemporaryStore extends TemporaryRawStore implements IBTreeManager {
      * @param ndx
      *            The data structure.
      */
-    final public void register(final String name, final ICheckpointProtocol ndx) {
+    private final void register(final String name, final ICheckpointProtocol ndx) {
 
         synchronized (name2Addr) {
 
@@ -318,6 +323,7 @@ public class TemporaryStore extends TemporaryRawStore implements IBTreeManager {
 
     }
     
+    @Override
     public void dropIndex(final String name) {
         
         synchronized(name2Addr) {
@@ -331,6 +337,7 @@ public class TemporaryStore extends TemporaryRawStore implements IBTreeManager {
         
     }
 
+    @Override
     public Iterator<String> indexNameScan(final String prefix,
             final long timestampIsIgnored) {
 
@@ -353,58 +360,68 @@ public class TemporaryStore extends TemporaryRawStore implements IBTreeManager {
 
     }
     
-    /**
-     * Return an {@link ITx#UNISOLATED} view of the named index -or-
-     * <code>null</code> if there is no registered index by that name.
-     */
+    @Override
+    public ICheckpointProtocol getUnisolatedIndex(final String name) {
+
+        synchronized(name2Addr) {
+
+            assertOpen();
+
+            return name2Addr.getIndex(name);
+            
+        }
+        
+    }
+    
+//    /**
+//     * Return an {@link ITx#UNISOLATED} view of the named index -or-
+//     * <code>null</code> if there is no registered index by that name.
+//     */
+    @Override
     public BTree getIndex(final String name) {
 
-        synchronized(name2Addr) {
-
-            assertOpen();
-
-            return (BTree) name2Addr.getIndex(name);
-            
-        }
+        return (BTree) getUnisolatedIndex(name);
 
     }
 
-    /**
-     * Return an {@link ITx#UNISOLATED} view of the named index -or-
-     * <code>null</code> if there is no registered index by that name.
-     */
-    public HTree getHTree(final String name) {
+//    /**
+//     * Return an {@link ITx#UNISOLATED} view of the named index -or-
+//     * <code>null</code> if there is no registered index by that name.
+//     */
+//    public HTree getHTree(final String name) {
+//
+//        return (HTree) getUnisolatedIndex(name);
+//
+//    }
 
-        synchronized(name2Addr) {
-
-            assertOpen();
-
-            return (HTree) name2Addr.getIndex(name);
-            
-        }
-
-    }
-
-    /**
-     * Historical reads and transactions are not supported.
-     * 
-     * @param name
-     * @param timestamp
-     * 
-     * @throws UnsupportedOperationException
-     *             unless the timestamp is {@link ITx#UNISOLATED}.
-     */
-//    * <p>
-//    * Note: If {@link ITx#READ_COMMITTED} is requested, then the returned
-//    * {@link BTree} will reflect the state of the named index as of the last
-//    * {@link #checkpoint()}. This view will be read-only and is NOT updated by
-//    * {@link #checkpoint()}. You must actually {@link #checkpoint()} before an
-//    * {@link ITx#READ_COMMITTED} view will be available.
+    @Override
     public BTree getIndex(final String name, final long timestamp) {
+        
+        return (BTree) getIndexLocal(name, timestamp);
 
+    }
+
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Note: Requests for historical reads or read-only tx views will result
+     * return the {@link ITx#UNISOLATED} index view.
+     * <p>
+     * Note: If {@link ITx#READ_COMMITTED} is requested, then the returned
+     * {@link BTree} will reflect the state of the named index as of the last
+     * {@link #checkpoint()}. This view will be read-only and is NOT updated by
+     * {@link #checkpoint()}. You must actually {@link #checkpoint()} before an
+     * {@link ITx#READ_COMMITTED} view will be available. When there is not a
+     * checkpoint available, the {@link ITx#UNISOLATED} index view will be
+     * returned.
+     */// Note: core impl for all index access methods.
+    @Override
+    public ICheckpointProtocol getIndexLocal(final String name,
+            final long commitTime) {
+        
         assertOpen();
 
-        if(timestamp == ITx.READ_COMMITTED) {
+        if (commitTime == ITx.READ_COMMITTED) {
             
             final long checkpointAddr;
             
@@ -415,7 +432,7 @@ public class TemporaryStore extends TemporaryRawStore implements IBTreeManager {
                 if (entry == null) {
 
                     log.warn("No such index: name=" + name + ", timestamp="
-                            + TimestampUtility.toString(timestamp));
+                            + TimestampUtility.toString(commitTime));
                     
                     return null;
                     
@@ -424,39 +441,70 @@ public class TemporaryStore extends TemporaryRawStore implements IBTreeManager {
                 checkpointAddr = entry.checkpointAddr;
                 
             }
+
+            /*
+             * Load from the store.
+             * 
+             * TODO There is no canonicalizaing mapping for read-only indices
+             * for the TemporaryStore. Each such request will produce a distinct
+             * view of that index. This could be very wasteful of resources
+             * (RAM).
+             */
+            final ICheckpointProtocol ndx = Checkpoint.loadFromCheckpoint(this,
+                    checkpointAddr, true/* readOnly */);
             
-            final BTree btree = BTree
-                    .load(this, checkpointAddr, true/*readOnly*/);
+//            final BTree btree = BTree
+//                    .load(this, checkpointAddr, true/*readOnly*/);
             
 //            btree.setReadOnly(true);
             
-            return btree;
+            return ndx;
             
         }
         
-        if(timestamp == ITx.UNISOLATED) {
-            
-            return getIndex(name);
-            
+        if (commitTime == ITx.UNISOLATED) {
+
+            return getUnisolatedIndex(name);
+
         }
 
-        /*
+        /**
          * FIXME The RWStore uses a read-only transaction to protect against
-         * recycling of the B+Tree revisions associated with the commit point
-         * on which it is reading.  The temporary store only supports unisolated
+         * recycling of the B+Tree revisions associated with the commit point on
+         * which it is reading. The temporary store only supports unisolated
          * reads, so this is just ignoring the tx specified by the mutation rule
-         * for reading on the temporary store and going with the unisolated index
-         * anyway.  See https://sourceforge.net/apps/trac/bigdata/ticket/215.
+         * for reading on the temporary store and going with the unisolated
+         * index anyway.
+         * <p>
+         * As a work around, I have modified the TemporaryStore in the
+         * JOURNAL_HA_BRANCH to use the unisolated view of the index. This
+         * allows the RWStore to be used in combination with incremental truth
+         * maintenance.
+         * <p>
+         * In the BOP model, the timestamp is associated with the predicate.
+         * This means that we can correctly annotate the predicate reading on
+         * the RWStore with the read-only tx identifier and the predicate
+         * reading on the TemporaryStore with the UNISOLATED timestamp (0L).
+         * Therefore, once the RWStore is brought into the QUADS_QUERY_BRANCH we
+         * can modify the rules to specify UNISOLATED for the reads on the
+         * TemporaryStore and the tx for the reads on the RWStore and then roll
+         * back the change to TemporaryStore? to force the use of the unisolated
+         * index when a read-only tx was specified.
+         * 
+         * @see <a hreg="https://sourceforge.net/apps/trac/bigdata/ticket/215" >
+         *      RWStore / TemporaryStore interaction when performing incremental
+         *      truth maintenance </a>
          */
         
 //        throw new UnsupportedOperationException(
 //                "Not supported: timestamp="
 //                + TimestampUtility.toString(timestamp));
 
-		return getIndex(name);
+        return getUnisolatedIndex(name);
 
     }
 
+    @Override
     public SparseRowStore getGlobalRowStore() {
 
         assertOpen();
@@ -466,6 +514,7 @@ public class TemporaryStore extends TemporaryRawStore implements IBTreeManager {
     }
     final private GlobalRowStoreHelper globalRowStoreHelper = new GlobalRowStoreHelper(this); 
 
+    @Override
     public SparseRowStore getGlobalRowStore(final long timestamp) {
 
         // TODO Perhaps only allowed for UNISOLATED on a TemporaryStore? 
@@ -473,6 +522,7 @@ public class TemporaryStore extends TemporaryRawStore implements IBTreeManager {
         
     }
     
+    @Override
     public BigdataFileSystem getGlobalFileSystem() {
 
         assertOpen();
@@ -482,15 +532,17 @@ public class TemporaryStore extends TemporaryRawStore implements IBTreeManager {
     }
     final private GlobalFileSystemHelper globalFileSystemHelper = new GlobalFileSystemHelper(this); 
 
-    public DefaultResourceLocator getResourceLocator() {
+    @Override
+    public DefaultResourceLocator<?> getResourceLocator() {
 
         assertOpen();
         
         return resourceLocator;
         
     }
-    private final DefaultResourceLocator resourceLocator;
+    private final DefaultResourceLocator<?> resourceLocator;
     
+    @Override
     public ExecutorService getExecutorService() {
     
         assertOpen();
@@ -500,6 +552,7 @@ public class TemporaryStore extends TemporaryRawStore implements IBTreeManager {
     }
     private final ExecutorService executorService;
     
+    @Override
     final public IResourceLockService getResourceLockService() {
 
         return resourceLockManager;
@@ -507,6 +560,7 @@ public class TemporaryStore extends TemporaryRawStore implements IBTreeManager {
     }
     final private ResourceLockService resourceLockManager = new ResourceLockService();
 
+    @Override
     public void close() {
 
         // immediate shutdown.
@@ -516,10 +570,14 @@ public class TemporaryStore extends TemporaryRawStore implements IBTreeManager {
         
     }
 
-	/**
-	 * Always returns ZERO (0L) since you can not perform a commit on a
-	 * {@link TemporaryRawStore} (it supports checkpoints but not commits).
-	 */
+    /**
+     * {@inheritDoc}
+     * <p>
+     * This implementation always returns ZERO (0L) since you can not perform a
+     * commit on a {@link TemporaryRawStore} (it supports checkpoints but not
+     * commits).
+     */
+    @Override
 	public long getLastCommitTime() {
 
 		return 0L;
@@ -529,6 +587,7 @@ public class TemporaryStore extends TemporaryRawStore implements IBTreeManager {
     /**
      * Always returns <i>this</i> {@link TemporaryStore}.
      */
+    @Override
     public TemporaryStore getTempStore() {
         
         return this;
@@ -538,6 +597,7 @@ public class TemporaryStore extends TemporaryRawStore implements IBTreeManager {
     /**
      * Not supported, returns <code>null</code>.
      */
+    @Override
 	public ScheduledFuture<?> addScheduledTask(Runnable task,
 			long initialDelay, long delay, TimeUnit unit) {
 		return null;
@@ -546,6 +606,7 @@ public class TemporaryStore extends TemporaryRawStore implements IBTreeManager {
     /**
      * Not supported, returns <code>false</code>.
      */
+    @Override
 	public boolean getCollectPlatformStatistics() {
 		return false;
 	}
@@ -553,6 +614,7 @@ public class TemporaryStore extends TemporaryRawStore implements IBTreeManager {
     /**
      * Not supported, returns <code>false</code>.
      */
+    @Override
 	public boolean getCollectQueueStatistics() {
 		return false;
 	}
@@ -560,8 +622,9 @@ public class TemporaryStore extends TemporaryRawStore implements IBTreeManager {
     /**
      * Not supported, returns <code>false</code>.
      */
+    @Override
 	public int getHttpdPort() {
 		return -1;
 	}
-    
+
 }

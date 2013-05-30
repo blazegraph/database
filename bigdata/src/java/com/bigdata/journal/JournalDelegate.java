@@ -36,6 +36,7 @@ import java.util.concurrent.TimeUnit;
 
 import com.bigdata.bfs.BigdataFileSystem;
 import com.bigdata.btree.BTree;
+import com.bigdata.btree.ICheckpointProtocol;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.counters.CounterSet;
@@ -286,4 +287,20 @@ public class JournalDelegate implements IJournal {
 	public boolean isDirty() {
 		return delegate.isDirty();
 	}
+
+    @Override
+    public ICheckpointProtocol register(String name, IndexMetadata metadata) {
+        return delegate.register(name, metadata);
+    }
+
+    @Override
+    public ICheckpointProtocol getIndexLocal(String name, long commitTime) {
+        return delegate.getIndexLocal(name, commitTime);
+    }
+
+    @Override
+    public ICheckpointProtocol getUnisolatedIndex(String name) {
+        return delegate.getUnisolatedIndex(name);
+    }
+
 }

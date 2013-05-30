@@ -33,20 +33,17 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
-import org.apache.log4j.Logger;
-
 import com.bigdata.bfs.BigdataFileSystem;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.btree.HTreeIndexMetadata;
 import com.bigdata.btree.view.FusedView;
-import com.bigdata.cache.LRUCache;
-import com.bigdata.cache.WeakValueCache;
 import com.bigdata.htree.HTree;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.AbstractLocalTransactionManager;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.ConcurrencyManager;
 import com.bigdata.journal.IIndexManager;
+import com.bigdata.journal.IJournal;
 import com.bigdata.journal.IResourceLockService;
 import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.Journal;
@@ -56,11 +53,8 @@ import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.relation.locator.DefaultResourceLocator;
 import com.bigdata.resources.IndexManager;
-import com.bigdata.rwstore.IRWStrategy;
-import com.bigdata.rwstore.RWStore;
 import com.bigdata.service.IDataService;
 import com.bigdata.sparse.SparseRowStore;
-import com.bigdata.util.NT;
 
 /**
  * A connection to a local, remote, or distributed caching layer.
@@ -70,8 +64,8 @@ import com.bigdata.util.NT;
  */
 public class CacheConnectionImpl implements ICacheConnection {
 
-    private static transient final Logger log = Logger
-            .getLogger(CacheConnectionImpl.class);
+//    private static transient final Logger log = Logger
+//            .getLogger(CacheConnectionImpl.class);
     
 //    public interface Options {
 //
@@ -97,41 +91,21 @@ public class CacheConnectionImpl implements ICacheConnection {
     
     /**
      * The backing store for cached data.
-     * 
-     * TODO Note: A slight twist on the design would allow us to cache in both
-     * main memory and on a backing {@link RWStore} (DISK). However, it would be
-     * worth while to migrate records to the {@link RWStore} only if they were
-     * expensive to compute and we had a reasonable expectation of reuse before
-     * they would be invalidated by an update. In practice, it is probably
-     * better to hash partition the cache.
-     * <p>
-     * A hash partitioned cache design could proceed readily with splitting the
-     * cache results between two nodes when adding a node. Any such approach
-     * presumes a circular hash function such as is common in distributed row
-     * stores, etc.
      */
-    private final AbstractJournal cacheStore;
+    private final IJournal cacheStore;
     
     /**
      */
     private boolean enableDescribeCache;
 
     /**
-     */
-    private boolean enableSolutionsCache;
-
-    /**
      * Boolean determines whether or not the main database is used for the
      * cache. When the main database is used, the cache winds up being durable.
      * A dedicated cache journal could also be durable, depending on how it was
      * configured, as long is it is not destroyed by {@link #close()}.
-     * 
-     * FIXME This is using the local RWStore Journal rather than the
-     * InnerCacheJournal. I am trying to track down an issue with visibility of
-     * SPARQL UPDATEs that write on solution sets using full read/write
-     * transactions. One assumes that if everything is writing onto the SAME
-     * journal instance, then the commit protocol should be taking care of
-     * things for us.
+     * <p>
+     * Note: It is substantially easier to get the visiblity criteria correct
+     * when using the main database as the backing store.
      */
     private static final boolean useMainDatabaseForCache = true;
     
@@ -203,8 +177,8 @@ public class CacheConnectionImpl implements ICacheConnection {
 
         if (useMainDatabaseForCache) {
         
-            this.cacheStore = (AbstractJournal) queryEngine.getIndexManager();
-            
+            this.cacheStore = (IJournal) queryEngine.getIndexManager();
+
         } else {
             
             this.cacheStore = new InnerCacheJournal(properties);
@@ -212,22 +186,9 @@ public class CacheConnectionImpl implements ICacheConnection {
         }
 
         /*
-         * TODO Hack enables the SOLUTIONS cache.
-         * 
-         * Note: The SolutionSetStream has a dependency on the IPSOutputStream
-         * so the solutions cache can not be enabled when that interface is not
-         * available.
-         * 
-         * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/555" >
-         * Support PSOutputStream/InputStream at IRawStore </a>
-         */
-        this.enableSolutionsCache = QueryHints.DEFAULT_SOLUTION_SET_CACHE
-                && cacheStore.getBufferStrategy() instanceof IRWStrategy;
-
-        /*
          * TODO Hack enables the DESCRIBE cache.
          * 
-         * FIXME The describe cache can not be local on a federation (or if it
+         * TODO The describe cache can not be local on a federation (or if it
          * is, it has to be local to the query controller).
          */
         this.enableDescribeCache = QueryHints.DEFAULT_DESCRIBE_CACHE
@@ -237,7 +198,9 @@ public class CacheConnectionImpl implements ICacheConnection {
     
     @Override
     public void init() {
-
+        
+        // NOP
+        
     }
     
     @Override
@@ -260,16 +223,6 @@ public class CacheConnectionImpl implements ICacheConnection {
 
     @Override
     public void destroyCaches(final String namespace, final long timestamp) {
-
-        // SOLUTIONS cache (if enabled)
-        final ISolutionSetCache solutionsCache = getSparqlCache(namespace,
-                timestamp);
-
-        if (solutionsCache != null) {
-
-            solutionsCache.clearAllSolutions();
-
-        }
 
         // DESCRIBE cache (if enabled)
         final IDescribeCache describeCache = getDescribeCache(namespace,
@@ -298,60 +251,6 @@ public class CacheConnectionImpl implements ICacheConnection {
         
     }
 
-    /**
-     * Return the store backing the named solution sets.
-     * 
-     * @return The backing store.
-     */
-    // TODO Make package private / protected.
-    public AbstractJournal getStore() {
-        
-        return cacheStore;
-        
-    }
-
-    public ISolutionSetCache getSparqlCache(final String namespace,
-            final long timestamp) {
-
-        if (!enableSolutionsCache) {
-
-            // Not enabled.
-            return null;
-
-        }
-
-        if (namespace == null)
-            throw new IllegalArgumentException();
-
-        final NT nt = new NT(namespace,timestamp);
-
-        synchronized (sparqlCaches) {
-
-            ISolutionSetCache tmp = sparqlCaches.get(nt);
-
-            if (tmp == null) {
-
-                tmp = new SolutionSetCache(this, namespace, timestamp);
-
-                sparqlCaches.put(nt, tmp, false/* dirty */);
-
-            }
-
-            return tmp;
-            
-        }
-        
-    }
-
-    /**
-     * Canonicalizing mapping for the {@link ISolutionSetCache} views.
-     * 
-     * TODO Review choices for the class used to cache the {@link ISolutionSetCache}
-     * views and the configuration for that cache class.
-     */
-    private WeakValueCache<NT, ISolutionSetCache> sparqlCaches = new WeakValueCache<NT, ISolutionSetCache>(
-            new LRUCache<NT, ISolutionSetCache>(10));
-    
     /**
      * 
      * @return The DESCRIBE cache for that view -or- <code>null</code> if the
@@ -399,7 +298,7 @@ public class CacheConnectionImpl implements ICacheConnection {
 
             final String name = namespace + ".describeCache";
 
-            htree = cacheStore.getHTree(name);
+            htree = (HTree) cacheStore.getUnisolatedIndex(name);
 
             if (htree == null) {
 
@@ -421,7 +320,7 @@ public class CacheConnectionImpl implements ICacheConnection {
 
             }
             
-            htree = cacheStore.getHTree(name);
+            htree = (HTree) cacheStore.getUnisolatedIndex(name);
 
         }
         

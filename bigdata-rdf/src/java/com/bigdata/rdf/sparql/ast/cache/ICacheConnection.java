@@ -49,19 +49,19 @@ public interface ICacheConnection {
      */
     void destroyCaches(final String namespace,final long timestamp);
 
-    /**
-     * Return a view of the named SOLUTIONS cache.
-     * 
-     * @param namespace
-     *            The KB namespace.
-     * @param timestamp
-     *            The timestamp of the view.
-     * 
-     * @return The view of the named solutions cache -or- <code>null</code> if
-     *         no cache is available for that KB.
-     */
-    ISolutionSetCache getSparqlCache(final String namespace,
-            final long timestamp);
+//    /**
+//     * Return a view of the named SOLUTIONS cache.
+//     * 
+//     * @param namespace
+//     *            The KB namespace.
+//     * @param timestamp
+//     *            The timestamp of the view.
+//     * 
+//     * @return The view of the named solutions cache -or- <code>null</code> if
+//     *         no cache is available for that KB.
+//     */
+//    ISolutionSetManager getSparqlCache(final String namespace,
+//            final long timestamp);
 
     /**
      * Return a view of a maintained DESCRIBE cache.
