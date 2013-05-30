@@ -863,32 +863,32 @@ public class BigdataSPARQLUpdateTest2 extends TestCase2 {
 
     }
     
-    /**
-     * Unit test where we INSERT some solutions into the same named solution set
-     * on which we are reading. This is done using an INCLUDE to join against
-     * the named solution set within an UPDATE operation which writes on that
-     * named solution set. The isolation semantics should provide one view for
-     * the reader and a different view for the writer.
-     * <p>
-     * Note: In order to setup this test, we will have to pre-populate the
-     * solution set. E.g., first load the data into graphs, then INSERT INTO
-     * SOLUTIONS. At that point we can do the INSERT which is also doing the
-     * "self-join" against the named solution set.
-     * 
-     * TODO DO a variant test where the operation is a DELETE.
-     */
-    public void test_isolation_insertIntoSolutionsWithIncludeFromSolutions() {
-
-        if (!isSolutionSetUpdateEnabled()) {
-            /*
-             * Test requires this feature.
-             */
-            return;
-        }
-
-        fail("write test");
-        
-    }
+//    /** FIXME Write test.
+//     * Unit test where we INSERT some solutions into the same named solution set
+//     * on which we are reading. This is done using an INCLUDE to join against
+//     * the named solution set within an UPDATE operation which writes on that
+//     * named solution set. The isolation semantics should provide one view for
+//     * the reader and a different view for the writer.
+//     * <p>
+//     * Note: In order to setup this test, we will have to pre-populate the
+//     * solution set. E.g., first load the data into graphs, then INSERT INTO
+//     * SOLUTIONS. At that point we can do the INSERT which is also doing the
+//     * "self-join" against the named solution set.
+//     * 
+//     * TODO DO a variant test where the operation is a DELETE.
+//     */
+//    public void test_isolation_insertIntoSolutionsWithIncludeFromSolutions() {
+//
+//        if (!isSolutionSetUpdateEnabled()) {
+//            /*
+//             * Test requires this feature.
+//             */
+//            return;
+//        }
+//
+//        fail("write test");
+//        
+//    }
 
     /**
      * Unit test of CREATE SOLUTIONS.
