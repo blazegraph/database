@@ -37,8 +37,8 @@ import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IVariable;
-import com.bigdata.rdf.sparql.ast.cache.ISolutionSetCache;
 import com.bigdata.rdf.sparql.ast.eval.IEvaluationContext;
+import com.bigdata.rdf.sparql.ast.ssets.ISolutionSetManager;
 
 /**
  * Base class for static analysis.
@@ -71,7 +71,7 @@ public class StaticAnalysisBase {
      *            analysis.
      * @param evaluationContext
 	 *            The evaluation context provides access to the
-	 *            {@link ISolutionSetStats} and the {@link ISolutionSetCache} for
+	 *            {@link ISolutionSetStats} and the {@link ISolutionSetManager} for
 	 *            named solution sets.
      */
     protected StaticAnalysisBase(final QueryRoot queryRoot,
@@ -332,7 +332,7 @@ public class StaticAnalysisBase {
      * Return the {@link ISolutionSetStats} for the named solution set.
      * <p>
      * Note: This does NOT report on {@link NamedSubqueryRoot}s for the query.
-     * It only checks the {@link ISolutionSetCache}.
+     * It only checks the {@link ISolutionSetManager}.
      * <p>
      * Note: Typically, callers MUST look for both a {@link NamedSubqueryRoot}
      * and an {@link ISolutionSetStats} and then handle these as appropriate. In

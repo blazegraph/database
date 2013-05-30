@@ -32,8 +32,8 @@ import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.sparql.ast.ISolutionSetStats;
 import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.cache.IDescribeCache;
-import com.bigdata.rdf.sparql.ast.cache.ISolutionSetCache;
 import com.bigdata.rdf.sparql.ast.optimizers.IASTOptimizer;
+import com.bigdata.rdf.sparql.ast.ssets.ISolutionSetManager;
 import com.bigdata.rdf.spo.SPORelation;
 import com.bigdata.rdf.store.AbstractTripleStore;
 
@@ -112,13 +112,11 @@ public interface IEvaluationContext {
     AbstractTripleStore getAbstractTripleStore();
     
     /**
-	 * Return the cache for named solution sets (experimental feature).
+	 * Return the manager for named solution sets (experimental feature).
 	 * 
-	 * @return The cache -or- <code>null</code>.
-	 * 
-	 * @see QueryHints#SOLUTION_SET_CACHE
+	 * @return The manager -or- <code>null</code>.
 	 */
-    ISolutionSetCache getSparqlCache();
+    ISolutionSetManager getSolutionSetManager();
 
     /**
      * Return the cache for described resources (experimental feature).

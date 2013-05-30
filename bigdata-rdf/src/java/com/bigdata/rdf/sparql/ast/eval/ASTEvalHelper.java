@@ -79,7 +79,6 @@ import com.bigdata.rdf.sparql.ast.DatasetNode;
 import com.bigdata.rdf.sparql.ast.DeleteInsertGraph;
 import com.bigdata.rdf.sparql.ast.DescribeModeEnum;
 import com.bigdata.rdf.sparql.ast.IDataSetNode;
-import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryType;
 import com.bigdata.rdf.sparql.ast.Update;
@@ -430,8 +429,8 @@ public class ASTEvalHelper {
 
         final IDescribeCache describeCache;
         final Set<IVariable<?>> describeVars;
-        if (context.sparqlCache != null && isDescribe) {
-            
+        if (isDescribe && context.describeCache != null) {
+
             /*
              * The DESCRIBE cache is enabled.
              */

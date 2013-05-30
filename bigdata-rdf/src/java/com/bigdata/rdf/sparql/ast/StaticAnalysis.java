@@ -48,7 +48,6 @@ import com.bigdata.rdf.internal.constraints.INeedsMaterialization;
 import com.bigdata.rdf.internal.constraints.INeedsMaterialization.Requirement;
 import com.bigdata.rdf.internal.constraints.IPassesMaterialization;
 import com.bigdata.rdf.internal.impl.literal.FullyInlineTypedLiteralIV;
-import com.bigdata.rdf.sparql.ast.cache.ISolutionSetCache;
 import com.bigdata.rdf.sparql.ast.cache.CacheConnectionImpl;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.eval.IEvaluationContext;
@@ -56,6 +55,7 @@ import com.bigdata.rdf.sparql.ast.optimizers.ASTBottomUpOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTLiftPreFiltersOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTOptimizerList;
 import com.bigdata.rdf.sparql.ast.service.ServiceNode;
+import com.bigdata.rdf.sparql.ast.ssets.ISolutionSetManager;
 
 /**
  * Methods for static analysis of a query. There is one method which looks "up".
@@ -229,7 +229,7 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
 	 *            analysis.
 	 * @param evaluationContext
 	 *            The evaluation context provides access to the
-	 *            {@link ISolutionSetStats} and the {@link ISolutionSetCache} for
+	 *            {@link ISolutionSetStats} and the {@link ISolutionSetManager} for
 	 *            named solution sets.
 	 * 
 	 * @see https://sourceforge.net/apps/trac/bigdata/ticket/412

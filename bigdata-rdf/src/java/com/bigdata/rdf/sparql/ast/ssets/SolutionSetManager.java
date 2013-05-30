@@ -21,7 +21,7 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
-package com.bigdata.rdf.sparql.ast.cache;
+package com.bigdata.rdf.sparql.ast.ssets;
 
 import java.util.Arrays;
 import java.util.Iterator;
@@ -36,21 +36,27 @@ import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NamedSolutionSetRefUtility;
 import com.bigdata.bop.solutions.SolutionSetStream;
 import com.bigdata.btree.IndexMetadata;
-import com.bigdata.journal.AbstractTask;
+import com.bigdata.journal.IBTreeManager;
+import com.bigdata.journal.IJournal;
 import com.bigdata.journal.ITx;
-import com.bigdata.journal.Name2Addr;
 import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rdf.sparql.ast.ISolutionSetStats;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.relation.AbstractResource;
-import com.bigdata.rwstore.IRWStrategy;
 import com.bigdata.stream.Stream.StreamIndexMetadata;
 import com.bigdata.striterator.CloseableIteratorWrapper;
 import com.bigdata.striterator.ICloseableIterator;
 
 /**
- * A cache for named SOLUTION SETS.
+ * A manager for named SOLUTION SETS scoped by some namespace and timestamp.
  * 
+ * @see <a
+ *      href="https://sourceforge.net/apps/mediawiki/bigdata/index.php?title=SPARQL_Update">
+ *      SPARQL Update </a>
+ *      
+ * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/531"> SPARQL
+ *      UPDATE for NAMED SOLUTION SETS </a>
+ *      
  * @see <a href="http://aksw.org/Projects/QueryCache"> Adaptive SPARQL Query
  *      Cache </a>
  * 
@@ -59,85 +65,96 @@ import com.bigdata.striterator.ICloseableIterator;
  *      > Improving the Performance of Semantic Web Applications with SPARQL
  *      Query Caching </a>
  * 
- * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/524> SPARQL
+ * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/524"> SPARQL
  *      Query Cache </a>
  * 
- *      TODO Add support for declared and maintained views. Views would be
- *      declared using SPARQL queries. The view would listen for updates to
- *      statement patterns and invalidate/maintain the SPARQL result sets when a
- *      triple in a statement pattern in use by the query for that solution set
- *      has been added or removed.
- *      <p>
- *      Maintained views should be used transparently in queries where they can
- *      be incorporated by subsumption. General match of solution sets should be
- *      based on the hash code of the SPARQL query or the deep hash code of a
- *      normalized and optimized AST. Detailed match must be on either the query
- *      text or the AST (deep equals). AST based caching allows sub-select
- *      caching or even caching of sub-groups.
- *      <p>
- *      When BINDINGS are present, then the query solutions are not the same as
- *      when they are not present. This makes the cache somewhat more difficult
- *      to integration since the same query is not always the same (e.g.,
- *      include the hash of the exogenous solutions in the query hash code and
- *      we will get less reuse). Therefore, either the view must be computed
- *      without reference to a set of exogenous solutions or the exogenous
- *      solutions must be incorporated into the declaration of the view and
- *      considered when making decisions about subsumption.
- *      <p>
- *      Benchmark impact of cache on BSBM explore+update. The cache should be
- *      integrated into the query planner so we can cache solution sets for
- *      sub-groups and sub-selects.
- *      
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
-public class SolutionSetCache implements ISolutionSetCache {
+//*      Add support for declared and maintained views. Views would be
+//*      declared using SPARQL queries. The view would listen for updates to
+//*      statement patterns and invalidate/maintain the SPARQL result sets when a
+//*      triple in a statement pattern in use by the query for that solution set
+//*      has been added or removed.
+//*      <p>
+//*      Maintained views should be used transparently in queries where they can
+//*      be incorporated by subsumption. General match of solution sets should be
+//*      based on the hash code of the SPARQL query or the deep hash code of a
+//*      normalized and optimized AST. Detailed match must be on either the query
+//*      text or the AST (deep equals). AST based caching allows sub-select
+//*      caching or even caching of sub-groups.
+//*      <p>
+//*      When BINDINGS are present, then the query solutions are not the same as
+//*      when they are not present. This makes the cache somewhat more difficult
+//*      to integration since the same query is not always the same (e.g.,
+//*      include the hash of the exogenous solutions in the query hash code and
+//*      we will get less reuse). Therefore, either the view must be computed
+//*      without reference to a set of exogenous solutions or the exogenous
+//*      solutions must be incorporated into the declaration of the view and
+//*      considered when making decisions about subsumption.
+//*      <p>
+//*      Benchmark impact of cache on BSBM explore+update. The cache should be
+//*      integrated into the query planner so we can cache solution sets for
+//*      sub-groups and sub-selects.
+public class SolutionSetManager implements ISolutionSetManager {
 
     private static transient final Logger log = Logger
-            .getLogger(SolutionSetCache.class);
-
-    private final CacheConnectionImpl cache;
+            .getLogger(SolutionSetManager.class);
 
     /**
-     * FIXME MVCC VIEWS: Convert over to Name2Addr and layered resolution with
-     * appropriate concurrency control at each layer.
-     * 
-     * <pre>
-     * (cache|query|database)[.queryUUID].namespace[.joinVars]
-     * </pre>
-     * 
-     * or something like that.
-     * <p>
-     * There are several problems here.
-     * <p>
-     * 1. We need a common semantics for visibility for the named solution sets
-     * and the query and update operations. This cache can not provide that
-     * without being somehow integrated with the MVCC architecture.
-     * <p>
-     * 2. We need to expire (at least some) cache objects. That expiration
-     * should have a default but should also be configurable for each cache
-     * object. The visibility issue also exists for expiration (we can not
-     * expire a result set while it is being used).
-     * <p>
-     * 3. If we allow updates against named solution sets, then the visibility
-     * of those updates must again be consistent with the MVCC architecture for
-     * the query and update operations.
-     * 
-     * FIXME Appropriate synchronization, including for updates, and on the
-     * Stream class (unisolated index protection).
-     * 
-     * FIXME This probably needs to buffer {@link Name2Addr} changes in a manner
-     * similar to {@link AbstractTask} in order to handle tx isolation
-     * correctly. However, this is not even hooked into the commit protocol so
-     * it is difficult to set how the view can evolve. I am unsure how this will
-     * play out for SPARQL UPDATE request sequences for either the UNISOLATED
-     * case or the case where the changes are isolated by a read/write tx.
-     * 
-     * FIXME The SolutionSetStream is not transaction aware at all. This makes
-     * it difficult to use named solution sets in SPARQL UPDATE in conjunction
-     * with full read-write transactions. There is no sense of a "FusedView" and
-     * the Stream is not being access through an AbstractTask running on the
-     * concurrency manager.
+     * The backing store.
      */
+    private final IBTreeManager store;
+
+    /**
+     * The backing store.
+     */
+    private IBTreeManager getStore() {
+
+        return store;
+        
+    }
+    
+//    /**
+//     * MVCC VIEWS: Convert over to Name2Addr and layered resolution with
+//     * appropriate concurrency control at each layer.
+//     * 
+//     * <pre>
+//     * (cache|query|database)[.queryUUID].namespace[.joinVars]
+//     * </pre>
+//     * 
+//     * or something like that.
+//     * <p>
+//     * There are several problems here.
+//     * <p>
+//     * 1. We need a common semantics for visibility for the named solution sets
+//     * and the query and update operations. This cache can not provide that
+//     * without being somehow integrated with the MVCC architecture.
+//     * <p>
+//     * 2. We need to expire (at least some) cache objects. That expiration
+//     * should have a default but should also be configurable for each cache
+//     * object. The visibility issue also exists for expiration (we can not
+//     * expire a result set while it is being used).
+//     * <p>
+//     * 3. If we allow updates against named solution sets, then the visibility
+//     * of those updates must again be consistent with the MVCC architecture for
+//     * the query and update operations.
+//     * 
+//     * Appropriate synchronization, including for updates, and on the
+//     * Stream class (unisolated index protection).
+//     * 
+//     * This probably needs to buffer {@link Name2Addr} changes in a manner
+//     * similar to {@link AbstractTask} in order to handle tx isolation
+//     * correctly. However, this is not even hooked into the commit protocol so
+//     * it is difficult to set how the view can evolve. I am unsure how this will
+//     * play out for SPARQL UPDATE request sequences for either the UNISOLATED
+//     * case or the case where the changes are isolated by a read/write tx.
+//     * 
+//     * The SolutionSetStream is not transaction aware at all. This makes
+//     * it difficult to use named solution sets in SPARQL UPDATE in conjunction
+//     * with full read-write transactions. There is no sense of a "FusedView" and
+//     * the Stream is not being access through an AbstractTask running on the
+//     * concurrency manager.
+//     */
 //    @Deprecated // We need to use Name2Addr and Name2Addr prefix scans
 //    private final ConcurrentHashMap<String/* name */, SolutionSetStream> cacheMap;
 
@@ -147,6 +164,7 @@ public class SolutionSetCache implements ISolutionSetCache {
     private final String namespace;
     private final long timestamp;
 
+    @Override
     public String toString() {
 
         return super.toString() + "{namespace=" + namespace + ",timestamp="
@@ -154,16 +172,16 @@ public class SolutionSetCache implements ISolutionSetCache {
     
     }
     
-    SolutionSetCache(final CacheConnectionImpl cache, final String namespace,
-            final long timestamp) {
+    public SolutionSetManager(final IBTreeManager store,
+            final String namespace, final long timestamp) {
 
-        if (cache == null)
+        if (store == null)
             throw new IllegalArgumentException();
 
         if (namespace == null)
             throw new IllegalArgumentException();
 
-        this.cache = cache;
+        this.store = store;
 
         this.namespace = namespace;
         
@@ -182,19 +200,12 @@ public class SolutionSetCache implements ISolutionSetCache {
 
     }
 
-    /**
-     * Return the backing store.
-     */
-    private IRWStrategy getRWStrategy() {
-
-        return (IRWStrategy) cache.getStore().getBufferStrategy();
-
+    @Override
+    public void init() {
+        
+        // NOP
+        
     }
-
-//    @Override
-//    public void init() {
-//        // NOP
-//    }
 
     /**
      * {@inheritDoc}
@@ -261,14 +272,14 @@ public class SolutionSetCache implements ISolutionSetCache {
         if (log.isInfoEnabled())
             log.info("Scanning: prefix=" + prefix);
         
-        final Iterator<String> itr = cache.getStore().indexNameScan(prefix,
+        final Iterator<String> itr = getStore().indexNameScan(prefix,
                 timestamp);
 
         while(itr.hasNext()) {
             
             final String name = itr.next();
             
-            cache.getStore().dropIndex(name);
+            getStore().dropIndex(name);
 
             if (log.isInfoEnabled())
                 log.info("Dropping: " + name);
@@ -310,34 +321,64 @@ public class SolutionSetCache implements ISolutionSetCache {
 
         if (timestamp == ITx.READ_COMMITTED) {
 
-            return (SolutionSetStream) cache.getStore().getIndexLocal(fqn,
-                    cache.getStore().getLastCommitTime());
+            return (SolutionSetStream) getStore().getIndexLocal(fqn,
+                    getStore().getLastCommitTime());
 
         } else if (timestamp == ITx.UNISOLATED) {
 
-            return (SolutionSetStream) cache.getStore().getUnisolatedIndex(fqn);
+            return (SolutionSetStream) getStore().getUnisolatedIndex(fqn);
 
         } else if(TimestampUtility.isReadWriteTx(timestamp)){
 
-            final long readsOnCommitTime = cache.getStore()
-                    .getLocalTransactionManager().getTx(timestamp)
-                    .getReadsOnCommitTime();
+            final long ts;
+            if (getStore() instanceof IJournal) {
 
-            return (SolutionSetStream) cache.getStore().getIndexLocal(fqn,
-                    readsOnCommitTime);
-            
+                /*
+                 * Optimized code path uses the readsOnCommitTime to improve
+                 * caching.
+                 */
+                
+                ts = ((IJournal) getStore())
+                        .getLocalTransactionManager().getTx(timestamp)
+                        .getReadsOnCommitTime();
+                
+            } else {
+
+                /**
+                 * Note: This code path is used by the TemporaryStore and
+                 * possibly ResourceManager (for a data service). The [store]
+                 * reference here is always the local index manager. Thus it can
+                 * not be an IBigdataFederation.
+                 * 
+                 * TODO Use the readsOnCommitTime. Test coverage for
+                 * TemporaryStore and DataService (but there is an open question
+                 * about how to handle hash partitioned solution sets on a
+                 * federation).
+                 * 
+                 * @see <a
+                 *      href="https://sourceforge.net/apps/trac/bigdata/ticket/266">
+                 *      Refactor native long tx id to thin object. </a>
+                 */
+
+                ts = timestamp;
+                
+            }
+
+            return (SolutionSetStream) getStore().getIndexLocal(fqn, ts);
+
         } else {
             
-            return (SolutionSetStream) cache.getStore().getIndexLocal(fqn,
+            return (SolutionSetStream) getStore().getIndexLocal(fqn,
                     timestamp);
 
         }
 
         // Note: Forces all access to be unisolated.
-//        return (SolutionSetStream) cache.getStore().getUnisolatedIndex(fqn);
+//        return (SolutionSetStream) getStore().getUnisolatedIndex(fqn);
    
     }
     
+    @Override
     public boolean existsSolutions(final String solutionSet) {
 
         if (solutionSet == null)
@@ -359,7 +400,7 @@ public class SolutionSetCache implements ISolutionSetCache {
 
             final String fqn = getFQN(solutionSet);
 
-            cache.getStore().dropIndex(fqn);
+            getStore().dropIndex(fqn);
         
             return true;
             
@@ -378,6 +419,7 @@ public class SolutionSetCache implements ISolutionSetCache {
 
     }
 
+    @Override
     public void putSolutions(final String solutionSet,
             final ICloseableIterator<IBindingSet[]> src) {
 
@@ -427,7 +469,7 @@ public class SolutionSetCache implements ISolutionSetCache {
         final StreamIndexMetadata md = new StreamIndexMetadata(fqn,
                 UUID.randomUUID());
         
-        /*
+        /**
          * TODO GIST : We should not have to do this here. See
          * Checkpoint.create() and SolutionSetStream.create() for why this is
          * necessary.
@@ -436,7 +478,7 @@ public class SolutionSetCache implements ISolutionSetCache {
          */
         md.setStreamClassName(SolutionSetStream.class.getName());
         
-        sset = (SolutionSetStream) cache.getStore().register(fqn, md);
+        sset = (SolutionSetStream) getStore().register(fqn, md);
 
 //        sset = SolutionSetStream.create(getRWStrategy(), md);
 
@@ -448,6 +490,7 @@ public class SolutionSetCache implements ISolutionSetCache {
         return sset;
     }
 
+    @Override
     public void createSolutions(final String solutionSet, final ISPO[] params) {
 
         final String fqn = getFQN(solutionSet);
@@ -474,6 +517,7 @@ public class SolutionSetCache implements ISolutionSetCache {
 
     }
 
+    @Override
     public ISolutionSetStats getSolutionSetStats(final String solutionSet) {
 
         final String fqn = getFQN(solutionSet);
@@ -496,6 +540,7 @@ public class SolutionSetCache implements ISolutionSetCache {
 
     }
 
+    @Override
     public ICloseableIterator<IBindingSet[]> getSolutions(
             final String solutionSet) {
 
@@ -527,4 +572,4 @@ public class SolutionSetCache implements ISolutionSetCache {
 
     }
 
-} // SparqlCacheImpl
+}

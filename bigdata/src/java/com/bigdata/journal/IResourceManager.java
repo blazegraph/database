@@ -41,6 +41,7 @@ import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.IndexSegmentStore;
 import com.bigdata.btree.view.FusedView;
 import com.bigdata.counters.CounterSet;
+import com.bigdata.htree.HTree;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.resources.ResourceManager;
 import com.bigdata.resources.StaleLocatorException;
@@ -163,9 +164,9 @@ public interface IResourceManager extends IServiceShutdown {
      * @param timestamp
      *            A transaction identifier, {@link ITx#UNISOLATED} for the
      *            unisolated index view, {@link ITx#READ_COMMITTED}, or
-     *            <code>timestamp</code> for a historical view no later than
-     *            the specified timestamp.
-     *            
+     *            <code>timestamp</code> for a historical view no later than the
+     *            specified timestamp.
+     * 
      * @return The index or <code>null</code> iff there is no index registered
      *         with that name for that <i>timestamp</i>, including if the
      *         timestamp is a transaction identifier and the transaction is
@@ -181,6 +182,14 @@ public interface IResourceManager extends IServiceShutdown {
      *                been split, joined or moved.
      * 
      * @see IIndexStore#getIndex(String, long)
+     * 
+     *      FIXME GIST - this only supports {@link ILocalBTreeView}. We need to
+     *      also support {@link HTree}, etc. See
+     *      {@link IBTreeManager#getIndexLocal(String, long)} which is the
+     *      corresponding method for local stores.
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/585" >
+     *      GIST </a>
      */
     public ILocalBTreeView getIndex(String name, long timestamp);
 
@@ -286,7 +295,7 @@ public interface IResourceManager extends IServiceShutdown {
      *             if the {@link IResourceManager} is not part of an
      *             {@link IBigdataFederation}.
      */
-    public IBigdataFederation getFederation();
+    public IBigdataFederation<?> getFederation();
     
 //    /**
 //     * Return the ordered {@link UUID}[] of the physical {@link IDataService}

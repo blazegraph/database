@@ -35,10 +35,11 @@ import com.bigdata.bop.solutions.ISolutionSet;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ISimpleIndexAccess;
 import com.bigdata.journal.AbstractJournal;
+import com.bigdata.journal.IBTreeManager;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rdf.sparql.ast.ISolutionSetStats;
-import com.bigdata.rdf.sparql.ast.cache.ISolutionSetCache;
+import com.bigdata.rdf.sparql.ast.ssets.ISolutionSetManager;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.striterator.Chunkerator;
 import com.bigdata.striterator.ICloseableIterator;
@@ -144,6 +145,7 @@ public class NamedSolutionSetRefUtility {
         
         }
 
+        @SuppressWarnings("rawtypes")
         final IVariable[] joinVars;
         {
         
@@ -394,8 +396,8 @@ public class NamedSolutionSetRefUtility {
      *             the same data.
      */
     public static ISolutionSetStats getSolutionSetStats(//
-            final ISolutionSetCache sparqlCache,//
-            final AbstractJournal localIndexManager, //
+            final ISolutionSetManager sparqlCache,//
+            final IBTreeManager localIndexManager, //
             final String namespace,//
             final long timestamp,//
             final String localName,//
@@ -491,8 +493,8 @@ public class NamedSolutionSetRefUtility {
      *             {@link IIndex}?
      */
     public static ICloseableIterator<IBindingSet[]> getSolutionSet(
-            final ISolutionSetCache sparqlCache,//
-            final AbstractJournal localIndexManager,//
+            final ISolutionSetManager sparqlCache,//
+            final IBTreeManager localIndexManager,//
             final String namespace,//
             final long timestamp,//
             final String localName,//
@@ -558,6 +560,7 @@ public class NamedSolutionSetRefUtility {
                     + localName + ", joinVars=" + Arrays.toString(joinVars));
 
         // Iterator visiting the solution set.
+        @SuppressWarnings("unchecked")
         final ICloseableIterator<IBindingSet> src = (ICloseableIterator<IBindingSet>) index
                 .scan();
 

@@ -123,16 +123,6 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
     static protected final Logger log = Logger.getLogger(AbstractTask.class);
 
     /**
-     * True iff the {@link #log} level is INFO or less.
-     */
-    final protected boolean INFO = log.isInfoEnabled();
-
-    /**
-     * True iff the {@link #log} level is DEBUG or less.
-     */
-    final protected boolean DEBUG = log.isDebugEnabled();
-
-    /**
      * Used to protect against re-submission of the same task object.
      */
     private final AtomicBoolean submitted = new AtomicBoolean(false);
@@ -463,7 +453,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
 
             if (commitList.put(name, this) != null) {
 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("Added index to commit list: name=" + name);
 
             }
@@ -477,7 +467,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
      */
     private void clearIndexCache() {
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("Clearing hard reference cache: " + indexCache.size()
                     + " indices accessed");
         
@@ -543,8 +533,9 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
      * @todo modify to return <code>null</code> if the index is not
      *       registered?
      */
+    @Override
     synchronized final public ILocalBTreeView getIndex(final String name) {
-
+    
         if (name == null) {
 
             // @todo change to IllegalArgumentException for API consistency?
@@ -1729,7 +1720,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
 
         MDC.put("timestamp", Long.valueOf(timestamp));
         
-        if(INFO)
+        if(log.isInfoEnabled())
         MDC.put("resources", Arrays.toString(resource));
         
     }
@@ -1744,7 +1735,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
 
         MDC.remove("timestamp");
 
-        if(INFO)
+        if(log.isInfoEnabled())
         MDC.remove("resources");
         
     }
@@ -1865,7 +1856,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
             
             if (isReadWriteTx) {
 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("Running read-write tx: timestamp=" + timestamp);
                 
 //                if(tx.isReadOnly()) {
@@ -1915,7 +1906,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
                     
                     clearIndexCache();
                 
-                    if(INFO) log.info("Reader is done: "+this);
+                    if(log.isInfoEnabled()) log.info("Reader is done: "+this);
                     
                 }
 
@@ -1934,7 +1925,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
 
         } finally {
 
-            if(INFO) log.info("done: "+this);
+            if(log.isInfoEnabled()) log.info("done: "+this);
 
         }
 
@@ -1954,7 +1945,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
 
         final Thread t = Thread.currentThread();
         
-        if(INFO)
+        if(log.isInfoEnabled())
             log.info("Unisolated write task: " + this + ", thread=" + t);
 
 //        // declare resource(s) to lock (exclusive locks are used).
@@ -2027,7 +2018,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
             // set flag.
             ran = true;
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("Task Ok: class=" + this);
                       
             /*
@@ -2049,7 +2040,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
 
                 // Do not re-invoke it afterTask failed above.
 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("Task failed: class=" + this + " : " + t2);
                 
                 writeService.afterTask(this, t2);
@@ -2343,6 +2334,8 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
     class IsolatedActionJournal implements IJournal, IAllocationContext {
         
         private final AbstractJournal delegate;
+
+        @SuppressWarnings("rawtypes")
         private final IResourceLocator resourceLocator;
         
         public String toString() {
@@ -2376,7 +2369,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
          * 
          * @param source
          */
-        @SuppressWarnings("unchecked")
+        @SuppressWarnings({ "unchecked", "rawtypes" })
         public IsolatedActionJournal(final AbstractJournal source) {
 
             if (source == null)
@@ -2416,6 +2409,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
         /**
          * Delegates to the {@link AbstractTask}.
          */
+        @Override
         public void dropIndex(final String name) {
 
             AbstractTask.this.dropIndex(name);
@@ -2426,12 +2420,28 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
          * Note: This is the core implementation for registering an index - it
          * delegates to the {@link AbstractTask}.
          */
+        @Override
         public IIndex registerIndex(final String name, final BTree btree) {
 
             return AbstractTask.this.registerIndex(name, btree);
 
         }
 
+        @Override
+        public ICheckpointProtocol register(final String name, final IndexMetadata metadata) {
+
+            /*
+             * FIXME GIST : Support registration of index types other than BTree
+             * (HTree, Stream, etc).
+             * 
+             * @see https://sourceforge.net/apps/trac/bigdata/ticket/585 (GIST)
+             */
+
+            throw new UnsupportedOperationException();
+            
+        }
+
+        @Override
         public void registerIndex(final IndexMetadata indexMetadata) {
 
             // delegate to core impl.
@@ -2439,6 +2449,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
 
         }
 
+        @Override
         public IIndex registerIndex(final String name,
                 final IndexMetadata indexMetadata) {
 
@@ -2456,6 +2467,31 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
         /**
          * Note: access to an unisolated index is governed by the AbstractTask.
          */
+        @Override
+        public ICheckpointProtocol getUnisolatedIndex(String name) {
+            try {
+
+                /*
+                 * FIXME GIST. This will throw a ClassCastException if the
+                 * returned index is an ILocalBTreeView.
+                 * 
+                 * @see https://sourceforge.net/apps/trac/bigdata/ticket/585 (GIST)
+                 */
+
+                return (ICheckpointProtocol) AbstractTask.this.getIndex(name);
+                
+            } catch(NoSuchIndexException ex) {
+                
+                // api conformance.
+                return null;
+                
+            }
+        }
+
+        /**
+         * Note: access to an unisolated index is governed by the AbstractTask.
+         */
+        @Override
         public IIndex getIndex(final String name) {
 
             try {
@@ -2476,25 +2512,60 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
          * declare a lock - such views will always be read-only and support
          * concurrent readers.
          */
-        public IIndex getIndex(final String name, final long timestamp) {
+        @Override
+        public ICheckpointProtocol getIndexLocal(final String name,
+                final long commitTime) {
 
-            if (timestamp == ITx.UNISOLATED) {
-                
-                return getIndex(name);
-                
+            if (commitTime == ITx.UNISOLATED) {
+
+                return getUnisolatedIndex(name);
+
             }
-            
-            // the index view is obtained from the resource manager.
-            return resourceManager.getIndex(name, timestamp);
+
+            /*
+             * The index view is obtained from the resource manager.
+             */
+
+            if (resourceManager instanceof IJournal) {
+
+                /*
+                 * This code path supports any type of index (BTree, HTree,
+                 * etc).
+                 */
+
+                return ((IJournal) resourceManager).getIndexLocal(name,
+                        commitTime);
+
+            }
+
+            /**
+             * FIXME GIST : This code path only supports BTree
+             * (ILocalBTreeView). An attempt to resolve an HTree or other
+             * non-BTree based named index data structure will probably result
+             * in a ClassCastException.
+             * 
+             * @see <a
+             *      href="https://sourceforge.net/apps/trac/bigdata/ticket/585"
+             *      > GIST </a>
+             */
+            return (ICheckpointProtocol) resourceManager.getIndex(name, commitTime);
             
         }
 
+        @Override
+        public IIndex getIndex(final String name, final long timestamp) {
+
+            return (IIndex) getIndexLocal(name, timestamp);
+            
+        }
+        
         /**
          * Returns an {@link ITx#READ_COMMITTED} view if the index exists -or-
          * an {@link ITx#UNISOLATED} view IFF the {@link AbstractTask} declared
          * the name of the backing index as one of the resources for which it
          * acquired a lock.
          */
+        @Override
         public SparseRowStore getGlobalRowStore() {
             
             // did the task declare the resource name?
@@ -2510,6 +2581,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
             
         }
 
+        @Override
         public SparseRowStore getGlobalRowStore(final long timestamp) {
 
             if (!TimestampUtility.isReadOnly(timestamp)) {
@@ -2547,6 +2619,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
          * declared the names of the backing indices as resources for which it
          * acquired a lock.
          */
+        @Override
         public BigdataFileSystem getGlobalFileSystem() {
             
             // did the task declare the resource name?
@@ -2583,6 +2656,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
          * and will break semantics when the task is isolated by a transaction
          * rather than unisolated.
          */
+        @Override
         public TemporaryStore getTempStore() {
             
             return tempStoreFactory.getTempStore();
@@ -2590,24 +2664,28 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
         }
         private TemporaryStoreFactory tempStoreFactory = new TemporaryStoreFactory();
         
-        public IResourceLocator getResourceLocator() {
+        @Override
+        public IResourceLocator<?> getResourceLocator() {
             
             return resourceLocator;
             
         }
 
+        @Override
         public ILocalTransactionManager getLocalTransactionManager() {
             
             return delegate.getLocalTransactionManager();
             
         }
 
+        @Override
         public IResourceLockService getResourceLockService() {
             
             return delegate.getResourceLockService();
             
         }
 
+        @Override
         public ExecutorService getExecutorService() {
             
             return delegate.getExecutorService();
@@ -2618,34 +2696,42 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
          * Disallowed methods (commit protocol and shutdown protocol).
          */
         
+        @Override
         public void abort() {
             throw new UnsupportedOperationException();
         }
 
+        @Override
         public void close() {
             throw new UnsupportedOperationException();
         }
 
+        @Override
         public void destroy() {
             throw new UnsupportedOperationException();
         }
 
+        @Override
         public void deleteResources() {
             throw new UnsupportedOperationException();
         }
 
+        @Override
         public long commit() {
             throw new UnsupportedOperationException();
         }
 
+        @Override
         public void setCommitter(int index, ICommitter committer) {
             throw new UnsupportedOperationException();
         }
 
+        @Override
         public void shutdown() {
             throw new UnsupportedOperationException();
         }
 
+        @Override
         public void shutdownNow() {
             throw new UnsupportedOperationException();
         }
@@ -2658,70 +2744,87 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
 //            return delegate.getKeyBuilder();
 //        }
         
+        @Override
         public void force(final boolean metadata) {
             delegate.force(metadata);
         }
 
+        @Override
         public int getByteCount(final long addr) {
             return delegate.getByteCount(addr);
         }
 
+        @Override
         public ICommitRecord getCommitRecord(final long timestamp) {
             return delegate.getCommitRecord(timestamp);
         }
 
+        @Override
         public CounterSet getCounters() {
             return delegate.getCounters();
         }
 
+        @Override
         public File getFile() {
             return delegate.getFile();
         }
-
+        
+        @Override
         public long getOffset(final long addr) {
             return delegate.getOffset(addr);
         }
 
+        @Override
         public long getPhysicalAddress(final long addr) {
             return delegate.getPhysicalAddress(addr);
         }
 
+        @Override
         public Properties getProperties() {
             return delegate.getProperties();
         }
 
+        @Override
         public UUID getUUID() {
             return delegate.getUUID();
         }
         
+        @Override
         public IResourceMetadata getResourceMetadata() {
             return delegate.getResourceMetadata();
         }
 
+        @Override
         public long getRootAddr(final int index) {
             return delegate.getRootAddr(index);
         }
 
+        @Override
         public long getLastCommitTime() {
             return delegate.getLastCommitTime();
         }
         
+        @Override
         public IRootBlockView getRootBlockView() {
             return delegate.getRootBlockView();
         }
 
+        @Override
         public boolean isFullyBuffered() {
             return delegate.isFullyBuffered();
         }
 
+        @Override
         public boolean isOpen() {
             return delegate.isOpen();
         }
 
+        @Override
         public boolean isReadOnly() {
             return delegate.isReadOnly();
         }
 
+        @Override
         public boolean isStable() {
             return delegate.isStable();
         }
@@ -2730,26 +2833,32 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
 //            delegate.packAddr(out, addr);
 //        }
 
+        @Override
         public ByteBuffer read(final long addr) {
             return delegate.read(addr);
         }
 
+        @Override
         public long size() {
             return delegate.size();
         }
 
+        @Override
         public long toAddr(final int nbytes, final long offset) {
             return delegate.toAddr(nbytes, offset);
         }
 
+        @Override
         public String toString(final long addr) {
             return delegate.toString(addr);
         }
 
+        @Override
         public IRootBlockView getRootBlock(final long commitTime) {
             return delegate.getRootBlock(commitTime);
         }
 
+        @Override
         public Iterator<IRootBlockView> getRootBlocks(final long startTime) {
             return delegate.getRootBlocks(startTime);
         }
@@ -2762,6 +2871,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
          * allocations to be scoped to the AbstractTask.
          */
 
+        @Override
         public long write(final ByteBuffer data) {
             return delegate.write(data, this);
         }
@@ -2782,6 +2892,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
             return delegate.getInputStream(addr);
         }
 
+        @Override
         public void delete(final long addr) {
             delegate.delete(addr, this);
         }
@@ -2808,19 +2919,23 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
             completeTask();
         }
 
+        @Override
         public ScheduledFuture<?> addScheduledTask(final Runnable task,
                 final long initialDelay, final long delay, final TimeUnit unit) {
             return delegate.addScheduledTask(task, initialDelay, delay, unit);
         }
 
+        @Override
         public boolean getCollectPlatformStatistics() {
             return delegate.getCollectPlatformStatistics();
         }
 
+        @Override
         public boolean getCollectQueueStatistics() {
             return delegate.getCollectQueueStatistics();
         }
 
+        @Override
         public int getHttpdPort() {
             return delegate.getHttpdPort();
         }
@@ -2849,6 +2964,8 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
     private class ReadOnlyJournal implements IJournal {
 
         private final IJournal delegate;
+        
+        @SuppressWarnings("rawtypes")
         private final DefaultResourceLocator resourceLocator;
         
         public String toString() {
@@ -2857,7 +2974,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
 
         }
 
-        @SuppressWarnings("unchecked")
+        @SuppressWarnings({ "unchecked", "rawtypes" })
         public ReadOnlyJournal(final AbstractJournal source) {
 
             if (source == null)
@@ -2885,17 +3002,13 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
          * do).
          */
         
-        /**
-         * {@inheritDoc}
-         * <p>
-         * Note: Does not allow access to {@link ITx#UNISOLATED} indices.
-         */
+        @Override
         public IIndex getIndex(final String name, final long timestamp) {
-
+            
             if (timestamp == ITx.UNISOLATED)
                 throw new UnsupportedOperationException();
 
-            if(timestamp == AbstractTask.this.timestamp) {
+            if (timestamp == AbstractTask.this.timestamp) {
                 
                 // to the AbstractTask
                 try {
@@ -2912,7 +3025,45 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
             }
             
             // to the backing journal.
-            return delegate.getIndex(name, timestamp);
+            return (IIndex) delegate.getIndexLocal(name, timestamp);
+
+        }
+        
+        /**
+         * {@inheritDoc}
+         * <p>
+         * Note: Does not allow access to {@link ITx#UNISOLATED} indices.
+         */
+        @Override
+        public ICheckpointProtocol getIndexLocal(final String name,
+                final long commitTime) {
+
+            if (timestamp == ITx.UNISOLATED)
+                throw new UnsupportedOperationException();
+
+            if (timestamp == AbstractTask.this.timestamp) {
+
+                // to the AbstractTask
+                try {
+
+                    /*
+                     * FIXME GIST : This will throw a ClassCastException if the
+                     * index type is ReadCommittedIndex or FusedView.
+                     */
+                    return (ICheckpointProtocol) AbstractTask.this
+                            .getIndex(name);
+
+                } catch (NoSuchIndexException ex) {
+
+                    // api conformance.
+                    return null;
+
+                }
+
+            }
+
+            // to the backing journal.
+            return delegate.getIndexLocal(name, timestamp);
 
         }
 
@@ -2937,30 +3088,53 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
          * Note: Not supported since this method returns the
          * {@link ITx#UNISOLATED} index.
          */
+        @Override
+        public ICheckpointProtocol getUnisolatedIndex(String name) {
+
+            throw new UnsupportedOperationException();
+            
+        }
+        
+        /**
+         * Note: Not supported since this method returns the
+         * {@link ITx#UNISOLATED} index.
+         */
+        @Override
         public IIndex getIndex(String name) {
 
             throw new UnsupportedOperationException();
             
         }
         
+        @Override
         public void dropIndex(String name) {
 
             throw new UnsupportedOperationException();
             
         }
 
+        @Override
+        public ICheckpointProtocol register(String name, IndexMetadata metadata) {
+
+            throw new UnsupportedOperationException();
+            
+        }
+
+        @Override
         public void registerIndex(IndexMetadata indexMetadata) {
             
             throw new UnsupportedOperationException();
             
         }
 
+        @Override
         public IIndex registerIndex(String name, BTree btree) {
             
             throw new UnsupportedOperationException();
             
         }
 
+        @Override
         public IIndex registerIndex(String name, IndexMetadata indexMetadata) {
             
             throw new UnsupportedOperationException();
@@ -2971,6 +3145,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
          * Returns an {@link ITx#READ_COMMITTED} view iff the index exists and
          * <code>null</code> otherwise.
          */
+        @Override
         public SparseRowStore getGlobalRowStore() {
 
             /*
@@ -3000,6 +3175,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
             
         }
 
+        @Override
         public SparseRowStore getGlobalRowStore(final long timestamp) {
 
             /*
@@ -3036,6 +3212,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
          * Returns an {@link ITx#READ_COMMITTED} view iff the file system exists
          * and <code>null</code> otherwise.
          */
+        @Override
         public BigdataFileSystem getGlobalFileSystem() {
 
             /*
@@ -3085,6 +3262,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
          * and will break semantics when the task is isolated by a transaction
          * rather than unisolated.
          */
+        @Override
         public TemporaryStore getTempStore() {
             
             return tempStoreFactory.getTempStore();
@@ -3092,24 +3270,28 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
         }
         private TemporaryStoreFactory tempStoreFactory = new TemporaryStoreFactory();
         
-        public DefaultResourceLocator getResourceLocator() {
+        @Override
+        public DefaultResourceLocator<?> getResourceLocator() {
             
             return resourceLocator;
             
         }
         
+        @Override
         public ILocalTransactionManager getLocalTransactionManager() {
             
             return delegate.getLocalTransactionManager();
             
         }
 
+        @Override
         public IResourceLockService getResourceLockService() {
             
             return delegate.getResourceLockService();
             
         }
 
+        @Override
         public ExecutorService getExecutorService() {
             
             return delegate.getExecutorService();
@@ -3120,34 +3302,42 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
          * Disallowed methods (commit and shutdown protocols).
          */
         
+        @Override
         public void abort() {
             throw new UnsupportedOperationException();
         }
 
+        @Override
         public void close() {
             throw new UnsupportedOperationException();
         }
 
+        @Override
         public void destroy() {
             throw new UnsupportedOperationException();
         }
 
+        @Override
         public long commit() {
             throw new UnsupportedOperationException();
         }
 
+        @Override
         public void deleteResources() {
             throw new UnsupportedOperationException();
         }
 
+        @Override
         public void setCommitter(int index, ICommitter committer) {
             throw new UnsupportedOperationException();
         }
 
+        @Override
         public void shutdown() {
             throw new UnsupportedOperationException();
         }
 
+        @Override
         public void shutdownNow() {
             throw new UnsupportedOperationException();
         }
@@ -3156,10 +3346,12 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
          * Disallowed methods (methods that write on the store).
          */
 
+        @Override
         public void force(boolean metadata) {
             throw new UnsupportedOperationException();
         }
 
+        @Override
         public long write(ByteBuffer data) {
             throw new UnsupportedOperationException();
         }       
@@ -3169,6 +3361,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
 //            throw new UnsupportedOperationException();
 //        }
         
+        @Override
         public void delete(long addr) {
             throw new UnsupportedOperationException();
         }
@@ -3177,107 +3370,133 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
          * Methods that delegate directly to the backing journal.
          */
         
+        @Override
         public int getByteCount(long addr) {
             return delegate.getByteCount(addr);
         }
 
+        @Override
         public ICommitRecord getCommitRecord(long timestamp) {
             return delegate.getCommitRecord(timestamp);
         }
 
+        @Override
         public CounterSet getCounters() {
             return delegate.getCounters();
         }
 
+        @Override
         public File getFile() {
             return delegate.getFile();
         }
 
+        @Override
         public long getOffset(long addr) {
             return delegate.getOffset(addr);
         }
 
+        @Override
         public long getPhysicalAddress(final long addr) {
             return delegate.getPhysicalAddress(addr);
         }
 
+        @Override
         public Properties getProperties() {
             return delegate.getProperties();
         }
 
+        @Override
         public UUID getUUID() {
             return delegate.getUUID();
         }
         
+        @Override
         public IResourceMetadata getResourceMetadata() {
             return delegate.getResourceMetadata();
         }
 
+        @Override
         public long getRootAddr(int index) {
             return delegate.getRootAddr(index);
         }
 
+        @Override
         public long getLastCommitTime() {
             return delegate.getLastCommitTime();
         }
         
+        @Override
         public IRootBlockView getRootBlockView() {
             return delegate.getRootBlockView();
         }
 
+        @Override
         public boolean isFullyBuffered() {
             return delegate.isFullyBuffered();
         }
 
+        @Override
         public boolean isOpen() {
             return delegate.isOpen();
         }
 
+        @Override
         public boolean isReadOnly() {
             return delegate.isReadOnly();
         }
 
+        @Override
         public boolean isStable() {
             return delegate.isStable();
         }
 
+        @Override
         public ByteBuffer read(long addr) {
             return delegate.read(addr);
         }
 
+        @Override
         public long size() {
             return delegate.size();
         }
 
+        @Override
         public long toAddr(int nbytes, long offset) {
             return delegate.toAddr(nbytes, offset);
         }
 
+        @Override
         public String toString(long addr) {
             return delegate.toString(addr);
         }
 
+        @Override
         public IRootBlockView getRootBlock(long commitTime) {
             return delegate.getRootBlock(commitTime);
         }
 
+        @Override
         public Iterator<IRootBlockView> getRootBlocks(long startTime) {
             return delegate.getRootBlocks(startTime);
         }
 
+        @Override
         public ScheduledFuture<?> addScheduledTask(Runnable task,
                 long initialDelay, long delay, TimeUnit unit) {
             return delegate.addScheduledTask(task, initialDelay, delay, unit);
         }
 
+        @Override
         public boolean getCollectPlatformStatistics() {
             return delegate.getCollectPlatformStatistics();
         }
 
+        @Override
         public boolean getCollectQueueStatistics() {
             return delegate.getCollectQueueStatistics();
         }
 
+        @Override
         public int getHttpdPort() {
             return delegate.getHttpdPort();
         }
@@ -3307,71 +3526,87 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
      
         private IIndexManager delegate;
         
-        public DelegateIndexManager(IIndexManager delegate) {
+        public DelegateIndexManager(final IIndexManager delegate) {
             this.delegate = delegate;
         }
 
+        @Override
         public void dropIndex(String name) {
             delegate.dropIndex(name);
         }
 
+        @Override
         public ExecutorService getExecutorService() {
             return delegate.getExecutorService();
         }
 
+        @Override
         public BigdataFileSystem getGlobalFileSystem() {
             return delegate.getGlobalFileSystem();
         }
 
+        @Override
         public SparseRowStore getGlobalRowStore() {
             return delegate.getGlobalRowStore();
         }
 
+        @Override
         public SparseRowStore getGlobalRowStore(final long timestamp) {
             return delegate.getGlobalRowStore(timestamp);
         }
 
+        @Override
         public IIndex getIndex(String name, long timestamp) {
             return delegate.getIndex(name, timestamp);
         }
 
+        @Override
         public long getLastCommitTime() {
             return delegate.getLastCommitTime();
         }
 
-        public IResourceLocator getResourceLocator() {
+        @Override
+        public IResourceLocator<?> getResourceLocator() {
             return delegate.getResourceLocator();
         }
 
+        @Override
         public IResourceLockService getResourceLockService() {
             return delegate.getResourceLockService();
         }
 
+        @Override
         public void registerIndex(IndexMetadata indexMetadata) {
             delegate.registerIndex(indexMetadata);
         }
 
+        @Override
         public void destroy() {
             delegate.destroy();
         }
         
+        @Override
         public TemporaryStore getTempStore() {
             return delegate.getTempStore();
         }
 
+        @Override
         public ScheduledFuture<?> addScheduledTask(Runnable task,
                 long initialDelay, long delay, TimeUnit unit) {
             return delegate.addScheduledTask(task, initialDelay, delay, unit);
         }
 
+        @Override
         public boolean getCollectPlatformStatistics() {
             return delegate.getCollectPlatformStatistics();
         }
 
+        @Override
         public boolean getCollectQueueStatistics() {
             return delegate.getCollectQueueStatistics();
         }
 
+        @Override
         public int getHttpdPort() {
             return delegate.getHttpdPort();
         }

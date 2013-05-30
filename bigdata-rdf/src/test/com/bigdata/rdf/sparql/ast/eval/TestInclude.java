@@ -48,6 +48,7 @@ import com.bigdata.bop.join.SolutionSetHashJoinOp;
 import com.bigdata.bop.solutions.ProjectionOp;
 import com.bigdata.bop.solutions.SliceOp;
 import com.bigdata.journal.BufferMode;
+import com.bigdata.journal.IBTreeManager;
 import com.bigdata.rdf.internal.impl.literal.XSDNumericIV;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataURI;
@@ -55,9 +56,8 @@ import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.NamedSubqueryRoot;
-import com.bigdata.rdf.sparql.ast.cache.CacheConnectionFactory;
-import com.bigdata.rdf.sparql.ast.cache.ICacheConnection;
-import com.bigdata.rdf.sparql.ast.cache.ISolutionSetCache;
+import com.bigdata.rdf.sparql.ast.ssets.ISolutionSetManager;
+import com.bigdata.rdf.sparql.ast.ssets.SolutionSetManager;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rwstore.IRWStrategy;
 import com.bigdata.rwstore.sector.MemStore;
@@ -137,13 +137,11 @@ public class TestInclude extends AbstractDataDrivenSPARQLTestCase {
         
 		final QueryEngine queryEngine = QueryEngineFactory
 				.getQueryController(tripleStore.getIndexManager());
-		
-        final ICacheConnection cacheConn = CacheConnectionFactory
-                .getCacheConnection(queryEngine);
 
-        final ISolutionSetCache sparqlCache = cacheConn.getSparqlCache(
+        final ISolutionSetManager sparqlCache = new SolutionSetManager(
+                (IBTreeManager) queryEngine.getIndexManager(),
                 tripleStore.getNamespace(), tripleStore.getTimestamp());
-        
+
 		final String solutionSet = "%solutionSet1";
 		
         final IVariable<?> x = Var.var("x");
@@ -251,10 +249,8 @@ public class TestInclude extends AbstractDataDrivenSPARQLTestCase {
 		final QueryEngine queryEngine = QueryEngineFactory
 				.getQueryController(tripleStore.getIndexManager());
 		
-        final ICacheConnection cacheConn = CacheConnectionFactory
-                .getCacheConnection(queryEngine);
-
-        final ISolutionSetCache sparqlCache = cacheConn.getSparqlCache(
+        final ISolutionSetManager sparqlCache = new SolutionSetManager(
+                (IBTreeManager) queryEngine.getIndexManager(),
                 tripleStore.getNamespace(), tripleStore.getTimestamp());
 
 		final String solutionSet = "%solutionSet1";
@@ -387,10 +383,8 @@ public class TestInclude extends AbstractDataDrivenSPARQLTestCase {
         final QueryEngine queryEngine = QueryEngineFactory
                 .getQueryController(tripleStore.getIndexManager());
         
-        final ICacheConnection cacheConn = CacheConnectionFactory
-                .getCacheConnection(queryEngine);
-
-        final ISolutionSetCache sparqlCache = cacheConn.getSparqlCache(
+        final ISolutionSetManager sparqlCache = new SolutionSetManager(
+                (IBTreeManager) queryEngine.getIndexManager(),
                 tripleStore.getNamespace(), tripleStore.getTimestamp());
 
         final String solutionSet = "%solutionSet1";
@@ -536,10 +530,8 @@ public class TestInclude extends AbstractDataDrivenSPARQLTestCase {
 		final QueryEngine queryEngine = QueryEngineFactory
 				.getQueryController(tripleStore.getIndexManager());
 		
-        final ICacheConnection cacheConn = CacheConnectionFactory
-                .getCacheConnection(queryEngine);
-
-        final ISolutionSetCache sparqlCache = cacheConn.getSparqlCache(
+        final ISolutionSetManager sparqlCache = new SolutionSetManager(
+                (IBTreeManager) queryEngine.getIndexManager(),
                 tripleStore.getNamespace(), tripleStore.getTimestamp());
 
 		final String solutionSet = "%solutionSet1";

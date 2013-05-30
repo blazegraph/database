@@ -25,7 +25,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Mar 26, 2012
  */
 
-package com.bigdata.rdf.sparql.ast.cache;
+package com.bigdata.rdf.sparql.ast.ssets;
 
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.rdf.sparql.ast.ISolutionSetStats;
@@ -33,24 +33,29 @@ import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.striterator.ICloseableIterator;
 
 /**
- * A SPARQL solution set cache or a connection to a remote SPARQL cache or cache
- * fabric.
+ * A management interface for named solution sets.
  * <p>
  * Note: This is an internal interface that may evolve substantially.
  * 
- * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/531"> SPARQL
- *      UPDATE Extensions (Trac) </a>
  * @see <a
  *      href="https://sourceforge.net/apps/mediawiki/bigdata/index.php?title=SPARQL_Update">
- *      SPARQL Update Extensions (Wiki) </a>
+ *      SPARQL Update </a>
+ *      
+ * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/531"> SPARQL
+ *      UPDATE for NAMED SOLUTION SETS </a>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface ISolutionSetCache {
+public interface ISolutionSetManager {
 
     /**
-     * Close the cache / cache connection.
+     * One time initialization.
+     */
+    void init();
+    
+    /**
+     * Shutdown.
      */
     void close();
 

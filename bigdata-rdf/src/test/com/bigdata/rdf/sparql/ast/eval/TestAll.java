@@ -110,12 +110,8 @@ public class TestAll extends TestCase {
         // Test suite for NAMED SUBQUERIES
         suite.addTestSuite(TestNamedSubQuery.class);
         
-		if (QueryHints.DEFAULT_SOLUTION_SET_CACHE) {
-		
-			// Test suite for INCLUDE of pre-existing named solution sets.
-			suite.addTestSuite(TestInclude.class);
-
-		}
+		// Test suite for INCLUDE of pre-existing named solution sets.
+		suite.addTestSuite(TestInclude.class);
 
         // Test suite for negation (EXISTS, NOT EXISTS, MINUS).
         suite.addTestSuite(TestNegation.class);
