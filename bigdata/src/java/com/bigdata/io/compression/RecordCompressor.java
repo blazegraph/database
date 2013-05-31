@@ -40,6 +40,8 @@ import java.util.zip.DeflaterOutputStream;
 import java.util.zip.Inflater;
 import java.util.zip.InflaterInputStream;
 
+import org.apache.log4j.Logger;
+
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.io.ByteBufferInputStream;
 import com.bigdata.io.ByteBufferOutputStream;
@@ -58,6 +60,8 @@ import com.bigdata.io.ByteBufferOutputStream;
  * @version $Id$
  */
 public class RecordCompressor implements Externalizable, IRecordCompressor {
+
+    protected static final Logger log = Logger.getLogger(CompressorRegistry.class);
 
     /**
      * 
@@ -125,6 +129,9 @@ public class RecordCompressor implements Externalizable, IRecordCompressor {
 		final ByteArrayOutputStream out = new ByteArrayOutputStream();
 		
 		compress(bin, out);
+		
+		if (log.isTraceEnabled())
+			log.trace("Record compression from " + bin.limit() + " to " + out.size());
 		
 		return ByteBuffer.wrap(out.toByteArray());
 	}

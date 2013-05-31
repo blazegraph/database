@@ -546,6 +546,12 @@ abstract public class WriteCacheService implements IWriteCache {
         /**
          * FIXME WCS compaction fails!
          * 
+         * CORRECTION, it is NOT clearly established that WCS compaction fails
+         * although some failures appear to correlate with it being enabled.
+         * It may be that with compaction enabled other errors are more likely
+         * that are not directly associated with the compaction; for example
+         * as a result of denser data content.
+         * 
          * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/674" >
          *      WCS write cache compaction causes errors in RWS postHACommit()
          *      </a>

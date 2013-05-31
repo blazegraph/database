@@ -849,7 +849,10 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
 		// new HAGlue[] { serverA, serverB, serverC });
 
 		// Verify binary equality of ALL journals.
-		assertDigestsEquals(new HAGlue[] { serverA, serverB, serverC });
+		HAGlue[] services = new HAGlue[] { serverA, serverB, serverC };
+		assertReady(services);
+		// If the services are all ready then they MUST have compatible journals
+		assertDigestsEquals(services);
 
 		// Now force further commit when fully met to remove log files
 		simpleTransaction();
@@ -863,9 +866,17 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
 				new HAGlue[] { serverA, serverB, serverC });
 
         // And again verify binary equality of ALL journals.
-         assertDigestsEquals(new HAGlue[] { serverA, serverB, serverC });
+        assertDigestsEquals(new HAGlue[] { serverA, serverB, serverC });
 
 		log.info("ALL GOOD!");
+	}
+	
+	public void testStressTestStartAB_C_LiveResync() throws Exception {
+		for (int i = 0; i < 50; i++) {
+			log.warn("Starting run " + i);
+			testStartAB_C_LiveResync();
+			destroyAll();
+		}
 	}
     
     /**

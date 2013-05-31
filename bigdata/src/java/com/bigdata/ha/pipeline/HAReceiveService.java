@@ -1078,7 +1078,7 @@ public class HAReceiveService<M extends IHAWriteMessageBase> extends Thread {
 
 			if (message.getChk() != (int) chk.getValue()) {
                 throw new ChecksumError("msg=" + message.toString()
-                        + ", actual=" + chk.getValue());
+                        + ", actual=" + (int) chk.getValue());
             }
 
             if (callback != null) {
