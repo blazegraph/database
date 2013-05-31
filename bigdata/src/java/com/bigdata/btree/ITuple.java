@@ -88,6 +88,9 @@ public interface ITuple<E extends Object> {
      * 
      * @throws IllegalStateException
      *             if nothing has been visited.
+     *             
+     * @see <a href="http://sourceforge.net/apps/trac/bigdata/ticket/682">
+     *      AtomicRowFilter UnsupportedOperationException </a>
      */
     public int getSourceIndex();
     

@@ -209,10 +209,21 @@ public class AtomicRowFilter extends TupleTransformer<TPV, TPS> implements
              *       blob reference. In order to allow blobs to be stored in
              *       a different index the name of the scale out index would
              *       have to be in the blob reference.
+             * 
+             * @see <a
+             *      href="http://sourceforge.net/apps/trac/bigdata/ticket/682">
+             *      AtomicRowFilter UnsupportedOperationException </a>
              */
+            
             public int getSourceIndex() {
 
-                throw new UnsupportedOperationException();
+                /*
+                 * TODO Returning ZERO (0) fixes the ticket cited above but
+                 * does not provide support for asynchronous resolution of
+                 * BLOBS in the sparse row store.
+                 */
+                return 0;
+//                throw new UnsupportedOperationException();
 
             }
 
