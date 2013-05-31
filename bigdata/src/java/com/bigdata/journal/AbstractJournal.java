@@ -165,6 +165,7 @@ import com.bigdata.rwstore.sector.MemoryManager;
 import com.bigdata.service.AbstractHATransactionService;
 import com.bigdata.service.AbstractTransactionService;
 import com.bigdata.service.IBigdataFederation;
+import com.bigdata.stream.Stream;
 import com.bigdata.util.ChecksumUtility;
 import com.bigdata.util.ClocksNotSynchronizedException;
 import com.bigdata.util.NT;
@@ -5215,7 +5216,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 //        return (Stream) getUnisolatedIndex(name);
 //        
 //    }
-
+        
     /**
      * Return the mutable view of the named persistence capable data structure
      * (aka the "live" or {@link ITx#UNISOLATED} view).
@@ -5966,7 +5967,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
             final boolean leader = localService == null ? false : localService
                     .isLeader(rootBlock.getQuorumToken());
-
+            
             if (leader) {
             
                 if (_bufferStrategy instanceof IRWStrategy) {

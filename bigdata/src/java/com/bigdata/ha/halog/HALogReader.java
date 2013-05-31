@@ -342,6 +342,7 @@ public class HALogReader implements IHALogReader {
 		}
 
 		switch (storeType) {
+		case WORM:
 		case RW: {
 
 			if (msg.getSize() > clientBuffer.capacity()) {
@@ -383,27 +384,7 @@ public class HALogReader implements IHALogReader {
 
 			break;
 		}
-		case WORM: {
-			/*
-			 * Note: The WriteCache block needs to be recovered from the
-			 * WORMStrategy by the caller.  The clientBuffer, if supplied,
-			 * is ignored and untouched.
-			 * 
-			 * It is permissible for the argument to be null.
-			 */
 
-			// final int nbytes = msg.getSize();
-			// clientBuffer.position(0);
-			// clientBuffer.limit(nbytes);
-			//
-			// final long address = m_addressManager.toAddr(nbytes, msg
-			// .getFirstOffset());
-			// final ByteBuffer src = m_bufferStrategy.read(address);
-			//
-			// clientBuffer.put(src);
-			// }
-			break;
-		}
 		default:
 			throw new UnsupportedOperationException();
 		}

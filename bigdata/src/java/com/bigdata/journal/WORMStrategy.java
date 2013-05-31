@@ -2507,7 +2507,31 @@ public class WORMStrategy extends AbstractBufferStrategy implements
     public void writeRawBuffer(final IHAWriteMessage msg, final IBufferAccess b)
             throws IOException, InterruptedException {
 
-        // FIXME Must EXPAND() iff message is compressed.
+        // expand buffer before writing on the store.
+        final ByteBuffer xb = msg.expand(b.buffer());
+
+        if (true || log.isTraceEnabled()) {
+            log.warn("Buffer, position: " + xb.position()
+                    + ", limit: " + xb.limit());
+        }
+    	
+        final IBufferAccess ba = new IBufferAccess() {
+
+			@Override
+			public ByteBuffer buffer() {
+				return xb;
+			}
+
+			@Override
+			public void release() throws InterruptedException {
+			}
+
+			@Override
+			public void release(long timeout, TimeUnit unit)
+					throws InterruptedException {
+			}
+		};
+         
         
         /*
          * Wrap up the data from the message as a WriteCache object. This will
@@ -2519,7 +2543,7 @@ public class WORMStrategy extends AbstractBufferStrategy implements
          * by WriteCache.flush(). We have expanded the payload above. Now we are
          * just flushing the write cache onto the disk.
           */
-        final WriteCacheImpl writeCache = writeCacheService.newWriteCache(b,
+        final WriteCacheImpl writeCache = writeCacheService.newWriteCache(ba,
                 useChecksums, true/* bufferHasData */, opener,
                 msg.getFileExtent());
         
@@ -2546,7 +2570,7 @@ public class WORMStrategy extends AbstractBufferStrategy implements
          * pos to zero and then write bytes up to the limit. So, we set the
          * position to the limit before calling flush.
          */
-        final ByteBuffer bb = b.buffer();
+        final ByteBuffer bb = ba.buffer();
         final int limit = bb.limit();
         bb.position(limit);
 
@@ -2574,13 +2598,13 @@ public class WORMStrategy extends AbstractBufferStrategy implements
             final IHAWriteMessage msg, final IBufferAccess b)
             throws IOException, InterruptedException {
 
-        // read direct from store
+        // Buffer now contains data directly from log, DO NOT read direct from store
         final ByteBuffer clientBuffer = b.buffer();
-        final int nbytes = msg.getSize();
-        clientBuffer.position(0);
-        clientBuffer.limit(nbytes);
-
-        readRaw(/*nbytes, */msg.getFirstOffset(), clientBuffer);
+//        final int nbytes = msg.getSize();
+//        clientBuffer.position(0);
+//        clientBuffer.limit(nbytes);
+//
+//        readRaw(/*nbytes, */msg.getFirstOffset(), clientBuffer);
         
         assert clientBuffer.remaining() > 0 : "Empty buffer: " + clientBuffer;
 
@@ -2904,13 +2928,16 @@ public class WORMStrategy extends AbstractBufferStrategy implements
     @Override
     public void writeRawBuffer(HARebuildRequest req, IHAWriteMessage msg,
             ByteBuffer transfer) throws IOException {
+        // expand buffer before writing on the store.
+        final ByteBuffer xtransfer = msg.expand(transfer);
+
 //      if (m_rebuildRequest == null)
 //          throw new IllegalStateException("Store is not in rebuild state");
 //      
 //      if (m_rebuildSequence != msg.getSequence())
 //          throw new IllegalStateException("Invalid sequence number for rebuild, expected: " + m_rebuildSequence + ", actual: " + msg.getSequence());
 
-        FileChannelUtility.writeAll(this.opener, transfer, msg.getFirstOffset());
+        FileChannelUtility.writeAll(this.opener, xtransfer, msg.getFirstOffset());
         
 //      m_rebuildSequence++;
     }

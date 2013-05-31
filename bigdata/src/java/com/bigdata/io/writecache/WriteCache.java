@@ -53,6 +53,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IndexSegmentBuilder;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.ha.msg.HAWriteMessage;
@@ -772,22 +773,22 @@ abstract public class WriteCache implements IWriteCache {
      *             specified to the constructor).
      */
     // package private : exposed to WriteTask.call().
-    int getWholeBufferChecksum(final ByteBuffer checksumBuffer) {
+//    int getWholeBufferChecksum(final ByteBuffer checksumBuffer) {
+//
+//        final ByteBuffer src = peek().duplicate();
+//        // flip(limit=pos;pos=0)
+//        src.flip();
+//
+//        return getWholeBufferChecksum(checksumBuffer, src, false);
+//
+//    }
 
-        final ByteBuffer src = peek().duplicate();
-        // flip(limit=pos;pos=0)
-        src.flip();
-
-        return getWholeBufferChecksum(checksumBuffer, src);
-
-    }
-
-    int getWholeBufferChecksum(final ByteBuffer checksumBuffer, final ByteBuffer src) {
+    int getWholeBufferChecksum(final ByteBuffer checksumBuffer, final ByteBuffer src, final boolean isCompressed) {
 
         if (checker == null)
             throw new UnsupportedOperationException();
         
-        if (prefixWrites) {
+        if (isCompressed || prefixWrites) {
             /*
              * Recalculate whole buffer checksum.
              * 
@@ -801,7 +802,8 @@ abstract public class WriteCache implements IWriteCache {
                     + src.capacity() + ", checksumBuffer.capacity="
                     + checksumBuffer.capacity();
 
-            checksumBuffer.limit(checksumBuffer.capacity());
+            // checksumBuffer.limit(checksumBuffer.capacity());
+            checksumBuffer.limit(src.limit());
             checksumBuffer.position(0);
             checksumBuffer.put(src);
             checksumBuffer.flip();
@@ -1646,18 +1648,21 @@ abstract public class WriteCache implements IWriteCache {
             
         }
     	
-        // log.warn("Message, position: " + send.position() + ", limit: " + send.limit());
-    	
+    	final int chksum = getWholeBufferChecksum(checksumBuffer, send.duplicate(), b != send /*isCompressed*/);
         final HAWriteMessage msg = new HAWriteMessage(//
                 storeUUID,//
                 lastCommitCounter,//
                 lastCommitTime,//
                 sequence, //
-                send.limit(), getWholeBufferChecksum(checksumBuffer, send.duplicate()),
+                send.limit(), chksum,
                 prefixWrites ? StoreTypeEnum.RW : StoreTypeEnum.WORM,
                 quorumToken, fileExtent.get(), firstOffset.get(),
                 compressorKey);
-    	
+
+        if (log.isTraceEnabled()) {
+            log.trace("Original buffer: " + b.limit() + ", final buffer: " + send.limit() + ", compressorKey: " + compressorKey + ", checksum: " + chksum);
+        }
+        
         return new HAPackage(msg, send);
     	
     }
