@@ -374,6 +374,7 @@ public class Banner {
                 + " " + SystemUtil.architecture() + //
         "\n"+SystemUtil.cpuInfo() + " #CPU="+SystemUtil.numProcessors() +//
         "\n"+System.getProperty("java.vendor")+" "+System.getProperty("java.version")+
+        "\nfreeMemory="+Runtime.getRuntime().freeMemory()+//
         getBuildString()+ // Note: Will add its own newline if non-empty.
         "\n\n"
         ;

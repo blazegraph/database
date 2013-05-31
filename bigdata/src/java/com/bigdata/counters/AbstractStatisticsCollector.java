@@ -31,6 +31,8 @@ package com.bigdata.counters;
 import java.io.IOException;
 import java.lang.management.GarbageCollectorMXBean;
 import java.lang.management.ManagementFactory;
+import java.lang.management.MemoryPoolMXBean;
+import java.lang.management.MemoryUsage;
 import java.net.InetAddress;
 import java.util.Arrays;
 import java.util.Enumeration;
@@ -318,6 +320,11 @@ abstract public class AbstractStatisticsCollector implements IStatisticsCollecto
                     .addGarbageCollectorMXBeanCounters(serviceRoot
                             .makePath(ICounterHierarchy.Memory_GarbageCollectors));
 
+            // add counters for memory pools.
+            AbstractStatisticsCollector
+                    .addMemoryPoolMXBeanCounters(serviceRoot
+                            .makePath(ICounterHierarchy.Memory_Memory_Pools));
+
             /*
              * Add counters reporting on the various DirectBufferPools.
              */
@@ -479,6 +486,99 @@ abstract public class AbstractStatisticsCollector implements IStatisticsCollecto
 
     }
     
+    
+    /**
+     * Adds/updates counters relating to JVM Memory Pools. These counters
+     * should be located within a per-service path.
+     * 
+     * @param counterSet
+     *            The counters set that is the direct parent.
+     */
+    static public void addMemoryPoolMXBeanCounters(
+            final CounterSet counterSet) {
+
+        final String name_pool = "Memory Pool";
+
+        final String name_max = "Maximum Usage";
+
+        final String name_used = "Current Usage";
+
+        synchronized (counterSet) {
+
+            final List<MemoryPoolMXBean> list = ManagementFactory
+                    .getMemoryPoolMXBeans();
+
+            for (final MemoryPoolMXBean bean : list) {
+
+                final String name = bean.getName();
+
+                // counter set for this GC bean (may be pre-existing).
+                final CounterSet tmp = counterSet.makePath(name);
+
+                synchronized (tmp) {
+
+                    // memory pool names.
+                    {
+                        if (tmp.getChild(name_pool) == null) {
+                            
+                            tmp.addCounter(name_pool,
+                                    new Instrument<String>() {
+
+                                        @Override
+                                        protected void sample() {
+
+                                            setValue(bean.getName());
+
+                                        }
+                        
+                            });
+                        
+                        }
+                        
+                    }
+
+                    // usage (max). 
+                    {
+                        if (tmp.getChild(name_max) == null) {
+                            tmp.addCounter(name_max, new Instrument<Long>() {
+
+                                @Override
+                                protected void sample() {
+
+                                    final MemoryUsage u = bean.getUsage();
+                                    
+                                    setValue(u.getMax());
+
+                                }
+                            });
+                        }
+                    }
+
+                    // usage (current)
+                    {
+                        if (tmp.getChild(name_used) == null) {
+                            tmp.addCounter(name_used, new Instrument<Long>() {
+
+                                @Override
+                                protected void sample() {
+
+                                    final MemoryUsage u = bean.getUsage();
+
+                                    setValue(u.getUsed());
+
+                                }
+                            });
+                        }
+                    }
+
+                }
+
+            }
+
+        }
+
+    }
+
     /**
      * Start collecting host performance data -- must be extended by the
      * concrete subclass.
@@ -706,8 +806,12 @@ abstract public class AbstractStatisticsCollector implements IStatisticsCollecto
         final AbstractStatisticsCollector client = AbstractStatisticsCollector
                 .newInstance( properties );
 
+        final CounterSet counterSet = client.getCounters();
+        
+        counterSet.attach(getMemoryCounterSet());
+        
         // write counters before we start the client
-        System.out.println(client.getCounters().toString());
+        System.out.println(counterSet.toString());
         
         System.err.println("Starting performance counter collection: interval="
                 + client.interval + ", count=" + count);
