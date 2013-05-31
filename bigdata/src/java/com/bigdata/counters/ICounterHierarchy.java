@@ -67,6 +67,12 @@ public interface ICounterHierarchy {
     String Memory_GarbageCollectors = Memory + ps + "Garbage Collectors";
 
     /**
+     * The namespace for counters identifying the different memory pools
+     * associated with the JVM.
+     */
+    String Memory_Memory_Pools = Memory + ps + "Memory Pools";
+
+    /**
      * The namespace for counters dealing with logical aggregations of disk.
      */
     String LogicalDisk = "LogicalDisk";
