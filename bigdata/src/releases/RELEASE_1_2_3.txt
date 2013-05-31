@@ -110,6 +110,7 @@ Change log:
 - http://sourceforge.net/apps/trac/bigdata/ticket/667 (Provide NanoSparqlServer initialization hook)
 - http://sourceforge.net/apps/trac/bigdata/ticket/669 (Doubly nested subqueries yield no results with LIMIT)
 - http://sourceforge.net/apps/trac/bigdata/ticket/675 (Flush indices in parallel during checkpoint to reduce IO latency)
+- http://sourceforge.net/apps/trac/bigdata/ticket/682 (AtomicRowFilter UnsupportedOperationException)
 
 1.2.2:
 
