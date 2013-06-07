@@ -36,6 +36,7 @@ import java.nio.channels.SocketChannel;
 import java.util.Iterator;
 import java.util.Set;
 import java.util.concurrent.Callable;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -50,6 +51,8 @@ import java.util.zip.Adler32;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.ha.QuorumPipelineImpl;
+import com.bigdata.ha.msg.IHASyncRequest;
 import com.bigdata.ha.msg.IHAWriteMessage;
 import com.bigdata.ha.msg.IHAWriteMessageBase;
 import com.bigdata.ha.pipeline.HASendService.IncSendTask;
@@ -74,6 +77,20 @@ public class HAReceiveService<M extends IHAWriteMessageBase> extends Thread {
     private static final Logger log = Logger
             .getLogger(HAReceiveService.class);
 
+    /**
+     * The timeout (milliseconds) on the client {@link Selector}.
+     * This provides a tradeoff for liveness when responding to 
+     * a pipeline change exception (firstCause) versus spinning
+     * while awaiting some bytes to read.
+     */
+    static private final long selectorTimeout = 500;
+    
+    /**
+     * The timeout (milliseconds) before logging @ WARN that we are
+     * blocking awaiting data on the socket from the upstream service.
+     */
+    static private final long logTimeout = 10000;
+    
     /** The Internet socket address at which this service will listen. */
     private final InetSocketAddress addrSelf;
 
@@ -503,14 +520,17 @@ public class HAReceiveService<M extends IHAWriteMessageBase> extends Thread {
                         messageReady.await();
                     }
                     
+                    // Note the message.
+                    final M msg = message; 
+                    
+                    // Message cleared.
+                    message = null;
+
                     // Setup task to read buffer for that message.
                     readFuture = waitFuture = new FutureTask<Void>(
-                            new ReadTask<M>(server, clientRef, message,
+                            new ReadTask<M>(server, clientRef, msg,
                                     localBuffer, sendService, addrNextRef,
                                     callback));
-
-                    // Message cleared once ReadTask started.
-                    message = null; 
 
                     // [waitFuture] is available for receiveData().
                     futureReady.signalAll();
@@ -577,6 +597,29 @@ public class HAReceiveService<M extends IHAWriteMessageBase> extends Thread {
         private final SocketChannel client;
         private final Selector clientSelector;
         private final SelectionKey clientKey;
+        
+        /**
+         * When a pipeline change event is handled, we need to throw out an
+         * exception rather than just cancelling the
+         * {@link HAReceiveService#readFuture}. Cancelling the
+         * {@link HAReceiveService#readFuture} causes a
+         * {@link CancellationException} to be propoagated back to the remote
+         * service that invoked
+         * {@link IPipelineGlue#receiveAndReplicate(IHASyncRequest, IHAWriteMessage)}
+         * . That {@link CancellationException} gets interpreted as a normal
+         * termination in {@link QuorumPipelineImpl} and results in the
+         * retrySend() logic NOT retrying and resending and thus breaks the
+         * robustness of write pipeline replication.
+         * <p>
+         * Instead, the pipeline change events are used to set a
+         * {@link Throwable} that is then thrown out of
+         * {@link ReadTask#doReceiveAndReplicate(Client)} and thus appears as a
+         * non-normal termination of the read future in the upstream service.
+         * This allows retrySend() to do the right thing - namely it sends an
+         * RMI message to the new downstream service and retransmits the payload
+         * along the write pipeline.
+         */
+        private final AtomicReference<Throwable> firstCause = new AtomicReference<Throwable>();
 
 //        /** Used to replicate the message to the downstream service (if any). */
 //        private final HASendService downstream;
@@ -639,6 +682,27 @@ public class HAReceiveService<M extends IHAWriteMessageBase> extends Thread {
 //                    }
 //                }
             }
+        }
+
+        /**
+         * Termination path used to signal a pipeline change through exception
+         * control back to the leader. The leader will then handle this in
+         * {@link QuorumPipelineImpl}'s retrySend() method.
+         */
+        public void checkFirstCause() throws RuntimeException {
+
+            final Throwable t = firstCause.getAndSet(null);
+
+            if (t != null) {
+                try {
+                    close();
+                } catch (IOException ex) {
+                    log.warn(ex, ex);
+                }
+                throw new RuntimeException(t);
+
+            }
+
         }
 
     }
@@ -937,8 +1001,12 @@ public class HAReceiveService<M extends IHAWriteMessageBase> extends Thread {
             while (rem > 0 && !EOS) {
 
                 // block up to the timeout.
-                final int nkeys = client.clientSelector.select(10000/* ms */);
-            
+                final int nkeys = client.clientSelector
+                        .select(selectorTimeout/* ms */);
+
+                // Check for termination (first cause exception).
+                client.checkFirstCause();
+                
                 if (nkeys == 0) {
                 
                     /*
@@ -949,7 +1017,7 @@ public class HAReceiveService<M extends IHAWriteMessageBase> extends Thread {
                     final long now = System.currentTimeMillis();
                     final long elapsed = now - mark;
                     
-                    if (elapsed > 10000) {
+                    if (elapsed > logTimeout) {
                         // Issue warning if we have been blocked for a while.
                         log.warn("Blocked: awaiting " + rem + " out of "
                                 + message.getSize() + " bytes.");
@@ -1027,11 +1095,12 @@ public class HAReceiveService<M extends IHAWriteMessageBase> extends Thread {
                      * retransmitting the current cache block.
                      * 
                      * The rdlen is checked for non zero to avoid an
-                     * IllegalArgumentException. 
+                     * IllegalArgumentException.
+                     * 
+                     * Note: loop since addrNext might change asynchronously.
                      */
-                    // dereference.
-                    final InetSocketAddress addrNext = addrNextRef.get();
-                    if (rdlen != 0 && addrNext != null) {
+                    while(true) {
+                    if (rdlen != 0 && addrNextRef.get() != null) {
                         if (log.isTraceEnabled())
                             log.trace("Incremental send of " + rdlen + " bytes");
                         final ByteBuffer out = localBuffer.asReadOnlyBuffer();
@@ -1051,11 +1120,19 @@ public class HAReceiveService<M extends IHAWriteMessageBase> extends Thread {
                                  * Prepare send service for incremental
                                  * transfers to the specified address.
                                  */
-                                sendService.start(addrNext);
+                                // Check for termination.
+                                client.checkFirstCause();
+                                // Note: use then current addrNext!
+                                sendService.start(addrNextRef.get());
+                                continue;
                             }
                         }
+                        // Check for termination.
+                        client.checkFirstCause();
                         // Send and await Future.
                         sendService.send(out).get();
+                        }
+                        break;
                     }
                 }
 
@@ -1300,12 +1377,40 @@ public class HAReceiveService<M extends IHAWriteMessageBase> extends Thread {
                 log.info("addrNext(old)=" + this.addrNextRef.get()
                         + ", addrNext(new)=" + addrNext);
 
-            if (readFuture != null) {
+            final Client c = clientRef.get();
 
-                // Interrupt the current receive operation.
-                readFuture.cancel(true/* mayInterruptIfRunning */);
+            if (c != null && readFuture != null) {
 
+                /*
+                 * Set firstCause. doReceiveAndReplicate() will notice this and
+                 * throw the (wrapped) exception back to the caller. This allows
+                 * retrySend() on the leader to differentiate between normal
+                 * termination of a downstream service and a pipeline change
+                 * event.
+                 * 
+                 * Note: We do this *instead* of interrupting the [readFuture].
+                 * The cause will be thrown out after a timeout on the client
+                 * Selector or the next time any bytes are received at that
+                 * Selector.
+                 * 
+                 * Note: The code path that interrupted the [readFuture] would
+                 * only do so if the [readFuture] was non-null. The same
+                 * behavior is preserved here. This subtlty means that a
+                 * pipeline change event that occurs *before* the next attempt
+                 * to receive a payload will succeed while a change that occurs
+                 * once we have started to read data will fail.
+                 */
+
+                c.firstCause.set(new PipelineDownstreamChange());
+                
             }
+   
+//            if (readFuture != null) {
+//
+//                // Interrupt the current receive operation.
+//                readFuture.cancel(true/* mayInterruptIfRunning */);
+//
+//            }
 
             synchronized (sendService) {
 
@@ -1316,12 +1421,16 @@ public class HAReceiveService<M extends IHAWriteMessageBase> extends Thread {
                     
                 }
                 
-            }
+                /*
+                 * Save the new addr.
+                 * 
+                 * Note: We need to do this while holding the monitor for the
+                 * [sendService] since the update must be visible if we restart
+                 * the sendService.
+                 */
+                this.addrNextRef.set(addrNext);
 
-            /*
-             * Save the new addr.
-             */
-            this.addrNextRef.set(addrNext);
+            }
 
             /*
              * Note: Do not start the service here. It will be started by the
@@ -1357,23 +1466,57 @@ public class HAReceiveService<M extends IHAWriteMessageBase> extends Thread {
             if (log.isInfoEnabled())
                 log.info("");
 
-            if (readFuture != null) {
+            final Client oldClient = clientRef.getAndSet(null);
 
-                // Interrupt the current receive operation.
-                readFuture.cancel(true/* mayInterruptIfRunning */);
+            if (oldClient != null) {
+
+                log.warn("Cleared Client reference.");
 
             }
+            
+            if (oldClient != null && readFuture != null) {
+
+                /*
+                 * Set firstCause. doReceiveAndReplicate() will notice this and
+                 * throw the (wrapped) exception back to the caller. This allows
+                 * retrySend() on the leader to differentiate between normal
+                 * termination of a downstream service and a pipeline change
+                 * event.
+                 * 
+                 * Note: We do this *instead* of interrupting the [readFuture].
+                 * The cause will be thrown out after a timeout on the client
+                 * Selector or the next time any bytes are received at that
+                 * Selector.
+                 * 
+                 * Note: The code path that interrupted the [readFuture] would
+                 * only do so if the [readFuture] was non-null. The same
+                 * behavior is preserved here. This subtlty means that a
+                 * pipeline change event that occurs *before* the next attempt
+                 * to receive a payload will succeed while a change that occurs
+                 * once we have started to read data will fail.
+                 */
+
+                oldClient.firstCause.set(new PipelineUpstreamChange());
+
+            }
+
+//            if (readFuture != null) {
+//
+//                // Interrupt the current receive operation.
+//                readFuture.cancel(true/* mayInterruptIfRunning */);
+//
+//            }
 
             /*
              * Explicitly close the client socket channel.
              */
             {
             
-                final Client oldClient = clientRef.getAndSet(null);
+//                final Client oldClient = clientRef.getAndSet(null);
 
                 if (oldClient != null) {
 
-                    log.warn("Cleared Client reference.");
+//                    log.warn("Cleared Client reference.");
                     
                     try {
                     

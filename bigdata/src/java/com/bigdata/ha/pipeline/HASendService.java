@@ -505,6 +505,21 @@ public class HASendService {
                      * However, the SocketChannel will be automatically reopened
                      * for the next request (unless the HASendService has been
                      * terminated).
+                     * 
+                     * Note: socketChannel.write() returns as soon as the socket
+                     * on the remote end point has locally buffered the data.
+                     * This is *before* the Selector.select() method returns
+                     * control to the application. Thus, the write() method here
+                     * can succeed if the payload is transmitted in a single
+                     * socket buffer exchange and the send() Future will report
+                     * success even through the application code on the receiver
+                     * could fail once it gets control back from select(). This
+                     * twist can be a bit suprising. Therefore it is useful to
+                     * write tests with both small payloads (the data transfer
+                     * will succeed at the socket level even if the application
+                     * logic then fails the transfer) and for large payloads.
+                     * The concept of "large" depends on the size of the socket
+                     * buffer.
                      */
 
                     final int nbytes = socketChannel.write(data);

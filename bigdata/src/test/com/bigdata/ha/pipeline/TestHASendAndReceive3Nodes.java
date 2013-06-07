@@ -37,9 +37,11 @@ import com.bigdata.ha.msg.IHAWriteMessageBase;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.IBufferAccess;
 import com.bigdata.io.TestCase3;
+import com.bigdata.rawstore.Bytes;
 import com.bigdata.util.ChecksumError;
 import com.bigdata.util.ChecksumUtility;
 import com.bigdata.util.InnerCause;
+import com.sun.corba.se.pept.transport.Selector;
 
 /**
  * Test the raw socket protocol implemented by {@link HASendService} and
@@ -243,13 +245,32 @@ public class TestHASendAndReceive3Nodes extends TestCase3 {
      * @throws IOException
      * @throws TimeoutException 
      */
-    public void testPipelineChange() throws InterruptedException,
+    public void testPipelineChange_smallMessage() throws InterruptedException,
             ExecutionException, IOException, TimeoutException {
 
-        final int msgSize = 50;
+        doTestPipelineChange(50/* msgSize */, true/* smallMessage */);
+
+    }
+
+    /**
+     * Variant test with a message size that we expect to be larger than will be
+     * received by the OS before it hands control back to our code through the
+     * {@link Selector}.
+     */
+    public void testPipelineChange_largeMessage() throws InterruptedException,
+            ExecutionException, IOException, TimeoutException {
+
+        doTestPipelineChange(10 * Bytes.megabyte32/* msgSize */, false/* smallMessage */);
+
+    }
+
+    private void doTestPipelineChange(final int msgSize, final boolean smallMessage)
+            throws InterruptedException, ExecutionException, IOException,
+            TimeoutException {
+        
         final long timeout = 5000; // milliseconds.
-        final ByteBuffer rcv1 = ByteBuffer.allocate(2000);
-        final ByteBuffer rcv2 = ByteBuffer.allocate(2000);
+        final ByteBuffer rcv1 = ByteBuffer.allocate(msgSize + Bytes.kilobyte32);
+        final ByteBuffer rcv2 = ByteBuffer.allocate(msgSize + Bytes.kilobyte32);
 
         /*
          * Pipeline is [A,B,C]. Write on A. Verify received by {B,C}.
@@ -280,6 +301,12 @@ public class TestHASendAndReceive3Nodes extends TestCase3 {
          */
         if(true){
             log.info("Pipeline: [A,B] (C removed)");
+            /*
+             * Note: The pipeline change events are applied *before* we start
+             * the send() or receiveData() operations. This means that the
+             * HAReceiveService should not transfer any data from the OS socket
+             * buffer into its localBuffer.
+             */
             receiveServiceB.changeDownStream(null/* addrNext */);
             receiveServiceC.changeUpStream(); // close upstream socket.
             
@@ -290,9 +317,66 @@ public class TestHASendAndReceive3Nodes extends TestCase3 {
                     .receiveData(msg1, rcv1);
 //            final Future<Void> futRec2 = receiveService2
 //                    .receiveData(msg1, rcv2);
-            final Future<Void> futSnd = sendServiceA.send(tst1);
-            futSnd.get(timeout,TimeUnit.MILLISECONDS);
-            futRec1.get(timeout,TimeUnit.MILLISECONDS);
+            final Future<Void> futSnd = sendServiceA.send(tst1.duplicate());
+            // Send will always succeed.
+            futSnd.get(timeout, TimeUnit.MILLISECONDS);
+            /*
+             * Note: the following does not occur since we are only closing the
+             * close of the socketChannel if there is an active ReadTask on the
+             * receiver. Since the pipeline change is applied before we send()
+             * from the leader, there is no active ReadTask on the follower and
+             * the send() will always succeed.
+             */
+//            if (smallMessage) {
+//                /*
+//                 * For a small message, the sendService should believe that it
+//                 * has successfully transferred the data. What happens is that
+//                 * the socket channel on the follower has accepted all of the
+//                 * message bytes into an OS level socket buffer. When that
+//                 * happens, the HASendService socketChannel.write() returns
+//                 * normally and the IncSendTask reports that all bytes were
+//                 * transferred. This is true. However, the HAReceiveService will
+//                 * throw an exception as soon as control is transferred to our
+//                 * code, we will throw the exception. That exception will be
+//                 * observed thrown the RMI Future for the receiveData() message
+//                 * on the follower.
+//                 */
+//                futSnd.get(timeout, TimeUnit.MILLISECONDS);
+//            } else {
+//                /*
+//                 * If the payload is larger than the OS level socket buffer then
+//                 * control will be transferred to the HAReceiveService before
+//                 * all bytes have been send by the upstream service. In this
+//                 * case, the HAReceiveService will throw out the
+//                 * PipelineChangedException and close the socketChannel. The
+//                 * IOException caught and tested here is caused when the
+//                 * HAReceiveService closes the socket channel, thus preventing
+//                 * the HASendService from completing the data transfer.
+//                 */
+//                try {
+//                    futSnd.get(timeout, TimeUnit.MILLISECONDS);
+//                    fail("Expecting: " + ExecutionException.class);
+//                } catch (ExecutionException ex) {
+//                    if (!InnerCause.isInnerCause(ex, IOException.class)) {
+//                        fail("Expecting: " + IOException.class + ", not " + ex,
+//                                ex);
+//                    }
+//                }
+//            }
+            /*
+             * Note: exception not thrown since pipelineChange is applied
+             * *before* we invoke send().
+             */
+//            try {
+                futRec1.get(timeout, TimeUnit.MILLISECONDS);
+//                fail("Expecting: "+PipelineDownstreamChange.class);
+//            } catch (ExecutionException ex) {
+//                if (!InnerCause
+//                        .isInnerCause(ex, PipelineDownstreamChange.class)) {
+//                    fail("Expecting: " + PipelineDownstreamChange.class
+//                            + ", not " + ex, ex);
+//                }
+//            }
 //            futRec2.get();
             assertEquals(tst1, rcv1);
 //            assertEquals(rcv1, rcv2);
@@ -338,7 +422,51 @@ public class TestHASendAndReceive3Nodes extends TestCase3 {
             final Future<Void> futRec2 = receiveServiceC
                     .receiveData(msg1, rcv2);
             final Future<Void> futSnd = sendServiceA.send(tst1);
-            futSnd.get(timeout,TimeUnit.MILLISECONDS);
+            // Send will always succeed.
+            futSnd.get(timeout, TimeUnit.MILLISECONDS);
+            /*
+             * Note: the following does not occur since we are only closing the
+             * close of the socketChannel if there is an active ReadTask on the
+             * receiver. Since the pipeline change is applied before we send()
+             * from the leader, there is no active ReadTask on the follower and
+             * the send() will always succeed.
+             */
+//            if (smallMessage) {
+//                /*
+//                 * For a small message, the sendService should believe that it
+//                 * has successfully transferred the data. What happens is that
+//                 * the socket channel on the follower has accepted all of the
+//                 * message bytes into an OS level socket buffer. When that
+//                 * happens, the HASendService socketChannel.write() returns
+//                 * normally and the IncSendTask reports that all bytes were
+//                 * transferred. This is true. However, the HAReceiveService will
+//                 * throw an exception as soon as control is transferred to our
+//                 * code, we will throw the exception. That exception will be
+//                 * observed thrown the RMI Future for the receiveData() message
+//                 * on the follower.
+//                 */
+//                futSnd.get(timeout, TimeUnit.MILLISECONDS);
+//            } else {
+//                /*
+//                 * If the payload is larger than the OS level socket buffer then
+//                 * control will be transferred to the HAReceiveService before
+//                 * all bytes have been send by the upstream service. In this
+//                 * case, the HAReceiveService will throw out the
+//                 * PipelineChangedException and close the socketChannel. The
+//                 * IOException caught and tested here is caused when the
+//                 * HAReceiveService closes the socket channel, thus preventing
+//                 * the HASendService from completing the data transfer.
+//                 */
+//                try {
+//                    futSnd.get(timeout, TimeUnit.MILLISECONDS);
+//                    fail("Expecting: " + ExecutionException.class);
+//                } catch (ExecutionException ex) {
+//                    if (!InnerCause.isInnerCause(ex, IOException.class)) {
+//                        fail("Expecting: " + IOException.class + ", not " + ex,
+//                                ex);
+//                    }
+//                }
+//            }
             futRec1.get(timeout,TimeUnit.MILLISECONDS);
             futRec2.get(timeout,TimeUnit.MILLISECONDS);
             assertEquals(tst1, rcv1);
@@ -582,4 +710,5 @@ public class TestHASendAndReceive3Nodes extends TestCase3 {
 			}
 		}
 	}
+
 }
