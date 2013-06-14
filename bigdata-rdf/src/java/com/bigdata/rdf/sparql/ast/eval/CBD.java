@@ -444,8 +444,6 @@ public class CBD {
      * describe cache materialization logic since rounds GT ZERO (0) are not
      * top-level DESCRIBE queries and do not describe top-level resources.
      * 
-     * @param store
-     *            The triple store.
      * @param bnodeIVs
      *            The blank nodes that need to be described.
      * @return An iterator from which the description of those blank nodes may
