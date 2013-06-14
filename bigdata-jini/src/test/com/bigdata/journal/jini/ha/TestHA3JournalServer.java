@@ -987,7 +987,7 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
         destroyC();
         shutdownA();
         shutdownB();
-
+        // TODO Remove all HALogs on A/B in order to force rebuild even if a restorePolicy is being used.
         /*
          * Now restart A, B & C.
          * 
@@ -2727,5 +2727,5 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
 //      }
 //  }
 //}
-
+    
 }
