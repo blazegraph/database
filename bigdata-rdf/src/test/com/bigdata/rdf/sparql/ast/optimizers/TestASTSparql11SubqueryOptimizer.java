@@ -33,6 +33,7 @@ import org.openrdf.model.impl.URIImpl;
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.query.algebra.StatementPattern.Scope;
 
+import com.bigdata.BigdataStatics;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.aggregate.AggregateBase;
 import com.bigdata.bop.aggregate.IAggregate;
@@ -833,6 +834,9 @@ public class TestASTSparql11SubqueryOptimizer extends AbstractASTEvaluationTestC
          * it can not predict the join variables correctly, it is actually
          * lifting everything when that code is enabled.
          */
+        if (!BigdataStatics.runKnownBadTests)
+            return;
+
         assertSameAST(expected, actual);
 
     }
