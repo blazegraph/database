@@ -65,7 +65,7 @@ public class HAJournalDiscoveryClient extends
 
         super(serviceDiscoveryManager, serviceDiscoveryListener,
                 HAGlue.class, new ServiceTemplate(null,
-                        new Class[] { IClientService.class }, null),
+                        new Class[] { HAGlue.class }, null),
                 null/* filter */, cacheMissTimeout);
 
     }
