@@ -101,7 +101,7 @@ public class StressTestHA3JournalServer extends AbstractHA3JournalServerTestCase
      */
     public void testABCMultiLoadFollowerReads() throws Exception {
         
-        doABCMultiLoadFollowerReads2(50/*nTransactions*/, false/*largeLoad*/);
+        doABCMultiLoadFollowerReads2(10/*nTransactions*/, false/*largeLoad*/);
         
     }
     
@@ -112,7 +112,7 @@ public class StressTestHA3JournalServer extends AbstractHA3JournalServerTestCase
      */
     public void testABCMultiLoadFollowerReadsLargeLoad() throws Exception {
 
-        doABCMultiLoadFollowerReads2(20/*nTransactions*/, true/*largeLoad*/);
+        doABCMultiLoadFollowerReads2(5/*nTransactions*/, true/*largeLoad*/);
         
     }
     
