@@ -100,6 +100,7 @@ import com.bigdata.rdf.sail.webapp.NanoSparqlServer;
 import com.bigdata.rwstore.RWStore;
 import com.bigdata.service.AbstractHATransactionService;
 import com.bigdata.service.jini.FakeLifeCycle;
+import com.bigdata.util.ClocksNotSynchronizedException;
 import com.bigdata.util.InnerCause;
 import com.bigdata.util.concurrent.LatchedExecutor;
 import com.bigdata.util.concurrent.MonitoredFutureTask;
@@ -197,6 +198,34 @@ public class HAJournalServer extends AbstractServer {
         long DEFAULT_HA_PREPARE_TIMEOUT = Long.MAX_VALUE; // milliseconds.
         
         long MIN_HA_PREPARE_TIMEOUT = 100; // milliseconds.
+
+        /**
+         * The maximum allowed clock skew (default
+         * {@value #DEFAULT_MAXIMUM_CLOCK_SKEW} milliseconds). Clock skew is
+         * identified during the commit protocol. A timestamp (A) is taken on
+         * the leader. The leader then messages the followers. The followers
+         * take timestamps (B) and message the leader. The leader then takes
+         * another timestamp (C). A {@link ClocksNotSynchronizedException} will
+         * be thrown if any of the following conditions are violated:
+         * <ul>
+         * <li>A is not <i>before</i> B (for each follower's value of B)</li>
+         * <li>B is not <i>before</i> C (for each follower's value of B)</li>
+         * </ul>
+         * This option controls the maximum skew in the clocks and thus how much
+         * error is allowable in the interpretation of the <i>before</i>
+         * relation.
+         * 
+         * @see ClocksNotSynchronizedException
+         */
+        String MAXIMUM_CLOCK_SKEW = "maximumClockSkew";
+        
+        long DEFAULT_MAXIMUM_CLOCK_SKEW = 5000;
+        
+        /**
+         * The mimimum allowed value for the {@link #MAXIMUM_CLOCK_SKEW}
+         * configuration option.
+         */
+        long MIN_MAXIMUM_CLOCK_SKEW = 100;
         
         /**
          * The property whose value is the name of the directory in which write

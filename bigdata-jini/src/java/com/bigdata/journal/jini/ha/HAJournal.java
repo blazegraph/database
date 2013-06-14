@@ -57,7 +57,6 @@ import com.bigdata.concurrent.FutureTaskMon;
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.QuorumService;
 import com.bigdata.ha.RunState;
-import com.bigdata.ha.halog.HALogReader;
 import com.bigdata.ha.halog.HALogWriter;
 import com.bigdata.ha.halog.IHALogReader;
 import com.bigdata.ha.msg.HADigestResponse;
@@ -185,6 +184,11 @@ public class HAJournal extends Journal {
      * @see HAJournalServer.ConfigurationOptions#HA_RELEASE_TIME_CONSENSUS_TIMEOUT
      */
     private final long haReleaseTimeConsensusTimeout;
+    
+    /**
+     * @see HAJournalServer.ConfigurationOptions#MAXIMUM_CLOCK_SKEW
+     */
+    private final long maximumClockSkew;
     
 //    /**
 //     * @see HAJournalServer.ConfigurationOptions#HA_LOG_DIR
@@ -352,6 +356,25 @@ public class HAJournal extends Journal {
             }
 
         }
+
+        {
+            maximumClockSkew = (Long) config
+                    .getEntry(
+                            HAJournalServer.ConfigurationOptions.COMPONENT,
+                            HAJournalServer.ConfigurationOptions.MAXIMUM_CLOCK_SKEW,
+                            Long.TYPE,
+                            HAJournalServer.ConfigurationOptions.DEFAULT_MAXIMUM_CLOCK_SKEW);
+
+            if (maximumClockSkew < HAJournalServer.ConfigurationOptions.MIN_MAXIMUM_CLOCK_SKEW) {
+                throw new ConfigurationException(
+                        HAJournalServer.ConfigurationOptions.MAXIMUM_CLOCK_SKEW
+                                + "="
+                                + maximumClockSkew
+                                + " : must be GTE "
+                                + HAJournalServer.ConfigurationOptions.MIN_MAXIMUM_CLOCK_SKEW);
+            }
+
+        }
         
         // HALog manager.
         haLogNexus = new HALogNexus(server, this, config);
@@ -508,6 +531,18 @@ public class HAJournal extends Journal {
     public final long getHAReleaseTimeConsensusTimeout() {
 
         return haReleaseTimeConsensusTimeout;
+        
+    }
+
+    /**
+     * {@inheritDoc}
+     * 
+     * @see HAJournalServer.ConfigurationOptions#MAXIMUM_CLOCK_SKEW
+     */
+    @Override
+    public final long getMaximumClockSkewMillis() {
+
+        return maximumClockSkew;
         
     }
 
@@ -1881,11 +1916,14 @@ public class HAJournal extends Journal {
             } else {
                 innerRunStateStr.append("N/A");
             }
+            final boolean debug = true;
             innerRunStateStr.append(" @ "
                     + journal.getRootBlockView().getCommitCounter());
-            innerRunStateStr.append(", haReady=" + getHAReady());
+            if(debug)
+                innerRunStateStr.append(", haReady=" + getHAReady());
             innerRunStateStr.append(", haStatus=" + getHAStatus());
-            innerRunStateStr.append(", serviceId="
+            if(debug)
+                innerRunStateStr.append(", serviceId="
                     + (quorumService == null ? "N/A" : quorumService
                             .getServiceId()));
             /*
@@ -1894,7 +1932,8 @@ public class HAJournal extends Journal {
              * not need that synchronized keyword on nextTimestamp(). Try
              * removing it and then using it here.]
              */
-            innerRunStateStr.append(", now=" + System.currentTimeMillis());
+            if(debug)
+                innerRunStateStr.append(", now=" + System.currentTimeMillis());
             final String msg = server.getOperatorAlert();
             if (msg != null)
                 innerRunStateStr.append(", msg=[" + msg + "]");

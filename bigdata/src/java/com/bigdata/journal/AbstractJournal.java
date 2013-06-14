@@ -165,7 +165,6 @@ import com.bigdata.rwstore.sector.MemoryManager;
 import com.bigdata.service.AbstractHATransactionService;
 import com.bigdata.service.AbstractTransactionService;
 import com.bigdata.service.IBigdataFederation;
-import com.bigdata.stream.Stream;
 import com.bigdata.util.ChecksumUtility;
 import com.bigdata.util.ClocksNotSynchronizedException;
 import com.bigdata.util.NT;
@@ -1780,6 +1779,8 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
      *            A timestamp from the another service.
      * 
      * @throws ClocksNotSynchronizedException
+     * 
+     * @see ClocksNotSynchronizedException
      */
     protected void assertBefore(final UUID serviceId1, final UUID serviceId2,
             final long t1, final long t2) throws ClocksNotSynchronizedException {
@@ -1787,14 +1788,8 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
         // Maximum allowed clock skew.
         final long maxSkew = getMaximumClockSkewMillis();
 
-        final long delta = Math.abs(t1 - t2);
-
-        if (delta < maxSkew)
-            return;
-
-        throw new ClocksNotSynchronizedException("service1=" + serviceId1
-                + ", serviceId2=" + serviceId2 + ", skew=" + delta
-                + "ms exceeds maximumSkew=" + maxSkew + "ms.");
+        ClocksNotSynchronizedException.assertBefore(serviceId1, serviceId2, t1,
+                t2, maxSkew);
 
     }
     
@@ -1804,17 +1799,14 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
      * are within some acceptable skew of one another. It is also used by
      * {@link #nextCommitTimestamp()} where it specifies the maximum clock skew
      * that will be corrected without operator intervention.
+     * <p>
+     * Note: This is overridden by the HAJournal.
      * 
      * @see #assertBefore(UUID, UUID, long, long)
-     * 
-     *      FIXME HA TXS : Configuration Option. Note: This is not just an HA
-     *      issue. We also need to be able to override this in order to write on
-     *      a journal if the local clock is wildly different from the clock on
-     *      the machine where the journal was produced.
      */
     protected long getMaximumClockSkewMillis() {
 
-        return 5000;
+        throw new UnsupportedOperationException();
         
     }
 
