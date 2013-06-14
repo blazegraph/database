@@ -72,5 +72,13 @@ public class BigdataStatics {
      */
     public static final boolean threadLocalBuffers = Boolean
             .getBoolean("com.bigdata.threadLocalBuffers");
+
+    /**
+     * Used to ignore tests in CI that are known to fail. This helps make CI
+     * green for people while still leaving us a trail for the tests that exist
+     * to mark problems that should be fixed at some point.
+     */
+    public static final boolean runKnownBadTests = Boolean
+            .getBoolean("com.bigdata.runKnownBadTests");
     
 }
