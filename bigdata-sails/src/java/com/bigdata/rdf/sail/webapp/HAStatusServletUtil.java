@@ -72,6 +72,8 @@ import com.bigdata.zookeeper.DumpZookeeper;
  */
 public class HAStatusServletUtil {
 
+    private static final boolean debug = true;
+    
     /**
      * Disaster recover of this service from the leader (REBUILD).
      * 
@@ -265,7 +267,8 @@ public class HAStatusServletUtil {
 //                            : "")//
                     ).node("br").close();
                     // Show the current root block.
-                    current.node("pre", rb.toString());
+                    if(debug)
+                        current.node("pre", rb.toString());
                 }
             }
 
@@ -478,7 +481,8 @@ public class HAStatusServletUtil {
             
             p.close();
 
-            current.node("pre", quorum.toString());
+            if(debug)
+                current.node("pre", quorum.toString());
 
         }
 

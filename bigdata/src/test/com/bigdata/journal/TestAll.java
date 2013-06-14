@@ -76,6 +76,9 @@ public class TestAll extends TestCase {
         // test suites for file names based on commit counters.
         suite.addTestSuite( TestCommitCounterUtility.class );
 
+        // test suite for ClocksNotSynchronizedException.
+        suite.addTestSuite( TestClockSkewDetection.class );
+
         /*
          * Test a scalable temporary store (uses the transient and disk-only
          * buffer modes).
