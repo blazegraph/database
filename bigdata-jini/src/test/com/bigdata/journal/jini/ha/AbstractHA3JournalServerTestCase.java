@@ -1480,7 +1480,7 @@ public class AbstractHA3JournalServerTestCase extends
      * 
      * @throws IOException
      */
-    static private void copyFile(final File src, final File dst,
+    static protected void copyFile(final File src, final File dst,
             final boolean append) throws IOException {
 
         if (!src.exists())
@@ -2421,49 +2421,43 @@ public class AbstractHA3JournalServerTestCase extends
      * Recursive copy.
      * 
      * @param src
-     *            The source (file or directory).
+     *            The source (must be a directory).
      * @param dst
-     *            The destination (file or directory, as per source).
+     *            The destination (must be a directory, as per source).
+     *            
      * @throws IOException
+     * 
+     * @see #copyFile(File, File, boolean)
      */
     protected void copyFiles(final File src, final File dst) throws IOException {
-        final byte[] buf = new byte[8192];
+        if (!src.isDirectory())
+            throw new IOException("src not a directory: " + src);
+        if (!dst.isDirectory())
+            throw new IOException("dst not a directory: " + dst);
         final File[] files = src.listFiles();
+        if (files == null)
+            return;
         if (log.isInfoEnabled())
             log.info("Copying " + src.getAbsolutePath() + " to "
-                    + dst.getAbsolutePath() + ", files: " + files.length);
-        if (files != null) {
-            for (File srcFile : files) {
-                final File dstFile = new File(dst, srcFile.getName());
-                if (log.isInfoEnabled())
-                    log.info("Copying " + srcFile.getAbsolutePath()
-                            + " to " + dstFile.getAbsolutePath());
-                if (srcFile.isDirectory()) {
-                    if (!dstFile.exists() && !dstFile.mkdirs())
-                        throw new IOException("Could not create directory: "
-                                + dstFile);
-                    // Recursive copy.
-                    copyFiles(srcFile, dstFile);
-                } else {
-                    final FileInputStream instr = new FileInputStream(srcFile);
-                    final FileOutputStream outstr = new FileOutputStream(
-                            dstFile);
-
-                    while (true) {
-                        final int len = instr.read(buf);
-                        if (len == -1)
-                            break;
-
-                        outstr.write(buf, 0, len);
-                    }
-
-                    outstr.close();
-                    instr.close();
-                }
+                    + dst.getAbsolutePath() + ", #=files="
+                    + (files == null ? 1 : files.length));
+        for (File srcFile : files) {
+            final File dstFile = new File(dst, srcFile.getName());
+            if (log.isInfoEnabled())
+                log.info("Copying " + srcFile.getAbsolutePath() + " to "
+                        + dstFile.getAbsolutePath());
+            if (srcFile.isDirectory()) {
+                if (!dstFile.exists() && !dstFile.mkdirs())
+                    throw new IOException("Could not create directory: "
+                            + dstFile);
+                // Recursive copy.
+                copyFiles(srcFile, dstFile);
+            } else { 
+                // copy a single file.
+                copyFile(srcFile, dstFile, false/* append */);
             }
         }
     }
-
 
     /**
      * Wait the service self-reports "RunMet".

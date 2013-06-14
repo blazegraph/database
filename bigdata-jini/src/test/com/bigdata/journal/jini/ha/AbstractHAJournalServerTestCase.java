@@ -35,6 +35,8 @@ import java.io.StringWriter;
 import java.math.BigInteger;
 import java.security.DigestException;
 import java.security.NoSuchAlgorithmException;
+import java.text.SimpleDateFormat;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -50,6 +52,8 @@ import org.apache.http.client.methods.HttpUriRequest;
 import org.apache.http.conn.ClientConnectionManager;
 import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.http.util.EntityUtils;
+import org.openrdf.model.Value;
+import org.openrdf.query.BindingSet;
 import org.openrdf.query.TupleQueryResult;
 
 import com.bigdata.btree.BytesUtil;
@@ -492,6 +496,82 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
         return count;
 
     }
+
+    /**
+     * Report COUNT(*) for the default SPARQL end point for an {@link HAGlue}
+     * instance.
+     * 
+     * @param haGlue
+     *            The service.
+     * @return The value reported by COUNT(*).
+     * @throws Exception
+     * @throws IOException
+     */
+    protected long getCountStar(final HAGlue haGlue) throws IOException,
+            Exception {
+
+        return new CountStarTask(haGlue).call();
+
+    }
+
+    /**
+     * Task reports COUNT(*) for the default SPARQL end point for an
+     * {@link HAGlue} instance.
+     */
+    protected class CountStarTask implements Callable<Long> {
+        
+//        /** The service to query. */
+//        private final HAGlue haGlue;
+        
+        /**
+         * The SPARQL end point for that service.
+         */
+        private final RemoteRepository remoteRepo;
+
+        /**
+         * Format for timestamps that may be used to correlate with the
+         * HA log messages.
+         */
+        final SimpleDateFormat df = new SimpleDateFormat("hh:mm:ss,SSS");
+
+        /**
+         * @param haGlue
+         *            The service to query.
+         *            
+         * @throws IOException 
+         */
+        public CountStarTask(final HAGlue haGlue) throws IOException {
+        
+//            this.haGlue = haGlue;
+            
+            /*
+             * Run query against one of the services.
+             */
+            remoteRepo = getRemoteRepository(haGlue);
+
+        }
+
+        /**
+         * Return the #of triples reported by <code>COUNT(*)</code> for
+         * the SPARQL end point.
+         */
+        public Long call() throws Exception {
+            
+            final String query = "SELECT (COUNT(*) AS ?count) WHERE { ?s ?p ?o }";
+
+            // Run query.
+            final TupleQueryResult result = remoteRepo.prepareTupleQuery(query)
+                    .evaluate();
+
+            final BindingSet bs = result.next();
+
+            // done.
+            final Value v = bs.getBinding("count").getValue();
+            
+            return (long) ((org.openrdf.model.Literal) v).intValue();                
+        }
+
+    };
 
     /**
      * Wait until the KB exists.

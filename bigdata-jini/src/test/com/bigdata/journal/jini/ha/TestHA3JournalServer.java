@@ -870,7 +870,7 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
 
 		log.info("ALL GOOD!");
 	}
-	
+	// FIXME Move to StressTestHA3JournalServer
 	public void testStressTestStartAB_C_LiveResync() throws Exception {
 		for (int i = 0; i < 50; i++) {
 			log.warn("Starting run " + i);

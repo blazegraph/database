@@ -94,8 +94,11 @@ public class TestAll extends TestCase {
         // HA2 test suite (k=3, but only 2 services are running).
         suite.addTestSuite(TestHA2JournalServer.class);
 
-        // HA3 test suite.
+        // HA3 test suite in which HALogs are purged on a fully met quorum.
         suite.addTestSuite(TestHA3JournalServer.class);
+
+        // HA3 test suite in which normal HALog retention rules apply.
+        suite.addTestSuite(TestHA3JournalServerWithHALogs.class);
 
         // HA3 snapshot policy test suite.
         suite.addTestSuite(TestHA3SnapshotPolicy.class);
@@ -109,6 +112,9 @@ public class TestAll extends TestCase {
 
         // Test suite for direct IBufferStrategy data xfer tests.
         suite.addTestSuite(TestRawTransfers.class);
+
+        // Test suite of longer running stress tests for an HA3 cluster.
+        suite.addTestSuite(StressTestHA3JournalServer.class);
 
         return suite;
 

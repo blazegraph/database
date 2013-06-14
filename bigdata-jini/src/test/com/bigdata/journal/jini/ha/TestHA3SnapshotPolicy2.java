@@ -26,7 +26,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.journal.jini.ha;
 
-import java.util.Calendar;
 import java.util.concurrent.TimeUnit;
 
 import net.jini.config.Configuration;
@@ -83,27 +82,8 @@ public class TestHA3SnapshotPolicy2 extends AbstractHA3BackupTestCase {
          * some point in the Future in order to avoid test failures due to
          * violated assumptions when the policy runs up self-triggering (based
          * on the specified run time) during a CI run.
-         * 
-         * We do this by adding one hour to [now] and then converting it into
-         * the 'hhmm' format as an integer.
          */
-        
-        // Right now.
-        final Calendar c = Calendar.getInstance();
-        
-        // Plus an hour.
-        c.add(Calendar.HOUR_OF_DAY, 1);
-        
-        // Get the hour.
-        final int hh = c.get(Calendar.HOUR_OF_DAY);
-        
-        // And the minutes.
-        final int mm = c.get(Calendar.MINUTE);
-        
-        // Format as hhmm.
-        final String neverRun = "" + hh + (mm < 10 ? "0" : "") + mm;
-
-//        assert neverRun.length() < 4 && neverRun.length() >= 3 : neverRun;
+        final String neverRun = getNeverRunSnapshotTime();
         
         return new String[]{
                 "com.bigdata.journal.jini.ha.HAJournalServer.restorePolicy=new com.bigdata.journal.jini.ha.DefaultRestorePolicy(0L,1,0)",
