@@ -116,7 +116,9 @@ public class DefaultRestorePolicy implements IRestorePolicy {
     }
     
     /**
-     * The default is to keep local backups on hand for 7 days.
+     * The default is to keep local backups on hand for 7 days. A minimum of
+     * {@value #DEFAULT_MIN_SNAPSHOTS} will be retained. A minimum of
+     * {@value #DEFAULT_MIN_RESTORE_POINTS} restore points will be retained.
      */
     public DefaultRestorePolicy() {
 
@@ -126,9 +128,9 @@ public class DefaultRestorePolicy implements IRestorePolicy {
     }
 
     /**
-     * Create a policy that determines when local backups may be purged. The
-     * policy will retain local backups unless all of the criteria are
-     * satisified.
+     * Create a policy that determines when local backups may be purged. A
+     * minimum of {@value #DEFAULT_MIN_SNAPSHOTS} will be retained. A minimum of
+     * {@value #DEFAULT_MIN_RESTORE_POINTS} restore points will be retained.
      * 
      * @param minRestoreAgeMillis
      *            The minimum age of a snapshot (in milliseconds) before it may
