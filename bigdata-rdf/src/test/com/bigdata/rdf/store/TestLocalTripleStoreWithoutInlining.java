@@ -162,7 +162,7 @@ public class TestLocalTripleStoreWithoutInlining extends AbstractTestCase {
         properties.setProperty(Options.CREATE_TEMP_FILE, "false");
 
         // The backing file that we need to re-open.
-        final File file = ((LocalTripleStore) store).store.getFile();
+        final File file = ((LocalTripleStore) store).getIndexManager().getFile();
 
         assertNotNull(file);
 
