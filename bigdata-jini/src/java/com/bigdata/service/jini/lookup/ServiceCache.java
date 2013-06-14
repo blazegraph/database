@@ -65,7 +65,10 @@ public class ServiceCache implements ServiceDiscoveryListener {
     protected static final transient Logger log = Logger
             .getLogger(ServiceCache.class);
         
-    private ConcurrentHashMap<ServiceID, ServiceItem> serviceIdMap = new ConcurrentHashMap<ServiceID, ServiceItem>();
+    /**
+     * Map from the {@link ServiceID} to the {@link ServiceItem}.
+     */
+    private final ConcurrentHashMap<ServiceID, ServiceItem> serviceIdMap;
 
     /**
      * An optional delegate listener that will also see the
@@ -81,8 +84,14 @@ public class ServiceCache implements ServiceDiscoveryListener {
      */
     public ServiceCache(final ServiceDiscoveryListener listener) {
         
-        // MAY be null;
+        /*
+         * MAY be null. When non-null, the listener will observe any events that
+         * our reported to our implementation of the ServiceDiscoveryListener
+         * interface.
+         */
         this.listener = listener;
+        
+        this.serviceIdMap = new ConcurrentHashMap<ServiceID, ServiceItem>();
         
     }
 
@@ -101,12 +110,14 @@ public class ServiceCache implements ServiceDiscoveryListener {
      */
     public void serviceAdded(final ServiceDiscoveryEvent e) {
 
-        if (log.isInfoEnabled())
-            log.info("" + e + ", class="
-                    + e.getPostEventServiceItem().toString());
+        final ServiceItem item = e.getPostEventServiceItem();
 
-        serviceIdMap.put(e.getPostEventServiceItem().serviceID, e
-                .getPostEventServiceItem());
+        final ServiceID serviceID = item.serviceID;
+
+        if (log.isInfoEnabled())
+            log.info("" + e + ", class=" + item);
+
+        serviceIdMap.put(serviceID, item);
 
         if (listener != null) {
 
@@ -121,12 +132,14 @@ public class ServiceCache implements ServiceDiscoveryListener {
      */
     public void serviceChanged(final ServiceDiscoveryEvent e) {
 
-        if (log.isInfoEnabled())
-            log.info("" + e + ", class="
-                    + e.getPostEventServiceItem().toString());
+        final ServiceItem item = e.getPostEventServiceItem();
 
-        serviceIdMap.put(e.getPostEventServiceItem().serviceID, e
-                .getPostEventServiceItem());
+        final ServiceID serviceID = item.serviceID;
+
+        if (log.isInfoEnabled())
+            log.info("" + e + ", class=" + item);
+
+        serviceIdMap.put(serviceID, item);
 
         if (listener != null) {
 
@@ -146,19 +159,23 @@ public class ServiceCache implements ServiceDiscoveryListener {
      */
     public void serviceRemoved(final ServiceDiscoveryEvent e) {
 
-        final Object service = e.getPreEventServiceItem().service;
+        final ServiceItem item = e.getPreEventServiceItem();
 
-        if(service instanceof IService) {
+        final ServiceID serviceID = item.serviceID;
+        
+        final Object service = item.service;
+
+        if (service instanceof IService) {
             
             try {
             
                 final String serviceName = ((IService)service).getServiceName();
 
-                log.warn("Service still active: "+serviceName);
-                
+                log.warn("Service still active: " + serviceName);
+
                 return;
                 
-            } catch(IOException ex) {
+            } catch (IOException ex) {
                 
                 // ignore, fall through and remove the service from the cache.
                 
@@ -167,10 +184,9 @@ public class ServiceCache implements ServiceDiscoveryListener {
         }
                 
         if (log.isInfoEnabled())
-            log.info("" + e + ", class="
-                    + e.getPreEventServiceItem().toString());
+            log.info("" + e + ", class=" + item);
 
-        serviceIdMap.remove(e.getPreEventServiceItem().serviceID);
+        serviceIdMap.remove(serviceID);
 
         if (listener != null) {
 
@@ -194,6 +210,9 @@ public class ServiceCache implements ServiceDiscoveryListener {
      * @return The cache {@link ServiceItem} for that service.
      */
     public ServiceItem getServiceItemByID(final ServiceID serviceID) {
+
+        if (serviceID == null)
+            throw new IllegalArgumentException();
         
         return serviceIdMap.get(serviceID);
         

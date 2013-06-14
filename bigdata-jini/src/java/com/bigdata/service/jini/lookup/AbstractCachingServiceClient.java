@@ -85,29 +85,29 @@ abstract public class AbstractCachingServiceClient<S extends Remote> {
      * a filter. This is used to keep track of all services registered with any
      * {@link ServiceRegistrar} to which the client is listening.
      */
-    protected final LookupCache lookupCache;
+    private final LookupCache lookupCache;
 
     /**
      * The template provided to the ctor.
      */
-    protected final ServiceTemplate template;
+    private final ServiceTemplate template;
 
     /**
      * The filter provided to the ctor.
      */
-    protected final ServiceItemFilter filter;
+    private final ServiceItemFilter filter;
 
     /**
      * Timeout for remote lookup on cache miss (milliseconds).
      */
-    protected final long cacheMissTimeout;
+    private final long cacheMissTimeout;
 
     /**
      * Provides direct cached lookup of discovered services matching both the
      * {@link #template} and the optional {@link #filter} by their
      * {@link ServiceID}.
      */
-    protected final ServiceCache serviceCache;
+    private final ServiceCache serviceCache;
 
     /**
      * An object that provides direct cached lookup of discovered services
@@ -134,7 +134,7 @@ abstract public class AbstractCachingServiceClient<S extends Remote> {
      * The most interesting interface on the services to be discovered (this is
      * used for log messages).
      */
-    private final Class serviceIface;
+    private final Class<?> serviceIface;
 
     /**
      * Sets up service discovery for the designed class of services.
@@ -163,7 +163,7 @@ abstract public class AbstractCachingServiceClient<S extends Remote> {
     public AbstractCachingServiceClient(
             final ServiceDiscoveryManager serviceDiscoveryManager,
             final ServiceDiscoveryListener serviceDiscoveryListener,
-            final Class serviceIface, final ServiceTemplate template,
+            final Class<?> serviceIface, final ServiceTemplate template,
             final ServiceItemFilter filter, final long cacheMissTimeout)
             throws RemoteException {
 
@@ -189,8 +189,18 @@ abstract public class AbstractCachingServiceClient<S extends Remote> {
 
         this.cacheMissTimeout = cacheMissTimeout;
 
+        /*
+         * Note: The ServiceCache itself is a ServiceDiscoveryListener. If the
+         * optional argument was specified, then it will also send the discovery
+         * events to that listener (the arg is optional listener that will also
+         * see service discovery events).
+         */
         serviceCache = new ServiceCache(serviceDiscoveryListener);
 
+        /*
+         * Note: The LookupCache will deliver discovery events to the
+         * ServiceCache.
+         */
         lookupCache = getServiceDiscoveryManager().createLookupCache(//
                 template,//
                 filter, //
@@ -396,7 +406,14 @@ abstract public class AbstractCachingServiceClient<S extends Remote> {
 
 			final ServiceTemplate template = new ServiceTemplate(serviceId,
 					null/* serviceTypes */, null/* attrSetTemplates */);
-        	
+
+            /*
+             * Perform lookup (RMI).
+             * 
+             * Note: If the service can be discovered, then this will deliver a
+             * ServiceDiscoveryEvent to the ServiceDiscoveryListener interface
+             * implemented by the ServiceCache.
+             */
             item = serviceDiscoveryManager.lookup(template, filter,
                     cacheMissTimeout);
 
@@ -430,6 +447,27 @@ abstract public class AbstractCachingServiceClient<S extends Remote> {
         if (log.isInfoEnabled())
             log.info("Found: " + item);
 
+        /**
+         * Verify that the discovered item was entered into the ServiceCache.
+         * The ServiceCache implements the ServiceDiscoveryListener interface.
+         * The LookupCache should have delivered a ServiceDiscoverEvent to the
+         * ServiceDiscoveryListener intercace on the ServiceCache when we
+         * performed the lookup at the top of this method.
+         * 
+         * Note: If you hit this, then a likely explanation is that the service
+         * interface specified to the constructor was not compatible with the
+         * template (i.e., one or the other was incorrect).
+         * 
+         * @see <a href="http://sourceforge.net/apps/trac/bigdata/ticket/687" >
+         *      HAJournalServer Cache not populated </a>
+         */
+        assert serviceCache.getServiceItemByID(serviceId) != null;
+//        if (serviceCache.getServiceItemByID(serviceId) == null) {
+//            throw new AssertionError(
+//                    "Failed to install service into cache: serviceId="
+//                            + serviceId + ", serviceItem=" + item);
+//        }
+        
         return item;
 
     }
@@ -662,7 +700,7 @@ abstract public class AbstractCachingServiceClient<S extends Remote> {
 
         for (int i = 0; i < items.length; i++) {
 
-            final Future f = futures.get(i);
+            final Future<Void> f = futures.get(i);
 
             try {
 
