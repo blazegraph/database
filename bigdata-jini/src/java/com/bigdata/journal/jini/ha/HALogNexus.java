@@ -236,8 +236,45 @@ public class HALogNexus implements IHALogWriter {
         // Make sure the snapshot directory exists.
         ensureHALogDirExists();
         
-        // Populate the in-memory index from the directory.
-        populateIndexRecursive(haLogDir, IHALogReader.HALOG_FILTER);
+        /**
+         * Populate the in-memory index from the directory.
+         * 
+         * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/679" >
+         *      HAJournalServer can not restart due to logically empty log files
+         *      </a>
+         */
+        {
+
+            /*
+             * Used to detect a logically empty HALog (iff it is the last one in
+             * commit order).
+             */
+            final HALogScanState tmp = new HALogScanState();
+            
+            // Scan the HALog directory, populating the in-memory index.
+            populateIndexRecursive(haLogDir, IHALogReader.HALOG_FILTER, tmp);
+
+            if (tmp.emptyHALogFile != null) {
+
+                /*
+                 * The last HALog file is logically empty. It WAS NOT added to
+                 * the in-memory index. We try to remove it now.
+                 * 
+                 * Note: It is not critical that we succeed in removing this
+                 * HALog file so long as it does not interfere with the correct
+                 * startup of the HAJournalServer.
+                 */
+                final File f = tmp.emptyHALogFile;
+
+                if (!f.delete()) {
+
+                    log.warn("Could not remove empty HALog: " + f);
+
+                }
+
+            }
+            
+        }
         
     }
 
@@ -252,18 +289,41 @@ public class HALogNexus implements IHALogWriter {
         }
 
     }
+
+    /**
+     * State used to trace the scan of the HALog files on startup.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+     *         Thompson</a>
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/679" >
+     *      HAJournalServer can not restart due to logically empty log files
+     *      </a>
+     */
+    private static class HALogScanState {
+        /**
+         * Flag is set the first time an empty HALog file is identified.
+         * <p>
+         * Note: We scan the HALog files in commit counter order. If the last
+         * file is (logically) empty, then we will silently remove it. However,
+         * if any other HALog file is logically empty, then this is an error.
+         */
+        File emptyHALogFile = null;
+    }
     
     /**
      * Scans the {@link #haLogDir} and populates the {@link #haLogIndex} from
      * the root blocks in HALog files found in that directory.
-     * 
-     * TODO If the last HALog file (in commit counter sequence) is discovered
+     * <p>
+     * Note: If the last HALog file (in commit counter sequence) is discovered
      * without a closing root block (the opening and closing root blocks are the
-     * same) then it can not be used. The right action is typically to remove
-     * the logically empty HALog file and let the service replicate the HALog
-     * file from the leader. This is action could also be taken if the last file
-     * is discovered to have bad checksums or otherwise corrupt root blocks. We
-     * should review the ramifications of automating those behaviors.
+     * same) then it can not be used. The log will be identified as a
+     * side-effect using the {@link HALogScanState} and will NOT be added to the
+     * index. The caller SHOULD then remove the logically empty HALog file
+     * 
+     * TODO If an HALog is discovered to have bad checksums or otherwise corrupt
+     * root blocks and there is a met quorum, then we should re-replicate that
+     * HALog from the quourm leader.
      * 
      * TODO For HALog files other than the last HALog file (in commit counter
      * sequence) if there are any missing HALog files in the sequence, if any if
@@ -277,7 +337,8 @@ public class HALogNexus implements IHALogWriter {
      * identified all of the HALog files in the file system.
      */
     private void populateIndexRecursive(final File f,
-            final FileFilter fileFilter) throws IOException {
+            final FileFilter fileFilter, final HALogScanState state)
+            throws IOException {
 
         if (f.isDirectory()) {
 
@@ -296,13 +357,43 @@ public class HALogNexus implements IHALogWriter {
 
             for (int i = 0; i < files.length; i++) {
 
-                populateIndexRecursive(files[i], fileFilter);
+                populateIndexRecursive(files[i], fileFilter, state);
 
             }
 
         } else {
 
-            addHALog(f);
+            if (state.emptyHALogFile != null) {
+
+                /*
+                 * We already have an empty HALog file. If there are any more
+                 * HALog files to visit then this is an error. There can be at
+                 * most one empty HALog file and it must be the last HALog file
+                 * in commit counter order (we are scanning in commit counter
+                 * order).
+                 */
+
+                throw new LogicallyEmptyHALogException(state.emptyHALogFile);
+                
+            }
+            
+            try {
+
+                // Attempt to add to the index.
+                addHALog(f);
+
+            } catch (LogicallyEmptyHALogException ex) {
+                
+                // Should be null since we checked this above.
+                assert state.emptyHALogFile == null;
+
+                /*
+                 * The first empty HALog file. There is at most one allowed and
+                 * it must be the last HALog file in commit counter order.
+                 */
+                state.emptyHALogFile = f;
+                
+            }
 
         }
 
@@ -374,10 +465,13 @@ public class HALogNexus implements IHALogWriter {
      * Add an HALog to the {@link #haLogIndex}.
      * 
      * @param file
-     *            The HALog file. 
+     *            The HALog file.
      * 
      * @throws IllegalArgumentException
      *             if argument is <code>null</code>.
+     * @throws LogicallyEmptyHALogException
+     *             if the HALog file has opening and closing root blocks that
+     *             are identical.
      * @throws IOException
      *             if the file can not be read.
      * @throws ChecksumError
@@ -396,7 +490,8 @@ public class HALogNexus implements IHALogWriter {
      *             with that HALog file unless it also happens to correspond to
      *             a snapshot.
      */
-    private void addHALog(final File file) throws IOException {
+    private void addHALog(final File file) throws IOException,
+            LogicallyEmptyHALogException {
 
         if (file == null)
             throw new IllegalArgumentException();
@@ -416,11 +511,11 @@ public class HALogNexus implements IHALogWriter {
              * used as the key for the index. If the opening and closing root
              * blocks are the same, then the closing commit time will be the
              * same as the closing commit time of the _previous_ HALog file and
-             * they would collide in the index.  DO NOT ADD THE LIVE HALOG FILE
+             * they would collide in the index. DO NOT ADD THE LIVE HALOG FILE
              * TO THE INDEX.
              */
-            
-            throw new IOException("Logically empty HALog: " + file);
+
+            throw new LogicallyEmptyHALogException(file);
             
         }
 
@@ -430,6 +525,28 @@ public class HALogNexus implements IHALogWriter {
 
         haLogIndex.add(new HALogRecord(closingRootBlock, sizeOnDisk));
 
+    }
+
+    /**
+     * Exception raise when an HALog file is logically empty (the opening and
+     * closing root blocks are identicial).
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+     *         Thompson</a>
+     */
+    private static class LogicallyEmptyHALogException extends IOException {
+
+        /**
+         * 
+         */
+        private static final long serialVersionUID = 1L;
+        
+        public LogicallyEmptyHALogException(final File file) {
+
+            super(file.getAbsolutePath());
+            
+        }
+        
     }
 
     /**
