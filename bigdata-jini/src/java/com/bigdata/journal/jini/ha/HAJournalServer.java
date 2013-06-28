@@ -3063,7 +3063,7 @@ public class HAJournalServer extends AbstractServer {
                                  * context since we are not running in the
                                  * Thread for any doRun() method.
                                  */
-                                Thread.interrupted();
+                                Thread.currentThread().interrupt();
                             } else {
                                 // log and ignore.
                                 log.error(e, e);
