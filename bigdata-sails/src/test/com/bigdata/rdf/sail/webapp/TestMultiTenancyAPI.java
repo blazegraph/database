@@ -287,11 +287,52 @@ public class TestMultiTenancyAPI<S extends IIndexManager> extends
          */
         final String namespace2 = "kb2-" + UUID.randomUUID();
 
+        doTestCreate(namespace2);
+        
+    }
+    
+    /**
+     * Test for correct URL encoding of the namespace in the URL requests.
+     * 
+     * @throws Exception
+     */
+    public void test_create02() throws Exception {
+
+        /*
+         * Create a new data set. The namespace incorporates a UUID in case we
+         * are running against a server rather than an embedded per-test target.
+         * The properties are mostly inherited from the default configuration,
+         * but the namespace of the new data set is explicitly set for the
+         * CREATE operation.
+         */
+        final String namespace2 = "kb2-" + UUID.randomUUID() + "-&/<>-foo";
+
+        doTestCreate(namespace2);
+        
+    }
+    
+    private void doTestCreate(final String namespace2) throws Exception {
+        
         final Properties properties = new Properties();
 
         properties.setProperty(BigdataSail.Options.NAMESPACE, namespace2);
 
+        { // verify does not exist.
+            try {
+                m_repo.getRepositoryProperties(namespace2);
+                fail("Should not exist: " + namespace2);
+            } catch (HttpException ex) {
+                // Expected status code.
+                assertEquals(404,ex.getStatusCode());
+            }
+        }
+        
         m_repo.createRepository(namespace2, properties);
+
+        { // verify exists.
+            final Properties p = m_repo.getRepositoryProperties(namespace2);
+            assertNotNull(p);
+        }
 
         /*
          * Verify error if attempting to create a KB for a namespace which

@@ -33,6 +33,8 @@ import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.io.UnsupportedEncodingException;
+import java.net.URLDecoder;
 import java.util.Iterator;
 import java.util.Properties;
 
@@ -285,6 +287,9 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
      *            The URI path string.
      * 
      * @return The namespace.
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/689" >
+     *      Missing URL encoding in RemoteRepositoryManager </a>
      */
     protected String getNamespace(final HttpServletRequest req) {
         
@@ -326,7 +331,14 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
         }
 
         // return the namespace.
-        return uri.substring(beginIndex + 1, endIndex);
+        final String t = uri.substring(beginIndex + 1, endIndex);
+        String namespace;
+        try {
+            namespace = URLDecoder.decode(t, UTF8);
+        } catch (UnsupportedEncodingException e) {
+            throw new RuntimeException(e);
+        }
+        return namespace;
 
     }
 
