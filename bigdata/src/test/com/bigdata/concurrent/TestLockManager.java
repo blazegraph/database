@@ -160,7 +160,7 @@ public class TestLockManager extends TestCase implements IComparisonTest {
      * behavior of tasks that lock only a single resource, eg., unisolated
      * operations on the {@link DataService}.
      */
-    public Result doComparisonTest(Properties properties) throws Exception {
+    public Result doComparisonTest(final Properties properties) throws Exception {
 
         final long testTimeout = Integer.parseInt(properties.getProperty(
                 TestOptions.TIMEOUT, TestOptions.DEFAULT_TIMEOUT));
@@ -210,10 +210,10 @@ public class TestLockManager extends TestCase implements IComparisonTest {
 
         assert maxLockTries >= 1;
         
-        ExecutorService execService = Executors.newFixedThreadPool(nthreads,
+        final ExecutorService execService = Executors.newFixedThreadPool(nthreads,
                 DaemonThreadFactory.defaultThreadFactory());
 
-        Collection<Callable<Object>> tasks = new ArrayList<Callable<Object>>(
+        final Collection<Callable<Object>> tasks = new ArrayList<Callable<Object>>(
                 ntasks);
 
         LockManager<String> db = new LockManager<String>(
@@ -231,7 +231,7 @@ public class TestLockManager extends TestCase implements IComparisonTest {
             
         }
 
-        Random r = new Random();
+        final Random r = new Random();
 
         // create tasks; each will use between minLocks and maxLocks distinct
         // resources.
@@ -737,6 +737,10 @@ public class TestLockManager extends TestCase implements IComparisonTest {
      * sorted NO deadlocks should result.
      * 
      * @throws Exception
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/237" > CI
+     *      deadlock in
+     *      com.bigdata.concurrent.TestLockManager.test_multipleResourceLocking_resources10_locktries10</a>
      */
     public void test_multipleResourceLocking_resources10_locktries10_predeclareLocks() throws Exception {
 
@@ -771,7 +775,7 @@ public class TestLockManager extends TestCase implements IComparisonTest {
      */
     public void test_multipleResourceLocking_resources10_locktries10() throws Exception {
 
-        Properties properties = new Properties();
+        final Properties properties = new Properties();
         
         properties.setProperty(TestOptions.NTHREADS,"20");
         properties.setProperty(TestOptions.NTASKS,"1000");
@@ -781,6 +785,11 @@ public class TestLockManager extends TestCase implements IComparisonTest {
         properties.setProperty(TestOptions.MAX_LOCK_TRIES,"10");
         properties.setProperty(TestOptions.PREDECLARE_LOCKS,"false");
         properties.setProperty(TestOptions.SORT_LOCK_REQUESTS,"false");
+        /*
+         * Note: A timeout was introduced in order to work cause this test to
+         * fail rather than deadlock. It very occasionally will deadlock in CI.
+         */
+        properties.setProperty(TestOptions.TIMEOUT, Long.toString(3 * 60/* seconds */));
                 
         doComparisonTest(properties);
         
