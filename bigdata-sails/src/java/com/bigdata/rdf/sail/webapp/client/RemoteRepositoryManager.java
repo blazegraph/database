@@ -102,17 +102,35 @@ public class RemoteRepositoryManager extends RemoteRepository {
     }
 
     /**
+     * Return the base URL for a remote repository (less the /sparql path
+     * component).
+     * 
+     * @param namespace
+     *            The namespace.
+     *            
+     * @return The base URL.
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/689" >
+     *      Missing URL encoding in RemoteRepositoryManager </a>
+     */
+    protected String getRepositoryBaseURLForNamespace(final String namespace) {
+    
+        return baseServiceURL + "/namespace/"
+                + ConnectOptions.urlEncode(namespace);
+    }
+    
+    /**
      * Obtain a {@link RemoteRepository} for a data set managed by the remote
      * service.
      * 
      * @param namespace
      *            The name of the data set (its bigdata namespace).
-     *            
+     * 
      * @return An interface which may be used to talk to that data set.
      */
     public RemoteRepository getRepositoryForNamespace(final String namespace) {
 
-        return new RemoteRepository(baseServiceURL + "/namespace/" + namespace
+        return new RemoteRepository(getRepositoryBaseURLForNamespace(namespace)
                 + "/sparql", httpClient, executor);
 
     }
@@ -220,8 +238,7 @@ public class RemoteRepositoryManager extends RemoteRepository {
      */
     public void deleteRepository(final String namespace) throws Exception {
 
-        final ConnectOptions opts = newConnectOptions(baseServiceURL
-                + "/namespace/" + namespace);
+        final ConnectOptions opts = newConnectOptions(getRepositoryBaseURLForNamespace(namespace));
 
         opts.method = "DELETE";
 
@@ -251,8 +268,8 @@ public class RemoteRepositoryManager extends RemoteRepository {
     public Properties getRepositoryProperties(final String namespace)
             throws Exception {
 
-        final ConnectOptions opts = newConnectOptions(baseServiceURL
-                + "/namespace/" + namespace + "/properties");
+        final ConnectOptions opts = newConnectOptions(getRepositoryBaseURLForNamespace(namespace)
+                + "/properties");
 
         opts.method = "GET";
 

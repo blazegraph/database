@@ -241,6 +241,34 @@ public class ConnectOptions {
 
     }
 
+    /**
+     * Apply a UTF8 encoding to a component of a URL.
+     * 
+     * @param in
+     *            The text to be encoded.
+     * 
+     * @return The UTF8 encoding of that text.
+     * 
+     * @throws RuntimeException
+     *             if the {@link RemoteRepository#UTF8} encoding is not
+     *             available.
+     * @throws NullPointerException
+     *             if the argument is <code>null</code>.
+     */
+    public static String urlEncode(final String in) {
 
+        try {
+        
+            final String out = URLEncoder.encode(in, RemoteRepository.UTF8);
+            
+            return out;
+            
+        } catch (UnsupportedEncodingException e) {
+            
+            throw new RuntimeException(e);
+            
+        }
+
+    }
 
 }

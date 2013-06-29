@@ -46,6 +46,7 @@ import com.bigdata.rdf.properties.PropertiesParserFactory;
 import com.bigdata.rdf.properties.PropertiesParserRegistry;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
+import com.bigdata.rdf.sail.webapp.client.ConnectOptions;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.ScaleOutTripleStore;
 import com.bigdata.service.IBigdataFederation;
@@ -125,6 +126,9 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
 
     /**
      * Delete the KB associated with the effective namespace.
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/689" >
+     *      Missing URL encoding in RemoteRepositoryManager </a>
      */
     @Override
     protected void doDelete(final HttpServletRequest req,
@@ -137,7 +141,8 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
 
         final String namespace = getNamespace(req);
 
-        if (req.getRequestURI().endsWith("/namespace/" + namespace)) {
+        if (req.getRequestURI().endsWith(
+                "/namespace/" + ConnectOptions.urlEncode(namespace))) {
 
             // Delete that namespace.
             doDeleteNamespace(req, resp);

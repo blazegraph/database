@@ -46,6 +46,7 @@ import com.bigdata.rdf.internal.NotMaterializedException;
 import com.bigdata.rdf.model.BigdataResource;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
+import com.bigdata.rdf.sail.webapp.client.ConnectOptions;
 import com.bigdata.rdf.spo.SPOKeyOrder;
 import com.bigdata.rdf.spo.SPORelation;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -173,11 +174,17 @@ public class VoID {
         // Also present the namespace in an unambiguous manner.
         g.add(aDataset, SD.KB_NAMESPACE, f.createLiteral(namespace));
 
-        /*
+        /**
          * Service end point for this namespace.
+         * 
+         * 
+         * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/689" >
+         *      Missing URL encoding in RemoteRepositoryManager </a>
          */
-        g.add(aDataset, VoidVocabularyDecl.sparqlEndpoint,
-                f.createURI(serviceURI + "/" + namespace + "/sparql"));
+        g.add(aDataset,
+                VoidVocabularyDecl.sparqlEndpoint,
+                f.createURI(serviceURI + "/"
+                        + ConnectOptions.urlEncode(namespace) + "/sparql"));
 
         // any URI is considered to be an entity.
         g.add(aDataset, VoidVocabularyDecl.uriRegexPattern,
