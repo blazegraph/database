@@ -23,46 +23,28 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.ha.msg;
 
-import java.io.Serializable;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
-import com.bigdata.btree.BytesUtil;
+/**
+ * Message requesting that the leader await the visibility of a join by the
+ * specified service.
+ */
+public interface IHAAwaitServiceJoinRequest extends IHAMessage {
 
-public class HADigestResponse implements IHADigestResponse, Serializable {
+    /**
+     * The {@link UUID} of the service whose service join will be awaited.
+     */
+    UUID getServiceUUID();
 
-    private static final long serialVersionUID = 1L;
+    /**
+     * How long to wait for the service join to become visible.
+     */
+    long getTimeout();
 
-    private final UUID storeUUID;
-    private final byte[] digest;
+    /**
+     * The unit for the timeout.
+     */
+    TimeUnit getUnit();
     
-    public HADigestResponse(final UUID storeUUID, final byte[] digest) {
-
-        this.storeUUID = storeUUID;
-        
-        this.digest = digest;
-        
-    }
-    
-    @Override
-    public UUID getStoreUUID() {
-        
-        return storeUUID;
-        
-    }
-
-    @Override
-    public byte[] getDigest() {
-
-        return digest;
-        
-    }
-
-    @Override
-    public String toString() {
-
-        return super.toString() + "{storeUUID=" + getStoreUUID() + ", digest="
-                + BytesUtil.toHexString(getDigest()) + "}";
-
-    }
-
 }

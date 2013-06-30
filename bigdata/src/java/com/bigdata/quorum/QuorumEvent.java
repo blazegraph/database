@@ -34,6 +34,8 @@ import java.util.UUID;
  * clients interested in quorum state changes. Services that are HA aware use a
  * more intimate API to handle the state changes.
  * 
+ * @see QuorumListener
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */

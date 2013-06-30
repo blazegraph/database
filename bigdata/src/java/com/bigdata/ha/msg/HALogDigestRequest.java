@@ -24,25 +24,31 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.ha.msg;
 
 import java.io.Serializable;
-import java.util.UUID;
 
 public class HALogDigestRequest implements IHALogDigestRequest, Serializable {
 
     private static final long serialVersionUID = 1L;
 
     private final long commitCounter;
-    
+
     public HALogDigestRequest(final long commitCounter) {
 
         this.commitCounter = commitCounter;
-        
+
     }
-    
+
     @Override
     public long getCommitCounter() {
-        
+
         return commitCounter;
-        
+
+    }
+
+    @Override
+    public String toString() {
+
+        return super.toString() + "{commitCounter=" + getCommitCounter() + "}";
+
     }
 
 }

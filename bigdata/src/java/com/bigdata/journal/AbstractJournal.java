@@ -63,6 +63,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock.ReadLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock.WriteLock;
@@ -104,6 +105,7 @@ import com.bigdata.ha.PrepareRequest;
 import com.bigdata.ha.PrepareResponse;
 import com.bigdata.ha.QuorumService;
 import com.bigdata.ha.RunState;
+import com.bigdata.ha.msg.HANotifyReleaseTimeResponse;
 import com.bigdata.ha.msg.HAReadResponse;
 import com.bigdata.ha.msg.HARootBlockRequest;
 import com.bigdata.ha.msg.HARootBlockResponse;
@@ -111,6 +113,7 @@ import com.bigdata.ha.msg.HAWriteSetStateResponse;
 import com.bigdata.ha.msg.IHA2PhaseAbortMessage;
 import com.bigdata.ha.msg.IHA2PhaseCommitMessage;
 import com.bigdata.ha.msg.IHA2PhasePrepareMessage;
+import com.bigdata.ha.msg.IHAAwaitServiceJoinRequest;
 import com.bigdata.ha.msg.IHADigestRequest;
 import com.bigdata.ha.msg.IHADigestResponse;
 import com.bigdata.ha.msg.IHAGatherReleaseTimeRequest;
@@ -393,6 +396,14 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 	 */
 	private final ReentrantReadWriteLock _fieldReadWriteLock = new ReentrantReadWriteLock(false/* fair */);
 
+    /**
+     * This lock is needed to synchronize serviceJoin of a <em>follower</em>
+     * with a GATHER. Specifically it ensures that if a service is trying to
+     * join during a replicated write set, then the GATHER and the SERVICE JOIN
+     * are MUTEX.
+     */
+    private final Lock _gatherLock = new ReentrantLock();
+	
     /**
      * Used to cache the most recent {@link ICommitRecord} -- discarded on
      * {@link #abort()}; set by {@link #commitNow(long)}.
@@ -2696,7 +2707,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 		try {
 
 			if (log.isInfoEnabled())
-				log.info("start");
+				log.info("start");//, new RuntimeException());
 
             // Clear
             gatherFuture.set(null/* newValue */);
@@ -2896,6 +2907,60 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
     }
 
     /**
+     * Helper class finds all joined and non-joined services for the quorum
+     * client.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+     *         Thompson</a>
+     */
+    private static class JoinedAndNonJoinedServices {
+
+        // The services joined with the met quorum, in their join order.
+        final UUID[] joinedServiceIds;
+        
+        // The services in the write pipeline (in any order).
+        final Set<UUID> nonJoinedPipelineServiceIds;
+
+        public JoinedAndNonJoinedServices(
+                final Quorum<HAGlue, QuorumService<HAGlue>> quorum) {
+
+            // The services joined with the met quorum, in their join order.
+            joinedServiceIds = quorum.getJoined();
+
+            // The UUID for this service.
+            final UUID serviceId = quorum.getClient().getServiceId();
+
+            if (joinedServiceIds.length == 0
+                    || !joinedServiceIds[0].equals(serviceId)) {
+
+                /*
+                 * Sanity check. Verify that the first service in the join order
+                 * is *this* service. This is a precondition for the service to
+                 * be the leader.
+                 */
+
+                throw new RuntimeException("Not leader: serviceId=" + serviceId
+                        + ", joinedServiceIds="
+                        + Arrays.toString(joinedServiceIds));
+
+            }
+
+            // The services in the write pipeline (in any order).
+            nonJoinedPipelineServiceIds = new LinkedHashSet<UUID>(
+                    Arrays.asList(quorum.getPipeline()));
+
+            // Remove all services that are joined from this collection.
+            for (UUID joinedServiceId : joinedServiceIds) {
+
+                nonJoinedPipelineServiceIds.remove(joinedServiceId);
+
+            }
+
+        }
+        
+    }
+        
+    /**
      * Get timestamp that will be assigned to this commit point.
      * <P>
      * Note: This will spin until commit time advances over
@@ -3086,73 +3151,44 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
             final QuorumService<HAGlue> quorumService = quorum == null ? null
                     : quorum.getClient();
 
-            // The services joined with the met quorum, in their join order.
-            final UUID[] joinedServiceIds;
-            
-            // The services in the write pipeline (in any order).
-            final Set<UUID> nonJoinedPipelineServiceIds;
-            
             if ((_bufferStrategy instanceof IHABufferStrategy)
                     && quorum != null && quorum.isHighlyAvailable()) {
 
-                // The services joined with the met quorum, in their join order.
-                joinedServiceIds = quorum.getJoined();
-                
-                // The UUID for this service.
-                final UUID serviceId = quorum.getClient().getServiceId();
+                /**
+                 * CRITICAL SECTION. We need obtain a distributed consensus for
+                 * the services joined with the met quorum concerning the
+                 * earliest commit point that is pinned by the combination of
+                 * the active transactions and the minReleaseAge on the TXS. New
+                 * transaction starts during this critical section will block
+                 * (on the leader or the folllower) unless they are guaranteed
+                 * to be allowable, e.g., based on the current minReleaseAge,
+                 * the new tx would read from the most recent commit point, the
+                 * new tx would ready from a commit point that is already pinned
+                 * by an active transaction on that node, etc.
+                 * 
+                 * Note: Lock makes this section MUTEX with awaitServiceJoin().
+                 * 
+                 * @see <a href=
+                 *      "https://docs.google.com/document/d/14FO2yJFv_7uc5N0tvYboU-H6XbLEFpvu-G8RhAzvxrk/edit?pli=1#"
+                 *      > HA TXS Design Document </a>
+                 * 
+                 * @see <a
+                 *      href="https://sourceforge.net/apps/trac/bigdata/ticket/623"
+                 *      > HA TXS / TXS Bottleneck </a>
+                 */
 
-                if (joinedServiceIds.length == 0
-                        || !joinedServiceIds[0].equals(serviceId)) {
-
-                    /*
-                     * Sanity check. Verify that the first service in the join
-                     * order is *this* service. This is a precondition for the
-                     * service to be the leader.
-                     */
-                    
-                    throw new RuntimeException("Not leader: serviceId="
-                            + serviceId + ", joinedServiceIds="
-                            + Arrays.toString(joinedServiceIds));
-
-                }
-                
-                // The services in the write pipeline (in any order).
-                nonJoinedPipelineServiceIds = new LinkedHashSet<UUID>(
-                        Arrays.asList(getQuorum().getPipeline()));
-
-                // Remove all services that are joined from this collection.
-                for(UUID joinedServiceId : joinedServiceIds) {
-
-                    nonJoinedPipelineServiceIds.remove(joinedServiceId);
-                    
-                }
+                _gatherLock.lock();
                 
                 try {
-                    /**
-                     * CRITICAL SECTION. We need obtain a distributed consensus
-                     * for the services joined with the met quorum concerning
-                     * the earliest commit point that is pinned by the
-                     * combination of the active transactions and the
-                     * minReleaseAge on the TXS. New transaction starts during
-                     * this critical section will block (on the leader or the
-                     * folllower) unless they are guaranteed to be allowable,
-                     * e.g., based on the current minReleaseAge, the new tx
-                     * would read from the most recent commit point, the new tx
-                     * would ready from a commit point that is already pinned by
-                     * an active transaction on that node, etc.
-                     * 
-                     * @see <a href=
-                     *      "https://docs.google.com/document/d/14FO2yJFv_7uc5N0tvYboU-H6XbLEFpvu-G8RhAzvxrk/edit?pli=1#"
-                     *      > HA TXS Design Document </a>
-                     * 
-                     * @see <a
-                     *      href="https://sourceforge.net/apps/trac/bigdata/ticket/623"
-                     *      > HA TXS / TXS Bottleneck </a>
-                     */
-                    
+                
+                    // Atomic decision point for GATHER re joined services.
+                    final JoinedAndNonJoinedServices tmp = new JoinedAndNonJoinedServices(
+                            quorum);
+
+                    // Run the GATHER protocol.
                     ((AbstractHATransactionService) getLocalTransactionManager()
                             .getTransactionService())
-                            .updateReleaseTimeConsensus(joinedServiceIds,
+                            .updateReleaseTimeConsensus(tmp.joinedServiceIds,
                                     getHAReleaseTimeConsensusTimeout(),
                                     TimeUnit.MILLISECONDS);
 
@@ -3163,14 +3199,13 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                     // Wrap and rethrow.
                     throw new RuntimeException(ex);
                     
+                } finally {
+
+                    _gatherLock.unlock();
+                    
                 }
                 
-            } else {
-                
-                joinedServiceIds = null;
-                nonJoinedPipelineServiceIds = null;
-                
-            }
+            } // if HA
 
             /*
              * Before flushing the commitRecordIndex we need to check for
@@ -3419,9 +3454,13 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                 boolean didVoteYes = false;
                 try {
 
+                    // Atomic decision point for joined vs non-joined services.
+                    final JoinedAndNonJoinedServices tmp = new JoinedAndNonJoinedServices(
+                            quorum);
+
                     final PrepareRequest req = new PrepareRequest(
-                            joinedServiceIds,//
-                            nonJoinedPipelineServiceIds,//
+                            tmp.joinedServiceIds,//
+                            tmp.nonJoinedPipelineServiceIds,//
 //                            !old.isRootBlock0(),//
                             newRootBlock,//
                             quorumService.getPrepareTimeout(), // timeout
@@ -6189,6 +6228,101 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
         }
 
+        /**
+         * {@inheritDoc}
+         * 
+         * FIXME awaitServiceJoin() is failing to set the commitCounter on the
+         * message. Either create a new message type or return the right
+         * message. The joining service should be able to verify that the
+         * release time is applicable for its commit counter (in
+         * {@link AbstractHATransactionService#runWithBarrierLock(Runnable)}.
+         */
+        @Override
+        public IHANotifyReleaseTimeResponse awaitServiceJoin(
+                final IHAAwaitServiceJoinRequest req)
+                throws AsynchronousQuorumCloseException, InterruptedException,
+                TimeoutException {
+
+            /*
+             * Note: Lock makes this operation MUTEX with a critical section in
+             * commitNow().
+             */
+            _gatherLock.lock();
+
+            try {
+                
+                final UUID serviceUUID = req.getServiceUUID();
+
+                final long begin = System.nanoTime();
+
+                final long nanos = req.getUnit().toNanos(req.getTimeout());
+
+                long remaining = nanos;
+
+                while ((remaining = nanos - (System.nanoTime() - begin)) > 0) {
+
+                    final UUID[] joined = getQuorum().getJoined();
+
+                    for (UUID t : joined) {
+
+                        if (serviceUUID.equals(t)) {
+
+                            /*
+                             * Found it.
+                             * 
+                             * FIXME This should be returning the commitCounter
+                             * associated with the most recent gather, not -1L.
+                             */
+
+                            if (log.isInfoEnabled())
+                                log.info("Found Joined Service: " + serviceUUID);
+
+                            final JournalTransactionService ts = (JournalTransactionService) getLocalTransactionManager()
+                                    .getTransactionService();
+
+                            return new HANotifyReleaseTimeResponse(
+                                    ts.getReleaseTime(), -1);
+
+                        }
+
+                    }
+
+                    // remaining := nanos - elapsed
+                    remaining = nanos - (System.nanoTime() - begin);
+
+                    if (remaining > 0) {
+
+                        final long sleepMillis = Math
+                                .min(TimeUnit.NANOSECONDS.toMillis(remaining),
+                                        10/* ms */);
+
+                        if (sleepMillis <= 0) {
+
+                            /*
+                             * If remaining LT 1 ms, then fail fast.
+                             */
+
+                            throw new TimeoutException();
+
+                        }
+
+                        Thread.sleep(sleepMillis);
+
+                    }
+
+                }
+
+                // timeout.
+                throw new TimeoutException();
+            
+            } finally {
+            
+                _gatherLock.unlock();
+                
+            }
+            
+        }
+
         @Override
         public IHADigestResponse computeDigest(final IHADigestRequest req)
                 throws IOException, NoSuchAlgorithmException, DigestException {
@@ -6422,7 +6556,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
         /**
          * Task prepares for a 2-phase commit (syncs to the disk) and votes YES
          * iff if is able to prepare successfully.
-         * 
+         * <p>
          * Note: This code path is only when [isJoined := true].
          */
         private class Prepare2PhaseTask implements Callable<Boolean> {
@@ -6451,18 +6585,44 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
              */
             public Boolean call() throws Exception {
 
+                /*
+                 * Get and clear the [gatherFuture]. A service which was joined
+                 * at the atomic decision point for the GATHER will have a
+                 * non-null Future here. A service which is newly joined and
+                 * which joined *after* the GATHER will have a [null] Future
+                 * here. If the service participated in the gather, then we will
+                 * use this Future to decide if it should vote NO. If the
+                 * service joined *after* the GATHER, then the Future will be
+                 * [null] and we will ignore it.
+                 * 
+                 * FIXME GATHER/PREPARE: This does not verify that the service
+                 * joined after the GATHER when [oldFuture] is [null]. This
+                 * condition is simply assumed to be true. We need to
+                 * distinguish between the two cases described above That could
+                 * be done by returning the set of joined services as of the
+                 * atomic decision point for the GATHER.
+                 */
+                final Future<Void> oldFuture = gatherFuture
+                        .getAndSet(null/* newValue */);
+
                 try {
                 
+                if (haLog.isInfoEnabled())
+                    haLog.info("gatherFuture=" + oldFuture);
+                    
                 final IRootBlockView rootBlock = prepareMessage.getRootBlock();
 
                 if (haLog.isInfoEnabled())
-                    haLog.info("preparedRequest=" + rootBlock);
+                    haLog.info("preparedRequest=" + rootBlock + ", isLeader: " + isLeader);
 
                 if (rootBlock == null)
                     throw new IllegalStateException();
 
                 // Validate the new root block against the current root block.
                 validateNewRootBlock(/*isJoined,*/ isLeader, AbstractJournal.this._rootBlock, rootBlock);
+
+                if (haLog.isInfoEnabled())
+                    haLog.info("validated=" + rootBlock);
 
                 /*
                  * if(follower) {...}
@@ -6484,19 +6644,41 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                      *      > Native thread leak in HAJournalServer process </a>
                      */
 
-                    final Future<Void> oldFuture = gatherFuture
-                            .getAndSet(null/* newValue */);
-
                     if (oldFuture == null) {
-                        throw new IllegalStateException(
-                                "Follower did not execute consensus protocol");
-                    }
 
-//                    if (!oldFuture.isDone()) {
-//                        // Ensure cancelled.
-//                        haLog.error("Gather not done on follower: serviceId=" + getServiceId()+ " : will cancel.");
-//                        oldFuture.cancel(true/* mayInterruptIfRunning */);
-//                    }
+                        /*
+                         * Ok not to be part of consensus, could have just
+                         * joined.
+                         * 
+                         * The GATHER is determines the earliest visible
+                         * commit point for new transaction starts. It is
+                         * not specifically about the commit itself.
+                         * 
+                         * Therefore the only restriction is to control when
+                         * historical transactions are permitted. We should
+                         * only fail the PREPARE if we have an earliest
+                         * transaction point prior to that reported in the
+                         * prepared rootblock.
+                         * 
+                         * Note: There should be no active transactions if
+                         * we joined on a live write and have not taken part
+                         * in a gather.
+                         * 
+                         * FIXME GATHER/PREPARE: Can we validate that this is a
+                         * newly joined service and hence that we can vote
+                         * YES unconditionally? Can we validate that there
+                         * are no active transactions? Can we validate that
+                         * the follower's releaseTime is consisent with (the
+                         * same as) the consensus release time for the
+                         * leader?
+                         */
+                        
+                        vote.set(true);
+
+                        // Done.
+                        return vote.get();
+                        
+                    }
 
                     try {
                         oldFuture.get();
@@ -6554,9 +6736,19 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                 } finally {
                 
                     if(!vote.get()) {
-                        
-                        doRejectedCommit();
-                        
+                        if (oldFuture != null) {
+                            /*
+                             * Did GATHER and voted NO.
+                             */
+                            doRejectedCommit();
+                        } else {
+                            /*
+                             * FIXME GATHER/PREPARE : This is *assuming* that we
+                             * have a newly joined service. That should have
+                             * been verified above.
+                             */
+                            haLog.info("Did not do GATHER : Presumed newly joined service.");
+                        }
                     }
                     
                 }
@@ -6767,6 +6959,8 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                          * the commit.
                          */
 
+                    	haLog.warn("IGNORING COMMIT2PHASE, joined: " + prepareMessage.isJoinedService());
+
                         return;
                     
                     }
@@ -6793,7 +6987,9 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                         AbstractJournal.this.doLocalCommit(localService,
                                 rootBlock);
 
-                    } // if(isJoinedService)
+                    } else { // if(isJoinedService)
+                    	haLog.warn("IGNORING COMMIT2PHASE - not joined");
+                    }
 
                     try {
 

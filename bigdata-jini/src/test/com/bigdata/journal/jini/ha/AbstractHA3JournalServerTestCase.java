@@ -463,7 +463,7 @@ public class AbstractHA3JournalServerTestCase extends
     protected void assertReady(final HAGlue[] members) throws IOException {
     	for (HAGlue member : members) {
     		final HAStatusEnum status = member.getHAStatus();
-    		System.err.println(member.getServiceName() + ": " + status);
+    		if(log.isInfoEnabled())log.info(member.getServiceName() + ": " + status);
     		assertFalse(HAStatusEnum.NotReady == status);
     	}
     }
@@ -1651,6 +1651,7 @@ public class AbstractHA3JournalServerTestCase extends
            /**
             * The {@link ServiceItem} iff discovered.
             */
+            @SuppressWarnings("unused")
             private ServiceItem serviceItem = null;
 
             /**
@@ -2032,7 +2033,7 @@ public class AbstractHA3JournalServerTestCase extends
                     throw new RuntimeException(e);
                 }
             }
-        }, 10, TimeUnit.SECONDS);
+        }, 20, TimeUnit.SECONDS);
 
         quorum.assertQuorum(token+1);
         

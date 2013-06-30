@@ -140,6 +140,10 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
      * have been purged on each service.
      */
     public void testStartAB_C() throws Exception {
+    	doStartAB_C();
+    }
+    
+    protected void doStartAB_C() throws Exception {
 
         // Start 2 services.
         final HAGlue serverA = startA();
@@ -574,6 +578,31 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
     }
 
     /**
+     * ZERO (0) committed transactions then at 50ms delay between each
+     * subsequent transaction.
+     */
+    public void testStartAB_C_MultiTransactionResync_5tx_then_50ms_delay()
+            throws Exception {
+
+        doStartAB_C_MultiTransactionResync(50, 5);
+    }
+
+    public void _testStressStartAB_C_MultiTransactionResync_500_0()
+            throws Exception {
+
+        for (int i = 0; i < 40; i++) {
+            try {
+                doStartAB_C_MultiTransactionResync(500, 0);
+            } catch (Throwable t) {
+                fail("Fail after " + (i + 1) + " trials : " + t, t);
+            } finally {
+                destroyAll();
+            }
+        }
+
+    }
+    
+    /**
      * This stress test was written after seeing rare failures in
      * testStartAB_C_MultiTransactionResync_5tx_then_200ms_delay.
      *
@@ -581,12 +610,17 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
      *
      * @throws Exception
      */
-    public void _testStressStartAB_C_MultiTransactionResync()
+    public void _testStressStartAB_C_MultiTransactionResync_200_5()
             throws Exception {
 
         for (int i = 0; i < 50; i++) {
-            doStartAB_C_MultiTransactionResync(200, 5);
-            destroyAll();
+            try {
+                doStartAB_C_MultiTransactionResync(200/* txDelayMillis */, 5/* initialTransactions */);
+            } catch (Throwable t) {
+                fail("Fail after " + (i + 1) + " trials : " + t, t);
+            } finally {
+                destroyAll();
+            }
         }
 
     }
@@ -741,7 +775,16 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
                     HAStatusEnum.Follower, HAStatusEnum.Follower },
                     new HAGlue[] { serverA, serverB, serverC });
 
-            // Verify binary equality of ALL journals.
+            /*
+             * Verify binary equality of ALL journals.
+             * 
+             * Note: A failure to have digest equality on the last follower
+             * after a service join has been diagnosed as a problem of the last
+             * follower to ensure that it's service join was visible to the
+             * leader before unblocking the write replication pipeline. This
+             * could result in the leader not including the newly joined
+             * follower in the 2-phase commit.
+             */
 			assertDigestsEquals(new HAGlue[] { serverA, serverB, serverC });
 
 			// Now force further commit when fully met to remove log files
@@ -870,8 +913,9 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
 
 		log.info("ALL GOOD!");
 	}
+	
 	// FIXME Move to StressTestHA3JournalServer
-	public void testStressTestStartAB_C_LiveResync() throws Exception {
+	public void _testStressTestStartAB_C_LiveResync() throws Exception {
 		for (int i = 0; i < 50; i++) {
 			log.warn("Starting run " + i);
 			testStartAB_C_LiveResync();
@@ -1037,6 +1081,19 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
         assertHALogDigestsEquals(7L/* firstCommitCounter */, 7L, new HAGlue[] {
                 serverA, serverB, serverC });
 
+    }
+
+    // FIXME Move to StressTestHA3JournalServer
+    public void _testStress_RebuildWithPipelineReorganisation() throws Exception {
+        for (int i = 0; i < 50; i++) {
+            try {
+                testStartABC_RebuildWithPipelineReorganisation();
+            } catch (Throwable t) {
+                fail("Run " + i, t);
+            } finally {
+                destroyAll();
+            }
+        }
     }
 
     /**
@@ -1278,6 +1335,23 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
                 || leader.equals(startup.serverC));
         
 	}
+    
+    /**
+     * Having observed stochastic failures, here is a stress test
+     * to try and generate a more deterministic failure.
+     * 
+     * @throws Exception
+     */
+    public void _testStressQuorumBreaksABC_failLeader()
+            throws Exception {
+
+        for (int i = 0; i < 40; i++) {
+        	log.warn("RUN: " + i);
+        	testQuorumBreaksABC_failLeader();
+            destroyAll();
+        }
+
+    }
     
     /**
      * Tests that halog files are generated and identical, and that
@@ -1810,6 +1884,170 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
 		}
 	    	
     }
+
+    /**
+     * Similar to multitransaction but rather than a number of updates following a load it is simply a number of loads
+     * followed by queries on the folowers that are checkd for consistency.
+     */
+    public void testABCMultiLoadFollowerReads() throws Exception {
+    	doABCMultiLoadFollowerReads2(50/*nTransactions*/, false/*largeLoad*/);
+    }
+    
+    /**
+     * Similar to multitransaction but rather than a number of updates following a load it is simply a number of loads
+     * followed by queries on the folowers that are checkd for consistency.
+     */
+    public void testABCMultiLoadFollowerReadsLargeLoad() throws Exception {
+    	doABCMultiLoadFollowerReads2(20/*nTransactions*/, true/*largeLoad*/);
+    }
+    
+    /**
+     * Similar to multitransaction but rather than a number of updates following a load it is simply a number of loads
+     * followed by queries on the folowers that are checkd for consistency.
+     * 
+     * @param loads
+     * @param transactionDelay
+     * @throws Exception
+     */
+    protected void doABCMultiLoadFollowerReads2(final int nTransactions,
+            final boolean largeLoad) throws Exception {
+
+        try {
+
+            // Start all services.
+            final ABC services = new ABC(true/* sequential */);
+
+            // Wait for a quorum meet.
+            final long token = quorum.awaitQuorum(awaitQuorumTimeout,
+                    TimeUnit.MILLISECONDS);
+
+            assertEquals(token, awaitFullyMetQuorum());
+
+            final HAGlue leader = quorum.getClient().getLeader(token);
+
+            // Verify assumption in this test.
+            assertEquals(leader, services.serverA);
+
+            // Wait until all services are "HA" ready.
+            leader.awaitHAReady(awaitQuorumTimeout, TimeUnit.MILLISECONDS);
+            services.serverB.awaitHAReady(awaitQuorumTimeout, TimeUnit.MILLISECONDS);
+            services.serverC.awaitHAReady(awaitQuorumTimeout, TimeUnit.MILLISECONDS);
+
+            /*
+             * Now create a Callable for the final followes to repeatedly query
+             * against the then current commit point. The task returns the #of
+             * queries that were executed. The task will run until we stop
+             * issuing UPDATE requests.
+             */
+            class QueryTask implements Callable<Long> {
+                
+                /** The service to query. */
+                private final HAGlue haGlue;
+                
+//                /**
+//                 * The SPARQL end point for that service.
+//                 */
+//                final RemoteRepository remoteRepo;
+//
+//                /**
+//                 * Format for timestamps that may be used to correlate with the
+//                 * HA log messages.
+//                 */
+//                final SimpleDateFormat df = new SimpleDateFormat("hh:mm:ss,SSS");
+
+                /**
+                 * @param haGlue
+                 *            The service to query.
+                 *            
+                 * @throws IOException 
+                 */
+                public QueryTask(final HAGlue haGlue) throws IOException {
+                
+//                    this.haGlue = haGlue;
+                    
+                    /*
+                     * Run query against one of the followers.
+                     * 
+                     * 6537 queries for 2000 transactions (leader)
+                     * 
+                     * 10109 queries for 2000 transactions (follower)
+                     */
+//                    remoteRepo = getRemoteRepository(haGlue);
+                    this.haGlue = haGlue;
+
+                }
+
+                public Long call() throws Exception {
+                    
+                    return getCountStar(haGlue);
+                    
+//                    final String query = "SELECT (COUNT(*) AS ?count) WHERE { ?s ?p ?o }";
+// 
+//                        // Verify quorum is still valid.
+//                    quorum.assertQuorum(token);
+//
+//                    // Run query.
+//                    final TupleQueryResult result = remoteRepo
+//                            .prepareTupleQuery(query).evaluate();
+//                    
+//                    final BindingSet bs = result.next();
+// 
+//                    // done.
+//                    final Value v = bs.getBinding("count").getValue();
+//                    
+//                    return (long) ((org.openrdf.model.Literal) v).intValue();                
+                }
+  
+            };
+
+            final FutureTask<Long> queryTaskFuture = new FutureTask<Long>(
+                    new QueryTask(services.serverC));
+
+            /*
+             * Sequentially run repeated loads and after each load submit queries on all services,
+             * checking for consistency.
+             */
+
+            try {
+            	for (int t = 0 ; t < nTransactions; t++) {
+                    final FutureTask<Void> loadTaskFuture = new FutureTask<Void>(new LargeLoadTask(token, largeLoad/* reallyLargeLoad */));
+                    executorService.submit(loadTaskFuture);
+                    loadTaskFuture.get(); // wait on load!
+
+                    final FutureTask<Long> qAFuture = new FutureTask<Long>(new QueryTask(services.serverA));
+                    final FutureTask<Long> qBFuture = new FutureTask<Long>(new QueryTask(services.serverB));
+                    final FutureTask<Long> qCFuture = new FutureTask<Long>(new QueryTask(services.serverC));
+                    
+                    executorService.submit(qAFuture);
+                    executorService.submit(qBFuture);
+                    executorService.submit(qCFuture);
+                    
+                    if (log.isInfoEnabled())
+	                   log.info("StatementsA: " + qAFuture.get()
+	                       		+ ", StatementsB: " + qBFuture.get()
+	                       		+ ", StatementsC: " + qCFuture.get()
+	                    		);
+                    
+                    assertTrue(qAFuture.get().equals(qBFuture.get()));
+                    assertTrue(qAFuture.get().equals(qCFuture.get()));
+            	}
+
+            } finally {
+            
+                queryTaskFuture.cancel(true/* mayInterruptIfRunning */);
+
+            }
+
+            // Finally cehck for binary compatibility
+			assertDigestsEquals(new HAGlue[] { services.serverA, services.serverB, services.serverC });
+
+        } finally {
+		
+            destroyAll();
+            
+		}
+	    	
+    }
     
    /**
      * Tests that halog files are removed after fully met on rebuild
@@ -1973,11 +2211,32 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
      */
     // disable from std test runs
     public void _testSANDBOXStressABCStartSimultaneous() throws Exception {
-        for (int i = 1; i <= 20; i++) {
+        for (int i = 1; i <= 200; i++) {
             ABC tmp = null;
             try {
                 tmp = new ABC(false/* sequential */);
-                awaitFullyMetQuorum();
+                // ABC already awaits quorum and assert commit counter!
+                tmp.shutdownAll();
+            } catch (Throwable e) {
+                fail("Unable to meet on run " + i, e);
+            } finally {
+                if (tmp != null) {
+                    tmp.shutdownAll();
+                }
+            }
+        }
+    }
+
+    public void _testSANDBOXStressStartup() throws Exception {
+        for (int i = 1; i <= 50; i++) {
+        	doStartAB_C();
+        	destroyAll();
+        	
+            ABC tmp = null;
+            try {
+            	
+                tmp = new ABC(false/* sequential */);
+                // ABC already awaits quorum and assert commit counter!
                 tmp.shutdownAll();
             } catch (Throwable e) {
                 fail("Unable to meet on run " + i, e);
@@ -2636,7 +2895,7 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
 
         // Start 2 services.
         HAGlue serverA = startA();
-        HAGlue serverB = startB();
+        final HAGlue serverB = startB();
 
         // Wait for a quorum meet.
         final long token = quorum.awaitQuorum(awaitQuorumTimeout,
@@ -2646,7 +2905,7 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
         awaitHAStatus(serverB, HAStatusEnum.Follower);
 
         // Start 3rd service.
-        HAGlue serverC = startC();
+        final HAGlue serverC = startC();
 
         // Wait until the quorum is fully met. The token should not change.
         assertEquals(token, awaitFullyMetQuorum());
@@ -2661,21 +2920,50 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
          */
         shutdownA();
 
-        final long token2 = quorum.awaitQuorum(awaitQuorumTimeout * 2,
-                TimeUnit.MILLISECONDS);
+//        /*
+//         * TODO Why sleep here? Is it because we might otherwise still observe a
+//         * valid quorum? In which case, we need to await the next token, passing
+//         * in the current one rather than just tossing in a sleep().
+//         */
+//        Thread.sleep(50); // wait a while for A to shutdown
+//
+//      final long token2 = quorum.awaitQuorum(awaitQuorumTimeout * 2,
+//      TimeUnit.MILLISECONDS);
+
+        // Wait for the next quorum meet on (token+1).
+        final long token2 = awaitNextQuorumMeet(token);
 
         // New token.
         assertEquals(token2, token + 1);
 
-        /*
+        /**
          * Figure out the new leader.
+         * 
+         * Note: There appears to be a problem were [leader] can not always be
+         * compared with [serverB] and [serverC] using reference testing (==).
+         * In the trace below, you can see that [leader] has the same data in
+         * this case as [serverC] (same UUID, same TcpEndpoint). I have modified
+         * the code to compare the ServiceID values using equals().
+         * 
+         * <pre>
+         * junit.framework.AssertionFailedError: Did not elect leader consistent with expectations:
+         *    leader=Proxy[HAGlue,BasicInvocationHandler[BasicObjectEndpoint[b44e72e1-dd5c-4dbc-9640-129bdab11007,TcpEndpoint[192.168.1.135:55983]]]],
+         *   serverB=Proxy[HAGlue,BasicInvocationHandler[BasicObjectEndpoint[073e0614-26a6-49be-83f4-381ce6338306,TcpEndpoint[192.168.1.135:55965]]]],
+         *   serverC=Proxy[HAGlue,BasicInvocationHandler[BasicObjectEndpoint[b44e72e1-dd5c-4dbc-9640-129bdab11007,TcpEndpoint[192.168.1.135:55983]]]]
+         *     at junit.framework.Assert.fail(Assert.java:47)
+         *     at com.bigdata.journal.jini.ha.TestHA3JournalServer.testQuorumABC_HAStatusUpdatesWithFailovers(TestHA3JournalServer.java:2946)
+         * </pre>
          */
         final HAGlue leader = quorum.getClient().getLeader(token2);
         final HAGlue follower1;
-        if (leader == serverB) {
+        if (leader.getServiceId().equals(serverB.getServiceId())) {
             follower1 = serverC;
-        } else {
+        } else if (leader.getServiceId().equals(serverC.getServiceId())) {
             follower1 = serverB;
+        } else {
+            follower1 = null; // to keep compiler happy
+            fail("Did not elect leader consistent with expectations: leader="
+                    + leader + ", serverB=" + serverB + ", serverC=" + serverC);
         }
 
         // Self-report in the correct roles.

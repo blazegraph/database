@@ -466,7 +466,9 @@ public class HAJournal extends Journal {
 
             /*
              * If there is a running snapshot, then cancel it since the quorum
-             * has broken.
+             * has broken (or this service has left the quorum). (HAReady will
+             * be NO_QUORUM if the quorum is still met, but this service is no
+             * longer joined with the met quorum.)
              * 
              * Note: The snapshot task will automatically terminate if it
              * observes a quorum break or similar event. This is just being
@@ -476,11 +478,6 @@ public class HAJournal extends Journal {
              * local service leaves the quorum. However, we should still cancel
              * a running snapshot if that occurs (if we add a serviceLeave()
              * handle then this will fix that).
-             * 
-             * FIXME We MUST ensure that the snapshot is terminated based on the
-             * clear of the haReadyToken. Even if the quorumToken does not
-             * change, the haReadyToken can be cleared if a serviceLeave() is
-             * performed by this service.
              */
             
             final Future<IHASnapshotResponse> ft = getSnapshotManager()
@@ -903,13 +900,15 @@ public class HAJournal extends Journal {
             /**
              * Return Future.
              * 
-             * FIXME DGC: This leaks a thread every time we return an
-             * asynchronous proxy, but we need the ability to interrupt the
-             * transfer of an HALog file.
+             * TODO This relies on DGC, which is supposed to be fixed in river
+             * 2.2.1 (it was leaking one thread per RMI in 2.2.0). Even if this
+             * leaks a thread every time we return an asynchronous proxy, we
+             * stil need the ability to interrupt the transfer of an HALog file.
              * 
-             * Look at HAJournalServer and how it manages the transition to a
-             * joined service in RESYNC and identify a different mechanism for
-             * interrupting the transfer of the HALog.
+             * If DGC is still leaking thread, then look at HAJournalServer and
+             * how it manages the transition to a joined service in RESYNC and
+             * identify a different mechanism for interrupting the transfer of
+             * the HALog.
              * 
              * Consider using a well known exception thrown back long the write
              * pipeline to indicate that a receiver is done recieving data for
@@ -1230,7 +1229,13 @@ public class HAJournal extends Journal {
 
             getBufferStrategy().computeDigest(null/* snapshot */, digest);
 
-            return new HADigestResponse(req.getStoreUUID(), digest.digest());
+            final IHADigestResponse resp = new HADigestResponse(req.getStoreUUID(), 
+                    digest.digest());
+            
+            if (haLog.isInfoEnabled())
+                log.info("Request=" + req + ", Response=" + resp);
+
+            return resp;
             
         }
         
@@ -1255,9 +1260,14 @@ public class HAJournal extends Journal {
 
             r.computeDigest(digest);
 
-            return new HALogDigestResponse(req.getCommitCounter(),
-                    digest.digest());
+            final IHALogDigestResponse resp = new HALogDigestResponse(
+                    req.getCommitCounter(), digest.digest());
 
+            if (haLog.isInfoEnabled())
+                log.info("Request=" + req + ", Response=" + resp);
+
+            return resp;
+            
         }
 
         @Override
@@ -1281,8 +1291,13 @@ public class HAJournal extends Journal {
              */
             getSnapshotManager().getDigest(commitCounter, digest);
 
-            return new HASnapshotDigestResponse(req.getCommitCounter(),
-                    digest.digest());
+            final IHASnapshotDigestResponse resp = new HASnapshotDigestResponse(
+                    req.getCommitCounter(), digest.digest());
+
+            if (haLog.isInfoEnabled())
+                log.info("Request=" + req + ", Response=" + resp);
+
+            return resp;
             
         }
 

@@ -697,6 +697,8 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
 
             final HAGlue haGlue = services[i];
 
+            if(log.isInfoEnabled()) log.info("Compute Digest for service: " + haGlue.getServiceName());
+            
             digests[i] = haGlue.computeDigest(
                     new HADigestRequest(null/* storeUUID */)).getDigest();
 

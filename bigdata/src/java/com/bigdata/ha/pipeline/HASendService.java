@@ -362,7 +362,13 @@ public class HASendService {
 
                     socketChannel.set(sc = openChannel(addrNext.get()));
 
+                    if (log.isTraceEnabled())
+                    	log.trace("Opened channel on try: " + tryno);
+
                 } catch (IOException e) {
+
+                    if (log.isInfoEnabled())
+                    	log.info("Failed to open channel on try: " + tryno);
 
                     if (tryno < retryMillis.length) {
 

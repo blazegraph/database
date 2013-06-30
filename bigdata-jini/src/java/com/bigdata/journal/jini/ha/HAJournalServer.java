@@ -66,6 +66,7 @@ import com.bigdata.ha.QuorumServiceBase;
 import com.bigdata.ha.halog.HALogWriter;
 import com.bigdata.ha.halog.IHALogReader;
 import com.bigdata.ha.halog.IHALogWriter;
+import com.bigdata.ha.msg.HAAwaitServiceJoinRequest;
 import com.bigdata.ha.msg.HALogRequest;
 import com.bigdata.ha.msg.HALogRootBlocksRequest;
 import com.bigdata.ha.msg.HARebuildRequest;
@@ -73,6 +74,7 @@ import com.bigdata.ha.msg.HARootBlockRequest;
 import com.bigdata.ha.msg.HAWriteSetStateRequest;
 import com.bigdata.ha.msg.IHALogRequest;
 import com.bigdata.ha.msg.IHALogRootBlocksResponse;
+import com.bigdata.ha.msg.IHANotifyReleaseTimeResponse;
 import com.bigdata.ha.msg.IHARebuildRequest;
 import com.bigdata.ha.msg.IHARemoteRebuildRequest;
 import com.bigdata.ha.msg.IHASendStoreResponse;
@@ -1118,7 +1120,11 @@ public class HAJournalServer extends AbstractServer {
 
                 } finally {
 
-                    haLog.warn(runState + ": exit.");
+                	/*
+                	 * Has a future been set? NOTE: THIS DOES NOT WAIT ON THE FUTURE ITSELF,
+                	 * it just displays the reference for the Future.
+                	 */
+                    haLog.warn(runState + ": exit, runStateFuture=" + runStateFutureRef.get());
 
                     /*
                      * Note: Do NOT clear the run state since it could have been
@@ -1188,6 +1194,9 @@ public class HAJournalServer extends AbstractServer {
             /*
              * Do synchronous service leave.
              */
+
+            log.warn("Will do SERVICE LEAVE");
+            
             serviceLeave();
             
             /*
@@ -1476,6 +1485,8 @@ public class HAJournalServer extends AbstractServer {
                     logLock.lock();
                     try {
                         if (!journal.getHALogNexus().isHALogOpen()) {
+                            if (log.isInfoEnabled())
+                         	log.info("Disable log on QuorumMeet");
                             journal.getHALogNexus().disableHALog();
                             journal.getHALogNexus().createHALog(
                                     journal.getRootBlockView());
@@ -1546,7 +1557,8 @@ public class HAJournalServer extends AbstractServer {
                  * Note: AbstractJournal.setQuorumToken() will detect
                  * case where it transitions from a met quorum through 
                  * a service leave and will clear its haReady token and
-                 * update its haStatus field appropriately.
+                 * update its haStatus field appropriately. (This is why
+                 * we pass in quorum.token() rather than NO_QUORUM.)
                  */
                 journal.setQuorumToken(getQuorum().token());
                 try {
@@ -2507,6 +2519,28 @@ public class HAJournalServer extends AbstractServer {
             // TODO Replace with pipelineSetup()?
             logLock.lock();
             try {
+            
+                if (getQuorum().getMember().isJoinedMember(token)) {
+                    /*
+                     * This can happen if there is a data race with a live write
+                     * that is the first write cache block for the write set
+                     * that that we would replicate from the ResyncTask. In this
+                     * case, we have lost the race to the live write and this
+                     * service has already joined as a follower. We can safely
+                     * return here since the test in this if() is the same as
+                     * the condition variable in the loop for the ResyncTask.
+                     * 
+                     * @see #resyncTransitionToMetQuorum()
+                     */
+                     
+                    return;
+                }
+                
+                /*
+                 * Since we are not joined, the HAReady token must not have been
+                 * set.
+                 */
+                assert journal.getHAReady() == Quorum.NO_QUORUM;
                 journal.getHALogNexus().disableHALog();
                 journal.getHALogNexus().createHALog(openRootBlock);
             } finally {
@@ -2525,6 +2559,8 @@ public class HAJournalServer extends AbstractServer {
                     .getCommitCounter();
 
             if (liveHALog) {
+	            	if (log.isInfoEnabled())
+	            		log.info("Joining live log");
 
                 /*
                  * If this was the live write set at the moment when we
@@ -2541,6 +2577,8 @@ public class HAJournalServer extends AbstractServer {
                 if (conditionalJoinWithMetQuorum(leader, token,
                         closingCommitCounter - 1)) {
 
+	             if (log.isInfoEnabled())
+	             	log.info("CAUGHT UP");
                     /*
                      * We are caught up and have joined the met quorum.
                      * 
@@ -2562,6 +2600,8 @@ public class HAJournalServer extends AbstractServer {
              * makes for simpler code, but we could replicate from any upstream
              * service that is joined with the met quorum.
              */
+	     if (log.isInfoEnabled())
+            	log.info("replicateAndApplyHALog: " + closingCommitCounter);
             final IRootBlockView closeRootBlock = replicateAndApplyHALog(
                     leader, closingCommitCounter, resp);
 
@@ -2755,7 +2795,11 @@ public class HAJournalServer extends AbstractServer {
                     /*
                      * Can not join. Some write has been received for this
                      * commit point (or a greater commit point). Leader has
-                     * moved on.
+                     * moved on. (Note: any live write for either the then
+                     * current commit point on the leader or any subsequent
+                     * commit point on the leader is sufficient to reject a
+                     * conditional join. We do not need to check the block
+                     * sequence as well.)
                      * 
                      * Note: [lastLiveMsg] was cleared to [null] when we did a
                      * local abort at the top of resync() or rebuild().
@@ -3185,6 +3229,9 @@ public class HAJournalServer extends AbstractServer {
                          * task, and enter RunMet.
                          */
 
+                    	if (haLog.isInfoEnabled())
+                    		haLog.info("Transition to MET after seeing LIVE that is NEXT after last resync, lastLiveNexusMsg " + journal.getHALogNexus().lastLiveHAWriteMessage);
+                    	
                         resyncTransitionToMetQuorum(msg, data);
 
                         return;
@@ -3308,6 +3355,9 @@ public class HAJournalServer extends AbstractServer {
 
             // UUID of the quorum leader.
             final UUID leaderId = quorum.getLeaderId();
+
+            // Resolve the leader.
+            final S leader = getLeader(token);
             
             // Verify that the quorum is valid.
             quorum.assertQuorum(token);
@@ -3329,6 +3379,10 @@ public class HAJournalServer extends AbstractServer {
             // Verify that the quorum is valid.
             getQuorum().assertQuorum(token);
             
+            if (haLog.isInfoEnabled())
+                haLog.info("Successful attempt to cast vote for met quorum: " + token
+                        + ", leadersVote=" + leadersVote);
+
             /*
              * Attempt to join the met quorum.
              * 
@@ -3348,14 +3402,17 @@ public class HAJournalServer extends AbstractServer {
              * 
              * TODO What happens if we are blocked here?
              */
-            ((AbstractHATransactionService) journal.getTransactionService())
-                    .runWithBarrierLock(new Runnable() {
+            final AbstractHATransactionService txs = (AbstractHATransactionService) journal
+                    .getTransactionService();
+
+            txs.runWithBarrierLock(new Runnable() {
 
                         public void run() {
                             
                             // Verify that the quorum is valid.
                             getQuorum().assertQuorum(token);
 
+                            // Synchronous service join (blocks until success or failure).
                             getActor().serviceJoin();
 
                             // Verify that the quorum is valid.
@@ -3366,9 +3423,70 @@ public class HAJournalServer extends AbstractServer {
 
                             // Verify that the quorum is valid.
                             getQuorum().assertQuorum(token);
+                            
+                            /*
+                             * We need to block until the leader observes our
+                             * service join. We are blocking replicated writes.
+                             * That prevents the leader from initiating a
+                             * 2-phase commit. By blocking until our service
+                             * join becomes visible to the leader, we are able
+                             * to ensure that we will participate in a 2-phase
+                             * commit where the leader might otherwise have
+                             * failed to observe that we are a joined service.
+                             * 
+                             * This addresses a failure mode demonstrated by the
+                             * test suite where a service join during a series
+                             * of short transactions could fail. The failure
+                             * mode was that the newly joined follower was
+                             * current on the write set and had invoked
+                             * serviceJoin(), but the leader did not include it
+                             * in the 2-phase commit because the service join
+                             * event had not been delivered from zk in time
+                             * (visibility).
+                             * 
+                             * Note: There is a gap between the GATHER and the
+                             * PREPARE. If this service joins with a met quorum
+                             * after the GATHER and before the PREPARE, then it
+                             * MUST set the most recent consensus release time
+                             * from the leader on its local journal. This
+                             * ensures that the newly joined follower will not
+                             * allow a transaction start against a commit point
+                             * that was recycled by the leader.
+                             * 
+                             * TODO The leader should use a real commit counter
+                             * in its response and the follower should verify
+                             * that the commit counter is consistent with its
+                             * assumptions.
+                             */
+                            try {
+                                
+                                final IHANotifyReleaseTimeResponse resp = leader.awaitServiceJoin(new HAAwaitServiceJoinRequest(
+                                        getServiceId(),
+                                        Long.MAX_VALUE/* timeout */,
+                                        TimeUnit.SECONDS/* unit */));
+
+                                if (log.isInfoEnabled())
+                                    log.info("Obtained releaseTime from leader: "
+                                            + resp);
+
+                                // Update the release time on the local journal.
+                                txs.setReleaseTime(resp.getCommitTime());
+
+                            } catch (Throwable t) {
+                                log.error(t, t);
+                                throw new QuorumException(
+                                        "Service join not observed by leader.",
+                                        t);
+                            }
+
+                            // Verify that the quorum is valid.
+                            getQuorum().assertQuorum(token);
                         }
                     });
 
+            if (haLog.isInfoEnabled())
+                haLog.info("TRANSITION", new RuntimeException());
+            
             // Transition to RunMet.
             enterRunState(new RunMetTask(token, leaderId));
 

@@ -1200,7 +1200,8 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
             log.warn("No meta allocation data included in root block for RWStore");
         }
         
-        if (log.isTraceEnabled()) {
+        // CANNOT check physicalAddress if follower
+        if (m_quorum == null && log.isTraceEnabled()) {
             final int commitRecordAddr = (int) (rbv.getCommitRecordAddr() >> 32);
             log.trace("CommitRecord " + rbv.getCommitRecordAddr()
                     + " at physical address: "
@@ -6878,8 +6879,9 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
      * @throws IOException 
      */
     public void writeRaw(final long offset, final ByteBuffer transfer) throws IOException {
-//      if (m_rebuildRequest == null)
-//          throw new IllegalStateException("Store is not in rebuild state");
+    	
+    	if (log.isDebugEnabled())
+    		log.debug("writeRaw: " + offset);
 
         // Guard IO against concurrent file extension.
         final Lock lock = m_extensionLock.readLock();

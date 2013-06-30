@@ -88,5 +88,21 @@ abstract public class AbstractHATransactionService extends
      * Used to make a serviceJoin() MUTEX with the consensus protocol.
      */
     abstract public void runWithBarrierLock(Runnable r);
-    
+
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Overridden to expose this method so it may be invoked when a follower
+     * joins an existing quorum to set the consensus release time of the quorum
+     * leader of the newly joined follower. This prevents the follower from
+     * permitting new transaction starts against a commit point which has been
+     * recycled by the quorum leader.
+     */
+    @Override
+    public void setReleaseTime(final long newReleaseTime) {
+
+        super.setReleaseTime(newReleaseTime);
+
+    }
+
 }
