@@ -1081,13 +1081,18 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
             
             barrierLock.lock();
             try {
-                r.run();
+                haLog.info("Will run with barrier lock.");
+                try {
+                    r.run();
+                } finally {
+                    haLog.info("Did run with barrier lock.");
+                }
             } finally {
                 barrierLock.unlock();
             }
             
         }
-        
+
         /**
          * {@inheritDoc}
          * <p>
@@ -1297,9 +1302,17 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
          * <p>
          * Overridden to take the necessary lock since we are invoking this
          * method from contexts in which the lock would not otherwise be held.
+         * <p>
+         * Note: This is also used to callback on service join to set the
+         * consensus release time from the leader of a newly joined follower.
+         * This ensures that live joiners need not take part in a gather and can
+         * still confidently join in an HA 2 phase commit.
+         * 
+         * @param newReleaseTime
+         *            The new release time for the local journal.
          */
         @Override
-        protected void setReleaseTime(final long newValue) {
+        public void setReleaseTime(final long newValue) {
 
             if (newValue < 0)
                 throw new IllegalArgumentException();

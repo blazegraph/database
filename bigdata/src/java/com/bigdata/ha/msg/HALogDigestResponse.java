@@ -25,6 +25,8 @@ package com.bigdata.ha.msg;
 
 import java.io.Serializable;
 
+import com.bigdata.btree.BytesUtil;
+
 public class HALogDigestResponse implements IHALogDigestResponse, Serializable {
 
     private static final long serialVersionUID = 1L;
@@ -52,6 +54,14 @@ public class HALogDigestResponse implements IHALogDigestResponse, Serializable {
 
         return digest;
         
+    }
+
+    @Override
+    public String toString() {
+
+        return super.toString() + "{commitCounter=" + getCommitCounter()
+                + ", digest=" + BytesUtil.toHexString(getDigest()) + "}";
+
     }
 
 }

@@ -25,7 +25,8 @@ package com.bigdata.ha.msg;
 
 import java.io.Serializable;
 
-public class HASnapshotDigestRequest implements IHASnapshotDigestRequest, Serializable {
+public class HASnapshotDigestRequest implements IHASnapshotDigestRequest,
+        Serializable {
 
     private static final long serialVersionUID = 1L;
 
@@ -44,4 +45,11 @@ public class HASnapshotDigestRequest implements IHASnapshotDigestRequest, Serial
         
     }
 
+    @Override
+    public String toString() {
+
+        return super.toString() + "{commitCounter=" + getCommitCounter() + "}";
+
+    }
+    
 }

@@ -25,6 +25,8 @@ package com.bigdata.ha.msg;
 
 import java.io.Serializable;
 
+import com.bigdata.btree.BytesUtil;
+
 public class HASnapshotDigestResponse implements IHASnapshotDigestResponse, Serializable {
 
     private static final long serialVersionUID = 1L;
@@ -52,6 +54,14 @@ public class HASnapshotDigestResponse implements IHASnapshotDigestResponse, Seri
 
         return digest;
         
+    }
+
+    @Override
+    public String toString() {
+
+        return super.toString() + "{commitCounter=" + getCommitCounter()
+                + ", digest=" + BytesUtil.toHexString(getDigest()) + "}";
+
     }
 
 }

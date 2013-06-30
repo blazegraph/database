@@ -53,7 +53,6 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IndexSegmentBuilder;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.ha.msg.HAWriteMessage;
@@ -1919,6 +1918,9 @@ abstract public class WriteCache implements IWriteCache {
             counters.nchannelWrite += nwrites;
             counters.bytesWritten += nbytes;
             counters.elapsedWriteNanos += (System.nanoTime() - begin);
+
+            if (log.isTraceEnabled())
+            	log.trace("WRITTEN ON CHANNEL");
 
             return true;
 

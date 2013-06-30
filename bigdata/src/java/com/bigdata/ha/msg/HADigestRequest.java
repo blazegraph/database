@@ -45,4 +45,11 @@ public class HADigestRequest implements IHADigestRequest, Serializable {
         
     }
 
+    @Override
+    public String toString() {
+
+        return super.toString() + "{storeUUID=" + getStoreUUID() + "}";
+
+    }
+    
 }

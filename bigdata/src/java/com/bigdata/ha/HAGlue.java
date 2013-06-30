@@ -32,10 +32,12 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
+import com.bigdata.ha.msg.IHAAwaitServiceJoinRequest;
 import com.bigdata.ha.msg.IHADigestRequest;
 import com.bigdata.ha.msg.IHADigestResponse;
 import com.bigdata.ha.msg.IHALogDigestRequest;
 import com.bigdata.ha.msg.IHALogDigestResponse;
+import com.bigdata.ha.msg.IHANotifyReleaseTimeResponse;
 import com.bigdata.ha.msg.IHARemoteRebuildRequest;
 import com.bigdata.ha.msg.IHARootBlockRequest;
 import com.bigdata.ha.msg.IHARootBlockResponse;
@@ -96,6 +98,38 @@ public interface HAGlue extends HAGlueBase, HAPipelineGlue, HAReadGlue,
             InterruptedException, TimeoutException, QuorumException,
             AsynchronousQuorumCloseException;
 
+    /**
+     * A follower uses this message to request that the quorum leader await the
+     * visibility of the zookeeper event in which the service join becomes
+     * visible to the leader. This is invoked while holding a lock that blocks
+     * pipeline replication, so the leader can not flush the write replication
+     * pipeline and enter the commit. The callback to the leader ensures that
+     * the service join is visible to the leader before the leader makes an
+     * atomic decision about the set of services that are joined with the met
+     * quorum for a 2-phase commit.
+     * 
+     * @param req
+     *            The request.
+     *            
+     * @return The most recent consensus release time for the quorum leader.
+     *         This information is used to ensure that a service which joins
+     *         after a gather and before a PREPARE will join with the correct
+     *         release time for its local journal and thus will not permit
+     *         transactions to start against commit points which have been
+     *         recycled by the quorum leader.
+     * 
+     * @throws InterruptedException
+     * @throws TimeoutException
+     *             if the timeout is exceeded before the service join becomes
+     *             visible to this service.
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/681" >
+     *      HAJournalServer deadlock: pipelineRemove() and getLeaderId()</a>
+     */
+    public IHANotifyReleaseTimeResponse awaitServiceJoin(
+            IHAAwaitServiceJoinRequest req) throws IOException,
+            InterruptedException, TimeoutException;
+    
     /*
      * Synchronization.
      * 

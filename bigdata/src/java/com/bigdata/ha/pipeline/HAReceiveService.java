@@ -1375,7 +1375,8 @@ public class HAReceiveService<M extends IHAWriteMessageBase> extends Thread {
 
             if (log.isInfoEnabled())
                 log.info("addrNext(old)=" + this.addrNextRef.get()
-                        + ", addrNext(new)=" + addrNext);
+                        + ", addrNext(new)=" + addrNext + ", readFuture="
+                        + readFuture);
 
             final Client c = clientRef.get();
 

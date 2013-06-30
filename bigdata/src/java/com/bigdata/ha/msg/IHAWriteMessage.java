@@ -40,7 +40,7 @@ public interface IHAWriteMessage extends IHAWriteMessageBase {
     /** The {@link UUID} of the store to which this message belongs. */
     UUID getUUID();
     
-    /** The commit counter associated with this message */
+    /** The commit counter for the opening root block associated with the write set for this message.*/
     long getCommitCounter();
 
     /** The commit time associated with this message. */

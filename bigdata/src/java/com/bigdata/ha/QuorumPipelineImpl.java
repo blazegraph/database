@@ -29,12 +29,15 @@ import java.io.ObjectInput;
 import java.io.ObjectOutput;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
+import java.util.Iterator;
 import java.util.UUID;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.RunnableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -54,10 +57,12 @@ import com.bigdata.ha.pipeline.HAReceiveService.IHAReceiveCallback;
 import com.bigdata.ha.pipeline.HASendService;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.IBufferAccess;
-import com.bigdata.io.writecache.WriteCache;
+import com.bigdata.quorum.QCE;
 import com.bigdata.quorum.Quorum;
 import com.bigdata.quorum.QuorumException;
 import com.bigdata.quorum.QuorumMember;
+import com.bigdata.quorum.QuorumStateChangeEvent;
+import com.bigdata.quorum.QuorumStateChangeEventEnum;
 import com.bigdata.quorum.QuorumStateChangeListener;
 import com.bigdata.quorum.QuorumStateChangeListenerBase;
 import com.bigdata.util.InnerCause;
@@ -151,11 +156,13 @@ import com.bigdata.util.InnerCause;
  * receive data, but no longer relays data to a downstream service.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  * @param <S>
+ * 
+ * @see <a href="http://sourceforge.net/apps/trac/bigdata/ticket/681" > 
+ * HAJournalServer deadlock: pipelineRemove() and getLeaderId() </a>
  */
-abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> extends
-        QuorumStateChangeListenerBase implements QuorumPipeline<S>,
+abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> /*extends
+        QuorumStateChangeListenerBase */implements QuorumPipeline<S>,
         QuorumStateChangeListener {
 
     static private transient final Logger log = Logger
@@ -213,8 +220,691 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> extends
      */
     private final AtomicReference<PipelineState<S>> pipelineStateRef = new AtomicReference<PipelineState<S>>();
 
-    public QuorumPipelineImpl(final QuorumMember<S> member) {
+    /**
+     * Inner class does the actual work once to handle an event.
+     */
+    private final InnerEventHandler innerEventHandler = new InnerEventHandler();
 
+    /**
+     * Core implementation of the handler for the various events. Always run
+     * while holding the {@link #lock}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+     *         Thompson</a>
+     * 
+     * @see <a href="http://sourceforge.net/apps/trac/bigdata/ticket/681" >
+     *      HAJournalServer deadlock: pipelineRemove() and getLeaderId() </a>
+     */
+    private final class InnerEventHandler extends QuorumStateChangeListenerBase {
+
+        /**
+         * A queue of events that can only be handled when a write replication
+         * operation owns the {@link QuorumPipelineImpl#lock}.
+         * 
+         * @see QuorumPipelineImpl#lock()
+         * @see #dispatchEvents()
+         */
+        private final BlockingQueue<QuorumStateChangeEvent> queue = new LinkedBlockingQueue<QuorumStateChangeEvent>();
+
+        protected InnerEventHandler() {
+
+        }
+
+        /**
+         * Enqueue an event.
+         * 
+         * @param e
+         *            The event.
+         */
+        private void queue(final QuorumStateChangeEvent e) {
+
+        	if (log.isInfoEnabled())
+        		log.info("Adding StateChange: " + e);
+        	
+            queue.add(e);
+            
+        }
+
+        /**
+         * Boolean controls whether or not event elision is used. See below.
+         * 
+         * @see <a href="http://sourceforge.net/apps/trac/bigdata/ticket/681" >
+         *      HAJournalServer deadlock: pipelineRemove() and getLeaderId()
+         *      </a>
+         */        
+        static private final boolean s_eventElission = true;
+        
+        /**
+         * Event elission endeavours to ensure that events processed
+         * represent current state change.
+         * 
+         * This is best explained with an example from its original usage
+         * in processing graphic events.  Whilst a "button click" is a singular
+         * event and all button clicks should be processed, a "mouse move" event
+         * could be elided with the next "mouse move" event.  Thus the move events 
+         * (L1 -> L2) and (L2 -> L3) would elide to a single (L1 -> L3).
+         * 
+         * In HA RMI calls can trigger event processing, whilst other threads monitor
+         * state changes - such as open sockets.  Without elission, monitoring threads
+         * will observe unnecessary transitional state changes.  HOWEVER, there remains
+         * a problem with this pattern of synchronization.
+         */
+        private void elideEvents() {
+
+            if (!s_eventElission) {
+                return;
+            }
+        	
+            /*
+             * Check for event elission: check for PIPELINE_UPSTREAM and
+             * PIPELINE_CHANGE and remove earlier ones check for PIPELINE_ADD
+             * and PIPELINE_REMOVE pairings.
+             */
+            final Iterator<QuorumStateChangeEvent> events = queue.iterator();
+            QuorumStateChangeEvent uce = null; // UPSTREAM CHANGE
+            QuorumStateChangeEvent dce = null; // DOWNSTREAM CHANGE
+            QuorumStateChangeEvent add = null; // PIPELINE_ADD
+            		
+            while (events.hasNext()) {
+                final QuorumStateChangeEvent tst = events.next();
+                if (tst.getEventType() == QuorumStateChangeEventEnum.PIPELINE_UPSTREAM_CHANGE) {
+                    if (uce != null) {
+                        if (log.isDebugEnabled())
+                            log.debug("Elission removal of: " + uce);
+                        queue.remove(uce);
+                    }
+                    uce = tst;
+                } else if (tst.getEventType() == QuorumStateChangeEventEnum.PIPELINE_CHANGE) {
+                    if (dce != null) {
+                        // replace 'from' of new state with 'from' of old
+                        tst.getDownstreamOldAndNew()[0] = dce
+                                .getDownstreamOldAndNew()[0];
+
+                        if (log.isDebugEnabled())
+                            log.debug("Elission removal of: " + dce);
+                        queue.remove(dce);
+                    }
+                    dce = tst;
+                } else if (tst.getEventType() == QuorumStateChangeEventEnum.PIPELINE_ADD) {
+                    add = tst;
+                } else if (tst.getEventType() == QuorumStateChangeEventEnum.PIPELINE_REMOVE) {
+                    if (add != null) {
+                        if (log.isDebugEnabled()) {
+                            log.debug("Elission removal of: " + add);
+                            log.debug("Elission removal of: " + tst);
+                        }
+                        queue.remove(add);
+                        queue.remove(tst);
+                        add = null;
+                    }
+                    if (dce != null) {
+                        if (log.isDebugEnabled())
+                            log.debug("Elission removal of: " + dce);
+                        queue.remove(dce);
+                        dce = null;
+                    }
+                    if (uce != null) {
+                        if (log.isDebugEnabled())
+                            log.debug("Elission removal of: " + uce);
+                        queue.remove(uce);
+                        uce = null;
+                    }
+                }
+
+            }
+                    	
+        } // elideEvents()
+        
+        /**
+         * Dispatch any events in the {@link #queue}.
+         */
+        private void dispatchEvents() {
+
+        	elideEvents();
+
+            QuorumStateChangeEvent e;
+            
+            // If an event is immediately available, dispatch it now.
+            while ((e = queue.poll()) != null) {
+        
+            	if (log.isInfoEnabled())
+            		log.info("Dispatching: " + e);
+
+                // An event is available.
+                innerEventHandler.dispatchEvent(e);
+
+            }
+
+        }
+
+        /**
+         * Dispatch to the InnerEventHandler.
+         * 
+         * @param e
+         *            The event.
+         * 
+         * @throws IllegalMonitorStateException
+         *             if the caller does not own the {@link #lock}.
+         */
+        private void dispatchEvent(final QuorumStateChangeEvent e)
+                throws IllegalMonitorStateException {
+
+            if(!lock.isHeldByCurrentThread()) {
+            
+                /*
+                 * The InnerEventHandler should be holding the outer lock.
+                 */
+                
+                throw new IllegalMonitorStateException();
+                
+            }
+            
+            if (log.isInfoEnabled())
+                log.info(e.toString());
+            
+            switch (e.getEventType()) {
+            case CONSENSUS:
+                consensus(e.getLastCommitTimeConsensus());
+                break;
+            case LOST_CONSENSUS:
+                lostConsensus();
+                break;
+            case MEMBER_ADD:
+                memberAdd();
+                break;
+            case MEMBER_REMOVE:
+                memberRemove();
+                break;
+            case PIPELINE_ADD:
+                pipelineAdd();
+                break;
+            case PIPELINE_CHANGE: {
+                final UUID[] a = e.getDownstreamOldAndNew();
+                pipelineChange(a[0]/* oldDownStreamId */, a[1]/* newDownStreamId */);
+                break;
+            }
+            case PIPELINE_ELECTED_LEADER:
+                pipelineElectedLeader();
+                break;
+            case PIPELINE_REMOVE:
+                pipelineRemove();
+                break;
+            case PIPELINE_UPSTREAM_CHANGE:
+                pipelineUpstreamChange();
+                break;
+            case QUORUM_BREAK:
+                quorumBreak();
+                break;
+            case QUORUM_MEET:
+                quorumMeet(e.getToken(), e.getLeaderId());
+                break;
+            case SERVICE_JOIN:
+                serviceJoin();
+                break;
+            case SERVICE_LEAVE:
+                serviceLeave();
+                break;
+            default:
+                throw new UnsupportedOperationException(e.getEventType().toString());
+            }
+        }
+
+//      @Override
+//      public void serviceLeave() {
+//      }
+//      
+//      @Override
+//      public void serviceJoin() {
+//      }
+//      
+//      /**
+//      * Extended to setup this service as a leader ({@link #setUpLeader()}),
+//      * or a relay ({@link #setUpReceiveAndRelay()}. 
+//      */
+//     @Override
+//     public void quorumMeet(final long token, final UUID leaderId) {
+//         super.quorumMeet(token, leaderId);
+//         lock.lock();
+//         try {
+//             this.token = token;
+//             if(leaderId.equals(serviceId)) {
+//                 setUpLeader();
+//             } else if(member.isPipelineMember()) {
+//                 setUpReceiveAndRelay();
+//             }
+//         } finally {
+//             lock.unlock();
+//         }        
+//     }
+
+//     @Override
+//     public void quorumBreak() {
+//         super.quorumBreak();
+//         lock.lock();
+//         try {
+//             tearDown();
+//         } finally {
+//             lock.unlock();
+//         }
+//     }
+      
+        /**
+         * {@inheritDoc}
+         * <p>
+         * This implementation sets up the {@link HASendService} or the
+         * {@link HAReceiveService} as appropriate depending on whether or not
+         * this service is the first in the pipeline order.
+         */
+        @Override
+        public void pipelineAdd() {
+            if (log.isInfoEnabled())
+                log.info("");
+            super.pipelineAdd();
+            lock.lock();
+            try {
+                // The current pipeline order.
+                final UUID[] pipelineOrder = member.getQuorum().getPipeline();
+                // The index of this service in the pipeline order.
+                final int index = getIndex(serviceId, pipelineOrder);
+                if (index == 0) {
+                    setUpSendService();
+                } else if (index > 0) {
+                    setUpReceiveService();
+                }
+            } finally {
+                lock.unlock();
+            }
+        }
+
+        @Override
+        public void pipelineElectedLeader() {
+            if (log.isInfoEnabled())
+                log.info("");
+            super.pipelineElectedLeader();
+            lock.lock();
+            try {
+                tearDown();
+                setUpSendService();
+            } finally {
+                lock.unlock();
+            }
+        }
+
+        /**
+         * {@inheritDoc}
+         * <p>
+         * This implementation tears down the {@link HASendService} or
+         * {@link HAReceiveService} associated with this service.
+         */
+        @Override
+        public void pipelineRemove() {
+            if (log.isInfoEnabled())
+                log.info("");
+            super.pipelineRemove();
+            lock.lock();
+            try {
+                tearDown();
+            } finally {
+                lock.unlock();
+            }
+        }
+
+        /**
+         * {@inheritDoc}
+         * <p>
+         * This implementation changes the target of the {@link HASendService}
+         * for the leader (or the {@link HAReceiveService} for a follower) to
+         * send (or relay) write cache blocks to the specified service.
+         */
+        @Override
+        public void pipelineChange(final UUID oldDownStreamId,
+                final UUID newDownStreamId) {
+            super.pipelineChange(oldDownStreamId, newDownStreamId);
+            lock.lock();
+            try {
+                // The address of the next service in the pipeline.
+                final InetSocketAddress addrNext = newDownStreamId == null ? null
+                        : getAddrNext(newDownStreamId);
+                if (log.isInfoEnabled())
+                    log.info("oldDownStreamId=" + oldDownStreamId
+                            + ",newDownStreamId=" + newDownStreamId
+                            + ", addrNext=" + addrNext + ", sendService="
+                            + sendService + ", receiveService="
+                            + receiveService);
+                if (sendService != null) {
+                    /*
+                     * Terminate the existing connection (we were the first
+                     * service in the pipeline).
+                     */
+                    sendService.terminate();
+                    if (addrNext != null) {
+                        if (log.isDebugEnabled())
+                            log.debug("sendService.start(): addrNext="
+                                    + addrNext);
+                        sendService.start(addrNext);
+                    }
+                } else if (receiveService != null) {
+                    /*
+                     * Reconfigure the receive service to change how it is
+                     * relaying (we were relaying, so the receiveService was
+                     * running but not the sendService).
+                     */
+                    if (log.isDebugEnabled())
+                        log.debug("receiveService.changeDownStream(): addrNext="
+                                + addrNext);
+                    receiveService.changeDownStream(addrNext);
+                }
+                // populate and/or clear the cache.
+                cachePipelineState(newDownStreamId);
+                if (log.isDebugEnabled())
+                    log.debug("pipelineChange - done.");
+            } finally {
+                lock.unlock();
+            }
+        }
+
+        @Override
+        public void pipelineUpstreamChange() {
+            super.pipelineUpstreamChange();
+            lock.lock();
+            try {
+                if (receiveService != null) {
+                    /*
+                     * Make sure that the receiveService closes out its client
+                     * connection with the old upstream service.
+                     */
+                    if (log.isInfoEnabled())
+                        log.info("receiveService=" + receiveService);
+                    receiveService.changeUpStream();
+                }
+            } finally {
+                lock.unlock();
+            }
+        }
+      
+//      @Override
+//      public void memberRemove() {
+//      }
+//      
+//      @Override
+//      public void memberAdd() {
+//      }
+//      
+//      @Override
+//      public void lostConsensus() {
+//      }
+//      
+//      @Override
+//      public void consensus(long lastCommitTime) {
+//      }
+
+        /**
+         * Request the {@link InetSocketAddress} of the write pipeline for a service
+         * (RMI).
+         * 
+         * @param downStreamId
+         *            The service.
+         *            
+         * @return It's {@link InetSocketAddress}
+         */
+        private InetSocketAddress getAddrNext(final UUID downStreamId) {
+
+            if (downStreamId == null)
+                return null;
+
+            final S service = member.getService(downStreamId);
+
+            try {
+
+                final InetSocketAddress addrNext = service.getWritePipelineAddr();
+
+                return addrNext;
+                
+            } catch (IOException e) {
+
+                throw new RuntimeException(e);
+
+            }
+
+        }
+
+        /**
+         * Tear down any state associated with the {@link QuorumPipelineImpl}. This
+         * implementation tears down the send/receive service and releases the
+         * receive buffer.
+         */
+        private void tearDown() {
+            if (log.isInfoEnabled())
+                log.info("");
+            lock.lock();
+            try {
+                /*
+                 * Leader tear down.
+                 */
+                {
+                    if (sendService != null) {
+                        sendService.terminate();
+                        sendService = null;
+                    }
+                }
+                /*
+                 * Follower tear down.
+                 */
+                {
+                    if (receiveService != null) {
+                        receiveService.terminate();
+                        try {
+                            receiveService.awaitShutdown();
+                        } catch (InterruptedException e) {
+                            throw new RuntimeException(e);
+                        } finally {
+                            receiveService = null;
+                        }
+                    }
+                    if (receiveBuffer != null) {
+                        try {
+                            /*
+                             * Release the buffer back to the pool.
+                             */
+                            receiveBuffer.release();
+                        } catch (InterruptedException e) {
+                            throw new RuntimeException(e);
+                        } finally {
+                            receiveBuffer = null;
+                        }
+                    }
+                }
+                // clear cache.
+                pipelineStateRef.set(null);
+            } finally {
+                lock.unlock();
+            }
+        }
+
+        /**
+         * Populate or clear the {@link #pipelineState} cache.
+         * <p>
+         * Note: The only times we need to populate the {@link #pipelineState} are
+         * in response to a {@link #pipelineChange(UUID, UUID)} event or in response
+         * to message a {@link #pipelineElectedLeader()} event.
+         * 
+         * @param downStreamId
+         *            The downstream service {@link UUID}.
+         */
+        private void cachePipelineState(final UUID downStreamId) {
+            
+            if (downStreamId == null) {
+            
+                pipelineStateRef.set(null);
+                
+                return;
+            
+            }
+
+            final S nextService = member.getService(downStreamId);
+            
+            final PipelineState<S> pipelineState = new PipelineState<S>();
+            
+            try {
+
+                pipelineState.addr = nextService.getWritePipelineAddr();
+                
+            } catch (IOException e) {
+                
+                throw new RuntimeException(e);
+                
+            }
+            
+            pipelineState.service = nextService;
+            
+            pipelineStateRef.set(pipelineState);
+            
+        }
+        
+        /**
+         * Setup the send service.
+         */
+        private void setUpSendService() {
+            if (log.isInfoEnabled())
+                log.info("");
+            lock.lock();
+            try {
+                // Allocate the send service.
+                sendService = new HASendService();
+                /*
+                 * The service downstream from this service.
+                 * 
+                 * Note: The downstream service in the pipeline is not available
+                 * when the first service adds itself to the pipeline. In those
+                 * cases the pipelineChange() event is used to update the
+                 * HASendService to send to the downstream service.
+                 * 
+                 * Note: When we handle a pipelineLeaderElected() message the
+                 * downstream service MAY already be available, which is why we
+                 * handle downstreamId != null conditionally.
+                 */
+                final UUID downstreamId = member.getDownstreamServiceId();
+                if (downstreamId != null) {
+                    // The address of the next service in the pipeline.
+                    final InetSocketAddress addrNext = member.getService(
+                            downstreamId).getWritePipelineAddr();
+                    // Start the send service.
+                    sendService.start(addrNext);
+                }
+                // populate and/or clear the cache.
+                cachePipelineState(downstreamId);
+            } catch (Throwable t) {
+                try {
+                    tearDown();
+                } catch (Throwable t2) {
+                    log.error(t2, t2);
+                }
+                throw new RuntimeException(t);
+            } finally {
+                lock.unlock();
+            }
+        }
+
+        /**
+         * Setup the service to receive pipeline writes and to relay them (if there
+         * is a downstream service).
+         */
+        private void setUpReceiveService() {
+            lock.lock();
+            try {
+                // The downstream service UUID.
+                final UUID downstreamId = member.getDownstreamServiceId();
+                // Acquire buffer from the pool to receive data.
+                try {
+                    receiveBuffer = DirectBufferPool.INSTANCE.acquire();
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
+                // The address of this service.
+                final InetSocketAddress addrSelf = member.getService()
+                        .getWritePipelineAddr();
+                // Address of the downstream service (if any).
+                final InetSocketAddress addrNext = downstreamId == null ? null
+                        : member.getService(downstreamId).getWritePipelineAddr();
+                // Setup the receive service.
+                receiveService = new HAReceiveService<HAMessageWrapper>(addrSelf,
+                        addrNext, new IHAReceiveCallback<HAMessageWrapper>() {
+                            public void callback(final HAMessageWrapper msg,
+                                    final ByteBuffer data) throws Exception {
+                                // delegate handling of write cache blocks.
+                                handleReplicatedWrite(msg.req, msg.msg, data);
+                            }
+                        });
+                // Start the receive service - will not return until service is
+                // running
+                receiveService.start();
+            } catch (Throwable t) {
+                /*
+                 * Always tear down if there was a setup problem to avoid leaking
+                 * threads or a native ByteBuffer.
+                 */
+                try {
+                    tearDown();
+                } catch (Throwable t2) {
+                    log.error(t2, t2);
+                } finally {
+                    log.error(t, t);
+                }
+                throw new RuntimeException(t);
+            } finally {
+                lock.unlock();
+            }
+        }
+
+    };
+    
+    /**
+     * Acquire {@link #lock} and {@link #dispatchEvents()}.
+     */
+    private void lock() {
+        boolean ok = false;
+        this.lock.lock();
+        try {
+            innerEventHandler.dispatchEvents();// have lock, dispatch events.
+            ok = true; // success.
+        } finally {
+            if (!ok) {
+                // release lock if there was a problem.
+                this.lock.unlock();
+            }
+        }
+    }
+
+    /**
+     * Acquire {@link #lock} and {@link #dispatchEvents()}.
+     */
+    private void lockInterruptibly() throws InterruptedException {
+        boolean ok = false;
+        lock.lockInterruptibly();
+        try {
+            innerEventHandler.dispatchEvents(); // have lock, dispatch events.
+            ok = true; // success.
+        } finally {
+            if (!ok) {
+                // release lock if there was a problem.
+                this.lock.unlock();
+            }
+        }
+    }
+
+    /**
+     * {@link #dispatchEvents()} and release {@link #lock}.
+     */
+    private void unlock() {
+        try {
+            innerEventHandler.dispatchEvents();
+        } finally {
+            this.lock.unlock();
+        }
+    }
+   
+    public QuorumPipelineImpl(final QuorumMember<S> member) {
+        
         if (member == null)
             throw new IllegalArgumentException();
 
@@ -232,7 +922,7 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> extends
     @Override
     protected void finalize() throws Throwable {
 
-        tearDown();
+        innerEventHandler.tearDown();
 
         super.finalize();
 
@@ -250,7 +940,7 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> extends
      * @return The index of the service in the array -or- <code>-1</code> if the
      *         service does not appear in the array.
      */
-    private int getIndex(final UUID serviceId, final UUID[] a) {
+    static private int getIndex(final UUID serviceId, final UUID[] a) {
 
         if (serviceId == null)
             throw new IllegalArgumentException();
@@ -331,330 +1021,129 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> extends
 
     /*
      * QuorumStateChangeListener 
+     * 
+     * Note: This interface is delegated using a queue.  The queue allows
+     * the processing of the events to be deferred until the appropriate
+     * lock is held.  This prevents contention for the lock and avoids
+     * lock ordering problems such as described at [1].
+     * 
+     * @see InnerEventHandler
      */
     
-//    /**
-//     * Extended to setup this service as a leader ({@link #setUpLeader()}),
-//     * or a relay ({@link #setUpReceiveAndRelay()}. 
-//     */
-//    @Override
-//    public void quorumMeet(final long token, final UUID leaderId) {
-//        super.quorumMeet(token, leaderId);
-//        lock.lock();
-//        try {
-//            this.token = token;
-//            if(leaderId.equals(serviceId)) {
-//                setUpLeader();
-//            } else if(member.isPipelineMember()) {
-//                setUpReceiveAndRelay();
-//            }
-//        } finally {
-//            lock.unlock();
-//        }        
-//    }
-
-//    @Override
-//    public void quorumBreak() {
-//        super.quorumBreak();
-//        lock.lock();
-//        try {
-//            tearDown();
-//        } finally {
-//            lock.unlock();
-//        }
-//    }
-
-    /**
-     * Sets up the {@link HASendService} or the {@link HAReceiveService} as
-     * appropriate depending on whether or not this service is the first in the
-     * pipeline order.
-     */
+    @Override
     public void pipelineAdd() {
-        if (log.isInfoEnabled())
-            log.info("");
-        super.pipelineAdd();
-        lock.lock();
-        try {
-            // The current pipeline order.
-            final UUID[] pipelineOrder = member.getQuorum().getPipeline();
-            // The index of this service in the pipeline order.
-            final int index = getIndex(serviceId, pipelineOrder);
-            if (index == 0) {
-                setUpSendService();
-            } else 
-            if (index > 0) {
-                setUpReceiveService();
-            }
-        } finally {
-            lock.unlock();
-        }
+
+        innerEventHandler
+                .queue(new QCE(QuorumStateChangeEventEnum.PIPELINE_ADD));
+
     }
 
+    @Override
     public void pipelineElectedLeader() {
-        if (log.isInfoEnabled())
-            log.info("");
-        super.pipelineElectedLeader();
-        lock.lock();
-        try {
-            tearDown();
-            setUpSendService();
-        } finally {
-            lock.unlock();
-        }
+
+        innerEventHandler.queue(new QCE(
+                QuorumStateChangeEventEnum.PIPELINE_ELECTED_LEADER));
+
     }
-    
-    /**
-     * Tears down the {@link HASendService} or {@link HAReceiveService}
-     * associated with this service.
-     */
+
     @Override
     public void pipelineRemove() {
-        if (log.isInfoEnabled())
-            log.info("");
-        super.pipelineRemove();
-        lock.lock();
-        try {
-            tearDown();
-        } finally {
-            lock.unlock();
-        }
+
+        innerEventHandler.queue(new QCE(
+                QuorumStateChangeEventEnum.PIPELINE_REMOVE));
+
     }
 
-    /**
-     * Changes the target of the {@link HASendService} for the leader (or the
-     * {@link HAReceiveService} for a follower) to send (or relay) write cache
-     * blocks to the specified service.
-     */
+    @Override
     public void pipelineChange(final UUID oldDownStreamId,
             final UUID newDownStreamId) {
-        super.pipelineChange(oldDownStreamId, newDownStreamId);
-        lock.lock();
-        try {
-            // The address of the next service in the pipeline.
-            final InetSocketAddress addrNext = newDownStreamId == null ? null
-                    : getAddrNext(newDownStreamId);
-            if (log.isInfoEnabled())
-                log.info("oldDownStreamId=" + oldDownStreamId
-                        + ",newDownStreamId=" + newDownStreamId + ", addrNext="
-                        + addrNext + ", sendService=" + sendService
-                        + ", receiveService=" + receiveService);
-            if (sendService != null) {
-                /*
-                 * Terminate the existing connection (we were the first service
-                 * in the pipeline).
-                 */
-                sendService.terminate();
-                if (addrNext != null) {
-                    if (log.isDebugEnabled())
-                        log.debug("sendService.start(): addrNext=" + addrNext);
-                    sendService.start(addrNext);
-                }
-            } else if (receiveService != null) {
-                /*
-                 * Reconfigure the receive service to change how it is relaying
-                 * (we were relaying, so the receiveService was running but not
-                 * the sendService).
-                 */
-                if (log.isDebugEnabled())
-                    log.debug("receiveService.changeDownStream(): addrNext="
-                            + addrNext);
-                receiveService.changeDownStream(addrNext);
-            }
-            // populate and/or clear the cache.
-            cachePipelineState(newDownStreamId);
-            if (log.isDebugEnabled())
-                log.debug("pipelineChange - done.");
-        } finally {
-            lock.unlock();
-        }
+
+        innerEventHandler
+                .queue(new QCE(QuorumStateChangeEventEnum.PIPELINE_CHANGE,
+                        new UUID[] { oldDownStreamId, newDownStreamId },
+                        null/* lastCommitTimeConsensus */, null/* token */,
+                        null/* leaderId */));
+
     }
 
     @Override
     public void pipelineUpstreamChange() {
-        super.pipelineUpstreamChange();
-        lock.lock();
-        try {
-            if (receiveService != null) {
-                /*
-                 * Make sure that the receiveService closes out its client
-                 * connection with the old upstream service.
-                 */
-                if (log.isInfoEnabled())
-                    log.info("receiveService=" + receiveService);
-                receiveService.changeUpStream();
-            }
-        } finally {
-            lock.unlock();
-        }
-    }
 
-    /**
-     * Request the {@link InetSocketAddress} of the write pipeline for a service
-     * (RMI).
-     * 
-     * @param downStreamId
-     *            The service.
-     *            
-     * @return It's {@link InetSocketAddress}
-     */
-    private InetSocketAddress getAddrNext(final UUID downStreamId) {
-
-        if (downStreamId == null)
-            return null;
-
-        final S service = member.getService(downStreamId);
-
-        try {
-
-            final InetSocketAddress addrNext = service.getWritePipelineAddr();
-
-            return addrNext;
-            
-        } catch (IOException e) {
-
-            throw new RuntimeException(e);
-
-        }
+        innerEventHandler.queue(new QCE(
+                QuorumStateChangeEventEnum.PIPELINE_UPSTREAM_CHANGE));
 
     }
 
-    /**
-     * Tear down any state associated with the {@link QuorumPipelineImpl}. This
-     * implementation tears down the send/receive service and releases the
-     * receive buffer.
-     */
-    private void tearDown() {
-        if (log.isInfoEnabled())
-            log.info("");
-        lock.lock();
-        try {
-            /*
-             * Leader tear down.
-             */
-            {
-                if (sendService != null) {
-                    sendService.terminate();
-                    sendService = null;
-                }
-            }
-            /*
-             * Follower tear down.
-             */
-            {
-                if (receiveService != null) {
-                    receiveService.terminate();
-                    try {
-                        receiveService.awaitShutdown();
-                    } catch (InterruptedException e) {
-                        throw new RuntimeException(e);
-                    } finally {
-                        receiveService = null;
-                    }
-                }
-                if (receiveBuffer != null) {
-                    try {
-                        /*
-                         * Release the buffer back to the pool.
-                         */
-                        receiveBuffer.release();
-                    } catch (InterruptedException e) {
-                        throw new RuntimeException(e);
-                    } finally {
-                        receiveBuffer = null;
-                    }
-                }
-            }
-            // clear cache.
-            pipelineStateRef.set(null);
-        } finally {
-            lock.unlock();
-        }
+    @Override
+    public void memberAdd() {
+
+        innerEventHandler.queue(new QCE(QuorumStateChangeEventEnum.MEMBER_ADD));
+
     }
 
-    /**
-     * Populate or clear the {@link #pipelineState} cache.
-     * <p>
-     * Note: The only times we need to populate the {@link #pipelineState} are
-     * in response to a {@link #pipelineChange(UUID, UUID)} event or in response
-     * to message a {@link #pipelineElectedLeader()} event.
-     * 
-     * @param downStreamId
-     *            The downstream service {@link UUID}.
-     */
-    private void cachePipelineState(final UUID downStreamId) {
-        
-        if (downStreamId == null) {
-        
-            pipelineStateRef.set(null);
-            
-            return;
-        
-        }
+    @Override
+    public void memberRemove() {
 
-        final S nextService = member.getService(downStreamId);
-        
-        final PipelineState<S> pipelineState = new PipelineState<S>();
-        
-        try {
+        innerEventHandler.queue(new QCE(
+                QuorumStateChangeEventEnum.MEMBER_REMOVE));
 
-            pipelineState.addr = nextService.getWritePipelineAddr();
-            
-        } catch (IOException e) {
-            
-            throw new RuntimeException(e);
-            
-        }
-        
-        pipelineState.service = nextService;
-        
-        this.pipelineStateRef.set(pipelineState);
-        
+    }
+
+    @Override
+    public void consensus(final long lastCommitTime) {
+
+        innerEventHandler.queue(new QCE(QuorumStateChangeEventEnum.CONSENSUS,
+                null/* downstreamIds */,
+                lastCommitTime/* lastCommitTimeConsensus */, null/* token */,
+                null/* leaderId */));
+
+    }
+
+    @Override
+    public void lostConsensus() {
+
+        innerEventHandler.queue(new QCE(
+                QuorumStateChangeEventEnum.LOST_CONSENSUS));
+
+    }
+
+    @Override
+    public void serviceJoin() {
+
+        innerEventHandler
+                .queue(new QCE(QuorumStateChangeEventEnum.SERVICE_JOIN));
+
+    }
+
+    @Override
+    public void serviceLeave() {
+
+        innerEventHandler.queue(new QCE(
+                QuorumStateChangeEventEnum.SERVICE_LEAVE));
+
+    }
+
+    @Override
+    public void quorumMeet(final long token, final UUID leaderId) {
+
+        innerEventHandler.queue(new QCE(QuorumStateChangeEventEnum.QUORUM_MEET,
+                null/* downstreamIds */, null/* lastCommitTimeConsensus */,
+                token, leaderId));
+
+    }
+
+    @Override
+    public void quorumBreak() {
+
+        innerEventHandler
+                .queue(new QCE(QuorumStateChangeEventEnum.QUORUM_BREAK));
+
     }
     
-    /**
-     * Setup the send service.
+    /*
+     * End of QuorumStateChangeListener.
      */
-    private void setUpSendService() {
-        if (log.isInfoEnabled())
-            log.info("");
-        lock.lock();
-        try {
-            // Allocate the send service.
-            sendService = new HASendService();
-            /*
-             * The service downstream from this service.
-             * 
-             * Note: The downstream service in the pipeline is not available
-             * when the first service adds itself to the pipeline. In those
-             * cases the pipelineChange() event is used to update the
-             * HASendService to send to the downstream service.
-             * 
-             * Note: When we handle a pipelineLeaderElected() message the
-             * downstream service MAY already be available, which is why we
-             * handle downstreamId != null conditionally.
-             */
-            final UUID downstreamId = member.getDownstreamServiceId();
-            if (downstreamId != null) {
-                // The address of the next service in the pipeline.
-                final InetSocketAddress addrNext = member.getService(
-                        downstreamId).getWritePipelineAddr();
-                // Start the send service.
-                sendService.start(addrNext);
-            }
-            // populate and/or clear the cache.
-            cachePipelineState(downstreamId);
-        } catch (Throwable t) {
-            try {
-                tearDown();
-            } catch (Throwable t2) {
-                log.error(t2, t2);
-            }
-            throw new RuntimeException(t);
-        } finally {
-            lock.unlock();
-        }
-    }
-
+    
     /**
      * Glue class wraps the {@link IHAWriteMessage} and the
      * {@link IHALogRequest} message and exposes the requires {@link IHAMessage}
@@ -686,57 +1175,6 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> extends
 
     }
     
-    /**
-     * Setup the service to receive pipeline writes and to relay them (if there
-     * is a downstream service).
-     */
-    private void setUpReceiveService() {
-        lock.lock();
-        try {
-            // The downstream service UUID.
-            final UUID downstreamId = member.getDownstreamServiceId();
-            // Acquire buffer from the pool to receive data.
-            try {
-                receiveBuffer = DirectBufferPool.INSTANCE.acquire();
-            } catch (InterruptedException e) {
-                throw new RuntimeException(e);
-            }
-            // The address of this service.
-            final InetSocketAddress addrSelf = member.getService()
-                    .getWritePipelineAddr();
-            // Address of the downstream service (if any).
-            final InetSocketAddress addrNext = downstreamId == null ? null
-                    : member.getService(downstreamId).getWritePipelineAddr();
-            // Setup the receive service.
-            receiveService = new HAReceiveService<HAMessageWrapper>(addrSelf,
-                    addrNext, new IHAReceiveCallback<HAMessageWrapper>() {
-                        public void callback(final HAMessageWrapper msg,
-                                final ByteBuffer data) throws Exception {
-                            // delegate handling of write cache blocks.
-                            handleReplicatedWrite(msg.req, msg.msg, data);
-                        }
-                    });
-            // Start the receive service - will not return until service is
-            // running
-            receiveService.start();
-        } catch (Throwable t) {
-            /*
-             * Always tear down if there was a setup problem to avoid leaking
-             * threads or a native ByteBuffer.
-             */
-            try {
-                tearDown();
-            } catch (Throwable t2) {
-                log.error(t2, t2);
-            } finally {
-                log.error(t, t);
-            }
-            throw new RuntimeException(t);
-        } finally {
-            lock.unlock();
-        }
-    }
-
     /*
      * This is the leader, so send() the buffer.
      */
@@ -746,14 +1184,14 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> extends
 
         final RunnableFuture<Void> ft;
 
-        lock.lock();
+        lock();
         try {
 
             ft = new FutureTask<Void>(new RobustReplicateTask(req, msg, b));
 
         } finally {
 
-            lock.unlock();
+            unlock();
 
         }
 
@@ -1057,7 +1495,7 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> extends
          */
         private void innerReplicate(final int retryCount) throws Exception {
 
-            lock.lockInterruptibly();
+            lockInterruptibly();
 
             try {
 
@@ -1082,7 +1520,7 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> extends
 
             } finally {
 
-                lock.unlock();
+                unlock();
 
             }
 
@@ -1158,22 +1596,22 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> extends
 
     } // class RobustReplicateTask
     
-    /**
-     * The logic needs to support the asynchronous termination of the
-     * {@link Future} that is responsible for replicating the {@link WriteCache}
-     * block, which is why the API exposes the means to inform the caller about
-     * that {@link Future}.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
-     *         Thompson</a>
-     */
-    public interface IRetrySendCallback {
-        /**
-         * 
-         * @param remoteFuture
-         */
-        void notifyRemoteFuture(final Future<Void> remoteFuture);
-    }
+//    /**
+//     * The logic needs to support the asynchronous termination of the
+//     * {@link Future} that is responsible for replicating the {@link WriteCache}
+//     * block, which is why the API exposes the means to inform the caller about
+//     * that {@link Future}.
+//     * 
+//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+//     *         Thompson</a>
+//     */
+//    public interface IRetrySendCallback {
+//        /**
+//         * 
+//         * @param remoteFuture
+//         */
+//        void notifyRemoteFuture(final Future<Void> remoteFuture);
+//    }
     
     /**
      * Task to send() a buffer to the follower.
@@ -1304,7 +1742,7 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> extends
 
         final RunnableFuture<Void> ft;
 
-        lock.lock();
+        lock();
 
         try {
 
@@ -1337,48 +1775,123 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> extends
             if (downstream == null) {
 
                 /*
-                 * This is the last service in the write pipeline, so just receive
-                 * the buffer.
+                 * This is the last service in the write pipeline, so just
+                 * receive the buffer.
                  * 
                  * Note: The receive service is executing this Future locally on
-                 * this host. We do not submit it for execution ourselves.
+                 * this host. However, we still want the receiveData() method to
+                 * run while we are not holding the [lock] so we wrap it up as a
+                 * task and submit it.
                  */
 
-                try {
+                ft = new FutureTask<Void>(new ReceiveTask<S>(member, token,
+                        req, msg, b, receiveService));
+                
+//                try {
+//
+//                    // wrap the messages together.
+//                    final HAMessageWrapper wrappedMsg = new HAMessageWrapper(
+//                            req, msg);
+//                    
+//                    // receive.
+//                    return receiveService.receiveData(wrappedMsg, b);
+//
+//                } catch (InterruptedException e) {
+//
+//                    throw new RuntimeException(e);
+//
+//                }
 
-                    // wrap the messages together.
-                    final HAMessageWrapper wrappedMsg = new HAMessageWrapper(
-                            req, msg);
-                    
-                    // receive.
-                    return receiveService.receiveData(wrappedMsg, b);
+            } else {
 
-                } catch (InterruptedException e) {
+                /*
+                 * A service in the middle of the write pipeline (not the first
+                 * and not the last).
+                 */
 
-                    throw new RuntimeException(e);
-
-                }
+                ft = new FutureTask<Void>(new ReceiveAndReplicateTask<S>(
+                        member, token, req, msg, b, downstream, receiveService));
 
             }
-            
-            /*
-             * A service in the middle of the write pipeline (not the first and
-             * not the last).
-             */
-
-            ft = new FutureTask<Void>(new ReceiveAndReplicateTask<S>(member,
-                    token, req, msg, b, downstream, receiveService));
 
         } finally {
             
-            lock.unlock();
+            unlock();
             
         }
 
-        // execute the FutureTask.
+        // Execute the FutureTask (w/o the lock).
         member.getExecutor().execute(ft);
 
         return ft;
+
+    }
+
+    /**
+     * Task sets up the {@link Future} for the receive on the last follower.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @param <S>
+     */
+    private static class ReceiveTask<S extends HAPipelineGlue> implements
+            Callable<Void> {
+
+        private final QuorumMember<S> member;
+        private final long token;
+        private final IHASyncRequest req;
+        private final IHAWriteMessage msg;
+        private final ByteBuffer b;
+        private final HAReceiveService<HAMessageWrapper> receiveService;
+
+        public ReceiveTask(final QuorumMember<S> member,
+                final long token, 
+                final IHASyncRequest req,
+                final IHAWriteMessage msg, final ByteBuffer b,
+                final HAReceiveService<HAMessageWrapper> receiveService
+                ) {
+
+            this.member = member;
+            this.token = token;
+            this.req = req; // Note: MAY be null.
+            this.msg = msg;
+            this.b = b;
+            this.receiveService = receiveService;
+        }
+        
+        public Void call() throws Exception {
+
+            // wrap the messages together.
+            final HAMessageWrapper wrappedMsg = new HAMessageWrapper(
+                    req, msg);
+
+            // Get Future for send() outcome on local service.
+            final Future<Void> futSnd = receiveService.receiveData(wrappedMsg,
+                    b);
+
+            try {
+
+                // Await outcome while monitoring the quorum token.
+                while (true) {
+                    try {
+                        // Verify token remains valid.
+                        member.getQuorum().assertQuorum(token);
+                        // Await the future.
+                        return futSnd.get(1000, TimeUnit.MILLISECONDS);
+                    } catch (TimeoutException ex) {
+                        // Timeout. Ignore and retry loop.
+                        Thread.sleep(100/* ms */);
+                        continue;
+                    }
+                }
+
+            } finally {
+
+                // cancel the local Future.
+                futSnd.cancel(true/*mayInterruptIfRunning*/);
+                
+            }
+            
+        }
 
     }
     
@@ -1506,7 +2019,6 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> extends
      * service using RMI.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     private
     static
