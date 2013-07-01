@@ -39,14 +39,33 @@ import com.bigdata.journal.IRootBlockView;
 public interface IHA2PhasePrepareMessage extends IHAMessage {
 
     /**
+     * The consensus release time from the GATHER.
+     */
+    IHANotifyReleaseTimeResponse getConsensusReleaseTime();
+    
+    /**
      * <code>true</code> iff the service was recognized as being joined with the
-     * met quorum at the time that the prepare message was prepared.
+     * met quorum at the time that the GATHER message was prepared.
+     * <p>
+     * Note: This is used to support atomic decisions about whether or not a
+     * service was joined with the met quorum at the time that the leader
+     * decided to update the consensus release time. Services that are in the
+     * pipeline and resynchronizing were either joined or not for the purposes
+     * of a given 2-phase GATHER operation based on this flag.
+     */
+    boolean isGatherService();
+    
+    /**
+     * <code>true</code> iff the service was recognized as being joined with the
+     * met quorum at the time that the PREPARE message was prepared.
      * <p>
      * Note: This is used to support atomic decisions about whether or not a
      * service was joined with the met quorum at the time that the leader
      * decided to commit. Services that are in the pipeline and resynchronizing
      * will either be joined or not for the purposes of a given 2-phase commit
      * based on this flag.
+     * <p>
+     * Note: A better name for this flag would be <code>isPrepareService()</code>.
      */
     boolean isJoinedService();
     

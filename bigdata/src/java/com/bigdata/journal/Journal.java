@@ -1113,7 +1113,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
          */
         // Note: Executed on the leader.
         @Override
-        public void updateReleaseTimeConsensus(final UUID[] joinedServiceIds,
+        public IHANotifyReleaseTimeResponse updateReleaseTimeConsensus(final UUID[] joinedServiceIds,
                 final long timeout, final TimeUnit units) throws IOException,
                 InterruptedException, TimeoutException, BrokenBarrierException {
 
@@ -1208,6 +1208,8 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
 
                 setReleaseTime(newReleaseTime);
 
+                return consensus;
+                
             } finally {
 
                 barrierLock.unlock();
@@ -1372,11 +1374,8 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
 
         }
 
-        /**
-         * Return the {@link GatherTask} that will be executed by the follower.
-         */
         @Override
-        public Callable<Void> newGatherMinimumVisibleCommitTimeTask(
+        public Callable<IHANotifyReleaseTimeResponse> newGatherMinimumVisibleCommitTimeTask(
                 final IHAGatherReleaseTimeRequest req) {
 
             return new GatherTask(req);
@@ -1414,7 +1413,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
          * 
          * @see #newTx(long)
          */
-        private class GatherTask implements Callable<Void> {
+        private class GatherTask implements Callable<IHANotifyReleaseTimeResponse> {
 
             private final IHAGatherReleaseTimeRequest req;
 
@@ -1434,7 +1433,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
              * commitNow(), then that change will be detected by the leader and
              * it will break the {@link CyclicBarrier}.
              */
-            public Void call() throws Exception {
+            public IHANotifyReleaseTimeResponse call() throws Exception {
 
                 if (log.isInfoEnabled())
                     log.info("Running gather on follower");
@@ -1580,7 +1579,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
                     }
 
                     // Done.
-                    return null;
+                    return consensusReleaseTime;
                     
                 } catch (Throwable t) {
 

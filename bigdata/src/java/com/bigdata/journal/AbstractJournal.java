@@ -38,11 +38,9 @@ import java.nio.channels.FileChannel;
 import java.rmi.RemoteException;
 import java.security.DigestException;
 import java.security.NoSuchAlgorithmException;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
-import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -101,6 +99,8 @@ import com.bigdata.ha.CommitRequest;
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.HAStatusEnum;
 import com.bigdata.ha.HATXSGlue;
+import com.bigdata.ha.IJoinedAndNonJoinedServices;
+import com.bigdata.ha.JoinedAndNonJoinedServices;
 import com.bigdata.ha.PrepareRequest;
 import com.bigdata.ha.PrepareResponse;
 import com.bigdata.ha.QuorumService;
@@ -2907,60 +2907,6 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
     }
 
     /**
-     * Helper class finds all joined and non-joined services for the quorum
-     * client.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
-     *         Thompson</a>
-     */
-    private static class JoinedAndNonJoinedServices {
-
-        // The services joined with the met quorum, in their join order.
-        final UUID[] joinedServiceIds;
-        
-        // The services in the write pipeline (in any order).
-        final Set<UUID> nonJoinedPipelineServiceIds;
-
-        public JoinedAndNonJoinedServices(
-                final Quorum<HAGlue, QuorumService<HAGlue>> quorum) {
-
-            // The services joined with the met quorum, in their join order.
-            joinedServiceIds = quorum.getJoined();
-
-            // The UUID for this service.
-            final UUID serviceId = quorum.getClient().getServiceId();
-
-            if (joinedServiceIds.length == 0
-                    || !joinedServiceIds[0].equals(serviceId)) {
-
-                /*
-                 * Sanity check. Verify that the first service in the join order
-                 * is *this* service. This is a precondition for the service to
-                 * be the leader.
-                 */
-
-                throw new RuntimeException("Not leader: serviceId=" + serviceId
-                        + ", joinedServiceIds="
-                        + Arrays.toString(joinedServiceIds));
-
-            }
-
-            // The services in the write pipeline (in any order).
-            nonJoinedPipelineServiceIds = new LinkedHashSet<UUID>(
-                    Arrays.asList(quorum.getPipeline()));
-
-            // Remove all services that are joined from this collection.
-            for (UUID joinedServiceId : joinedServiceIds) {
-
-                nonJoinedPipelineServiceIds.remove(joinedServiceId);
-
-            }
-
-        }
-        
-    }
-        
-    /**
      * Get timestamp that will be assigned to this commit point.
      * <P>
      * Note: This will spin until commit time advances over
@@ -3151,6 +3097,8 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
             final QuorumService<HAGlue> quorumService = quorum == null ? null
                     : quorum.getClient();
 
+            final IJoinedAndNonJoinedServices gatherJoinedAndNonJoinedServices;
+            final IHANotifyReleaseTimeResponse consensusReleaseTime;
             if ((_bufferStrategy instanceof IHABufferStrategy)
                     && quorum != null && quorum.isHighlyAvailable()) {
 
@@ -3182,13 +3130,14 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                 try {
                 
                     // Atomic decision point for GATHER re joined services.
-                    final JoinedAndNonJoinedServices tmp = new JoinedAndNonJoinedServices(
+                    gatherJoinedAndNonJoinedServices = new JoinedAndNonJoinedServices(
                             quorum);
-
+                    
                     // Run the GATHER protocol.
-                    ((AbstractHATransactionService) getLocalTransactionManager()
+                    consensusReleaseTime = ((AbstractHATransactionService) getLocalTransactionManager()
                             .getTransactionService())
-                            .updateReleaseTimeConsensus(tmp.joinedServiceIds,
+                            .updateReleaseTimeConsensus(
+                                    gatherJoinedAndNonJoinedServices.getJoinedServiceIds(),
                                     getHAReleaseTimeConsensusTimeout(),
                                     TimeUnit.MILLISECONDS);
 
@@ -3205,7 +3154,16 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                     
                 }
                 
-            } // if HA
+            } else {
+                
+                /*
+                 * Not HA. Did not do GATHER.
+                 */
+                
+                gatherJoinedAndNonJoinedServices = null;
+                consensusReleaseTime = null;
+                
+            } // if (HA) do GATHER
 
             /*
              * Before flushing the commitRecordIndex we need to check for
@@ -3455,13 +3413,13 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                 try {
 
                     // Atomic decision point for joined vs non-joined services.
-                    final JoinedAndNonJoinedServices tmp = new JoinedAndNonJoinedServices(
+                    final IJoinedAndNonJoinedServices prepareJoinedAndNonJoinedServices = new JoinedAndNonJoinedServices(
                             quorum);
 
-                    final PrepareRequest req = new PrepareRequest(
-                            tmp.joinedServiceIds,//
-                            tmp.nonJoinedPipelineServiceIds,//
-//                            !old.isRootBlock0(),//
+                    final PrepareRequest req = new PrepareRequest(//
+                            consensusReleaseTime,//
+                            gatherJoinedAndNonJoinedServices,//
+                            prepareJoinedAndNonJoinedServices,//
                             newRootBlock,//
                             quorumService.getPrepareTimeout(), // timeout
                             TimeUnit.MILLISECONDS//
@@ -6076,7 +6034,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
      * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/673" >
      *      Native thread leak in HAJournalServer process </a>
      */
-    private final AtomicReference<Future<Void>> gatherFuture = new AtomicReference<Future<Void>>();
+    private final AtomicReference<Future<IHANotifyReleaseTimeResponse>> gatherFuture = new AtomicReference<Future<IHANotifyReleaseTimeResponse>>();
     
     /**
      * The {@link Quorum} for this service -or- <code>null</code> if the service
@@ -6585,174 +6543,196 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
              */
             public Boolean call() throws Exception {
 
-                /*
-                 * Get and clear the [gatherFuture]. A service which was joined
-                 * at the atomic decision point for the GATHER will have a
-                 * non-null Future here. A service which is newly joined and
-                 * which joined *after* the GATHER will have a [null] Future
-                 * here. If the service participated in the gather, then we will
-                 * use this Future to decide if it should vote NO. If the
-                 * service joined *after* the GATHER, then the Future will be
-                 * [null] and we will ignore it.
-                 * 
-                 * FIXME GATHER/PREPARE: This does not verify that the service
-                 * joined after the GATHER when [oldFuture] is [null]. This
-                 * condition is simply assumed to be true. We need to
-                 * distinguish between the two cases described above That could
-                 * be done by returning the set of joined services as of the
-                 * atomic decision point for the GATHER.
-                 */
-                final Future<Void> oldFuture = gatherFuture
-                        .getAndSet(null/* newValue */);
-
                 try {
-                
-                if (haLog.isInfoEnabled())
-                    haLog.info("gatherFuture=" + oldFuture);
                     
-                final IRootBlockView rootBlock = prepareMessage.getRootBlock();
-
-                if (haLog.isInfoEnabled())
-                    haLog.info("preparedRequest=" + rootBlock + ", isLeader: " + isLeader);
-
-                if (rootBlock == null)
-                    throw new IllegalStateException();
-
-                // Validate the new root block against the current root block.
-                validateNewRootBlock(/*isJoined,*/ isLeader, AbstractJournal.this._rootBlock, rootBlock);
-
-                if (haLog.isInfoEnabled())
-                    haLog.info("validated=" + rootBlock);
-
-                /*
-                 * if(follower) {...}
-                 */
-                if (/*isJoined &&*/ !isLeader) {
-
-                    /**
-                     * This is a follower.
+                    /*
+                     * Get and clear the [gatherFuture]. A service which was
+                     * joined at the atomic decision point for the GATHER will
+                     * have a non-null Future here. A service which is newly
+                     * joined and which joined *after* the GATHER will have a
+                     * [null] Future here. If the service participated in the
+                     * gather, then we will use this Future to decide if it
+                     * should vote NO. If the service joined *after* the GATHER,
+                     * then the Future will be [null] and we will ignore it.
                      * 
-                     * Validate the release time consensus protocol was
-                     * completed successfully on the follower.
-                     * 
-                     * Note: We need to block here (on oldFuture.get()) in case
-                     * the follower has not finished applying the updated
-                     * release time.
-                     * 
-                     * @see <a
-                     *      href="https://sourceforge.net/apps/trac/bigdata/ticket/673"
-                     *      > Native thread leak in HAJournalServer process </a>
+                     * Note: This is checked below.
                      */
+                    final Future<IHANotifyReleaseTimeResponse> oldFuture = gatherFuture
+                            .getAndSet(null/* newValue */);
 
-                    if (oldFuture == null) {
+                    if (haLog.isInfoEnabled())
+                        haLog.info("gatherFuture=" + oldFuture);
+                        
+                    final IRootBlockView rootBlock = prepareMessage.getRootBlock();
+    
+                    if (haLog.isInfoEnabled())
+                        haLog.info("preparedRequest=" + rootBlock + ", isLeader: " + isLeader);
+    
+                    if (rootBlock == null)
+                        throw new IllegalStateException();
+    
+                    // Validate the new root block against the current root block.
+                    validateNewRootBlock(/*isJoined,*/ isLeader, AbstractJournal.this._rootBlock, rootBlock);
+    
+                    if (haLog.isInfoEnabled())
+                        haLog.info("validated=" + rootBlock);
+    
+                    /*
+                     * Verify that the local release time is consisent with the
+                     * GATHER.
+                     */
+                    final IHANotifyReleaseTimeResponse consensusReleaseTime = prepareMessage
+                            .getConsensusReleaseTime();
+                    
+                    {
+                        
+                        final long localReleaseTime = getLocalTransactionManager()
+                                .getTransactionService().getReleaseTime();
+    
+                        // Note: Per the GatherTask (in Journal.java).
+                        final long expectedReleaseTime = Math.max(0L,
+                                consensusReleaseTime.getCommitTime() - 1);
 
-                        /*
-                         * Ok not to be part of consensus, could have just
-                         * joined.
+                        if (localReleaseTime != expectedReleaseTime) {
+
+                            throw new AssertionError(
+                                    "Local service does not agree with consensusReleaseTime: localReleaseTime="
+                                            + localReleaseTime
+                                            + ", expectedReleaseTime="
+                                            + expectedReleaseTime
+                                            + ", consensusReleaseTime="
+                                            + consensusReleaseTime);
+
+                        }
+    
+                    }
+    
+                    /*
+                     * if(follower) {...}
+                     */
+                    if (/*isJoined &&*/ !isLeader) {
+    
+                        /**
+                         * This is a follower.
                          * 
-                         * The GATHER is determines the earliest visible
-                         * commit point for new transaction starts. It is
-                         * not specifically about the commit itself.
+                         * Validate the release time consensus protocol was
+                         * completed successfully on the follower.
                          * 
-                         * Therefore the only restriction is to control when
-                         * historical transactions are permitted. We should
-                         * only fail the PREPARE if we have an earliest
-                         * transaction point prior to that reported in the
-                         * prepared rootblock.
-                         * 
-                         * Note: There should be no active transactions if
-                         * we joined on a live write and have not taken part
-                         * in a gather.
-                         * 
-                         * FIXME GATHER/PREPARE: Can we validate that this is a
-                         * newly joined service and hence that we can vote
-                         * YES unconditionally? Can we validate that there
-                         * are no active transactions? Can we validate that
-                         * the follower's releaseTime is consisent with (the
-                         * same as) the consensus release time for the
-                         * leader?
+                         * @see <a
+                         *      href="https://sourceforge.net/apps/trac/bigdata/ticket/673"
+                         *      > Native thread leak in HAJournalServer process </a>
                          */
-                        
-                        vote.set(true);
+    
+                        if (!prepareMessage.isGatherService()) {
+    
+                            /*
+                             * This service did not participate in the GATHER.
+                             * Instead, it joined after the GATHER but before
+                             * the PREPARE.
+                             */
 
-                        // Done.
-                        return vote.get();
-                        
+                            // [gatherFuture] should have been [null].
+                            assert oldFuture == null;
+                            
+                            vote.set(true);
+    
+                            // Done.
+                            return vote.get();
+                            
+                        }
+
+                        /**
+                         * Note: We need to block here (on oldFuture.get()) in
+                         * case the follower has not finished applying the
+                         * updated release time.
+                         */
+                        try {
+
+                            // Note: [oldFuture] MUST be non-null!
+                            final IHANotifyReleaseTimeResponse tmp = oldFuture.get();
+                            
+                            if ((tmp.getCommitCounter() != consensusReleaseTime
+                                    .getCommitCounter())
+                                    || (tmp.getCommitTime() != consensusReleaseTime
+                                            .getCommitTime())) {
+                            
+                                throw new AssertionError(
+                                        "GatherTask reports different consensus: GatherTask="
+                                                + tmp
+                                                + ", consensusReleaseTime="
+                                                + consensusReleaseTime);
+                            }
+
+                            /*
+                             * Gather was successful - fall through.
+                             */
+                            
+                        } catch (InterruptedException e) {
+                            /*
+                             * Note: Future isDone(). Caller should not block.
+                             */
+                            throw new AssertionError();
+                        } catch (CancellationException e) {
+                            /*
+                             * Gather cancelled on the follower (e.g.,
+                             * immediately above).
+                             */
+                            haLog.error("Gather cancelled on follower: serviceId="
+                                    + getServiceId() + " : " + e, e);
+                            return vote.get();
+                        } catch (ExecutionException e) {
+                            // Gather failed on the follower.
+                            haLog.error("Gather failed on follower: serviceId="
+                                    + getServiceId() + " : " + e, e);
+                            return vote.get();
+                        }
+    
                     }
-
-                    try {
-                        oldFuture.get();
-                        // Gather was successful - fall through.
-                    } catch (InterruptedException e) {
-                        // Note: Future isDone(). Caller should not block.
-                        throw new AssertionError();
-                    } catch (CancellationException e) {
-                        // Gather cancelled on the follower (e.g., immediately above).
-                        haLog.error("Gather cancelled on follower: serviceId="
-                                + getServiceId() + " : " + e, e);
-                        return vote.get();
-                    } catch (ExecutionException e) {
-                        // Gather failed on the follower.
-                        haLog.error("Gather failed on follower: serviceId="
-                                + getServiceId() + " : " + e, e);
-                        return vote.get();
+                    
+                    /*
+                     * Call to ensure strategy does everything required for itself
+                     * before final root block commit. At a minimum it must flush
+                     * its write cache to the backing file (issue the writes).
+                     */
+                    // _bufferStrategy.commit(); // lifted to before we
+                    // retrieve
+                    // RootBlock in commitNow
+                    /*
+                     * Force application data to stable storage _before_ we update
+                     * the root blocks. This option guarantees that the application
+                     * data is stable on the disk before the atomic commit. Some
+                     * operating systems and/or file systems may otherwise choose an
+                     * ordered write with the consequence that the root blocks are
+                     * laid down on the disk before the application data and a hard
+                     * failure could result in the loss of application data
+                     * addressed by the new root blocks (data loss on restart).
+                     * 
+                     * Note: We do not force the file metadata to disk. If that is
+                     * done, it will be done by a force() after we write the root
+                     * block on the disk.
+                     */
+                    if (doubleSync) {
+    
+                        _bufferStrategy.force(false/* metadata */);
+    
                     }
-
-                }
-                
-                /*
-                 * Call to ensure strategy does everything required for itself
-                 * before final root block commit. At a minimum it must flush
-                 * its write cache to the backing file (issue the writes).
-                 */
-                // _bufferStrategy.commit(); // lifted to before we
-                // retrieve
-                // RootBlock in commitNow
-                /*
-                 * Force application data to stable storage _before_ we update
-                 * the root blocks. This option guarantees that the application
-                 * data is stable on the disk before the atomic commit. Some
-                 * operating systems and/or file systems may otherwise choose an
-                 * ordered write with the consequence that the root blocks are
-                 * laid down on the disk before the application data and a hard
-                 * failure could result in the loss of application data
-                 * addressed by the new root blocks (data loss on restart).
-                 * 
-                 * Note: We do not force the file metadata to disk. If that is
-                 * done, it will be done by a force() after we write the root
-                 * block on the disk.
-                 */
-                if (doubleSync) {
-
-                    _bufferStrategy.force(false/* metadata */);
-
-                }
-
-                // Vote YES.
-                vote.set(true);
-
-                return vote.get();
+    
+                    // Vote YES.
+                    vote.set(true);
+    
+                    return vote.get();
 
                 } finally {
-                
-                    if(!vote.get()) {
-                        if (oldFuture != null) {
-                            /*
-                             * Did GATHER and voted NO.
-                             */
-                            doRejectedCommit();
-                        } else {
-                            /*
-                             * FIXME GATHER/PREPARE : This is *assuming* that we
-                             * have a newly joined service. That should have
-                             * been verified above.
-                             */
-                            haLog.info("Did not do GATHER : Presumed newly joined service.");
-                        }
+
+                    if (!vote.get()) {
+                        /*
+                         * Throw away our local write set.
+                         */
+                        doRejectedCommit();
                     }
-                    
+
                 }
-                
+
             }
 
         }
@@ -7439,18 +7419,26 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
             if (haLog.isInfoEnabled())
                 haLog.info("req=" + req);
 
-            // Clear the old outcome. Reference SHOULD be null. Ensure not running.
-            final Future<Void> oldFuture = gatherFuture.getAndSet(null);
+            {
+
+                /*
+                 * Clear the old outcome. Reference SHOULD be null. Ensure not
+                 * running.
+                 */
+                final Future<IHANotifyReleaseTimeResponse> oldFuture = gatherFuture
+                        .getAndSet(null);
+
+                if (oldFuture != null && !oldFuture.isDone())
+                    oldFuture.cancel(true/* mayInterruptIfRunning */);
+
+            }
             
-            if (oldFuture != null && !oldFuture.isDone())
-                oldFuture.cancel(true/* mayInterruptIfRunning */);
-            
-            final Callable<Void> task = ((AbstractHATransactionService) AbstractJournal.this
+            final Callable<IHANotifyReleaseTimeResponse> task = ((AbstractHATransactionService) AbstractJournal.this
                     .getLocalTransactionManager()
                     .getTransactionService())
                     .newGatherMinimumVisibleCommitTimeTask(req);
 
-            final FutureTask<Void> ft = new FutureTask<Void>(task);
+            final FutureTask<IHANotifyReleaseTimeResponse> ft = new FutureTask<IHANotifyReleaseTimeResponse>(task);
 
             // Save reference to the gather Future.
             gatherFuture.set(ft);
