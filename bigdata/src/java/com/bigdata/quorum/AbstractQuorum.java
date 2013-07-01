@@ -1062,7 +1062,7 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
             return;
         }
         
-        throw new QuorumException("Quorum not met on token: expected " + token
+        throw new QuorumException("Quorum not met on token: expected=" + token
                 + ", actual=" + this.token);
 
     }
