@@ -795,11 +795,20 @@ abstract public class WriteCache implements IWriteCache {
              * flipping the sign on the fileOffset in the pre-record header.
              * This means that we can not use an incrementally computed
              * checksum.
+             * 
+             * Note: With the introduction of HALog compression (compress /
+             * expand), the target ByteBuffer may be sized for the message
+             * rather than drawn from a pool. Therefore, the assert has been
+             * modified such to ensure that the buffer has sufficient capacity
+             * for the transfer - as defined by limit().
              */
 
-            assert checksumBuffer.capacity() == src.capacity() : "b.capacity="
-                    + src.capacity() + ", checksumBuffer.capacity="
+            assert checksumBuffer.capacity() >= src.limit() : "b.limit="
+                    + src.limit() + ", checksumBuffer.capacity="
                     + checksumBuffer.capacity();
+//            assert checksumBuffer.capacity() == src.capacity() : "b.capacity="
+//                    + src.capacity() + ", checksumBuffer.capacity="
+//                    + checksumBuffer.capacity();
 
             // checksumBuffer.limit(checksumBuffer.capacity());
             checksumBuffer.limit(src.limit());
