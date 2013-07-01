@@ -147,7 +147,8 @@ public class QuorumCommitImpl<S extends HACommitGlue> extends
 
         final IRootBlockView rootBlock = req.getRootBlock();
 
-        final UUID[] joinedServiceIds = req.getJoinedServiceIds();
+        final UUID[] joinedServiceIds = req.getPrepareAndNonJoinedServices()
+                .getJoinedServiceIds();
         
 //        final Set<UUID> nonJoinedPipelineServiceIds = req
 //                .getNonJoinedPipelineServiceIds();
@@ -205,10 +206,6 @@ public class QuorumCommitImpl<S extends HACommitGlue> extends
 
             {
 
-                // The message used for the services that are joined.
-                final IHA2PhasePrepareMessage msgForJoinedService = new HA2PhasePrepareMessage(
-                        true/* isJoinedService */, rootBlock, timeout, unit);
-
                 // First, message the joined services (met with the quorum).
                 int i = 1;
                 {
@@ -216,6 +213,31 @@ public class QuorumCommitImpl<S extends HACommitGlue> extends
                     for (; i < joinedServiceIds.length; i++) {
 
                         final UUID serviceId = joinedServiceIds[i];
+
+                        /*
+                         * Figure out if this service participated in the
+                         * GATHER.
+                         */
+                        final boolean isGatherService;
+                        {
+                            boolean found = false;
+                            for (UUID x : req
+                                    .getGatherJoinedAndNonJoinedServices()
+                                    .getJoinedServiceIds()) {
+                                if (serviceId.equals(x)) {
+                                    found = true;
+                                    break;
+                                }
+                            }
+                            isGatherService = found;
+                        }
+
+                        // The message used for the services that are joined.
+                        final IHA2PhasePrepareMessage msgForJoinedService = new HA2PhasePrepareMessage(
+                                req.getConsensusReleaseTime(),//
+                                isGatherService,//
+                                true, // isJoinedService
+                                rootBlock, timeout, unit);
 
                         /*
                          * Runnable which will execute this message on the
@@ -292,6 +314,13 @@ public class QuorumCommitImpl<S extends HACommitGlue> extends
 
                     final S leader = member.getService();
                     
+                    // The message used for the leader.
+                    final IHA2PhasePrepareMessage msgForJoinedService = new HA2PhasePrepareMessage(
+                            req.getConsensusReleaseTime(),//
+                            true, // isGatherService (always true for leader)
+                            true, // isJoinedService (always true for leader)
+                            rootBlock, timeout, unit);
+
                     final Future<Boolean> f = leader
                             .prepare2Phase(msgForJoinedService);
                     
@@ -433,7 +462,8 @@ public class QuorumCommitImpl<S extends HACommitGlue> extends
         
         final PrepareRequest preq = req.getPrepareRequest();
 
-        final UUID[] joinedServiceIds = preq.getJoinedServiceIds();
+        final UUID[] joinedServiceIds = preq.getPrepareAndNonJoinedServices()
+                .getJoinedServiceIds();
 
 //        final Set<UUID> nonJoinedPipelineServiceIds = preq
 //                .getNonJoinedPipelineServiceIds();

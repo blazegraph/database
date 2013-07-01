@@ -36,6 +36,7 @@ import java.util.concurrent.TimeoutException;
 
 import com.bigdata.ha.HATXSGlue;
 import com.bigdata.ha.msg.IHAGatherReleaseTimeRequest;
+import com.bigdata.ha.msg.IHANotifyReleaseTimeResponse;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.ITransactionService;
 
@@ -54,7 +55,7 @@ abstract public class AbstractHATransactionService extends
     }
     
     /**
-     * Factory for the Gather task on the follower.
+     * Factory for the Gather task that will be executed by the follower.
      * 
      * @param req
      *            The request.
@@ -64,7 +65,7 @@ abstract public class AbstractHATransactionService extends
      * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/673" >
      *      Native thread leak in HAJournalServer process </a>
      */
-    abstract public Callable<Void> newGatherMinimumVisibleCommitTimeTask(
+    abstract public Callable<IHANotifyReleaseTimeResponse> newGatherMinimumVisibleCommitTimeTask(
             final IHAGatherReleaseTimeRequest req);
 
     /**
@@ -79,7 +80,7 @@ abstract public class AbstractHATransactionService extends
      * @param units
      *            The units for that timeout.
      */
-    abstract public void updateReleaseTimeConsensus(
+    abstract public IHANotifyReleaseTimeResponse updateReleaseTimeConsensus(
             final UUID[] joinedServiceIds, final long timeout,
             final TimeUnit units) throws IOException, TimeoutException,
             InterruptedException, Exception;

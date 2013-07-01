@@ -536,9 +536,7 @@ public class AbstractHA3JournalServerTestCase extends
      * individual service directory.
      */
     protected File getTestDir() {
-
-        return new File("benchmark/CI-HAJournal-1");
-        
+        return new File(FEDNAME + "/CI-HAJournal-1");
     }
 
     protected File getServiceDirA() {

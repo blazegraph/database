@@ -99,6 +99,16 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
     }
 
     /**
+     * The name of the federation. This is also used for the JINI locator
+     * GROUPS.
+     * <p>
+     * Note: If you want to change this, then you also need to change the
+     * HAJournal-{ABC}.config, jiniClient.config, zkClient.config, and how
+     * you run the LookupStarter class to use the new federation name.
+     */
+    static final protected String FEDNAME = "benchmark";
+    
+    /**
      * Path to the config files.
      */
     static final protected String SRC_PATH = "bigdata-jini/src/test/com/bigdata/journal/jini/ha/";
@@ -107,8 +117,8 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
      * Path to the directory in which the service directories exist. The
      * individual service directories are formed by adding the service name.
      */
-    // static final protected String TGT_PATH = "/Volumes/SSDData/bigdata/benchmark/CI-HAJournal-1/";
-    static final protected String TGT_PATH = "benchmark/CI-HAJournal-1/";
+    // static final protected String TGT_PATH = "/Volumes/SSDData/bigdata/"+FEDNAME+"/CI-HAJournal-1/";
+    static final protected String TGT_PATH = FEDNAME + "/CI-HAJournal-1/";
 
     /**
      * The timeout used to await quorum meet or break.

@@ -34,18 +34,33 @@ import com.bigdata.util.ChecksumUtility;
 
 public class HA2PhasePrepareMessage implements IHA2PhasePrepareMessage, Serializable {
 
-    private static final long serialVersionUID = 1L;
-    
+    /**
+     * Note: The original {@link #serialVersionUID} was <code>1L</code> - this
+     * version was never release. The {@link #serialVersionUID} was changed to
+     * <code>2L</code> when adding the {@link #consensusReleaseTime} and
+     * {@link #isGatherService} fields. It is not possible to roll forward from
+     * the non-released version without shutting down each service before
+     * allowing another commit.
+     */
+    private static final long serialVersionUID = 2L;
+
+    private final IHANotifyReleaseTimeResponse consensusReleaseTime;
+    private final boolean isGatherService;
     private final boolean isJoinedService;
     private final boolean isRootBlock0;
     private final byte[] rootBlock;
     private final long timeout;
     private final TimeUnit unit;
 
-    public HA2PhasePrepareMessage(final boolean isJoinedService,
+    public HA2PhasePrepareMessage(
+            final IHANotifyReleaseTimeResponse consensusReleaseTime,
+            final boolean isGatherService, final boolean isJoinedService,
             final IRootBlockView rootBlock, final long timeout,
             final TimeUnit unit) {
         
+        if (consensusReleaseTime == null)
+            throw new IllegalArgumentException();
+
         if (rootBlock == null)
             throw new IllegalArgumentException();
 
@@ -55,6 +70,10 @@ public class HA2PhasePrepareMessage implements IHA2PhasePrepareMessage, Serializ
         if (unit == null)
             throw new IllegalArgumentException();
 
+        this.consensusReleaseTime = consensusReleaseTime;
+        
+        this.isGatherService = isGatherService;
+        
         this.isJoinedService = isJoinedService;
         
         this.isRootBlock0 = rootBlock.isRootBlock0();
@@ -70,6 +89,17 @@ public class HA2PhasePrepareMessage implements IHA2PhasePrepareMessage, Serializ
         
         this.unit = unit;
         
+    }
+
+
+    @Override
+    public IHANotifyReleaseTimeResponse getConsensusReleaseTime() {
+        return consensusReleaseTime;
+    }
+
+    @Override
+    public boolean isGatherService() {
+        return isGatherService;
     }
 
     @Override
@@ -100,4 +130,17 @@ public class HA2PhasePrepareMessage implements IHA2PhasePrepareMessage, Serializ
         return unit;
     }
 
+    @Override
+    public String toString() {
+        return super.toString()+"{"//
+                +"consensusReleaseTime="+getConsensusReleaseTime()//
+                +",isGatherService="+isGatherService()//
+                +",isPrepareService="+isJoinedService()//
+                +",isRootBlock0="+isRootBlock0()//
+                +",rootBlock()="+getRootBlock()//
+                +",timeout="+getTimeout()//
+                +",unit="+getUnit()//
+                +"}";
+    }
+    
 }
