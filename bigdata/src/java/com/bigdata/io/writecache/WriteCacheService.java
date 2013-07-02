@@ -556,7 +556,7 @@ abstract public class WriteCacheService implements IWriteCache {
          *      WCS write cache compaction causes errors in RWS postHACommit()
          *      </a>
          */
-        this.compactionEnabled = false;//canCompact() && compactionThreshold < 100;
+        this.compactionEnabled = canCompact() && compactionThreshold < 100;
         
         if (log.isInfoEnabled())
             log.info("Compaction Enabled: " + compactionEnabled
@@ -855,6 +855,12 @@ abstract public class WriteCacheService implements IWriteCache {
      */
     private volatile boolean flush = false;
 
+    /**
+     * When <code>true</code> any dirty buffers are written directly and never compacted.
+     * This is only used in flush() when adding any compactingCache to the dirty list.
+     */
+    private volatile boolean directWrite = false;
+
     protected Callable<Void> newWriteTask() {
 
         return new WriteTask();
@@ -1002,7 +1008,7 @@ abstract public class WriteCacheService implements IWriteCache {
 
                     final int percentEmpty = cache.potentialCompaction();
 
-                    if (compactionEnabled //&& !flush 
+                    if (compactionEnabled && !directWrite 
                             && percentEmpty >= compactionThreshold) {
 
                         if (log.isDebugEnabled())
@@ -2181,19 +2187,31 @@ abstract public class WriteCacheService implements IWriteCache {
                  * 
                  * Note: We can not drop the compactingCache onto the dirtyList
                  * until the dirtyList has been spun down to empty.
+                 * 
+                 * Note: We have introduced the directWrite state variable to indicate
+                 * that the compactingCache must not be compacted or it may not be
+                 * written.
                  */
                 final WriteCache tmp2 = compactingCacheRef.getAndSet(null/* newValue */);
                 if (tmp2 != null) {
-                    dirtyList.add(tmp2);
-                    counters.get().ndirty++;
-                    dirtyListChange.signalAll();
-                    while (!dirtyList.isEmpty() && !halt) {
-                        // remaining := (total - elapsed).
-                        remaining = nanos - (System.nanoTime() - begin);
-                        if (!dirtyListEmpty.await(remaining, TimeUnit.NANOSECONDS)) {
-                            throw new TimeoutException();
-                        }
-                    }
+                	directWrite = true;
+                	try {
+	                    if (log.isInfoEnabled()) {
+	                        log.info("Adding compacting cache");
+	                    }
+	                    dirtyList.add(tmp2);
+	                    counters.get().ndirty++;
+	                    dirtyListChange.signalAll();
+	                    while (!dirtyList.isEmpty() && !halt) {
+	                        // remaining := (total - elapsed).
+	                        remaining = nanos - (System.nanoTime() - begin);
+	                        if (!dirtyListEmpty.await(remaining, TimeUnit.NANOSECONDS)) {
+	                            throw new TimeoutException();
+	                        }
+	                    }
+                	} finally {
+                		directWrite = false;
+                	}
                 }
                 if (halt)
                     throw new RuntimeException(firstCause.get());
