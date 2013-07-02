@@ -2986,6 +2986,9 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
         assert addr > 0;
         
         try {
+        	if (log.isDebugEnabled())
+        		log.debug("writing metabits at: " + addr);
+        	
             m_writeCacheService.write(addr, ByteBuffer.wrap(buf), 0/*chk*/, false/*useChecksum*/, m_metaBitsAddr/*latchedAddr*/);
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
@@ -3459,7 +3462,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
             m_nextAllocation -= META_ALLOCATION; // 256K
 
             m_metaBitsSize = nsize;
-
+            
             // now get new allocation!
             bit = fndMetabit();
 
@@ -6206,7 +6209,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
                 if (oldmetabits.length % cDefaultMetaBitsSize != 0)
                 	throw new AssertionError();
                 if (m_metaBits.length % cDefaultMetaBitsSize != 0)
-                	throw new AssertionError();
+                	throw new AssertionError("New metabits: " + m_metaBits.length + ", old: " + oldmetabits.length);
 
                 // Is it always valid to assume that:
                 //	metabits.length >= oldmetabits.length
@@ -6788,8 +6791,8 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
                 final int nbytes = (int) Math.min((long) bufferCapacity,
                         remaining);
 
-                if (log.isDebugEnabled())
-                    log.debug("Computing digest: sequence=" + sequence
+                if (log.isTraceEnabled())
+                    log.trace("Computing digest: sequence=" + sequence
                             + ", offset=" + offset + ", nbytes=" + nbytes);
 
                 // Setup for read.

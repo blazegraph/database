@@ -1927,7 +1927,7 @@ abstract public class WriteCache implements IWriteCache {
             counters.nchannelWrite += nwrites;
             counters.bytesWritten += nbytes;
             counters.elapsedWriteNanos += (System.nanoTime() - begin);
-
+            
             if (log.isTraceEnabled())
             	log.trace("WRITTEN ON CHANNEL");
 
