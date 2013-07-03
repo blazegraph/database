@@ -346,7 +346,7 @@ public interface Options {
      *      Compress write cache blocks for replication and in HALogs </a>
      */
     String HALOG_COMPRESSOR = "HALogCompressor";
-    String DEFAULT_HALOG_COMPRESSOR = null;//CompressorRegistry.DEFLATE_BEST_SPEED;
+    String DEFAULT_HALOG_COMPRESSOR = CompressorRegistry.DEFLATE_BEST_SPEED;
 
     /**
      * The initial extent of the journal (bytes). When the journal is backed by
