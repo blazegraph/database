@@ -54,7 +54,10 @@ import com.bigdata.rdf.properties.PropertiesWriterRegistry;
  * 
  * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/628" > Create
  *      a bigdata-client jar for the NSS REST API </a>
- *      
+ * 
+ * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/696" >
+ *      Incorrect HttpEntity consuming in RemoteRepositoryManager </a>
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
 public class RemoteRepositoryManager extends RemoteRepository {
@@ -169,14 +172,26 @@ public class RemoteRepositoryManager extends RemoteRepository {
         opts.method = "GET";
 
         HttpResponse response = null;
-
+        GraphQueryResult result = null;
+        
         opts.acceptHeader = ConnectOptions.DEFAULT_GRAPH_ACCEPT_HEADER;
 
-        checkResponseCode(response = doConnect(opts));
+        try {
+            // check response in try.
+            checkResponseCode(response = doConnect(opts));
 
-        // return asGraph(graphResults(response));
-        return graphResults(response);
+            // return asynchronous parse of result.
+            return result = graphResults(response);
 
+        } finally {
+            if (result == null) {
+                // Consume entity if bad response.
+                try {
+                    EntityUtils.consume(response.getEntity());
+                } catch (IOException ex) {
+                }
+            }
+        }
     }
 
     /**
@@ -197,7 +212,6 @@ public class RemoteRepositoryManager extends RemoteRepository {
 
         opts.method = "POST";
 
-        @SuppressWarnings("unused")
         HttpResponse response = null;
 
         // Setup the request entity.
@@ -222,7 +236,20 @@ public class RemoteRepositoryManager extends RemoteRepository {
         
         }
 
-        checkResponseCode(response = doConnect(opts));
+        try {
+
+            checkResponseCode(response = doConnect(opts));
+
+        } finally {
+
+            if (response != null) {
+                try {
+                    EntityUtils.consume(response.getEntity());
+                } catch (IOException ex) {
+                }
+            }
+
+        }
         
     }
 
@@ -242,10 +269,22 @@ public class RemoteRepositoryManager extends RemoteRepository {
 
         opts.method = "DELETE";
 
-        @SuppressWarnings("unused")
         HttpResponse response = null;
 
-        checkResponseCode(response = doConnect(opts));
+        try {
+
+            checkResponseCode(response = doConnect(opts));
+
+        } finally {
+
+            if (response != null) {
+                try {
+                    EntityUtils.consume(response.getEntity());
+                } catch (IOException ex) {
+                }
+            }
+
+        }
         
     }
 
@@ -277,13 +316,11 @@ public class RemoteRepositoryManager extends RemoteRepository {
 
         opts.acceptHeader = ConnectOptions.MIME_PROPERTIES_XML;
 
-        checkResponseCode(response = doConnect(opts));
-
-        HttpEntity entity = null;
-        BackgroundGraphResult result = null;
         try {
 
-            entity = response.getEntity();
+            checkResponseCode(response = doConnect(opts));
+
+            final HttpEntity entity = response.getEntity();
 
             final String contentType = entity.getContentType().getValue();
 
@@ -318,9 +355,9 @@ public class RemoteRepositoryManager extends RemoteRepository {
 
         } finally {
 
-            if (result == null) {
+            if (response != null) {
                 try {
-                    EntityUtils.consume(entity);
+                    EntityUtils.consume(response.getEntity());
                 } catch (IOException ex) {
                 }
             }
