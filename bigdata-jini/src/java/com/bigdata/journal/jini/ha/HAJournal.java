@@ -474,10 +474,11 @@ public class HAJournal extends Journal {
              * observes a quorum break or similar event. This is just being
              * proactive.
              * 
-             * FIXME This will not be called if the quorum remains met but the
+             * done. This will not be called if the quorum remains met but the
              * local service leaves the quorum. However, we should still cancel
              * a running snapshot if that occurs (if we add a serviceLeave()
-             * handle then this will fix that).
+             * handler then this will fix that). [there is no a serviceLeave()
+             * handler in HAJournalServer.]
              */
             
             final Future<IHASnapshotResponse> ft = getSnapshotManager()
@@ -654,20 +655,20 @@ public class HAJournal extends Journal {
 
     }
     
-    /**
-     * {@inheritDoc}
-     * <p>
-     * Extended to expose this method to the {@link HAQuorumService}.
-     */
-    @Override
-    protected void doLocalAbort() {
-
-        // Clear the last live message out.
-        haLogNexus.lastLiveHAWriteMessage = null;
-        
-        super.doLocalAbort();
-
-    }
+//    /**
+//     * {@inheritDoc}
+//     * <p>
+//     * Extended to expose this method to the {@link HAQuorumService}.
+//     */
+//    @Override
+//    protected void doLocalAbort() {
+//
+//        // Clear the last live message out.
+//        haLogNexus.lastLiveHAWriteMessage = null;
+//        
+//        super.doLocalAbort();
+//
+//    }
     
     /**
      * Extended implementation supports RMI.
@@ -1867,20 +1868,20 @@ public class HAJournal extends Journal {
             
         }
 
-        /**
-         * {@inheritDoc}
-         * <p>
-         * Extended to kick the {@link HAJournalServer} into an error state. It
-         * will recover from that error state by re-entering seek consensus.
-         */
-        @Override
-        protected void doRejectedCommit() {
-        
-            super.doRejectedCommit();
-            
-            getQuorumService().enterErrorState();
-            
-        }
+//        /**
+//         * {@inheritDoc}
+//         * <p>
+//         * Extended to kick the {@link HAJournalServer} into an error state. It
+//         * will recover from that error state by re-entering seek consensus.
+//         */
+//        @Override
+//        protected void doRejectedCommit() {
+//        
+//            super.doRejectedCommit();
+//            
+//            getQuorumService().enterErrorState();
+//            
+//        }
         
         /**
          * Return this quorum member, appropriately cast.

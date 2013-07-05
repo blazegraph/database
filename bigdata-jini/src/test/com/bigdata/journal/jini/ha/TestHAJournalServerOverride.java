@@ -38,6 +38,7 @@ import com.bigdata.ha.HAStatusEnum;
 import com.bigdata.ha.msg.IHA2PhaseCommitMessage;
 import com.bigdata.ha.msg.IHA2PhasePrepareMessage;
 import com.bigdata.ha.msg.IHANotifyReleaseTimeRequest;
+import com.bigdata.journal.AbstractTask;
 import com.bigdata.journal.jini.ha.HAJournalTest.HAGlueTest;
 import com.bigdata.journal.jini.ha.HAJournalTest.SpuriousTestException;
 import com.bigdata.rdf.sail.webapp.client.HttpException;
@@ -161,6 +162,25 @@ public class TestHAJournalServerOverride extends AbstractHA3JournalServerTestCas
     }
 
     /**
+     * A user level transaction abort must not cause a service leave or quorum
+     * break. It should simply discard the buffered write set for that
+     * transactions.
+     * 
+     * TODO Currently, there is a single unisolated connection commit protocol.
+     * When we add concurrent unisolated writers, the user level transaction
+     * abort will just discard the buffered writes for a specific
+     * {@link AbstractTask}.
+     * 
+     * @throws Exception
+     */
+    public void testStartABC_userLevelAbortDoesNotCauseQuorumBreak()
+            throws Exception {
+
+        fail("write test");
+
+    }
+
+    /**
      * This test forces clock skew on one of the followers causing it to
      * encounter an error in its GatherTask. This models the problem that was
      * causing a deadlock in an HA3 cluster with BSBM UPDATE running on the
@@ -253,6 +273,9 @@ public class TestHAJournalServerOverride extends AbstractHA3JournalServerTestCas
         /*
          * New transactions are still accepted.
          */
+        ((HAGlueTest)startup.serverA).log("2nd transaction");
+        ((HAGlueTest)startup.serverB).log("2nd transaction");
+        ((HAGlueTest)startup.serverC).log("2nd transaction");
         simpleTransaction();
 
         // Should be one commit point.
@@ -292,6 +315,9 @@ public class TestHAJournalServerOverride extends AbstractHA3JournalServerTestCas
 
         // Setup B to vote "NO" on the next PREPARE request.
         ((HAGlueTest) startup.serverB).voteNo();
+        ((HAGlueTest) startup.serverA).log("B will vote NO.");
+        ((HAGlueTest) startup.serverB).log("B will vote NO.");
+        ((HAGlueTest) startup.serverC).log("B will vote NO.");
         
         // Simple transaction.
         simpleTransaction();

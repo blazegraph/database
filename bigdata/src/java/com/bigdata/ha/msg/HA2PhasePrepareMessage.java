@@ -130,6 +130,18 @@ public class HA2PhasePrepareMessage implements IHA2PhasePrepareMessage, Serializ
         return unit;
     }
 
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Returns <code>false</code> by default
+     */
+    @Override
+    public boolean voteNo() {
+
+        return false;
+        
+    }
+    
     @Override
     public String toString() {
         return super.toString()+"{"//

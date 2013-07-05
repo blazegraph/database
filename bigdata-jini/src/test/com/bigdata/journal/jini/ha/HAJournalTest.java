@@ -83,6 +83,7 @@ import com.bigdata.ha.msg.IHAWriteMessage;
 import com.bigdata.ha.msg.IHAWriteSetStateRequest;
 import com.bigdata.ha.msg.IHAWriteSetStateResponse;
 import com.bigdata.journal.AbstractJournal;
+import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.jini.ha.HAJournalServer.HAQuorumService;
 import com.bigdata.quorum.AsynchronousQuorumCloseException;
 import com.bigdata.quorum.Quorum;
@@ -125,6 +126,14 @@ public class HAJournalTest extends HAJournal {
          */
         public void helloWorld() throws IOException;
 
+        /**
+         * Logs a message @ WARN on the HAGlue service.
+         * 
+         * @param msg
+         *            The message.
+         */
+        public void log(String msg) throws IOException;
+        
         /**
          * Force the end point to enter into an error state from which it will
          * naturally move back into a consistent state.
@@ -462,6 +471,13 @@ public class HAJournalTest extends HAJournal {
         }
 
         @Override
+        public void log(final String msg) throws IOException {
+
+            log.warn(msg);
+
+        }
+
+        @Override
         public Future<Void> enterErrorState() {
 
             final FutureTask<Void> ft = new FutureTaskMon<Void>(
@@ -775,23 +791,20 @@ public class HAJournalTest extends HAJournal {
 
         @Override
         public Future<Boolean> prepare2Phase(
-                IHA2PhasePrepareMessage prepareMessage) {
+                final IHA2PhasePrepareMessage prepareMessage) {
 
             checkMethod("prepare2Phase",
                     new Class[] { IHA2PhasePrepareMessage.class });
 
             if (voteNo.compareAndSet(true/* expect */, false/* update */)) {
 
-                final FutureTask<Boolean> ft = new FutureTask<Boolean>(
-                        new VoteNoTask());
+                return super.prepare2Phase(new MyPrepareMessage(prepareMessage));
 
-                super.getIndexManager().getExecutorService().submit(ft);
-
-                return super.getProxy(ft);
-
+            } else {
+                
+                return super.prepare2Phase(prepareMessage);
+                
             }
-
-            return super.prepare2Phase(prepareMessage);
 
         }
 
@@ -929,4 +942,57 @@ public class HAJournalTest extends HAJournal {
 
     } // class HAGlueTestImpl
 
+    private static class MyPrepareMessage implements IHA2PhasePrepareMessage {
+        
+        private final IHA2PhasePrepareMessage delegate;
+        
+        MyPrepareMessage(final IHA2PhasePrepareMessage msg) {
+            this.delegate = msg;
+        }
+
+        @Override
+        public IHANotifyReleaseTimeResponse getConsensusReleaseTime() {
+            return delegate.getConsensusReleaseTime();
+        }
+
+        @Override
+        public boolean isGatherService() {
+            return delegate.isGatherService();
+        }
+
+        @Override
+        public boolean isJoinedService() {
+            return delegate.isJoinedService();
+        }
+
+        @Override
+        public boolean isRootBlock0() {
+            return delegate.isRootBlock0();
+        }
+
+        @Override
+        public IRootBlockView getRootBlock() {
+            return delegate.getRootBlock();
+        }
+
+        @Override
+        public long getTimeout() {
+            return delegate.getTimeout();
+        }
+
+        @Override
+        public TimeUnit getUnit() {
+            return delegate.getUnit();
+        }
+
+        /**
+         * Force the PREPARE to vote NO.
+         */
+        @Override
+        public boolean voteNo() {
+            return true;
+        }
+        
+    }
+    
 } // class HAJournalTest

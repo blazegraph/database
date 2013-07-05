@@ -141,4 +141,16 @@ public interface QuorumService<S extends HAGlue> extends QuorumMember<S>,
     void didMeet(final long token, final long commitCounter,
             final boolean isLeader);
 
+    /**
+     * Enter an error state. The error state should take whatever corrective
+     * actions are necessary in order to prepare the service for continued
+     * operations.
+     */
+    void enterErrorState();
+
+    /**
+     * Discard all state associated with the current write set. 
+     */
+    void discardWriteSet();
+    
 }

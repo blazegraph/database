@@ -302,8 +302,12 @@ public class HAStatusServletUtil {
                         nbytes += currentFile.length();
                         nfiles++;
                     }
+                    final String compressorKey = journal.getProperties().getProperty(
+                            com.bigdata.journal.Options.HALOG_COMPRESSOR,
+                            com.bigdata.journal.Options.DEFAULT_HALOG_COMPRESSOR);
                     p.text("HALogDir: nfiles=" + nfiles + ", nbytes=" + nbytes
-                            + ", path=" + nexus.getHALogDir()).node("br")
+                            + ", path=" + nexus.getHALogDir()
+                            + ", compressorKey=" + compressorKey).node("br")
                             .close();
                 }
                 if (digests) {
