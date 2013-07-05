@@ -620,8 +620,13 @@ public class HALogWriter implements IHALogWriter {
 				 * Conditional remove iff file is open. Will not remove
 				 * something that has been closed.
 				 */
-			    m_state.forceCloseAll();
+                if (haLog.isInfoEnabled())
+                    haLog.info("Will close: " + m_state.m_haLogFile);
 
+			    m_state.forceCloseAll();
+			    if(false||m_state.isCommitted()) return; // Do not remove a sealed HALog file!
+                if (haLog.isInfoEnabled())
+                    haLog.info("Will remove: " + m_state.m_haLogFile);
 				if (m_state.m_haLogFile.exists() && !m_state.m_haLogFile.delete()) {
 
 					/*

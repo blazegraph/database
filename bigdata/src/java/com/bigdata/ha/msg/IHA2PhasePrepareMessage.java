@@ -88,4 +88,10 @@ public interface IHA2PhasePrepareMessage extends IHAMessage {
      * The unit for the timeout.
      */
     TimeUnit getUnit();
+    
+    /**
+     * When <code>true</code>, always vote note.
+     */
+    boolean voteNo();
+    
 }

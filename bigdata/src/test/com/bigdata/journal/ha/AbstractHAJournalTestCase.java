@@ -487,6 +487,16 @@ for(int i=0; i<3; i++)log.error("quorum["+i+"]:"+(stores[i].getQuorum()).toStrin
                 throw new UnsupportedOperationException();
             }
 
+            @Override
+            public void enterErrorState() {
+                // TODO Auto-generated method stub
+            }
+
+            @Override
+            public void discardWriteSet() {
+                // TODO Auto-generated method stub
+            }
+
         };
 
     }
