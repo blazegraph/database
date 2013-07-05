@@ -769,9 +769,15 @@ public class TestLockManager extends TestCase implements IComparisonTest {
      * <p>
      * Note: This condition provides the basis for deadlocks. In fact, since we
      * have 10 resource locks for each operation and only 100 operations the
-     * chances of a deadlock on any given operation are extremely high.
+     * chances of a deadlock on any given operation are extremely high. However,
+     * since we are predeclaring our locks and the lock requests are being
+     * sorted NO deadlocks should result.
      * 
      * @throws Exception
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/237" > CI
+     *      deadlock in
+     *      com.bigdata.concurrent.TestLockManager.test_multipleResourceLocking_resources10_locktries10</a>
      */
     public void test_multipleResourceLocking_resources10_locktries10() throws Exception {
 

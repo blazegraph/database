@@ -55,7 +55,7 @@ public class LocalTripleStore extends AbstractLocalTripleStore {
 
     final static private Logger log = Logger.getLogger(LocalTripleStore.class);
 
-    protected final Journal store;
+    private final Journal store;
 
     /**
      * The backing embedded database.

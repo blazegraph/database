@@ -345,8 +345,9 @@ public class TestSplitJoin extends AbstractEmbeddedFederationTestCase {
             // ground truth range count for that index partition.
             final int rangeCount = (int) groundTruth.rangeCount(fromKey, toKey);
 
-            assertTrue(rangeCount > 0);
-            
+            if (rangeCount == 0)
+                fail("rangeCount=" + rangeCount + ", but expected non-zero");
+
             // #of entries to delete (seeking to trigger a join operation).
             final int ndelete = rangeCount <= batchSize ? (rangeCount / 2) + 1
                     : rangeCount - batchSize;

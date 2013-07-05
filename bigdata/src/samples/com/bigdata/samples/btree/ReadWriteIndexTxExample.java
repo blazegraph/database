@@ -167,7 +167,7 @@ public class ReadWriteIndexTxExample {
 
         /**
          * 
-         * @param store
+         * @param jnl
          *            The journal.
          * @param indexName
          *            The name of the index.

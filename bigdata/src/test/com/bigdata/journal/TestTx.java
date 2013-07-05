@@ -1385,7 +1385,7 @@ public class TestTx extends ProxyTestCase<Journal> {
 
         /**
          * 
-         * @param store
+         * @param jnl
          *            The journal.
          * @param indexName
          *            The name of the index.

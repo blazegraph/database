@@ -118,21 +118,21 @@ public class RemoteRepositoryManager extends RemoteRepository {
         return baseServiceURL + "/namespace/"
                 + ConnectOptions.urlEncode(namespace);
     }
-    
+
     /**
      * Obtain a {@link RemoteRepository} for a data set managed by the remote
      * service.
      * 
      * @param namespace
      *            The name of the data set (its bigdata namespace).
-     * 
+     *            
      * @return An interface which may be used to talk to that data set.
      */
     public RemoteRepository getRepositoryForNamespace(final String namespace) {
 
         return new RemoteRepository(getRepositoryBaseURLForNamespace(namespace)
                 + "/sparql", httpClient, executor);
-
+        
     }
 
     /**
