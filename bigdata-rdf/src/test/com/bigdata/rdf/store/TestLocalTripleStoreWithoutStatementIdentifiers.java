@@ -152,7 +152,7 @@ public class TestLocalTripleStoreWithoutStatementIdentifiers extends AbstractTes
         properties.setProperty(Options.CREATE_TEMP_FILE, "false");
 
         // The backing file that we need to re-open.
-        File file = ((LocalTripleStore) store).store.getFile();
+        File file = ((LocalTripleStore) store).getIndexManager().getFile();
 
         assertNotNull(file);
 

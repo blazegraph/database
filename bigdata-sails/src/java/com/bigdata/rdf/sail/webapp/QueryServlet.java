@@ -1295,11 +1295,11 @@ public class QueryServlet extends BigdataRDFServlet {
 								current.node("p", "rangeCount=" + rangeCount
 										+ ", elapsed=" + elapsed2 + "ms");
 							}
-							current = current.close();
+//							current = current.close();
 						}
 
 						// host + locators in key order.
-						current.node("H2","shards").node("pre", sb.toString()).close();
+						current.node("H2","shards").node("pre", sb.toString());
 						
 						// hosts + #shards in host name order
 						{
@@ -1315,7 +1315,7 @@ public class QueryServlet extends BigdataRDFServlet {
 								
 							}
 
-							current.node("H2","hosts").node("pre", sb.toString()).close();
+							current.node("H2","hosts").node("pre", sb.toString());
 
 						}
 

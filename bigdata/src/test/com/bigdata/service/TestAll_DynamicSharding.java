@@ -63,6 +63,9 @@ public class TestAll_DynamicSharding extends TestCase2 {
         // test basic journal overflow scenario.
         suite.addTestSuite(TestOverflow.class);
 
+        // test suite for GRS overflow.
+        suite.addTestSuite(TestOverflowGRS.class);
+
         // test split/join (inserts eventually split; deletes eventually join).
         suite.addTestSuite(TestSplitJoin.class);
 

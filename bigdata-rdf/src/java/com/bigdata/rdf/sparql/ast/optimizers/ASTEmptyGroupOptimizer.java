@@ -250,10 +250,10 @@ public class ASTEmptyGroupOptimizer implements IASTOptimizer {
                  */
 
             	/*
-1. JoinGroup1 [optional=false] { JoinGroup2 [optional=false] { É } } -> JoinGroup2 [optional=false] { É }
-2. JoinGroup1 [optional=true]  { JoinGroup2 [optional=true]  { É } } -> JoinGroup2 [optional=true]  { É }
-3. JoinGroup1 [optional=true]  { JoinGroup2 [optional=false] { É } } -> JoinGroup2 [optional=true]  { É }
-4. JoinGroup1 [optional=false] { JoinGroup2 [optional=true]  { É } } -> JoinGroup2 [optional=true]  { É }
+1. JoinGroup1 [optional=false] { JoinGroup2 [optional=false] { ... } } -> JoinGroup2 [optional=false] { ... }
+2. JoinGroup1 [optional=true]  { JoinGroup2 [optional=true]  { ... } } -> JoinGroup2 [optional=true]  { ... }
+3. JoinGroup1 [optional=true]  { JoinGroup2 [optional=false] { ... } } -> JoinGroup2 [optional=true]  { ... }
+4. JoinGroup1 [optional=false] { JoinGroup2 [optional=true]  { ... } } -> JoinGroup2 [optional=true]  { ... }
             	 */
 
                 if (parent.isOptional() && !child.isOptional()) {

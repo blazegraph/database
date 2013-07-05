@@ -339,7 +339,6 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
             throw new RuntimeException(e);
         }
         return namespace;
-        
     }
 
     /**

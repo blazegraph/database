@@ -77,8 +77,8 @@ abstract public class AbstractRuleTestCase extends AbstractInferenceEngineTestCa
      * Invoke as <code>applyRule( store.{rule}, ..., ... )</code>
      * 
      * @param rule
-     *            The rule, which must be one of those found on {@link #store}
-     *            or otherwise configured so as to run with the {@link #store}
+     *            The rule, which must be one of those found on the triple store
+     *            or otherwise configured so as to run with the triple store
      *            instance.
      * 
      * @param expectedSolutionCount

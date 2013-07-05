@@ -86,11 +86,11 @@ public class BackchainAccessPath implements IAccessPath<ISPO> {
      * there are none in the data? I.e., are there scenarios under which
      * [isOwlSameAsUsed] would evaluate to [false] if tested before closure and
      * to [true] if evaluated after closure. I don't think that it matters
-     * either way since we don''t use the sameAs backchainer during closure
+     * either way since we don't use the sameAs backchainer during closure
      * itself, but I wanted to run it past you anyway. -bryan
      * <p>
      * The only way that could happen is if there were a property that was a
-     * subproperty of owl:sameAs and that subproperty was used in the data. I’ve
+     * subproperty of owl:sameAs and that subproperty was used in the data. I've
      * never seen anything like that, but it is technically possible. -mike
      * <p>
      * Ok. But still, it is not a problem since we are not using the backchainer
