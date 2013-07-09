@@ -531,11 +531,11 @@ public class TestASTStaticJoinOptimizer extends AbstractASTEvaluationTestCase {
      *   JoinGroupNode {
      *     StatementPatternNode(VarNode(x), ConstantNode(e), ConstantNode(e))
      *     StatementPatternNode(VarNode(x), ConstantNode(b), ConstantNode(b))
-     *     StatementPatternNode(VarNode(x), ConstantNode(f), ConstantNode(f)) [OPTIONAL]
      *     StatementPatternNode(VarNode(x), ConstantNode(d), ConstantNode(d))
-     *     StatementPatternNode(VarNode(x), ConstantNode(g), ConstantNode(g)) [OPTIONAL]
      *     StatementPatternNode(VarNode(x), ConstantNode(a), ConstantNode(a))
      *     StatementPatternNode(VarNode(x), ConstantNode(c), ConstantNode(c))
+     *     StatementPatternNode(VarNode(x), ConstantNode(f), ConstantNode(f)) [OPTIONAL]
+     *     StatementPatternNode(VarNode(x), ConstantNode(g), ConstantNode(g)) [OPTIONAL]
      *   }
      * </pre>
      *
