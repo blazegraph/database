@@ -37,6 +37,7 @@ import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.AbstractASTEvaluationTestCase;
 import com.bigdata.rdf.sparql.ast.AssignmentNode;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
+import com.bigdata.rdf.sparql.ast.GroupMemberNodeBase;
 import com.bigdata.rdf.sparql.ast.IQueryNode;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueryInclude;
@@ -58,6 +59,130 @@ import com.bigdata.rdf.store.BDS;
  */
 public class TestASTStaticJoinOptimizer extends AbstractASTEvaluationTestCase {
 
+	enum HelperFlags { 
+		OPTIONAL {
+			@Override
+			public void apply(StatementPatternNode sp) {
+				sp.setOptional(true);
+			}
+		};
+
+		abstract public void apply(StatementPatternNode rslt) ;
+	};
+	/**
+	 * The purpose of this class is to make the tests look like
+	 * the old comments. The first example 
+	 * {@link TestASTStaticJoinOptimizer#test_simpleOptional01A()}
+	 * is based on the comments of
+	 * {@link TestASTStaticJoinOptimizer#test_simpleOptional01()}
+	 * and demonstrates that the comment is out of date.
+	 * 
+	 * NB: Given this goal, several Java naming conventions are ignored.
+	 * e.g. methods whose names are ALLCAPS or the same as ClassNames
+	 * 
+	 * @author jeremycarroll
+	 *
+	 */
+    @SuppressWarnings("rawtypes")
+    public class Helper {
+		protected QueryRoot given, expected;
+    	protected final String x="x", y="y", z="z";
+    	protected final IV a = iv("a"), b = iv("b"), c = iv("c"), d=iv("d"), e=iv("e"), 
+    			f=iv("f"), g=iv("g");
+    	
+
+		protected final HelperFlags OPTIONAL = HelperFlags.OPTIONAL;
+
+	
+
+		private IV iv(String id) {
+			return makeIV(new URIImpl("http://example/"+id));
+		}
+
+
+		protected  VarNode VarNode(String varName) {
+			return new VarNode(varName);
+		}
+
+		protected  TermNode ConstantNode(IV iv) {
+			return new ConstantNode(iv);
+		}
+		
+
+
+		protected StatementPatternNode StatementPatternNode(TermNode s,
+				TermNode p, TermNode o, long cardinality,
+				HelperFlags ...flags ) {
+			StatementPatternNode rslt = newStatementPatternNode(s, p,  o , cardinality);
+			for (HelperFlags flag:flags) {
+				flag.apply(rslt);
+			}
+			return rslt;
+		}
+
+
+		protected JoinGroupNode JoinGroupNode(
+				GroupMemberNodeBase ... statements) {
+			final JoinGroupNode whereClause = new JoinGroupNode();
+			for (GroupMemberNodeBase mem: statements)
+				whereClause.addChild(mem);
+			return whereClause;
+		}
+		
+
+		protected JoinGroupNode WHERE(
+				GroupMemberNodeBase ... statements) {
+			return JoinGroupNode(statements);
+		}
+
+		protected QueryRoot SELECT(VarNode varNode,
+				JoinGroupNode whereClause) {
+
+			QueryRoot select = new QueryRoot(QueryType.SELECT);
+            final ProjectionNode projection = new ProjectionNode();
+            projection.addProjectionVar(varNode);
+
+            select.setProjection(projection);
+            select.setWhereClause(whereClause);
+            return select;
+		}
+
+		public void test() {
+	        final IASTOptimizer rewriter = new ASTStaticJoinOptimizer();
+	        
+	        final AST2BOpContext context = new AST2BOpContext(new ASTContainer(given), store);
+
+	        final IQueryNode actual = rewriter.optimize(context,given, new IBindingSet[]{});
+	        
+	        assertSameAST(expected, actual);
+		}
+    }
+    public void test_simpleOptional01A() {
+    	new Helper() {{
+    		given = SELECT( VarNode(x), 
+    				WHERE (
+    						StatementPatternNode(VarNode(x), ConstantNode(e), ConstantNode(e),5),
+    						StatementPatternNode(VarNode(x), ConstantNode(b), ConstantNode(b),2),
+    						StatementPatternNode(VarNode(x), ConstantNode(d), ConstantNode(d),4),
+    						StatementPatternNode(VarNode(x), ConstantNode(a), ConstantNode(a),1),
+    						StatementPatternNode(VarNode(x), ConstantNode(c), ConstantNode(c),3),
+    						StatementPatternNode(VarNode(x), ConstantNode(f), ConstantNode(f),1,OPTIONAL),
+    						StatementPatternNode(VarNode(x), ConstantNode(g), ConstantNode(g),1,OPTIONAL)
+    						) );
+    		expected = SELECT( VarNode(x), 
+    				WHERE (
+    						StatementPatternNode(VarNode(x), ConstantNode(a), ConstantNode(a),1),
+    						StatementPatternNode(VarNode(x), ConstantNode(b), ConstantNode(b),2),
+    						StatementPatternNode(VarNode(x), ConstantNode(c), ConstantNode(c),3),
+    						StatementPatternNode(VarNode(x), ConstantNode(d), ConstantNode(d),4),
+    						StatementPatternNode(VarNode(x), ConstantNode(e), ConstantNode(e),5),
+    						StatementPatternNode(VarNode(x), ConstantNode(f), ConstantNode(f),1,OPTIONAL),
+    						StatementPatternNode(VarNode(x), ConstantNode(g), ConstantNode(g),1,OPTIONAL)
+    						) );
+
+
+    	}}.test();
+    }
     /**
      * 
      */
@@ -522,7 +647,8 @@ public class TestASTStaticJoinOptimizer extends AbstractASTEvaluationTestCase {
         assertSameAST(expected, actual);
 
     }
-    
+
+
     /**
      * Given
      * 
