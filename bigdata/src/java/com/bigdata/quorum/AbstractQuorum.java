@@ -1692,6 +1692,10 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
         }
 
         private void conditionalWithdrawVoteImpl() throws InterruptedException {
+        	
+        	if (log.isDebugEnabled())
+        		log.debug("Check context", new RuntimeException());
+        	
             final Long lastCommitTime = getCastVote(serviceId);
             if (lastCommitTime != null) {
                 doWithdrawVote();
@@ -3204,7 +3208,11 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
                 if (client != null) {
                     // Notify all quorum members that a service left.
                     try {
-                        client.serviceLeave();
+                    	// PREVIOUSLY called client.serviceLeave() unconditionally
+                        final UUID clientId = client.getServiceId();
+                    	if (serviceId.equals(clientId))
+                    			client.serviceLeave();
+                    	
                     } catch (Throwable t) {
                         launderThrowable(t);
                     }

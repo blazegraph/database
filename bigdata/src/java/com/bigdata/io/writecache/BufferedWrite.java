@@ -29,6 +29,8 @@ import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.concurrent.atomic.AtomicReference;
 
+import org.apache.log4j.Logger;
+
 import com.bigdata.counters.CAT;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.io.DirectBufferPool;
@@ -54,7 +56,9 @@ import com.bigdata.rwstore.RWStore;
  */
 public class BufferedWrite {
 
-	/**
+    protected static final Logger log = Logger.getLogger(WriteCache.class);
+
+    /**
 	 * Used to determine the size of the allocation slot onto which a record is
 	 * being written. This is used to pad the size of the IO out to the size of
 	 * the slot. This can improve the IO efficiency When the slots are sized so
@@ -226,7 +230,7 @@ public class BufferedWrite {
 		m_data.flip();
 		final int nwrites = FileChannelUtility.writeAll(opener, m_data, m_startAddr);
 		m_fileWrites.add(nwrites);
-
+		
 		reset();
 		
 		return nwrites;

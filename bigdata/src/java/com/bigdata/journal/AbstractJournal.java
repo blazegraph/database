@@ -2699,7 +2699,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 	 * {@link ICommitRecord} from the root blocks of the store.
 	 */// TODO Could merge with doLocalAbort().
 	private void _abort() {
-log.warn("ABORT",new RuntimeException("ABORT"));
+		log.warn("ABORT",new RuntimeException("ABORT"));
 		final WriteLock lock = _fieldReadWriteLock.writeLock();
 
 		lock.lock();
@@ -5601,9 +5601,16 @@ log.warn("ABORT",new RuntimeException("ABORT"));
                      * well as cases where the service is either not a follower
                      * or is a follower, but the leader is not at
                      * commitCounter==0L, etc.
+                     * 
+                     * If didJoinMetQuorum hen we MUST be leaving Resync, so should NOT
+                     * need to complete a localAbort.  BUT what should this imply
+                     * about installedRBs?
                      */
                     
-                    doLocalAbort();
+                	if (log.isInfoEnabled())
+                		log.info("Calling localAbort if NOT didJoinMetQuorum: " + didJoinMetQuorum);
+                	if (!didJoinMetQuorum)
+                		doLocalAbort();
 
                 }
 
@@ -6789,7 +6796,13 @@ log.warn("ABORT",new RuntimeException("ABORT"));
                         /*
                          * Throw away our local write set.
                          */
-                        doLocalAbort();
+                        // doLocalAbort(); // enterErrorState will do this
+                        
+                        /*
+                         * Exit the service
+                         */
+                        // quorum.getActor().serviceLeave(); // enterErrorState will do this
+
                         /*
                          * Since the service refuses the commit, we want it to
                          * enter an error state and then figure out whether it
@@ -7655,4 +7668,5 @@ log.warn("ABORT",new RuntimeException("ABORT"));
         return removed;
         
     }
+
 }

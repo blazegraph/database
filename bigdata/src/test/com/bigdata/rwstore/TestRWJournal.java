@@ -1645,6 +1645,14 @@ public class TestRWJournal extends AbstractJournalTestCase {
 
 		}
 		
+		public void test_stressCommit() {
+			Journal journal = (Journal) getStore(0); // remember no history!
+			
+			for (int i = 0; i < 1000; i++)
+				commitSomeData(journal);
+
+		}
+		
 		public int doStressCommitIndex(final long retention, final int runs) {
 			Journal journal = (Journal) getStore(retention); // remember no history!
 			try {

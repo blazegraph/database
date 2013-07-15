@@ -326,7 +326,7 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> /*extends
                     }
                     dce = tst;
                 } else if (tst.getEventType() == QuorumStateChangeEventEnum.PIPELINE_ADD) {
-                    add = tst;
+                		add = tst;
                 } else if (tst.getEventType() == QuorumStateChangeEventEnum.PIPELINE_REMOVE) {
                     if (add != null) {
                         if (log.isDebugEnabled()) {
@@ -2068,5 +2068,18 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> /*extends
         }
 
     }
+
+    /**
+     * Called from ErrorTask to ensure that events are processed before entering SeekConsensus
+     */
+	public void processEvents() {
+        this.lock.lock();
+        try {
+            innerEventHandler.dispatchEvents();// have lock, dispatch events.
+        } finally {
+            this.lock.unlock();
+        }
+
+	}
     
 }

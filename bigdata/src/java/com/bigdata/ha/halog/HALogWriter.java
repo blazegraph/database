@@ -260,7 +260,7 @@ public class HALogWriter implements IHALogWriter {
 			throw new IllegalStateException();
 
 		if (haLog.isInfoEnabled())
-			haLog.info("rootBlock=" + rootBlock);
+			haLog.info("rootBlock=" + rootBlock, new RuntimeException());
 
 		m_rootBlock = rootBlock;
 
@@ -621,12 +621,14 @@ public class HALogWriter implements IHALogWriter {
 				 * something that has been closed.
 				 */
                 if (haLog.isInfoEnabled())
-                    haLog.info("Will close: " + m_state.m_haLogFile);
+                    haLog.info("Will close: " + m_state.m_haLogFile + ", committed: " + m_state.isCommitted());
 
 			    m_state.forceCloseAll();
-			    if(false||m_state.isCommitted()) return; // Do not remove a sealed HALog file!
+			    
+			    if (m_state.isCommitted()) return; // Do not remove a sealed HALog file!
+			    
                 if (haLog.isInfoEnabled())
-                    haLog.info("Will remove: " + m_state.m_haLogFile);
+                    haLog.info("Will remove: " + m_state.m_haLogFile, new RuntimeException());
 				if (m_state.m_haLogFile.exists() && !m_state.m_haLogFile.delete()) {
 
 					/*
