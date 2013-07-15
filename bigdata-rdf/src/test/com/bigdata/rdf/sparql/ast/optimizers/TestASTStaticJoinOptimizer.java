@@ -130,15 +130,15 @@ public class TestASTStaticJoinOptimizer extends AbstractASTEvaluationTestCase {
 			return makeIV(new URIImpl("http://example/" + id));
 		}
 
-		protected QueryRoot SELECT(VarNode[] varNodes,
+		protected QueryRoot select(VarNode[] varNodes,
 				NamedSubqueryRoot namedSubQuery, JoinGroupNode where,
 				HelperFlag... flags) {
-			QueryRoot rslt = SELECT(varNodes, where, flags);
+			QueryRoot rslt = select(varNodes, where, flags);
 			rslt.getNamedSubqueriesNotNull().add(namedSubQuery);
 			return rslt;
 		}
 
-		protected QueryRoot SELECT(VarNode[] varNodes, JoinGroupNode where,
+		protected QueryRoot select(VarNode[] varNodes, JoinGroupNode where,
 				HelperFlag... flags) {
 
 			QueryRoot select = new QueryRoot(QueryType.SELECT);
@@ -153,19 +153,19 @@ public class TestASTStaticJoinOptimizer extends AbstractASTEvaluationTestCase {
 			return select;
 		}
 
-		protected QueryRoot SELECT(VarNode varNode,
+		protected QueryRoot select(VarNode varNode,
 				NamedSubqueryRoot namedSubQuery, JoinGroupNode where,
 				HelperFlag... flags) {
-			return SELECT(new VarNode[] { varNode }, namedSubQuery, where,
+			return select(new VarNode[] { varNode }, namedSubQuery, where,
 					flags);
 		}
 
-		protected QueryRoot SELECT(VarNode varNode, JoinGroupNode where,
+		protected QueryRoot select(VarNode varNode, JoinGroupNode where,
 				HelperFlag... flags) {
-			return SELECT(new VarNode[] { varNode }, where, flags);
+			return select(new VarNode[] { varNode }, where, flags);
 		}
 
-		protected NamedSubqueryRoot NamedSubQuery(String name, VarNode varNode,
+		protected NamedSubqueryRoot namedSubQuery(String name, VarNode varNode,
 				JoinGroupNode where) {
 			final NamedSubqueryRoot namedSubquery = new NamedSubqueryRoot(
 					QueryType.SELECT, name);
@@ -178,26 +178,26 @@ public class TestASTStaticJoinOptimizer extends AbstractASTEvaluationTestCase {
 			return namedSubquery;
 		}
 
-		protected GroupMemberNodeBase NamedSubQueryInclude(String name) {
+		protected GroupMemberNodeBase namedSubQueryInclude(String name) {
 			return new NamedSubqueryInclude(name);
 		}
 
-		protected VarNode[] VarNodes(String... names) {
+		protected VarNode[] varNodes(String... names) {
 			VarNode rslt[] = new VarNode[names.length];
 			for (int i = 0; i < names.length; i++)
-				rslt[i] = VarNode(names[i]);
+				rslt[i] = varNode(names[i]);
 			return rslt;
 		}
 
-		protected VarNode VarNode(String varName) {
+		protected VarNode varNode(String varName) {
 			return new VarNode(varName);
 		}
 
-		protected TermNode ConstantNode(IV iv) {
+		protected TermNode constantNode(IV iv) {
 			return new ConstantNode(iv);
 		}
 
-		protected StatementPatternNode StatementPatternNode(TermNode s,
+		protected StatementPatternNode statementPatternNode(TermNode s,
 				TermNode p, TermNode o, long cardinality, HelperFlag... flags) {
 			StatementPatternNode rslt = newStatementPatternNode(s, p, o,
 					cardinality);
@@ -220,23 +220,23 @@ public class TestASTStaticJoinOptimizer extends AbstractASTEvaluationTestCase {
 			return rslt;
 		}
 
-		protected JoinGroupNode JoinGroupNode(Object... statements) {
+		protected JoinGroupNode joinGroupNode(Object... statements) {
 			return initGraphPatternGroup(new JoinGroupNode(), statements);
 		}
 
-		protected PropertyPathUnionNode PropertyPathUnionNode(
+		protected PropertyPathUnionNode propertyPathUnionNode(
 				Object... statements) {
 			return initGraphPatternGroup(new PropertyPathUnionNode(),
 					statements);
 		}
 
-		protected UnionNode UnionNode(Object... statements) {
+		protected UnionNode unionNode(Object... statements) {
 			return initGraphPatternGroup(new UnionNode(), statements);
 
 		}
 
-		protected JoinGroupNode WHERE(GroupMemberNodeBase... statements) {
-			return JoinGroupNode((Object[]) statements);
+		protected JoinGroupNode where(GroupMemberNodeBase... statements) {
+			return joinGroupNode((Object[]) statements);
 		}
 
 		public void test() {
@@ -253,25 +253,25 @@ public class TestASTStaticJoinOptimizer extends AbstractASTEvaluationTestCase {
 	}
     public void test_simpleOptional01A() {
     	new Helper() {{
-    		given = SELECT( VarNode(x), 
-    				WHERE (
-    						StatementPatternNode(VarNode(x), ConstantNode(e), ConstantNode(e),5),
-    						StatementPatternNode(VarNode(x), ConstantNode(b), ConstantNode(b),2),
-    						StatementPatternNode(VarNode(x), ConstantNode(d), ConstantNode(d),4),
-    						StatementPatternNode(VarNode(x), ConstantNode(a), ConstantNode(a),1),
-    						StatementPatternNode(VarNode(x), ConstantNode(c), ConstantNode(c),3),
-    						StatementPatternNode(VarNode(x), ConstantNode(f), ConstantNode(f),1,OPTIONAL),
-    						StatementPatternNode(VarNode(x), ConstantNode(g), ConstantNode(g),1,OPTIONAL)
+    		given = select( varNode(x), 
+    				where (
+    						statementPatternNode(varNode(x), constantNode(e), constantNode(e),5),
+    						statementPatternNode(varNode(x), constantNode(b), constantNode(b),2),
+    						statementPatternNode(varNode(x), constantNode(d), constantNode(d),4),
+    						statementPatternNode(varNode(x), constantNode(a), constantNode(a),1),
+    						statementPatternNode(varNode(x), constantNode(c), constantNode(c),3),
+    						statementPatternNode(varNode(x), constantNode(f), constantNode(f),1,OPTIONAL),
+    						statementPatternNode(varNode(x), constantNode(g), constantNode(g),1,OPTIONAL)
     						) );
-    		expected = SELECT( VarNode(x), 
-    				WHERE (
-    						StatementPatternNode(VarNode(x), ConstantNode(a), ConstantNode(a),1),
-    						StatementPatternNode(VarNode(x), ConstantNode(b), ConstantNode(b),2),
-    						StatementPatternNode(VarNode(x), ConstantNode(c), ConstantNode(c),3),
-    						StatementPatternNode(VarNode(x), ConstantNode(d), ConstantNode(d),4),
-    						StatementPatternNode(VarNode(x), ConstantNode(e), ConstantNode(e),5),
-    						StatementPatternNode(VarNode(x), ConstantNode(f), ConstantNode(f),1,OPTIONAL),
-    						StatementPatternNode(VarNode(x), ConstantNode(g), ConstantNode(g),1,OPTIONAL)
+    		expected = select( varNode(x), 
+    				where (
+    						statementPatternNode(varNode(x), constantNode(a), constantNode(a),1),
+    						statementPatternNode(varNode(x), constantNode(b), constantNode(b),2),
+    						statementPatternNode(varNode(x), constantNode(c), constantNode(c),3),
+    						statementPatternNode(varNode(x), constantNode(d), constantNode(d),4),
+    						statementPatternNode(varNode(x), constantNode(e), constantNode(e),5),
+    						statementPatternNode(varNode(x), constantNode(f), constantNode(f),1,OPTIONAL),
+    						statementPatternNode(varNode(x), constantNode(g), constantNode(g),1,OPTIONAL)
     						) );
 
 
@@ -1517,24 +1517,24 @@ public class TestASTStaticJoinOptimizer extends AbstractASTEvaluationTestCase {
 
     public void test_NSI01X() {
     	new Helper() {{
-    		given = SELECT( VarNodes(x,y,z), 
-    				NamedSubQuery("_set1",VarNode(x),WHERE(StatementPatternNode(VarNode(x), ConstantNode(a), ConstantNode(b),1))),
-    				WHERE (
-    						NamedSubQueryInclude("_set1"),
-    						StatementPatternNode(VarNode(x), ConstantNode(c), VarNode(y),1,OPTIONAL),
-    						JoinGroupNode( StatementPatternNode(VarNode(w), ConstantNode(e), VarNode(z),10),
-    								StatementPatternNode(VarNode(w), ConstantNode(d), VarNode(x),100),
+    		given = select( varNodes(x,y,z), 
+    				namedSubQuery("_set1",varNode(x),where(statementPatternNode(varNode(x), constantNode(a), constantNode(b),1))),
+    				where (
+    						namedSubQueryInclude("_set1"),
+    						statementPatternNode(varNode(x), constantNode(c), varNode(y),1,OPTIONAL),
+    						joinGroupNode( statementPatternNode(varNode(w), constantNode(e), varNode(z),10),
+    								statementPatternNode(varNode(w), constantNode(d), varNode(x),100),
     								OPTIONAL )
     						), DISTINCT );
 
 
-    		expected = SELECT( VarNodes(x,y,z), 
-    				NamedSubQuery("_set1",VarNode(x),WHERE(StatementPatternNode(VarNode(x), ConstantNode(a), ConstantNode(b),1))),
-    				WHERE (
-    						NamedSubQueryInclude("_set1"),
-    						StatementPatternNode(VarNode(x), ConstantNode(c), VarNode(y),1,OPTIONAL),
-    						JoinGroupNode( StatementPatternNode(VarNode(w), ConstantNode(d), VarNode(x),100),
-    								StatementPatternNode(VarNode(w), ConstantNode(e), VarNode(z),10),
+    		expected = select( varNodes(x,y,z), 
+    				namedSubQuery("_set1",varNode(x),where(statementPatternNode(varNode(x), constantNode(a), constantNode(b),1))),
+    				where (
+    						namedSubQueryInclude("_set1"),
+    						statementPatternNode(varNode(x), constantNode(c), varNode(y),1,OPTIONAL),
+    						joinGroupNode( statementPatternNode(varNode(w), constantNode(d), varNode(x),100),
+    								statementPatternNode(varNode(w), constantNode(e), varNode(z),10),
     								OPTIONAL )
     						), DISTINCT );
 
@@ -1932,39 +1932,39 @@ where {
     public void test_union_trac684_A() {
     	new Helper(){{
 
-    		given = SELECT( VarNode(z), // z is ?o
+    		given = select( varNode(z), // z is ?o
     				      
-    				NamedSubQuery("_bds",VarNode(z),WHERE(StatementPatternNode(VarNode(z), 
-    						ConstantNode(a), // a is bds:search
-    						ConstantNode(b), // fill in for the literal
+    				namedSubQuery("_bds",varNode(z),where(statementPatternNode(varNode(z), 
+    						constantNode(a), // a is bds:search
+    						constantNode(b), // fill in for the literal
     						1))),
-    				WHERE (
-    						NamedSubQueryInclude("_bds"),
-    						StatementPatternNode(VarNode(x), ConstantNode(c), // inScheme
-    								                         ConstantNode(d), // anatomical_entity
+    				where (
+    						namedSubQueryInclude("_bds"),
+    						statementPatternNode(varNode(x), constantNode(c), // inScheme
+    								                         constantNode(d), // anatomical_entity
     								                         81053),
-    						PropertyPathUnionNode(
-    						    JoinGroupNode( StatementPatternNode(VarNode(x), ConstantNode(e), VarNode(z),960191) ),
+    						propertyPathUnionNode(
+    						    joinGroupNode( statementPatternNode(varNode(x), constantNode(e), varNode(z),960191) ),
 
-    						    JoinGroupNode( StatementPatternNode(VarNode(x), ConstantNode(f), VarNode(z),615502) ) )
+    						    joinGroupNode( statementPatternNode(varNode(x), constantNode(f), varNode(z),615502) ) )
     						),
     				 DISTINCT );
     		
     		
-    		expected = SELECT( VarNode(z), // z is ?o
+    		expected = select( varNode(z), // z is ?o
 				      
-				NamedSubQuery("_bds",VarNode(z),WHERE(StatementPatternNode(VarNode(z), 
-						ConstantNode(a), // a is bds:search
-						ConstantNode(b), // fill in for the literal
+				namedSubQuery("_bds",varNode(z),where(statementPatternNode(varNode(z), 
+						constantNode(a), // a is bds:search
+						constantNode(b), // fill in for the literal
 						1))),
-				WHERE (
-						NamedSubQueryInclude("_bds"),
-						PropertyPathUnionNode(
-						    JoinGroupNode( StatementPatternNode(VarNode(x), ConstantNode(e), VarNode(z),960191) ),
+				where (
+						namedSubQueryInclude("_bds"),
+						propertyPathUnionNode(
+						    joinGroupNode( statementPatternNode(varNode(x), constantNode(e), varNode(z),960191) ),
 
-						    JoinGroupNode( StatementPatternNode(VarNode(x), ConstantNode(f), VarNode(z),615502) ) ),
-						StatementPatternNode(VarNode(x), ConstantNode(c), // inScheme
-			                         ConstantNode(d), // anatomical_entity
+						    joinGroupNode( statementPatternNode(varNode(x), constantNode(f), varNode(z),615502) ) ),
+						statementPatternNode(varNode(x), constantNode(c), // inScheme
+			                         constantNode(d), // anatomical_entity
 			                         81053)
 						),
 				 DISTINCT );
@@ -1992,52 +1992,52 @@ where {
     public void test_union_trac684_B() {
     	new Helper(){{
 
-    		given = SELECT( VarNode(z), // z is ?o
+    		given = select( varNode(z), // z is ?o
     				      
-    				NamedSubQuery("_bds",VarNode(z),WHERE(StatementPatternNode(VarNode(z), 
-    						ConstantNode(a), // a is bds:search
-    						ConstantNode(b), // fill in for the literal
+    				namedSubQuery("_bds",varNode(z),where(statementPatternNode(varNode(z), 
+    						constantNode(a), // a is bds:search
+    						constantNode(b), // fill in for the literal
     						1))),
-    				WHERE (
-    						NamedSubQueryInclude("_bds"),
-    						UnionNode(
-    						    JoinGroupNode( 
-    		    						StatementPatternNode(VarNode(x), ConstantNode(c), // inScheme
-						                         ConstantNode(d), // anatomical_entity
+    				where (
+    						namedSubQueryInclude("_bds"),
+    						unionNode(
+    						    joinGroupNode( 
+    		    						statementPatternNode(varNode(x), constantNode(c), // inScheme
+						                         constantNode(d), // anatomical_entity
 						                         81053),
-    						    		StatementPatternNode(VarNode(x), ConstantNode(e), VarNode(z),960191) 
+    						    		statementPatternNode(varNode(x), constantNode(e), varNode(z),960191) 
     						    ),
 
-    						    JoinGroupNode( 
-    						    		StatementPatternNode(VarNode(x), ConstantNode(f), VarNode(z),615502),
-    		    						StatementPatternNode(VarNode(x), ConstantNode(c), // inScheme
-						                         ConstantNode(d), // anatomical_entity
+    						    joinGroupNode( 
+    						    		statementPatternNode(varNode(x), constantNode(f), varNode(z),615502),
+    		    						statementPatternNode(varNode(x), constantNode(c), // inScheme
+						                         constantNode(d), // anatomical_entity
 						                         81053)
     						    ) )
     						),
     				 DISTINCT );
     		
     		
-    		expected = SELECT( VarNode(z), // z is ?o
+    		expected = select( varNode(z), // z is ?o
 				      
-				NamedSubQuery("_bds",VarNode(z),WHERE(StatementPatternNode(VarNode(z), 
-						ConstantNode(a), // a is bds:search
-						ConstantNode(b), // fill in for the literal
+				namedSubQuery("_bds",varNode(z),where(statementPatternNode(varNode(z), 
+						constantNode(a), // a is bds:search
+						constantNode(b), // fill in for the literal
 						1))),
-				WHERE (
-						NamedSubQueryInclude("_bds"),
-						UnionNode(
-						    JoinGroupNode( 
-						    		StatementPatternNode(VarNode(x), ConstantNode(e), VarNode(z),960191),
-		    						StatementPatternNode(VarNode(x), ConstantNode(c), // inScheme
-					                         ConstantNode(d), // anatomical_entity
+				where (
+						namedSubQueryInclude("_bds"),
+						unionNode(
+						    joinGroupNode( 
+						    		statementPatternNode(varNode(x), constantNode(e), varNode(z),960191),
+		    						statementPatternNode(varNode(x), constantNode(c), // inScheme
+					                         constantNode(d), // anatomical_entity
 					                         81053)
 						    ),
 
-						    JoinGroupNode( 
-						    		StatementPatternNode(VarNode(x), ConstantNode(f), VarNode(z),615502),
-		    						StatementPatternNode(VarNode(x), ConstantNode(c), // inScheme
-					                         ConstantNode(d), // anatomical_entity
+						    joinGroupNode( 
+						    		statementPatternNode(varNode(x), constantNode(f), varNode(z),615502),
+		    						statementPatternNode(varNode(x), constantNode(c), // inScheme
+					                         constantNode(d), // anatomical_entity
 					                         81053)
 						    ) )
 						),
@@ -2068,59 +2068,59 @@ where {
    public void test_union_trac684_C() {
    	new Helper(){{
 
-   		given = SELECT( VarNode(z), // z is ?o
+   		given = select( varNode(z), // z is ?o
    				      
-   				NamedSubQuery("_bds",VarNode(z),WHERE(StatementPatternNode(VarNode(z), 
-   						ConstantNode(a), // a is bds:search
-   						ConstantNode(b), // fill in for the literal
+   				namedSubQuery("_bds",varNode(z),where(statementPatternNode(varNode(z), 
+   						constantNode(a), // a is bds:search
+   						constantNode(b), // fill in for the literal
    						1))),
-   				WHERE (
-   						NamedSubQueryInclude("_bds"),
-   						StatementPatternNode(VarNode(x), ConstantNode(g), // type
-   								ConstantNode(h), // Concept
+   				where (
+   						namedSubQueryInclude("_bds"),
+   						statementPatternNode(varNode(x), constantNode(g), // type
+   								constantNode(h), // Concept
    								960191) ,
-   						UnionNode(
-   						    JoinGroupNode( 
-   		    						StatementPatternNode(VarNode(x), ConstantNode(c), // inScheme
-						                         ConstantNode(d), // anatomical_entity
+   						unionNode(
+   						    joinGroupNode( 
+   		    						statementPatternNode(varNode(x), constantNode(c), // inScheme
+						                         constantNode(d), // anatomical_entity
 						                         81053),
-   						    		StatementPatternNode(VarNode(x), ConstantNode(e), VarNode(z),960191) 
+   						    		statementPatternNode(varNode(x), constantNode(e), varNode(z),960191) 
    						    ),
 
-   						    JoinGroupNode( 
-   						    		StatementPatternNode(VarNode(x), ConstantNode(f), VarNode(z),615502),
-   		    						StatementPatternNode(VarNode(x), ConstantNode(c), // inScheme
-						                         ConstantNode(d), // anatomical_entity
+   						    joinGroupNode( 
+   						    		statementPatternNode(varNode(x), constantNode(f), varNode(z),615502),
+   		    						statementPatternNode(varNode(x), constantNode(c), // inScheme
+						                         constantNode(d), // anatomical_entity
 						                         81053)
    						    ) )
    						),
    				 DISTINCT );
    		
    		
-   		expected = SELECT( VarNode(z), // z is ?o
+   		expected = select( varNode(z), // z is ?o
 				      
-				NamedSubQuery("_bds",VarNode(z),WHERE(StatementPatternNode(VarNode(z), 
-						ConstantNode(a), // a is bds:search
-						ConstantNode(b), // fill in for the literal
+				namedSubQuery("_bds",varNode(z),where(statementPatternNode(varNode(z), 
+						constantNode(a), // a is bds:search
+						constantNode(b), // fill in for the literal
 						1))),
-				WHERE (
-						NamedSubQueryInclude("_bds"),
-						UnionNode(
-						    JoinGroupNode( 
-						    		StatementPatternNode(VarNode(x), ConstantNode(e), VarNode(z),960191),
-		    						StatementPatternNode(VarNode(x), ConstantNode(c), // inScheme
-					                         ConstantNode(d), // anatomical_entity
+				where (
+						namedSubQueryInclude("_bds"),
+						unionNode(
+						    joinGroupNode( 
+						    		statementPatternNode(varNode(x), constantNode(e), varNode(z),960191),
+		    						statementPatternNode(varNode(x), constantNode(c), // inScheme
+					                         constantNode(d), // anatomical_entity
 					                         81053)
 						    ),
 
-						    JoinGroupNode( 
-						    		StatementPatternNode(VarNode(x), ConstantNode(f), VarNode(z),615502),
-		    						StatementPatternNode(VarNode(x), ConstantNode(c), // inScheme
-					                         ConstantNode(d), // anatomical_entity
+						    joinGroupNode( 
+						    		statementPatternNode(varNode(x), constantNode(f), varNode(z),615502),
+		    						statementPatternNode(varNode(x), constantNode(c), // inScheme
+					                         constantNode(d), // anatomical_entity
 					                         81053)
 						    ) ),
 
-	   					StatementPatternNode(VarNode(x), ConstantNode(g), ConstantNode(h),960191) 
+	   					statementPatternNode(varNode(x), constantNode(g), constantNode(h),960191) 
 						),
 				 DISTINCT );
    		
