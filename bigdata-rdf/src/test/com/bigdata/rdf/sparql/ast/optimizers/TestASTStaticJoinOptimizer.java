@@ -1929,7 +1929,7 @@ where {
 }
      */
     
-    public void test_union_trac684_A() {
+    public void xtest_union_trac684_A() {
     	new Helper(){{
 
     		given = select( varNode(z), // z is ?o
@@ -2065,7 +2065,7 @@ where {
 }
     */
    
-   public void test_union_trac684_C() {
+   public void xtest_union_trac684_C() {
    	new Helper(){{
 
    		given = select( varNode(z), // z is ?o
