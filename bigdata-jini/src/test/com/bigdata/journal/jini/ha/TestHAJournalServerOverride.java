@@ -322,12 +322,19 @@ public class TestHAJournalServerOverride extends AbstractHA3JournalServerTestCas
         // Simple transaction.
         simpleTransaction();
         
+        ((HAGlueTest) startup.serverA).log("Transaction done");
+        ((HAGlueTest) startup.serverB).log("Transaction done");
+        ((HAGlueTest) startup.serverC).log("Transaction done");
+
         // Verify quorum is unchanged.
         assertEquals(token, quorum.token());
         
         // Should be two commit points on {A,C].
         awaitCommitCounter(2L, startup.serverA, startup.serverC);
         
+        ((HAGlueTest) startup.serverA).log("Commit Counter #2");
+        ((HAGlueTest) startup.serverB).log("Commit Counter #2");
+        ((HAGlueTest) startup.serverC).log("Commit Counter #2");
         /*
          * B should go into an ERROR state and then into SeekConsensus and from
          * there to RESYNC and finally back to RunMet. We can not reliably
@@ -342,6 +349,10 @@ public class TestHAJournalServerOverride extends AbstractHA3JournalServerTestCas
          */
         awaitPipeline(new HAGlue[] { startup.serverA, startup.serverC,
                 startup.serverB });
+
+        final long token2 = awaitFullyMetQuorum();
+        
+        assertEquals(token, token2);
 
         /*
          * There should be two commit points on {A,C,B} (note that this assert

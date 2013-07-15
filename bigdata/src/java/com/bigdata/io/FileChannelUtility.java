@@ -471,7 +471,7 @@ public class FileChannelUtility {
 
         if (log.isInfoEnabled()) {
 
-            log.info("wrote on disk: bytes=" + nbytes + ", elapsed="
+            log.info("wrote on disk: address: " + pos + ", bytes=" + nbytes + ", elapsed="
                     + TimeUnit.NANOSECONDS.toMillis(elapsed) + "ms");
 
         }

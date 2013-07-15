@@ -372,5 +372,13 @@ abstract public class QuorumServiceBase<S extends HAGlue, L extends AbstractJour
         return readImpl.readFromQuorum(storeId, addr);
 
     }
+    
+    /**
+     * Called from ErrorTask to process the event queue before
+     * moving to SeekConsensus.
+     */
+    protected void processEvents() {
+    	pipelineImpl.processEvents();
+    }
 
 }

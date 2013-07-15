@@ -1055,7 +1055,7 @@ public class HAJournalServer extends AbstractServer {
             }
 
             haLog.warn("runState=" + runState + ", oldRunState=" + oldRunState
-                    + ", serviceName=" + server.getServiceName());
+                    + ", serviceName=" + server.getServiceName(), new RuntimeException());
 
         }
         
@@ -1202,29 +1202,29 @@ public class HAJournalServer extends AbstractServer {
         public void discardWriteSet() {
             
             logLock.lock();
-            try {
-                log.warn("");
-                
-                // Clear the last live message out.
-                journal.getHALogNexus().lastLiveHAWriteMessage = null;
+			try {
+				log.warn("");
 
-                if (false&&journal.getHALogNexus().isHALogOpen()) {
-                    /*
-                     * Note: Closing the HALog is necessary for us to be able to
-                     * re-enter SeekConsensus without violating a pre-condition
-                     * for that run state.
-                     */
-                    try {
-                        journal.getHALogNexus().disableHALog();
-                    } catch (IOException e) {
-                        log.error(e, e);
-                    }
-                }
-            } finally {
-                logLock.unlock();
-            }
+				// Clear the last live message out.
+				journal.getHALogNexus().lastLiveHAWriteMessage = null;
 
-        }
+				if (journal.getHALogNexus().isHALogOpen()) {
+					/*
+					 * Note: Closing the HALog is necessary for us to be able to
+					 * re-enter SeekConsensus without violating a pre-condition
+					 * for that run state.
+					 */
+					try {
+						journal.getHALogNexus().disableHALog();
+					} catch (IOException e) {
+						log.error(e, e);
+					}
+				}
+			} finally {
+				logLock.unlock();
+			}
+
+		}
         
         /**
          * {@inheritDoc}
@@ -1573,6 +1573,11 @@ public class HAJournalServer extends AbstractServer {
          * Transition to {@link RunStateEnum#Error}.
          */
         private class EnterErrorStateTask implements Callable<Void> {
+        	
+        	protected EnterErrorStateTask() {
+                log.warn("", new RuntimeException());
+        	}
+        	
             public Void call() throws Exception {
                 enterRunState(new ErrorTask());
                 return null;
@@ -1643,6 +1648,8 @@ public class HAJournalServer extends AbstractServer {
 
                 super(RunStateEnum.Error);
                 
+                log.warn("", new RuntimeException());
+                
             }
             
             @Override
@@ -1696,10 +1703,20 @@ public class HAJournalServer extends AbstractServer {
                  * TODO This will (conditionally) trigger doLocalAbort().  Since we did this
                  * explicitly above, that can be do invocations each time we pass through here!
                  */
+                if (log.isInfoEnabled())
+                	log.info("Current Token: " + journal.getHAReady() + ", new: " + getQuorum().token());
+                journal.setQuorumToken(Quorum.NO_QUORUM);
                 journal.setQuorumToken(getQuorum().token());
+                // journal.setQuorumToken(Quorum.NO_QUORUM);
                 
 //                assert journal.getHAReady() == Quorum.NO_QUORUM;
 
+                
+               /**
+                * dispatch Events before entering SeekConsensus!
+                */
+                processEvents();
+                
                 /*
                  * Note: We can spin here to give the service an opportunity to
                  * handle any backlog of events that trigger a transition into
@@ -1707,12 +1724,13 @@ public class HAJournalServer extends AbstractServer {
                  * do not want to spin too long.
                  */
 
-                final long sleepMillis = 1000; // TODO CONFIG?
+                final long sleepMillis = 0; // 2000; // TODO CONFIG?
                 
-                log.warn("Sleeping " + sleepMillis + "ms to let events quisce.");
+                log.warn("Sleeping " + sleepMillis + "ms to let events quiesce.");
                 
-                Thread.sleep(sleepMillis);
-                
+                if (sleepMillis > 0)
+                	Thread.sleep(sleepMillis);
+
                 // Seek consensus.
                 enterRunState(new SeekConsensusTask());
 
@@ -2397,6 +2415,8 @@ public class HAJournalServer extends AbstractServer {
 
                 // Until joined with the met quorum.
                 while (!getQuorum().getMember().isJoinedMember(token)) {
+
+                    assert journal.getHAReady() == Quorum.NO_QUORUM;
 
                     // The current commit point on the local store.
                     final long commitCounter = journal.getRootBlockView()
