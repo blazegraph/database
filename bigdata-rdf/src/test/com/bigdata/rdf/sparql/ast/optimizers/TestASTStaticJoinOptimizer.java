@@ -42,13 +42,11 @@ import com.bigdata.rdf.sparql.ast.ConstantNode;
 import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
 import com.bigdata.rdf.sparql.ast.GroupMemberNodeBase;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
-import com.bigdata.rdf.sparql.ast.IJoinNode;
 import com.bigdata.rdf.sparql.ast.IQueryNode;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueryInclude;
 import com.bigdata.rdf.sparql.ast.NamedSubqueryRoot;
 import com.bigdata.rdf.sparql.ast.ProjectionNode;
-import com.bigdata.rdf.sparql.ast.PropertyPathNode;
 import com.bigdata.rdf.sparql.ast.QueryBase;
 import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
@@ -66,186 +64,193 @@ import com.bigdata.rdf.sparql.ast.PropertyPathUnionNode;
  */
 public class TestASTStaticJoinOptimizer extends AbstractASTEvaluationTestCase {
 
-	public interface Annotations extends com.bigdata.rdf.sparql.ast.GraphPatternGroup.Annotations,
-	            com.bigdata.rdf.sparql.ast.eval.AST2BOpBase.Annotations {}
-	enum HelperFlags { 
+	public interface Annotations extends
+			com.bigdata.rdf.sparql.ast.GraphPatternGroup.Annotations,
+			com.bigdata.rdf.sparql.ast.eval.AST2BOpBase.Annotations {
+	}
+
+	enum HelperFlag {
 		OPTIONAL {
 			@Override
 			public void apply(ASTBase sp) {
-				 ((ModifiableBOpBase)sp).setProperty(Annotations.OPTIONAL,true);
+				((ModifiableBOpBase) sp)
+						.setProperty(Annotations.OPTIONAL, true);
 			}
-		}, 
+		},
 		DISTINCT {
 			@Override
 			public void apply(ASTBase rslt) {
-				((QueryBase)rslt).getProjection().setDistinct(true);
+				((QueryBase) rslt).getProjection().setDistinct(true);
 			}
 		};
 
 		/**
 		 * 
 		 * @param target
-		 * @throws ClassCastException If there is a mismatch between the flag and its usage.
+		 * @throws ClassCastException
+		 *             If there is a mismatch between the flag and its usage.
 		 */
-		abstract public void apply(ASTBase target) ;
+		abstract public void apply(ASTBase target);
 	};
+
 	/**
-	 * The purpose of this class is to make the tests look like
-	 * the old comments. The first example 
-	 * {@link TestASTStaticJoinOptimizer#test_simpleOptional01A()}
-	 * is based on the comments of
-	 * {@link TestASTStaticJoinOptimizer#test_simpleOptional01()}
-	 * and demonstrates that the comment is out of date.
+	 * The purpose of this class is to make the tests look like the old
+	 * comments. The first example
+	 * {@link TestASTStaticJoinOptimizer#test_simpleOptional01A()} is based on
+	 * the comments of
+	 * {@link TestASTStaticJoinOptimizer#test_simpleOptional01()} and
+	 * demonstrates that the comment is out of date.
 	 * 
-	 * NB: Given this goal, several Java naming conventions are ignored.
-	 * e.g. methods whose names are ALLCAPS or the same as ClassNames
+	 * NB: Given this goal, several Java naming conventions are ignored. e.g.
+	 * methods whose names are ALLCAPS or the same as ClassNames
+	 * 
+	 * Also, note that the intent is that this class be used in
+	 * anonymous subclasses with a single invocation of the {@link #test()} method,
+	 * and the two fields {@link #given} and {@link #expected} initialized
+	 * in the subclasses constructor (i.e. inside a second pair of braces).
+	 * 
+	 * All of the protected members are wrappers around constructors,
+	 * to allow the initialization of these two fields, to have a style
+	 * much more like Prolog than Java.
 	 * 
 	 * @author jeremycarroll
-	 *
+	 * 
 	 */
-    @SuppressWarnings("rawtypes")
-    public class Helper {
+	@SuppressWarnings("rawtypes")
+	public abstract class Helper {
 		protected QueryRoot given, expected;
-    	protected final String w="w", x="x", y="y", z="z";
-    	protected final IV a = iv("a"), b = iv("b"), c = iv("c"), d=iv("d"), e=iv("e"), 
-    			f=iv("f"), g=iv("g"), h=iv("h");
-    	
+		protected final String w = "w", x = "x", y = "y", z = "z";
+		protected final IV a = iv("a"), b = iv("b"), c = iv("c"), d = iv("d"),
+				e = iv("e"), f = iv("f"), g = iv("g"), h = iv("h");
 
-		protected final HelperFlags OPTIONAL = HelperFlags.OPTIONAL;
-		protected final HelperFlags DISTINCT = HelperFlags.DISTINCT;
+		protected final HelperFlag OPTIONAL = HelperFlag.OPTIONAL;
+		protected final HelperFlag DISTINCT = HelperFlag.DISTINCT;
 
 		private IV iv(String id) {
-			return makeIV(new URIImpl("http://example/"+id));
+			return makeIV(new URIImpl("http://example/" + id));
 		}
 
-
 		protected QueryRoot SELECT(VarNode[] varNodes,
-				NamedSubqueryRoot namedSubQuery,
-				JoinGroupNode where,
-				HelperFlags ... flags) {
-			QueryRoot rslt = SELECT(varNodes,where, flags);
+				NamedSubqueryRoot namedSubQuery, JoinGroupNode where,
+				HelperFlag... flags) {
+			QueryRoot rslt = SELECT(varNodes, where, flags);
 			rslt.getNamedSubqueriesNotNull().add(namedSubQuery);
 			return rslt;
 		}
 
-
-		protected QueryRoot SELECT(VarNode[] varNodes,
-				JoinGroupNode where,
-				HelperFlags ... flags) {
+		protected QueryRoot SELECT(VarNode[] varNodes, JoinGroupNode where,
+				HelperFlag... flags) {
 
 			QueryRoot select = new QueryRoot(QueryType.SELECT);
-            final ProjectionNode projection = new ProjectionNode();
-            for (VarNode varNode:varNodes)
-                projection.addProjectionVar(varNode);
+			final ProjectionNode projection = new ProjectionNode();
+			for (VarNode varNode : varNodes)
+				projection.addProjectionVar(varNode);
 
-            select.setProjection(projection);
-            select.setWhereClause(where);
-            for (HelperFlags flag:flags) 
-            	flag.apply(select);
-            return select;
+			select.setProjection(projection);
+			select.setWhereClause(where);
+			for (HelperFlag flag : flags)
+				flag.apply(select);
+			return select;
 		}
 
 		protected QueryRoot SELECT(VarNode varNode,
-				NamedSubqueryRoot namedSubQuery,
-				JoinGroupNode where,HelperFlags ...flags) {
-            return SELECT(new VarNode[]{varNode},namedSubQuery,where,flags);
-		}
-		protected QueryRoot SELECT(VarNode varNode,
-				JoinGroupNode where,HelperFlags ...flags) {
-            return SELECT(new VarNode[]{varNode},where,flags);
+				NamedSubqueryRoot namedSubQuery, JoinGroupNode where,
+				HelperFlag... flags) {
+			return SELECT(new VarNode[] { varNode }, namedSubQuery, where,
+					flags);
 		}
 
-		protected NamedSubqueryRoot NamedSubQuery(
-				String name,
-				VarNode varNode,
+		protected QueryRoot SELECT(VarNode varNode, JoinGroupNode where,
+				HelperFlag... flags) {
+			return SELECT(new VarNode[] { varNode }, where, flags);
+		}
+
+		protected NamedSubqueryRoot NamedSubQuery(String name, VarNode varNode,
 				JoinGroupNode where) {
-			final NamedSubqueryRoot namedSubquery = new NamedSubqueryRoot(QueryType.SELECT, name);
+			final NamedSubqueryRoot namedSubquery = new NamedSubqueryRoot(
+					QueryType.SELECT, name);
 			final ProjectionNode projection = new ProjectionNode();
 			namedSubquery.setProjection(projection);
-            projection.addProjectionExpression(new AssignmentNode(varNode,new VarNode(varNode)));
+			projection.addProjectionExpression(new AssignmentNode(varNode,
+					new VarNode(varNode)));
 
 			namedSubquery.setWhereClause(where);
 			return namedSubquery;
 		}
 
-
 		protected GroupMemberNodeBase NamedSubQueryInclude(String name) {
 			return new NamedSubqueryInclude(name);
 		}
 
-
-		protected VarNode[] VarNodes(String  ...names) {
+		protected VarNode[] VarNodes(String... names) {
 			VarNode rslt[] = new VarNode[names.length];
-			for (int i=0;i<names.length;i++)
+			for (int i = 0; i < names.length; i++)
 				rslt[i] = VarNode(names[i]);
 			return rslt;
 		}
 
-
-		protected  VarNode VarNode(String varName) {
+		protected VarNode VarNode(String varName) {
 			return new VarNode(varName);
 		}
 
-		protected  TermNode ConstantNode(IV iv) {
+		protected TermNode ConstantNode(IV iv) {
 			return new ConstantNode(iv);
 		}
-		
-
 
 		protected StatementPatternNode StatementPatternNode(TermNode s,
-				TermNode p, TermNode o, long cardinality,
-				HelperFlags ...flags ) {
-			StatementPatternNode rslt = newStatementPatternNode(s, p,  o , cardinality);
-			for (HelperFlags flag:flags) {
+				TermNode p, TermNode o, long cardinality, HelperFlag... flags) {
+			StatementPatternNode rslt = newStatementPatternNode(s, p, o,
+					cardinality);
+			for (HelperFlag flag : flags) {
 				flag.apply(rslt);
 			}
 			return rslt;
 		}
 
-
 		@SuppressWarnings("unchecked")
-		private <E extends IGroupMemberNode,T extends GraphPatternGroup<E>> T initGraphPatternGroup(T rslt, Object ... statements) {
-			for (Object mem: statements) {
+		private <E extends IGroupMemberNode, T extends GraphPatternGroup<E>> T initGraphPatternGroup(
+				T rslt, Object... statements) {
+			for (Object mem : statements) {
 				if (mem instanceof IGroupMemberNode) {
-				   rslt.addChild((E)mem);
+					rslt.addChild((E) mem);
 				} else {
-					((HelperFlags)mem).apply(rslt);
+					((HelperFlag) mem).apply(rslt);
 				}
 			}
 			return rslt;
 		}
-		
-		protected JoinGroupNode JoinGroupNode(
-				Object ... statements) {
-			return initGraphPatternGroup(new JoinGroupNode(),statements);
-		}
-		
-		protected PropertyPathUnionNode PropertyPathUnionNode(Object ... statements) {
-			return initGraphPatternGroup(new PropertyPathUnionNode(),statements);
+
+		protected JoinGroupNode JoinGroupNode(Object... statements) {
+			return initGraphPatternGroup(new JoinGroupNode(), statements);
 		}
 
-		protected UnionNode UnionNode(Object ... statements) {
-			return initGraphPatternGroup(new UnionNode(),statements);
-			
-		}    
-		
-
-		protected JoinGroupNode WHERE(
-				GroupMemberNodeBase ... statements) {
-			return JoinGroupNode((Object[])statements);
+		protected PropertyPathUnionNode PropertyPathUnionNode(
+				Object... statements) {
+			return initGraphPatternGroup(new PropertyPathUnionNode(),
+					statements);
 		}
 
+		protected UnionNode UnionNode(Object... statements) {
+			return initGraphPatternGroup(new UnionNode(), statements);
+
+		}
+
+		protected JoinGroupNode WHERE(GroupMemberNodeBase... statements) {
+			return JoinGroupNode((Object[]) statements);
+		}
 
 		public void test() {
-	        final IASTOptimizer rewriter = new ASTStaticJoinOptimizer();
-	        
-	        final AST2BOpContext context = new AST2BOpContext(new ASTContainer(given), store);
+			final IASTOptimizer rewriter = new ASTStaticJoinOptimizer();
 
-	        final IQueryNode actual = rewriter.optimize(context,given, new IBindingSet[]{});
-	        
-	        assertSameAST(expected, actual);
+			final AST2BOpContext context = new AST2BOpContext(new ASTContainer(
+					given), store);
+
+			final IQueryNode actual = rewriter.optimize(context, given,
+					new IBindingSet[] {});
+
+			assertSameAST(expected, actual);
 		}
-    }
+	}
     public void test_simpleOptional01A() {
     	new Helper() {{
     		given = SELECT( VarNode(x), 
@@ -1518,23 +1523,23 @@ public class TestASTStaticJoinOptimizer extends AbstractASTEvaluationTestCase {
     						NamedSubQueryInclude("_set1"),
     						StatementPatternNode(VarNode(x), ConstantNode(c), VarNode(y),1,OPTIONAL),
     						JoinGroupNode( StatementPatternNode(VarNode(w), ConstantNode(e), VarNode(z),10),
-    						               StatementPatternNode(VarNode(w), ConstantNode(d), VarNode(x),100),
-    						               OPTIONAL )
+    								StatementPatternNode(VarNode(w), ConstantNode(d), VarNode(x),100),
+    								OPTIONAL )
     						), DISTINCT );
-    		
-    		
+
+
     		expected = SELECT( VarNodes(x,y,z), 
     				NamedSubQuery("_set1",VarNode(x),WHERE(StatementPatternNode(VarNode(x), ConstantNode(a), ConstantNode(b),1))),
     				WHERE (
     						NamedSubQueryInclude("_set1"),
     						StatementPatternNode(VarNode(x), ConstantNode(c), VarNode(y),1,OPTIONAL),
     						JoinGroupNode( StatementPatternNode(VarNode(w), ConstantNode(d), VarNode(x),100),
-    						               StatementPatternNode(VarNode(w), ConstantNode(e), VarNode(z),10),
-   						                   OPTIONAL )
+    								StatementPatternNode(VarNode(w), ConstantNode(e), VarNode(z),10),
+    								OPTIONAL )
     						), DISTINCT );
-    		
+
     	}}.test();
-    
+
     }
     @SuppressWarnings("rawtypes")
     public void test_NSI01() {
