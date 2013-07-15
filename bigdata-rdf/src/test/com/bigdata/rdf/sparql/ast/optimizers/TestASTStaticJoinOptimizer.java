@@ -108,7 +108,7 @@ public class TestASTStaticJoinOptimizer extends AbstractASTEvaluationTestCase {
 		protected QueryRoot given, expected;
     	protected final String w="w", x="x", y="y", z="z";
     	protected final IV a = iv("a"), b = iv("b"), c = iv("c"), d=iv("d"), e=iv("e"), 
-    			f=iv("f"), g=iv("g");
+    			f=iv("f"), g=iv("g"), h=iv("h");
     	
 
 		protected final HelperFlags OPTIONAL = HelperFlags.OPTIONAL;
@@ -1966,7 +1966,161 @@ where {
     		
     	}}.test();
     }
+    /*
+     prefix skos: <http://www.w3.org/2004/02/skos/core#>   
+prefix bds: <http://www.bigdata.com/rdf/search#> 
+   
+select distinct ?o
+where {     
+    {
+       ?s skos:prefLabel ?o .
+       ?s skos:inScheme <http://syapse.com/vocabularies/fma/anatomical_entity#> .
+    }
+    UNION {
+       ?s skos:altLabel ?o.     
+        ?s skos:inScheme <http://syapse.com/vocabularies/fma/anatomical_entity#> .
+    }
+   ?o bds:search "viscu*"
+}
+     */
     
+    public void test_union_trac684_B() {
+    	new Helper(){{
+
+    		given = SELECT( VarNode(z), // z is ?o
+    				      
+    				NamedSubQuery("_bds",VarNode(z),WHERE(StatementPatternNode(VarNode(z), 
+    						ConstantNode(a), // a is bds:search
+    						ConstantNode(b), // fill in for the literal
+    						1))),
+    				WHERE (
+    						NamedSubQueryInclude("_bds"),
+    						UnionNode(
+    						    JoinGroupNode( 
+    		    						StatementPatternNode(VarNode(x), ConstantNode(c), // inScheme
+						                         ConstantNode(d), // anatomical_entity
+						                         81053),
+    						    		StatementPatternNode(VarNode(x), ConstantNode(e), VarNode(z),960191) 
+    						    ),
+
+    						    JoinGroupNode( 
+    						    		StatementPatternNode(VarNode(x), ConstantNode(f), VarNode(z),615502),
+    		    						StatementPatternNode(VarNode(x), ConstantNode(c), // inScheme
+						                         ConstantNode(d), // anatomical_entity
+						                         81053)
+    						    ) )
+    						),
+    				 DISTINCT );
+    		
+    		
+    		expected = SELECT( VarNode(z), // z is ?o
+				      
+				NamedSubQuery("_bds",VarNode(z),WHERE(StatementPatternNode(VarNode(z), 
+						ConstantNode(a), // a is bds:search
+						ConstantNode(b), // fill in for the literal
+						1))),
+				WHERE (
+						NamedSubQueryInclude("_bds"),
+						UnionNode(
+						    JoinGroupNode( 
+						    		StatementPatternNode(VarNode(x), ConstantNode(e), VarNode(z),960191),
+		    						StatementPatternNode(VarNode(x), ConstantNode(c), // inScheme
+					                         ConstantNode(d), // anatomical_entity
+					                         81053)
+						    ),
+
+						    JoinGroupNode( 
+						    		StatementPatternNode(VarNode(x), ConstantNode(f), VarNode(z),615502),
+		    						StatementPatternNode(VarNode(x), ConstantNode(c), // inScheme
+					                         ConstantNode(d), // anatomical_entity
+					                         81053)
+						    ) )
+						),
+				 DISTINCT );
+    		
+    	}}.test();
+    }
+    
+    /*
+prefix skos: <http://www.w3.org/2004/02/skos/core#>   
+prefix bds: <http://www.bigdata.com/rdf/search#> 
+   
+select distinct ?o
+where {     
+    {
+    ?s skos:prefLabel ?o .
+    ?s skos:inScheme <http://syapse.com/vocabularies/fma/anatomical_entity#> .
+    }
+    UNION {
+    ?s skos:inScheme <http://syapse.com/vocabularies/fma/anatomical_entity#> .
+      ?s skos:altLabel ?o.     
+    }
+   ?s rdf:type skos:Concept .
+   ?o bds:search "viscu*"
+}
+    */
+   
+   public void test_union_trac684_C() {
+   	new Helper(){{
+
+   		given = SELECT( VarNode(z), // z is ?o
+   				      
+   				NamedSubQuery("_bds",VarNode(z),WHERE(StatementPatternNode(VarNode(z), 
+   						ConstantNode(a), // a is bds:search
+   						ConstantNode(b), // fill in for the literal
+   						1))),
+   				WHERE (
+   						NamedSubQueryInclude("_bds"),
+   						StatementPatternNode(VarNode(x), ConstantNode(g), // type
+   								ConstantNode(h), // Concept
+   								960191) ,
+   						UnionNode(
+   						    JoinGroupNode( 
+   		    						StatementPatternNode(VarNode(x), ConstantNode(c), // inScheme
+						                         ConstantNode(d), // anatomical_entity
+						                         81053),
+   						    		StatementPatternNode(VarNode(x), ConstantNode(e), VarNode(z),960191) 
+   						    ),
+
+   						    JoinGroupNode( 
+   						    		StatementPatternNode(VarNode(x), ConstantNode(f), VarNode(z),615502),
+   		    						StatementPatternNode(VarNode(x), ConstantNode(c), // inScheme
+						                         ConstantNode(d), // anatomical_entity
+						                         81053)
+   						    ) )
+   						),
+   				 DISTINCT );
+   		
+   		
+   		expected = SELECT( VarNode(z), // z is ?o
+				      
+				NamedSubQuery("_bds",VarNode(z),WHERE(StatementPatternNode(VarNode(z), 
+						ConstantNode(a), // a is bds:search
+						ConstantNode(b), // fill in for the literal
+						1))),
+				WHERE (
+						NamedSubQueryInclude("_bds"),
+						UnionNode(
+						    JoinGroupNode( 
+						    		StatementPatternNode(VarNode(x), ConstantNode(e), VarNode(z),960191),
+		    						StatementPatternNode(VarNode(x), ConstantNode(c), // inScheme
+					                         ConstantNode(d), // anatomical_entity
+					                         81053)
+						    ),
+
+						    JoinGroupNode( 
+						    		StatementPatternNode(VarNode(x), ConstantNode(f), VarNode(z),615502),
+		    						StatementPatternNode(VarNode(x), ConstantNode(c), // inScheme
+					                         ConstantNode(d), // anatomical_entity
+					                         81053)
+						    ) ),
+
+	   					StatementPatternNode(VarNode(x), ConstantNode(g), ConstantNode(h),960191) 
+						),
+				 DISTINCT );
+   		
+   	}}.test();
+   }
     @SuppressWarnings("rawtypes")
     public void test_runFirstRunLast_02() {
 
