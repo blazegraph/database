@@ -32,24 +32,27 @@ import org.openrdf.model.impl.URIImpl;
 import org.openrdf.model.vocabulary.RDF;
 
 import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.ModifiableBOpBase;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.sparql.ast.ASTBase;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.AbstractASTEvaluationTestCase;
 import com.bigdata.rdf.sparql.ast.AssignmentNode;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
 import com.bigdata.rdf.sparql.ast.GroupMemberNodeBase;
+import com.bigdata.rdf.sparql.ast.IJoinNode;
 import com.bigdata.rdf.sparql.ast.IQueryNode;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueryInclude;
 import com.bigdata.rdf.sparql.ast.NamedSubqueryRoot;
 import com.bigdata.rdf.sparql.ast.ProjectionNode;
+import com.bigdata.rdf.sparql.ast.QueryBase;
 import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryType;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.TermNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
-import com.bigdata.rdf.sparql.ast.eval.AST2BOpBase.Annotations;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.service.ServiceNode;
 import com.bigdata.rdf.store.BDS;
@@ -59,15 +62,28 @@ import com.bigdata.rdf.store.BDS;
  */
 public class TestASTStaticJoinOptimizer extends AbstractASTEvaluationTestCase {
 
+	public interface Annotations extends com.bigdata.rdf.sparql.ast.GraphPatternGroup.Annotations,
+	            com.bigdata.rdf.sparql.ast.eval.AST2BOpBase.Annotations {}
 	enum HelperFlags { 
 		OPTIONAL {
 			@Override
-			public void apply(StatementPatternNode sp) {
-				sp.setOptional(true);
+			public void apply(ASTBase sp) {
+				 ((ModifiableBOpBase)sp).setProperty(Annotations.OPTIONAL,true);
+			}
+		}, 
+		DISTINCT {
+			@Override
+			public void apply(ASTBase rslt) {
+				((QueryBase)rslt).getProjection().setDistinct(true);
 			}
 		};
 
-		abstract public void apply(StatementPatternNode rslt) ;
+		/**
+		 * 
+		 * @param target
+		 * @throws ClassCastException If there is a mismatch between the flag and its usage.
+		 */
+		abstract public void apply(ASTBase target) ;
 	};
 	/**
 	 * The purpose of this class is to make the tests look like
@@ -86,17 +102,75 @@ public class TestASTStaticJoinOptimizer extends AbstractASTEvaluationTestCase {
     @SuppressWarnings("rawtypes")
     public class Helper {
 		protected QueryRoot given, expected;
-    	protected final String x="x", y="y", z="z";
+    	protected final String w="w", x="x", y="y", z="z";
     	protected final IV a = iv("a"), b = iv("b"), c = iv("c"), d=iv("d"), e=iv("e"), 
     			f=iv("f"), g=iv("g");
     	
 
 		protected final HelperFlags OPTIONAL = HelperFlags.OPTIONAL;
-
-	
+		protected final HelperFlags DISTINCT = HelperFlags.DISTINCT;
 
 		private IV iv(String id) {
 			return makeIV(new URIImpl("http://example/"+id));
+		}
+
+
+		protected QueryRoot SELECT(VarNode[] varNodes,
+				NamedSubqueryRoot namedSubQuery,
+				JoinGroupNode where,
+				HelperFlags ... flags) {
+			QueryRoot rslt = SELECT(varNodes,where, flags);
+			rslt.getNamedSubqueriesNotNull().add(namedSubQuery);
+			return rslt;
+		}
+
+
+		protected QueryRoot SELECT(VarNode[] varNodes,
+				JoinGroupNode where,
+				HelperFlags ... flags) {
+
+			QueryRoot select = new QueryRoot(QueryType.SELECT);
+            final ProjectionNode projection = new ProjectionNode();
+            for (VarNode varNode:varNodes)
+                projection.addProjectionVar(varNode);
+
+            select.setProjection(projection);
+            select.setWhereClause(where);
+            for (HelperFlags flag:flags) 
+            	flag.apply(select);
+            return select;
+		}
+
+		protected QueryRoot SELECT(VarNode varNode,
+				JoinGroupNode where,HelperFlags ...flags) {
+
+            return SELECT(new VarNode[]{varNode},where,flags);
+		}
+
+		protected NamedSubqueryRoot NamedSubQuery(
+				String name,
+				VarNode varNode,
+				JoinGroupNode where) {
+			final NamedSubqueryRoot namedSubquery = new NamedSubqueryRoot(QueryType.SELECT, name);
+			final ProjectionNode projection = new ProjectionNode();
+			namedSubquery.setProjection(projection);
+            projection.addProjectionExpression(new AssignmentNode(varNode,new VarNode(varNode)));
+
+			namedSubquery.setWhereClause(where);
+			return namedSubquery;
+		}
+
+
+		protected GroupMemberNodeBase NamedSubQueryInclude(String name) {
+			return new NamedSubqueryInclude(name);
+		}
+
+
+		protected VarNode[] VarNodes(String  ...names) {
+			VarNode rslt[] = new VarNode[names.length];
+			for (int i=0;i<names.length;i++)
+				rslt[i] = VarNode(names[i]);
+			return rslt;
 		}
 
 
@@ -122,30 +196,24 @@ public class TestASTStaticJoinOptimizer extends AbstractASTEvaluationTestCase {
 
 
 		protected JoinGroupNode JoinGroupNode(
-				GroupMemberNodeBase ... statements) {
+				Object ... statements) {
 			final JoinGroupNode whereClause = new JoinGroupNode();
-			for (GroupMemberNodeBase mem: statements)
-				whereClause.addChild(mem);
+			for (Object mem: statements) {
+				if (mem instanceof GroupMemberNodeBase) {
+				   whereClause.addChild((GroupMemberNodeBase)mem);
+				} else {
+					((HelperFlags)mem).apply(whereClause);
+				}
+			}
 			return whereClause;
 		}
 		
 
 		protected JoinGroupNode WHERE(
 				GroupMemberNodeBase ... statements) {
-			return JoinGroupNode(statements);
+			return JoinGroupNode((Object[])statements);
 		}
 
-		protected QueryRoot SELECT(VarNode varNode,
-				JoinGroupNode whereClause) {
-
-			QueryRoot select = new QueryRoot(QueryType.SELECT);
-            final ProjectionNode projection = new ProjectionNode();
-            projection.addProjectionVar(varNode);
-
-            select.setProjection(projection);
-            select.setWhereClause(whereClause);
-            return select;
-		}
 
 		public void test() {
 	        final IASTOptimizer rewriter = new ASTStaticJoinOptimizer();
@@ -1420,33 +1488,33 @@ public class TestASTStaticJoinOptimizer extends AbstractASTEvaluationTestCase {
 
     }
     
-    /**
-     * Given
-     * 
-     * <pre>
-     *   SELECT VarNode(x)
-     *   JoinGroupNode {
-     *     ServiceNode {
-     *       StatementPatternNode(VarNode(x), ConstantNode(bd:search), ConstantNode("foo")
-     *     }
-     *     StatementPatternNode(VarNode(y), ConstantNode(b), ConstantNode(b)) [CARDINALITY=1]
-     *     StatementPatternNode(VarNode(x), ConstantNode(a), VarNode(y)) [CARDINALITY=2]
-     *   }
-     * </pre>
-     *
-     * Reorder as
-     * 
-     * <pre>
-     *   SELECT VarNode(x)
-     *   JoinGroupNode {
-     *     ServiceNode {
-     *       StatementPatternNode(VarNode(x), ConstantNode(bd:search), ConstantNode("foo")
-     *     }
-     *     StatementPatternNode(VarNode(x), ConstantNode(a), VarNode(y)) [CARDINALITY=2]
-     *     StatementPatternNode(VarNode(y), ConstantNode(b), ConstantNode(b)) [CARDINALITY=1]
-     *   }
-     * </pre>
-     */
+
+    public void test_NSI01X() {
+    	new Helper() {{
+    		given = SELECT( VarNodes(x,y,z), 
+    				NamedSubQuery("_set1",VarNode(x),WHERE(StatementPatternNode(VarNode(x), ConstantNode(a), ConstantNode(b),1))),
+    				WHERE (
+    						NamedSubQueryInclude("_set1"),
+    						StatementPatternNode(VarNode(x), ConstantNode(c), VarNode(y),1,OPTIONAL),
+    						JoinGroupNode( StatementPatternNode(VarNode(w), ConstantNode(e), VarNode(z),10),
+    						               StatementPatternNode(VarNode(w), ConstantNode(d), VarNode(x),100),
+    						               OPTIONAL )
+    						), DISTINCT );
+    		
+    		
+    		expected = SELECT( VarNodes(x,y,z), 
+    				NamedSubQuery("_set1",VarNode(x),WHERE(StatementPatternNode(VarNode(x), ConstantNode(a), ConstantNode(b),1))),
+    				WHERE (
+    						NamedSubQueryInclude("_set1"),
+    						StatementPatternNode(VarNode(x), ConstantNode(c), VarNode(y),1,OPTIONAL),
+    						JoinGroupNode( StatementPatternNode(VarNode(w), ConstantNode(d), VarNode(x),100),
+    						               StatementPatternNode(VarNode(w), ConstantNode(e), VarNode(z),10),
+   						                   OPTIONAL )
+    						), DISTINCT );
+    		
+    	}}.test();
+    
+    }
     @SuppressWarnings("rawtypes")
     public void test_NSI01() {
 
