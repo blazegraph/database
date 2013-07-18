@@ -1641,6 +1641,10 @@ public class HAJournalServer extends AbstractServer {
 
         /**
          * Handle an error condition on the service.
+         * 
+         * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/695">
+         *      HAJournalServer reports "follower" but is in SeekConsensus and
+         *      is not participating in commits</a>
          */
         private class ErrorTask extends RunStateCallable<Void> {
             
@@ -1704,32 +1708,39 @@ public class HAJournalServer extends AbstractServer {
                  * explicitly above, that can be do invocations each time we pass through here!
                  */
                 if (log.isInfoEnabled())
-                	log.info("Current Token: " + journal.getHAReady() + ", new: " + getQuorum().token());
+                    log.info("Current Token: " + journal.getHAReady() + ", new: " + getQuorum().token());
+
+                /*
+                 * FIXME Why is this first clearing the quorum token and then
+                 * setting it? Document or revert this change.
+                 */
                 journal.setQuorumToken(Quorum.NO_QUORUM);
                 journal.setQuorumToken(getQuorum().token());
-                // journal.setQuorumToken(Quorum.NO_QUORUM);
                 
 //                assert journal.getHAReady() == Quorum.NO_QUORUM;
 
                 
                /**
-                * dispatch Events before entering SeekConsensus!
+                * Dispatch Events before entering SeekConsensus! Otherwise
+                * the events triggered by the serviceLeave() will not be
+                * handled until we enter SeekConsensus, and then they will
+                * just kick us out of SeekConsensus again.
                 */
                 processEvents();
                 
-                /*
-                 * Note: We can spin here to give the service an opportunity to
-                 * handle any backlog of events that trigger a transition into
-                 * the ERROR state. This might not be strictly necessary, and we
-                 * do not want to spin too long.
-                 */
-
-                final long sleepMillis = 0; // 2000; // TODO CONFIG?
-                
-                log.warn("Sleeping " + sleepMillis + "ms to let events quiesce.");
-                
-                if (sleepMillis > 0)
-                	Thread.sleep(sleepMillis);
+//                /*
+//                 * Note: We can spin here to give the service an opportunity to
+//                 * handle any backlog of events that trigger a transition into
+//                 * the ERROR state. This might not be strictly necessary, and we
+//                 * do not want to spin too long.
+//                 */
+//
+//                final long sleepMillis = 0; // 2000; // TODO CONFIG?
+//                
+//                log.warn("Sleeping " + sleepMillis + "ms to let events quiesce.");
+//                
+//                if (sleepMillis > 0)
+//                	Thread.sleep(sleepMillis);
 
                 // Seek consensus.
                 enterRunState(new SeekConsensusTask());
@@ -2416,7 +2427,15 @@ public class HAJournalServer extends AbstractServer {
                 // Until joined with the met quorum.
                 while (!getQuorum().getMember().isJoinedMember(token)) {
 
-                    assert journal.getHAReady() == Quorum.NO_QUORUM;
+                    // This service should not be joined yet (HAReady==-1).
+                    final long haReady = journal.getHAReady();
+
+                    if (haReady != Quorum.NO_QUORUM) {
+                    
+                        throw new AssertionError(
+                                "HAReady: Expecting NO_QUOURM, not " + haReady);
+                        
+                    }
 
                     // The current commit point on the local store.
                     final long commitCounter = journal.getRootBlockView()
