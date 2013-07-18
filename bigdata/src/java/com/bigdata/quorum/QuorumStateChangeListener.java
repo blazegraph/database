@@ -61,6 +61,10 @@ import java.util.UUID;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id: QuorumStateChangeListener.java 4069 2011-01-09 20:58:02Z
  *          thompsonbry $
+ * 
+ * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/695">
+ *      HAJournalServer reports "follower" but is in SeekConsensus and is not
+ *      participating in commits (javadoc clarifications)</a>
  */
 public interface QuorumStateChangeListener {
 
@@ -75,7 +79,7 @@ public interface QuorumStateChangeListener {
     void memberRemove();
 
     /**
-     * Invoked when the service is added to the write pipeline. The service
+     * Invoked when this service is added to the write pipeline. The service
      * always enters at the of the pipeline.
      */
     void pipelineAdd();
@@ -86,16 +90,17 @@ public interface QuorumStateChangeListener {
     void pipelineRemove();
 
     /**
-     * Invoked when a service already in the pipeline becomes the first service
-     * in the write pipeline because all previous services in the pipeline order
-     * have been removed from the pipeline.
+     * Invoked for this service when the service is already in the pipeline and
+     * this service becomes the first service in the write pipeline because all
+     * previous services in the pipeline order have been removed from the
+     * pipeline (failover into the leader position).
      */
     void pipelineElectedLeader();
     
     /**
-     * Invoked when the downstream service in the write pipeline has changed.
-     * Services always enter at the end of the write pipeline, but may be
-     * removed at any position in the write pipeline.
+     * Invoked for this service when the downstream service in the write
+     * pipeline has changed. Services always enter at the end of the write
+     * pipeline, but may be removed at any position in the write pipeline.
      * 
      * @param oldDownstreamId
      *            The {@link UUID} of the service which <em>was</em> downstream
@@ -106,13 +111,13 @@ public interface QuorumStateChangeListener {
      *            from this service in the write pipeline and <code>null</code>
      *            iff this service <em>is</em> the last service in the pipeline.
      */
-    void pipelineChange(UUID oldDownStreamId, UUID newDownStreamId);
+    void pipelineChange(final UUID oldDownStreamId, final UUID newDownStreamId);
     
     /**
-     * Invoked when the upstream service in the write pipeline has been removed.
-     * This hook provides an opportunity for the service to close out its
-     * connection with the old upstream service and to prepare to establish a
-     * new connection with the new downstream service.
+     * Invoked for this service when the upstream service in the write pipeline
+     * has been removed. This hook provides an opportunity for this service to
+     * close out its connection with the old upstream service and to prepare to
+     * establish a new connection with the new downstream service.
      */
     void pipelineUpstreamChange();
 
@@ -157,6 +162,8 @@ public interface QuorumStateChangeListener {
     /**
      * Invoked when the consensus is lost. Services do not withdraw their cast
      * votes until a quorum breaks and a new consensus needs to be established.
+     * This message is sent to each member service regardless of whether or not
+     * they participated in the consensus.
      * 
      * @see #consensus(long)
      */
@@ -185,8 +192,10 @@ public interface QuorumStateChangeListener {
     /**
      * Invoked when a quorum meets. The state of the met quorum can be queried
      * using the <i>token</i>. Quorum members can use this to decide whether
-     * they are the leader (using {@link #isLeader(long)} or joined as a
-     * follower (using {@link #isFollower(long)}).
+     * they are the leader (using {@link #isLeader(long)}, joined as a
+     * follower (using {@link #isFollower(long)}), or do not participate
+     * in the quorum (this message is sent to all quorum members, so this
+     * service might not be part of the met qourum).
      * <p>
      * The following pre-conditions will be satisfied before this message is
      * sent to the {@link QuorumMember}:
@@ -231,7 +240,8 @@ public interface QuorumStateChangeListener {
      * current root block; and (b) casting a vote for their current commit time.
      * Once a consensus is reached on the current commit time, services will be
      * joined in the vote order, a new leader will be elected, and the quorum
-     * will meet again.
+     * will meet again. This message is sent to all member services, regardless
+     * of whether they were joined with the met quorum.
      */
     void quorumBreak();
 

@@ -3208,7 +3208,16 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
                 if (client != null) {
                     // Notify all quorum members that a service left.
                     try {
-                    	// PREVIOUSLY called client.serviceLeave() unconditionally
+                        /**
+                         * PREVIOUSLY called client.serviceLeave()
+                         * unconditionally
+                         * 
+                         * @see <a
+                         *      href="https://sourceforge.net/apps/trac/bigdata/ticket/695">
+                         *      HAJournalServer reports "follower" but is in
+                         *      SeekConsensus and is not participating in
+                         *      commits </a>
+                         */
                         final UUID clientId = client.getServiceId();
                     	if (serviceId.equals(clientId))
                     			client.serviceLeave();
