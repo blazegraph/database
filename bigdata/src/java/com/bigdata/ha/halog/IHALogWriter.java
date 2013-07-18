@@ -88,7 +88,13 @@ public interface IHALogWriter {
     public void closeHALog(IRootBlockView rootBlock) throws IOException;
     
     /**
-     * Disable (and remove) the current log file if one is open.
+     * Disable (and remove) the current log file if one is open (an HALog file
+     * which has been committed by applying its closing root block is NOT
+     * removed).
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/695">
+     *      HAJournalServer reports "follower" but is in SeekConsensus and is
+     *      not participating in commits</a>
      */
     public void disableHALog() throws IOException;
 
