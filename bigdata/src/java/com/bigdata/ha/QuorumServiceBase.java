@@ -374,11 +374,17 @@ abstract public class QuorumServiceBase<S extends HAGlue, L extends AbstractJour
     }
     
     /**
-     * Called from ErrorTask to process the event queue before
-     * moving to SeekConsensus.
+     * Called from ErrorTask in HAJournalServer to ensure that events are
+     * processed before entering SeekConsensus.
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/695">
+     * HAJournalServer reports "follower" but is in SeekConsensus and is not
+     * participating in commits</a>
      */
     protected void processEvents() {
-    	pipelineImpl.processEvents();
+
+        pipelineImpl.processEvents();
+        
     }
 
 }
