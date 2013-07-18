@@ -29,15 +29,12 @@ import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.concurrent.atomic.AtomicReference;
 
-import org.apache.log4j.Logger;
-
 import com.bigdata.counters.CAT;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.FileChannelUtility;
 import com.bigdata.io.IBufferAccess;
 import com.bigdata.io.IReopenChannel;
-import com.bigdata.rwstore.RWStore;
 
 /**
  * The BufferedWrite merges/elides sorted scattered writes to minimize IO
@@ -55,8 +52,6 @@ import com.bigdata.rwstore.RWStore;
  * @todo harmonize with {@link CounterSet} for reporting purposes.
  */
 public class BufferedWrite {
-
-    protected static final Logger log = Logger.getLogger(WriteCache.class);
 
     /**
 	 * Used to determine the size of the allocation slot onto which a record is
