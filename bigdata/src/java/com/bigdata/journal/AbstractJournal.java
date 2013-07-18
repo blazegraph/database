@@ -5477,9 +5477,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                 /*
                  * Local abort (no quorum, so 2-phase abort not required).
                  * 
-                 * FIXME HA : local abort on quorum break -or- service leave?
-                 * 
-                 * FIXME HA : Abort the unisolated connection?
+                 * FIXME HA : Abort the unisolated connection? (esp for group commit).
                  */
                 doLocalAbort(); 
                 
@@ -5594,7 +5592,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                 
                 if (!installedRBs) {
 
-                    /*
+                    /**
                      * If we install the RBs, then a local abort was already
                      * done. Otherwise we need to do one now (this covers the
                      * case when setQuorumToken() is called on the leader as
@@ -5602,15 +5600,32 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                      * or is a follower, but the leader is not at
                      * commitCounter==0L, etc.
                      * 
-                     * If didJoinMetQuorum hen we MUST be leaving Resync, so should NOT
-                     * need to complete a localAbort.  BUT what should this imply
-                     * about installedRBs?
+                     * If didJoinMetQuorum==true, then we MUST be leaving the
+                     * Resync run state in the HAJournalServer, so should NOT
+                     * need to complete a localAbort.
+                     * 
+                     * TODO We should still review this point. If we do not
+                     * delete a committed HALog, then why is doLocalAbort() a
+                     * problem here? Ah. It is because doLocalAbort() is hooked
+                     * by the HAJournalServer and will trigger a serviceLeave()
+                     * and a transition to the error state.
+                     * 
+                     * @see <a
+                     *      href="https://sourceforge.net/apps/trac/bigdata/ticket/695">
+                     *      HAJournalServer reports "follower" but is in
+                     *      SeekConsensus and is not participating in
+                     *      commits</a>
                      */
-                    
-                	if (log.isInfoEnabled())
-                		log.info("Calling localAbort if NOT didJoinMetQuorum: " + didJoinMetQuorum);
-                	if (!didJoinMetQuorum)
-                		doLocalAbort();
+
+                    if (log.isInfoEnabled())
+                        log.info("Calling localAbort if NOT didJoinMetQuorum: "
+                                + didJoinMetQuorum);
+
+                    if (!didJoinMetQuorum) {
+
+                        doLocalAbort();
+
+                    }
 
                 }
 
@@ -6793,20 +6808,30 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                 } finally {
 
                     if (!vote.get()) {
-                        /*
-                         * Throw away our local write set.
-                         */
-                        // doLocalAbort(); // enterErrorState will do this
-                        
-                        /*
-                         * Exit the service
-                         */
-                        // quorum.getActor().serviceLeave(); // enterErrorState will do this
-
-                        /*
+//                        /*
+//                         * Throw away our local write set.
+//                         */
+//                        // doLocalAbort(); // enterErrorState will do this
+//                        
+//                        /*
+//                         * Exit the service
+//                         */
+//                        // quorum.getActor().serviceLeave(); // enterErrorState will do this
+//
+                        /**
                          * Since the service refuses the commit, we want it to
                          * enter an error state and then figure out whether it
                          * needs to resynchronize with the quorum.
+                         * <p>
+                         * Note: Entering the error state will cause the local
+                         * abort and serviceLeave() actions to be taken, which
+                         * is why then have been commented out above.
+                         * 
+                         * @see <a
+                         *      href="https://sourceforge.net/apps/trac/bigdata/ticket/695">
+                         *      HAJournalServer reports "follower" but is in
+                         *      SeekConsensus and is not participating in
+                         *      commits</a>
                          */
                         quorum.getClient().enterErrorState();
                     }
