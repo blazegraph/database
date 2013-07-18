@@ -2070,7 +2070,12 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> /*extends
     }
 
     /**
-     * Called from ErrorTask to ensure that events are processed before entering SeekConsensus
+     * Called from ErrorTask in HAJournalServer to ensure that events are
+     * processed before entering SeekConsensus.
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/695">
+     * HAJournalServer reports "follower" but is in SeekConsensus and is not
+     * participating in commits</a>
      */
 	public void processEvents() {
         this.lock.lock();
