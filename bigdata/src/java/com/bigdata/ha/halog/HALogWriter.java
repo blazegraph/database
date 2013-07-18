@@ -603,11 +603,15 @@ public class HALogWriter implements IHALogWriter {
 
 	}
 
-	/**
-	 * On various error conditions we may need to remove the log
-	 * 
-	 * @throws IOException
-	 */
+	    /**
+     * On various error conditions we may need to remove the log
+     * 
+     * @throws IOException
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/695">
+     *      HAJournalServer reports "follower" but is in SeekConsensus and is
+     *      not participating in commits§</a>
+     */
 	private void remove() throws IOException {
 
 		final Lock lock = m_stateLock.writeLock();
@@ -620,15 +624,18 @@ public class HALogWriter implements IHALogWriter {
 				 * Conditional remove iff file is open. Will not remove
 				 * something that has been closed.
 				 */
+			    final boolean isCommitted = m_state.isCommitted();
+			    
                 if (haLog.isInfoEnabled())
-                    haLog.info("Will close: " + m_state.m_haLogFile + ", committed: " + m_state.isCommitted());
+                    haLog.info("Will close: " + m_state.m_haLogFile + ", committed: " + isCommitted);
 
 			    m_state.forceCloseAll();
 			    
-			    if (m_state.isCommitted()) return; // Do not remove a sealed HALog file!
+			    if (isCommitted) return; // Do not remove a sealed HALog file!
 			    
                 if (haLog.isInfoEnabled())
                     haLog.info("Will remove: " + m_state.m_haLogFile, new RuntimeException());
+                
 				if (m_state.m_haLogFile.exists() && !m_state.m_haLogFile.delete()) {
 
 					/*
@@ -653,9 +660,7 @@ public class HALogWriter implements IHALogWriter {
 
 	}
 
-	/**
-	 * Disable (and remove) the current log file if one is open.
-	 */
+	@Override
 	public void disableHALog() throws IOException {
 
 		if (haLog.isInfoEnabled())
