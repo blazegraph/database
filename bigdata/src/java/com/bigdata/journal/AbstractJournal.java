@@ -5351,12 +5351,25 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
         if (haLog.isInfoEnabled())
             haLog.info("oldValue=" + oldValue + ", newToken=" + newValue);
 
-        if (oldValue == newValue && oldValue == haReadyToken) {
-         
-            // No change.
-            return;
-            
-        }
+        /*
+         * Note that previously the noTokenChange condition was a short circuit exit.
+         * 
+         * This has been removed so we must account for this condition to determine
+         * correct transition
+         */
+        final boolean noTokenChange = oldValue == newValue && oldValue == oldReady;
+//        if (oldValue == newValue && oldValue == oldReady) {
+//        	log.warn("NO TOKEN CHANGE");
+//             // No change.
+//            return;
+//            
+//        }
+        
+        /*
+         * Protect for potential NPE
+         */
+        if (quorum == null)
+        	return;
 
         // This quorum member.
         final QuorumService<HAGlue> localService = quorum.getClient();
@@ -5365,8 +5378,19 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
         final boolean didMeet;
         final boolean didJoinMetQuorum;
         final boolean didLeaveMetQuorum;
+        final boolean isJoined = localService != null && localService.isJoinedMember(newValue);
 
-        if (newValue == Quorum.NO_QUORUM && oldValue != Quorum.NO_QUORUM) {
+        /**
+         * Adding set of initial conditions to account for noTokenChange
+         * 
+         * TODO: should there be more than one initial condition?
+         */
+        if (noTokenChange && isJoined) {
+            didBreak = false; // quorum break.
+            didMeet = false;
+            didJoinMetQuorum = true;
+            didLeaveMetQuorum = haReadyToken != Quorum.NO_QUORUM; // if service was joined with met quorum, then it just left the met quorum.
+        } else if (newValue == Quorum.NO_QUORUM && oldValue != Quorum.NO_QUORUM) {
 
             /*
              * Quorum break.
@@ -5395,9 +5419,8 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
             didLeaveMetQuorum = false;
 
         } else if (newValue != Quorum.NO_QUORUM // quorum exists
-                && haReadyToken == Quorum.NO_QUORUM // service was not joined with met quorum.
-                && localService != null //
-                && localService.isJoinedMember(newValue) // service is now joined with met quorum.
+                && oldReady == Quorum.NO_QUORUM // service was not joined with met quorum.
+                && isJoined // service is now joined with met quorum.
                 ) {
 
             /*
@@ -5410,9 +5433,8 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
             didLeaveMetQuorum = false;
             
         } else if (newValue != Quorum.NO_QUORUM // quorum exists
-                && haReadyToken != Quorum.NO_QUORUM // service was joined with met quorum
-                && localService != null //
-                && !localService.isJoinedMember(newValue) // service is no longer joined with met quorum.
+                && oldReady != Quorum.NO_QUORUM // service was joined with met quorum
+                && !isJoined // service is no longer joined with met quorum.
                 ) {
 
             /*
