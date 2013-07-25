@@ -1711,20 +1711,25 @@ public class HAJournalServer extends AbstractServer {
                     log.info("Current Token: " + journal.getHAReady() + ", new: " + getQuorum().token());
 
                 /*
-                 * FIXME Why is this first clearing the quorum token and then
-                 * setting it? Document or revert this change.
+                 * We must ensure that the token is reset to generate the required
+                 * additional events.
+                 * 
+                 * Processing the events at this point, after serviceLeave, is not sufficient.  
+                 * 
+                 * TODO It is possible that we could avoid the clear/set pattern with more 
+                 * state analysis in setQuorumToken and this should be investigated.
                  */
-                journal.setQuorumToken(Quorum.NO_QUORUM);
+                // journal.setQuorumToken(Quorum.NO_QUORUM);
                 journal.setQuorumToken(getQuorum().token());
-                
-//                assert journal.getHAReady() == Quorum.NO_QUORUM;
-
                 
                /**
                 * Dispatch Events before entering SeekConsensus! Otherwise
-                * the events triggered by the serviceLeave() will not be
-                * handled until we enter SeekConsensus, and then they will
-                * just kick us out of SeekConsensus again.
+                * the events triggered by the serviceLeave() and setQuorumToken
+                * will not be handled until we enter SeekConsensus, and then
+                * when they are received SeekConsensus will fail.
+                * 
+                * The intention of this action is to ensure that when SeekConsensus is
+                * entered the service is in a "clean" state.
                 */
                 processEvents();
                 
