@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.relation.accesspath;
 
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -256,6 +257,110 @@ public class TestBlockingBuffer extends TestCase2 {
                 }
                 
             }
+            
+        } finally {
+
+            service.shutdownNow();
+            
+            service.awaitTermination(1/* timeout */, TimeUnit.SECONDS);
+            
+        }
+        
+    }
+    
+
+    /**
+     * Test that a thread blocked on add() will be unblocked by
+     * {@link BlockingBuffer#close()}. For this test, there is no consumer and
+     * there is a single producer. We just fill up the buffer and when it is
+     * full, we verify that the producer is blocked. We then use the object
+     * returned by {@link BlockingBuffer#iterator()} to
+     * {@link IAsynchronousIterator#close()} to close the buffer and verify that
+     * the producer was woken up.
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/707" >
+     *      BlockingBuffer.close() does not unblock threads </a>
+     */
+    public void test_blockingBuffer_close_noConsumer_closedThroughIterator() throws Exception {
+      
+        // object added to the queue by the producer threads.
+        final Object e0 = new Object();
+
+        // the buffer
+        final BlockingBuffer<Object> buffer = new BlockingBuffer<Object>(2/* capacity */);
+
+        // Set to the first cause for the producer.
+        final AtomicReference<Throwable> producerCause = new AtomicReference<Throwable>();
+
+        // the producer - just drops an object onto the buffer.
+        final class Producer implements Runnable {
+            @Override
+            public void run() {
+                try {
+                buffer.add(e0);
+                } catch(Throwable t) {
+                    // set the first cause.
+                    if (producerCause.compareAndSet(null/* expect */, t)) {
+                        log.warn("First producer cause: " + t);
+                    }
+                    // ensure that producer does not re-run by throwing out
+                    // cause.
+                    throw new RuntimeException(t);
+                }
+            }
+        }
+
+        final Producer p = new Producer();
+        
+        p.run(); // should not block.
+        p.run(); // should not block.
+        
+        final ExecutorService service = Executors
+                .newSingleThreadExecutor(DaemonThreadFactory
+                        .defaultThreadFactory());
+        Future<?> f = null;
+        try {
+
+            f = service.submit(new Producer());
+         
+            /*
+             * Set the Future on the BlockingBuffer. This is how it will notice
+             * when the iterator is closed.
+             */
+            buffer.setFuture(f);
+
+            Thread.sleep(200/*ms*/);
+            
+            // The producer should be blocked.
+            assertFalse(f.isDone());
+            
+            // Closed the buffer using the iterator.
+            buffer.iterator().close();
+
+            // Verify producer was woken up.
+            try {
+
+                f.get(1/* timeout */, TimeUnit.SECONDS);
+                
+            } catch(CancellationException ex) {
+                
+                if(log.isInfoEnabled())
+                    log.info("Ignoring expected exception: "+ex);
+                
+            }
+//            } catch (ExecutionException ex) {
+//                
+//                if (!InnerCause.isInnerCause(ex, BufferClosedException.class)) {
+//                
+//                    /*
+//                     * Should have thrown a BufferClosedException.
+//                     */
+//                    
+//                    fail("Unexpected cause: " + ex, ex);
+//                    
+//                }
+//                
+//            }
             
         } finally {
 
