@@ -488,7 +488,7 @@ public class TestHAJournalServerOverride extends AbstractHA3JournalServerTestCas
      * fails the commit if there is a single failure, even though the quourm
      * might have a consensus around the new commit point.)
      * 
-     * TODO Consider leader failure scenariors in this test suite, not just
+     * TODO Consider leader failure scenarios in this test suite, not just
      * scenarios where B fails. Probably we should also cover failures of C (the
      * 2nd follower). We should also cover scenariors where the quorum is barely
      * met and a single failure causes a rejected commit (local decision) or
@@ -514,24 +514,6 @@ public class TestHAJournalServerOverride extends AbstractHA3JournalServerTestCas
 
         // Simple transaction.
         simpleTransaction();
-        
-//        try {
-//            // Simple transaction.
-//            simpleTransaction();
-//            fail("Expecting failed transaction");
-//        } catch(HttpException ex) {
-//        if (!ex.getMessage().contains(
-//                SpuriousTestException.class.getName())) {
-//            /*
-//             * Wrong inner cause.
-//             * 
-//             * Note: The stack trace of the local exception does not include
-//             * the remote stack trace. The cause is formatted into the HTTP
-//             * response body.
-//             */
-//            fail("Expecting " + ClocksNotSynchronizedException.class, t);
-//        }
-//        }
         
         // Verify quorum is unchanged.
         assertEquals(token, quorum.token());

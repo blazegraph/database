@@ -587,12 +587,12 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
         doStartAB_C_MultiTransactionResync(50, 5);
     }
 
-    public void _testStressStartAB_C_MultiTransactionResync_500_0()
+    public void _testStressStartAB_C_MultiTransactionResync_5tx_then_50ms_delay()
             throws Exception {
 
         for (int i = 0; i < 40; i++) {
             try {
-                doStartAB_C_MultiTransactionResync(500, 0);
+                doStartAB_C_MultiTransactionResync(50, 5);
             } catch (Throwable t) {
                 fail("Fail after " + (i + 1) + " trials : " + t, t);
             } finally {
