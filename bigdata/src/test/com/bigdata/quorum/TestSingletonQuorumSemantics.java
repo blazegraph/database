@@ -34,6 +34,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import junit.framework.AssertionFailedError;
 
+import com.bigdata.journal.AbstractJournal;
 import com.bigdata.quorum.MockQuorumFixture.MockQuorumMember;
 
 /**
@@ -632,6 +633,87 @@ public class TestSingletonQuorumSemantics extends AbstractQuorumTestCase {
             fail("Not expecting " + e, e);
         }
 
+    }
+    
+    /**
+     * Check all valid quorum transitions with:
+     * 	currentToken,
+     * 	nextToken,
+     * 	isJoined state
+     * 	haReady token.
+     * 
+     * Compare tokens to check Quorum state.
+     * Compare tokens with haReady and isJoined to check service state.
+     * 
+     * Possible outcomes are:
+     * quorum didBreak
+     * quorum didMeet
+     * service didLeave
+     * service didJoin
+     * 
+     * Clearly didBreak/didMeet and didLeave/didJoin are exclusive (or should be),
+     * but what about didMeet and didLeave or didBreak and didJoin?
+     */
+    public void testQuorumTransitions() {
+    	// combinations are possible current/new/haReady - each with a true/false isJoined
+    	final long tokens[][] = new long[][] {
+    			// current, new, haReady
+        		new long[] {-1, -1, -1}, // wasn't met, not met, wasn't joined
+        		new long[] {-1, 0, -1}, // met
+        		new long[] {0, 0, -1}, // remains met
+        		new long[] {0, -1, -1}, // break
+        		
+        		new long[] {-1, -1, 0}, // notmet, wasJoined
+        		new long[] {-1, 0, 0}, // met, wasJoined
+        		new long[] {0, 0, 0}, // remains met, wasJoined
+        		new long[] {0, -1, 0}, // break, wasJoined
+ 
+        		// Are these scenarios plausible only as a result of locking problem
+        		//	or possibly Zookeeper bounce?
+//        		new long[] {0, 2, -1}, // token bumped more than one
+//        		new long[] {0, 2, 0}, // token bumped more than one
+//        		new long[] {0, 2, 1}, // token bumped more than one
+//        		new long[] {0, 2, 2}, // token bumped more than one
+    	};
+    	
+    	for (int i = 0; i < tokens.length; i++) {
+    		final long[] tst = tokens[i];
+    		
+    		// token combinations with isJoined == true
+    		final AbstractJournal.QuorumTokenTransitions qtjoined = new AbstractJournal.QuorumTokenTransitions(tst[0]/*current token*/, tst[1]/*new token*/, true/*isJoined*/, tst[2]/*haReady*/);
+    		
+    		// token combinations with isJoined == false
+    		final AbstractJournal.QuorumTokenTransitions qtnotjoined = new AbstractJournal.QuorumTokenTransitions(tst[0]/*current token*/, tst[1]/*new token*/, false/*isJoined*/, tst[2]/*haReady*/);
+    	}
+    	
+    	// test invalid scenarios to confirm AssertionErrors are thrown
+    	try {
+    		new AbstractJournal.QuorumTokenTransitions(1/*current token*/, 2/*new token*/, true/*isJoined*/, 1/*haReady*/);
+    		fail("Expected assertion error, cannot progress quorum token without break");
+    	} catch (AssertionError ae) {
+    		// expected;
+    	}
+       	
+    	try {
+    		new AbstractJournal.QuorumTokenTransitions(2/*current token*/, 1/*new token*/, true/*isJoined*/, 1/*haReady*/);
+    		fail("Expected assertion error, new valid < current valid");
+    	} catch (AssertionError ae) {
+    		// expected;
+    	}
+       	
+    	try {
+    		new AbstractJournal.QuorumTokenTransitions(1/*current token*/, 1/*new token*/, true/*isJoined*/, 2/*haReady*/);
+    		fail("Expected assertion error, haReady > newToken");
+    	} catch (AssertionError ae) {
+    		// expected;
+    	}
+       	
+    	try {
+    		new AbstractJournal.QuorumTokenTransitions(1/*current token*/, 2/*new token*/, true/*isJoined*/, 2/*haReady*/);
+    		fail("Expected assertion error, haReady > currentToken");
+    	} catch (AssertionError ae) {
+    		// expected;
+    	}
     }
     
 }
