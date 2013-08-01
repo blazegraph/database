@@ -35,6 +35,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import junit.framework.AssertionFailedError;
 
 import com.bigdata.journal.AbstractJournal;
+import com.bigdata.journal.AbstractJournal.QuorumTokenTransitions;
 import com.bigdata.quorum.MockQuorumFixture.MockQuorumMember;
 
 /**
@@ -653,6 +654,11 @@ public class TestSingletonQuorumSemantics extends AbstractQuorumTestCase {
      * 
      * Clearly didBreak/didMeet and didLeave/didJoin are exclusive (or should be),
      * but what about didMeet and didLeave or didBreak and didJoin?
+     * 
+     * TODO This test only verifies the expected presence or absence of an
+     * assertion error thrown by the {@link QuorumTokenTransitions} class.
+     * It should do actual post-condition checks on the public fields of
+     * that class.
      */
     public void testQuorumTransitions() {
     	// combinations are possible current/new/haReady - each with a true/false isJoined
