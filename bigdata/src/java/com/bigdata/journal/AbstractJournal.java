@@ -5344,10 +5344,11 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
      * better abstractions on the quorum/service states.
      */
     static public class QuorumTokenTransitions {
-    	final long currentQuorumToken;
-    	final long newQuorumToken;
-    	final long currentHaReady;
-    	
+        
+        final long currentQuorumToken;
+        final long newQuorumToken;
+        final long currentHaReady;
+
         final boolean didBreak;
         final boolean didMeet;
         final boolean didJoinMetQuorum;
@@ -5358,11 +5359,18 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
         final boolean isJoined;
         final boolean wasJoined;
         
-        public QuorumTokenTransitions(final long currentQuorumToken, final long newQuorumToken, QuorumService<HAGlue> service, final long haReady) {
-        	this(currentQuorumToken, newQuorumToken, service != null && service.isJoinedMember(newQuorumToken), haReady);
+        public QuorumTokenTransitions(final long currentQuorumToken,
+                final long newQuorumToken, final QuorumService<HAGlue> service,
+                final long haReady) {
+
+            this(currentQuorumToken, newQuorumToken, service != null
+                    && service.isJoinedMember(newQuorumToken), haReady);
+            
         }
         
-        public QuorumTokenTransitions(final long currentQuorumToken, final long newQuorumToken, final boolean joined, final long haReady) {
+        public QuorumTokenTransitions(final long currentQuorumToken,
+                final long newQuorumToken, final boolean joined,
+                final long haReady) {
         	
             this.currentHaReady = haReady;
             this.currentQuorumToken = currentQuorumToken;
@@ -5373,6 +5381,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
             wasMet = currentQuorumToken != Quorum.NO_QUORUM;
             isMet = newQuorumToken != Quorum.NO_QUORUM;
             
+            // Both quorum token and haReadyToken agree with newValue.
 			final boolean noTokenChange = currentQuorumToken == newQuorumToken
 					&& currentQuorumToken == currentHaReady;
 
@@ -5439,6 +5448,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
             checkStates();
         }
         
+        // TODO Document rationale for each assertion.
         private void checkStates() {
         	if (wasJoined && wasMet && currentHaReady > currentQuorumToken)
         		throw new AssertionError("haReady greater than current token");
@@ -5447,14 +5457,19 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
         		throw new AssertionError("next token less than current token");
         	}
         	
-        	if (didMeet && didJoinMetQuorum) {
-        		throw new AssertionError("didMeet && didJoinMetQuorum");
-        	}
-        	
         	if (wasMet && isMet && newQuorumToken != currentQuorumToken) {
         		throw new AssertionError("New quorum token without quorum break first");
         	}
         	
+        if (didMeet && didJoinMetQuorum) {
+                /*
+                 * It is not possible to both join with an existing quorum and
+                 * to be one of the services that caused a quorum to meet. These
+                 * conditions are exclusive.
+                 */
+            throw new AssertionError("didMeet && didJoinMetQuorum");
+        }
+            
         	/**
         	 * This is a bit odd, it is okay, but probably didLeaveMetQuorum will
         	 * only be true iff isJoined
@@ -5462,207 +5477,234 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 //        	if (didBreak && didLeaveMetQuorum) {
 //        		throw new AssertionError("didBreak && didLeaveMetQuorum");
 //        	}
-//        	if (didLeaveMetQuorum && !isJoined) {
+//        	if (didLeaveMetQuorum && !isJoined) { // TODO Why not valid?
 //        		throw new AssertionError("didLeaveMetQuorum && !isJoined");
 //        	}
         }
         
-        public final boolean noChange() {
-        	return currentQuorumToken == newQuorumToken;
-        }
+        /*
+         * Methods for making decisions in the ctor. They are NOT for public
+         * use. There are simple public fields that report out the decisions
+         * make using these methods.
+         */
         
-        public final boolean isBreak() {
+//        public final boolean noChange() {
+//        	return currentQuorumToken == newQuorumToken;
+//        }
+        
+        private final boolean isBreak() {
         	return wasMet && !isMet;
         }
         
-        public final boolean isMeet() {
+        private final boolean isMeet() {
         	return isMet & !wasMet;
         }
         
-        public final boolean didJoin() {
+        private final boolean didJoin() {
         	return isMet && isJoined && !wasJoined;
         }
         
-        public final boolean didLeave() {
-        	return isBreak() && wasJoined;
-        }
+//        private final boolean didLeave() {
+//        	return isBreak() && wasJoined;
+//        }
         
-        public final boolean didLeaveMet() {
+        private final boolean didLeaveMet() {
         	return isMet && wasJoined && !isJoined;
         }
         
         public final String showState() {
-            return "";
-
+            return ""; // TODO showState().
         }
-    }    
+    }
+    
     protected void setQuorumToken(final long newValue) {
     	
-        /*
-         * Protect for potential NPE
-         */
+        // Protect for potential NPE
         if (quorum == null)
-        	return;
+            return;
 
         // This quorum member.
         final QuorumService<HAGlue> localService = quorum.getClient();
 
-        final QuorumTokenTransitions transitionState = new QuorumTokenTransitions(quorumToken, newValue, localService, haReadyToken);
+        // Figure out the state transitions involved.
+        final QuorumTokenTransitions transitionState = new QuorumTokenTransitions(
+                quorumToken, newValue, localService, haReadyToken);
 
-        /*
-         * The token is [volatile]. Save it's state on entry. Figure out if this
-         * is a quorum meet or a quorum break.
-         */
-		{
-			/*
-			 * TODO: remove this code once the refactoring with QuorumTokenTransitions is stable, right
-			 * now it is used to sanity check the new code.
-			 */
-			final long oldValue = quorumToken;
-			final long oldReady = haReadyToken;
-			final HAStatusEnum oldStatus = haStatus;
+//        /*
+//         * The token is [volatile]. Save it's state on entry. Figure out if this
+//         * is a quorum meet or a quorum break.
+//         */
+//		{
+//			/*
+//			 * TODO: remove this code once the refactoring with QuorumTokenTransitions is stable, right
+//			 * now it is used to sanity check the new code.
+//			 */
+//			final long oldValue = quorumToken;
+//			final long oldReady = haReadyToken;
+//			final HAStatusEnum oldStatus = haStatus;
+//
+//			if (haLog.isInfoEnabled())
+//				haLog.info("oldValue=" + oldValue + ", newToken=" + newValue
+//						+ ", oldReady=" + oldReady);
+//
+//			/*
+//			 * Note that previously the noTokenChange condition was a short
+//			 * circuit exit.
+//			 * 
+//			 * This has been removed so we must account for this condition to
+//			 * determine correct transition
+//			 */
+//			final boolean noTokenChange = oldValue == newValue
+//					&& oldValue == oldReady;
+//			// if (oldValue == newValue && oldValue == oldReady) {
+//			// log.warn("NO TOKEN CHANGE");
+//			// // No change.
+//			// return;
+//			//
+//			// }
+//
+//			final boolean didBreak;
+//			final boolean didMeet;
+//			final boolean didJoinMetQuorum;
+//			final boolean didLeaveMetQuorum;
+//			final boolean isJoined = localService != null
+//					&& localService.isJoinedMember(newValue);
+//			
+//			final boolean wasJoined = oldReady != Quorum.NO_QUORUM;
+//
+//			/**
+//			 * Adding set of initial conditions to account for noTokenChange
+//			 * 
+//			 * TODO: should there be more than one initial condition?
+//			 */
+//			if (noTokenChange && isJoined) {
+//				didBreak = false; // quorum break.
+//				didMeet = false;
+//				didJoinMetQuorum = false; // true;
+//				didLeaveMetQuorum = false; // haReadyToken != Quorum.NO_QUORUM;
+//											// // if service was joined with met
+//											// quorum, then it just left the met
+//											// quorum.
+//			} else if (newValue == Quorum.NO_QUORUM
+//					&& oldValue != Quorum.NO_QUORUM) {
+//
+//				/*
+//				 * Quorum break.
+//				 * 
+//				 * Immediately invalidate the token. Do not wait for a lock.
+//				 */
+//
+//				this.quorumToken = newValue;
+//
+//				didBreak = true; // quorum break.
+//				didMeet = false;
+//				didJoinMetQuorum = false;
+//				didLeaveMetQuorum = wasJoined; // if service was joined with met
+//												// quorum, then it just left the
+//												// met quorum.
+//
+//			} else if (newValue != Quorum.NO_QUORUM
+//					&& oldValue == Quorum.NO_QUORUM) {
+//
+//				/*
+//				 * Quorum meet.
+//				 * 
+//				 * We must wait for the lock to update the token.
+//				 */
+//
+//				didBreak = false;
+//				didMeet = true; // quorum meet.
+//				didJoinMetQuorum = false;
+//				didLeaveMetQuorum = false;
+//
+//			} else if (newValue != Quorum.NO_QUORUM // quorum exists
+//					&& oldReady == Quorum.NO_QUORUM // service was not joined
+//													// with met quorum.
+//					&& isJoined // service is now joined with met quorum.
+//			) {
+//
+//				/*
+//				 * This service is joining a quorum that is already met.
+//				 */
+//
+//				didBreak = false;
+//				didMeet = false;
+//				didJoinMetQuorum = true; // service joined with met quorum.
+//				didLeaveMetQuorum = false;
+//
+//			} else if (newValue != Quorum.NO_QUORUM // quorum exists
+//					&& wasJoined // service was joined with met quorum
+//					&& !isJoined // service is no longer joined with met quorum.
+//			) {
+//
+//				/*
+//				 * This service is leaving a quorum that is already met (but
+//				 * this is not a quorum break since the new token is not
+//				 * NO_QUORUM).
+//				 */
+//
+//				didBreak = false;
+//				didMeet = false;
+//				didJoinMetQuorum = false;
+//				didLeaveMetQuorum = true; // service left met quorum. quorum
+//											// still met.
+//
+//			} else {
+//
+//				// /*
+//				// * No change in state.
+//				// */
+//				//
+//				// log.warn("No change"//
+//				// + ": qorumToken(" + oldValue + " => " + newValue + ")"//
+//				// + ", haReadyToken(" + haReadyToken + ")"//
+//				// );
+//
+//				didBreak = false;
+//				didMeet = false;
+//				didJoinMetQuorum = false;
+//				didLeaveMetQuorum = false;
+//
+//				return;
+//
+//			}
+//			
+//			log.warn("didBreak: " + didBreak
+//					+ ", didMeet: " + didMeet
+//					+ ", didJoinMetQuorum: " + didJoinMetQuorum
+//					+ ", didLeaveMetQuorum: " + didLeaveMetQuorum
+//					+ ", isJoined: " + isJoined
+//					+ ", wasJoined: " + wasJoined
+//					);
+//
+//			assert didBreak == transitionState.didBreak;
+//			assert didMeet == transitionState.didMeet;
+//			assert didJoinMetQuorum == transitionState.didJoinMetQuorum;
+//			assert didLeaveMetQuorum == transitionState.didLeaveMetQuorum;
+//			assert isJoined == transitionState.isJoined;
+//			assert wasJoined == transitionState.wasJoined;
+//		}
 
-			if (haLog.isInfoEnabled())
-				haLog.info("oldValue=" + oldValue + ", newToken=" + newValue
-						+ ", oldReady=" + oldReady);
-
-			/*
-			 * Note that previously the noTokenChange condition was a short
-			 * circuit exit.
-			 * 
-			 * This has been removed so we must account for this condition to
-			 * determine correct transition
-			 */
-			final boolean noTokenChange = oldValue == newValue
-					&& oldValue == oldReady;
-			// if (oldValue == newValue && oldValue == oldReady) {
-			// log.warn("NO TOKEN CHANGE");
-			// // No change.
-			// return;
-			//
-			// }
-
-			final boolean didBreak;
-			final boolean didMeet;
-			final boolean didJoinMetQuorum;
-			final boolean didLeaveMetQuorum;
-			final boolean isJoined = localService != null
-					&& localService.isJoinedMember(newValue);
-			
-			final boolean wasJoined = oldReady != Quorum.NO_QUORUM;
-
-			/**
-			 * Adding set of initial conditions to account for noTokenChange
-			 * 
-			 * TODO: should there be more than one initial condition?
-			 */
-			if (noTokenChange && isJoined) {
-				didBreak = false; // quorum break.
-				didMeet = false;
-				didJoinMetQuorum = false; // true;
-				didLeaveMetQuorum = false; // haReadyToken != Quorum.NO_QUORUM;
-											// // if service was joined with met
-											// quorum, then it just left the met
-											// quorum.
-			} else if (newValue == Quorum.NO_QUORUM
-					&& oldValue != Quorum.NO_QUORUM) {
-
-				/*
-				 * Quorum break.
-				 * 
-				 * Immediately invalidate the token. Do not wait for a lock.
-				 */
-
-				this.quorumToken = newValue;
-
-				didBreak = true; // quorum break.
-				didMeet = false;
-				didJoinMetQuorum = false;
-				didLeaveMetQuorum = wasJoined; // if service was joined with met
-												// quorum, then it just left the
-												// met quorum.
-
-			} else if (newValue != Quorum.NO_QUORUM
-					&& oldValue == Quorum.NO_QUORUM) {
-
-				/*
-				 * Quorum meet.
-				 * 
-				 * We must wait for the lock to update the token.
-				 */
-
-				didBreak = false;
-				didMeet = true; // quorum meet.
-				didJoinMetQuorum = false;
-				didLeaveMetQuorum = false;
-
-			} else if (newValue != Quorum.NO_QUORUM // quorum exists
-					&& oldReady == Quorum.NO_QUORUM // service was not joined
-													// with met quorum.
-					&& isJoined // service is now joined with met quorum.
-			) {
-
-				/*
-				 * This service is joining a quorum that is already met.
-				 */
-
-				didBreak = false;
-				didMeet = false;
-				didJoinMetQuorum = true; // service joined with met quorum.
-				didLeaveMetQuorum = false;
-
-			} else if (newValue != Quorum.NO_QUORUM // quorum exists
-					&& wasJoined // service was joined with met quorum
-					&& !isJoined // service is no longer joined with met quorum.
-			) {
-
-				/*
-				 * This service is leaving a quorum that is already met (but
-				 * this is not a quorum break since the new token is not
-				 * NO_QUORUM).
-				 */
-
-				didBreak = false;
-				didMeet = false;
-				didJoinMetQuorum = false;
-				didLeaveMetQuorum = true; // service left met quorum. quorum
-											// still met.
-
-			} else {
-
-				// /*
-				// * No change in state.
-				// */
-				//
-				// log.warn("No change"//
-				// + ": qorumToken(" + oldValue + " => " + newValue + ")"//
-				// + ", haReadyToken(" + haReadyToken + ")"//
-				// );
-
-				didBreak = false;
-				didMeet = false;
-				didJoinMetQuorum = false;
-				didLeaveMetQuorum = false;
-
-				return;
-
-			}
-			
-			log.warn("didBreak: " + didBreak
-					+ ", didMeet: " + didMeet
-					+ ", didJoinMetQuorum: " + didJoinMetQuorum
-					+ ", didLeaveMetQuorum: " + didLeaveMetQuorum
-					+ ", isJoined: " + isJoined
-					+ ", wasJoined: " + wasJoined
-					);
-
-			assert didBreak == transitionState.didBreak;
-			assert didMeet == transitionState.didMeet;
-			assert didJoinMetQuorum == transitionState.didJoinMetQuorum;
-			assert didLeaveMetQuorum == transitionState.didLeaveMetQuorum;
-			assert isJoined == transitionState.isJoined;
-			assert wasJoined == transitionState.wasJoined;
-		}
+        if (transitionState.didBreak) {
+            /*
+             * If the quorum broke then set the token immediately without
+             * waiting for the lock.
+             * 
+             * Note: This is a volatile write. We want the break to become
+             * visible as soon as possible in order to fail things which examine
+             * the token.
+             * 
+             * TODO Why not clear the haReadyToken and haStatus here as well?
+             * However, those changes are not going to be noticed by threads
+             * awaiting a state change until we do signalAll() and that requires
+             * the lock.
+             * 
+             * TODO Why not clear the haReadyToken and haStatus on a leave using
+             * a volatile write?  Again, threads blocked in awaitHAReady() would
+             * not notice until we actually take the lock and do signalAll().
+             */
+            this.quorumToken = Quorum.NO_QUORUM;
+        }
 
         /*
          * Both a meet and a break require an exclusive write lock.
@@ -5670,13 +5712,6 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
         final boolean isLeader;
         final boolean isFollower;
         final long localCommitCounter;
-        
-        /*
-         * If the quorum broke then set the token immediately without waiting for the lock.
-         * TODO: explain why this is necessary/what would go wrong if we waited for the lock?
-         */
-        if (transitionState.didBreak)
-        	this.quorumToken = newValue;
 
         /*
          * TODO: Is this lock synchronization a problem? With token update delayed on a lock could a second thread
@@ -5709,15 +5744,13 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
         	 * It may well be that this is the source of the stochastic failures we see.
         	 */
 
-        	/*
-        	 * didLeaveMetQuorum is only ever set when didBreak is also true,
-        	 * so test separately
-          	 */
             if (transitionState.didLeaveMetQuorum) {
 
-            	/*
-            	 * Is it okay to set this token prior to the abort methods?
-            	 */
+                /*
+                 * The service was joined with a met quorum.
+                 * 
+                 * TODO Is it okay to set this token prior to the abort methods?
+                 */
                 quorumToken = newValue; // volatile write.
                 
                 localCommitCounter = -1;
@@ -5757,14 +5790,20 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                 haReadyCondition.signalAll(); // signal ALL.
                 
             } else if (transitionState.didBreak) {
-            	/*
-            	 * As we were not joined at the break there is nothing to do save for
-            	 * updating the token
-            	 */
-                quorumToken = newValue; // volatile write.
+            	    
+                /*
+                 * Note: [didLeaveMetQuorum] was handled above. So, this else if
+                 * only applies to a service that observes a quorum break but
+                 * which was not joined with the met quorum. As we were not
+                 * joined at the break there is nothing to do save for updating
+                 * the token.
+                 */
                 
+                quorumToken = Quorum.NO_QUORUM; // volatile write.
+
                 localCommitCounter = -1;
                 isLeader = isFollower = false;
+                
             } else if (transitionState.didMeet || transitionState.didJoinMetQuorum) {
             	
             	/**

@@ -1710,16 +1710,6 @@ public class HAJournalServer extends AbstractServer {
                 if (log.isInfoEnabled())
                     log.info("Current Token: " + journal.getHAReady() + ", new: " + getQuorum().token());
 
-                /*
-                 * We must ensure that the token is reset to generate the required
-                 * additional events.
-                 * 
-                 * Processing the events at this point, after serviceLeave, is not sufficient.  
-                 * 
-                 * TODO It is possible that we could avoid the clear/set pattern with more 
-                 * state analysis in setQuorumToken and this should be investigated.
-                 */
-                // journal.setQuorumToken(Quorum.NO_QUORUM);
                 journal.setQuorumToken(getQuorum().token());
                 
                /**
