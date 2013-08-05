@@ -36,6 +36,7 @@ import java.util.TreeMap;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
+import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -45,9 +46,6 @@ import java.util.concurrent.locks.ReentrantLock;
 import com.bigdata.btree.keys.KVO;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.relation.accesspath.BlockingBuffer;
-import com.bigdata.service.ndx.pipeline.AbstractKeyRangeMasterTestCase.L;
-import com.bigdata.service.ndx.pipeline.AbstractMasterTestCase.H;
-import com.bigdata.service.ndx.pipeline.AbstractMasterTestCase.O;
 
 /**
  * Test ability to handle a redirect (subtask learns that the target service no
@@ -142,10 +140,15 @@ public class TestMasterTaskWithRedirect extends AbstractMasterTestCase {
             
         };
         
-        // start the consumer.
-        final Future<H> future = executorService.submit(master);
-        masterBuffer.setFuture(future);
-
+        // Wrap computation as FutureTask.
+        final FutureTask<H> ft = new FutureTask<H>(master);
+        
+        // Set Future on BlockingBuffer.
+        masterBuffer.setFuture(ft);
+        
+        // Start the consumer.
+        executorService.submit(ft);
+        
         final KVO<O>[] a = new KVO[] {
                 new KVO<O>(new byte[]{1},new byte[]{2},null/*val*/),
                 new KVO<O>(new byte[]{13},new byte[]{3},null/*val*/)
@@ -321,10 +324,15 @@ public class TestMasterTaskWithRedirect extends AbstractMasterTestCase {
             
         };
         
-        // start the consumer.
-        final Future<H> future = executorService.submit(master);
-        masterBuffer.setFuture(future);
+        // Wrap computation as FutureTask.
+        final FutureTask<H> ft = new FutureTask<H>(master);
 
+        // Set Future on BlockingBuffer.
+        masterBuffer.setFuture(ft);
+
+        // Start the consumer.
+        executorService.submit(ft);
+        
         // write on L(1) and L(14).
         {
             final KVO<O>[] a = new KVO[] {
@@ -730,10 +738,15 @@ public class TestMasterTaskWithRedirect extends AbstractMasterTestCase {
         
         redirecter.init(initialLocatorCount);
         
-        // start the consumer.
-        final Future<H> future = executorService.submit(master);
-        masterBuffer.setFuture(future);
+        // Wrap computation as FutureTask.
+        final FutureTask<H> ft = new FutureTask<H>(master);
+        
+        // Set Future on BlockingBuffer.
+        masterBuffer.setFuture(ft);
 
+        // Start the consumer.
+        executorService.submit(ft);
+        
         // start writing data.
         final List<Future> producerFutures = new LinkedList<Future>();
         for (int i = 0; i < nproducers; i++) {

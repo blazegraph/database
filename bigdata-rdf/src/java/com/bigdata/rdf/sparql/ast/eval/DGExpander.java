@@ -16,7 +16,6 @@ import com.bigdata.bop.IVariable;
 import com.bigdata.bop.ap.Predicate;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IIndex;
-import com.bigdata.btree.ITupleIterator;
 import com.bigdata.counters.CAT;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.spo.ISPO;
@@ -310,7 +309,7 @@ public class DGExpander implements IAccessPathExpander<ISPO> {
                 this.buffer = new BlockingBuffer<ISPO>(sourceAccessPath
                         .getChunkCapacity());
 
-                Future<Void> future = null;
+                FutureTask<Void> future = null;
                 try {
 
                     /*
@@ -325,15 +324,20 @@ public class DGExpander implements IAccessPathExpander<ISPO> {
                      * will be passed along to the iterator) and to close the
                      * buffer (the iterator will notice that the buffer has been
                      * closed as well as that the cause was set on the buffer).
+                     *
+                     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/707">
+                     *      BlockingBuffer.close() does not unblock threads </a>
                      */
 
-                    // run the task.
-                    future = sourceAccessPath.getIndexManager()
-                            .getExecutorService().submit(
-                                    newRunIteratorsTask(buffer));
+                    // Wrap task as FutureTask.
+                    future = new FutureTask<Void>(newRunIteratorsTask(buffer));
 
                     // set the future on the BlockingBuffer.
                     buffer.setFuture(future);
+
+                    // submit task for execution.
+                    sourceAccessPath.getIndexManager().getExecutorService()
+                            .submit(future);
 
                     /*
                      * The outer access path will impose the "DISTINCT SPO"

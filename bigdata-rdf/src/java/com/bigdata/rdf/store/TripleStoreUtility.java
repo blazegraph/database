@@ -32,6 +32,7 @@ import java.io.FileNotFoundException;
 import java.util.Properties;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.FutureTask;
 
 import org.apache.log4j.Logger;
 import org.openrdf.model.Statement;
@@ -42,8 +43,8 @@ import com.bigdata.rdf.axioms.Axioms;
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataStatement;
-import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.rio.AbstractStatementBuffer.StatementBuffer2;
+import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.rules.BackchainAccessPath;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPO;
@@ -305,47 +306,60 @@ public class TripleStoreUtility {
          * Run task. The task consumes externalized statements from [expected]
          * and writes statements not found in [actual] onto the blocking buffer.
          */
-        buffer.setFuture(actual.getExecutorService().submit(
-                new Callable<Void>() {
+        final Callable<Void> myTask = new Callable<Void>() {
 
-                    public Void call() throws Exception {
+                public Void call() throws Exception {
 
-                        try {
+                    try {
 
-                            while (itr2.hasNext()) {
+                        while (itr2.hasNext()) {
 
-                                // a statement from the source db.
-                                final BigdataStatement stmt = itr2.next();
+                            // a statement from the source db.
+                            final BigdataStatement stmt = itr2.next();
 
-                                // if (log.isInfoEnabled()) log.info("Source: "
-                                // + stmt);
+                            // if (log.isInfoEnabled()) log.info("Source: "
+                            // + stmt);
 
-                                // add to the buffer.
-                                sb.add(stmt);
-
-                            }
-
-                        } finally {
-
-                            itr2.close();
+                            // add to the buffer.
+                            sb.add(stmt);
 
                         }
 
-                        /*
-                         * Flush everything in the StatementBuffer so that it
-                         * shows up in the BlockingBuffer's iterator().
-                         */
+                    } finally {
 
-                        final long nnotFound = sb.flush();
-
-                        if (log.isInfoEnabled())
-                            log.info("Flushed: #notFound=" + nnotFound);
-
-                        return null;
+                        itr2.close();
 
                     }
 
-                }));
+                    /*
+                     * Flush everything in the StatementBuffer so that it
+                     * shows up in the BlockingBuffer's iterator().
+                     */
+
+                    final long nnotFound = sb.flush();
+
+                    if (log.isInfoEnabled())
+                        log.info("Flushed: #notFound=" + nnotFound);
+
+                    return null;
+
+                }
+
+        };
+
+        /**
+         * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/707">
+         *      BlockingBuffer.close() does not unblock threads </a>
+         */
+
+        // Wrap computation as FutureTask.
+        final FutureTask<Void> ft = new FutureTask<Void>(myTask);
+        
+        // Set Future on BlockingBuffer.
+        buffer.setFuture(ft);
+        
+        // Submit computation for evaluation.
+        actual.getExecutorService().submit(ft);
 
         /*
          * Return iterator reading "not found" statements from the blocking
