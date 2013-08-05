@@ -148,12 +148,6 @@ public class ASTEmptyGroupOptimizer implements IASTOptimizer {
 
     }
 
-    /**
-     * Eliminate a parent join group whose only child is another join group by
-     * lifting the child (it replaces the parent).
-     * 
-     * @param op
-     */
     private static void eliminateEmptyGroups(final QueryBase queryBase, 
             final GraphPatternGroup<?> op) {
 
