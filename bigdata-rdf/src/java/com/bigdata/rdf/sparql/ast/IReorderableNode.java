@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sparql.ast;
 
 import com.bigdata.bop.BOp;
+import com.bigdata.rdf.sparql.ast.optimizers.StaticOptimizer;
 
 /**
  * Interface for things which can be re-ordered by the static join
@@ -48,7 +49,8 @@ public interface IReorderableNode extends IGroupMemberNode, IBindingProducerNode
 	 * Return the estimated cardinality - either the range count of a 
 	 * statement pattern or some computed estimated cardinality for a join
 	 * group.
+	 * @param opt This optimizer can be used to help work out the estimate
 	 */
-	long getEstimatedCardinality();
+	long getEstimatedCardinality(StaticOptimizer opt);
 	
 }
