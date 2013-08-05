@@ -33,6 +33,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.FutureTask;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
@@ -318,21 +319,26 @@ public class TestBlockingBuffer extends TestCase2 {
         final ExecutorService service = Executors
                 .newSingleThreadExecutor(DaemonThreadFactory
                         .defaultThreadFactory());
-        Future<?> f = null;
+
+        FutureTask<Void> ft = null;
         try {
 
-            f = service.submit(new Producer());
-         
+            // Wrap computation as FutureTask.
+            ft = new FutureTask<Void>(new Producer(), (Void) null/* result */);
+
             /*
              * Set the Future on the BlockingBuffer. This is how it will notice
              * when the iterator is closed.
              */
-            buffer.setFuture(f);
+            buffer.setFuture(ft);
 
+            // Submit computation for evaluation.
+            service.submit(ft);
+            
             Thread.sleep(200/*ms*/);
             
             // The producer should be blocked.
-            assertFalse(f.isDone());
+            assertFalse(ft.isDone());
             
             // Closed the buffer using the iterator.
             buffer.iterator().close();
@@ -340,7 +346,7 @@ public class TestBlockingBuffer extends TestCase2 {
             // Verify producer was woken up.
             try {
 
-                f.get(1/* timeout */, TimeUnit.SECONDS);
+                ft.get(1/* timeout */, TimeUnit.SECONDS);
                 
             } catch(CancellationException ex) {
                 

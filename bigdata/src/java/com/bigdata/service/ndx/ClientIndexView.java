@@ -36,6 +36,7 @@ import java.util.NoSuchElementException;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
+import java.util.concurrent.FutureTask;
 import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -91,7 +92,6 @@ import com.bigdata.service.IDataService;
 import com.bigdata.service.IMetadataService;
 import com.bigdata.service.Split;
 import com.bigdata.service.ndx.pipeline.IDuplicateRemover;
-import com.bigdata.service.ndx.pipeline.IndexAsyncWriteStats;
 import com.bigdata.service.ndx.pipeline.IndexWriteTask;
 import com.bigdata.striterator.ICloseableIterator;
 import com.bigdata.util.InnerCause;
@@ -833,7 +833,19 @@ public class ClientIndexView implements IScaleOutClientIndex {
                 ts, isReadConsistentTx, fromKey, toKey, capacity, flags,
                 filter, queryBuffer);
 
-        queryBuffer.setFuture(fed.getExecutorService().submit(task));
+        /**
+         * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/707">
+         *      BlockingBuffer.close() does not unblock threads </a>
+         */
+
+        // Wrap computation as FutureTask.
+        final FutureTask<Void> ft = new FutureTask<Void>(task);
+
+        // Set Future on BlockingBuffer.
+        queryBuffer.setFuture(ft);
+
+        // Submit computation for evaluation.
+        fed.getExecutorService().submit(ft);
 
         return new UnchunkedTupleIterator(queryBuffer.iterator());
 
@@ -2228,10 +2240,20 @@ public class ClientIndexView implements IScaleOutClientIndex {
                 writeBuffer//
                 );
 
-        final Future<? extends IndexAsyncWriteStats> future = fed
-                .getExecutorService().submit(task);
+        /**
+         * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/707">
+         *      BlockingBuffer.close() does not unblock threads </a>
+         */
 
-        writeBuffer.setFuture(future);
+        // Wrap computation as FutureTask.
+        @SuppressWarnings({ "unchecked", "rawtypes" })
+        final FutureTask<?> ft = new FutureTask(task);
+
+        // Set Future on BlockingBuffer.
+        writeBuffer.setFuture(ft);
+
+        // Submit computation for evaluation.
+        fed.getExecutorService().submit(ft);
 
         return task.getBuffer();
 

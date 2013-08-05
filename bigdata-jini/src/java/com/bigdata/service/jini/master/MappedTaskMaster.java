@@ -32,6 +32,7 @@ import java.io.Serializable;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Future;
+import java.util.concurrent.FutureTask;
 import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.TimeUnit;
 
@@ -406,10 +407,20 @@ V extends Serializable//
 
         };
 
-        final Future<? extends ResourceBufferStatistics> future = getFederation()
-                .getExecutorService().submit(task);
+        /**
+         * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/707">
+         *      BlockingBuffer.close() does not unblock threads </a>
+         */
+        
+        // Wrap computation as FutureTask.
+        @SuppressWarnings({ "unchecked", "rawtypes" })
+        final FutureTask<?> ft = new FutureTask(task);
 
-        resourceBuffer.setFuture(future);
+        // Set Future on BlockingBuffer.
+        resourceBuffer.setFuture(ft);
+
+        // Submit FutureTask for computation.
+        getFederation().getExecutorService().submit(ft);
 
         /*
          * Attach to the counters reported by the client to the LBS.

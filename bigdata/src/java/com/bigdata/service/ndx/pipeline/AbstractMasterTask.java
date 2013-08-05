@@ -896,10 +896,28 @@ L>//
 
                 // if (oldval == null) {
 
-                // assign a worker thread to the sink.
-                final Future<? extends AbstractSubtaskStats> future = submitSubtask(sink);
-
-                out.setFuture(future);
+                /**
+                 * Hack pattern ensures that the Future is cancelled if we exit
+                 * by any code path after the Future has been submitted for
+                 * evaluation and before the Future has been set on the
+                 * BlockingBuffer.
+                 * 
+                 * @see <a
+                 *      href="https://sourceforge.net/apps/trac/bigdata/ticket/707">
+                 *      BlockingBuffer.close() does not unblock threads </a>
+                 */
+                Future<? extends AbstractSubtaskStats> future = null;
+                try {
+                    // assign a worker thread to the sink.
+                    future = submitSubtask(sink);
+                    // set Future (can now be cancelled)
+                    out.setFuture(future);
+                } finally {
+                    if (future != null && buffer.getFuture() == null) {
+                        // Future exists but not set on BlockingBuffer.
+                        future.cancel(true/* mayInterruptIfRunning */);
+                    }
+                }
 
                 stats.subtaskStartCount.incrementAndGet();
 

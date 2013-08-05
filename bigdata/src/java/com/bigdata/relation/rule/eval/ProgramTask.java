@@ -355,13 +355,25 @@ public class ProgramTask extends DataServiceCallable<Object> implements IProgram
              * @todo if the #of results is small and they are available with
              * little latency then return the results inline using a fully
              * buffered iterator.
+             * 
+             * Note: hack pattern to ensure Future is cancelled if we exit by
+             * any code path before the future has been set on the BlockingBuffer.
+             *
+             * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/707">
+             *      BlockingBuffer.close() does not unblock threads </a>
              */
+            try {
+                // run the task.
+                future = queryTask.submit();
 
-            // run the task.
-            future = queryTask.submit();
-            
-            // set the future on the BlockingBuffer.
-            buffer.setFuture(future);
+                // set the future on the BlockingBuffer.
+                buffer.setFuture(future);
+            } finally {
+                if (future != null && buffer.getFuture() == null) {
+                    // Future exists but not set on BlockingBuffer.
+                    future.cancel(true/* mayInterruptIfRunning */);
+                }
+            }
 
             if (log.isDebugEnabled())
                 log.debug("Returning iterator reading on async query task");

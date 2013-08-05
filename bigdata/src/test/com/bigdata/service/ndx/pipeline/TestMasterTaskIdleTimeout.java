@@ -31,7 +31,7 @@ package com.bigdata.service.ndx.pipeline;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
+import java.util.concurrent.FutureTask;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
@@ -41,8 +41,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import com.bigdata.btree.keys.KVO;
 import com.bigdata.relation.accesspath.BlockingBuffer;
-import com.bigdata.service.ndx.pipeline.AbstractMasterTestCase.H;
-import com.bigdata.service.ndx.pipeline.AbstractMasterTestCase.O;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
@@ -92,10 +90,15 @@ public class TestMasterTaskIdleTimeout extends AbstractMasterTestCase {
 
         };
 
-        // start the consumer.
-        final Future<H> future = executorService.submit(master);
-        masterBuffer.setFuture(future);
-
+        // Wrap computation as FutureTask.
+        final FutureTask<H> ft = new FutureTask<H>(master);
+        
+        // Set Future on BlockingBuffer.
+        masterBuffer.setFuture(ft);
+        
+        // Start the consumer.
+        executorService.submit(ft);
+        
         /*
          * write a chunk on the buffer. this will cause an output buffer to be
          * created.
@@ -245,9 +248,14 @@ public class TestMasterTaskIdleTimeout extends AbstractMasterTestCase {
 
         };
 
-        // start the consumer.
-        final Future<H> future = executorService.submit(master);
-        masterBuffer.setFuture(future);
+        // Wrap computation as FutureTask.
+        final FutureTask<H> ft = new FutureTask<H>(master);
+
+        // Set Future on BlockingBuffer
+        masterBuffer.setFuture(ft);
+
+        // Start the consumer.
+        executorService.submit(ft);
 
         /*
          * write a chunk on the buffer. this will cause a sink to be created.
@@ -413,10 +421,15 @@ public class TestMasterTaskIdleTimeout extends AbstractMasterTestCase {
 
         };
 
-        // start the consumer.
-        final Future<H> future = executorService.submit(master);
-        masterBuffer.setFuture(future);
-
+        // Wrap computation as FutureTask.
+        final FutureTask<H> ft = new FutureTask<H>(master);
+        
+        // Set Future on BlockingBuffer.
+        masterBuffer.setFuture(ft);
+        
+        // Start the consumer.
+        executorService.submit(ft);
+        
         // scheduled service used to write on the master.
         final ScheduledExecutorService scheduledExecutorService = Executors
                 .newScheduledThreadPool(1, DaemonThreadFactory
@@ -656,10 +669,15 @@ public class TestMasterTaskIdleTimeout extends AbstractMasterTestCase {
             
         };
         
-        // start the consumer.
-        final Future<H> future = executorService.submit(master);
-        masterBuffer.setFuture(future);
+        // Wrap computation as FutureTask.
+        final FutureTask<H> ft = new FutureTask<H>(master);
+        
+        // Set Future on BlockingBuffer.
+        masterBuffer.setFuture(ft);
 
+        // Start the consumer.
+        executorService.submit(ft);
+        
         // write a chunk on the master.
         {
             final KVO<O>[] a = new KVO[] {
@@ -761,9 +779,14 @@ public class TestMasterTaskIdleTimeout extends AbstractMasterTestCase {
             
         };
         
-        // start the consumer.
-        final Future<H> future = executorService.submit(master);
-        masterBuffer.setFuture(future);
+        // Wrap computation as FutureTask.
+        final FutureTask<H> ft = new FutureTask<H>(master);
+        
+        // Set Future on BlockingBuffer.
+        masterBuffer.setFuture(ft);
+
+        // Start the consumer.
+        executorService.submit(ft);
 
         // write a chunk on the master.
         {
