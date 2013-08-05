@@ -128,6 +128,57 @@ public class TestOptionals extends AbstractDataDrivenSPARQLTestCase {
         
     }
 
+
+    /**
+     * Unit test for <a href="http://sourceforge.net/apps/trac/bigdata/ticket/712">trac 712</a>
+     * 
+     * <pre>
+     * select ?x 
+     * where {
+     *   OPTIONAL {
+     *    FILTER ( false )
+     *   }
+     * }
+     * </pre>
+     */
+    public void test_non_matching_optional_01() throws Exception {
+        
+        new TestHelper(
+                "non-matching-optional-01",// testURI
+                "non-matching-optional-01.rq", // queryURI
+                "non-matching-optional-01.ttl", // dataURI
+                "non-matching-optional-01.srx"  // resultURI
+//                ,true// laxCardinality
+//                ,false // checkOrder
+                ).runTest();
+        
+    }
+
+    /**
+     * Unit test for <a href="http://sourceforge.net/apps/trac/bigdata/ticket/712">trac 712</a>
+     * 
+     * <pre>
+     * select ?x 
+     * where {
+     *   BIND ( 1 as ?y )
+     *   OPTIONAL {
+     *     FILTER ( false )
+     *   }
+     * }
+     * </pre>
+     */
+    public void test_non_matching_optional_02() throws Exception {
+        
+        new TestHelper(
+                "non-matching-optional-02",// testURI
+                "non-matching-optional-02.rq", // queryURI
+                "non-matching-optional-01.ttl", // dataURI - same as before
+                "non-matching-optional-01.srx"  // resultURI - same as before
+//                ,true// laxCardinality
+//                ,false // checkOrder
+                ).runTest();
+        
+    }
     /**
      * <pre>
      * select *
