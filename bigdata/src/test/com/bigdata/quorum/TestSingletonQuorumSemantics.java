@@ -34,8 +34,6 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import junit.framework.AssertionFailedError;
 
-import com.bigdata.journal.AbstractJournal;
-import com.bigdata.journal.AbstractJournal.QuorumTokenTransitions;
 import com.bigdata.quorum.MockQuorumFixture.MockQuorumMember;
 
 /**
@@ -686,36 +684,36 @@ public class TestSingletonQuorumSemantics extends AbstractQuorumTestCase {
     		final long[] tst = tokens[i];
     		
     		// token combinations with isJoined == true
-    		final AbstractJournal.QuorumTokenTransitions qtjoined = new AbstractJournal.QuorumTokenTransitions(tst[0]/*current token*/, tst[1]/*new token*/, true/*isJoined*/, tst[2]/*haReady*/);
+    		final QuorumTokenTransitions qtjoined = new QuorumTokenTransitions(tst[0]/*current token*/, tst[1]/*new token*/, true/*isJoined*/, tst[2]/*haReady*/);
     		
     		// token combinations with isJoined == false
-    		final AbstractJournal.QuorumTokenTransitions qtnotjoined = new AbstractJournal.QuorumTokenTransitions(tst[0]/*current token*/, tst[1]/*new token*/, false/*isJoined*/, tst[2]/*haReady*/);
+    		final QuorumTokenTransitions qtnotjoined = new QuorumTokenTransitions(tst[0]/*current token*/, tst[1]/*new token*/, false/*isJoined*/, tst[2]/*haReady*/);
     	}
     	
     	// test invalid scenarios to confirm AssertionErrors are thrown
     	try {
-    		new AbstractJournal.QuorumTokenTransitions(1/*current token*/, 2/*new token*/, true/*isJoined*/, 1/*haReady*/);
+    		new QuorumTokenTransitions(1/*current token*/, 2/*new token*/, true/*isJoined*/, 1/*haReady*/);
     		fail("Expected assertion error, cannot progress quorum token without break");
     	} catch (AssertionError ae) {
     		// expected;
     	}
        	
     	try {
-    		new AbstractJournal.QuorumTokenTransitions(2/*current token*/, 1/*new token*/, true/*isJoined*/, 1/*haReady*/);
+    		new QuorumTokenTransitions(2/*current token*/, 1/*new token*/, true/*isJoined*/, 1/*haReady*/);
     		fail("Expected assertion error, new valid < current valid");
     	} catch (AssertionError ae) {
     		// expected;
     	}
        	
     	try {
-    		new AbstractJournal.QuorumTokenTransitions(1/*current token*/, 1/*new token*/, true/*isJoined*/, 2/*haReady*/);
+    		new QuorumTokenTransitions(1/*current token*/, 1/*new token*/, true/*isJoined*/, 2/*haReady*/);
     		fail("Expected assertion error, haReady > newToken");
     	} catch (AssertionError ae) {
     		// expected;
     	}
        	
     	try {
-    		new AbstractJournal.QuorumTokenTransitions(1/*current token*/, 2/*new token*/, true/*isJoined*/, 2/*haReady*/);
+    		new QuorumTokenTransitions(1/*current token*/, 2/*new token*/, true/*isJoined*/, 2/*haReady*/);
     		fail("Expected assertion error, haReady > currentToken");
     	} catch (AssertionError ae) {
     		// expected;

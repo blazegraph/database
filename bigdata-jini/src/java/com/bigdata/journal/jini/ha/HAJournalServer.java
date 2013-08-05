@@ -1319,14 +1319,31 @@ public class HAJournalServer extends AbstractServer {
                 throw new IllegalArgumentException();
 
             synchronized (runStateRef) {
-
+            	
+            	
+            	/*
+            	 * This check appears to cause some transitions to be lost.
+            	 * 
+            	 * TODO: It would seem that a more precise check is required.
+            	 */
                 if (runStateTask.runState
                         .equals(lastSubmittedRunStateRef.get())) {
-
-                    haLog.warn("Will not reenter active run state: "
-                            + runStateTask.runState);
-
-                    return null;
+                	
+                	/*
+                	 * FIXME: Checking if the token has changed fixes some test
+                	 * scenarios but breaks others.
+                	 */
+                	if (journal.getQuorumToken() == journal.getQuorum().token()) {
+	                    haLog.warn("Will not reenter active run state: "
+	                            + runStateTask.runState
+	                            + ", currentToken: " + journal.getQuorumToken()
+	                            + ", newToken: " + journal.getQuorum().token()
+	                            );
+	
+	                    return null;
+                	} else {
+	                    haLog.warn("Re-entering current state since token has changed: " + runStateTask.runState);
+                	}
 
                 }
                
