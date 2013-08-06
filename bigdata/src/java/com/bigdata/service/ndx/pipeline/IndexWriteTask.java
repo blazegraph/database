@@ -30,7 +30,7 @@ package com.bigdata.service.ndx.pipeline;
 
 import java.util.LinkedList;
 import java.util.concurrent.Callable;
-import java.util.concurrent.Future;
+import java.util.concurrent.FutureTask;
 import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.TimeUnit;
 
@@ -288,13 +288,12 @@ A//
         
     }
 
-    @SuppressWarnings("unchecked")
     @Override
-    protected Future<HS> submitSubtask(final S subtask) {
+    protected void submitSubtask(
+            final FutureTask<? extends AbstractSubtaskStats> subtask) {
 
-        return (Future<HS>) ndx.getFederation().getExecutorService().submit(
-                subtask);
-        
+        ndx.getFederation().getExecutorService().submit(subtask);
+
     }
 
     /**

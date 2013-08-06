@@ -35,6 +35,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Future;
+import java.util.concurrent.FutureTask;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Condition;
@@ -897,26 +898,25 @@ L>//
                 // if (oldval == null) {
 
                 /**
-                 * Hack pattern ensures that the Future is cancelled if we exit
-                 * by any code path after the Future has been submitted for
-                 * evaluation and before the Future has been set on the
-                 * BlockingBuffer.
+                 * Start subtask.
                  * 
                  * @see <a
                  *      href="https://sourceforge.net/apps/trac/bigdata/ticket/707">
                  *      BlockingBuffer.close() does not unblock threads </a>
                  */
-                Future<? extends AbstractSubtaskStats> future = null;
-                try {
-                    // assign a worker thread to the sink.
-                    future = submitSubtask(sink);
-                    // set Future (can now be cancelled)
-                    out.setFuture(future);
-                } finally {
-                    if (future != null && buffer.getFuture() == null) {
-                        // Future exists but not set on BlockingBuffer.
-                        future.cancel(true/* mayInterruptIfRunning */);
-                    }
+                {
+                    
+                    // Wrap the computation as a FutureTask.
+                    @SuppressWarnings({ "unchecked", "rawtypes" })
+                    final FutureTask<? extends AbstractSubtaskStats> ft = new FutureTask(
+                            sink);
+                    
+                    // Set Future on the BlockingBuffer.
+                    out.setFuture(ft);
+                    
+                    // Assign a worker thread to the sink.
+                    submitSubtask(ft);
+                    
                 }
 
                 stats.subtaskStartCount.incrementAndGet();
@@ -958,15 +958,26 @@ L>//
      */
     abstract protected S newSubtask(L locator, BlockingBuffer<E[]> out);
     
+//    /**
+//     * Submit the subtask to an {@link Executor}.
+//     * 
+//     * @param subtask
+//     *            The subtask.
+//     * 
+//     * @return The {@link Future}.
+//     */
+//    abstract protected Future<? extends AbstractSubtaskStats> submitSubtask(S subtask);
     /**
      * Submit the subtask to an {@link Executor}.
      * 
      * @param subtask
-     *            The subtask.
-     * 
-     * @return The {@link Future}.
+     *            The {@link FutureTask} used to execute thee subtask.
+     *            
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/707">
+     *      BlockingBuffer.close() does not unblock threads </a>
      */
-    abstract protected Future<? extends AbstractSubtaskStats> submitSubtask(S subtask);
+    abstract protected void submitSubtask(
+            FutureTask<? extends AbstractSubtaskStats> subtask);
 
     /**
      * Drains any {@link Future}s from {@link #finishedSubtaskQueue} which are done

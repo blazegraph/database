@@ -28,18 +28,16 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.service.ndx.pipeline;
 
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
+import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -507,10 +505,11 @@ public class AbstractKeyRangeMasterTestCase extends TestCase2 {
         }
 
         @Override
-        protected Future<? extends AbstractSubtaskStats> submitSubtask(S subtask) {
+        protected void submitSubtask(
+                final FutureTask<? extends AbstractSubtaskStats> subtask) {
 
-            return executorService.submit(subtask);
-            
+            executorService.submit(subtask);
+
         }
 
     }
