@@ -29,6 +29,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.relation.accesspath;
 
 import java.util.concurrent.Future;
+import java.util.concurrent.FutureTask;
 
 import com.bigdata.relation.IMutableRelation;
 import com.bigdata.relation.IRelation;
@@ -97,7 +98,12 @@ public interface IBlockingBuffer<E> extends IRunnableBuffer<E> {
     
     /**
      * Set the {@link Future} for the source processing writing on the
-     * {@link IBlockingBuffer}.
+     * {@link IBlockingBuffer} (the producer).
+     * <p>
+     * Note: You should always wrap the task as a {@link FutureTask} and set the
+     * {@link Future} on the {@link IBlockingBuffer} before you start the
+     * consumer. This ensures that the producer will be cancelled if the
+     * consumer is interrupted.
      * 
      * @param future
      *            The {@link Future}.
@@ -106,7 +112,10 @@ public interface IBlockingBuffer<E> extends IRunnableBuffer<E> {
      *             if the argument is <code>null</code>.
      * @throws IllegalStateException
      *             if the future has already been set.
-     *             
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/707">
+     *      BlockingBuffer.close() does not unblock threads </a>
+     * 
      * @todo There should be a generic type for this.
      */
     public void setFuture(Future future);
