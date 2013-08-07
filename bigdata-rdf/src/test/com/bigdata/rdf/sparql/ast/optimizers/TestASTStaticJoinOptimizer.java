@@ -1487,11 +1487,14 @@ public class TestASTStaticJoinOptimizer extends AbstractASTEvaluationTestCase {
             
             final JoinGroupNode subgroup3 = new JoinGroupNode();
             
-            subgroup3.addChild(newStatementPatternNode(new VarNode("x"),
-                    new ConstantNode(e), new ConstantNode(e), 10l));
+            // Note: both x and y are bound at this point, so the best order
+            // is lowest cardinality first
             
             subgroup3.addChild(newStatementPatternNode(new VarNode("y"),
                     new ConstantNode(d), new ConstantNode(d), 1l));
+
+            subgroup3.addChild(newStatementPatternNode(new VarNode("x"),
+                    new ConstantNode(e), new ConstantNode(e), 10l));
             
             subgroup2.addChild(subgroup3);
             
@@ -1929,7 +1932,7 @@ where {
 }
      */
     
-    public void xtest_union_trac684_A() {
+    public void test_union_trac684_A() {
     	new Helper(){{
 
     		given = select( varNode(z), // z is ?o
@@ -2065,7 +2068,7 @@ where {
 }
     */
    
-   public void xtest_union_trac684_C() {
+   public void test_union_trac684_C() {
    	new Helper(){{
 
    		given = select( varNode(z), // z is ?o
