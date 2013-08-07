@@ -35,27 +35,21 @@ package com.bigdata.rdf.sail.tck;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.Arrays;
 import java.util.Properties;
 
 import org.apache.log4j.Logger;
-import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
-import org.openrdf.model.URI;
 import org.openrdf.model.Value;
+import org.openrdf.model.vocabulary.RDFS;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.GraphQuery;
 import org.openrdf.query.GraphQueryResult;
-import org.openrdf.query.MalformedQueryException;
-import org.openrdf.query.QueryEvaluationException;
+import org.openrdf.query.QueryInterruptedException;
 import org.openrdf.query.QueryLanguage;
 import org.openrdf.query.TupleQuery;
 import org.openrdf.query.TupleQueryResult;
-import org.openrdf.query.impl.DatasetImpl;
 import org.openrdf.repository.Repository;
 import org.openrdf.repository.RepositoryConnectionTest;
-import org.openrdf.repository.RepositoryException;
-import org.openrdf.repository.contextaware.ContextAwareConnection;
 
 import com.bigdata.btree.keys.CollatorEnum;
 import com.bigdata.btree.keys.StrengthEnum;
@@ -682,6 +676,55 @@ public class BigdataConnectionTest extends RepositoryConnectionTest {
 		}
 	}
 
-    
+    /*
+     * I have lifted this out of the base openrdf class since it often enough
+     * fails in CI or when running the entire TestBigdataSailWithQuads test
+     * suite. However, when run by itself I observe timely termination based on
+     * the deadline.
+     * 
+     * Note: This query does several scans of the KB and computes their
+     * unconstrained cross-product and then sorts the results.
+     * 
+     * I suspect that the problem may be that the ORDER BY operator does not
+     * notice the timeout since the deadline is only examined when an operator
+     * starts or stops. If evaluation reaches the ORDER BY operator and the SORT
+     * begins, then the SORT is not interrupted since the deadline is not being
+     * examined.
+     * 
+     * (non-Javadoc)
+     * 
+     * @see org.openrdf.repository.RepositoryConnectionTest#
+     * testOrderByQueriesAreInterruptable()
+     */
+    @Override
+    public void testOrderByQueriesAreInterruptable()
+            throws Exception
+        {
+            testCon.setAutoCommit(false);
+            for (int index = 0; index < 512; index++) {
+                testCon.add(RDFS.CLASS, RDFS.COMMENT, testCon.getValueFactory().createBNode());
+            }
+            testCon.setAutoCommit(true);
+
+            TupleQuery query = testCon.prepareTupleQuery(QueryLanguage.SPARQL,
+                    "SELECT * WHERE { ?s ?p ?o . ?s1 ?p1 ?o1 . ?s2 ?p2 ?o2 . ?s3 ?p3 ?o3 . } ORDER BY ?s1 ?p1 ?o1 LIMIT 1000");
+            query.setMaxQueryTime(2);
+
+            TupleQueryResult result = query.evaluate();
+            log.warn("Query evaluation has begin");
+            long startTime = System.currentTimeMillis();
+            try {
+                result.hasNext();
+                fail("Query should have been interrupted");
+            }
+            catch (QueryInterruptedException e) {
+                // Expected
+                long duration = System.currentTimeMillis() - startTime;
+                log.warn("Actual query duration: " + duration + "ms");
+                assertTrue("Query not interrupted quickly enough, should have been ~2s, but was "
+                        + (duration / 1000) + "s", duration < 5000);
+            }
+        }
+
 
 }
