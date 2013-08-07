@@ -3,7 +3,6 @@ package com.bigdata.rdf.sail.webapp;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
-import java.util.Arrays;
 import java.util.Collection;
 
 import org.openrdf.model.Graph;
@@ -18,6 +17,8 @@ import org.openrdf.model.impl.StatementImpl;
 import org.openrdf.model.impl.URIImpl;
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
+import org.openrdf.query.resultio.BooleanQueryResultFormat;
+import org.openrdf.query.resultio.TupleQueryResultFormat;
 import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFWriter;
 import org.openrdf.rio.RDFWriterFactory;
@@ -95,26 +96,50 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
     }
 
     /**
-     * "ASK" query with an empty KB.
+     * "ASK" query with an empty KB and CONNEG for various known/accepted MIME
+     * Types.
      */
     public void test_ASK() throws Exception {
         
         final String queryStr = "ASK where {?s ?p ?o}";
         
 //        final RemoteRepository repo = new RemoteRepository(m_serviceURL);
-        final IPreparedBooleanQuery query = m_repo.prepareBooleanQuery(queryStr);
-        assertEquals(false, query.evaluate());
-
-//        final QueryOptions opts = new QueryOptions();
-//        opts.serviceURL = m_serviceURL;
-//        opts.queryStr = queryStr;
-//        opts.method = "GET";
-//
-//        opts.acceptHeader = BooleanQueryResultFormat.SPARQL.getDefaultMIMEType();
-//        assertEquals(false, askResults(doSparqlQuery(opts, requestPath)));
-//
-//        opts.acceptHeader = BooleanQueryResultFormat.TEXT.getDefaultMIMEType();
-//        assertEquals(false, askResults(doSparqlQuery(opts, requestPath)));
+        {
+            final IPreparedBooleanQuery query = m_repo
+                    .prepareBooleanQuery(queryStr);
+            assertEquals(false, query.evaluate());
+        }
+        {
+            final IPreparedBooleanQuery query = m_repo
+                    .prepareBooleanQuery(queryStr);
+            query.setHeader("Accept",
+                    BooleanQueryResultFormat.SPARQL.getDefaultMIMEType());
+            assertEquals(false, query.evaluate());
+        }
+        {
+            final IPreparedBooleanQuery query = m_repo
+                    .prepareBooleanQuery(queryStr);
+            query.setHeader("Accept",
+                    BooleanQueryResultFormat.TEXT.getDefaultMIMEType());
+            assertEquals(false, query.evaluate());
+        }
+        
+        /**
+         * FIXME JJC: Uncomment to test CONNEG for JSON.
+         * 
+         * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/588" >
+         *      JSON-LD </a>
+         * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/714" >
+         *      Migrate to openrdf 2.7 </a>
+         * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/704" >
+         *      ask does not return json </a>
+         */
+//        {
+//            final IPreparedBooleanQuery query = m_repo
+//                    .prepareBooleanQuery(queryStr);
+//            query.setHeader("Accept", "application/sparql-results+json");
+//            assertEquals(false, query.evaluate());
+//        }
         
     }
 
@@ -146,26 +171,92 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
 
 		final String queryStr = "select * where {?s ?p ?o}";
 
-//        final RemoteRepository repo = new RemoteRepository(m_serviceURL);
-        final IPreparedTupleQuery query = m_repo.prepareTupleQuery(queryStr);
-		assertEquals(0, countResults(query.evaluate()));
+        {
 
+            final IPreparedTupleQuery query = m_repo
+                    .prepareTupleQuery(queryStr);
+            
+            assertEquals(0, countResults(query.evaluate()));
+            
+        }
+
+        {
+
+            final IPreparedTupleQuery query = m_repo
+                    .prepareTupleQuery(queryStr);
+            
+            query.setHeader("Accept",
+                    TupleQueryResultFormat.SPARQL.getDefaultMIMEType());
+
+            assertEquals(0, countResults(query.evaluate()));
+
+        }
+
+        {
+
+            final IPreparedTupleQuery query = m_repo
+                    .prepareTupleQuery(queryStr);
+            
+            query.setHeader("Accept",
+                    TupleQueryResultFormat.BINARY.getDefaultMIMEType());
+
+            assertEquals(0, countResults(query.evaluate()));
+
+        }
+
+        /**
+         * FIXME The necessary parser does not appear to be available. If you
+         * enable this you will get ClassNotFoundException for
+         * <code>au/com/bytecode/opencsv/CSVReader</code>
+         * 
+         * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/714" >
+         *      Migrate to openrdf 2.7 </a>
+         */
+        if (false) {
+
+            final IPreparedTupleQuery query = m_repo
+                    .prepareTupleQuery(queryStr);
+            
+            query.setHeader("Accept",
+                    TupleQueryResultFormat.CSV.getDefaultMIMEType());
+
+            assertEquals(0, countResults(query.evaluate()));
+
+        }
         
-//		final QueryOptions opts = new QueryOptions();
-//		opts.serviceURL = m_serviceURL;
-//		opts.queryStr = queryStr;
-//		opts.method = "GET";
-//
-//		opts.acceptHeader = TupleQueryResultFormat.SPARQL.getDefaultMIMEType();
-//		assertEquals(0, countResults(doSparqlQuery(opts, requestPath)));
-//
-//		// TODO JSON parser is not bundled by openrdf.
-////        opts.acceptHeader = TupleQueryResultFormat.JSON.getDefaultMIMEType();
-////        assertEquals(0, countResults(doSparqlQuery(opts, requestPath)));
-//
-//        opts.acceptHeader = TupleQueryResultFormat.BINARY.getDefaultMIMEType();
-//        assertEquals(0, countResults(doSparqlQuery(opts, requestPath)));
+        {
 
+            final IPreparedTupleQuery query = m_repo
+                    .prepareTupleQuery(queryStr);
+            
+            query.setHeader("Accept",
+                    TupleQueryResultFormat.TSV.getDefaultMIMEType());
+
+            assertEquals(0, countResults(query.evaluate()));
+
+        }
+
+        /**
+         * FIXME Enable this once we have a JSON result format parser (openrdf
+         * 2.7).
+         * 
+         * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/714" >
+         *      Migrate to openrdf 2.7 </a>
+         * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/588" >
+         *      JSON-LD </a>
+         */
+        if (false) {
+
+            final IPreparedTupleQuery query = m_repo
+                    .prepareTupleQuery(queryStr);
+            
+            query.setHeader("Accept",
+                    TupleQueryResultFormat.JSON.getDefaultMIMEType());
+
+            assertEquals(0, countResults(query.evaluate()));
+
+        }
+        
 	}
 
 //    /**
