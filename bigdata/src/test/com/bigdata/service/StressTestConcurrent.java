@@ -603,14 +603,15 @@ public class StressTestConcurrent extends
             ret.put("nsplit", "" + overflowCounters.indexPartitionSplitCounter);
             ret.put("nmove", "" + overflowCounters.indexPartitionMoveCounter);
 
-            System.err.println(ret.toString(true/* newline */));
+            if (log.isInfoEnabled())
+                log.info(ret.toString(true/* newline */));
 
-            System.err.println(overflowCounters.getCounters().toString());
+            if (log.isInfoEnabled())
+                log.info(overflowCounters.getCounters().toString());
 
             if (!failures.isEmpty()) {
 
-                System.err.println("failures:\n"
-                        + Arrays.toString(failures.toArray()));
+                log.error("failures:\n" + Arrays.toString(failures.toArray()));
 
                 fail("There were " + failures.size()
                         + " failed tasks for unexpected causes");
@@ -630,12 +631,12 @@ public class StressTestConcurrent extends
                 final boolean forceOverflow = false;
                 if (forceOverflow) {
 
-                    System.err.println("Forcing overflow: " + new Date());
+                    log.warn("Forcing overflow: " + new Date());
 
 					((AbstractScaleOutFederation<?>) federation)
 							.forceOverflow(true/* compactingMerge */, true/* truncateJournal */);
 
-                    System.err.println("Forced  overflow: " + new Date());
+                    log.warn("Forced  overflow: " + new Date());
 
                 }
 
@@ -650,7 +651,8 @@ public class StressTestConcurrent extends
 
                     final IIndex expected = groundTruth[i];
 
-                    System.err.println("Validating: "
+                    if (log.isInfoEnabled())
+                        log.info("Validating: "
                             + name
                             + " #groundTruthEntries="
                             + groundTruth[i].rangeCount()
@@ -733,8 +735,9 @@ public class StressTestConcurrent extends
 
                 }
 
-                System.err.println("Validated " + nindices
-                        + " indices against ground truth.");
+                if (log.isInfoEnabled())
+                    log.info("Validated " + nindices
+                            + " indices against ground truth.");
 
             }
 
@@ -788,7 +791,7 @@ public class StressTestConcurrent extends
 
         if (targetService == null) {
 
-            System.err.println("Spamming LBS: services have equal load.");
+            log.warn("Spamming LBS: services have equal load.");
 
             fakeServiceScores[0] = new ServiceScore(
                     AbstractStatisticsCollector.fullyQualifiedHostName,
@@ -802,8 +805,7 @@ public class StressTestConcurrent extends
 
         } else {
 
-            System.err
-                    .println("Spamming LBS: one service will appear heavily loaded.");
+            log.warn("Spamming LBS: one service will appear heavily loaded.");
 
             fakeServiceScores[0] = new ServiceScore(
                     AbstractStatisticsCollector.fullyQualifiedHostName,
