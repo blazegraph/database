@@ -174,7 +174,7 @@ public class RemoteRepositoryManager extends RemoteRepository {
         HttpResponse response = null;
         GraphQueryResult result = null;
         
-        opts.acceptHeader = ConnectOptions.DEFAULT_GRAPH_ACCEPT_HEADER;
+        opts.setAcceptHeader(ConnectOptions.DEFAULT_GRAPH_ACCEPT_HEADER);
 
         try {
             // check response in try.
@@ -314,7 +314,7 @@ public class RemoteRepositoryManager extends RemoteRepository {
 
         HttpResponse response = null;
 
-        opts.acceptHeader = ConnectOptions.MIME_PROPERTIES_XML;
+        opts.setAcceptHeader(ConnectOptions.MIME_PROPERTIES_XML);
 
         try {
 

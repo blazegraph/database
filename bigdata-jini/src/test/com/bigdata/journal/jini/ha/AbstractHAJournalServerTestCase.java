@@ -31,6 +31,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.security.DigestException;
 import java.security.NoSuchAlgorithmException;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -165,13 +166,18 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
 
             request = newRequest(urlString.toString(), opts.method);
             
-            if (opts.acceptHeader != null) {
-            
-                request.addHeader("Accept", opts.acceptHeader);
-                
-                if (log.isDebugEnabled())
-                    log.debug("Accept: " + opts.acceptHeader);
-                
+            if (opts.requestHeaders != null) {
+
+                for (Map.Entry<String, String> e : opts.requestHeaders
+                        .entrySet()) {
+
+                    request.addHeader(e.getKey(), e.getValue());
+
+                    if (log.isDebugEnabled())
+                        log.debug(e.getKey() + ": " + e.getValue());
+
+                }
+
             }
 
             if (opts.entity != null) {
