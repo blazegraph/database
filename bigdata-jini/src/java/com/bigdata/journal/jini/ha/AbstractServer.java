@@ -1264,7 +1264,8 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
             throw new IllegalArgumentException();
         
         if (log.isInfoEnabled())
-            log.info("serviceID=" + serviceID);
+            log.info("serviceID=" + serviceID + ", serviceUUID="
+                    + JiniUtil.serviceID2UUID(serviceID));
 
         if (this.serviceID != null && !this.serviceID.equals(serviceID)) {
 
