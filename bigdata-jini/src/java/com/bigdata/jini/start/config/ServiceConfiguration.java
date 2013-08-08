@@ -615,9 +615,11 @@ abstract public class ServiceConfiguration implements Serializable {
 
         /**
          * Hook for overriding the service directory. The default returns the
-         * {@link ServiceConfiguration#serviceDir}. It SHOULD be overriden to
-         * return the actual directory in which the specific service instance
-         * will be started.
+         * {@link ServiceConfiguration#serviceDir}, which is <code>public</code>
+         * and accessed in a variety of places. Therefore, in order to override
+         * the returned value, you should specify an override such that
+         * {@link ServiceConfiguration#getServiceDir(String, Configuration)}
+         * will return the desired value.
          * 
          * @see ServiceConfiguration#serviceDir
          * @see ServiceConfiguration#getServiceDir(String, Configuration)

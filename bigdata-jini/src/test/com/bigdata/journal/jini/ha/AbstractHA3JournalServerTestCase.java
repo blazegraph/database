@@ -257,12 +257,12 @@ public class AbstractHA3JournalServerTestCase extends
          */
         {
 
-            final File testDir = new File(TGT_PATH);
-            
+            final File testDir = getTestDir();
+
             if (testDir.exists()) {
 
                 recursiveDelete(testDir);
-                
+
             }
 
         }
@@ -532,11 +532,33 @@ public class AbstractHA3JournalServerTestCase extends
      */
     
     /**
+     * The effective name for this test as used to name the directories in which
+     * we store things.
+     */
+    protected String getEffectiveTestFileName() {
+        
+        return effectiveTestFileName;
+        
+    }
+
+    /**
+     * The effective name for this test as used to name the directories in which
+     * we store things.
+     * 
+     * TODO If there are method name collisions across the different test
+     * classes then the test suite name can be added to this. Also, if there are
+     * file naming problems, then this value can be munged before it is
+     * returned.
+     */
+    private final String effectiveTestFileName = getClass().getSimpleName()
+            + "." + getName();
+
+    /**
      * The directory that is the parent of each {@link HAJournalServer}'s
      * individual service directory.
      */
     protected File getTestDir() {
-        return new File(FEDNAME + "/CI-HAJournal-1");
+        return new File(TGT_PATH, getEffectiveTestFileName());
     }
 
     protected File getServiceDirA() {
@@ -1329,7 +1351,7 @@ public class AbstractHA3JournalServerTestCase extends
 
         final String configFile = SRC_PATH + sourceConfigFileName;
 
-        final File serviceDir = new File(TGT_PATH, name);
+        final File serviceDir = new File(getTestDir(), name);
 
         final String installedConfigFileName = "HAJournal.config";
 
@@ -1381,20 +1403,28 @@ public class AbstractHA3JournalServerTestCase extends
          */
         
         // Overrides for this test.
-        final String[] overrides = getOverrides();
+        final String[] testOverrides = getOverrides();
+
+        // Add override for the serviceDir.
+        final String[] overrides = ConfigMath.concat(
+                new String[] { "bigdata.serviceDir=new java.io.File(\"" + serviceDir + "\")" },
+                testOverrides);
 
         // Config file + overrides from perspective of this JVM.
         final String[] ourArgs = ConfigMath.concat(new String[] { configFile },
                 overrides);
 
         // Config file + overrides from perspective of the child process.
-        final String[] childArgs = ConfigMath.concat(
-                new String[] { installedConfigFileName }, overrides);
+        final String[] childArgs = ConfigMath.concat(new String[] {
+                installedConfigFileName, // as installed.
+                "bigdata.serviceDir=new java.io.File(\".\")" // relative to the serviceDir!
+                }, testOverrides // plus anything from the test case.
+                );
 
         final Configuration config = ConfigurationProvider.getInstance(ourArgs);
         
         final ServiceConfiguration serviceConfig = new HAJournalServerConfiguration(
-                name, config, serviceId, serviceDir, childArgs);
+                name, config, serviceId, /*serviceDir,*/ childArgs);
 
         final AbstractServiceStarter<?> serviceStarter = serviceConfig
                 .newServiceStarter(serviceListener);
@@ -1595,12 +1625,12 @@ public class AbstractHA3JournalServerTestCase extends
 
         private final String serviceName;
         private final UUID serviceId;
-        private final File serviceDir;
+//        private final File serviceDir;
         private final String[] args;
         
         public HAJournalServerConfiguration(final String serviceName,
                 final Configuration config, final UUID serviceId,
-                final File serviceDir, final String[] args)
+                /*final File serviceDirIsIgnored, */ final String[] args)
                 throws ConfigurationException {
 
             // Note: ignored! args[] is used instead.
@@ -1628,7 +1658,7 @@ public class AbstractHA3JournalServerTestCase extends
 
             this.serviceId = serviceId;
             
-            this.serviceDir = serviceDir;
+//            this.serviceDir = serviceDir;
             
             this.args = args;
             
