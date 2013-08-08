@@ -1093,7 +1093,8 @@ public class HAJournalServer extends AbstractServer {
                     if (InnerCause.isInnerCause(t, InterruptedException.class)) {
 
                         // Note: This is a normal exit condition.
-                        log.info("Interrupted.");
+                        if (log.isInfoEnabled())
+                            log.info("Interrupted: " + runState);
 
                         // Done.
                         return null;
@@ -1320,43 +1321,21 @@ public class HAJournalServer extends AbstractServer {
                 throw new IllegalArgumentException();
 
             synchronized (runStateRef) {
-            	
-            	    /*
-                 * This check appears to cause some transitions to be lost.
-                 * 
-                 * FIXME ERROR HANDLING: The specific problem is that a service
-                 * leave can cause a quorum break. This is essentially an
-                 * escalation of the error condition and does require us to at
-                 * least clear the quorum token on the journal (the HAReadyToken
-                 * would be cleared by an uninterrupted service leave, the the
-                 * journal quorum token would only be cleared by a quorum
-                 * break.)
-                 */
+
                 if (runStateTask.runState
                         .equals(lastSubmittedRunStateRef.get())) {
-
+                    
                     /*
-                     * FIXME ERROR HANDLING: Checking if the token has changed
-                     * (per the note above) fixes some test scenarios
-                     * (testAB_BounceFollower) but breaks others
-                     * (testAB_BounceLeader and testAB_RestartLeader
-                     * occasionally fails).
+                     * Do not re-enter the same run state.
+                     * 
+                     * Note: This was added to prevent re-entry of the
+                     * ErrorState when we are already in the ErrorState.
                      */
-                    if (journal.getQuorumToken() == journal.getQuorum().token()) {
+                    
+                    haLog.warn("Will not reenter active run state: "
+                            + runStateTask.runState);
 
-                        haLog.warn("Will not reenter active run state: "
-                                + runStateTask.runState + ", currentToken: "
-                                + journal.getQuorumToken() + ", newToken: "
-                                + journal.getQuorum().token());
-
-                        return null;
-                        
-                    } else {
-                        
-                        haLog.warn("Re-entering current state since token has changed: "
-                                + runStateTask.runState);
-                        
-                    }
+                    return null;
 
                 }
                
@@ -1603,15 +1582,20 @@ public class HAJournalServer extends AbstractServer {
          * Transition to {@link RunStateEnum#Error}.
          */
         private class EnterErrorStateTask implements Callable<Void> {
-        	
-        	protected EnterErrorStateTask() {
+
+            protected EnterErrorStateTask() {
+                /*
+                 * Note: This tells us the code path from which submitted the
+                 * task to enter the ERROR state.
+                 */
                 log.warn("", new StackInfoReport());
-        	}
-        	
+            }
+
             public Void call() throws Exception {
                 enterRunState(new ErrorTask());
                 return null;
             }
+
         }
 
         /**
@@ -1681,11 +1665,25 @@ public class HAJournalServer extends AbstractServer {
             protected ErrorTask() {
 
                 super(RunStateEnum.Error);
-                
-                log.warn("", new StackInfoReport());
+                // Note: This stack trace does not have any useful info.
+//                log.warn("", new StackInfoReport());
                 
             }
             
+            /**
+             * FIXME The error task may need to validate that it does not need
+             * to re-execute and may transition to SeekConsensus. The specific
+             * problem is when doServiceLeave() leads to a QUORUM_BREAK event.
+             * <p>
+             * The relevant tests are testAB_BounceFollower,
+             * (testAB_BounceLeader, testAB_RestartLeader.
+             */
+//            if (journal.getQuorumToken() == journal.getQuorum().token()) {
+//
+//                haLog.warn("Will not reenter active run state: "
+//                        + runStateTask.runState + ", currentToken: "
+//                        + journal.getQuorumToken() + ", newToken: "
+//                        + journal.getQuorum().token());
             @Override
             public Void doRun() throws Exception {
 

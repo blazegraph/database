@@ -2701,15 +2701,15 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 	 * {@link ICommitRecord} from the root blocks of the store.
 	 */// TODO Could merge with doLocalAbort().
 	private void _abort() {
-		log.warn("ABORT",new StackInfoReport("ABORT"));
+
 		final WriteLock lock = _fieldReadWriteLock.writeLock();
 
 		lock.lock();
 
 		try {
 
-			if (log.isInfoEnabled())
-				log.info("start");//, new RuntimeException());
+            if (log.isInfoEnabled())
+                log.info("ABORT", new StackInfoReport("ABORT"));
 
             // Clear
             gatherFuture.set(null/* newValue */);
