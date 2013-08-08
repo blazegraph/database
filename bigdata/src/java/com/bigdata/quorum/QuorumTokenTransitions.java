@@ -36,18 +36,33 @@ public class QuorumTokenTransitions {
     
     final long currentQuorumToken;
     final long newQuorumToken;
-    final long currentHaReady;
+    final long currentHAReadyToken;
 
     public final boolean didBreak;
     public final boolean didMeet;
     public final boolean didJoinMetQuorum;
     public final boolean didLeaveMetQuorum;
     
-    final boolean wasMet;
-    final boolean isMet;
-    final boolean isJoined;
-    final boolean wasJoined;
-    
+    final private boolean wasMet;
+    final private boolean isMet;
+    final private boolean isJoined;
+    final private boolean wasJoined;
+
+    @Override
+    public final String toString() {
+        final StringBuilder sb = new StringBuilder();
+        sb.append(getClass());
+        sb.append("{oldQuorumToken=" + currentQuorumToken);
+        sb.append(",newQuorumToken=" + newQuorumToken);
+        sb.append(",oldHAReadyToken=" + currentHAReadyToken);
+        sb.append(",didBreak=" + didBreak);
+        sb.append(",didMeet=" + didMeet);
+        sb.append(",didJoinMetQuorum=" + didJoinMetQuorum);
+        sb.append(",didLeaveMetQuorum=" + didLeaveMetQuorum);
+        sb.append("}");
+        return sb.toString();
+    }
+
     public QuorumTokenTransitions(final long currentQuorumToken,
             final long newQuorumToken, final QuorumService<HAGlue> service,
             final long haReady) {
@@ -61,7 +76,7 @@ public class QuorumTokenTransitions {
             final long newQuorumToken, final boolean joined,
             final long haReady) {
     	
-        this.currentHaReady = haReady;
+        this.currentHAReadyToken = haReady;
         this.currentQuorumToken = currentQuorumToken;
         this.newQuorumToken = newQuorumToken;
                     
@@ -72,7 +87,7 @@ public class QuorumTokenTransitions {
         
         // Both quorum token and haReadyToken agree with newValue.
 		final boolean noTokenChange = currentQuorumToken == newQuorumToken
-				&& currentQuorumToken == currentHaReady;
+				&& currentQuorumToken == currentHAReadyToken;
 
 		/*
          * TODO: more understanding required as to the effect of this clause
@@ -140,7 +155,7 @@ public class QuorumTokenTransitions {
     // TODO Document rationale for each assertion.
     private void checkStates() {
 
-        if (wasJoined && wasMet && currentHaReady > currentQuorumToken) {
+        if (wasJoined && wasMet && currentHAReadyToken > currentQuorumToken) {
          
             throw new AssertionError("haReady greater than current token");
             
@@ -220,8 +235,5 @@ public class QuorumTokenTransitions {
     	return isMet && wasJoined && !isJoined;
     }
     
-    public final String showState() {
-        return ""; // TODO showState().
-    }
 }
 
