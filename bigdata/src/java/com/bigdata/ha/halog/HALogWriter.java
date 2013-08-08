@@ -47,6 +47,7 @@ import com.bigdata.journal.RootBlockUtility;
 import com.bigdata.journal.RootBlockView;
 import com.bigdata.journal.StoreTypeEnum;
 import com.bigdata.rawstore.Bytes;
+import com.bigdata.util.StackInfoReport;
 
 /**
  * Wrapper class to handle process log creation and output for HA.
@@ -260,7 +261,7 @@ public class HALogWriter implements IHALogWriter {
 			throw new IllegalStateException();
 
 		if (haLog.isInfoEnabled())
-			haLog.info("rootBlock=" + rootBlock, new RuntimeException());
+			haLog.info("rootBlock=" + rootBlock, new StackInfoReport());
 
 		m_rootBlock = rootBlock;
 
@@ -634,7 +635,7 @@ public class HALogWriter implements IHALogWriter {
 			    if (isCommitted) return; // Do not remove a sealed HALog file!
 			    
                 if (haLog.isInfoEnabled())
-                    haLog.info("Will remove: " + m_state.m_haLogFile, new RuntimeException());
+                    haLog.info("Will remove: " + m_state.m_haLogFile, new StackInfoReport());
                 
 				if (m_state.m_haLogFile.exists() && !m_state.m_haLogFile.delete()) {
 

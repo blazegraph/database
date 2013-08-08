@@ -104,6 +104,7 @@ import com.bigdata.service.AbstractHATransactionService;
 import com.bigdata.service.jini.FakeLifeCycle;
 import com.bigdata.util.ClocksNotSynchronizedException;
 import com.bigdata.util.InnerCause;
+import com.bigdata.util.StackInfoReport;
 import com.bigdata.util.concurrent.LatchedExecutor;
 import com.bigdata.util.concurrent.MonitoredFutureTask;
 import com.bigdata.util.config.NicUtil;
@@ -1055,7 +1056,7 @@ public class HAJournalServer extends AbstractServer {
             }
 
             haLog.warn("runState=" + runState + ", oldRunState=" + oldRunState
-                    + ", serviceName=" + server.getServiceName(), new RuntimeException());
+                    + ", serviceName=" + server.getServiceName(), new StackInfoReport());
 
         }
         
@@ -1604,7 +1605,7 @@ public class HAJournalServer extends AbstractServer {
         private class EnterErrorStateTask implements Callable<Void> {
         	
         	protected EnterErrorStateTask() {
-                log.warn("", new RuntimeException());
+                log.warn("", new StackInfoReport());
         	}
         	
             public Void call() throws Exception {
@@ -1681,7 +1682,7 @@ public class HAJournalServer extends AbstractServer {
 
                 super(RunStateEnum.Error);
                 
-                log.warn("", new RuntimeException());
+                log.warn("", new StackInfoReport());
                 
             }
             
