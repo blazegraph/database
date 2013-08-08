@@ -515,6 +515,24 @@ public class TestHAJournalServerOverride extends AbstractHA3JournalServerTestCas
         // Simple transaction.
         simpleTransaction();
         
+//        try {
+//            // Simple transaction.
+//            simpleTransaction();
+//            fail("Expecting failed transaction");
+//        } catch(HttpException ex) {
+//        if (!ex.getMessage().contains(
+//                SpuriousTestException.class.getName())) {
+//            /*
+//             * Wrong inner cause.
+//             * 
+//             * Note: The stack trace of the local exception does not include
+//             * the remote stack trace. The cause is formatted into the HTTP
+//             * response body.
+//             */
+//            fail("Expecting " + ClocksNotSynchronizedException.class, t);
+//        }
+//        }
+        
         // Verify quorum is unchanged.
         assertEquals(token, quorum.token());
         

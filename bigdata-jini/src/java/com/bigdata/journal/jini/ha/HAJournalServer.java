@@ -1320,30 +1320,42 @@ public class HAJournalServer extends AbstractServer {
 
             synchronized (runStateRef) {
             	
-            	
-            	/*
-            	 * This check appears to cause some transitions to be lost.
-            	 * 
-            	 * TODO: It would seem that a more precise check is required.
-            	 */
+            	    /*
+                 * This check appears to cause some transitions to be lost.
+                 * 
+                 * FIXME ERROR HANDLING: The specific problem is that a service
+                 * leave can cause a quorum break. This is essentially an
+                 * escalation of the error condition and does require us to at
+                 * least clear the quorum token on the journal (the HAReadyToken
+                 * would be cleared by an uninterrupted service leave, the the
+                 * journal quorum token would only be cleared by a quorum
+                 * break.)
+                 */
                 if (runStateTask.runState
                         .equals(lastSubmittedRunStateRef.get())) {
-                	
-                	/*
-                	 * FIXME: Checking if the token has changed fixes some test
-                	 * scenarios but breaks others.
-                	 */
-                	if (journal.getQuorumToken() == journal.getQuorum().token()) {
-	                    haLog.warn("Will not reenter active run state: "
-	                            + runStateTask.runState
-	                            + ", currentToken: " + journal.getQuorumToken()
-	                            + ", newToken: " + journal.getQuorum().token()
-	                            );
-	
-	                    return null;
-                	} else {
-	                    haLog.warn("Re-entering current state since token has changed: " + runStateTask.runState);
-                	}
+
+                    /*
+                     * FIXME ERROR HANDLING: Checking if the token has changed
+                     * (per the note above) fixes some test scenarios
+                     * (testAB_BounceFollower) but breaks others
+                     * (testAB_BounceLeader and testAB_RestartLeader
+                     * occasionally fails).
+                     */
+                    if (journal.getQuorumToken() == journal.getQuorum().token()) {
+
+                        haLog.warn("Will not reenter active run state: "
+                                + runStateTask.runState + ", currentToken: "
+                                + journal.getQuorumToken() + ", newToken: "
+                                + journal.getQuorum().token());
+
+                        return null;
+                        
+                    } else {
+                        
+                        haLog.warn("Re-entering current state since token has changed: "
+                                + runStateTask.runState);
+                        
+                    }
 
                 }
                

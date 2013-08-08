@@ -1,3 +1,26 @@
+/**
+
+Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
+
+Contact:
+     SYSTAP, LLC
+     4501 Tower Road
+     Greensboro, NC 27410
+     licenses@bigdata.com
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; version 2 of the License.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ */
 package com.bigdata.quorum;
 
 import com.bigdata.ha.HAGlue;
@@ -116,36 +139,55 @@ public class QuorumTokenTransitions {
     
     // TODO Document rationale for each assertion.
     private void checkStates() {
-    	if (wasJoined && wasMet && currentHaReady > currentQuorumToken)
-    		throw new AssertionError("haReady greater than current token");
-    	
-    	if (wasMet && isMet && newQuorumToken < currentQuorumToken) {
-    		throw new AssertionError("next token less than current token");
-    	}
-    	
-    	if (wasMet && isMet && newQuorumToken != currentQuorumToken) {
-    		throw new AssertionError("New quorum token without quorum break first, current: " + currentQuorumToken + ", new: " + newQuorumToken);
-    	}
-    	
-    if (didMeet && didJoinMetQuorum) {
+
+        if (wasJoined && wasMet && currentHaReady > currentQuorumToken) {
+         
+            throw new AssertionError("haReady greater than current token");
+            
+        }
+        
+        if (wasMet && isMet && newQuorumToken < currentQuorumToken) {
+        
+            throw new AssertionError("next token less than current token");
+            
+        }
+
+        if (wasMet && isMet && newQuorumToken != currentQuorumToken) {
+
             /*
-             * It is not possible to both join with an existing quorum and
-             * to be one of the services that caused a quorum to meet. These
+             * This service observed a quorum token change without observing the
+             * quorum break. The service CAN NOT go directly into the new
+             * quorum. It MUST first do a serviceLeave().
+             */
+            
+            throw new AssertionError(
+                    "New quorum token without quorum break first, current: "
+                            + currentQuorumToken + ", new: " + newQuorumToken);
+            
+        }
+
+        if (didMeet && didJoinMetQuorum) {
+
+            /*
+             * It is not possible to both join with an existing quorum and to be
+             * one of the services that caused a quorum to meet. These
              * conditions are exclusive.
              */
-        throw new AssertionError("didMeet && didJoinMetQuorum");
-    }
-        
-    	/**
-    	 * This is a bit odd, it is okay, but probably didLeaveMetQuorum will
-    	 * only be true iff isJoined
-    	 */
-//    	if (didBreak && didLeaveMetQuorum) {
-//    		throw new AssertionError("didBreak && didLeaveMetQuorum");
-//    	}
-//    	if (didLeaveMetQuorum && !isJoined) { // TODO Why not valid?
-//    		throw new AssertionError("didLeaveMetQuorum && !isJoined");
-//    	}
+            
+            throw new AssertionError("didMeet && didJoinMetQuorum");
+            
+        }
+
+        /**
+         * This is a bit odd, it is okay, but probably didLeaveMetQuorum will
+         * only be true iff isJoined
+         */
+        // if (didBreak && didLeaveMetQuorum) {
+        // throw new AssertionError("didBreak && didLeaveMetQuorum");
+        // }
+        // if (didLeaveMetQuorum && !isJoined) { // TODO Why not valid?
+        // throw new AssertionError("didLeaveMetQuorum && !isJoined");
+        // }
     }
     
     /*
