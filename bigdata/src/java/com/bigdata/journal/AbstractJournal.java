@@ -172,6 +172,7 @@ import com.bigdata.service.IBigdataFederation;
 import com.bigdata.util.ChecksumUtility;
 import com.bigdata.util.ClocksNotSynchronizedException;
 import com.bigdata.util.NT;
+import com.bigdata.util.StackInfoReport;
 
 /**
  * <p>
@@ -2700,7 +2701,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 	 * {@link ICommitRecord} from the root blocks of the store.
 	 */// TODO Could merge with doLocalAbort().
 	private void _abort() {
-		log.warn("ABORT",new RuntimeException("ABORT"));
+		log.warn("ABORT",new StackInfoReport("ABORT"));
 		final WriteLock lock = _fieldReadWriteLock.writeLock();
 
 		lock.lock();
