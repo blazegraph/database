@@ -5341,7 +5341,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
     
     protected void setQuorumToken(final long newValue) {
     	
-    	log.warn("current: " + quorumToken + ", new: " + newValue);
+        if(haLog.isInfoEnabled()) log.info("current: " + quorumToken + ", new: " + newValue);
     	
         // Protect for potential NPE
         if (quorum == null)
