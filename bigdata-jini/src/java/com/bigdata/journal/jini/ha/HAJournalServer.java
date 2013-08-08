@@ -1670,109 +1670,119 @@ public class HAJournalServer extends AbstractServer {
                 
             }
             
-            /**
-             * FIXME The error task may need to validate that it does not need
-             * to re-execute and may transition to SeekConsensus. The specific
-             * problem is when doServiceLeave() leads to a QUORUM_BREAK event.
-             * <p>
-             * The relevant tests are testAB_BounceFollower,
-             * (testAB_BounceLeader, testAB_RestartLeader.
-             */
-//            if (journal.getQuorumToken() == journal.getQuorum().token()) {
-//
-//                haLog.warn("Will not reenter active run state: "
-//                        + runStateTask.runState + ", currentToken: "
-//                        + journal.getQuorumToken() + ", newToken: "
-//                        + journal.getQuorum().token());
             @Override
             public Void doRun() throws Exception {
 
-//                /*
-//                 * Discard the current write set.
-//                 * 
-//                 * Note: This is going to call through to discardWriteSet().
-//                 * That method will close out the current HALog and discard the
-//                 * last live write message.
-//                 * 
-//                 * FIXME the setQuorumToken() after the serviceLeave() will also
-//                 * cause doLocalAbort() to be called, so we probably do NOT want
-//                 * to call it here.
-//                 */
-                journal.doLocalAbort();
+                while (true) {
 
-                /*
-                 * Note: Bouncing the ZK connection here appears to cause
-                 * problems within the test suite. We have not tracked down why
-                 * yet.
-                 */
-//                server.haGlueService.bounceZookeeperConnection();
-                
-                /*
-                 * Do synchronous service leave.
-                 */
+                    log.warn("Will do error handler.");
 
-                log.warn("Will do SERVICE LEAVE");
-                
-                getActor().serviceLeave();
-                
-                /*
-                 * Set token. Journal will notice that it is no longer
-                 * "HA Ready"
-                 * 
-                 * Note: We update the haReadyToken and haStatus regardless of
-                 * whether the quorum token has changed in case this service is
-                 * no longer joined with a met quorum.
-                 * 
-                 * Note: AbstractJournal.setQuorumToken() will detect case where
-                 * it transitions from a met quorum through a service leave and
-                 * will clear its haReady token and update its haStatus field
-                 * appropriately. (This is why we pass in quorum.token() rather
-                 * than NO_QUORUM.)
-                 * 
-                 * TODO There are cases where nothing changes that may hit an
-                 * AssertionError in setQuorumToken().
-                 * 
-                 * TODO This will (conditionally) trigger doLocalAbort().  Since we did this
-                 * explicitly above, that can be do invocations each time we pass through here!
-                 */
-                if (log.isInfoEnabled())
-                    log.info("Current Token: " + journal.getHAReady() + ", new: " + getQuorum().token());
+                    /*
+                     * Discard the current write set.
+                     * 
+                     * Note: This is going to call through to discardWriteSet().
+                     * That method will close out the current HALog and discard
+                     * the last live write message.
+                     * 
+                     * FIXME the setQuorumToken() after the serviceLeave() will
+                     * also cause doLocalAbort() to be called, so we probably do
+                     * NOT want to call it here.
+                     */
+                    journal.doLocalAbort();
 
-                journal.setQuorumToken(getQuorum().token());
-                
-               /**
-                * Dispatch Events before entering SeekConsensus! Otherwise
-                * the events triggered by the serviceLeave() and setQuorumToken
-                * will not be handled until we enter SeekConsensus, and then
-                * when they are received SeekConsensus will fail.
-                * 
-                * The intention of this action is to ensure that when SeekConsensus is
-                * entered the service is in a "clean" state.
-                */
-                processEvents();
-                
-//                /*
-//                 * Note: We can spin here to give the service an opportunity to
-//                 * handle any backlog of events that trigger a transition into
-//                 * the ERROR state. This might not be strictly necessary, and we
-//                 * do not want to spin too long.
-//                 */
-//
-//                final long sleepMillis = 0; // 2000; // TODO CONFIG?
-//                
-//                log.warn("Sleeping " + sleepMillis + "ms to let events quiesce.");
-//                
-//                if (sleepMillis > 0)
-//                	Thread.sleep(sleepMillis);
+                    /*
+                     * Do synchronous service leave.
+                     */
+
+                    log.warn("Will do SERVICE LEAVE");
+
+                    getActor().serviceLeave();
+
+                    /*
+                     * Set token. Journal will notice that it is no longer
+                     * "HA Ready"
+                     * 
+                     * Note: We update the haReadyToken and haStatus regardless
+                     * of whether the quorum token has changed in case this
+                     * service is no longer joined with a met quorum.
+                     * 
+                     * Note: AbstractJournal.setQuorumToken() will detect case
+                     * where it transitions from a met quorum through a service
+                     * leave and will clear its haReady token and update its
+                     * haStatus field appropriately. (This is why we pass in
+                     * quorum.token() rather than NO_QUORUM.)
+                     * 
+                     * TODO There are cases where nothing changes that may hit
+                     * an AssertionError in setQuorumToken().
+                     * 
+                     * TODO This will (conditionally) trigger doLocalAbort().
+                     * Since we did this explicitly above, that can be do
+                     * invocations each time we pass through here!
+                     */
+                    if (log.isInfoEnabled())
+                        log.info("Current Token: haJournalReady="
+                                + journal.getHAReady()
+                                + ", getQuorum().token()=: "
+                                + getQuorum().token());
+
+                    journal.setQuorumToken(getQuorum().token());
+
+                    /**
+                     * Dispatch Events before entering SeekConsensus! Otherwise
+                     * the events triggered by the serviceLeave() and
+                     * setQuorumToken will not be handled until we enter
+                     * SeekConsensus, and then when they are received
+                     * SeekConsensus will fail.
+                     * 
+                     * The intention of this action is to ensure that when
+                     * SeekConsensus is entered the service is in a "clean"
+                     * state.
+                     */
+                    processEvents();
+
+                    /**
+                     * The error task needs to validate that it does not need to
+                     * re-execute and may transition to SeekConsensus. The
+                     * specific problem is when a SERVICE_LEAVE leads to a
+                     * QUORUM_BREAK event. When we handle the SERVICE_LEAVE the
+                     * quorum's token has not yet been cleared. However, it must
+                     * be cleared when the QUORUM_BREAK comes around. Since we
+                     * do not permit re-entry into the ErrorTask in
+                     * enterRunState(), we need to check this post-condition
+                     * here.
+                     * <p>
+                     * The relevant tests are testAB_BounceFollower and
+                     * testAB_BounceLeader and also testAB_RestartLeader and
+                     * testAB_RestartFollower. In addition, any test where we
+                     * fail the leader could require this 2nd pass through
+                     * ErrorTask.doRun().
+                     */
+                    final long t1 = journal.getQuorumToken();
+                    
+                    final long t2 = journal.getQuorum().token();
+                    
+                    if (t1 == t2) {
+
+                        haLog.warn("Will not re-do error handler"
+                                + ": journal.quorumToken=" + t1
+                                + ", quorum.token()=" + t2);
+
+                        break;
+
+                    }
+
+                    // Sleep here to avoid a tight loop?
+
+                } // while(true)
 
                 // Seek consensus.
                 enterRunState(new SeekConsensusTask());
 
                 return null;
-                
-            }
-            
-        }
+
+            } // doRun()
+
+        } // class ErrorTask
         
         /**
          * Task to handle a quorum break event.

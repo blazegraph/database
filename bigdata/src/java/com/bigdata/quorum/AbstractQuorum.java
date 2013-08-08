@@ -54,6 +54,7 @@ import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.HAPipelineGlue;
 import com.bigdata.ha.QuorumService;
 import com.bigdata.util.InnerCause;
+import com.bigdata.util.StackInfoReport;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 import com.bigdata.util.concurrent.ThreadGuard;
 import com.bigdata.util.concurrent.ThreadGuard.Guard;
@@ -1693,9 +1694,9 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
 
         private void conditionalWithdrawVoteImpl() throws InterruptedException {
         	
-        	if (log.isDebugEnabled())
-        		log.debug("Check context", new RuntimeException());
-        	
+            if (log.isDebugEnabled())
+                log.debug(new StackInfoReport());
+
             final Long lastCommitTime = getCastVote(serviceId);
             if (lastCommitTime != null) {
                 doWithdrawVote();

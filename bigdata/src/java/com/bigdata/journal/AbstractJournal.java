@@ -5781,7 +5781,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
         }
         
         if (haLog.isInfoEnabled())
-            haLog.info(transitionState.showState());
+            haLog.info(transitionState.toString());
 
         if (isLeader || isFollower) {
 
