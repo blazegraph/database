@@ -1104,18 +1104,19 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
      */
     public void testStartABC_Rebuild() throws Exception {
 
-        {
-
-            final HAGlue serverA = startA();
-            final HAGlue serverB = startB();
-            final HAGlue serverC = startC();
-
-            awaitFullyMetQuorum();
-
-            // Await initial commit point (KB create) on all servers.
-            awaitCommitCounter(1L, serverA, serverB, serverC);
-            
-        }
+        new ABC(false/*sequential*/); // simultaneous start.
+//        {
+//
+//            final HAGlue serverA = startA();
+//            final HAGlue serverB = startB();
+//            final HAGlue serverC = startC();
+//
+//            awaitFullyMetQuorum();
+//
+//            // Await initial commit point (KB create) on all servers.
+//            awaitCommitCounter(1L, serverA, serverB, serverC);
+//            
+//        }
         
         // Now run several transactions
         for (int i = 0; i < 5; i++)

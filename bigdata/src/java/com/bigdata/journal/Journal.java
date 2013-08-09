@@ -1463,11 +1463,12 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
                     log.info("Running gather on follower");
 
                 /*
-                 * These variables are set in the try {} below. If we can
-                 * discover the leader, then we will eventually respond either
-                 * in the try{} or in the finally{}.
+                 * This variable is set in the try {} below. We eventually
+                 * respond either in the try{} or in the finally{}, depending on
+                 * whether or not the GatherTask encounters an error when it
+                 * executes.
                  */
-                long now = 0L;
+//                long now = 0L;
                 
                 boolean didNotifyLeader = false;
                 
@@ -1497,18 +1498,10 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
                     final QuorumService<HAGlue> quorumService = getQuorum()
                             .getClient();
 
-                    /*
-                     * This timestamp is used to help detect clock skew.
-                     */
-                    now = newConsensusProtocolTimestamp();
-
-                    // The leader is obtained by its serviceId above.
 //                    /*
-//                     * If the token is invalid, making it impossible for us to
-//                     * discover and message the leader, then the leader will
-//                     * reset() the CyclicBarrier.
+//                     * This timestamp is used to help detect clock skew.
 //                     */
-//                    leader = quorumService.getLeader(token);
+//                    now = newConsensusProtocolTimestamp();
 
                     /*
                      * Note: At this point we have everything we need to form up
@@ -1621,7 +1614,8 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
                         try {
                             final IHANotifyReleaseTimeRequest resp = new HANotifyReleaseTimeRequest(
                                     serviceId, 0L/* pinnedCommitTime */,
-                                    1L/* pinnedCommitCounter */, now/* timestamp */);
+                                    1L/* pinnedCommitCounter */,
+                                    nextTimestamp()/* timestamp */);
                             log.warn("Sending mock response for gather protocol: cause="
                                     + t);
                             // Will block until barrier breaks on leader.
