@@ -1600,6 +1600,9 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
                             final IHANotifyReleaseTimeRequest resp = new HANotifyReleaseTimeRequest(
                                     serviceId, 0L/* pinnedCommitTime */,
                                     1L/* pinnedCommitCounter */, now/* timestamp */);
+                            log.warn("Sending mock response for gather protocol: cause="
+                                    + t);
+                            // Will block until barrier breaks on leader.
                             leader.notifyEarliestCommitTime(resp);
                         } catch (Throwable t2) {
                             log.error(t2, t2);
@@ -1650,7 +1653,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
             final BarrierState barrierState = barrierRef.get();
 
             if (barrierState == null) {
-                
+
                 /*
                  * If the BarrierState reference has been cleared then it is not
                  * possible for us to count down at the barrier for this message
@@ -1663,6 +1666,9 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
             }
 
             try {
+
+                if (haLog.isInfoEnabled())
+                    haLog.info("resp=" + req);
 
                 getQuorum().assertLeader(barrierState.token);
 
@@ -1697,8 +1703,18 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
                  * the catch{} block above.
                  */
 
-                // follower blocks on Thread on the leader here.
-                barrierState.barrier.await();
+                try {
+                    if (haLog.isInfoEnabled()) {
+                        haLog.info("Awaiting barrier: #responses="
+                                + barrierState.responses.size() + ", #parties="
+                                + barrierState.barrier.getParties()
+                                + ", #joinedUUIDs="
+                                + barrierState.joinedServiceIds.length);
+                    }
+                } finally {
+                    // follower blocks on Thread on the leader here.
+                    barrierState.barrier.await();
+                }
                 
             }
 
