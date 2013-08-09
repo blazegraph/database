@@ -598,7 +598,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
             try {
 
                 final IHAGatherReleaseTimeRequest msg = new HAGatherReleaseTimeRequest(
-                        token, timestampOnLeader);
+                        token, timestampOnLeader, leaderId);
                 
                 // Do not send message to self (leader is at index 0).
                 for (int i = 1; i < joinedServiceIds.length; i++) {
@@ -1376,9 +1376,9 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
 
         @Override
         public Callable<IHANotifyReleaseTimeResponse> newGatherMinimumVisibleCommitTimeTask(
-                final IHAGatherReleaseTimeRequest req) {
+                final HAGlue leader, final IHAGatherReleaseTimeRequest req) {
 
-            return new GatherTask(req);
+            return new GatherTask(leader, req);
 
         }
 
@@ -1415,13 +1415,19 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
          */
         private class GatherTask implements Callable<IHANotifyReleaseTimeResponse> {
 
+            private final HAGlue leader;
             private final IHAGatherReleaseTimeRequest req;
 
-            public GatherTask(final IHAGatherReleaseTimeRequest req) {
+            public GatherTask(final HAGlue leader, final IHAGatherReleaseTimeRequest req) {
+
+                if (leader == null)
+                    throw new IllegalArgumentException();
 
                 if (req == null)
                     throw new IllegalArgumentException();
 
+                this.leader = leader;
+                
                 this.req = req;
 
             }
@@ -1445,7 +1451,6 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
                  */
                 long now = 0L;
                 UUID serviceId = null;
-                HAGlue leader = null;
                 
                 boolean didNotifyLeader = false;
                 
@@ -1461,8 +1466,10 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
                      * this case.
                      */
 
+                    // Verify quorum valid for token (implies leader valid)
                     getQuorum().assertQuorum(token);
 
+                    // Verify this service is HAReady for token.
                     assertHAReady(token);
 
                     /*
@@ -1481,12 +1488,13 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
                      */
                     now = newConsensusProtocolTimestamp();
 
-                    /*
-                     * If the token is invalid, making it impossible for us to
-                     * discover and message the leader, then then leader will
-                     * reset() the CyclicBarrier.
-                     */
-                    leader = quorumService.getLeader(token);
+                    // The leader is obtained by its serviceId above.
+//                    /*
+//                     * If the token is invalid, making it impossible for us to
+//                     * discover and message the leader, then the leader will
+//                     * reset() the CyclicBarrier.
+//                     */
+//                    leader = quorumService.getLeader(token);
 
                     /*
                      * Note: At this point we have everything we need to form up
@@ -1588,7 +1596,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
 
                     log.error(t, t);
                     
-                    if (!didNotifyLeader && leader != null) {
+                    if (!didNotifyLeader) {
 
                         /*
                          * Send mock response to the leader so it does not block

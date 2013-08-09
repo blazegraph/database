@@ -34,6 +34,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
+import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.HATXSGlue;
 import com.bigdata.ha.msg.IHAGatherReleaseTimeRequest;
 import com.bigdata.ha.msg.IHANotifyReleaseTimeResponse;
@@ -66,7 +67,7 @@ abstract public class AbstractHATransactionService extends
      *      Native thread leak in HAJournalServer process </a>
      */
     abstract public Callable<IHANotifyReleaseTimeResponse> newGatherMinimumVisibleCommitTimeTask(
-            final IHAGatherReleaseTimeRequest req);
+            final HAGlue leader, final IHAGatherReleaseTimeRequest req);
 
     /**
      * Coordinate the update of the <i>releaseTime</i> on each service that is

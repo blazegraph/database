@@ -23,6 +23,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.ha.msg;
 
+import java.util.UUID;
+
 public class HAGatherReleaseTimeRequest implements
         IHAGatherReleaseTimeRequest {
 
@@ -33,17 +35,19 @@ public class HAGatherReleaseTimeRequest implements
 
     private final long token;
     private final long timestampOnLeader;
+    private final UUID leaderId;
 
     public HAGatherReleaseTimeRequest(final long token,
-            final long timestampOnLeader) {
+            final long timestampOnLeader, final UUID leaderId) {
         this.token = token;
         this.timestampOnLeader = timestampOnLeader;
+        this.leaderId = leaderId;
     }
 
     @Override
     public String toString() {
         return super.toString() + "{token=" + token + ",timestampOnLeader="
-                + timestampOnLeader + "}";
+                + timestampOnLeader + ", leaderId=" + leaderId + "}";
     }
     
     @Override
@@ -54,6 +58,11 @@ public class HAGatherReleaseTimeRequest implements
     @Override
     public long getTimestampOnLeader() {
         return timestampOnLeader;
+    }
+    
+    @Override
+    public UUID getLeaderId() {
+        return leaderId;
     }
 
 }

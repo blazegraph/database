@@ -7691,10 +7691,28 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
             }
             
+            /*
+             * Lookup the leader using its UUID.
+             * 
+             * Note: We do not use the token to find the leader. If the token is
+             * invalid, then we will handle that once we are in the GatherTask.
+             * 
+             * Note: We do this early and pass it into the GatherTask. We can
+             * not send back an RMI response unless we know the leader's proxy.
+             */
+            
+            final UUID leaderId = req.getLeaderId();
+
+            final HAGlue leader = getQuorum().getClient().getService(leaderId);
+
+            if (leader == null)
+                throw new RuntimeException(
+                        "Could not discover the quorum leader.");
+            
             final Callable<IHANotifyReleaseTimeResponse> task = ((AbstractHATransactionService) AbstractJournal.this
                     .getLocalTransactionManager()
                     .getTransactionService())
-                    .newGatherMinimumVisibleCommitTimeTask(req);
+                    .newGatherMinimumVisibleCommitTimeTask(leader, req);
 
             final FutureTask<IHANotifyReleaseTimeResponse> ft = new FutureTask<IHANotifyReleaseTimeResponse>(task);
 

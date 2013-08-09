@@ -23,6 +23,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.ha.msg;
 
+import java.util.UUID;
+
 /**
  * Message used to request information about the earliest commit point that is
  * pinned on a follower. This is used by the leader to make a decision about the
@@ -48,5 +50,11 @@ public interface IHAGatherReleaseTimeRequest extends IHAMessage {
      * where the clocks are not synchronized on the services.
      */
     public long getTimestampOnLeader();
+
+    /**
+     * The UUID of the leader. This may be used to discover the service that
+     * is (or was) the leader even if the token has been invalidated.
+     */
+    public UUID getLeaderId();
     
 }
