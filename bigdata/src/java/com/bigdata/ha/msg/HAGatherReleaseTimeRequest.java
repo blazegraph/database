@@ -39,6 +39,8 @@ public class HAGatherReleaseTimeRequest implements
 
     public HAGatherReleaseTimeRequest(final long token,
             final long timestampOnLeader, final UUID leaderId) {
+        if (leaderId == null)
+            throw new IllegalArgumentException();
         this.token = token;
         this.timestampOnLeader = timestampOnLeader;
         this.leaderId = leaderId;
