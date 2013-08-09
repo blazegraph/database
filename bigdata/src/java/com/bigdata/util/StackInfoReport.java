@@ -47,10 +47,11 @@ public class StackInfoReport extends RuntimeException {
         super();
     }
 
-    public StackInfoReport(String message, Throwable cause,
-            boolean enableSuppression, boolean writableStackTrace) {
-        super(message, cause, enableSuppression, writableStackTrace);
-    }
+    // Note: This constructor is not available in JDK 1.6.
+//    public StackInfoReport(String message, Throwable cause,
+//            boolean enableSuppression, boolean writableStackTrace) {
+//        super(message, cause, enableSuppression, writableStackTrace);
+//    }
 
     public StackInfoReport(String message, Throwable cause) {
         super(message, cause);
