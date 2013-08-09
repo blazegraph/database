@@ -38,6 +38,7 @@ import java.security.NoSuchAlgorithmException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -206,12 +207,17 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
 
             request = newRequest(urlString.toString(), opts.method);
             
-            if (opts.acceptHeader != null) {
+            if (opts.requestHeaders != null) {
+
+                for (Map.Entry<String, String> e : opts.requestHeaders
+                        .entrySet()) {
             
-                request.addHeader("Accept", opts.acceptHeader);
+                    request.addHeader(e.getKey(), e.getValue());
                 
                 if (log.isDebugEnabled())
-                    log.debug("Accept: " + opts.acceptHeader);
+                        log.debug(e.getKey() + ": " + e.getValue());
+
+                }
                 
             }
 

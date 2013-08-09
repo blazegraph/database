@@ -31,7 +31,7 @@ package com.bigdata.relation.accesspath;
 import java.util.Iterator;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Future;
+import java.util.concurrent.FutureTask;
 import java.util.concurrent.RejectedExecutionException;
 
 import org.apache.log4j.Logger;
@@ -1182,14 +1182,21 @@ public class AccessPath<R> implements IAccessPath<R>, IBindingSetAccessPath<R> {
         final BlockingBuffer<R[]> buffer = new BlockingBuffer<R[]>(
                 chunkOfChunksCapacity);
 
-        final ExecutorService executorService = indexManager
-                .getExecutorService();
+        /**
+         * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/707">
+         *      BlockingBuffer.close() does not unblock threads </a>
+         */
         
-        final Future<Void> future = executorService
-                .submit(new ChunkConsumerTask<R>(this, src, buffer));
+        // Wrap computation as FutureTask.
+        final FutureTask<Void> ft = new FutureTask<Void>(
+                new ChunkConsumerTask<R>(this, src, buffer));
 
-        buffer.setFuture(future);
+        // Set Future on BlockingBuffer *before* starting computation.
+        buffer.setFuture(ft);
         
+        // Start computation.
+        indexManager.getExecutorService().submit(ft);
+
         return new ChunkConsumerIterator<R>(buffer.iterator(), keyOrder);
             
     }

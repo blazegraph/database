@@ -42,4 +42,32 @@ public interface IPreparedQuery {
      */
     UUID getQueryId();
 
+    /**
+     * Override the value of the specified HTTP header.
+     * 
+     * @param name
+     *            The name of the HTTP header.
+     * @param value
+     *            The value to be used.
+     */
+    void setHeader(String name, String value);
+
+    /**
+     * Convenience method to set the <code>Accept</code> header.
+     * 
+     * @param value
+     *            The value to be used.
+     */
+    void setAcceptHeader(String value);
+    
+    /**
+     * Return the value of the specified HTTP header.
+     * 
+     * @param name
+     *            The name of the HTTP header.
+     *            
+     * @return The value -or- <code>null</code> if the header is not defined.
+     */
+    String getHeader(String name);
+    
 }

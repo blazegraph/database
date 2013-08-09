@@ -5,6 +5,7 @@ import java.util.Map;
 import org.apache.log4j.Logger;
 
 import com.bigdata.bop.BOp;
+import com.bigdata.rdf.sparql.ast.optimizers.StaticOptimizer;
 
 /**
  * A special kind of group {@link IGroupNode} that represents the sparql union
@@ -12,7 +13,7 @@ import com.bigdata.bop.BOp;
  * <p>
  * Note: This node only accepts {@link JoinGroupNode}s as children.
  */
-public class UnionNode extends GraphPatternGroup<JoinGroupNode> {
+public class UnionNode extends GraphPatternGroup<JoinGroupNode>  implements IReorderableNode {
 	
     /**
      * 
@@ -55,15 +56,6 @@ public class UnionNode extends GraphPatternGroup<JoinGroupNode> {
     @Override
     public UnionNode addChild(final JoinGroupNode child) {
 
-        // can only add non-optional join groups as children to union
-        if (!(child instanceof JoinGroupNode)) {
-
-            throw new IllegalArgumentException("UnionNode only permits "
-                    + JoinGroupNode.class.getSimpleName()
-                    + " children, but child=" + child);
-
-        }
-
         final JoinGroupNode group = (JoinGroupNode) child;
 
         // can only add non-optional join groups as children to union
@@ -94,5 +86,30 @@ public class UnionNode extends GraphPatternGroup<JoinGroupNode> {
         return false;
         
     }
+    
+
+	@Override
+ 	public long getEstimatedCardinality(StaticOptimizer optimizer) {
+ 		long cardinality = 0;
+ 		for (JoinGroupNode child : this) {
+ 			StaticOptimizer opt = new StaticOptimizer(optimizer, child.getReorderableChildren());
+ 			cardinality += opt.getCardinality();
+ 		}
+ 		return cardinality;
+ 	}
+
+	@Override
+	public boolean isReorderable() {
+		for (JoinGroupNode child : this) {
+			for (IGroupMemberNode grandchild : child) {
+				if (! (grandchild instanceof IReorderableNode))
+					return false;
+				if (! ((IReorderableNode)grandchild).isReorderable())
+					return false;
+			}
+		}
+		return true;
+	}
+
     
 }

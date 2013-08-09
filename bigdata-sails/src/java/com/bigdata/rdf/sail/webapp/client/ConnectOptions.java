@@ -56,11 +56,11 @@ public class ConnectOptions {
     /** The HTTP method (GET, POST, etc). */
     public String method = "POST";
 
-    /**
-     * The accept header (NO DEFAULT).
-     */
-    public String acceptHeader = null;
-
+//    /**
+//     * The accept header (NO DEFAULT).
+//     */
+//    public String acceptHeader = null;
+    
     /**
      * Used for {@link RDFFormat} responses.
      */
@@ -125,10 +125,24 @@ public class ConnectOptions {
 
     }
 
-    /** Request parameters to be formatted as URL query parameters. */
+    /**
+     * Request parameters to be formatted as URL query parameters.
+     * 
+     * TODO Should be private or package private
+     */
     public Map<String, String[]> requestParams;
 
-    /** Request entity. */
+    /**
+     * Optional request headers.
+     * 
+     * TODO Should be private or package private
+     */
+    public Map<String, String> requestHeaders;
+
+    /** Request entity.
+     * 
+     * TODO Should be private or package private.
+     */
     public HttpEntity entity = null;
 
 //    /**
@@ -187,6 +201,37 @@ public class ConnectOptions {
 
     }
 
+    public void setHeader(final String name, final String val) {
+
+        if (requestHeaders == null) {
+            requestHeaders = new LinkedHashMap<String, String>();
+        }
+
+        requestHeaders.put(name, val);
+
+    }
+
+    public void setAcceptHeader(final String value) {
+
+        setHeader("Accept", value);
+
+    }
+
+    public String getAcceptHeader() {
+
+        return getHeader("Accept");
+
+    }
+
+    public String getHeader(final String name) {
+
+        if (requestHeaders == null)
+            return null;
+
+        return requestHeaders.get(name);
+
+    }
+    
     /**
      * Add any URL query parameters.
      */

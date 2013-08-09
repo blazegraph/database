@@ -63,7 +63,6 @@ import com.bigdata.relation.accesspath.MultiSourceSequentialCloseableIterator;
 import com.bigdata.rwstore.sector.IMemoryManager;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.striterator.ICloseableIterator;
-import com.bigdata.util.InnerCause;
 import com.bigdata.util.concurrent.Memoizer;
 import com.sun.jini.thread.Executor;
 
@@ -806,6 +805,11 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
                  * is invoked from within the running task in order to remove
                  * the latency for that RMI from the thread which submits tasks
                  * to consume chunks.
+                 * 
+                 * FIXME This is a protocol that should be optimized to provide
+                 * better throughput for scale-out. E.g., a single socket on
+                 * which we transmit and receive notice about operator
+                 * start/stop metadata using some non-blocking service.
                  */
 
 //                final boolean lastPassRequested = ((PipelineOp) (t.bop))
@@ -1292,7 +1296,7 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
                 halt(new Exception("task=" + toString() + ", cause=" + t, t));
                 if (getCause() != null) {
                     // Abnormal termination - wrap and rethrow.
-                    
+                    // TODO Why is this line empty? (I think that it is handled by the ChunkTaskWrapper.)
                 }
                 // otherwise ignore exception (normal completion).
             } finally {
@@ -1304,6 +1308,19 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
                  * it is closed.
                  */
                 context.getSource().close();
+                /**
+                 * Ensure that the task is cancelled.
+                 * 
+                 * Note: This does not appear to be necessary. I am observing
+                 * the interrupt of the operator evaluation task regardless.
+                 * 
+                 * @see https://sourceforge.net/apps/trac/bigdata/ticket/707
+                 *      (BlockingBuffer.close() does not unblock threads)
+                 * @see https://sourceforge.net/apps/trac/bigdata/ticket/716
+                 *      (Verify that IRunningQuery instances (and nested
+                 *      queries) are correctly cancelled when interrupted)
+                 */
+//                ft.cancel(true/*mayInterruptIfRunning*/);
             }
             // Done.
             return null;

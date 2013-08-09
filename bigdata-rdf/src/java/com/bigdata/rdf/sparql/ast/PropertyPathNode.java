@@ -59,8 +59,7 @@ public class PropertyPathNode extends
      * @param p
      * @param o
      * 
-     * @see PropertyPathNode#StatementPatternNode(TermNode, PathNode,
-     *      TermNode, TermNode, Scope)
+     * @see #PropertyPathNode(TermNode, PathNode,  TermNode, TermNode, Scope)
      */
     public PropertyPathNode(final TermNode s, final PathNode p,
             final TermNode o) {

@@ -1,0 +1,6 @@
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+SELECT *
+WHERE
+{
+?sub rdfs:subClassOf+ <http://example.org/A>
+}
