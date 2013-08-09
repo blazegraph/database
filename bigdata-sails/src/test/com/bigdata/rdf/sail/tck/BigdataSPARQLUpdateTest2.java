@@ -475,7 +475,17 @@ public class BigdataSPARQLUpdateTest2 extends TestCase2 {
              * 
              * Also, document this on the wiki. The sub-select is necessary because
              * SPARQL does not allow solution modifiers on the top-level WHERE clause
-             * for INSERT/DELETE+WHERE. [Back port test changes to 1.2.x branch].
+             * for INSERT/DELETE+WHERE. 
+             */
+            /*
+             * FIXME test variants w/ and w/o embedded sub-select and verify the
+             * *order* is preserved when using the embedded subselect w/ its
+             * order by. Also, verify that we translate this by lifting out the
+             * sub-select since the top-level query is empty at thast point.
+             * 
+             * Also, document this on the wiki. The sub-select is necessary because
+             * SPARQL does not allow solution modifiers on the top-level WHERE clause
+             * for INSERT/DELETE+WHERE.
              */
             sb.append("PREFIX rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#>\n");
             sb.append("PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>\n");

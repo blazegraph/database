@@ -36,6 +36,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.log4j.Logger;
@@ -180,19 +181,27 @@ public class ClientAsynchronousIterator<E> implements IAsynchronousIterator<E>,
         
         // allocate local buffer.
         this.localBuffer = new BlockingBuffer<E>(capacity);
-    
-        // start reader.
-        this.future = executorService.submit(new ReaderTask());
+
+        /**
+         * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/707">
+         *      BlockingBuffer.close() does not unblock threads </a>
+         */
+
+        // Wrap computation as FutureTask.
+        final FutureTask<Void> ft = new FutureTask<Void>(new ReaderTask());
         
         /*
          * Set future on the local buffer so that we can interrupt it when the
          * client side of the iterator is closed.
          */
-        this.localBuffer.setFuture(future);
+        this.localBuffer.setFuture(future = ft);
         
         // save reference to iterator draining the [localBuffer].
         this.localIterator = localBuffer.iterator();
 
+        // start reader.
+        executorService.submit(ft);
+        
     }
 
     /**

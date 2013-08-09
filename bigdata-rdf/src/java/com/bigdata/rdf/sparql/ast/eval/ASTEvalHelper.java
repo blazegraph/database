@@ -191,11 +191,19 @@ public class ASTEvalHelper {
             return itr.hasNext();
         } finally {
             if (itr != null) {
+                /**
+                 * Ensure query is terminated. An interrupt during hasNext()
+                 * should cause the query to terminate through itr.close().
+                 * 
+                 * @see <a
+                 *      href="https://sourceforge.net/apps/trac/bigdata/ticket/707">
+                 *      BlockingBuffer.close() does not unblock threads </a>
+                 */
                 itr.close();
             }
         }
     }
-        
+
     /**
      * Evaluate a SELECT query.
      * 
@@ -241,14 +249,29 @@ public class ASTEvalHelper {
         final boolean materializeProjectionInQuery = context.materializeProjectionInQuery
                 && !optimizedQuery.hasSlice();
 
-        return new TupleQueryResultImpl(projectedSet,
-                ASTEvalHelper.evaluateQuery(
-                        astContainer,
-                        context,
-                        bindingSets
-                        ,materializeProjectionInQuery//
+        final CloseableIteration<BindingSet, QueryEvaluationException> itr = ASTEvalHelper
+                .evaluateQuery(astContainer, context, bindingSets,
+                        materializeProjectionInQuery//
                         , projected//
-                        ));
+                );
+
+        TupleQueryResult r = null;
+        try {
+            r = new TupleQueryResultImpl(projectedSet, itr);
+            return r;
+        } finally {
+            if (r == null) {
+                /**
+                 * Ensure query is terminated if assignment to fails. E.g., if
+                 * interrupted during the ctor.
+                 * 
+                 * @see <a
+                 *      href="https://sourceforge.net/apps/trac/bigdata/ticket/707">
+                 *      BlockingBuffer.close() does not unblock threads </a>
+                 */
+                itr.close();
+            }
+        }
 
     }
 
@@ -463,17 +486,10 @@ public class ASTEvalHelper {
         final boolean materializeProjectionInQuery = context.materializeProjectionInQuery
                 && !optimizedQuery.hasSlice();
 
-        // Solutions to the WHERE clause (as projected).
-        final CloseableIteration<BindingSet, QueryEvaluationException> solutions = ASTEvalHelper
-                .evaluateQuery(astContainer, context, bindingSets//
-                        , materializeProjectionInQuery//
-                        , optimizedQuery.getProjection().getProjectionVars()//
-                );
-
         // The effective DescribeMode.
-//        final DescribeModeEnum describeMode = optimizedQuery.getProjection()
-//                .getDescribeMode() == null ? QueryHints.DEFAULT_DESCRIBE_MODE
-//                : optimizedQuery.getProjection().getDescribeMode();
+//      final DescribeModeEnum describeMode = optimizedQuery.getProjection()
+//              .getDescribeMode() == null ? QueryHints.DEFAULT_DESCRIBE_MODE
+//              : optimizedQuery.getProjection().getDescribeMode();
         final DescribeModeEnum describeMode = context
                 .getDescribeMode(optimizedQuery.getProjection());
 
@@ -483,6 +499,18 @@ public class ASTEvalHelper {
         final int describeStatementlimit = context
                 .getDescribeStatementLimit(optimizedQuery.getProjection());
 
+        // The final result to be returned.
+        GraphQueryResult result = null;
+        
+        // Solutions to the WHERE clause (as projected).
+        final CloseableIteration<BindingSet, QueryEvaluationException> solutions = ASTEvalHelper
+                .evaluateQuery(astContainer, context, bindingSets//
+                        , materializeProjectionInQuery//
+                        , optimizedQuery.getProjection().getProjectionVars()//
+                );
+
+        try {
+        
         final CloseableIteration<BindingSet, QueryEvaluationException> solutions2;
         final ConcurrentHashSet<BigdataValue> describedResources;
         if (describeCache != null) {
@@ -593,9 +621,32 @@ public class ASTEvalHelper {
 
         }
         
-        return new GraphQueryResultImpl(//
+        result = new GraphQueryResultImpl(//
                 optimizedQuery.getPrefixDecls(), //
                 src3);
+        } finally {
+            if (result == null) {
+                /**
+                 * Cancel the query since we are not returning the
+                 * GraphTupleQuery result object to the caller.
+                 * 
+                 * Note: This provides only partial resolution of the following
+                 * ticket. There are other operations than the underlying query
+                 * that would need to be canceled. I have NOT verified that
+                 * closing the underlying query is sufficient to unwind those
+                 * operations. Also, the CBD support is not written to be
+                 * interruptable at this time (see the TODO above).
+                 * 
+                 * @see <a
+                 *      href="https://sourceforge.net/apps/trac/bigdata/ticket/715"
+                 *      > Interrupt of thread submitting a query for evaluation
+                 *      does not always terminate the AbstractRunningQuery </a>
+                 */
+                solutions.close();
+            }
+        }
+        
+        return result;
 
     }
 
@@ -664,7 +715,7 @@ public class ASTEvalHelper {
         }
 
     }
-
+    
     /**
      * Convert a Sesame {@link BindingSet} into a bigdata {@link IBindingSet}
      * and merges it with the BINDINGS clause (if any) attached to the

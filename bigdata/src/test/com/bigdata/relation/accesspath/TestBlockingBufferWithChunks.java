@@ -156,7 +156,7 @@ public class TestBlockingBufferWithChunks extends TestCase2 {
         final AtomicBoolean proceedFlag = new AtomicBoolean(false);
         
         // future of task writing a 3rd element on the buffer.
-        final Future producerFuture = service.submit(new Callable<Void>() {
+        final Future<?> producerFuture = service.submit(new Callable<Void>() {
             public Void call() throws Exception {
                 
                 lock.lockInterruptibly();
@@ -184,7 +184,7 @@ public class TestBlockingBufferWithChunks extends TestCase2 {
 		});
 
 		// future of task draining the buffer.
-		final Future consumerFuture = service.submit(new Callable<Void>() {
+		final Future<?> consumerFuture = service.submit(new Callable<Void>() {
 			public Void call() throws Exception {
 
 				try {

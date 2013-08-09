@@ -32,32 +32,251 @@ import org.openrdf.model.impl.URIImpl;
 import org.openrdf.model.vocabulary.RDF;
 
 import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.ModifiableBOpBase;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.sparql.ast.ASTBase;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.AbstractASTEvaluationTestCase;
 import com.bigdata.rdf.sparql.ast.AssignmentNode;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
+import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
+import com.bigdata.rdf.sparql.ast.GroupMemberNodeBase;
+import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.IQueryNode;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueryInclude;
 import com.bigdata.rdf.sparql.ast.NamedSubqueryRoot;
 import com.bigdata.rdf.sparql.ast.ProjectionNode;
+import com.bigdata.rdf.sparql.ast.QueryBase;
 import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryType;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.TermNode;
+import com.bigdata.rdf.sparql.ast.UnionNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
-import com.bigdata.rdf.sparql.ast.eval.AST2BOpBase.Annotations;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.service.ServiceNode;
 import com.bigdata.rdf.store.BDS;
-
+import com.bigdata.rdf.sparql.ast.PropertyPathUnionNode;
 /**
  * Test suite for {@link ASTStaticJoinOptimizer}.
  */
 public class TestASTStaticJoinOptimizer extends AbstractASTEvaluationTestCase {
 
+	public interface Annotations extends
+			com.bigdata.rdf.sparql.ast.GraphPatternGroup.Annotations,
+			com.bigdata.rdf.sparql.ast.eval.AST2BOpBase.Annotations {
+	}
+
+	enum HelperFlag {
+		OPTIONAL {
+			@Override
+			public void apply(ASTBase sp) {
+				((ModifiableBOpBase) sp)
+						.setProperty(Annotations.OPTIONAL, true);
+			}
+		},
+		DISTINCT {
+			@Override
+			public void apply(ASTBase rslt) {
+				((QueryBase) rslt).getProjection().setDistinct(true);
+			}
+		};
+
+		/**
+		 * 
+		 * @param target
+		 * @throws ClassCastException
+		 *             If there is a mismatch between the flag and its usage.
+		 */
+		abstract public void apply(ASTBase target);
+	};
+
+	/**
+	 * The purpose of this class is to make the tests look like the old
+	 * comments. The first example
+	 * {@link TestASTStaticJoinOptimizer#test_simpleOptional01A()} is based on
+	 * the comments of
+	 * {@link TestASTStaticJoinOptimizer#test_simpleOptional01()} and
+	 * demonstrates that the comment is out of date.
+	 * 
+	 * NB: Given this goal, several Java naming conventions are ignored. e.g.
+	 * methods whose names are ALLCAPS or the same as ClassNames
+	 * 
+	 * Also, note that the intent is that this class be used in
+	 * anonymous subclasses with a single invocation of the {@link #test()} method,
+	 * and the two fields {@link #given} and {@link #expected} initialized
+	 * in the subclasses constructor (i.e. inside a second pair of braces).
+	 * 
+	 * All of the protected members are wrappers around constructors,
+	 * to allow the initialization of these two fields, to have a style
+	 * much more like Prolog than Java.
+	 * 
+	 * @author jeremycarroll
+	 * 
+	 */
+	@SuppressWarnings("rawtypes")
+	public abstract class Helper {
+		protected QueryRoot given, expected;
+		protected final String w = "w", x = "x", y = "y", z = "z";
+		protected final IV a = iv("a"), b = iv("b"), c = iv("c"), d = iv("d"),
+				e = iv("e"), f = iv("f"), g = iv("g"), h = iv("h");
+
+		protected final HelperFlag OPTIONAL = HelperFlag.OPTIONAL;
+		protected final HelperFlag DISTINCT = HelperFlag.DISTINCT;
+
+		private IV iv(String id) {
+			return makeIV(new URIImpl("http://example/" + id));
+		}
+
+		protected QueryRoot select(VarNode[] varNodes,
+				NamedSubqueryRoot namedSubQuery, JoinGroupNode where,
+				HelperFlag... flags) {
+			QueryRoot rslt = select(varNodes, where, flags);
+			rslt.getNamedSubqueriesNotNull().add(namedSubQuery);
+			return rslt;
+		}
+
+		protected QueryRoot select(VarNode[] varNodes, JoinGroupNode where,
+				HelperFlag... flags) {
+
+			QueryRoot select = new QueryRoot(QueryType.SELECT);
+			final ProjectionNode projection = new ProjectionNode();
+			for (VarNode varNode : varNodes)
+				projection.addProjectionVar(varNode);
+
+			select.setProjection(projection);
+			select.setWhereClause(where);
+			for (HelperFlag flag : flags)
+				flag.apply(select);
+			return select;
+		}
+
+		protected QueryRoot select(VarNode varNode,
+				NamedSubqueryRoot namedSubQuery, JoinGroupNode where,
+				HelperFlag... flags) {
+			return select(new VarNode[] { varNode }, namedSubQuery, where,
+					flags);
+		}
+
+		protected QueryRoot select(VarNode varNode, JoinGroupNode where,
+				HelperFlag... flags) {
+			return select(new VarNode[] { varNode }, where, flags);
+		}
+
+		protected NamedSubqueryRoot namedSubQuery(String name, VarNode varNode,
+				JoinGroupNode where) {
+			final NamedSubqueryRoot namedSubquery = new NamedSubqueryRoot(
+					QueryType.SELECT, name);
+			final ProjectionNode projection = new ProjectionNode();
+			namedSubquery.setProjection(projection);
+			projection.addProjectionExpression(new AssignmentNode(varNode,
+					new VarNode(varNode)));
+
+			namedSubquery.setWhereClause(where);
+			return namedSubquery;
+		}
+
+		protected GroupMemberNodeBase namedSubQueryInclude(String name) {
+			return new NamedSubqueryInclude(name);
+		}
+
+		protected VarNode[] varNodes(String... names) {
+			VarNode rslt[] = new VarNode[names.length];
+			for (int i = 0; i < names.length; i++)
+				rslt[i] = varNode(names[i]);
+			return rslt;
+		}
+
+		protected VarNode varNode(String varName) {
+			return new VarNode(varName);
+		}
+
+		protected TermNode constantNode(IV iv) {
+			return new ConstantNode(iv);
+		}
+
+		protected StatementPatternNode statementPatternNode(TermNode s,
+				TermNode p, TermNode o, long cardinality, HelperFlag... flags) {
+			StatementPatternNode rslt = newStatementPatternNode(s, p, o,
+					cardinality);
+			for (HelperFlag flag : flags) {
+				flag.apply(rslt);
+			}
+			return rslt;
+		}
+
+		@SuppressWarnings("unchecked")
+		private <E extends IGroupMemberNode, T extends GraphPatternGroup<E>> T initGraphPatternGroup(
+				T rslt, Object... statements) {
+			for (Object mem : statements) {
+				if (mem instanceof IGroupMemberNode) {
+					rslt.addChild((E) mem);
+				} else {
+					((HelperFlag) mem).apply(rslt);
+				}
+			}
+			return rslt;
+		}
+
+		protected JoinGroupNode joinGroupNode(Object... statements) {
+			return initGraphPatternGroup(new JoinGroupNode(), statements);
+		}
+
+		protected PropertyPathUnionNode propertyPathUnionNode(
+				Object... statements) {
+			return initGraphPatternGroup(new PropertyPathUnionNode(),
+					statements);
+		}
+
+		protected UnionNode unionNode(Object... statements) {
+			return initGraphPatternGroup(new UnionNode(), statements);
+
+		}
+
+		protected JoinGroupNode where(GroupMemberNodeBase... statements) {
+			return joinGroupNode((Object[]) statements);
+		}
+
+		public void test() {
+			final IASTOptimizer rewriter = new ASTStaticJoinOptimizer();
+
+			final AST2BOpContext context = new AST2BOpContext(new ASTContainer(
+					given), store);
+
+			final IQueryNode actual = rewriter.optimize(context, given,
+					new IBindingSet[] {});
+
+			assertSameAST(expected, actual);
+		}
+	}
+    public void test_simpleOptional01A() {
+    	new Helper() {{
+    		given = select( varNode(x), 
+    				where (
+    						statementPatternNode(varNode(x), constantNode(e), constantNode(e),5),
+    						statementPatternNode(varNode(x), constantNode(b), constantNode(b),2),
+    						statementPatternNode(varNode(x), constantNode(d), constantNode(d),4),
+    						statementPatternNode(varNode(x), constantNode(a), constantNode(a),1),
+    						statementPatternNode(varNode(x), constantNode(c), constantNode(c),3),
+    						statementPatternNode(varNode(x), constantNode(f), constantNode(f),1,OPTIONAL),
+    						statementPatternNode(varNode(x), constantNode(g), constantNode(g),1,OPTIONAL)
+    						) );
+    		expected = select( varNode(x), 
+    				where (
+    						statementPatternNode(varNode(x), constantNode(a), constantNode(a),1),
+    						statementPatternNode(varNode(x), constantNode(b), constantNode(b),2),
+    						statementPatternNode(varNode(x), constantNode(c), constantNode(c),3),
+    						statementPatternNode(varNode(x), constantNode(d), constantNode(d),4),
+    						statementPatternNode(varNode(x), constantNode(e), constantNode(e),5),
+    						statementPatternNode(varNode(x), constantNode(f), constantNode(f),1,OPTIONAL),
+    						statementPatternNode(varNode(x), constantNode(g), constantNode(g),1,OPTIONAL)
+    						) );
+
+
+    	}}.test();
+    }
     /**
      * 
      */
@@ -522,7 +741,8 @@ public class TestASTStaticJoinOptimizer extends AbstractASTEvaluationTestCase {
         assertSameAST(expected, actual);
 
     }
-    
+
+
     /**
      * Given
      * 
@@ -531,11 +751,11 @@ public class TestASTStaticJoinOptimizer extends AbstractASTEvaluationTestCase {
      *   JoinGroupNode {
      *     StatementPatternNode(VarNode(x), ConstantNode(e), ConstantNode(e))
      *     StatementPatternNode(VarNode(x), ConstantNode(b), ConstantNode(b))
-     *     StatementPatternNode(VarNode(x), ConstantNode(f), ConstantNode(f)) [OPTIONAL]
      *     StatementPatternNode(VarNode(x), ConstantNode(d), ConstantNode(d))
-     *     StatementPatternNode(VarNode(x), ConstantNode(g), ConstantNode(g)) [OPTIONAL]
      *     StatementPatternNode(VarNode(x), ConstantNode(a), ConstantNode(a))
      *     StatementPatternNode(VarNode(x), ConstantNode(c), ConstantNode(c))
+     *     StatementPatternNode(VarNode(x), ConstantNode(f), ConstantNode(f)) [OPTIONAL]
+     *     StatementPatternNode(VarNode(x), ConstantNode(g), ConstantNode(g)) [OPTIONAL]
      *   }
      * </pre>
      *
@@ -1267,11 +1487,14 @@ public class TestASTStaticJoinOptimizer extends AbstractASTEvaluationTestCase {
             
             final JoinGroupNode subgroup3 = new JoinGroupNode();
             
-            subgroup3.addChild(newStatementPatternNode(new VarNode("x"),
-                    new ConstantNode(e), new ConstantNode(e), 10l));
+            // Note: both x and y are bound at this point, so the best order
+            // is lowest cardinality first
             
             subgroup3.addChild(newStatementPatternNode(new VarNode("y"),
                     new ConstantNode(d), new ConstantNode(d), 1l));
+
+            subgroup3.addChild(newStatementPatternNode(new VarNode("x"),
+                    new ConstantNode(e), new ConstantNode(e), 10l));
             
             subgroup2.addChild(subgroup3);
             
@@ -1294,33 +1517,33 @@ public class TestASTStaticJoinOptimizer extends AbstractASTEvaluationTestCase {
 
     }
     
-    /**
-     * Given
-     * 
-     * <pre>
-     *   SELECT VarNode(x)
-     *   JoinGroupNode {
-     *     ServiceNode {
-     *       StatementPatternNode(VarNode(x), ConstantNode(bd:search), ConstantNode("foo")
-     *     }
-     *     StatementPatternNode(VarNode(y), ConstantNode(b), ConstantNode(b)) [CARDINALITY=1]
-     *     StatementPatternNode(VarNode(x), ConstantNode(a), VarNode(y)) [CARDINALITY=2]
-     *   }
-     * </pre>
-     *
-     * Reorder as
-     * 
-     * <pre>
-     *   SELECT VarNode(x)
-     *   JoinGroupNode {
-     *     ServiceNode {
-     *       StatementPatternNode(VarNode(x), ConstantNode(bd:search), ConstantNode("foo")
-     *     }
-     *     StatementPatternNode(VarNode(x), ConstantNode(a), VarNode(y)) [CARDINALITY=2]
-     *     StatementPatternNode(VarNode(y), ConstantNode(b), ConstantNode(b)) [CARDINALITY=1]
-     *   }
-     * </pre>
-     */
+
+    public void test_NSI01X() {
+    	new Helper() {{
+    		given = select( varNodes(x,y,z), 
+    				namedSubQuery("_set1",varNode(x),where(statementPatternNode(varNode(x), constantNode(a), constantNode(b),1))),
+    				where (
+    						namedSubQueryInclude("_set1"),
+    						statementPatternNode(varNode(x), constantNode(c), varNode(y),1,OPTIONAL),
+    						joinGroupNode( statementPatternNode(varNode(w), constantNode(e), varNode(z),10),
+    								statementPatternNode(varNode(w), constantNode(d), varNode(x),100),
+    								OPTIONAL )
+    						), DISTINCT );
+
+
+    		expected = select( varNodes(x,y,z), 
+    				namedSubQuery("_set1",varNode(x),where(statementPatternNode(varNode(x), constantNode(a), constantNode(b),1))),
+    				where (
+    						namedSubQueryInclude("_set1"),
+    						statementPatternNode(varNode(x), constantNode(c), varNode(y),1,OPTIONAL),
+    						joinGroupNode( statementPatternNode(varNode(w), constantNode(d), varNode(x),100),
+    								statementPatternNode(varNode(w), constantNode(e), varNode(z),10),
+    								OPTIONAL )
+    						), DISTINCT );
+
+    	}}.test();
+
+    }
     @SuppressWarnings("rawtypes")
     public void test_NSI01() {
 
@@ -1696,6 +1919,216 @@ public class TestASTStaticJoinOptimizer extends AbstractASTEvaluationTestCase {
         
     }
         
+    /*
+     * 
+     * prefix skos: <http://www.w3.org/2004/02/skos/core#>    
+       prefix bds: <http://www.bigdata.com/rdf/search#>
+   
+select distinct ?o
+where {     
+   ?o bds:search "viscu*" .
+    ?s skos:inScheme <http://syapse.com/vocabularies/fma/anatomical_entity#> .
+    ?s skos:prefLabel|skos:altLabel ?o. 
+}
+     */
+    
+    public void test_union_trac684_A() {
+    	new Helper(){{
+
+    		given = select( varNode(z), // z is ?o
+    				      
+    				namedSubQuery("_bds",varNode(z),where(statementPatternNode(varNode(z), 
+    						constantNode(a), // a is bds:search
+    						constantNode(b), // fill in for the literal
+    						1))),
+    				where (
+    						namedSubQueryInclude("_bds"),
+    						statementPatternNode(varNode(x), constantNode(c), // inScheme
+    								                         constantNode(d), // anatomical_entity
+    								                         81053),
+    						propertyPathUnionNode(
+    						    joinGroupNode( statementPatternNode(varNode(x), constantNode(e), varNode(z),960191) ),
+
+    						    joinGroupNode( statementPatternNode(varNode(x), constantNode(f), varNode(z),615502) ) )
+    						),
+    				 DISTINCT );
+    		
+    		
+    		expected = select( varNode(z), // z is ?o
+				      
+				namedSubQuery("_bds",varNode(z),where(statementPatternNode(varNode(z), 
+						constantNode(a), // a is bds:search
+						constantNode(b), // fill in for the literal
+						1))),
+				where (
+						namedSubQueryInclude("_bds"),
+						propertyPathUnionNode(
+						    joinGroupNode( statementPatternNode(varNode(x), constantNode(e), varNode(z),960191) ),
+
+						    joinGroupNode( statementPatternNode(varNode(x), constantNode(f), varNode(z),615502) ) ),
+						statementPatternNode(varNode(x), constantNode(c), // inScheme
+			                         constantNode(d), // anatomical_entity
+			                         81053)
+						),
+				 DISTINCT );
+    		
+    	}}.test();
+    }
+    /*
+     prefix skos: <http://www.w3.org/2004/02/skos/core#>   
+prefix bds: <http://www.bigdata.com/rdf/search#> 
+   
+select distinct ?o
+where {     
+    {
+       ?s skos:prefLabel ?o .
+       ?s skos:inScheme <http://syapse.com/vocabularies/fma/anatomical_entity#> .
+    }
+    UNION {
+       ?s skos:altLabel ?o.     
+        ?s skos:inScheme <http://syapse.com/vocabularies/fma/anatomical_entity#> .
+    }
+   ?o bds:search "viscu*"
+}
+     */
+    
+    public void test_union_trac684_B() {
+    	new Helper(){{
+
+    		given = select( varNode(z), // z is ?o
+    				      
+    				namedSubQuery("_bds",varNode(z),where(statementPatternNode(varNode(z), 
+    						constantNode(a), // a is bds:search
+    						constantNode(b), // fill in for the literal
+    						1))),
+    				where (
+    						namedSubQueryInclude("_bds"),
+    						unionNode(
+    						    joinGroupNode( 
+    		    						statementPatternNode(varNode(x), constantNode(c), // inScheme
+						                         constantNode(d), // anatomical_entity
+						                         81053),
+    						    		statementPatternNode(varNode(x), constantNode(e), varNode(z),960191) 
+    						    ),
+
+    						    joinGroupNode( 
+    						    		statementPatternNode(varNode(x), constantNode(f), varNode(z),615502),
+    		    						statementPatternNode(varNode(x), constantNode(c), // inScheme
+						                         constantNode(d), // anatomical_entity
+						                         81053)
+    						    ) )
+    						),
+    				 DISTINCT );
+    		
+    		
+    		expected = select( varNode(z), // z is ?o
+				      
+				namedSubQuery("_bds",varNode(z),where(statementPatternNode(varNode(z), 
+						constantNode(a), // a is bds:search
+						constantNode(b), // fill in for the literal
+						1))),
+				where (
+						namedSubQueryInclude("_bds"),
+						unionNode(
+						    joinGroupNode( 
+						    		statementPatternNode(varNode(x), constantNode(e), varNode(z),960191),
+		    						statementPatternNode(varNode(x), constantNode(c), // inScheme
+					                         constantNode(d), // anatomical_entity
+					                         81053)
+						    ),
+
+						    joinGroupNode( 
+						    		statementPatternNode(varNode(x), constantNode(f), varNode(z),615502),
+		    						statementPatternNode(varNode(x), constantNode(c), // inScheme
+					                         constantNode(d), // anatomical_entity
+					                         81053)
+						    ) )
+						),
+				 DISTINCT );
+    		
+    	}}.test();
+    }
+    
+    /*
+prefix skos: <http://www.w3.org/2004/02/skos/core#>   
+prefix bds: <http://www.bigdata.com/rdf/search#> 
+   
+select distinct ?o
+where {     
+    {
+    ?s skos:prefLabel ?o .
+    ?s skos:inScheme <http://syapse.com/vocabularies/fma/anatomical_entity#> .
+    }
+    UNION {
+    ?s skos:inScheme <http://syapse.com/vocabularies/fma/anatomical_entity#> .
+      ?s skos:altLabel ?o.     
+    }
+   ?s rdf:type skos:Concept .
+   ?o bds:search "viscu*"
+}
+    */
+   
+   public void test_union_trac684_C() {
+   	new Helper(){{
+
+   		given = select( varNode(z), // z is ?o
+   				      
+   				namedSubQuery("_bds",varNode(z),where(statementPatternNode(varNode(z), 
+   						constantNode(a), // a is bds:search
+   						constantNode(b), // fill in for the literal
+   						1))),
+   				where (
+   						namedSubQueryInclude("_bds"),
+   						statementPatternNode(varNode(x), constantNode(g), // type
+   								constantNode(h), // Concept
+   								960191) ,
+   						unionNode(
+   						    joinGroupNode( 
+   		    						statementPatternNode(varNode(x), constantNode(c), // inScheme
+						                         constantNode(d), // anatomical_entity
+						                         81053),
+   						    		statementPatternNode(varNode(x), constantNode(e), varNode(z),960191) 
+   						    ),
+
+   						    joinGroupNode( 
+   						    		statementPatternNode(varNode(x), constantNode(f), varNode(z),615502),
+   		    						statementPatternNode(varNode(x), constantNode(c), // inScheme
+						                         constantNode(d), // anatomical_entity
+						                         81053)
+   						    ) )
+   						),
+   				 DISTINCT );
+   		
+   		
+   		expected = select( varNode(z), // z is ?o
+				      
+				namedSubQuery("_bds",varNode(z),where(statementPatternNode(varNode(z), 
+						constantNode(a), // a is bds:search
+						constantNode(b), // fill in for the literal
+						1))),
+				where (
+						namedSubQueryInclude("_bds"),
+						unionNode(
+						    joinGroupNode( 
+						    		statementPatternNode(varNode(x), constantNode(e), varNode(z),960191),
+		    						statementPatternNode(varNode(x), constantNode(c), // inScheme
+					                         constantNode(d), // anatomical_entity
+					                         81053)
+						    ),
+
+						    joinGroupNode( 
+						    		statementPatternNode(varNode(x), constantNode(f), varNode(z),615502),
+		    						statementPatternNode(varNode(x), constantNode(c), // inScheme
+					                         constantNode(d), // anatomical_entity
+					                         81053)
+						    ) ),
+
+	   					statementPatternNode(varNode(x), constantNode(g), constantNode(h),960191) 
+						),
+				 DISTINCT );
+   		
+   	}}.test();
+   }
     @SuppressWarnings("rawtypes")
     public void test_runFirstRunLast_02() {
 

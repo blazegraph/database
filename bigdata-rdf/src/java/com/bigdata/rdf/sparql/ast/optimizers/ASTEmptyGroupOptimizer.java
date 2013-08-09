@@ -148,12 +148,6 @@ public class ASTEmptyGroupOptimizer implements IASTOptimizer {
 
     }
 
-    /**
-     * Eliminate a parent join group whose only child is another join group by
-     * lifting the child (it replaces the parent).
-     * 
-     * @param op
-     */
     private static void eliminateEmptyGroups(final QueryBase queryBase, 
             final GraphPatternGroup<?> op) {
 
@@ -234,14 +228,17 @@ public class ASTEmptyGroupOptimizer implements IASTOptimizer {
         } else if (arity == 1 && 
         		op instanceof JoinGroupNode && 
     			op.get(0) instanceof JoinGroupNode) {
-            
+
             final JoinGroupNode parent = (JoinGroupNode) op;
 
             final JoinGroupNode child = (JoinGroupNode) op.get(0);
 
-            if (!parent.isMinus() && !child.isMinus()) {
+            if ( (!parent.isMinus() && !child.isMinus()) 
+            //  fix for trac 712
+            	&& (parent.isOptional() || !child.isOptional()) 
+            	) {
 
-                /*
+            	/*
                  * We can always merge two JoinGroupNodes into one, but we have
                  * to make sure we get the optionality right.
                  * 
@@ -253,6 +250,8 @@ public class ASTEmptyGroupOptimizer implements IASTOptimizer {
 1. JoinGroup1 [optional=false] { JoinGroup2 [optional=false] { ... } } -> JoinGroup2 [optional=false] { ... }
 2. JoinGroup1 [optional=true]  { JoinGroup2 [optional=true]  { ... } } -> JoinGroup2 [optional=true]  { ... }
 3. JoinGroup1 [optional=true]  { JoinGroup2 [optional=false] { ... } } -> JoinGroup2 [optional=true]  { ... }
+
+This case 4 appears to be misconceived: Jeremy Carroll.
 4. JoinGroup1 [optional=false] { JoinGroup2 [optional=true]  { ... } } -> JoinGroup2 [optional=true]  { ... }
             	 */
 

@@ -34,7 +34,7 @@ import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
+import java.util.concurrent.FutureTask;
 import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.TimeUnit;
 
@@ -341,10 +341,11 @@ public class AbstractMasterTestCase extends TestCase2 {
         }
 
         @Override
-        protected Future<? extends AbstractSubtaskStats> submitSubtask(S subtask) {
+        protected void submitSubtask(
+                final FutureTask<? extends AbstractSubtaskStats> subtask) {
 
-            return executorService.submit(subtask);
-            
+            executorService.submit(subtask);
+
         }
 
     }

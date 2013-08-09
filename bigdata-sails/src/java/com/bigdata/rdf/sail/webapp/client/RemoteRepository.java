@@ -327,7 +327,7 @@ public class RemoteRepository {
 
         HttpResponse response = null;
 
-        opts.acceptHeader = ConnectOptions.DEFAULT_GRAPH_ACCEPT_HEADER;
+        opts.setAcceptHeader(ConnectOptions.DEFAULT_GRAPH_ACCEPT_HEADER);
 
         checkResponseCode(response = doConnect(opts));
 
@@ -574,7 +574,7 @@ public class RemoteRepository {
         HttpResponse resp = null;
         try {
             
-            opts.acceptHeader = ConnectOptions.MIME_APPLICATION_XML;
+            opts.setAcceptHeader(ConnectOptions.MIME_APPLICATION_XML);
             
             checkResponseCode(resp = doConnect(opts));
             
@@ -627,7 +627,7 @@ public class RemoteRepository {
         HttpResponse resp = null;
         try {
             
-            opts.acceptHeader = ConnectOptions.MIME_APPLICATION_XML;
+            opts.setAcceptHeader(ConnectOptions.MIME_APPLICATION_XML);
             
             checkResponseCode(resp = doConnect(opts));
             
@@ -686,7 +686,7 @@ public class RemoteRepository {
         HttpResponse response = null;
         try {
             
-            opts.acceptHeader = ConnectOptions.MIME_APPLICATION_XML;
+            opts.setAcceptHeader(ConnectOptions.MIME_APPLICATION_XML);
             
             checkResponseCode(response = doConnect(opts));
             
@@ -766,7 +766,7 @@ public class RemoteRepository {
         HttpResponse response = null;
         try {
             
-            opts.acceptHeader = ConnectOptions.MIME_APPLICATION_XML;
+            opts.setAcceptHeader(ConnectOptions.MIME_APPLICATION_XML);
 
             checkResponseCode(response = doConnect(opts));
             
@@ -854,7 +854,7 @@ public class RemoteRepository {
         HttpResponse response = null;
         try {
 
-            opts.acceptHeader = ConnectOptions.MIME_APPLICATION_XML;
+            opts.setAcceptHeader(ConnectOptions.MIME_APPLICATION_XML);
             
             checkResponseCode(response = doConnect(opts));
             
@@ -880,7 +880,7 @@ public class RemoteRepository {
      * <p>
      * Right now, the only metadata is the query ID.
      */
-    protected abstract class Query implements IPreparedOperation {
+    protected abstract class Query implements IPreparedOperation, IPreparedQuery {
         
         protected final ConnectOptions opts;
         
@@ -920,18 +920,16 @@ public class RemoteRepository {
             this.query = query;
             this.update = update;
             
-            /*
-             * Note: This sets various defaults.
-             */
-            setupConnectOptions();
         }
 
+        @Override
         final public UUID getQueryId() {
             
             return id;
             
         }
         
+        @Override
         public final boolean isUpdate() {
             
             return update;
@@ -957,11 +955,30 @@ public class RemoteRepository {
 
             if (id != null)
                 opts.addRequestParam("queryId", getQueryId().toString());
-
-//            return opts;
                 
         }
+        
+        @Override
+        public void setAcceptHeader(final String value) {
+            
+            opts.setAcceptHeader(value);
+            
+        }
+        
+        @Override
+        public void setHeader(final String name, final String value) {
 
+            opts.setHeader(name, value);
+            
+        }
+
+        @Override
+        public String getHeader(final String name) {
+            
+            return opts.getHeader(name);
+            
+        }
+        
     }
 
     private final class TupleQuery extends Query implements IPreparedTupleQuery {
@@ -972,14 +989,23 @@ public class RemoteRepository {
             super(opts, id, query);
 
         }
-        
+
+        @Override
+        protected void setupConnectOptions() {
+
+            super.setupConnectOptions();
+
+            if (opts.getAcceptHeader() == null)
+                opts.setAcceptHeader(ConnectOptions.DEFAULT_SOLUTIONS_ACCEPT_HEADER);
+
+        }
+
         public TupleQueryResult evaluate() throws Exception {
             
             HttpResponse response = null;
 //            try {
-                
-                if (opts.acceptHeader == null)
-                    opts.acceptHeader = ConnectOptions.DEFAULT_SOLUTIONS_ACCEPT_HEADER;
+
+            setupConnectOptions();
 
                 checkResponseCode(response = doConnect(opts));
                 
@@ -1014,13 +1040,22 @@ public class RemoteRepository {
         }
 
         @Override
+        protected void setupConnectOptions() {
+
+            super.setupConnectOptions();
+
+            if (opts.getAcceptHeader() == null)
+                opts.setAcceptHeader(ConnectOptions.DEFAULT_GRAPH_ACCEPT_HEADER);
+
+        }
+
+        @Override
         public GraphQueryResult evaluate() throws Exception {
 
             HttpResponse response = null;
 
-            if (opts.acceptHeader == null)
-                opts.acceptHeader = ConnectOptions.DEFAULT_GRAPH_ACCEPT_HEADER;
-
+            setupConnectOptions();
+            
             checkResponseCode(response = doConnect(opts));
 
             return graphResults(response);
@@ -1039,17 +1074,25 @@ public class RemoteRepository {
             
         }
         
+
+        @Override
+        protected void setupConnectOptions() {
+
+            super.setupConnectOptions();
+
+            if (opts.getAcceptHeader() == null)
+                opts.setAcceptHeader(ConnectOptions.DEFAULT_BOOLEAN_ACCEPT_HEADER);
+
+        }
+        
         @Override
         public boolean evaluate() throws Exception {
             
             HttpResponse response = null;
             try {
 
-//                final ConnectOptions opts = getConnectOpts();
+                setupConnectOptions();
                 
-                if (opts.acceptHeader == null)
-                    opts.acceptHeader = ConnectOptions.DEFAULT_BOOLEAN_ACCEPT_HEADER;
-
                 checkResponseCode(response = doConnect(opts));
                 
                 return booleanResults(response);
@@ -1088,8 +1131,8 @@ public class RemoteRepository {
          
             HttpResponse response = null;
             try {
-                
-//                final ConnectOptions opts = getConnectOpts();
+
+                setupConnectOptions();
 
                 // Note: No response body is expected.
                 
@@ -1334,14 +1377,19 @@ public class RemoteRepository {
         try {
 
             request = newRequest(urlString.toString(), opts.method);
-            
-            if (opts.acceptHeader != null) {
-            
-                request.addHeader("Accept", opts.acceptHeader);
-                
-                if (log.isDebugEnabled())
-                    log.debug("Accept: " + opts.acceptHeader);
-                
+
+            if (opts.requestHeaders != null) {
+
+                for (Map.Entry<String, String> e : opts.requestHeaders
+                        .entrySet()) {
+
+                    request.addHeader(e.getKey(), e.getValue());
+
+                    if (log.isDebugEnabled())
+                        log.debug(e.getKey() + ": " + e.getValue());
+
+                }
+
             }
             
 //            // conn = doConnect(urlString.toString(), opts.method);

@@ -165,7 +165,15 @@ public class ASTComplexOptionalOptimizer implements IASTOptimizer {
 
             if (namedSubqueries != null) {
 
+            	final List<NamedSubqueryRoot> roots = new LinkedList<NamedSubqueryRoot>();
+            	
                 for (NamedSubqueryRoot namedSubquery : namedSubqueries) {
+                	
+                	roots.add(namedSubquery);
+                	
+                }
+
+                for (NamedSubqueryRoot namedSubquery : roots) {
 
                     convertComplexOptionalGroups(context, sa, namedSubquery,
                             namedSubquery.getWhereClause(), exogenousVars);

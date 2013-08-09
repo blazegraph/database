@@ -1207,8 +1207,9 @@ public class TestRangeQuery extends AbstractEmbeddedFederationTestCase {
 
             final ITuple<E> actualTuple = actual.next();
 
-            System.err.println("nvisited=" + (nfound + 1) + ", actualTuple="
-                    + actualTuple);
+            if (log.isInfoEnabled())
+                log.info("nvisited=" + (nfound + 1) + ", actualTuple="
+                        + actualTuple);
 
             boolean found = false;
 
