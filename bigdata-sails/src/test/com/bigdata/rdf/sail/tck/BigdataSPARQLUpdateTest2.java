@@ -467,16 +467,28 @@ public class BigdataSPARQLUpdateTest2 extends TestCase2 {
 
             final StringBuilder sb = new StringBuilder();
             
+            /*
+             * FIXME test variants w/ and w/o embedded sub-select and verify the
+             * *order* is preserved when using the embedded subselect w/ its
+             * order by. Also, verify that we translate this by lifting out the
+             * sub-select since the top-level query is empty at thast point.
+             * 
+             * Also, document this on the wiki. The sub-select is necessary because
+             * SPARQL does not allow solution modifiers on the top-level WHERE clause
+             * for INSERT/DELETE+WHERE.
+             */
             sb.append("PREFIX rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#>\n");
             sb.append("PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>\n");
             sb.append("PREFIX foaf: <http://xmlns.com/foaf/0.1/>\n");
             sb.append("INSERT INTO %namedSet1\n");
             sb.append("SELECT ?x ?name\n");
+            sb.append("WHERE { SELECT ?x ?name\n");
             sb.append("WHERE {\n");
             sb.append("  ?x rdf:type foaf:Person .\n");
             sb.append("  ?x rdfs:label ?name .\n");
             sb.append("}\n");
-//            sb.append("ORDER BY ?name");
+            sb.append("ORDER BY ?name\n");
+            sb.append("}");
             
             con.prepareUpdate(QueryLanguage.SPARQL, sb.toString()).execute();
 
