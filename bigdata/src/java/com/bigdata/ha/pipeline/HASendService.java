@@ -308,7 +308,7 @@ public class HASendService {
      * A series of timeouts used when we need to re-open the
      * {@link SocketChannel}.
      */
-    private final static long[] retryMillis = new long[] { 1, 5, 10, 50, 100 };
+    private final static long[] retryMillis = new long[] { 1, 5, 10, 50, 100, 250, 500 };
 
     /**
      * (Re-)open the {@link SocketChannel} if it is closed and this service is
