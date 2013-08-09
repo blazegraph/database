@@ -1101,28 +1101,27 @@ public class HAJournalServer extends AbstractServer {
                         
                     } else {
 
-                        log.error(t, t);
-
                         /*
                          * Unhandled error.
                          */
                         
+                        log.error(t, t);
+
                         /*
                          * Sleep for a moment to avoid tight error handling
                          * loops that can generate huge log files.
                          */
-                        Thread.sleep(250/*ms*/);
-
-                        if (runState != RunStateEnum.Error) {
+                        Thread.sleep(250/* ms */);
                         
-                            /*
-                             * Transition to the Error task (but do not allow
-                             * the error task to interrupt itself).
-                             */
+                        /*
+                         * Transition to the Error task.
+                         * 
+                         * Note: The ErrorTask can not interrupt itself even if
+                         * it was the current task since the current task has
+                         * been terminated by the theows exception!
+                         */
 
-                            enterErrorState();// enterRunState(new ErrorTask());
-                            
-                        }
+                        enterErrorState();
 
                         // Done.
                         return null;
@@ -1242,6 +1241,8 @@ public class HAJournalServer extends AbstractServer {
          */
         @Override
         public void enterErrorState() {
+
+            log.warn(new StackInfoReport());
 
             enterRunState(new ErrorTask());
 
@@ -1592,7 +1593,7 @@ public class HAJournalServer extends AbstractServer {
             }
 
             public Void call() throws Exception {
-                enterRunState(new ErrorTask());
+                enterErrorState();
                 return null;
             }
 

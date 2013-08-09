@@ -1460,7 +1460,10 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
                      * invalid. The leader will reset() the CylicBarrier for
                      * this case.
                      */
+
                     getQuorum().assertQuorum(token);
+
+                    assertHAReady(token);
 
                     /*
                      * If the quorumService is null because this service is

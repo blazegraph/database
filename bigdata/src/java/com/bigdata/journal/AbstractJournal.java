@@ -5770,7 +5770,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                 
             } else {
 
-                throw new AssertionError("VOID setToken");
+                throw new AssertionError("VOID setToken");// FIXME HA-ABC
                 
             }
             
@@ -5927,6 +5927,25 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
         return haStatus;
         
+    }
+
+    /**
+     * Assert that the {@link #getHAReady()} token has the specified value.
+     * 
+     * @param token
+     *            The specified value.
+     */
+    final public void assertHAReady(final long token) throws QuorumException {
+
+        if (quorum == null)
+            return;
+
+        if (token != haReadyToken) {
+
+            throw new QuorumException(HAStatusEnum.NotReady.toString());
+
+        }
+
     }
     
     /**
@@ -6586,6 +6605,8 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
             // Do not prepare if the token is wrong.
 			quorum.assertQuorum(prepareToken);
 
+			assertHAReady(prepareToken);
+			
 			// Save off a reference to the prepare request.
 			prepareRequest.set(prepareMessage);
 
@@ -6771,10 +6792,11 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
     
                     if (rootBlock == null)
                         throw new IllegalStateException();
-    
-                    // Validate the new root block against the current root block.
-                    validateNewRootBlock(/*isJoined,*/ isLeader, AbstractJournal.this._rootBlock, rootBlock);
-    
+
+                    // Validate new root block against current root block.
+                    validateNewRootBlock(/* isJoined, */isLeader,
+                            AbstractJournal.this._rootBlock, rootBlock);
+
                     if (haLog.isInfoEnabled())
                         haLog.info("validated=" + rootBlock);
     
@@ -7057,6 +7079,9 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
             // Verify that the same quorum is still met.
             quorum.assertQuorum(prepareToken);
+
+            // Verify HA ready for that token.
+            assertHAReady(prepareToken);
 
             if (!isLeader) {// && isJoined) {
 
