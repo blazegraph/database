@@ -33,6 +33,10 @@ import org.apache.log4j.Logger;
  * Extract and return the quality score for the mime type (defaults to
  * <code>1.0</code>).
  * 
+ * Note: <a href="http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.1">the grammar</a> permits
+ * whitespace fairly generally, but the parser in this class does not cope with this correctly,
+ * but largely assumes that such whitespace is omitted.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
@@ -50,7 +54,7 @@ public class MiniMime {
 
     public MiniMime(final String s) {
         final String[] b = s.split(";");
-        mimeType = b[0];
+        mimeType = b[0].trim();
         float q = 1f;
         params = new String[b.length][];
         for (int i = 1; i < b.length; i++) {

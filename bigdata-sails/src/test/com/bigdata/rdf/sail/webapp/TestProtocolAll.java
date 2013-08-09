@@ -20,46 +20,21 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
-
 package com.bigdata.rdf.sail.webapp;
 
+
 import junit.framework.Test;
+import junit.framework.TestCase;
 import junit.framework.TestSuite;
 
-import com.bigdata.journal.IIndexManager;
-import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryManager;
-
-/**
- * Proxied test suite.
- *
- * @param <S>
- */
-public class TestNanoSparqlClient2<S extends IIndexManager> extends
-        AbstractTestNanoSparqlClient<S> {
-
-    public TestNanoSparqlClient2() {
-
+public class TestProtocolAll  extends TestCase  {
+    public static Test suite() {
+        final TestSuite suite = ProxySuiteHelper.suiteWithOptionalProxy("SPARQL 1.1 Protocol",TestMode.quads,TestMode.triples, TestMode.sids);
+        suite.addTestSuite(ExampleProtocolTest.class);
+        suite.addTestSuite(TestRelease123Protocol.class);
+        suite.addTestSuite(TestPostNotURLEncoded.class);
+        suite.addTestSuite(TestAskJsonTrac704.class);
+        return suite;
     }
 
-	public TestNanoSparqlClient2(final String name) {
-
-		super(name);
-
-	}
-	
-	static public Test suite() {
-		return ProxySuiteHelper.suiteWhenStandalone(TestNanoSparqlClient2.class,"test.*", TestMode.quads,TestMode.sids,TestMode.triples);
-	}
-
-    /**
-     * Delete everything matching an access path description.
-     */
-    public void test_IMPLEMENT_ME() throws Exception {
-
-    	final RemoteRepositoryManager rrm = super.m_repo;
-    	
-    	// do something here
-        
-    }
-    
 }

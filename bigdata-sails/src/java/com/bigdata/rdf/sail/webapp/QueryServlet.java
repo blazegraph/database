@@ -26,6 +26,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
+import java.io.Reader;
 import java.io.StringWriter;
 import java.io.Writer;
 import java.util.Iterator;
@@ -145,12 +146,17 @@ public class QueryServlet extends BigdataRDFServlet {
     protected void doPost(final HttpServletRequest req,
             final HttpServletResponse resp) throws IOException {
 
+
         if (req.getParameter(ATTR_UPDATE) != null) {
             
             // SPARQL 1.1 UPDATE.
             doUpdate(req, resp);
             
-        } else if (req.getParameter(ATTR_UUID) != null) {
+        } else if (RESTServlet.hasMimeType(req, MIME_SPARQL_UPDATE)) {
+            // SPARQL 1.1 UPDATE, see trac 711 for bug report motivating this case
+            doUpdate(req, resp);
+            
+	    } else if (req.getParameter(ATTR_UUID) != null) {
 
             // UUID with caching defeated.
             doUUID(req, resp);
@@ -298,7 +304,7 @@ public class QueryServlet extends BigdataRDFServlet {
      * Handles SPARQL UPDATE.
      * 
      * <pre>
-     * update (required)
+     * update OR update in body (see trac 711)
      * using-graph-uri (0 or more)
      * using-named-graph-uri (0 or more) 
      * </pre>
@@ -319,8 +325,8 @@ public class QueryServlet extends BigdataRDFServlet {
 
         final long timestamp = ITx.UNISOLATED;//getTimestamp(req);
 
-        // The SPARQL query.
-        final String updateStr = req.getParameter("update");
+        // The SPARQL update
+        final String updateStr = getUpdateString(req);
 
         if (updateStr == null) {
 
@@ -419,15 +425,7 @@ public class QueryServlet extends BigdataRDFServlet {
 
         final long timestamp = getTimestamp(req);
 
-        /*
-         * The SPARQL query.
-         * 
-         * Note: This can be attached as a request attribute. That supports a
-         * linked data GET by turning it into a SPARQL DESCRIBE query.
-         */
-        final String queryStr = req.getParameter(ATTR_QUERY) != null ? req
-                .getParameter(ATTR_QUERY) : (String) req
-                .getAttribute(ATTR_QUERY);
+        final String queryStr = getQueryString(req);
 
         if (queryStr == null) {
 
@@ -651,6 +649,43 @@ public class QueryServlet extends BigdataRDFServlet {
 			}
 		}
 	
+	}
+    
+    /**
+     * The SPARQL query.
+     * 
+     * Note: This can be attached as a request attribute. That supports a
+     * linked data GET by turning it into a SPARQL DESCRIBE query.
+     * @throws IOException 
+     */
+	private String getQueryString(final HttpServletRequest req) throws IOException {
+		if (RESTServlet.hasMimeType(req, MIME_SPARQL_QUERY)) {
+			// return the body of the POST, see trac 711
+			return readFully( req.getReader() );
+		}
+		return req.getParameter(ATTR_QUERY) != null ? req
+                .getParameter(ATTR_QUERY) : (String) req
+                .getAttribute(ATTR_QUERY);
+	}
+	
+	private String getUpdateString(final HttpServletRequest req) throws IOException {
+		if (RESTServlet.hasMimeType(req, MIME_SPARQL_UPDATE)) {
+			// return the body of the POST, see trac 711
+			return readFully( req.getReader() );
+		}
+		return req.getParameter(ATTR_UPDATE);
+	}
+	
+	static String readFully(Reader reader) throws IOException {
+		char[] arr = new char[8*1024]; // 8K at a time
+		StringBuffer buf = new StringBuffer();
+		int numChars;
+
+		while ((numChars = reader.read(arr, 0, arr.length)) > 0) {
+			buf.append(arr, 0, numChars);
+		}
+
+		return buf.toString();
 	}
 
     /**

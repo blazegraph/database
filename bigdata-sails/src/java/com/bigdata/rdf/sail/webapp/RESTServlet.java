@@ -33,6 +33,8 @@ import javax.servlet.http.HttpServletResponse;
 import org.openrdf.model.URI;
 import org.openrdf.model.impl.URIImpl;
 
+import com.bigdata.rdf.sail.webapp.client.MiniMime;
+
 /**
  * Default dispatch pattern for a core REST API.
  * 
@@ -189,12 +191,15 @@ public class RESTServlet extends BigdataRDFServlet {
     @Override
     protected void doPost(final HttpServletRequest req,
             final HttpServletResponse resp) throws IOException {
-
-        if (req.getParameter(QueryServlet.ATTR_QUERY) != null
+    	
+		if (req.getParameter(QueryServlet.ATTR_QUERY) != null
                 || req.getParameter(QueryServlet.ATTR_UPDATE) != null
                 || req.getParameter(QueryServlet.ATTR_UUID) != null
                 || req.getParameter(QueryServlet.ATTR_ESTCARD) != null
                 || req.getParameter(QueryServlet.ATTR_CONTEXTS) != null
+                // the two cases below were added to fix bug trac 711
+                || hasMimeType(req, BigdataRDFServlet.MIME_SPARQL_UPDATE)
+                || hasMimeType(req, BigdataRDFServlet.MIME_SPARQL_QUERY)
                 ) {
 
             // SPARQL QUERY -or- SPARQL UPDATE via POST
@@ -229,6 +234,11 @@ public class RESTServlet extends BigdataRDFServlet {
 		    
 		}
 
+	}
+
+	static boolean hasMimeType(final HttpServletRequest req, String mimeType) {
+		String contentType = req.getContentType();
+		return contentType != null &&  mimeType.equals(new MiniMime(contentType).getMimeType());
 	}
 
     /**
