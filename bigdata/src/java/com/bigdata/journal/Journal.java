@@ -1376,9 +1376,10 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
 
         @Override
         public Callable<IHANotifyReleaseTimeResponse> newGatherMinimumVisibleCommitTimeTask(
-                final HAGlue leader, final IHAGatherReleaseTimeRequest req) {
+                final HAGlue leader, final UUID serviceId,
+                final IHAGatherReleaseTimeRequest req) {
 
-            return new GatherTask(leader, req);
+            return new GatherTask(leader, serviceId, req);
 
         }
 
@@ -1415,18 +1416,35 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
          */
         private class GatherTask implements Callable<IHANotifyReleaseTimeResponse> {
 
+            /**
+             * The proxy for the leader (the service that made this request).
+             * This is used to RMI back to the leader and therefore MUST be non-
+             * <code>null</code>.
+             */
             private final HAGlue leader;
+            /**
+             * The {@link UUID} of <em>this</em> service. This is required as
+             * part of the RMI back to the leader (so the leader knows which
+             * services responded) and therefore MUST be non-<code>null</code>.
+             */
+            private final UUID serviceId;
             private final IHAGatherReleaseTimeRequest req;
 
-            public GatherTask(final HAGlue leader, final IHAGatherReleaseTimeRequest req) {
+            public GatherTask(final HAGlue leader, final UUID serviceId,
+                    final IHAGatherReleaseTimeRequest req) {
 
                 if (leader == null)
+                    throw new IllegalArgumentException();
+
+                if (serviceId == null)
                     throw new IllegalArgumentException();
 
                 if (req == null)
                     throw new IllegalArgumentException();
 
                 this.leader = leader;
+                
+                this.serviceId = serviceId;
                 
                 this.req = req;
 
@@ -1450,7 +1468,6 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
                  * in the try{} or in the finally{}.
                  */
                 long now = 0L;
-                UUID serviceId = null;
                 
                 boolean didNotifyLeader = false;
                 
@@ -1479,9 +1496,6 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
                      */
                     final QuorumService<HAGlue> quorumService = getQuorum()
                             .getClient();
-
-                    // The serviceId for this service.
-                    serviceId = quorumService.getServiceId();
 
                     /*
                      * This timestamp is used to help detect clock skew.

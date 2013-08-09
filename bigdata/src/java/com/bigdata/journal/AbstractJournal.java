@@ -7708,11 +7708,16 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
             if (leader == null)
                 throw new RuntimeException(
                         "Could not discover the quorum leader.");
+
+            final UUID serviceId = getServiceId();
+
+            if(serviceId == null)
+                throw new AssertionError();
             
             final Callable<IHANotifyReleaseTimeResponse> task = ((AbstractHATransactionService) AbstractJournal.this
-                    .getLocalTransactionManager()
-                    .getTransactionService())
-                    .newGatherMinimumVisibleCommitTimeTask(leader, req);
+                    .getLocalTransactionManager().getTransactionService())
+                    .newGatherMinimumVisibleCommitTimeTask(leader,
+                            serviceId, req);
 
             final FutureTask<IHANotifyReleaseTimeResponse> ft = new FutureTask<IHANotifyReleaseTimeResponse>(task);
 
