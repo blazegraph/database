@@ -79,6 +79,10 @@ import com.bigdata.service.jini.JiniFederation;
  */
 public class TestNanoSparqlServerWithProxyIndexManager2<S extends IIndexManager>
         extends AbstractIndexManagerTestCase<S> {
+	
+	static {
+		ProxySuiteHelper.proxyIndexManagerTestingHasStarted = true;
+	}
 
 	/**
 	 * The {@link IIndexManager} for the backing persistence engine (may be a
@@ -214,6 +218,8 @@ public class TestNanoSparqlServerWithProxyIndexManager2<S extends IIndexManager>
          */
         
         suite.addTestSuite(TestNanoSparqlClient2.class);
+		//Protocol
+		suite.addTest(TestProtocolAll.suite());
 
         return suite;
     

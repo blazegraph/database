@@ -28,6 +28,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sail.webapp;
 
 
+import java.io.IOException;
+import java.io.OutputStream;
 import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
@@ -35,6 +37,9 @@ import java.util.regex.Pattern;
 
 import org.apache.log4j.Logger;
 import org.openrdf.query.resultio.BooleanQueryResultFormat;
+import org.openrdf.query.resultio.BooleanQueryResultWriter;
+import org.openrdf.query.resultio.BooleanQueryResultWriterFactory;
+import org.openrdf.query.resultio.BooleanQueryResultWriterRegistry;
 import org.openrdf.query.resultio.TupleQueryResultFormat;
 import org.openrdf.rio.RDFFormat;
 
@@ -49,6 +54,7 @@ import com.bigdata.rdf.sail.webapp.client.MiniMime;
  * @version $Id$
  */
 public class ConnegUtil {
+	
 
     private static Logger log = Logger.getLogger(ConnegUtil.class);
 
@@ -57,6 +63,40 @@ public class ConnegUtil {
         pattern = Pattern.compile("\\s*,\\s*");
     }
 
+
+	static {
+	// Work-around for sesame not handling ask and json (see trac 704 and 714)
+		
+		if (BooleanQueryResultFormat.forMIMEType(BigdataRDFServlet.MIME_SPARQL_RESULTS_JSON)!=null) {
+			// This should fire once trac 714 is fixed, and we have upgraded, at this point the whole static block should be deleted.
+			log.warn("Workaround for sesame 2.6 BooleanQueryResultFormat defect no longer needed", new RuntimeException("location of issue"));
+		} else {
+			final BooleanQueryResultFormat askJsonFormat = BooleanQueryResultFormat.register("SPARQL/JSON",BigdataRDFServlet.MIME_SPARQL_RESULTS_JSON,"srj");
+			BooleanQueryResultWriterRegistry.getInstance().add(new BooleanQueryResultWriterFactory(){
+
+				@Override
+				public BooleanQueryResultFormat getBooleanQueryResultFormat() {
+					return askJsonFormat;
+				}
+
+				@Override
+				public BooleanQueryResultWriter getWriter(final OutputStream out) {
+					return new BooleanQueryResultWriter(){
+
+						@Override
+						public BooleanQueryResultFormat getBooleanQueryResultFormat() {
+							return askJsonFormat;
+						}
+
+						@Override
+						public void write(boolean arg0) throws IOException {
+							final String answer = "{ \"head\":{ } , \"boolean\": " +  Boolean.toString(arg0) + " }";
+							out.write(answer.getBytes("utf-8"));
+						}};
+				}});
+		}
+	}
+	
     private final ConnegScore<?>[] scores;
 
     /**
@@ -110,7 +150,7 @@ public class ConnegUtil {
                 // BooleanQueryResultFormat
                 {
                 
-                    final BooleanQueryResultFormat booleanFormat = BooleanQueryResultFormat
+                    BooleanQueryResultFormat booleanFormat = BooleanQueryResultFormat
                             .forMIMEType(t.getMimeType());
 
                     if (booleanFormat != null) {

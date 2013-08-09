@@ -23,43 +23,32 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sail.webapp;
 
-import junit.framework.Test;
-import junit.framework.TestSuite;
+import java.io.IOException;
 
-import com.bigdata.journal.IIndexManager;
-import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryManager;
+import junit.framework.Test;
+
 
 /**
- * Proxied test suite.
+ * This class tests whether its superclass is working (at least a little)
+ * The superclass provides capability to check the request/response protocol,
+ * without actually starting a server.
+ * @author jeremycarroll
  *
- * @param <S>
  */
-public class TestNanoSparqlClient2<S extends IIndexManager> extends
-        AbstractTestNanoSparqlClient<S> {
+public class ExampleProtocolTest extends AbstractProtocolTest {
 
-    public TestNanoSparqlClient2() {
-
-    }
-
-	public TestNanoSparqlClient2(final String name) {
-
+	public ExampleProtocolTest(String name)  {
 		super(name);
-
 	}
 	
+	public void test101() throws  IOException {
+		assertTrue(serviceRequest("query","SELECT ( true AS ?t ) {}").contains("</sparql>"));
+		assertEquals("application/sparql-results+xml", getResponseContentType());
+	}
+	
+
 	static public Test suite() {
-		return ProxySuiteHelper.suiteWhenStandalone(TestNanoSparqlClient2.class,"test.*", TestMode.quads,TestMode.sids,TestMode.triples);
+		return ProxySuiteHelper.suiteWhenStandalone(ExampleProtocolTest.class,"test.*", TestMode.quads,TestMode.sids,TestMode.triples);
 	}
 
-    /**
-     * Delete everything matching an access path description.
-     */
-    public void test_IMPLEMENT_ME() throws Exception {
-
-    	final RemoteRepositoryManager rrm = super.m_repo;
-    	
-    	// do something here
-        
-    }
-    
 }
