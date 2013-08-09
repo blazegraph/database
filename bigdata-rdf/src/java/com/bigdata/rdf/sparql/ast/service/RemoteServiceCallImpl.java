@@ -106,11 +106,11 @@ public class RemoteServiceCallImpl implements RemoteServiceCall {
 
             if (acceptHeader != null) {
 
-                o.acceptHeader = acceptHeader;
+                o.setAcceptHeader(acceptHeader);
                 
             } else {
                 
-                o.acceptHeader = ConnectOptions.DEFAULT_SOLUTIONS_ACCEPT_HEADER;
+                o.setAcceptHeader(ConnectOptions.DEFAULT_SOLUTIONS_ACCEPT_HEADER);
 
             }
             

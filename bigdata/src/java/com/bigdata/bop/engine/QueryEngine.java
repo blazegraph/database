@@ -886,7 +886,11 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
         
         shutdown = true;
         
-        // stop the query engine.
+        /*
+         * Stop the QueryEngineTask: this is the task that accepts chunks that
+         * are available for evaluation and assigns them to the
+         * AbstractRunningQuery.
+         */
         final Future<?> f = engineFuture.get();
         if (f != null) {
             if (log.isInfoEnabled())
@@ -894,7 +898,7 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
             f.cancel(true/* mayInterruptIfRunning */);
         }
         
-        // stop the service on which we ran the query engine.
+        // stop the service on which we ran the QueryEngineTask.
         final ExecutorService s = engineService.get();
         if (s != null) {
             if (log.isInfoEnabled())
@@ -1425,8 +1429,8 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
              * a safety check against UUID collisions which might be non-random.
              */
             throw new RuntimeException("Query exists with that UUID: uuid="
-                    + runningQuery.getQueryId());
-
+                + runningQuery.getQueryId());
+            
         }
 
 //        final String tag = query.getProperty(QueryHints.TAG,
@@ -1521,7 +1525,34 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
                 
             }
 
-            // Query was newly registered.
+            /*
+             * Query was newly registered.
+             */
+            try {
+                
+                // Verify QueryEngine is running.
+                assertRunning();
+                
+            } catch (IllegalStateException ex) {
+                
+                /**
+                 * The query engine either is not initialized or was shutdown
+                 * concurrent with adding the new query to the running query
+                 * table. We yank the query out of the running query table in
+                 * order to have no net effect and then throw out the exception
+                 * indicating that the QueryEngine has been shutdown.
+                 * 
+                 * @see <a
+                 *      href="https://sourceforge.net/apps/trac/bigdata/ticket/705">
+                 *      Race condition in QueryEngine.putIfAbsent() </a>
+                 */
+
+                runningQueries.remove(queryId, runningQuery);
+
+                throw ex;
+
+            }
+            
             return runningQuery;
             
         } finally {

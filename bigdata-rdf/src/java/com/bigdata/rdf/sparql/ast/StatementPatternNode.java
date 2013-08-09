@@ -19,6 +19,7 @@ import com.bigdata.rdf.sparql.ast.eval.AST2BOpJoins;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpUtility;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTGraphGroupOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTSimpleOptionalOptimizer;
+import com.bigdata.rdf.sparql.ast.optimizers.StaticOptimizer;
 import com.bigdata.rdf.spo.DistinctTermAdvancer;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPOAccessPath;
@@ -644,7 +645,7 @@ public class StatementPatternNode extends
 	 * @see com.bigdata.rdf.sparql.ast.IReorderableNode#getEstimatedCardinality()
 	 */
 	@Override
-	public long getEstimatedCardinality() {
+	public long getEstimatedCardinality(StaticOptimizer opt) {
         
 		return getProperty(AST2BOpBase.Annotations.ESTIMATED_CARDINALITY, -1l);
         

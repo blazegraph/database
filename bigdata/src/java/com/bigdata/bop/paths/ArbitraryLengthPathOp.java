@@ -265,7 +265,8 @@ public class ArbitraryLengthPathOp extends PipelineOp {
                 		
 	                    final IBindingSet[] chunk = sitr.next();
 	                    
-						processChunk(chunk);
+	                    for (IBindingSet bs : chunk)
+	                    	processChunk(new IBindingSet[] { bs });
 						
                 	}
                 	

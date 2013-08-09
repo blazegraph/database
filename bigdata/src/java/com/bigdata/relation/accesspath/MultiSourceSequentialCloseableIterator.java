@@ -131,19 +131,29 @@ public class MultiSourceSequentialCloseableIterator<E> implements
         // current is known to be [null].
         lock.lock();
         try {
-            /* Close iterator which has been consumed.
+            /**
+             * Close iterator which has been consumed.
              * 
+             * @see <a
+             *      href="https://sourceforge.net/apps/trac/bigdata/ticket/706"
+             *      > MultiSourceSequentialCloseableIterator.nextSource() can
+             *      throw NPE </a>
              */
-            if (log.isInfoEnabled())
-                log.info("Closing source: " + current);
-            current.close();
+            ICloseableIterator<E> t = this.current;
+            {
+                if (t != null) {
+                    if (log.isInfoEnabled())
+                        log.info("Closing source: " + t);
+                    t.close();
+                }
+            }
             // remove the head of the queue (non-blocking)
-            while ((current = sources.poll()) != null) {
-                if (current.hasNext()) {
-                    return current;
+            while ((t = current = sources.poll()) != null) {
+                if (t.hasNext()) {
+                    return t;
                 } else {
                     // Note: should already be closed since exhausted.
-                    current.close();
+                    t.close();
                 }
             }
             // no more sources with data, close while holding lock.

@@ -44,11 +44,11 @@ public class FutureTaskMon<T> extends FutureTask<T> {
 
 	private volatile boolean didStart = false;
 	
-	public FutureTaskMon(Callable<T> callable) {
+	public FutureTaskMon(final Callable<T> callable) {
 		super(callable);
 	}
 
-	public FutureTaskMon(Runnable runnable, T result) {
+	public FutureTaskMon(final Runnable runnable, final T result) {
 		super(runnable, result);
 	}
 
@@ -76,13 +76,12 @@ public class FutureTaskMon<T> extends FutureTask<T> {
 		
 		final boolean ret = super.cancel(mayInterruptIfRunning);
 
-		if (didStart && mayInterruptIfRunning && ret && log.isDebugEnabled()) {
-			try {
-				throw new RuntimeException("cancel call trace");
-			} catch (RuntimeException re) {
-				log.debug("May interrupt running task", re);
-			}
-		}
+        if (didStart && mayInterruptIfRunning && ret && log.isDebugEnabled()) {
+
+            log.debug("May have interrupted running task",
+                    new RuntimeException("Stack trace of cancel() invocation"));
+
+        }
 
 		return ret;
 

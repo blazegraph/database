@@ -29,12 +29,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.service.ndx.pipeline;
 
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Future;
+import java.util.concurrent.FutureTask;
 
 import com.bigdata.btree.keys.KVO;
 import com.bigdata.relation.accesspath.BlockingBuffer;
-import com.bigdata.service.ndx.pipeline.AbstractMasterTestCase.H;
-import com.bigdata.service.ndx.pipeline.AbstractMasterTestCase.O;
 import com.bigdata.util.InnerCause;
 
 /**
@@ -100,10 +98,15 @@ public class TestMasterTaskWithErrors extends AbstractMasterTestCase {
             
         };
         
-        // start the consumer.
-        final Future<H> future = executorService.submit(master);
-        masterBuffer.setFuture(future);
-
+        // Wrap computation as FutureTask.
+        final FutureTask<H> ft = new FutureTask<H>(master);
+        
+        // Set Future on BlockingBuffer.
+        masterBuffer.setFuture(ft);
+        
+        // Start the consumer.
+        executorService.submit(ft);
+        
         final KVO<O>[] a = new KVO[] {
                 new KVO<O>(new byte[]{1},new byte[]{2},null/*val*/),
                 new KVO<O>(new byte[]{13},new byte[]{3},null/*val*/)

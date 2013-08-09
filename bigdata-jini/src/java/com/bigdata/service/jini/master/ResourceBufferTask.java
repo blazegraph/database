@@ -36,6 +36,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Future;
+import java.util.concurrent.FutureTask;
 import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.TimeUnit;
 
@@ -47,6 +48,7 @@ import com.bigdata.service.IRemoteExecutor;
 import com.bigdata.service.jini.JiniFederation;
 import com.bigdata.service.ndx.pipeline.AbstractPendingSetMasterTask;
 import com.bigdata.service.ndx.pipeline.AbstractSubtask;
+import com.bigdata.service.ndx.pipeline.AbstractSubtaskStats;
 
 /**
  * Task drains a {@link BlockingBuffer} containing resources (really, resource
@@ -404,11 +406,20 @@ HS extends ResourceBufferSubtaskStatistics //
              * I fixed this before...
              */
             task.setFederation(getFederation());
-            
-            final Future future = getFederation().getExecutorService().submit(
-                    task);
 
-            task.setFuture(future);
+            /**
+             * Note: while this is not an IBlockingBuffer, it should use the
+             * same pattern.
+             * 
+             * @see <a
+             *      href="https://sourceforge.net/apps/trac/bigdata/ticket/707">
+             *      BlockingBuffer.close() does not unblock threads </a>
+             */
+            final FutureTask ft = new FutureTask(task);
+            
+            task.setFuture(ft);
+
+            getFederation().getExecutorService().submit(ft);
 
             return (IAsynchronousClientTask) ((JiniFederation) getFederation())
                     .getProxy(task, true/* enableDGC */);
@@ -434,12 +445,11 @@ HS extends ResourceBufferSubtaskStatistics //
 
     }
 
-    @SuppressWarnings("unchecked")
     @Override
-    protected Future<HS> submitSubtask(final S subtask) {
+    protected void submitSubtask(
+            final FutureTask<? extends AbstractSubtaskStats> subtask) {
 
-        return (Future<HS>) getFederation().getExecutorService()
-                .submit(subtask);
+        getFederation().getExecutorService().submit(subtask);
 
     }
 

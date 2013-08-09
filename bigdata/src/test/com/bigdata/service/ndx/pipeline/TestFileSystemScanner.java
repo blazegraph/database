@@ -34,7 +34,7 @@ import java.util.Iterator;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
+import java.util.concurrent.FutureTask;
 
 import junit.framework.TestCase2;
 
@@ -114,11 +114,15 @@ public class TestFileSystemScanner extends TestCase2 {
                         .defaultThreadFactory());
         try {
 
-            final Future<Long> future = service.submit(new DrainBuffer());
+            // Wrap computation as FutureTask.
+            final FutureTask<Long> ft = new FutureTask<Long>(new DrainBuffer());
 
             // buffer will be abort()ed if task fails.
-            buffer.setFuture(future);
-            
+            buffer.setFuture(ft);
+
+            // start computation
+            service.submit(ft);
+
             final Long acceptCount = scanner.call();
             
             if (log.isInfoEnabled())
@@ -128,7 +132,7 @@ public class TestFileSystemScanner extends TestCase2 {
             buffer.close();
             
             // compare the accept count with the drain task count.
-            assertEquals(acceptCount, future.get());
+            assertEquals(acceptCount, ft.get());
             
         } finally {
          

@@ -40,12 +40,11 @@ import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
+import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
-
-import javax.management.openmbean.OpenDataException;
 
 import com.bigdata.btree.keys.KVO;
 import com.bigdata.btree.keys.KeyBuilder;
@@ -844,21 +843,38 @@ public class TestMasterTaskWithSplits extends AbstractKeyRangeMasterTestCase {
          */
         final RedirectTask redirecter = new RedirectTask(master, schedule);
         
-        // start the consumer.
-        final Future<H> future = executorService.submit(master);
-        masterBuffer.setFuture(future);
+        // Start the master.
+        {
+            // Wrap computation as FutureTask.
+            final FutureTask<H> ft = new FutureTask<H>(master);
 
-        // start writing data.
-        final List<Future> producerFutures = new LinkedList<Future>();
+            // Set Future on BlockingBuffer.
+            masterBuffer.setFuture(ft);
+
+            // Start the consumer.
+            executorService.submit(ft);
+        }
+
+        // Setup producers.
+        final List<FutureTask<Void>> producerFutures = new LinkedList<FutureTask<Void>>();
+
         for (int i = 0; i < nproducers; i++) {
 
-            producerFutures.add(executorService.submit(new ProducerTask(
+            // Wrap computation as FutureTask.
+            producerFutures.add(new FutureTask<Void>(new ProducerTask(
                     masterBuffer)));
             
         }
         
+        // Start writing data.
+        for (FutureTask<Void> ft : producerFutures) {
+
+            executorService.submit(ft);
+            
+        }
+        
         // start redirects.
-        final Future redirecterFuture = executorService.submit(redirecter);  
+        final Future<Void> redirecterFuture = executorService.submit(redirecter);  
 
         try {
 
@@ -880,7 +896,7 @@ public class TestMasterTaskWithSplits extends AbstractKeyRangeMasterTestCase {
                 }
 
                 // check producers.
-                for (Future f : producerFutures) {
+                for (Future<Void> f : producerFutures) {
                     if (f.isDone()) {
                         break;
                     }
@@ -905,7 +921,7 @@ public class TestMasterTaskWithSplits extends AbstractKeyRangeMasterTestCase {
             redirecterFuture.get();
 
             // await termination and check producer futures for errors.
-            for (Future f : producerFutures) {
+            for (Future<Void> f : producerFutures) {
 
                 f.get();
 

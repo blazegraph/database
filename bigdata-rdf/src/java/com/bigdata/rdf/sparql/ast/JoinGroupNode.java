@@ -1,5 +1,6 @@
 package com.bigdata.rdf.sparql.ast;
 
+import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -7,6 +8,7 @@ import java.util.Map;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IVariable;
 import com.bigdata.rdf.internal.constraints.InBOp;
+import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.service.ServiceNode;
 
 /**
@@ -409,6 +411,18 @@ public class JoinGroupNode extends GraphPatternGroup<IGroupMemberNode> {
 
         return filters;
         
+    }
+
+    public List<IReorderableNode> getReorderableChildren() {
+    	final List<IReorderableNode> nodes = getChildren(IReorderableNode.class);
+    	final Iterator<IReorderableNode> it = nodes.iterator();
+    	while (it.hasNext()) {
+    		final IReorderableNode node = it.next();
+    		if (!node.isReorderable()) {
+    			it.remove();
+    		}
+    	}   	
+    	return nodes;
     }
 
 	/*

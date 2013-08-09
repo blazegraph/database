@@ -10,6 +10,7 @@ import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.rdf.sparql.ast.PathNode.PathMod;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpBase;
+import com.bigdata.rdf.sparql.ast.optimizers.StaticOptimizer;
 
 /**
  * A special kind of AST node that represents the SPARQL 1.1 arbitrary length
@@ -210,14 +211,14 @@ public class ArbitraryLengthPathNode
 //	@Override
 	public boolean isReorderable() {
 
-		final long estCard = getEstimatedCardinality();
+		final long estCard = getEstimatedCardinality(null);
 		
 		return estCard >= 0 && estCard < Long.MAX_VALUE;
 		
 	}
 
 //	@Override
-	public long getEstimatedCardinality() {
+	public long getEstimatedCardinality(StaticOptimizer opt) {
 		
 		final JoinGroupNode group = subgroup();
 
