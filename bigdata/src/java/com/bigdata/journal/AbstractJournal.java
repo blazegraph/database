@@ -7701,7 +7701,13 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
             // Save reference to the gather Future.
             gatherFuture.set(ft);
 
-            // Fire and forget. The Future is checked by prepare2Phase.
+            /*
+             * Fire and forget. The Future is checked by prepare2Phase.
+             * 
+             * Note: This design pattern was used to due a DGC thread leak
+             * issue. The gather protocol should be robust even through the
+             * Future is not checked (or awaited) here.
+             */
             getExecutorService().execute(ft);
 
             return;
