@@ -40,6 +40,8 @@ public class HANotifyReleaseTimeRequest implements IHANotifyReleaseTimeRequest {
     public HANotifyReleaseTimeRequest(final UUID serviceUUID,
             final long pinnedCommitTime, final long pinnedCommitCounter,
             final long timestamp) {
+        if (serviceUUID == null)
+            throw new IllegalArgumentException();
         this.serviceUUID = serviceUUID;
         this.pinnedCommitTime = pinnedCommitTime;
         this.pinnedCommitCounter = pinnedCommitCounter;
