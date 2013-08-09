@@ -1541,7 +1541,17 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
                     log.info("Interrupted: " + this, ex);
                 else if (log.isInfoEnabled())
                     log.info("Interrupted: " + this);
-
+                /**
+                 * Note: Propagating the interrupt appears to be necessary here
+                 * in order to have timely termination of nested subqueries.
+                 * 
+                 * @see https://sourceforge.net/apps/trac/bigdata/ticket/707
+                 *      (BlockingBuffer.close() does not unblock threads)
+                 * @see https://sourceforge.net/apps/trac/bigdata/ticket/716
+                 *      (Verify that IRunningQuery instances (and nested
+                 *      queries) are correctly cancelled when interrupted)
+                 */
+                Thread.currentThread().interrupt(); 
                 return false;
 
             }

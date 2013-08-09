@@ -194,6 +194,14 @@ public class AST2BOpUtility extends AST2BOpJoins {
      *         solution sets to be passed into a query.  Any such change would
      *         have to be deeply integrated with the SPARQL parser in order to
      *         provide any benefit for the Java heap.
+     *         
+     *         TODO This logic is currently single-threaded.  If we allow internal
+     *         concurrency or when we integrate the RTO, we will need to ensure that
+     *         the logic remains safely cancelable by an interrupt of the thread in
+     *         which the query was submitted. See <a 
+     *         href="https://sourceforge.net/apps/trac/bigdata/ticket/715" > 
+     *         Interrupt of thread submitting a query for evaluation does not
+     *         always terminate the AbstractRunningQuery </a>.
      */
     static PipelineOp convert(final AST2BOpContext ctx,
             final IBindingSet[] bindingSets) {

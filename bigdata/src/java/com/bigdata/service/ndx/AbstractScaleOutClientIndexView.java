@@ -33,7 +33,7 @@ import java.util.Arrays;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.Future;
+import java.util.concurrent.FutureTask;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
@@ -75,16 +75,15 @@ import com.bigdata.mdi.MetadataIndex.MetadataIndexMetadata;
 import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.resources.StaleLocatorException;
-import com.bigdata.service.AbstractScaleOutFederation;
-import com.bigdata.service.IBigdataClient.Options;
 import com.bigdata.service.AbstractClient;
+import com.bigdata.service.AbstractScaleOutFederation;
 import com.bigdata.service.IBigdataClient;
+import com.bigdata.service.IBigdataClient.Options;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.IMetadataService;
 import com.bigdata.service.Split;
 import com.bigdata.service.ndx.pipeline.IDuplicateRemover;
-import com.bigdata.service.ndx.pipeline.IndexAsyncWriteStats;
 import com.bigdata.service.ndx.pipeline.IndexWriteTask;
 
 import cutthecrap.utils.striterators.IFilter;
@@ -1272,10 +1271,20 @@ abstract public class AbstractScaleOutClientIndexView implements IScaleOutClient
                 writeBuffer//
                 );
 
-        final Future<? extends IndexAsyncWriteStats> future = fed
-                .getExecutorService().submit(task);
+        /**
+         * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/707">
+         *      BlockingBuffer.close() does not unblock threads </a>
+         */
 
-        writeBuffer.setFuture(future);
+        // Wrap computation as FutureTask.
+        @SuppressWarnings({ "unchecked", "rawtypes" })
+        final FutureTask<?> ft = new FutureTask(task);
+
+        // Set Future on BlockingBuffer
+        writeBuffer.setFuture(ft);
+
+        // Submit computation for evaluation.
+        fed.getExecutorService().submit(ft);
 
         return task.getBuffer();
 

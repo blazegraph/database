@@ -29,8 +29,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.service.ndx.pipeline;
 
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Future;
+import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import com.bigdata.btree.keys.KVO;
 import com.bigdata.relation.accesspath.BlockingBuffer;
@@ -67,10 +68,15 @@ public class TestMasterTask extends AbstractMasterTestCase {
 
         final M master = new M(masterStats, masterBuffer, executorService);
 
-        // start the consumer.
-        final Future<H> future = executorService.submit(master);
-        masterBuffer.setFuture(future);
-
+        // Wrap computation as FutureTask.
+        final FutureTask<H> ft = new FutureTask<H>(master);
+        
+        // Set Future on BlockingBuffer.
+        masterBuffer.setFuture(ft);
+        
+        // Start the consumer.
+        executorService.submit(ft);
+        
         masterBuffer.close();
 
         masterBuffer.getFuture().get();
@@ -100,10 +106,15 @@ public class TestMasterTask extends AbstractMasterTestCase {
 
         final M master = new M(masterStats, masterBuffer, executorService);
 
-        // start the consumer.
-        final Future<H> future = executorService.submit(master);
-        masterBuffer.setFuture(future);
+        // Wrap computation as FutureTask.
+        final FutureTask<H> ft = new FutureTask<H>(master);
+        
+        // Set Future on BlockingBuffer.
+        masterBuffer.setFuture(ft);
 
+        // Start the consumer.
+        executorService.submit(ft);
+        
         final KVO<O>[] a = new KVO[0];
         
         masterBuffer.add(a);
@@ -125,9 +136,10 @@ public class TestMasterTask extends AbstractMasterTestCase {
      * 
      * @throws InterruptedException
      * @throws ExecutionException
+     * @throws TimeoutException 
      */
     public void test_startWriteStop1() throws InterruptedException,
-            ExecutionException {
+            ExecutionException, TimeoutException {
 
         final H masterStats = new H();
 
@@ -136,10 +148,15 @@ public class TestMasterTask extends AbstractMasterTestCase {
 
         final M master = new M(masterStats, masterBuffer, executorService);
 
-        // start the consumer.
-        final Future<H> future = executorService.submit(master);
-        masterBuffer.setFuture(future);
+        // Wrap computation as FutureTask.
+        final FutureTask<H> ft = new FutureTask<H>(master);
 
+        // Set the Future on the BlockingBuffer.
+        masterBuffer.setFuture(ft);
+
+        // start the consumer.
+        executorService.submit(ft);
+        
         final KVO<O>[] a = new KVO[] {
                 new KVO<O>(new byte[]{1},new byte[]{2},null/*val*/),
                 new KVO<O>(new byte[]{1},new byte[]{3},null/*val*/)
@@ -149,7 +166,8 @@ public class TestMasterTask extends AbstractMasterTestCase {
 
         masterBuffer.close();
 
-        masterBuffer.getFuture().get();
+        // Run with timeout (test fails if Future not done before timeout).
+        masterBuffer.getFuture().get(5L, TimeUnit.SECONDS);
 
         assertEquals("elementsIn", a.length, masterStats.elementsIn.get());
         assertEquals("chunksIn", 1, masterStats.chunksIn.get());
@@ -181,9 +199,10 @@ public class TestMasterTask extends AbstractMasterTestCase {
      * 
      * @throws InterruptedException
      * @throws ExecutionException
+     * @throws TimeoutException 
      */
     public void test_startWriteStop2() throws InterruptedException,
-            ExecutionException {
+            ExecutionException, TimeoutException {
 
         doStartWriteStop2Test();
 
@@ -249,9 +268,10 @@ public class TestMasterTask extends AbstractMasterTestCase {
      *       assumption within them which is being violated.
      * 
      * @throws InterruptedException
+     * @throws TimeoutException 
      */
     private void doStartWriteStop2Test() throws InterruptedException,
-            ExecutionException  {
+            ExecutionException, TimeoutException  {
 
         final BlockingBuffer<KVO<O>[]> masterBuffer = new BlockingBuffer<KVO<O>[]>(
                 masterQueueCapacity);
@@ -260,9 +280,14 @@ public class TestMasterTask extends AbstractMasterTestCase {
 
         final M master = new M(masterStats, masterBuffer, executorService);
 
-        // start the consumer.
-        final Future<H> future = executorService.submit(master);
-        masterBuffer.setFuture(future);
+        // Wrap as FutureTask.
+        final FutureTask<H> ft = new FutureTask<H>(master);
+        
+        // Set Future on BlockingBuffer.
+        masterBuffer.setFuture(ft);
+        
+        // Start the consumer.
+        executorService.submit(ft);
 
         final KVO<O>[] a = new KVO[] {
                 new KVO<O>(new byte[]{1},new byte[]{2},null/*val*/),
@@ -274,7 +299,8 @@ public class TestMasterTask extends AbstractMasterTestCase {
 
         masterBuffer.close();
 
-        masterBuffer.getFuture().get();
+        // test fails if not done before timeout.
+        masterBuffer.getFuture().get(5L, TimeUnit.SECONDS);
 
         assertEquals("elementsIn", a.length, masterStats.elementsIn.get());
         assertEquals("chunksIn", 1, masterStats.chunksIn.get());
@@ -334,10 +360,15 @@ public class TestMasterTask extends AbstractMasterTestCase {
 
         final M master = new M(masterStats, masterBuffer, executorService);
 
-        // start the consumer.
-        final Future<H> future = executorService.submit(master);
-        masterBuffer.setFuture(future);
-
+        // Wrap computation as FutureTask.
+        final FutureTask<H> ft = new FutureTask<H>(master);
+        
+        // Set Future on BlockingBuffer.
+        masterBuffer.setFuture(ft);
+        
+        // Start the consumer.
+        executorService.submit(ft);
+        
         {
         final KVO<O>[] a = new KVO[] {
                     new KVO<O>(new byte[] { 1 }, new byte[] { 2 }, null/* val */),
