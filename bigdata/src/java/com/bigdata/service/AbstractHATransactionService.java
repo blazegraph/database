@@ -58,6 +58,14 @@ abstract public class AbstractHATransactionService extends
     /**
      * Factory for the Gather task that will be executed by the follower.
      * 
+     * @param leader
+     *            The proxy for the quorum leader (the service that made this
+     *            request). This is used to RMI back to the leader and therefore
+     *            MUST be non- <code>null</code>.
+     * @param serviceId
+     *            The {@link UUID} of this service. This is required as part of
+     *            the RMI back to the leader (so the leader knows which services
+     *            responded) and therefore MUST be non-<code>null</code>.
      * @param req
      *            The request.
      * 
@@ -67,7 +75,8 @@ abstract public class AbstractHATransactionService extends
      *      Native thread leak in HAJournalServer process </a>
      */
     abstract public Callable<IHANotifyReleaseTimeResponse> newGatherMinimumVisibleCommitTimeTask(
-            final HAGlue leader, final IHAGatherReleaseTimeRequest req);
+            final HAGlue leader, final UUID serviceId,
+            final IHAGatherReleaseTimeRequest req);
 
     /**
      * Coordinate the update of the <i>releaseTime</i> on each service that is
