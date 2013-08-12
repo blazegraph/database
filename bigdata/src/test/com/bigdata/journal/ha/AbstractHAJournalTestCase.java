@@ -471,11 +471,11 @@ for(int i=0; i<3; i++)log.error("quorum["+i+"]:"+(stores[i].getQuorum()).toStrin
                 throw new UnsupportedOperationException();
             }
 
-            @Override
-            public void didMeet(final long token, final long commitCounter,
-                    final boolean isLeader) {
-                throw new UnsupportedOperationException();
-            }
+//            @Override
+//            public void didMeet(final long token, final long commitCounter,
+//                    final boolean isLeader) {
+//                throw new UnsupportedOperationException();
+//            }
             
             @Override
             public File getServiceDir() {

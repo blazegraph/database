@@ -833,6 +833,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
                      * action ourselves. E.g., in the thread that calls
                      * barrier.reset()].
                      */
+                    log.error("Forcing barrier break");
                     barrier.reset();
                 }
 

@@ -3626,6 +3626,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
     }
 
+    @Override
 	public void force(final boolean metadata) {
 
 		assertOpen();
@@ -3634,12 +3635,14 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
 	}
 
+	@Override
 	public long size() {
 
 		return _bufferStrategy.size();
 
 	}
 
+    @Override
     public ByteBuffer read(final long addr) {
             assertOpen();
 
@@ -3649,6 +3652,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
             
 	}
     
+    @Override
     public long write(final ByteBuffer data) {
 
         assertCanWrite();
@@ -3657,6 +3661,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 	
     }
 
+    @Override
     public long write(final ByteBuffer data, final IAllocationContext context) {
 
         assertCanWrite();
@@ -3704,6 +3709,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
 
 	// Note: NOP for WORM. Used by RW for eventual recycle protocol.
+    @Override
     public void delete(final long addr) {
 
         assertCanWrite();
@@ -3712,6 +3718,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
     }
 
+    @Override
     public void delete(final long addr, final IAllocationContext context) {
 
         assertCanWrite();
@@ -3728,6 +3735,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
     }
     
+    @Override
     public void detachContext(final IAllocationContext context) {
         
         assertCanWrite();
@@ -3740,6 +3748,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
     	
     }
 
+    @Override
     public void abortContext(final IAllocationContext context) {
         
         assertCanWrite();
@@ -3752,6 +3761,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
         
     }
 
+    @Override
     public void registerContext(final IAllocationContext context) {
         
         assertCanWrite();
@@ -3764,6 +3774,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
         
     }
     
+    @Override
 	final public long getRootAddr(final int index) {
 
 		final ReadLock lock = _fieldReadWriteLock.readLock();
@@ -4394,6 +4405,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
      *       also write on this index. I have tried some different approaches to
      *       handling this.
      */
+    @Override
     public ICommitRecord getCommitRecord(final long commitTime) {
 
         if (isHistoryGone(commitTime))
@@ -4487,6 +4499,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
      *      than having an inner delegate for the mutable view. The local/remote
      *      issue is more complex.
      */
+    @Override
 	public IIndex getIndex(final String name, final long commitTime) {
 
         return (BTree) getIndexLocal(name, commitTime);
@@ -4514,7 +4527,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
      *      cache for access to historical index views on the Journal by name
      *      and commitTime. </a>
      */
-//	@Override TODO Add @Override once change in IBTreeManager merged into READ_CACHE branch.
+	@Override
 	final public ICheckpointProtocol getIndexLocal(final String name,
             final long commitTime) {
 
@@ -4922,6 +4935,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 	 * Note: You MUST {@link #commit()} before the registered index will be
 	 * either restart-safe or visible to new transactions.
 	 */
+    @Override
 	final public void registerIndex(final IndexMetadata metadata) {
 
 		if (metadata == null)
@@ -4968,6 +4982,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
      * 
      * @deprecated by {@link #register(String, IndexMetadata)}
      */
+    @Override
 	final public BTree registerIndex(final String name, final IndexMetadata metadata) {
 
 		validateIndexMetadata(name, metadata);
@@ -4992,7 +5007,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
      * 
      * @see Checkpoint#create(IRawStore, IndexMetadata)
      */
-//  @Override TODO Add @Override once change in IBTreeManager merged into READ_CACHE branch.
+    @Override
     public ICheckpointProtocol register(final String name,
             final IndexMetadata metadata) {
 
@@ -5004,6 +5019,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
     }
 
+    @Override
 	final public BTree registerIndex(final String name, final BTree ndx) {
 
 	    _register(name, ndx);
@@ -5063,6 +5079,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
      * commits and will not be visible to new transactions.  Storage will be
      * reclaimed IFF the backing store support that functionality.
      */
+    @Override
 	public void dropIndex(final String name) {
 
         final ICheckpointProtocol ndx = getUnisolatedIndex(name);
@@ -5112,6 +5129,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
 	}
 
+    @Override
     public Iterator<String> indexNameScan(final String prefix,
             final long timestamp) {
 
@@ -5189,32 +5207,32 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
      * 
      * @see #getLiveView(String, long)
      */
+    @Override
     final public BTree getIndex(final String name) {
 
         return (BTree) getUnisolatedIndex(name);
         
     }
 
-    /**
-     * Return the mutable view of the named index (aka the "live" or
-     * {@link ITx#UNISOLATED} index). This object is NOT thread-safe. You MUST
-     * NOT write on this index unless you KNOW that you are the only writer. See
-     * {@link ConcurrencyManager}, which handles exclusive locks for
-     * {@link ITx#UNISOLATED} indices.
-     * 
-     * @return The mutable view of the index.
-     * 
-     * @see #getUnisolatedIndex(String)
-     * 
-     * @deprecated Use {@link #getUnisolatedIndex(String)}
-     */
-//  TODO Remove method once change in IBTreeManager merged into READ_CACHE branch.
-    @Deprecated
-    final public HTree getHTree(final String name) {
-        
-        return (HTree) getUnisolatedIndex(name);
-        
-    }
+//    /**
+//     * Return the mutable view of the named index (aka the "live" or
+//     * {@link ITx#UNISOLATED} index). This object is NOT thread-safe. You MUST
+//     * NOT write on this index unless you KNOW that you are the only writer. See
+//     * {@link ConcurrencyManager}, which handles exclusive locks for
+//     * {@link ITx#UNISOLATED} indices.
+//     * 
+//     * @return The mutable view of the index.
+//     * 
+//     * @see #getUnisolatedIndex(String)
+//     * 
+//     * @deprecated Use {@link #getUnisolatedIndex(String)}
+//     */
+//    @Deprecated
+//    final public HTree getHTree(final String name) {
+//        
+//        return (HTree) getUnisolatedIndex(name);
+//        
+//    }
 
 //    /**
 //     * Return the mutable view of the named index (aka the "live" or
@@ -5239,7 +5257,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
      * 
      * @return The mutable view of the persistence capable data structure.
      */
-//  @Override TODO Add @Override once change in IBTreeManager merged into READ_CACHE branch.
+    @Override
     final public ICheckpointProtocol getUnisolatedIndex(final String name) {
 
         final ReadLock lock = _fieldReadWriteLock.readLock();
@@ -5279,22 +5297,27 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 	 * IAddressManager
 	 */
 
+    @Override
 	final public long getOffset(long addr) {
 		return _bufferStrategy.getOffset(addr);
 	}
 
+    @Override
 	final public long getPhysicalAddress(long addr) {
 		return _bufferStrategy.getAddressManager().getPhysicalAddress(addr);
 	}
 
+    @Override
 	final public int getByteCount(long addr) {
 		return _bufferStrategy.getByteCount(addr);
 	}
 
+    @Override
 	final public long toAddr(int nbytes, long offset) {
 		return _bufferStrategy.toAddr(nbytes, offset);
 	}
 
+    @Override
 	final public String toString(long addr) {
 		return _bufferStrategy.toString(addr);
 	}
@@ -5355,160 +5378,8 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
         final QuorumTokenTransitions transitionState = new QuorumTokenTransitions(
                 quorumToken, newValue, localService, haReadyToken);
 
-//        /*
-//         * The token is [volatile]. Save it's state on entry. Figure out if this
-//         * is a quorum meet or a quorum break.
-//         */
-//		{
-//			/*
-//			 * TODO: remove this code once the refactoring with QuorumTokenTransitions is stable, right
-//			 * now it is used to sanity check the new code.
-//			 */
-//			final long oldValue = quorumToken;
-//			final long oldReady = haReadyToken;
-//			final HAStatusEnum oldStatus = haStatus;
-//
-//			if (haLog.isInfoEnabled())
-//				haLog.info("oldValue=" + oldValue + ", newToken=" + newValue
-//						+ ", oldReady=" + oldReady);
-//
-//			/*
-//			 * Note that previously the noTokenChange condition was a short
-//			 * circuit exit.
-//			 * 
-//			 * This has been removed so we must account for this condition to
-//			 * determine correct transition
-//			 */
-//			final boolean noTokenChange = oldValue == newValue
-//					&& oldValue == oldReady;
-//			// if (oldValue == newValue && oldValue == oldReady) {
-//			// log.warn("NO TOKEN CHANGE");
-//			// // No change.
-//			// return;
-//			//
-//			// }
-//
-//			final boolean didBreak;
-//			final boolean didMeet;
-//			final boolean didJoinMetQuorum;
-//			final boolean didLeaveMetQuorum;
-//			final boolean isJoined = localService != null
-//					&& localService.isJoinedMember(newValue);
-//			
-//			final boolean wasJoined = oldReady != Quorum.NO_QUORUM;
-//
-//			/**
-//			 * Adding set of initial conditions to account for noTokenChange
-//			 * 
-//			 * TODO: should there be more than one initial condition?
-//			 */
-//			if (noTokenChange && isJoined) {
-//				didBreak = false; // quorum break.
-//				didMeet = false;
-//				didJoinMetQuorum = false; // true;
-//				didLeaveMetQuorum = false; // haReadyToken != Quorum.NO_QUORUM;
-//											// // if service was joined with met
-//											// quorum, then it just left the met
-//											// quorum.
-//			} else if (newValue == Quorum.NO_QUORUM
-//					&& oldValue != Quorum.NO_QUORUM) {
-//
-//				/*
-//				 * Quorum break.
-//				 * 
-//				 * Immediately invalidate the token. Do not wait for a lock.
-//				 */
-//
-//				this.quorumToken = newValue;
-//
-//				didBreak = true; // quorum break.
-//				didMeet = false;
-//				didJoinMetQuorum = false;
-//				didLeaveMetQuorum = wasJoined; // if service was joined with met
-//												// quorum, then it just left the
-//												// met quorum.
-//
-//			} else if (newValue != Quorum.NO_QUORUM
-//					&& oldValue == Quorum.NO_QUORUM) {
-//
-//				/*
-//				 * Quorum meet.
-//				 * 
-//				 * We must wait for the lock to update the token.
-//				 */
-//
-//				didBreak = false;
-//				didMeet = true; // quorum meet.
-//				didJoinMetQuorum = false;
-//				didLeaveMetQuorum = false;
-//
-//			} else if (newValue != Quorum.NO_QUORUM // quorum exists
-//					&& oldReady == Quorum.NO_QUORUM // service was not joined
-//													// with met quorum.
-//					&& isJoined // service is now joined with met quorum.
-//			) {
-//
-//				/*
-//				 * This service is joining a quorum that is already met.
-//				 */
-//
-//				didBreak = false;
-//				didMeet = false;
-//				didJoinMetQuorum = true; // service joined with met quorum.
-//				didLeaveMetQuorum = false;
-//
-//			} else if (newValue != Quorum.NO_QUORUM // quorum exists
-//					&& wasJoined // service was joined with met quorum
-//					&& !isJoined // service is no longer joined with met quorum.
-//			) {
-//
-//				/*
-//				 * This service is leaving a quorum that is already met (but
-//				 * this is not a quorum break since the new token is not
-//				 * NO_QUORUM).
-//				 */
-//
-//				didBreak = false;
-//				didMeet = false;
-//				didJoinMetQuorum = false;
-//				didLeaveMetQuorum = true; // service left met quorum. quorum
-//											// still met.
-//
-//			} else {
-//
-//				// /*
-//				// * No change in state.
-//				// */
-//				//
-//				// log.warn("No change"//
-//				// + ": qorumToken(" + oldValue + " => " + newValue + ")"//
-//				// + ", haReadyToken(" + haReadyToken + ")"//
-//				// );
-//
-//				didBreak = false;
-//				didMeet = false;
-//				didJoinMetQuorum = false;
-//				didLeaveMetQuorum = false;
-//
-//				return;
-//
-//			}
-//			
-//			log.warn("didBreak: " + didBreak
-//					+ ", didMeet: " + didMeet
-//					+ ", didJoinMetQuorum: " + didJoinMetQuorum
-//					+ ", didLeaveMetQuorum: " + didLeaveMetQuorum
-//					+ ", isJoined: " + isJoined
-//					+ ", wasJoined: " + wasJoined
-//					);
-//
-//			assert didBreak == transitionState.didBreak;
-//			assert didMeet == transitionState.didMeet;
-//			assert didJoinMetQuorum == transitionState.didJoinMetQuorum;
-//			assert didLeaveMetQuorum == transitionState.didLeaveMetQuorum;
-//			assert isJoined == transitionState.isJoined;
-//			assert wasJoined == transitionState.wasJoined;
-//		}
+        if (haLog.isInfoEnabled())
+            haLog.info(transitionState.toString());
 
         if (transitionState.didBreak) {
             /*
@@ -5533,53 +5404,43 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
         /*
          * Both a meet and a break require an exclusive write lock.
-         */
-        final boolean isLeader;
-        final boolean isFollower;
-        final long localCommitCounter;
-
-        /*
-         * TODO: Is this lock synchronization a problem? With token update delayed on a lock could a second thread
-         * process a new token based on incorrect state since the first thread has not updated the token?
-         * For example: NO_TOKEN -> valid token -> NO_TOKEN
+         * 
+         * TODO: Is this lock synchronization a problem? With token update
+         * delayed on a lock could a second thread process a new token based on
+         * incorrect state since the first thread has not updated the token? For
+         * example: NO_TOKEN -> valid token -> NO_TOKEN
          */
         final WriteLock lock = _fieldReadWriteLock.writeLock();
         
         lock.lock();
 
         try {
-        	
-        	/*
-        	 * The following condition tests are slightly confusing, it is not clear that they
-        	 * represent all real states.
-        	 * 
-        	 * Essentially
-        	 * 	didBreak - abort
-        	 * 	didLeaveMetQuorum - abort
-        	 * 	didJoinMetQuorum - follower gets rootBlocks
-        	 * 	didMeet - just sets token
-        	 * 
-        	 * Are there other valid states?  
-        	 * 
-        	 * If a void call is made - no token change, no leave or join - then this should
-        	 * result in an assertion error.
-        	 * 
-        	 * FIXME: It is possible that these are being thrown and the quorum is then re-forming
-        	 * but we need to be able to trap these errors (if they occur) to understand the circumstances.
-        	 * It may well be that this is the source of the stochastic failures we see.
-        	 */
+
+            /**
+             * The following condition tests are slightly confusing, it is not
+             * clear that they represent all real states.
+             * 
+             * <pre>
+             * Essentially:
+             * 	didBreak - abort
+             * 	didLeaveMetQuorum - abort
+             * 	didJoinMetQuorum - follower gets rootBlocks
+             * 	didMeet - just sets token
+             * </pre>
+             * 
+             * In addition, there is a case where a service is joined as
+             * perceived by the ZKQuorum but not yet HAReady. If a 2-phase
+             * commit is initiated, then the service will enter an error state
+             * (because it is not yet HAReady). This net-zero change case is
+             * explicitly handled below.
+             */
 
             if (transitionState.didLeaveMetQuorum) {
 
                 /*
                  * The service was joined with a met quorum.
-                 * 
-                 * TODO Is it okay to set this token prior to the abort methods?
                  */
                 quorumToken = newValue; // volatile write.
-                
-                localCommitCounter = -1;
-                isLeader = isFollower = false;
                 
                 /*
                  * We also need to discard any active read/write tx since there
@@ -5625,26 +5486,32 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                  */
                 
                 quorumToken = Quorum.NO_QUORUM; // volatile write.
-
-                localCommitCounter = -1;
-                isLeader = isFollower = false;
                 
-            } else if (transitionState.didMeet || transitionState.didJoinMetQuorum) {
-            	
-            	/**
-            	 * TODO: This state is a bit confused, is it possible that both conditions
-            	 * are true? Could we already be joined at the time we learn that the quorum is
-            	 * met?  If not then it might make more sense to test separately
-            	 */
+                haReadyToken = Quorum.NO_QUORUM; // volatile write.
+                
+                haStatus = HAStatusEnum.NotReady; // volatile write.
+                
+                haReadyCondition.signalAll(); // signal ALL.
+                
+            } else if (transitionState.didMeet
+                    || transitionState.didJoinMetQuorum) {
+
+                /**
+                 * Either a quorum meet (didMeet:=true) or the service is
+                 * joining a quorum that is already met (didJoinMetQuorum).
+                 */
 
                 final long tmp;
-                
+
                 quorumToken = newValue;
 
                 boolean installedRBs = false;
 
-                localCommitCounter = _rootBlock.getCommitCounter();
-                
+                final long localCommitCounter = _rootBlock.getCommitCounter();
+
+                final boolean isLeader;
+                final boolean isFollower;
+
                 if (localService.isFollower(newValue)) {
 
                     isLeader = false;
@@ -5770,7 +5637,36 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                 
             } else {
 
-                throw new AssertionError("VOID setToken");// FIXME HA-ABC
+                /*
+                 * Did not (leave|break|meet|join).
+                 */
+
+                if (haReadyToken != Quorum.NO_QUORUM) {
+
+                    /*
+                     * We should not be here if this service is HAReady.
+                     */
+                    throw new AssertionError("VOID setToken");
+
+                }
+
+                /*
+                 * We are not joined. No change in token or HAReadyToken.
+                 * 
+                 * Note: This can occur (for example) if we are not yet joined
+                 * and an error occurs during our attempt to join with a met
+                 * quorum. One observed example is when this service is in the
+                 * joined[] for zookeeper and therefore is messaged as part of
+                 * the GATHER or PREPARE protocols for a 2-phase commit, but the
+                 * service is not yet HAReady and therefore enters an error
+                 * state rather than completing the 2-phase commit protocol
+                 * successfully. When setQuorumToken() is called from the error
+                 * handling task, the haReadyToken is already cleared. Unless
+                 * the quorum also breaks, the quorum token will be unchanged.
+                 * Hence we did not (leave|break|meet|join).
+                 */
+
+                // Fall through.
                 
             }
             
@@ -5778,15 +5674,6 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
             lock.unlock();
             
-        }
-        
-        if (haLog.isInfoEnabled())
-            haLog.info(transitionState.toString());
-
-        if (isLeader || isFollower) {
-
-            localService.didMeet(newValue, localCommitCounter, isLeader);
-
         }
         
     }
@@ -5797,20 +5684,20 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
      */
     private volatile HAStatusEnum haStatus = HAStatusEnum.NotReady;
     
-    /**
-     * Await the service being ready to partitipate in an HA quorum. The
-     * preconditions include:
-     * <ol>
-     * <li>receiving notice of the quorum token via
-     * {@link #setQuorumToken(long)}</li>
-     * <li>The service is joined with the met quorum for that token</li>
-     * <li>If the service is a follower and it's local root blocks were at
-     * <code>commitCounter:=0</code>, then the root blocks from the leader have
-     * been installed on the follower.</li>
-     * <ol>
-     * 
-     * @return the quorum token for which the service became HA ready.
-     */
+//    /**
+//     * Await the service being ready to partitipate in an HA quorum. The
+//     * preconditions include:
+//     * <ol>
+//     * <li>receiving notice of the quorum token via
+//     * {@link #setQuorumToken(long)}</li>
+//     * <li>The service is joined with the met quorum for that token</li>
+//     * <li>If the service is a follower and it's local root blocks were at
+//     * <code>commitCounter:=0</code>, then the root blocks from the leader have
+//     * been installed on the follower.</li>
+//     * <ol>
+//     * 
+//     * @return the quorum token for which the service became HA ready.
+//     */
 //    final public long awaitHAReady() throws InterruptedException,
 //            AsynchronousQuorumCloseException, QuorumException {
 //        final WriteLock lock = _fieldReadWriteLock.writeLock();
@@ -6808,7 +6695,25 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                             .getConsensusReleaseTime();
                     
                     {
-                        
+
+                        if (oldFuture != null) {
+
+                            /*
+                             * If we ran the GATHER task, then we must await the
+                             * outcome of the GATHER on this service before we
+                             * can verify that the local consensus release time
+                             * is consistent with the GATHER.
+                             * 
+                             * Note: If the oldFuture is null, then the service
+                             * just joined and was explicitly handed the
+                             * consensus release time and hence should be
+                             * consistent here anyway.
+                             */
+                            
+                            oldFuture.get();
+                            
+                        }
+
                         final long localReleaseTime = getLocalTransactionManager()
                                 .getTransactionService().getReleaseTime();
     
@@ -6824,7 +6729,8 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                                             + ", expectedReleaseTime="
                                             + expectedReleaseTime
                                             + ", consensusReleaseTime="
-                                            + consensusReleaseTime);
+                                            + consensusReleaseTime
+                                            + ", serviceId=" + getServiceId());
 
                         }
     

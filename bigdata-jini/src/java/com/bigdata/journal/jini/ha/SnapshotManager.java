@@ -1077,7 +1077,9 @@ public class SnapshotManager {
          * snapshot as a percentage of the size of the journal.
          */
         
-        final long journalSize = journal.size();
+        // Note: This is the file size on the disk (or in memory). No locks
+        // should be required.
+        final long journalSize = journal.getBufferStrategy().getExtent();
 
         // size(HALogs)/size(journal) as percentage.
         final int actualPercentLogSize = (int) (100 * (((double) haLogBytesOnDisk) / ((double) journalSize)));

@@ -1055,8 +1055,19 @@ public class HAJournalServer extends AbstractServer {
                 
             }
 
-            haLog.warn("runState=" + runState + ", oldRunState=" + oldRunState
-                    + ", serviceName=" + server.getServiceName(), new StackInfoReport());
+            // Note: *should* be non-null. Just paranoid.
+            final IRootBlockView rb = journal.getRootBlockView();
+            
+            final String commitCounterStr = (rb == null) ? "N/A" : Long
+                    .toString(rb.getCommitCounter());
+            
+            haLog.warn("runState=" + runState //
+                    + ", oldRunState=" + oldRunState //
+                    + ", quorumToken=" + journal.getQuorumToken()//
+                    + ", haStatus=" + journal.getHAStatus()//
+                    + ", commitCounter=" + commitCounterStr//
+                    + ", serviceName=" + server.getServiceName(),//
+                    new StackInfoReport());
 
         }
         
@@ -1599,49 +1610,48 @@ public class HAJournalServer extends AbstractServer {
 
         }
 
-        /**
-         * {@inheritDoc}
-         * <p>
-         * If there is a fully met quorum, then we can purge all HA logs
-         * <em>EXCEPT</em> the current one.
-         */
-        @Override
-        public void serviceJoin() {
-
-            super.serviceJoin();
-
-            // FIXME serviceJoin() - restore event handler.
-//            // Submit task to handle this event.
-//            server.singleThreadExecutor.execute(new MonitoredFutureTask<Void>(
-//                    new ServiceJoinTask()));
-        }
-
-        /**
-         * Purge HALog files on a fully met quorum.
-         */
-        private class ServiceJoinTask implements Callable<Void> {
-            public Void call() throws Exception {
-
-                final long token = getQuorum().token();
-
-                if (getQuorum().isQuorumFullyMet(token)) {
-                    /*
-                     * TODO Even though the quorum is fully met, we should wait
-                     * until we have a positive indication from the leader that
-                     * it is "ha ready" before purging the HA logs and aging put
-                     * snapshots. The leader might need to explicitly schedule
-                     * this operation against the joined services and the
-                     * services should then verify that the quorum is fully met
-                     * before they actually age out the HALogs and snapshots.
-                     */
-                    purgeHALogs(token);
-
-                }
-                
-                return null;
-                
-            }
-        }
+//        /**
+//         * {@inheritDoc}
+//         * <p>
+//         * If there is a fully met quorum, then we can purge all HA logs
+//         * <em>EXCEPT</em> the current one.
+//         */
+//        @Override
+//        public void serviceJoin() {
+//
+//            super.serviceJoin();
+//
+////            // Submit task to handle this event.
+////            server.singleThreadExecutor.execute(new MonitoredFutureTask<Void>(
+////                    new ServiceJoinTask()));
+//        }
+//
+//        /**
+//         * Purge HALog files on a fully met quorum.
+//         */
+//        private class ServiceJoinTask implements Callable<Void> {
+//            public Void call() throws Exception {
+//
+//                final long token = getQuorum().token();
+//
+//                if (getQuorum().isQuorumFullyMet(token)) {
+//                    /*
+//                     * TODO Even though the quorum is fully met, we should wait
+//                     * until we have a positive indication from the leader that
+//                     * it is "ha ready" before purging the HA logs and aging put
+//                     * snapshots. The leader might need to explicitly schedule
+//                     * this operation against the joined services and the
+//                     * services should then verify that the quorum is fully met
+//                     * before they actually age out the HALogs and snapshots.
+//                     */
+//                    purgeHALogs(token);
+//
+//                }
+//                
+//                return null;
+//                
+//            }
+//        }
 
         @Override
         public void memberRemove() {
@@ -1840,6 +1850,19 @@ public class HAJournalServer extends AbstractServer {
                 // ensure in pipeline.
                 getActor().pipelineAdd();
 
+                /**
+                 * Make sure that the pipelineAdd() is handled before
+                 * continuing. Handling this event will setup the
+                 * HAReceiveService. This is necessary since the event is no
+                 * longer synchronously handled.
+                 * 
+                 * @see <a
+                 *      href="https://sourceforge.net/apps/trac/bigdata/ticket/695">
+                 *      HAJournalServer reports "follower" but is in
+                 *      SeekConsensus and is not participating in commits</a>
+                 */
+                processEvents();
+                
                 {
 
                     final long token = getQuorum().token();
@@ -3887,11 +3910,11 @@ public class HAJournalServer extends AbstractServer {
 
         }
 
-        @Override
-        public void didMeet(final long token, final long commitCounter,
-                final boolean isLeader) {
-            // NOP
-        }
+//        @Override
+//        public void didMeet(final long token, final long commitCounter,
+//                final boolean isLeader) {
+//            // NOP
+//        }
 
         @Override
         public File getServiceDir() {

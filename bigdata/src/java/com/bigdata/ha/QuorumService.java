@@ -124,24 +124,6 @@ public interface QuorumService<S extends HAGlue> extends QuorumMember<S>,
             final IRootBlockView rootBlock1);
 
     /**
-     * Callback method.
-     * 
-     * @param token
-     *            The token on which the service joined a met quorum.
-     * @param commitCounter
-     *            The commitCounter for the local service.
-     * @param isLeader
-     *            <code>true</code> iff the local service is the quorum leader.
-     */
-    /*
-     * I added this in but wound up not needed it. Do not use without good
-     * justification.
-     */
-    @Deprecated
-    void didMeet(final long token, final long commitCounter,
-            final boolean isLeader);
-
-    /**
      * Enter an error state. The error state should take whatever corrective
      * actions are necessary in order to prepare the service for continued
      * operations.
