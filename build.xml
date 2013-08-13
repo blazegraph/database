@@ -1968,9 +1968,15 @@ ${postInstallMessage}</echo>
       <echo>
 </echo>
 
+      <!-- Clear out the old test results. -->
       <property name="test.results.dir" location="${classes.test.dir}/test-results" />
       <delete dir="${test.results.dir}" quiet="true" />
       <mkdir dir="${test.results.dir}" />
+
+    	<!-- Clear out the old HA test suite logs. -->
+      <property name="HAtest.dir" location="benchmark/CI-HAJournal-1" />
+      <delete dir="${HAtest.dir}" quiet="true" />
+      <mkdir dir="${HATest.dir}" />
 
       <condition property="testClass" value="${testName}">
         <isset property="testName" />
