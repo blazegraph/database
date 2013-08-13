@@ -2167,6 +2167,9 @@ ${postInstallMessage}</echo>
       <!-- Archive the generated HTML report. -->
       <tar destfile="${test.results.dir}/report.tgz" basedir="${test.results.dir}/report" compression="gzip"/>
 
+      <!-- Archive the HA test suite output logs. -->
+      <tar destfile="${test.results.dir}/HAtest-report.tgz" basedir="${HAtest.dir}" compression="gzip"/>
+
     </target>
 
 <target name="clean-sparql-test-suite" description="delete the files unpacked by the Sesame SPARQL test suite.">
