@@ -27,6 +27,7 @@ package com.bigdata.ha.pipeline;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
+import java.nio.channels.Selector;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
@@ -41,7 +42,6 @@ import com.bigdata.rawstore.Bytes;
 import com.bigdata.util.ChecksumError;
 import com.bigdata.util.ChecksumUtility;
 import com.bigdata.util.InnerCause;
-import com.sun.corba.se.pept.transport.Selector;
 
 /**
  * Test the raw socket protocol implemented by {@link HASendService} and
