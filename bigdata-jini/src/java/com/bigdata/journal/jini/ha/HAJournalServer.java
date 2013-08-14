@@ -2481,18 +2481,17 @@ public class HAJournalServer extends AbstractServer {
                  */
                 final S leader = getLeader(token);
 
-                // Until joined with the met quorum.
-                while (!getQuorum().getMember().isJoinedMember(token)) {
-
-                    // This service should not be joined yet (HAReady==-1).
-                    final long haReady = journal.getHAReady();
-
-                    if (haReady != Quorum.NO_QUORUM) {
-                    
-                        throw new AssertionError(
-                                "HAReady: Expecting NO_QUOURM, not " + haReady);
-                        
-                    }
+                /*
+                 * Loop until joined with the met quorum (and HAReady).
+                 * 
+                 * Note: The transition will occur atomically either when we
+                 * catch up with the live write or at a commit point.
+                 * 
+                 * Note: This loop will go through an abnormal exit if the
+                 * quorum breaks or reforms (thrown error). The control when
+                 * then pass through the ErrorTask and back into SeekConsensus.
+                 */
+                while (true) {
 
                     // The current commit point on the local store.
                     final long commitCounter = journal.getRootBlockView()
@@ -2502,10 +2501,7 @@ public class HAJournalServer extends AbstractServer {
                     replicateAndApplyWriteSet(leader, token, commitCounter + 1);
 
                 }
-
-                // Done
-                return null;
-
+                
             }
 
         } // class ResyncTask
@@ -2647,15 +2643,32 @@ public class HAJournalServer extends AbstractServer {
                      * 
                      * @see #resyncTransitionToMetQuorum()
                      */
-                     
+
+                    if (journal.getHAReady() != token) {
+                        /*
+                         * Service must be HAReady before exiting RESYNC
+                         * normally.
+                         */
+                        throw new AssertionError();
+                    }
+                    
                     return;
+                    
                 }
                 
                 /*
                  * Since we are not joined, the HAReady token must not have been
                  * set.
                  */
-                assert journal.getHAReady() == Quorum.NO_QUORUM;
+                if (journal.getHAReady() != Quorum.NO_QUORUM) {
+                    /*
+                     * The HAReady token is set by setQuorumToken() and this
+                     * should have been done atomically in runWithBarrierLock().
+                     * Thus, it is a problem if the HAReady token is set here to
+                     * any valid token value.
+                     */
+                    throw new AssertionError();
+                }
                 journal.getHALogNexus().disableHALog();
                 journal.getHALogNexus().createHALog(openRootBlock);
             } finally {
