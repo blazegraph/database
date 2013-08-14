@@ -50,6 +50,8 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.log4j.Logger;
 
+import cern.colt.Arrays;
+
 import com.bigdata.bfs.BigdataFileSystem;
 import com.bigdata.bfs.GlobalFileSystemHelper;
 import com.bigdata.bop.engine.QueryEngine;
@@ -1123,6 +1125,11 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
             long remaining = nanos;
 
             final long token = getQuorum().token();
+
+            if (haLog.isInfoEnabled())
+                haLog.info("GATHER PROTOCOL: token=" + token
+                        + ", joinedServiceIds="
+                        + Arrays.toString(joinedServiceIds));
             
             final BarrierState barrierState;
             
