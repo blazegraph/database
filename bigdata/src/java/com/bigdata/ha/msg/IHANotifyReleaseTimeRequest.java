@@ -84,5 +84,17 @@ public interface IHANotifyReleaseTimeRequest extends IHAMessage {
      *      simultaneous service start failure </a>
      */
     public boolean isMock();
+
+    /**
+     * The commit counter that will be assigned to the new commit point (as
+     * specified by the leader).
+     */
+    public long getNewCommitCounter();
+
+    /**
+     * The commit time that will be assigned to the new commit point (as
+     * specified by the leader).
+     */
+    public long getNewCommitTime();
     
 }

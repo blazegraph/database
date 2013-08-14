@@ -3076,6 +3076,10 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
 			assertCommitTimeAdvances(commitTime);
 
+            final IRootBlockView old = _rootBlock;
+
+            final long newCommitCounter = old.getCommitCounter() + 1;
+            
 			/*
 			 * First, run each of the committers accumulating the updated root
 			 * addresses in an array. In general, these are btrees and they may
@@ -3156,7 +3160,8 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                     // Run the GATHER protocol.
                     consensusReleaseTime = ((AbstractHATransactionService) getLocalTransactionManager()
                             .getTransactionService())
-                            .updateReleaseTimeConsensus(
+                            .updateReleaseTimeConsensus(newCommitCounter,
+                                    commitTime,
                                     gatherJoinedAndNonJoinedServices.getJoinedServiceIds(),
                                     getHAReleaseTimeConsensusTimeout(),
                                     TimeUnit.MILLISECONDS);
@@ -3210,10 +3215,6 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
              * but good root blocks can be found elsewhere in the file.
              */
 
-            final IRootBlockView old = _rootBlock;
-
-            final long newCommitCounter = old.getCommitCounter() + 1;
-            
             final ICommitRecord commitRecord = new CommitRecord(commitTime,
                     newCommitCounter, rootAddrs);
 
