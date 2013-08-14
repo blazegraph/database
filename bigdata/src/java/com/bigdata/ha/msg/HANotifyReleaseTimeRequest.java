@@ -37,10 +37,13 @@ public class HANotifyReleaseTimeRequest implements IHANotifyReleaseTimeRequest {
     private final long pinnedCommitCounter;
     private final long timestamp;
     private final boolean isMock;
+    private final long newCommitCounter;
+    private final long newCommitTime;
 
     public HANotifyReleaseTimeRequest(final UUID serviceUUID,
             final long pinnedCommitTime, final long pinnedCommitCounter,
-            final long timestamp, final boolean isMock) {
+            final long timestamp, final boolean isMock,
+            final long newCommitCounter, final long newCommitTime) {
         if (serviceUUID == null)
             throw new IllegalArgumentException();
         if (pinnedCommitTime < 0)
@@ -52,6 +55,8 @@ public class HANotifyReleaseTimeRequest implements IHANotifyReleaseTimeRequest {
         this.pinnedCommitCounter = pinnedCommitCounter;
         this.timestamp = timestamp;
         this.isMock = isMock;
+        this.newCommitCounter = newCommitCounter;
+        this.newCommitTime = newCommitTime;
     }
 
     @Override
@@ -87,4 +92,14 @@ public class HANotifyReleaseTimeRequest implements IHANotifyReleaseTimeRequest {
         return isMock;
     }
     
+    @Override
+    public long getNewCommitCounter() {
+        return newCommitCounter;
+    }
+
+    @Override
+    public long getNewCommitTime() {
+        return newCommitTime;
+    }
+
 }

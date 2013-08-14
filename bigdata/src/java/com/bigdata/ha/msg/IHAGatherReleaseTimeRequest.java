@@ -56,5 +56,15 @@ public interface IHAGatherReleaseTimeRequest extends IHAMessage {
      * is (or was) the leader even if the token has been invalidated.
      */
     public UUID getLeaderId();
+
+    /**
+     * The commit counter that will be assigned to the new commit point.
+     */
+    public long getNewCommitCounter();
+
+    /**
+     * The commit time that will be assigned to the new commit point.
+     */
+    public long getNewCommitTime();
     
 }

@@ -82,6 +82,11 @@ abstract public class AbstractHATransactionService extends
      * Coordinate the update of the <i>releaseTime</i> on each service that is
      * joined with the met quorum.
      * 
+     * @param newCommitCounter
+     *            The commit counter that will be assigned to the new commit
+     *            point.
+     * @param newCommitTime
+     *            The commit time that will be assigned to the new commit point.
      * @param joinedServiceIds
      *            The services that are joined with the met quorum as of an
      *            atomic decision point in {@link AbstractJournal#commitNow()}.
@@ -91,6 +96,8 @@ abstract public class AbstractHATransactionService extends
      *            The units for that timeout.
      */
     abstract public IHANotifyReleaseTimeResponse updateReleaseTimeConsensus(
+            final long newCommitCounter,
+            final long newCommitTime,
             final UUID[] joinedServiceIds, final long timeout,
             final TimeUnit units) throws IOException, TimeoutException,
             InterruptedException, Exception;
