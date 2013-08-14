@@ -512,6 +512,67 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
     }
     
     /**
+     * Unit test of the ability to go through a simultaneous restart of all
+     * services once those services are no longer at commit point 0. Two
+     * services will meet on the lastCommitTime. The third will need to RESYNC
+     * and then join. This test provides converage of the RESYNC and JOIN
+     * transitions when the database is not empty.
+     */
+    public void testStartABC_RestartAllSimultaneous() throws Exception {
+
+        // Start simultaneous.
+        ABC servers = new ABC(true);
+
+        /*
+         * Now go through a commit point with a met quorum.
+         */
+        simpleTransaction();
+
+        // Current commit point.
+        final long lastCommitCounter2 = 2;
+
+        // Await 2nd commit point on all services.
+        awaitCommitCounter(lastCommitCounter2, servers.serverA,
+                servers.serverB, servers.serverC);
+
+        /*
+         * Shutdown ALL services.
+         */
+        
+        shutdownA();
+        shutdownB();
+        shutdownC();
+        
+        /*
+         * Start simultaneous (again).
+         * 
+         * Note: Since these are not new service starts, we are only awaiting
+         * the fully met quorum. Hence I am NOT re-verifying that the services
+         * are at the same commit point (they should be of course) because I
+         * would like to promote a data race for the UPDATE with the MEET +
+         * RESYNC.
+         */
+        servers = new ABC(true, false/* newServiceStarts */);
+
+//        // Should be at the same commit point on all services.
+//        awaitCommitCounter(lastCommitCounter2, servers.serverA,
+//                servers.serverB, servers.serverC);
+        
+        /*
+         * Now go through a commit point with a met quorum.
+         */
+        simpleTransaction();
+
+        // Current commit point.
+        final long lastCommitCounter3 = 3;
+
+        // Await 3rd commit point on all services.
+        awaitCommitCounter(lastCommitCounter3, servers.serverA,
+                servers.serverB, servers.serverC);
+
+    }
+    
+    /**
      * TWO (2) committed transactions then at 3000ms delay between each
      * subsequent transaction.
      * <P>

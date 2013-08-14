@@ -2128,15 +2128,36 @@ public class AbstractHA3JournalServerTestCase extends
          */
         final HAGlue serverA, serverB, serverC;
 
-		/**
-		 * Start of 3 HA services (this happens in the ctor).
-		 * 
-		 * @param sequential
-		 *           True if the startup should be sequential or false
-		 *           if services should start concurrently.
-		 * @throws Exception
-		 */
-        public ABC(final boolean sequential) throws Exception {
+        /**
+         * Start of 3 HA services (this happens in the ctor).
+         * 
+         * @param sequential
+         *           True if the startup should be sequential or false
+         *           if services should start concurrently.
+         * @throws Exception
+         */
+        public ABC(final boolean sequential)
+                throws Exception {
+
+            this(true/* sequential */, true/* newServiceStarts */);
+
+        }
+
+        /**
+         * Start of 3 HA services (this happens in the ctor).
+         * 
+         * @param sequential
+         *            True if the startup should be sequential or false if
+         *            services should start concurrently.
+         * @param newServiceStarts
+         *            When <code>true</code> the services are new, the database
+         *            should be at <code>commitCounter:=0</code> and the
+         *            constructor will check for the implicit create of the
+         *            default KB.
+         * @throws Exception
+         */
+        public ABC(final boolean sequential, final boolean newServiceStarts)
+                throws Exception {
 
             if (sequential) {
             
@@ -2171,8 +2192,10 @@ public class AbstractHA3JournalServerTestCase extends
             // wait for the quorum to fully meet.
             awaitFullyMetQuorum();
 
-            // wait for the initial commit point (KB create).
-            awaitCommitCounter(1L, serverA, serverB, serverC);
+            if(newServiceStarts) {
+                // wait for the initial commit point (KB create).
+                awaitCommitCounter(1L, serverA, serverB, serverC);
+            }
             
         }
 

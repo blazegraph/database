@@ -69,4 +69,20 @@ public interface IHANotifyReleaseTimeRequest extends IHAMessage {
      */
     public long getTimestamp();
 
+    /**
+     * Mock responses are used when a follow is unable to provide a correct
+     * response (typically because the follower is not yet HAReady and hence is
+     * not able to participate in the gather). The mock responses preserves
+     * liveness since the GATHER protocol will terminate quickly. By marking the
+     * response as a mock object, the leader can differentiate mock responses
+     * from valid responses and discard the mock responeses. If the GATHER task
+     * on the follower sends a mock response to the leader, then it will also
+     * have thrown an exception out of its GatherTask which will prevent the
+     * follower from voting YES on the PREPARE message for that 2-phase commit.
+     * 
+     * @see <href="https://sourceforge.net/apps/trac/bigdata/ticket/720" > HA3
+     *      simultaneous service start failure </a>
+     */
+    public boolean isMock();
+    
 }
