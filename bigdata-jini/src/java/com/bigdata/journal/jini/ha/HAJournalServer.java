@@ -2479,6 +2479,9 @@ public class HAJournalServer extends AbstractServer {
                  * The quorum leader (RMI interface). This is fixed until the
                  * quorum breaks.
                  */
+                
+                final UUID leaderId = getQuorum().getLeaderId();
+                
                 final S leader = getLeader(token);
 
                 /*
@@ -2498,7 +2501,8 @@ public class HAJournalServer extends AbstractServer {
                             .getCommitCounter();
 
                     // Replicate and apply the next write set
-                    replicateAndApplyWriteSet(leader, token, commitCounter + 1);
+                    replicateAndApplyWriteSet(leaderId, leader, token,
+                            commitCounter + 1);
 
                 }
                 
@@ -2526,10 +2530,10 @@ public class HAJournalServer extends AbstractServer {
          * @throws ExecutionException
          * @throws InterruptedException
          */
-        private void replicateAndApplyWriteSet(final S leader,
-                final long token, final long closingCommitCounter)
-                throws FileNotFoundException, IOException,
-                InterruptedException, ExecutionException {
+        private void replicateAndApplyWriteSet(final UUID leaderId,
+                final S leader, final long token,
+                final long closingCommitCounter) throws FileNotFoundException,
+                IOException, InterruptedException, ExecutionException {
 
             if (leader == null)
                 throw new IllegalArgumentException();
@@ -2651,9 +2655,13 @@ public class HAJournalServer extends AbstractServer {
                          */
                         throw new AssertionError();
                     }
+
+                    // Transition to RunMet.
+                    enterRunState(new RunMetTask(token, leaderId));
                     
-                    return;
-                    
+                    // Force immediate exit of the resync protocol.
+                    throw new InterruptedException();
+
                 }
                 
                 /*
