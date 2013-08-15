@@ -28,6 +28,8 @@ package com.bigdata.rdf.sail;
 
 import java.util.Properties;
 import java.util.concurrent.Callable;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import org.apache.log4j.Logger;
 
@@ -91,6 +93,10 @@ public class CreateKBTask implements Callable<Void> {
 
     }
 
+    /**
+     * TODO This process is not robust if the leader is elected and becomes
+     * HAReady and then fails over before the KB is created.
+     */
     private void doRun() {
     
         if (indexManager instanceof AbstractJournal) {
@@ -115,6 +121,9 @@ public class CreateKBTask implements Callable<Void> {
 
             } else {
 
+                /*
+                 * Wait for a quorum meet.
+                 */
                 final long token;
                 try {
                     long tmp = quorum.token();
@@ -131,6 +140,19 @@ public class CreateKBTask implements Callable<Void> {
                     throw new RuntimeException(e1);
                 }
 
+                /*
+                 * Now wait until the service is HAReady.
+                 */
+                try {
+                    jnl.awaitHAReady(Long.MAX_VALUE, TimeUnit.NANOSECONDS);
+                } catch (AsynchronousQuorumCloseException e) {
+                    throw new RuntimeException(e);
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                } catch (TimeoutException e) {
+                    throw new RuntimeException(e);
+                }
+                
                 if (quorum.getMember().isLeader(token)) {
                     isSoloOrLeader = true;
                 } else {
