@@ -3564,82 +3564,98 @@ public class HAJournalServer extends AbstractServer {
 
             txs.runWithBarrierLock(new Runnable() {
 
-                        public void run() {
-                            
-                            // Verify that the quorum is valid.
-                            getQuorum().assertQuorum(token);
+                public void run() {
 
-                            // Synchronous service join (blocks until success or failure).
-                            getActor().serviceJoin();
+                    // Verify that the quorum is valid.
+                    getQuorum().assertQuorum(token);
 
-                            // Verify that the quorum is valid.
-                            getQuorum().assertQuorum(token);
+                    // Synchronous service join (blocks until success or
+                    // failure).
+                    getActor().serviceJoin();
 
-                            // Set the token on the journal.
-                            journal.setQuorumToken(token);
+                    // Verify that the quorum is valid.
+                    getQuorum().assertQuorum(token);
 
-                            // Verify that the quorum is valid.
-                            getQuorum().assertQuorum(token);
-                            
-                            /*
-                             * We need to block until the leader observes our
-                             * service join. We are blocking replicated writes.
-                             * That prevents the leader from initiating a
-                             * 2-phase commit. By blocking until our service
-                             * join becomes visible to the leader, we are able
-                             * to ensure that we will participate in a 2-phase
-                             * commit where the leader might otherwise have
-                             * failed to observe that we are a joined service.
-                             * 
-                             * This addresses a failure mode demonstrated by the
-                             * test suite where a service join during a series
-                             * of short transactions could fail. The failure
-                             * mode was that the newly joined follower was
-                             * current on the write set and had invoked
-                             * serviceJoin(), but the leader did not include it
-                             * in the 2-phase commit because the service join
-                             * event had not been delivered from zk in time
-                             * (visibility).
-                             * 
-                             * Note: There is a gap between the GATHER and the
-                             * PREPARE. If this service joins with a met quorum
-                             * after the GATHER and before the PREPARE, then it
-                             * MUST set the most recent consensus release time
-                             * from the leader on its local journal. This
-                             * ensures that the newly joined follower will not
-                             * allow a transaction start against a commit point
-                             * that was recycled by the leader.
-                             * 
-                             * TODO The leader should use a real commit counter
-                             * in its response and the follower should verify
-                             * that the commit counter is consistent with its
-                             * assumptions.
-                             */
-                            try {
-                                
-                                final IHANotifyReleaseTimeResponse resp = leader.awaitServiceJoin(new HAAwaitServiceJoinRequest(
+//                    // Set the token on the journal.
+//                    journal.setQuorumToken(token);
+//
+//                    // Verify that the quorum is valid.
+//                    getQuorum().assertQuorum(token);
+
+                    /*
+                     * We need to block until the leader observes our service
+                     * join. We are blocking replicated writes. That prevents
+                     * the leader from initiating a 2-phase commit. By blocking
+                     * until our service join becomes visible to the leader, we
+                     * are able to ensure that we will participate in a 2-phase
+                     * commit where the leader might otherwise have failed to
+                     * observe that we are a joined service.
+                     * 
+                     * This addresses a failure mode demonstrated by the test
+                     * suite where a service join during a series of short
+                     * transactions could fail. The failure mode was that the
+                     * newly joined follower was current on the write set and
+                     * had invoked serviceJoin(), but the leader did not include
+                     * it in the 2-phase commit because the service join event
+                     * had not been delivered from zk in time (visibility).
+                     * 
+                     * Note: There is a gap between the GATHER and the PREPARE.
+                     * If this service joins with a met quorum after the GATHER
+                     * and before the PREPARE, then it MUST set the most recent
+                     * consensus release time from the leader on its local
+                     * journal. This ensures that the newly joined follower will
+                     * not allow a transaction start against a commit point that
+                     * was recycled by the leader.
+                     * 
+                     * TODO The leader should use a real commit counter in its
+                     * response and the follower should verify that the commit
+                     * counter is consistent with its assumptions.
+                     */
+                    final IHANotifyReleaseTimeResponse resp;
+                    try {
+
+                        resp = leader
+                                .awaitServiceJoin(new HAAwaitServiceJoinRequest(
                                         getServiceId(),
                                         Long.MAX_VALUE/* timeout */,
                                         TimeUnit.SECONDS/* unit */));
 
-                                if (log.isInfoEnabled())
-                                    log.info("Obtained releaseTime from leader: "
-                                            + resp);
+                        if (haLog.isInfoEnabled())
+                            haLog.info("Obtained releaseTime from leader: "
+                                    + resp);
 
-                                // Update the release time on the local journal.
-                                txs.setReleaseTime(resp.getCommitTime());
+                    } catch (Exception t) {
+                        throw new QuorumException(
+                                "Service join not observed by leader.", t);
+                    }
 
-                            } catch (Throwable t) {
-                                log.error(t, t);
-                                throw new QuorumException(
-                                        "Service join not observed by leader.",
-                                        t);
-                            }
+                    /*
+                     * Set the token on the journal.
+                     * 
+                     * Note: We need to do this after the leader has observed
+                     * the service join. This is necessary in order to have the
+                     * precondition checks in the GatherTask correctly reject a
+                     * GatherTask when the service is not yet HAReady. If we set
+                     * the quorumToken *before* we await the visibility of the
+                     * service join on the leader, then the GatherTask will see
+                     * that the follower (this service) that is attempting to
+                     * join is HAReady and will incorrectly attempt to execute
+                     * the GatherTask, which can result in a deadlock.
+                     */
 
-                            // Verify that the quorum is valid.
-                            getQuorum().assertQuorum(token);
-                        }
-                    });
+                    journal.setQuorumToken(token);
+
+                    // Verify that the quorum is valid.
+                    getQuorum().assertQuorum(token);
+
+                    // Update the release time on the local journal.
+                    txs.setReleaseTime(resp.getCommitTime());
+
+                    // Verify that the quorum is valid.
+                    getQuorum().assertQuorum(token);
+
+                }
+            }); // runWithBarrierLock()
 
             if (haLog.isInfoEnabled())
                 haLog.info("TRANSITION", new RuntimeException());
