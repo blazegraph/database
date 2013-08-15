@@ -753,8 +753,8 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
                  * Thread (actually it now uses barrier.reset()).
                  * 
                  * Note: CyclicBarrier.await(timeout,unit) causes the barrier to
-                 * break if the timeout is exceeded. Therefore is CAN NOT be
-                 * used in preference to this pattern.
+                 * break if the timeout is exceeded (as opposed to simply throwing the TimeoutException and allowing the thread to
+                 * retry the CyclicBarrier.await()). Therefore it CAN NOT be used in preference to this pattern. However, we could replace the use of the CyclicBarrier with a Phaser (JDK 1.7 or jr166).
                  */
                 {
 //                    final Thread blockedAtBarrier = Thread.currentThread();
@@ -1183,6 +1183,13 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
                 haLog.info("Will run with barrier lock.");
                 try {
                     r.run();
+                } catch(Throwable t) {
+                    /*
+                     * Note: An Interrupt here is not really an ERROR. It
+                     * could be caused by a change in the RunState of the
+                     * HAJournalServer.
+                     */
+                    haLog.error(t, t);
                 } finally {
                     haLog.info("Did run with barrier lock.");
                 }
@@ -1540,6 +1547,14 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
             private final UUID serviceId;
             private final IHAGatherReleaseTimeRequest req;
 
+            /**
+             * This variable is set in the try {} block in {@link #call()}. We
+             * eventually respond (sending an RMI to the leader) either in the
+             * try{} or in the finally{}, depending on whether or not the
+             * {@link GatherTask} encounters an error when it executes.
+             */
+            volatile private boolean didNotifyLeader = false;            
+
             public GatherTask(final HAGlue leader, final UUID serviceId,
                     final IHAGatherReleaseTimeRequest req) {
 
@@ -1569,8 +1584,8 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
              */
             public IHANotifyReleaseTimeResponse call() throws Exception {
 
-                if (log.isInfoEnabled())
-                    log.info("Running gather on follower");
+                if (haLog.isInfoEnabled())
+                    haLog.info("Running gather on follower");
 
                 /*
                  * This variable is set in the try {} below. We eventually
@@ -1578,150 +1593,34 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
                  * whether or not the GatherTask encounters an error when it
                  * executes.
                  */
-//                long now = 0L;
-                
-                boolean didNotifyLeader = false;
-                
-                barrierLock.lock(); // take lock on follower!
+                didNotifyLeader = false;
 
                 try {
 
-                    final long token = req.token();
-
                     /*
-                     * we do not need to handle the case where the token is
-                     * invalid. The leader will reset() the CylicBarrier for
-                     * this case.
+                     * Test pre-conditions BEFORE getting the barrierLock. This
+                     * allows a service that is not yet properly joined to
+                     * refuse to do the GATHER before it obtains the barrierLock
+                     * that makes the GatherTask MUTEX with
+                     * doCastLeadersVoteAndServiceJoin().
                      */
+                    preconditionTest();
 
-                    // Verify quorum valid for token (implies leader valid)
-                    getQuorum().assertQuorum(token);
+                    barrierLock.lock(); // take lock on follower!
 
-                    // Verify this service is HAReady for token.
-                    assertHAReady(token);
-
-                    /*
-                     * If the quorumService is null because this service is
-                     * shutting down then the leader will notice the
-                     * serviceLeave() and reset() the CyclicBarrier.
-                     */
-                    final QuorumService<HAGlue> quorumService = getQuorum()
-                            .getClient();
-
-//                    /*
-//                     * This timestamp is used to help detect clock skew.
-//                     */
-//                    now = newConsensusProtocolTimestamp();
-
-                    /*
-                     * Note: At this point we have everything we need to form up
-                     * our response. If we hit an assertion, we will still
-                     * respond in the finally {} block below.
-                     */
-
-                    /*
-                     * Note: This assert has been moved to the leader when it
-                     * analyzes the messages from the followers. This allows us
-                     * to report out the nature of the exception on the leader
-                     * and thence back to the client.
-                     */
-//                    /* Verify event on leader occurs before event on follower.
-//                     */
-//                    assertBefore(req.getTimestampOnLeader(), now);
-
-                    if (!quorumService.isFollower(token))
-                        throw new QuorumException();
-
-                    final long localCommitCounter = getRootBlockView()
-                            .getCommitCounter();
-                    
-                    if (req.getNewCommitCounter() != localCommitCounter + 1) {
-                        throw new RuntimeException(
-                                "leader is preparing for commitCounter="
-                                        + req.getNewCommitCounter()
-                                        + ", but follower is at localCommitCounter="
-                                        + localCommitCounter);
-                    }
-                    
-                    final IHANotifyReleaseTimeRequest req2 = newHANotifyReleaseTimeRequest(
-                            serviceId, req.getNewCommitCounter(),
-                            req.getNewCommitTime());
-
-                    /*
-                     * RMI to leader.
-                     * 
-                     * Note: Will block until barrier breaks on the leader.
-                     */
-                    
-                    didNotifyLeader = true;
-
-                    final IHANotifyReleaseTimeResponse consensusReleaseTime = leader
-                            .notifyEarliestCommitTime(req2);
-
-                    /*
-                     * Now spot check the earliest active tx on this follower.
-                     * We want to make sure that this tx is not reading against
-                     * a commit point whose state would be released by the new
-                     * [consensusReleaseTime] that we just obtained from the
-                     * leader.
-                     * 
-                     * If everything is Ok, we update the releaseTime on the
-                     * follower.
-                     */
-
-                    lock.lock();
-                    
                     try {
 
-                        if (log.isInfoEnabled())
-                            log.info("Validating consensus releaseTime on follower: consensus="
-                                    + consensusReleaseTime);
-                        
-                        // the earliest active tx on this follower.
-                        final TxState txState = getEarliestActiveTx();
+                        // Re-test the pre-conditions.
+                        preconditionTest();
 
-                        // Consensus for new earliest visible commit time.
-                        final long t2 = consensusReleaseTime.getCommitTime();
-
-                        if (txState != null
-                                && txState.getReadsOnCommitTime() < t2) {
-
-                            /*
-                             * At least one transaction exists on the follower
-                             * that is reading on a commit point LT the commit
-                             * point which would be released. This is either a
-                             * failure in the logic to compute the consensus
-                             * releaseTime or a failure to exclude new
-                             * transaction starts on the follower while
-                             * computing the new consensus releaseTime.
-                             */
-
-                            throw new AssertionError(
-                                    "The releaseTime consensus would release a commit point with active readers"
-                                            + ": consensus=" + consensusReleaseTime
-                                            + ", earliestActiveTx=" + txState);
-
-                        }
-
-                        final long newReleaseTime = Math.max(0L,
-                                consensusReleaseTime.getCommitTime() - 1);
-
-                        if (log.isInfoEnabled())
-                            log.info("Advancing releaseTime on follower: "
-                                    + newReleaseTime);
-
-                        // Update the releaseTime on the follower
-                        setReleaseTime(newReleaseTime);
+                        return doRunWithBarrierLock();
 
                     } finally {
-                        
-                        lock.unlock();
-                        
+
+                        barrierLock.unlock();
+
                     }
 
-                    // Done.
-                    return consensusReleaseTime;
-                    
                 } catch (Throwable t) {
 
                     log.error(t, t);
@@ -1762,13 +1661,168 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
                      */
                     throw new Exception(t);
                     
-                } finally {
-
-                    barrierLock.unlock();
-
-                }
+                 }
                 
             }
+
+            /**
+             * Check various conditions that need to be true.
+             * <p>
+             * Note: We do this once before we take the barrier lock and once
+             * after. We need to do this before we take the barrier lock to
+             * avoid a distributed deadlock when a service is attempting to do
+             * runWithBarrierLock() to join concurrent with the GATHER of a
+             * 2-phase commit. We do it after we take the barrier lock to ensure
+             * that the conditions are still satisified - they are all light
+             * weight tests, but the conditions could become invalidated so it
+             * does not hurt to check again.
+             */
+            private void preconditionTest() {
+            
+                final long token = req.token();
+
+                /*
+                 * we do not need to handle the case where the token is
+                 * invalid. The leader will reset() the CylicBarrier for
+                 * this case.
+                 */
+
+                // Verify quorum valid for token (implies leader valid)
+                getQuorum().assertQuorum(token);
+
+                // Verify this service is HAReady for token.
+                assertHAReady(token);
+
+                /*
+                 * If the quorumService is null because this service is
+                 * shutting down then the leader will notice the
+                 * serviceLeave() and reset() the CyclicBarrier.
+                 */
+                final QuorumService<HAGlue> quorumService = getQuorum()
+                        .getClient();
+
+//                /*
+//                 * This timestamp is used to help detect clock skew.
+//                 */
+//                now = newConsensusProtocolTimestamp();
+
+                /*
+                 * Note: At this point we have everything we need to form up
+                 * our response. If we hit an assertion, we will still
+                 * respond in the finally {} block below.
+                 */
+
+                /*
+                 * Note: This assert has been moved to the leader when it
+                 * analyzes the messages from the followers. This allows us
+                 * to report out the nature of the exception on the leader
+                 * and thence back to the client.
+                 */
+//                /* Verify event on leader occurs before event on follower.
+//                 */
+//                assertBefore(req.getTimestampOnLeader(), now);
+
+                if (!quorumService.isFollower(token))
+                    throw new QuorumException();
+
+                final long localCommitCounter = getRootBlockView()
+                        .getCommitCounter();
+                
+                if (req.getNewCommitCounter() != localCommitCounter + 1) {
+                    throw new RuntimeException(
+                            "leader is preparing for commitCounter="
+                                    + req.getNewCommitCounter()
+                                    + ", but follower is at localCommitCounter="
+                                    + localCommitCounter);
+                }
+
+            }
+            
+            /**
+             * This code is MUTEX with runWithBarrierLock() in HAJournalServer's
+             * doCastLeadersVoteAndJoin().
+             */
+            private IHANotifyReleaseTimeResponse doRunWithBarrierLock()
+                    throws Exception {
+
+                final IHANotifyReleaseTimeRequest req2 = newHANotifyReleaseTimeRequest(
+                        serviceId, req.getNewCommitCounter(),
+                        req.getNewCommitTime());
+
+                /*
+                 * RMI to leader.
+                 * 
+                 * Note: Will block until barrier breaks on the leader.
+                 */
+
+                didNotifyLeader = true;
+
+                final IHANotifyReleaseTimeResponse consensusReleaseTime = leader
+                        .notifyEarliestCommitTime(req2);
+
+                /*
+                 * Now spot check the earliest active tx on this follower. We
+                 * want to make sure that this tx is not reading against a
+                 * commit point whose state would be released by the new
+                 * [consensusReleaseTime] that we just obtained from the leader.
+                 * 
+                 * If everything is Ok, we update the releaseTime on the
+                 * follower.
+                 */
+
+                lock.lock();
+
+                try {
+
+                    if (log.isInfoEnabled())
+                        log.info("Validating consensus releaseTime on follower: consensus="
+                                + consensusReleaseTime);
+
+                    // the earliest active tx on this follower.
+                    final TxState txState = getEarliestActiveTx();
+
+                    // Consensus for new earliest visible commit time.
+                    final long t2 = consensusReleaseTime.getCommitTime();
+
+                    if (txState != null && txState.getReadsOnCommitTime() < t2) {
+
+                        /*
+                         * At least one transaction exists on the follower that
+                         * is reading on a commit point LT the commit point
+                         * which would be released. This is either a failure in
+                         * the logic to compute the consensus releaseTime or a
+                         * failure to exclude new transaction starts on the
+                         * follower while computing the new consensus
+                         * releaseTime.
+                         */
+
+                        throw new AssertionError(
+                                "The releaseTime consensus would release a commit point with active readers"
+                                        + ": consensus=" + consensusReleaseTime
+                                        + ", earliestActiveTx=" + txState);
+
+                    }
+
+                    final long newReleaseTime = Math.max(0L,
+                            consensusReleaseTime.getCommitTime() - 1);
+
+                    if (log.isInfoEnabled())
+                        log.info("Advancing releaseTime on follower: "
+                                + newReleaseTime);
+
+                    // Update the releaseTime on the follower
+                    setReleaseTime(newReleaseTime);
+
+                } finally {
+
+                    lock.unlock();
+
+                }
+
+                // Done.
+                return consensusReleaseTime;
+
+            } // doRunWithBarrierLock
 
         } // GatherTask
         

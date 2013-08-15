@@ -5528,7 +5528,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                         // Remote interface for the quorum leader.
                         final HAGlue leader = localService.getLeader(newValue);
 
-                        log.info("Fetching root block from leader.");
+                        haLog.info("Fetching root block from leader.");
                         final IRootBlockView leaderRB;
                         try {
                             leaderRB = leader
@@ -5622,8 +5622,8 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                      *      commits</a>
                      */
 
-                    if (log.isInfoEnabled())
-                        log.info("Calling localAbort if NOT didJoinMetQuorum: "
+                    if (haLog.isInfoEnabled())
+                        haLog.info("Calling localAbort if NOT didJoinMetQuorum: "
                                 + transitionState.didJoinMetQuorum);
 
                     if (!transitionState.didJoinMetQuorum) {
@@ -5676,7 +5676,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
             lock.unlock();
             
         }
-        
+        if(haLog.isInfoEnabled()) haLog.info("done: token="+quorumToken+", HAReady="+haReadyToken+", HAStatus="+haStatus);
     }
     private final Condition haReadyCondition = _fieldReadWriteLock.writeLock().newCondition();
     private volatile long haReadyToken = Quorum.NO_QUORUM;
