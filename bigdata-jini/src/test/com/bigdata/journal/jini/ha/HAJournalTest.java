@@ -35,6 +35,7 @@ import java.security.NoSuchAlgorithmException;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.BrokenBarrierException;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
@@ -83,6 +84,7 @@ import com.bigdata.ha.msg.IHAWriteMessage;
 import com.bigdata.ha.msg.IHAWriteSetStateRequest;
 import com.bigdata.ha.msg.IHAWriteSetStateResponse;
 import com.bigdata.journal.AbstractJournal;
+import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.jini.ha.HAJournalServer.HAQuorumService;
 import com.bigdata.quorum.AsynchronousQuorumCloseException;
@@ -115,7 +117,65 @@ public class HAJournalTest extends HAJournal {
         return new HAGlueTestImpl(serviceId);
 
     }
+    
+    /**
+     * Utility accessible for HAGlueTest methods and public static for
+     * test purposes.
+     * 
+     * TODO This should use a one-up counter within the service and write
+     * the thread dump into a file named by that counter. It shoudl include
+     * the datetime stamp in the file contents.  It should log @ ERROR that
+     * a thread dump was written and include the name of the file.
+     */
+	static public void dumpThreads() {
 
+		final StringBuilder sb = new StringBuilder();
+		
+		final Map<Thread, StackTraceElement[]> dump = Thread
+				.getAllStackTraces();
+		
+		for (Map.Entry<Thread, StackTraceElement[]> threadEntry : dump
+				.entrySet()) {
+			final Thread thread = threadEntry.getKey();
+			sb.append("THREAD#" + thread.getId() + ", " + thread.getName() + "\n");
+			for (StackTraceElement elem : threadEntry.getValue()) {
+				sb.append("\t" + elem.toString() + "\n");
+			}
+			
+		}
+		
+		log.warn("THREAD DUMP\n" + sb.toString());
+	}
+
+	public interface IIndexManagerCallable<T> extends Callable<T>{
+
+	    /**
+	     * Invoked before the task is executed to provide a reference to the
+	     * {@link IIndexManager} on which it is executing.
+	     * 
+	     * @param indexManager
+	     *            The index manager on the service.
+	     * 
+	     * @throws IllegalArgumentException
+	     *             if the argument is <code>null</code>
+	     * @throws IllegalStateException
+	     *             if {@link #setIndexManager(IIndexManager)} has already been
+	     *             invoked and was set with a different value.
+	     */
+	    void setIndexManager(IIndexManager indexManager);
+	    
+	    /**
+	     * Return the {@link IIndexManager}.
+	     * 
+	     * @return The data service and never <code>null</code>.
+	     * 
+	     * @throws IllegalStateException
+	     *             if {@link #setIndexManager(IIndexManager)} has not been invoked.
+	     */
+	    IIndexManager getIndexManager();
+	    
+	}
+	
     /**
      * A {@link Remote} interface for new methods published by the service.
      */
@@ -212,11 +272,31 @@ public class HAJournalTest extends HAJournal {
          */
         public void setNextTimestamp(long nextTimestamp) throws IOException;
         
+        /**
+         * Enable remote lpgging of JVM thread state.
+         */
+        public void dumpThreads() throws IOException;
+        
+        /**
+         * Run the caller's task on the service.
+         * 
+         * @param callable
+         *            The task to run on the service.
+         * @param asyncFuture
+         *            <code>true</code> if the task will execute asynchronously
+         *            and return a {@link Future} for the computation that may
+         *            be used to inspect and/or cancel the computation.
+         *            <code>false</code> if the task will execute synchronously
+         *            and return a thick {@link Future}.
+         */
+        public <T> Future<T> submit(IIndexManagerCallable<T> callable,
+                boolean asyncFuture) throws IOException;
+
     }
 
     /**
      * Identifies a method to be failed and tracks the #of invocations of that
-     * methosuper.
+     * method.
      */
     private static class MethodData {
         @SuppressWarnings("unused")
@@ -939,6 +1019,26 @@ public class HAJournalTest extends HAJournal {
             super.shutdown();
 
         }
+
+		@Override
+		public void dumpThreads() {
+			HAJournalTest.dumpThreads();
+		}
+
+        @Override
+        public <T> Future<T> submit(final IIndexManagerCallable<T> callable,
+                final boolean asyncFuture) throws IOException {
+
+            callable.setIndexManager(getIndexManager());
+
+            final Future<T> ft = getIndexManager().getExecutorService().submit(
+                    callable);
+
+            return getProxy(ft, asyncFuture);
+
+        }
+
+        // @Override
 
     } // class HAGlueTestImpl
 
