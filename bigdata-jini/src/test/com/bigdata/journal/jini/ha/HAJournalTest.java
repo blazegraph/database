@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.journal.jini.ha;
 
 import java.io.IOException;
+import java.io.Serializable;
 import java.lang.reflect.Method;
 import java.net.InetSocketAddress;
 import java.rmi.Remote;
@@ -147,7 +148,7 @@ public class HAJournalTest extends HAJournal {
 		log.warn("THREAD DUMP\n" + sb.toString());
 	}
 
-	public interface IIndexManagerCallable<T> extends Callable<T>{
+	public interface IIndexManagerCallable<T> extends Serializable, Callable<T> {
 
 	    /**
 	     * Invoked before the task is executed to provide a reference to the
@@ -174,6 +175,36 @@ public class HAJournalTest extends HAJournal {
 	     */
 	    IIndexManager getIndexManager();
 	    
+	}
+	
+	@SuppressWarnings("serial")
+	static public abstract class IndexManagerCallable<T> implements IIndexManagerCallable<T> {
+	    private static final Logger log = Logger.getLogger(HAJournal.class);
+
+	    private transient IIndexManager indexManager;
+		
+		public IndexManagerCallable() {
+			
+		}
+		
+	    public void setIndexManager(IIndexManager indexManager) {
+	    	this.indexManager = indexManager;
+	    }
+	    
+	    /**
+	     * Return the {@link IIndexManager}.
+	     * 
+	     * @return The data service and never <code>null</code>.
+	     * 
+	     * @throws IllegalStateException
+	     *             if {@link #setIndexManager(IIndexManager)} has not been invoked.
+	     */
+	    public IIndexManager getIndexManager() {
+	    	if (indexManager == null)
+	    		throw new IllegalStateException();
+	    	
+	    	return indexManager;
+	    }
 	}
 	
     /**

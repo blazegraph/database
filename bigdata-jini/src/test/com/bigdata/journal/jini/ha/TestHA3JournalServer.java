@@ -264,6 +264,8 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
          * can not reliably predict whether or not the quorum was fully met at
          * the 2-phase commit.
          */
+        
+        
     }
 
     /**
