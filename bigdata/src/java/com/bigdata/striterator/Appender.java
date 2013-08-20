@@ -42,21 +42,33 @@ public class Appender<I extends Iterator<E>,E> implements IFilter<I,E,E> {
 
     private static final long serialVersionUID = 1307691066685808103L;
 
-    private final I itr2;
-    
-    public Appender(I itr2) {
+    private final int chunkSize;
+    private final I src2;
 
-        if (itr2 == null)
-            throw new IllegalArgumentException();
-        
-        this.itr2 = itr2;
+    public Appender(final I src2) {
+
+        this(IChunkedIterator.DEFAULT_CHUNK_SIZE, src2);
 
     }
 
-    @SuppressWarnings("unchecked")
-    public I filter(I src) {
+    public Appender(final int chunkSize, final I src2) {
 
-        return (I) new AppendingIterator(src, this);
+        if (chunkSize <= 0)
+            throw new IllegalArgumentException();
+
+        if (src2 == null)
+            throw new IllegalArgumentException();
+
+        this.chunkSize = chunkSize;
+
+        this.src2 = src2;
+
+    }
+
+    @SuppressWarnings({ "rawtypes", "unchecked" })
+    public I filter(final I src) {
+
+        return (I) new AppendingIterator(chunkSize, src, src2);
 
     }
 
@@ -68,32 +80,35 @@ public class Appender<I extends Iterator<E>,E> implements IFilter<I,E,E> {
      * @param <I>
      * @param <E>
      */
-    private static class AppendingIterator<I extends Iterator<E>, E> implements
-            Iterator<E> {
+    private static class AppendingIterator<I extends Iterator<E>, E>
+            implements IChunkedIterator<E> {
+
+        private final int chunkSize;
+        private final I src1;
+        private final I src2;
 
         /**
          * Initially set to the value supplied to the ctor. When that source is
-         * exhausted, this is set to {@link Appender#itr2}. When the second
-         * source is exhausted then the total iterator is exhausted.
+         * exhausted, this is set to {@link #src2}. When the second source is
+         * exhausted then the total iterator is exhausted.
          */
         private I src;
 
         private boolean firstSource = true;
 
-        private final Appender<I, E> filter;
+        public AppendingIterator(final int chunkSize, final I src, final I src2) {
 
-        /**
-         * @param src
-         * @param filter
-         */
-        public AppendingIterator(I src, Appender<I, E> filter) {
-
+            this.chunkSize = chunkSize;
+            
             this.src = src;
+            
+            this.src1 = src;
 
-            this.filter = filter;
-
+            this.src2 = src2;
+            
         }
 
+        @Override
         public boolean hasNext() {
 
             if (src == null) {
@@ -109,8 +124,9 @@ public class Appender<I extends Iterator<E>,E> implements IFilter<I,E,E> {
             if (firstSource) {
 
                 // start on the 2nd source.
-                src = filter.itr2;
-
+                src = src2;
+                firstSource = false;
+                
             } else {
 
                 // exhausted.
@@ -122,6 +138,7 @@ public class Appender<I extends Iterator<E>,E> implements IFilter<I,E,E> {
 
         }
 
+        @Override
         public E next() {
 
             if (src == null)
@@ -132,6 +149,7 @@ public class Appender<I extends Iterator<E>,E> implements IFilter<I,E,E> {
 
         }
 
+        @Override
         public void remove() {
 
             if (src == null)
@@ -139,6 +157,84 @@ public class Appender<I extends Iterator<E>,E> implements IFilter<I,E,E> {
 
             src.remove();
 
+        }
+
+        @Override
+        public void close() {
+
+            // exhausted.
+            src = null;
+            
+            if (src1 instanceof ICloseableIterator) {
+
+                ((ICloseableIterator<?>) src1).close();
+
+            }
+
+            if (src2 instanceof ICloseableIterator) {
+
+                ((ICloseableIterator<?>) src2).close();
+
+            }
+
+        }
+
+        /**
+         * The next chunk of elements in whatever order they were visited by
+         * {@link #next()}.
+         */
+        @Override
+        @SuppressWarnings("unchecked")
+        public E[] nextChunk() {
+
+            if (!hasNext()) {
+
+                throw new NoSuchElementException();
+
+            }
+
+            int n = 0;
+
+            E[] chunk = null;
+            
+            while (hasNext() && n < chunkSize) {
+
+                final E t = next();
+
+                if (chunk == null) {
+
+                    /*
+                     * Dynamically instantiation an array of the same component
+                     * type as the objects that we are visiting.
+                     */
+
+                    chunk = (E[]) java.lang.reflect.Array.newInstance(t
+                            .getClass(), chunkSize);
+
+                }
+
+                // add to this chunk.
+                chunk[n++] = t;
+
+            }
+
+            if (n != chunkSize) {
+
+                // make it dense.
+
+                final E[] tmp = (E[]) java.lang.reflect.Array.newInstance(
+//                        chunk[0].getClass(),
+                        chunk.getClass().getComponentType(),//
+                        n);
+                
+                System.arraycopy(chunk, 0, tmp, 0, n);
+                
+                chunk = tmp;
+             
+            }
+            
+            return chunk;
+            
         }
 
     }
