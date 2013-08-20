@@ -61,7 +61,9 @@ public class TestAll extends TestCase {
         final TestSuite suite = new TestSuite("striterators");
    
         suite.addTestSuite(TestMergeFilter.class);
-        
+
+        suite.addTestSuite(TestAppendFilter.class);
+
         suite.addTestSuite(TestPushbackIterator.class);
         
         suite.addTestSuite(TestResolver.class);

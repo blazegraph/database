@@ -106,6 +106,7 @@ public class Striterator<I extends Iterator<E>, E> implements IStriterator<I,E> 
 
     }
 
+    @Override
     @SuppressWarnings("unchecked")
     public IStriterator<I, E> addFilter(final IFilter<I, ?, E> filter) {
 
@@ -115,6 +116,7 @@ public class Striterator<I extends Iterator<E>, E> implements IStriterator<I,E> 
 
     }
 
+    @Override
     public IStriterator<I, E> addInstanceOfFilter(final Class<E> cls) {
 
         return addFilter(new Filter<I, E>(cls) {
@@ -132,7 +134,8 @@ public class Striterator<I extends Iterator<E>, E> implements IStriterator<I,E> 
         
     }
 
-    public IStriterator<I, E> append(I src) {
+    @Override
+    public IStriterator<I, E> append(final I src) {
 
         return addFilter(new Appender<I, E>(src));
         
@@ -148,38 +151,42 @@ public class Striterator<I extends Iterator<E>, E> implements IStriterator<I,E> 
      */
     public IStriterator<I,E> exclude(Set<E> set) {
         // TODO Auto-generated method stub
-        return null;
+        throw new UnsupportedOperationException();
     }
 
     // @todo use temporary store for scalable set to filter the instances.
     public IStriterator<I,E> makeUnique() {
         // TODO Auto-generated method stub
-        return null;
+        throw new UnsupportedOperationException();
     }
 
     public IStriterator<I,E> map(Object client, Method method) {
         // TODO Auto-generated method stub
-        return null;
+        throw new UnsupportedOperationException();
     }
 
+    @Override
     final public boolean hasMoreElements() {
 
         return src.hasNext();
         
     }
 
+    @Override
     final public E nextElement() {
         
         return src.next();
         
     }
     
+    @Override
     final public boolean hasNext() {
 
         return src.hasNext();
         
     }
 
+    @Override
     final public E next() {
         
         return src.next();

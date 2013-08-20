@@ -88,23 +88,26 @@ public class ChunkedStriterator<I extends IChunkedIterator<E>, E> extends
         
     }
 
+    @Override
     final public E[] nextChunk() {
 
         return src.nextChunk();
         
     }
 
+    @Override
     final public void close() {
 
-        src.close();
-        
+        ((ICloseableIterator<?>) src).close();
+
     }
 
     /**
      * Strengthened return type.
      */
-    public IChunkedStriterator<I, E> addFilter(IFilter<I, ?, E> filter) {
-        
+    @Override
+    public IChunkedStriterator<I, E> addFilter(final IFilter<I, ?, E> filter) {
+
         return (IChunkedStriterator<I, E>) super.addFilter(filter);
         
     }
