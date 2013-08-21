@@ -25,9 +25,11 @@ package com.bigdata.ha;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.Serializable;
 import java.rmi.Remote;
 import java.security.DigestException;
 import java.security.NoSuchAlgorithmException;
+import java.util.concurrent.Callable;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -46,6 +48,7 @@ import com.bigdata.ha.msg.IHASnapshotDigestResponse;
 import com.bigdata.ha.msg.IHASnapshotRequest;
 import com.bigdata.ha.msg.IHASnapshotResponse;
 import com.bigdata.journal.AbstractJournal;
+import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.jini.ha.HAJournalServer;
 import com.bigdata.quorum.AsynchronousQuorumCloseException;
 import com.bigdata.quorum.QuorumException;
@@ -296,4 +299,50 @@ public interface HAGlue extends HAGlueBase, HAPipelineGlue, HAReadGlue,
     Future<Void> rebuildFromLeader(IHARemoteRebuildRequest req)
             throws IOException;
 
+
+    /**
+     * Run the caller's task on the service.
+     * 
+     * @param callable
+     *            The task to run on the service.
+     * @param asyncFuture
+     *            <code>true</code> if the task will execute asynchronously
+     *            and return a {@link Future} for the computation that may
+     *            be used to inspect and/or cancel the computation.
+     *            <code>false</code> if the task will execute synchronously
+     *            and return a thick {@link Future}.
+     */
+    public <T> Future<T> submit(IIndexManagerCallable<T> callable,
+            boolean asyncFuture) throws IOException;
+
+
+	public interface IIndexManagerCallable<T> extends Serializable, Callable<T> {
+
+	    /**
+	     * Invoked before the task is executed to provide a reference to the
+	     * {@link IIndexManager} on which it is executing.
+	     * 
+	     * @param indexManager
+	     *            The index manager on the service.
+	     * 
+	     * @throws IllegalArgumentException
+	     *             if the argument is <code>null</code>
+	     * @throws IllegalStateException
+	     *             if {@link #setIndexManager(IIndexManager)} has already been
+	     *             invoked and was set with a different value.
+	     */
+	    void setIndexManager(IIndexManager indexManager);
+	    
+	    /**
+	     * Return the {@link IIndexManager}.
+	     * 
+	     * @return The data service and never <code>null</code>.
+	     * 
+	     * @throws IllegalStateException
+	     *             if {@link #setIndexManager(IIndexManager)} has not been invoked.
+	     */
+	    IIndexManager getIndexManager();
+	    
+	}
+	
 }

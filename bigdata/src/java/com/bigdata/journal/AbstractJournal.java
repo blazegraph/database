@@ -105,6 +105,7 @@ import com.bigdata.ha.PrepareRequest;
 import com.bigdata.ha.PrepareResponse;
 import com.bigdata.ha.QuorumService;
 import com.bigdata.ha.RunState;
+import com.bigdata.ha.HAGlue.IIndexManagerCallable;
 import com.bigdata.ha.msg.HANotifyReleaseTimeResponse;
 import com.bigdata.ha.msg.HAReadResponse;
 import com.bigdata.ha.msg.HARootBlockRequest;
@@ -7732,6 +7733,20 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
             AbstractJournal.this.destroy();
             
         }
+
+        @Override
+        public <T> Future<T> submit(final IIndexManagerCallable<T> callable,
+                final boolean asyncFuture) throws IOException {
+
+            callable.setIndexManager(getIndexManager());
+
+            final Future<T> ft = getIndexManager().getExecutorService().submit(
+                    callable);
+
+            return getProxy(ft, asyncFuture);
+
+        }
+
 
 	};
 
