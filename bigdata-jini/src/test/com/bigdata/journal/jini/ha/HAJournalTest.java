@@ -148,65 +148,6 @@ public class HAJournalTest extends HAJournal {
 		log.warn("THREAD DUMP\n" + sb.toString());
 	}
 
-	public interface IIndexManagerCallable<T> extends Serializable, Callable<T> {
-
-	    /**
-	     * Invoked before the task is executed to provide a reference to the
-	     * {@link IIndexManager} on which it is executing.
-	     * 
-	     * @param indexManager
-	     *            The index manager on the service.
-	     * 
-	     * @throws IllegalArgumentException
-	     *             if the argument is <code>null</code>
-	     * @throws IllegalStateException
-	     *             if {@link #setIndexManager(IIndexManager)} has already been
-	     *             invoked and was set with a different value.
-	     */
-	    void setIndexManager(IIndexManager indexManager);
-	    
-	    /**
-	     * Return the {@link IIndexManager}.
-	     * 
-	     * @return The data service and never <code>null</code>.
-	     * 
-	     * @throws IllegalStateException
-	     *             if {@link #setIndexManager(IIndexManager)} has not been invoked.
-	     */
-	    IIndexManager getIndexManager();
-	    
-	}
-	
-	@SuppressWarnings("serial")
-	static public abstract class IndexManagerCallable<T> implements IIndexManagerCallable<T> {
-	    private static final Logger log = Logger.getLogger(HAJournal.class);
-
-	    private transient IIndexManager indexManager;
-		
-		public IndexManagerCallable() {
-			
-		}
-		
-	    public void setIndexManager(IIndexManager indexManager) {
-	    	this.indexManager = indexManager;
-	    }
-	    
-	    /**
-	     * Return the {@link IIndexManager}.
-	     * 
-	     * @return The data service and never <code>null</code>.
-	     * 
-	     * @throws IllegalStateException
-	     *             if {@link #setIndexManager(IIndexManager)} has not been invoked.
-	     */
-	    public IIndexManager getIndexManager() {
-	    	if (indexManager == null)
-	    		throw new IllegalStateException();
-	    	
-	    	return indexManager;
-	    }
-	}
-	
     /**
      * A {@link Remote} interface for new methods published by the service.
      */
@@ -308,21 +249,6 @@ public class HAJournalTest extends HAJournal {
          */
         public void dumpThreads() throws IOException;
         
-        /**
-         * Run the caller's task on the service.
-         * 
-         * @param callable
-         *            The task to run on the service.
-         * @param asyncFuture
-         *            <code>true</code> if the task will execute asynchronously
-         *            and return a {@link Future} for the computation that may
-         *            be used to inspect and/or cancel the computation.
-         *            <code>false</code> if the task will execute synchronously
-         *            and return a thick {@link Future}.
-         */
-        public <T> Future<T> submit(IIndexManagerCallable<T> callable,
-                boolean asyncFuture) throws IOException;
-
     }
 
     /**

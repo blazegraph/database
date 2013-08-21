@@ -244,7 +244,7 @@ public class AbstractHA3JournalServerTestCase extends
     /**
      * The zpath of the logical service.
      */
-    private String logicalServiceZPath = null;
+    protected String logicalServiceZPath = null;
     
     @Override
     protected void setUp() throws Exception {
@@ -305,7 +305,7 @@ public class AbstractHA3JournalServerTestCase extends
                 null/* serviceDiscoveryListener */, cacheMissTimeout);
 
         // Setup quorum client.
-        quorum = newQuourm();
+        quorum = newQuorum();
         
     }
     
@@ -1076,7 +1076,7 @@ public class AbstractHA3JournalServerTestCase extends
      * @throws InterruptedException 
      * @throws KeeperException 
      */
-    protected Quorum<HAGlue, QuorumClient<HAGlue>> newQuourm()
+    protected Quorum<HAGlue, QuorumClient<HAGlue>> newQuorum()
             throws ConfigurationException, InterruptedException,
             KeeperException {
 
