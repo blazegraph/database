@@ -1,0 +1,8 @@
+prefix : <http://www.bigdata.com/> 
+prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> 
+
+select ?g where { 
+  { select distinct ?g 
+    { graph ?g { ?s ?p ?o } }
+  }
+}
