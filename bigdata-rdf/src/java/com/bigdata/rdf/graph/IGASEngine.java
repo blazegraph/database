@@ -1,9 +1,9 @@
 package com.bigdata.rdf.graph;
 
 import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
 
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
  * 
@@ -26,12 +26,7 @@ import com.bigdata.rdf.store.AbstractTripleStore;
  *            {@link IGASProgram}. This would allow us to reuse resources within
  *            the {@link IGASEngine}.
  */
-public interface IGASEngine<VS, ES, ST> extends Callable<Void> {
-
-    /**
-     * Return the graph.
-     */
-    AbstractTripleStore getKB();
+public interface IGASEngine<VS, ES, ST> extends Callable<IGASStats> {
 
     /**
      * Return the program that is being evaluated.
@@ -67,8 +62,13 @@ public interface IGASEngine<VS, ES, ST> extends Callable<Void> {
     /**
      * Execute one iteration.
      * 
+     * @param stats
+     *            Used to report statistics about the execution of the
+     *            algorithm.
+     * 
      * @return true iff the new frontier is empty.
      */
-    boolean doRound();
-    
+    boolean doRound(IGASStats stats) throws Exception, ExecutionException,
+            InterruptedException;
+
 }

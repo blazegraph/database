@@ -37,10 +37,11 @@ public class SSSP implements IGASProgram<SSSP.VS, SSSP.ES, Integer/* dist */> {
     /**
      * The length of an edge.
      * 
-     * FIXME This should be modified to use link weights with RDR. We need a
-     * pattern to get the link attributes materialized with the {@link ISPO} for
-     * the link. That could be done using a read-ahead filter on the striterator
-     * if the link weights are always clustered with the ground triple.
+     * FIXME RDR: This should be modified to use link weights with RDR. We need
+     * a pattern to get the link attributes materialized with the {@link ISPO}
+     * for the link. That could be done using a read-ahead filter on the
+     * striterator if the link weights are always clustered with the ground
+     * triple.
      * 
      * When we make this change, the distance should be of the same type as the
      * link weight or generalized as <code>double</code>.

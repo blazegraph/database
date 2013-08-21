@@ -23,6 +23,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.rdf.graph.analytics;
 
+import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.rdf.graph.AbstractGraphTestCase;
 import com.bigdata.rdf.graph.IGASEngine;
@@ -50,7 +51,8 @@ public class TestSSSP extends AbstractGraphTestCase {
         final SmallGraphProblem p = setupSmallGraphProblem();
 
         final IGASEngine<SSSP.VS, SSSP.ES, Integer> gasEngine = new GASEngine<SSSP.VS, SSSP.ES, Integer>(
-                sail.getDatabase(), new SSSP());
+                sail.getDatabase().getIndexManager(), sail.getDatabase()
+                        .getNamespace(), ITx.READ_COMMITTED, new SSSP());
 
         // Initialize the froniter.
         gasEngine.init(p.mike.getIV());
