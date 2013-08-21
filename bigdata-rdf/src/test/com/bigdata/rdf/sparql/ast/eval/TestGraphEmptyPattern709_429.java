@@ -60,6 +60,16 @@ public class TestGraphEmptyPattern709_429 extends AbstractDataDrivenSPARQLTestCa
         new TestHelper("trac429").runTest();
 
     }
+    public void test_notgraph_uri() throws Exception {
+
+        new TestHelper("trac429neg").runTest();
+
+    }
+    public void test_work_empty_graph_matches_by_uri() throws Exception {
+
+        new TestHelper("trac429empty", "trac429.rq", "trac429empty.trig", "trac429.srx").runTest();
+
+    }
     public void test_work_around_graph_var() throws Exception {
 
         new TestHelper("trac709workaround", "trac709workaround.rq", "trac709.trig", "trac709.srx").runTest();
