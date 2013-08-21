@@ -51,6 +51,7 @@ import org.semanticweb.yars.nx.Node;
 import org.semanticweb.yars.nx.parser.NxParser;
 
 import com.bigdata.rdf.internal.ILexiconConfiguration;
+import com.bigdata.util.InnerCause;
 
 /**
  * A wrapper for an {@link NxParser} which implements the {@link RDFParser}
@@ -204,6 +205,9 @@ public class NQuadsParser extends RDFParserBase implements RDFParser  {
          * corresponding character sequences.
          */
         
+        /*
+         * Note: Will throw NPE if the Literal could not be parsed.
+         */
         final String label = lit.getUnescapedData();
 
         final String languageTag = lit.getLanguageTag();
@@ -314,6 +318,8 @@ public class NQuadsParser extends RDFParserBase implements RDFParser  {
         
         while (parser.hasNext()) {
 
+            try {
+            
             final Node[] nodes = parser.next();
 
             if (nodes.length != 3 && nodes.length != 4)
@@ -365,10 +371,55 @@ public class NQuadsParser extends RDFParserBase implements RDFParser  {
             final Statement stmt = f.createStatement(s, p, o, c);
 
             handler.handleStatement(stmt);
+            
+            } catch(Throwable t) {
+
+                /*
+                 * Conditionally wrap and rethrow the exception unless
+                 * stopAtFirstError:=false.
+                 */
+                launderThrowable(t);
+
+                // Do not stop at the first error.
+                log.warn("Continuing: " + t);
+
+            }
 
         }
 
         handler.endRDF();
+        
+    }
+
+    /**
+     * Conditionally wrap and rethrow the exception unless
+     * <code>stopAtFirstError:=false</code>.
+     */
+    private void launderThrowable(final Throwable t) {
+
+        if (InnerCause.isInnerCause(t, InterruptedException.class)) {
+
+            // Do not intercept an interrupt.
+            throw new RuntimeException(t);
+ 
+        }
+
+        if (!getParserConfig().stopAtFirstError()) {
+
+            log.warn("Continuing: " + t, t);
+
+            return;
+            
+        }
+
+        if (t instanceof RuntimeException) {
+        
+            // No need to wrap this.
+            throw (RuntimeException) t;
+
+        }
+
+        throw new RuntimeException(t);
         
     }
 
