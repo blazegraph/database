@@ -407,17 +407,21 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
         return serviceDiscoveryManager;
         
     }
+
+    /*
+     * DiscoveryListener
+     */
     
     /**
      * Lock controlling access to the {@link #discoveryEvent} {@link Condition}.
      */
-    protected final ReentrantLock discoveryEventLock = new ReentrantLock();
+    private final ReentrantLock discoveryEventLock = new ReentrantLock();
 
     /**
      * Condition signaled any time there is a {@link DiscoveryEvent} delivered to
      * our {@link DiscoveryListener}.
      */
-    protected final Condition discoveryEvent = discoveryEventLock
+    private final Condition discoveryEvent = discoveryEventLock
             .newCondition();
 
     /**

@@ -24,14 +24,15 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.journal.jini.ha;
 
 import java.rmi.RemoteException;
+import java.util.UUID;
 
+import net.jini.core.lookup.ServiceItem;
 import net.jini.core.lookup.ServiceTemplate;
 import net.jini.lookup.LookupCache;
 import net.jini.lookup.ServiceDiscoveryListener;
 import net.jini.lookup.ServiceDiscoveryManager;
 
 import com.bigdata.ha.HAGlue;
-import com.bigdata.service.IClientService;
 import com.bigdata.service.jini.lookup.AbstractCachingServiceClient;
 
 /**
@@ -70,4 +71,53 @@ public class HAJournalDiscoveryClient extends
 
     }
 
+    /**
+     * Return the proxy for an {@link HAGlue} service from the local cache -or-
+     * the reference to this service if the {@link UUID} identifies this service
+     * (this avoids RMI requests from a service to itself).
+     * 
+     * @param serviceUUID
+     *            The {@link UUID} for the {@link HAGlue} service.
+     * 
+     * @return The proxy or <code>null</code> if the {@link UUID} does not
+     *         identify a known {@link HAGlue} service.
+     * 
+     * @throws IllegalArgumentException
+     *             if <i>serviceUUID</i> is <code>null</code>.
+     */
+    public HAGlue getService(final UUID serviceUUID) {
+
+        /*
+         * Note: I have backed out this optimization as it raises concerns that
+         * code written to assume RMI might rely on the deserialized objects
+         * returned from the proxy being independent of the objects on the
+         * remote service. Since the main optimization of interest is joins, I
+         * will handle this explicitly from within the distributed join logic.
+         */
+//        if (serviceUUID.equals(thisServiceUUID)) {
+//
+//            /*
+//             * Return the actual service reference rather than a proxy to avoid
+//             * RMI when this service makes a request to itself.
+//             */
+//
+//            return (IDataService) thisService;
+//
+//        }
+        
+        final ServiceItem serviceItem = getServiceItem(serviceUUID);
+        
+        if (serviceItem == null) {
+
+            log.error("No such service: uuid=" + serviceUUID);
+
+            return null;
+
+        }
+        
+        // return the data service.
+        return (HAGlue) serviceItem.service;
+        
+    }
+    
 }
