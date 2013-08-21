@@ -50,7 +50,7 @@ public class TestGraphEmptyPattern709_429 extends AbstractDataDrivenSPARQLTestCa
 
     }
 
-    public void test_empty_graph_matches() throws Exception {
+    public void test_empty_graph_does_not_match() throws Exception {
 
         new TestHelper("trac709empty").runTest();
 
@@ -65,9 +65,9 @@ public class TestGraphEmptyPattern709_429 extends AbstractDataDrivenSPARQLTestCa
         new TestHelper("trac429neg").runTest();
 
     }
-    public void test_work_empty_graph_matches_by_uri() throws Exception {
+    public void test_empty_graph_does_not_match_by_uri() throws Exception {
 
-        new TestHelper("trac429empty", "trac429.rq", "trac429empty.trig", "trac429.srx").runTest();
+        new TestHelper("trac429empty", "trac429.rq", "trac429empty.trig", "trac429empty.srx").runTest();
 
     }
     public void test_work_around_graph_var() throws Exception {
