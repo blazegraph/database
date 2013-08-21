@@ -7,10 +7,5 @@
     <variable name="g"/>
    </head>
    <results>
-     <result>
-		<binding name="g">
-			<uri>http://www.bigdata.com/</uri>
-		</binding>
-     </result>
    </results>
 </sparql>
