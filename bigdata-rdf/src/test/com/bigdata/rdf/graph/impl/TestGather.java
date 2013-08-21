@@ -27,6 +27,7 @@ import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
+import com.bigdata.journal.ITx;
 import com.bigdata.rdf.graph.AbstractGraphTestCase;
 import com.bigdata.rdf.graph.EdgesEnum;
 import com.bigdata.rdf.graph.Factory;
@@ -174,7 +175,7 @@ public class TestGather extends AbstractGraphTestCase {
 
     };
     
-    public void testGather_inEdges() {
+    public void testGather_inEdges() throws Exception {
 
         final SmallGraphProblem p = setupSmallGraphProblem();
 
@@ -235,18 +236,21 @@ public class TestGather extends AbstractGraphTestCase {
      * Start on a known vertex. Do one iteration. Verify that the GATHER
      * populated the data structures on the mock object with the appropriate
      * collections.
+     * @throws Exception 
      */
     protected void doGatherTest(final EdgesEnum gatherEdges,
-            final Set<ISPO> expected, final IV startingVertex) {
+            final Set<ISPO> expected, final IV startingVertex) throws Exception {
 
         final IGASEngine<Set<ISPO>, Set<ISPO>, Set<ISPO>> gasEngine = new GASEngine<Set<ISPO>, Set<ISPO>, Set<ISPO>>(
-                sail.getDatabase(), new MockGASProgram(gatherEdges));
+                sail.getDatabase().getIndexManager(), sail.getDatabase()
+                        .getNamespace(), ITx.READ_COMMITTED,
+                new MockGASProgram(gatherEdges));
 
         // Initialize the froniter.
         gasEngine.init(startingVertex);
 
         // Do one round.
-        gasEngine.doRound();
+        gasEngine.doRound(new GASStats());
 
         /*
          * Lookup the state for the starting vertex (this should be the only
