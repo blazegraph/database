@@ -26,9 +26,12 @@ package com.bigdata.rdf.sparql.ast.eval;
 import junit.framework.AssertionFailedError;
 
 /**
- * Test suite for a hesienbug involving BIND.
- * Unlike the other issues this sometimes happens, and is sometimes OK,
- * so we run the test in a loop 20 times.
+ * Test suite for a hesienbug involving BIND. Unlike the other issues this
+ * sometimes happens, and is sometimes OK, so we run the test in a loop 20
+ * times.
+ * 
+ * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/708">
+ *      Heisenbug </a>
  * 
  * @version $Id$
  */
@@ -52,13 +55,40 @@ public class TestBindHeisenbug708 extends AbstractDataDrivenSPARQLTestCase {
         				"heisenbug-708.ttl", // dataURI
         				"heisenbug-708.srx" // resultURI
         				).runTest();
+//        		return; // stop @ success
         	}
         	catch (AssertionFailedError e) {
         		cnt++;
+//        		throw e;// halt @ 1st failure.
         	}
         }
         assertTrue("Test failed " + cnt + "/" + max + " times", cnt==0);
     }
-   
+
+    /**
+     * Demonstrates the same problem using two BIND()s. This rules out the
+     * JOIN as the problem.
+     */
+    public void test_heisenbug708_doubleBind() throws Exception {
+        int cnt = 0;
+        int max = 10;
+        for (int i=0; i<max; i++) {
+            try {
+                new TestHelper(
+                        "heisenbug-708-doubleBind",// testURI
+                        "heisenbug-708-doubleBind.rq", // queryURI
+                        "heisenbug-708-doubleBind.ttl", // dataURI
+                        "heisenbug-708-doubleBind.srx" // resultURI
+                        ).runTest();
+//              return; // stop @ success
+            }
+            catch (AssertionFailedError e) {
+                cnt++;
+//              throw e;// halt @ 1st failure.
+            }
+        }
+        assertTrue("Test failed " + cnt + "/" + max + " times", cnt==0);
+    }
+
     
 }

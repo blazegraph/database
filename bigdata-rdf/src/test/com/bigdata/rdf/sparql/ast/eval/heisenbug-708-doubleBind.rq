@@ -1,0 +1,15 @@
+PREFIX :    <http://example/>
+
+
+SELECT ?a
+{
+  {
+#    ?a :label "RNK-16-2B3"
+    BIND ( :bound2 as ?a )
+  }
+  UNION
+  {
+    BIND ( :bound as ?a )
+  }
+}
+
