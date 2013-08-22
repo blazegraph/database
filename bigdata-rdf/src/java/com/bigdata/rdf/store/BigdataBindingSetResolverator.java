@@ -218,6 +218,9 @@ public class BigdataBindingSetResolverator
 	                    
 	                }
 	                
+	                if (iv.hasValue())
+	                	continue;
+	                
 	                ids.add(iv);
 	
 	            }
@@ -240,6 +243,9 @@ public class BigdataBindingSetResolverator
 	                            + ", " + bindingSet);
 	                    
 	                }
+	                
+	                if (iv.hasValue())
+	                	continue;
 	                
 	                ids.add(iv);
 	                
@@ -350,6 +356,9 @@ public class BigdataBindingSetResolverator
             }
 
             final IV<?,?> iv = (IV<?,?>) boundValue;
+            
+            if (iv.hasValue())
+            	continue;
 
             final BigdataValue value = terms.get(iv);
 
