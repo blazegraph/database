@@ -54,43 +54,26 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 package com.bigdata.rdf.sail.webapp;
 
-import java.io.File;
 
 import junit.framework.Test;
 
-import org.openrdf.model.Literal;
 import org.openrdf.model.Resource;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.model.ValueFactory;
-import org.openrdf.model.impl.LiteralImpl;
 import org.openrdf.model.impl.ValueFactoryImpl;
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
 import org.openrdf.model.vocabulary.XMLSchema;
 import org.openrdf.query.parser.sparql.DC;
 import org.openrdf.query.parser.sparql.FOAF;
-import org.openrdf.query.parser.sparql.SPARQLUpdateTest;
 import org.openrdf.repository.RepositoryException;
-import org.openrdf.rio.RDFFormat;
 
 import com.bigdata.journal.IIndexManager;
-import com.bigdata.rdf.sail.webapp.client.IPreparedTupleQuery;
-import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
-import com.bigdata.rdf.sail.webapp.client.RemoteRepository.AddOp;
 
 /**
  * Proxied test suite.
- * <p>
- * Note: Also see {@link SPARQLUpdateTest}. These two test suites SHOULD be kept
- * synchronized. {@link SPARQLUpdateTest} runs against a local kb instance while
- * this class runs against the NSS. The two test suites are not exactly the same
- * because one uses the {@link RemoteRepository} to commuicate with the NSS
- * while the other uses the local API.
- * 
- * @param <S>
- * 
- * @see SPARQLUpdateTest
+ * We test the behavior reported in trac 727.
  */
 public class TestInsertFilterFalse727<S extends IIndexManager> extends
         AbstractTestNanoSparqlClient<S> {
