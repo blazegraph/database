@@ -91,6 +91,20 @@ import com.sun.jini.start.ServiceDescriptor;
  * that file is passed to {@link #newInstance(String[])}. The configuration must
  * be consistent with the configuration of the federation to which you wish to
  * connect.
+ * <p>
+ * Each HA replication cluster has a logical service identifier. You can use
+ * this to obtain the {@link Quorum} for that cluster. See
+ * {@link HAConnection#getHAGlueQuorum(String)}. Once you have the quorum, you
+ * can get the {@link QuorumClient} and obtain the {@link UUID}s of the leader
+ * and the followers using {@link Quorum#token()},
+ * {@link QuorumClient#getLeader(long)} and {@link Quorum#getJoined()} (which
+ * reports all joined services, including the leader and the followers). You can
+ * then use {@link HAConnection#getHAGlueService(UUID)} to obtain the RMI proxy
+ * for a given service using its service identifier (the UUID).
+ * <p>
+ * Once you have the RMI proxy for the service, you can use the {@link HAGlue}
+ * interface to talk directly to that service. Some methods of interest include
+ * {@link HAGlue#getHAStatus()}, {@link HAGlue#getHostname()}, etc.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
