@@ -37,6 +37,7 @@ import java.util.concurrent.TimeoutException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import org.apache.log4j.Logger;
 import org.apache.zookeeper.KeeperException;
 
 import com.bigdata.ha.HAGlue;
@@ -73,6 +74,8 @@ import com.bigdata.zookeeper.DumpZookeeper;
 public class HAStatusServletUtil {
 
     private static final boolean debug = true;
+    
+    static private final transient Logger log = Logger.getLogger(HAStatusServletUtil.class);
     
     /**
      * Disaster recover of this service from the leader (REBUILD).
@@ -545,20 +548,53 @@ public class HAStatusServletUtil {
                     /*
                      * Ignore. Might not be an HAGlue instance.
                      */
-
+                    
+                    if (log.isInfoEnabled())
+                        log.info(ex, ex);
+                    
                     continue;
 
                 }
 
                 /*
-                 * TODO When there are multiple ethernet interfaces, is not
-                 * necessarily reporting the interface(s) that the port is
-                 * exposed to.
+                 * Do all RMIs to the remote service in a try/catch. This allows
+                 * us to catch problems with communications to the remote
+                 * service and continue to paint the page.
                  */
+                final String hostname;
+                final int nssPort;
+                final InetSocketAddress writePipelineAddr;
+                final String extendedRunState;
+                try {
+                    
+                    hostname = remoteService.getHostname();
 
-                final String hostname = remoteService.getHostname();
+                    /*
+                     * TODO When there are multiple ethernet interfaces, is not
+                     * necessarily reporting the interface(s) that the port is
+                     * exposed to.
+                     */
+                    nssPort = remoteService.getNSSPort();
 
-                final int nssPort = remoteService.getNSSPort();
+                    // address where the downstream service will listen.
+                    writePipelineAddr = remoteService.getWritePipelineAddr();
+
+                    // The AbstractServer and HAQuorumService run states.
+                    extendedRunState = remoteService.getExtendedRunState();
+
+                } catch (IOException ex) {
+
+                    /*
+                     * Note error and continue with the next service.
+                     */
+ 
+                    p.text("Unable to reach service: " + remoteService).close();
+
+                    log.error(ex, ex);
+                    
+                    continue;
+                    
+                }
 
                 final boolean isLeader = serviceId.equals(quorum
                         .getLeaderId());
@@ -569,14 +605,6 @@ public class HAStatusServletUtil {
                         .getServiceId());
 
                 final int pipelineIndex = indexOf(serviceId, pipeline);
-                
-                // address where the downstream service will listen.
-                final InetSocketAddress writePipelineAddr = remoteService
-                        .getWritePipelineAddr();
-
-                // The AbstractServer and HAQuorumService run states.
-                final String extendedRunState = remoteService
-                        .getExtendedRunState();
                 
                 final String nssUrl = "http://" + hostname + ":" + nssPort;
                 
@@ -593,7 +621,6 @@ public class HAStatusServletUtil {
                         + ", service=" + (isSelf ? "self" : "other")//
                         + ", extendedRunState=" + extendedRunState//
                 ).node("br").close();
-
             }
 
             p.close();

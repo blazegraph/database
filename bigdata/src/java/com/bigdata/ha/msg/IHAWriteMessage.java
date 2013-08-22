@@ -70,6 +70,9 @@ public interface IHAWriteMessage extends IHAWriteMessageBase {
     /** The quorum token for which this message is valid. */
     long getQuorumToken();
 
+    /** The replication factor for the quorum leader. */
+    int getReplicationFactor();
+
     /** The length of the backing file on the disk. */
     long getFileExtent();
 

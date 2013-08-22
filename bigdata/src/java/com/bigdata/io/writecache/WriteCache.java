@@ -1632,6 +1632,7 @@ abstract public class WriteCache implements IWriteCache {
             final long lastCommitCounter,//
             final long lastCommitTime,//
             final long sequence,//
+            final int replicationFactor,//
             final ByteBuffer checksumBuffer
             ) {
     	
@@ -1664,7 +1665,8 @@ abstract public class WriteCache implements IWriteCache {
                 sequence, //
                 send.limit(), chksum,
                 prefixWrites ? StoreTypeEnum.RW : StoreTypeEnum.WORM,
-                quorumToken, fileExtent.get(), firstOffset.get(),
+                quorumToken, replicationFactor,
+                fileExtent.get(), firstOffset.get(),
                 compressorKey);
 
         if (log.isTraceEnabled()) {

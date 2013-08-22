@@ -54,6 +54,7 @@ abstract public class AbstractQuorumMember<S extends Remote> extends
 
     }
 
+    @Override
     public S getLeader(final long token) {
         final Quorum<?,?> q = getQuorum();
         q.assertQuorum(token);
@@ -65,8 +66,10 @@ abstract public class AbstractQuorumMember<S extends Remote> extends
         return getService(leaderId);
     }
 
+    @Override
     abstract public S getService(UUID serviceId);
 
+    @Override
     public UUID getServiceId() {
         return serviceId;
     }
@@ -75,6 +78,7 @@ abstract public class AbstractQuorumMember<S extends Remote> extends
      * Return the actor for this {@link QuorumMember} (it is allocated by
      * {@link AbstractQuorum#start(QuorumClient)}).
      */
+    @Override
     public QuorumActor<S, QuorumMember<S>> getActor() {
         // Note: This causes a compiler error on CI builds w/ JDK1.1.6_17.
 //        return (QuorumActor<S, QuorumMember<S>>) getQuorum().getActor();
@@ -212,6 +216,7 @@ abstract public class AbstractQuorumMember<S extends Remote> extends
         getQuorum().assertQuorum(token);
     }
 
+    @Override
     public void assertLeader(final long token) {
         getQuorum().assertLeader(token);
     }
