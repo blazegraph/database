@@ -7,6 +7,7 @@ import com.bigdata.rdf.graph.Factory;
 import com.bigdata.rdf.graph.GASUtil;
 import com.bigdata.rdf.graph.IGASContext;
 import com.bigdata.rdf.graph.IGASProgram;
+import com.bigdata.rdf.graph.impl.GASRunner;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.spo.ISPO;
 
@@ -256,6 +257,24 @@ public class SSSP implements IGASProgram<SSSP.VS, SSSP.ES, Integer/* dist */> {
      * {@link ISPO#s()}. The remote vertex is {@link ISPO#o()}.
      * <p>
      * {@inheritDoc}
+     * 
+     * FIXME Test both variations on a variety of data sets and see which is
+     * better:
+     * 
+     * <p>
+     * Zhisong wrote: In the original GASengine, the scatter operator only need
+     * to access the status of the source: src.changes.
+     * 
+     * To check the status of destination, it needs to load destination data:
+     * dst.dist and edge data: e. And then check if new dist is different from
+     * the old value.
+     * 
+     * Bryan wrote: I will have to think about this more. It sounds like it
+     * depends on the fan-out of the scatter at time t versus the fan-in of the
+     * gather at time t+1. The optimization might only benefit if a reasonable
+     * fraction of the destination vertices wind up NOT being retriggered. I
+     * will try on these variations in the Java code as well. *
+     * </p>
      */
     @Override
     public void scatter(final IGASContext<SSSP.VS, SSSP.ES, Integer> ctx,
@@ -288,6 +307,24 @@ public class SSSP implements IGASProgram<SSSP.VS, SSSP.ES, Integer/* dist */> {
             ctx.schedule(e.o());
 
         }
+
+    }
+
+    /**
+     * Performance test harness.
+     */
+    public static void main(final String[] args) throws Exception {
+
+        new GASRunner<SSSP.VS, SSSP.ES, Integer>(args) {
+
+            @Override
+            protected IGASProgram<SSSP.VS, SSSP.ES, Integer> newGASProgram() {
+
+                return new SSSP();
+
+            }
+
+        }.call();
 
     }
 

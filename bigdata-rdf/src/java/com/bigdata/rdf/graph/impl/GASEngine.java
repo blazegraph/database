@@ -304,7 +304,7 @@ public class GASEngine<VS, ES, ST> implements IGASEngine<VS, ES, ST>,
      * </pre>
      * Parameterize execution runs againt these runtime options!
      */
-    private final int nparallel = 1;
+    private final int nthreads;
 
     /**
      * 
@@ -333,12 +333,16 @@ public class GASEngine<VS, ES, ST> implements IGASEngine<VS, ES, ST>,
      *            through the history index).
      */
     public GASEngine(final IIndexManager indexManager, final String namespace,
-            final long timestamp, final IGASProgram<VS, ES, ST> program) {
+            final long timestamp, final IGASProgram<VS, ES, ST> program,
+            final int nthreads) {
 
         if (indexManager == null)
             throw new IllegalArgumentException();
 
         if (program == null)
+            throw new IllegalArgumentException();
+
+        if (nthreads <= 0)
             throw new IllegalArgumentException();
 
         this.indexManager = indexManager;
@@ -348,6 +352,8 @@ public class GASEngine<VS, ES, ST> implements IGASEngine<VS, ES, ST>,
         this.timestamp = timestamp;
         
         this.program = program;
+        
+        this.nthreads = nthreads;
         
         this.executorService = indexManager.getExecutorService();
         
@@ -926,11 +932,11 @@ public class GASEngine<VS, ES, ST> implements IGASEngine<VS, ES, ST>,
     private Callable<Long> newFrontierStrategy(
             final VertexTaskFactory<Long> taskFactory) {
 
-        if (nparallel == 1)
+        if (nthreads == 1)
             return new RunInCallersThreadFrontierStrategy(taskFactory);
 
         return new LatchedExecutorFrontierStrategy(taskFactory,
-                executorService, nparallel);
+                executorService, nthreads);
 
     }
 
