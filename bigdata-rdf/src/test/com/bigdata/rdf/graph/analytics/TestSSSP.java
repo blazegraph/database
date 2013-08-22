@@ -24,12 +24,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.graph.analytics;
 
 import com.bigdata.journal.ITx;
-import com.bigdata.journal.Journal;
 import com.bigdata.rdf.graph.AbstractGraphTestCase;
 import com.bigdata.rdf.graph.IGASEngine;
-import com.bigdata.rdf.graph.IGASProgram;
 import com.bigdata.rdf.graph.impl.GASEngine;
-import com.bigdata.rdf.graph.impl.PerformanceTest;
 
 /**
  * Test class for SSP traversal.
@@ -52,7 +49,7 @@ public class TestSSSP extends AbstractGraphTestCase {
 
         final IGASEngine<SSSP.VS, SSSP.ES, Integer> gasEngine = new GASEngine<SSSP.VS, SSSP.ES, Integer>(
                 sail.getDatabase().getIndexManager(), sail.getDatabase()
-                        .getNamespace(), ITx.READ_COMMITTED, new SSSP());
+                        .getNamespace(), ITx.READ_COMMITTED, new SSSP(), 1/* nthreads */);
 
         // Initialize the froniter.
         gasEngine.init(p.mike.getIV());
@@ -72,25 +69,6 @@ public class TestSSSP extends AbstractGraphTestCase {
         assertEquals(2, gasEngine.getGASContext().getState(p.martyn.getIV())
                 .dist());
         
-    }
-
-    /**
-     * Test routine to running against a {@link Journal} in which some data set
-     * has already been loaded.
-     */
-    public static void main(final String[] args) throws Exception {
-
-        new PerformanceTest<SSSP.VS, SSSP.ES, Integer>(args) {
-
-            @Override
-            protected IGASProgram<SSSP.VS, SSSP.ES, Integer> newGASProgram() {
-
-                return new SSSP();
-
-            }
-
-        }.call();
-
     }
 
 }

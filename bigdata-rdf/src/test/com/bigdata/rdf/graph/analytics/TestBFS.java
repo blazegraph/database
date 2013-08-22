@@ -24,12 +24,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.graph.analytics;
 
 import com.bigdata.journal.ITx;
-import com.bigdata.journal.Journal;
 import com.bigdata.rdf.graph.AbstractGraphTestCase;
 import com.bigdata.rdf.graph.IGASEngine;
-import com.bigdata.rdf.graph.IGASProgram;
 import com.bigdata.rdf.graph.impl.GASEngine;
-import com.bigdata.rdf.graph.impl.PerformanceTest;
 
 /**
  * Test class for Breadth First Search (BFS) traversal.
@@ -54,7 +51,7 @@ public class TestBFS extends AbstractGraphTestCase {
 
         final IGASEngine<BFS.VS, BFS.ES, Void> gasEngine = new GASEngine<BFS.VS, BFS.ES, Void>(
                 sail.getDatabase().getIndexManager(), sail.getDatabase()
-                        .getNamespace(), ITx.READ_COMMITTED, new BFS());
+                        .getNamespace(), ITx.READ_COMMITTED, new BFS(), 1/* nthreads */);
 
         // Initialize the froniter.
         gasEngine.init(p.mike.getIV());
@@ -76,23 +73,4 @@ public class TestBFS extends AbstractGraphTestCase {
 
     }
     
-    /**
-     * Test routine to running against a {@link Journal} in which some data set
-     * has already been loaded.
-     */
-    public static void main(final String[] args) throws Exception {
-
-        new PerformanceTest<BFS.VS, BFS.ES, Void>(args) {
-
-            @Override
-            protected IGASProgram<BFS.VS, BFS.ES, Void> newGASProgram() {
-
-                return new BFS();
-
-            }
-
-        }.call();
-        
-    }
-
 }

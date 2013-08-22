@@ -81,22 +81,23 @@ public class GASGraphUtil {
     @SuppressWarnings("rawtypes")
     public static IV getRandomVertex(final Random r, final AbstractTripleStore kb) {
     
+        /*
+         * TODO This assumes a local, non-sharded index. The specific
+         * approach to identifying a starting vertex relies on the
+         * ILinearList API. If the caller is specifying the starting vertex
+         * then we do not need to do this.
+         * 
+         * TODO The bias here is towards vertices having more out-edges
+         * and/or attributes since the sample is uniform over the triples in
+         * the index and a triple may be either an edge or an attribute
+         * value (or a link attribute using RDR).
+         */
+        final BTree ndx = (BTree) kb.getSPORelation().getPrimaryIndex();
+
         // Select a random starting vertex.
         IV startingVertex = null;
         {
-            /*
-             * TODO This assumes a local, non-sharded index. The specific
-             * approach to identifying a starting vertex relies on the
-             * ILinearList API. If the caller is specifying the starting vertex
-             * then we do not need to do this.
-             * 
-             * TODO The bias here is towards vertices having more out-edges
-             * and/or attributes since the sample is uniform over the triples in
-             * the index and a triple may be either an edge or an attribute
-             * value (or a link attribute using RDR).
-             */
-            final BTree ndx = (BTree) kb.getSPORelation().getPrimaryIndex();
-    
+
             // Truncate at MAX_INT.
             final int size = (int) Math
                     .min(ndx.rangeCount(), Integer.MAX_VALUE);
@@ -143,8 +144,9 @@ public class GASGraphUtil {
         }
     
         if (startingVertex == null)
-            throw new RuntimeException("No starting vertex");
-    
+            throw new RuntimeException("No starting vertex: nedges="
+                    + ndx.rangeCount());
+
         return startingVertex;
     
     }

@@ -244,7 +244,7 @@ public class TestGather extends AbstractGraphTestCase {
         final IGASEngine<Set<ISPO>, Set<ISPO>, Set<ISPO>> gasEngine = new GASEngine<Set<ISPO>, Set<ISPO>, Set<ISPO>>(
                 sail.getDatabase().getIndexManager(), sail.getDatabase()
                         .getNamespace(), ITx.READ_COMMITTED,
-                new MockGASProgram(gatherEdges));
+                new MockGASProgram(gatherEdges), 1/* nthreads */);
 
         // Initialize the froniter.
         gasEngine.init(startingVertex);
