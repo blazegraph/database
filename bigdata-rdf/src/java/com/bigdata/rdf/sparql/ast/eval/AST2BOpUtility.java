@@ -2243,10 +2243,11 @@ public class AST2BOpUtility extends AST2BOpJoins {
              * Need to make sure the first operator in the group has the right
              * Id.
              */
-            left = new CopyOp(leftOrEmpty(left), NV.asMap(new NV[] {//
-                    new NV(Predicate.Annotations.BOP_ID, subqueryIds[i++]),//
-                    }));
-
+//            left = new CopyOp(leftOrEmpty(left), NV.asMap(new NV[] {//
+//                    new NV(Predicate.Annotations.BOP_ID, subqueryIds[i++]),//
+//                    }));
+            ctx.setNextId(subqueryIds[i++]);
+            
             // Start with everything already known to be materialized.
             final Set<IVariable<?>> tmp = new LinkedHashSet<IVariable<?>>(
                     doneSet);
@@ -2278,11 +2279,12 @@ public class AST2BOpUtility extends AST2BOpJoins {
         /*
          * All the subqueries get routed here when they are done.
          */
-        left = applyQueryHints(new CopyOp(leftOrEmpty(left),//
-                new NV(Predicate.Annotations.BOP_ID, downstreamId),//
-                new NV(BOp.Annotations.EVALUATION_CONTEXT,
-                        BOpEvaluationContext.CONTROLLER)//
-                ), ctx.queryHints);
+//        left = applyQueryHints(new CopyOp(leftOrEmpty(left),//
+//                new NV(Predicate.Annotations.BOP_ID, downstreamId),//
+//                new NV(BOp.Annotations.EVALUATION_CONTEXT,
+//                        BOpEvaluationContext.CONTROLLER)//
+//                ), ctx.queryHints);
+        ctx.setNextId(downstreamId);
 
         // Add in anything which was known materialized for all child groups.
         doneSet.addAll(doneSetsIntersection);
