@@ -228,6 +228,10 @@ public class TestNanoSparqlServerWithProxyIndexManager<S extends IIndexManager>
 
         // BigdataSailRemoteRepository test (nano sparql server client-wrapper)
         suite.addTestSuite(TestBigdataSailRemoteRepository.class);
+        
+        // TestInsertFilterFalse727
+        suite.addTestSuite(TestInsertFilterFalse727.class);
+        
 
         // SPARQL UPDATE test suite.
         switch(testMode) {
