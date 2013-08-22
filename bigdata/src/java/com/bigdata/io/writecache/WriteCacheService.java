@@ -443,6 +443,8 @@ abstract public class WriteCacheService implements IWriteCache {
      */
     final private long quorumToken;
     
+    final private int replicationFactor;
+    
     /**
      * The object which manages {@link Quorum} state changes on the behalf of
      * this service.
@@ -567,8 +569,11 @@ abstract public class WriteCacheService implements IWriteCache {
         // the token under which the write cache service was established.
         if ((this.quorum = quorum) != null) {
             this.quorumToken = quorum.token();
+            this.replicationFactor = quorum.replicationFactor();
         } else {
+            // Not HA.
             this.quorumToken = Quorum.NO_QUORUM;
+            this.replicationFactor = 1;
         }
         
         this.reader = reader;
@@ -1412,6 +1417,7 @@ abstract public class WriteCacheService implements IWriteCache {
                         quorumMember.getLastCommitCounter(),//
                         quorumMember.getLastCommitTime(),//
                         thisSequence,//
+                        replicationFactor,//
                         checksumBuffer
                         );
 

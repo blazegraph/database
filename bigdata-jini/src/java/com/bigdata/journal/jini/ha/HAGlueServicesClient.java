@@ -40,7 +40,7 @@ import com.bigdata.service.jini.lookup.AbstractCachingServiceClient;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
-public class HAJournalDiscoveryClient extends
+public class HAGlueServicesClient extends
         AbstractCachingServiceClient<HAGlue> {
 
     /**
@@ -58,7 +58,7 @@ public class HAJournalDiscoveryClient extends
      * @throws RemoteException
      *             if we could not setup the {@link LookupCache}
      */
-    public HAJournalDiscoveryClient(
+    public HAGlueServicesClient(
             final ServiceDiscoveryManager serviceDiscoveryManager,
             final ServiceDiscoveryListener serviceDiscoveryListener,
             final long cacheMissTimeout)

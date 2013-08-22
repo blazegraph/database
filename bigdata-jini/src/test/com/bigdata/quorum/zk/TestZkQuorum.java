@@ -82,7 +82,10 @@ public class TestZkQuorum extends AbstractZooTestCase {
         zookeeper.create(logicalServiceId, new byte[0], Ids.OPEN_ACL_UNSAFE,
                 CreateMode.PERSISTENT);
 
-        ZKQuorumImpl.setupQuorum(logicalServiceId, zookeeperAccessor, acl);
+        final int replicationFactor = 3;
+        
+        ZKQuorumImpl.setupQuorum(logicalServiceId, replicationFactor,
+                zookeeperAccessor, acl);
 
         dumpZoo(Level.INFO, "setupQuorum", logicalServiceId);
         

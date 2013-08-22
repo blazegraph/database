@@ -858,6 +858,10 @@ public class StatusServlet extends BigdataRDFServlet {
             
             doc.closeAll(current);
 
+        } catch(Throwable t) {
+        
+            log.error(t,t);
+            
         } finally {
 
             w.flush();

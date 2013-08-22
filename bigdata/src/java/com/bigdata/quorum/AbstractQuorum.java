@@ -500,6 +500,7 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
         
     }
 
+    @Override
     public void terminate() {
         boolean interrupted = false;
         lock.lock();
@@ -572,7 +573,8 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
             } catch (Throwable t) {
                 launderThrowable(t);
             }
-            watcher.terminate();
+            if (watcher != null)
+                watcher.terminate();
             if (watcherActionService != null) {
                 watcherActionService.shutdown();
                 try {

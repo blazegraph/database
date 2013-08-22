@@ -220,8 +220,8 @@ public class ManageLogicalServiceTask<V extends ServiceConfiguration>
         /*
          * Setup the quorum state.
          */
-        ZKQuorumImpl.setupQuorum(logicalServiceZPath, fed.getZookeeperAccessor(),
-                acl);
+        ZKQuorumImpl.setupQuorum(logicalServiceZPath, 1/* replicationFactor */,
+                fed.getZookeeperAccessor(), acl);
 
         try {
 

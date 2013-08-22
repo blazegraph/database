@@ -49,7 +49,6 @@ import net.jini.config.Configuration;
 import net.jini.config.ConfigurationException;
 import net.jini.core.lookup.ServiceID;
 import net.jini.core.lookup.ServiceItem;
-import net.jini.core.lookup.ServiceRegistrar;
 
 import org.apache.log4j.Logger;
 import org.apache.zookeeper.CreateMode;
@@ -141,6 +140,39 @@ public class HAJournalServer extends AbstractServer {
         
         /**
          * The target replication factor (k).
+         * 
+         * <strong>CAUTION: </strong> In order to change the replication factor
+         * of an existing quorum, all services MUST be shutdown. You may then
+         * edit the {@link #REPLICATION_FACTOR} value in the configuration files
+         * of each service. The replication factor may be changed to any odd
+         * number, but the easiest migration is when it is increased or
+         * decreased by TWO (2).
+         * <p>
+         * In the special case where the replication factor is changed from ONE
+         * (not HA) to THREE (HA3), you MUST replicate the data by hand to at
+         * least one new service (scp the journal and HALogs) before the quorum
+         * can meet. This is because the minimum quorum for HA3 is TWO (2)
+         * services.
+         * <p>
+         * If the replication factor was increased, then you will need to start
+         * additional services to obtain a fully met quorum and those services
+         * must be told to perform an online disaster recover (replication of
+         * their entire state from the quorum).
+         * <p>
+         * If the replication factor is decreased, then you can simply delete
+         * the services that you no longer wish to run and then restart the
+         * remaining services.
+         * 
+         * TODO It is (conceptually) possible to automate a change of the
+         * replication factor by +2 since the quorum would not break (except
+         * when the replication factor is currently ONE (1)). This would require
+         * the ability to replicate the backing store and HALogs without
+         * escalating the new services from PIPELINE to JOINED.
+         * 
+         * TODO Automating a reduction in the replication factor would require
+         * us to identify those services that would no longer be part of the
+         * quorum and ensure that they are removed from the quorum and do not
+         * reenter before changing the replication factor.
          */
         String REPLICATION_FACTOR = "replicationFactor";
         
@@ -377,10 +409,10 @@ public class HAJournalServer extends AbstractServer {
         
     }
 
-    /**
-     * Caching discovery client for the {@link HAGlue} services.
-     */
-    private HAJournalDiscoveryClient discoveryClient;
+//    /**
+//     * Caching discovery client for the {@link HAGlue} services.
+//     */
+//    private HAJournalDiscoveryClient discoveryClient;
 
     /**
      * The journal.
@@ -394,9 +426,9 @@ public class HAJournalServer extends AbstractServer {
      */
     private boolean onelineDisasterRecovery;
     
-    private ZookeeperClientConfig zkClientConfig;
+//    private ZookeeperClientConfig zkClientConfig;
     
-    private ZooKeeperAccessor zka;
+//    private ZooKeeperAccessor zka;
     
     /**
      * An executor used to handle events that were received in the zk watcher
@@ -492,14 +524,14 @@ public class HAJournalServer extends AbstractServer {
         Operator;
     }
     
-    /**
-     * Caching discovery client for the {@link HAGlue} services.
-     */
-    public HAJournalDiscoveryClient getDiscoveryClient() {
-
-        return discoveryClient;
-        
-    }
+//    /**
+//     * Caching discovery client for the {@link HAGlue} services.
+//     */
+//    public HAJournalDiscoveryClient getDiscoveryClient() {
+//
+//        return discoveryClient;
+//        
+//    }
 
     public HAJournalServer(final String[] args, final LifeCycle lifeCycle) {
 
@@ -534,13 +566,13 @@ public class HAJournalServer extends AbstractServer {
     @Override
     protected void terminate() {
 
-        if (discoveryClient != null) {
-        
-            discoveryClient.terminate();
-            
-            discoveryClient = null;
-            
-        }
+//        if (discoveryClient != null) {
+//        
+//            discoveryClient.terminate();
+//            
+//            discoveryClient = null;
+//            
+//        }
 
         super.terminate();
     
@@ -552,41 +584,45 @@ public class HAJournalServer extends AbstractServer {
         /*
          * Verify discovery of at least one ServiceRegistrar.
          */
-        {
-            final long begin = System.currentTimeMillis();
+        getHAClient().getConnection().awaitServiceRegistrars(10/* timeout */,
+                TimeUnit.SECONDS);
+        
+//        {
+//            final long begin = System.currentTimeMillis();
+//
+//            ServiceRegistrar[] registrars = null;
+//
+//            long elapsed = 0;
+//
+//            while ((registrars == null || registrars.length == 0)
+//                    && elapsed < TimeUnit.SECONDS.toMillis(10)) {
+//
+//                registrars = getHAClient().getConnection()
+//                        .getDiscoveryManagement().getRegistrars();
+//
+//                Thread.sleep(100/* ms */);
+//
+//                elapsed = System.currentTimeMillis() - begin;
+//
+//            }
+//
+//            if (registrars == null || registrars.length == 0) {
+//
+//                throw new RuntimeException(
+//                        "Could not discover ServiceRegistrar(s)");
+//
+//            }
+//
+//            if (log.isInfoEnabled()) {
+//                log.info("Found " + registrars.length + " service registrars");
+//            }
+//
+//        }
 
-            ServiceRegistrar[] registrars = null;
-
-            long elapsed = 0;
-
-            while ((registrars == null || registrars.length == 0)
-                    && elapsed < TimeUnit.SECONDS.toMillis(10)) {
-
-                registrars = getDiscoveryManagement().getRegistrars();
-
-                Thread.sleep(100/* ms */);
-
-                elapsed = System.currentTimeMillis() - begin;
-
-            }
-
-            if (registrars == null || registrars.length == 0) {
-
-                throw new RuntimeException(
-                        "Could not discover ServiceRegistrar(s)");
-
-            }
-
-            if (log.isInfoEnabled()) {
-                log.info("Found " + registrars.length + " service registrars");
-            }
-
-        }
-
-        // Setup discovery for HAGlue clients.
-        discoveryClient = new HAJournalDiscoveryClient(
-                getServiceDiscoveryManager(),
-                null/* serviceDiscoveryListener */, cacheMissTimeout);
+//        // Setup discovery for HAGlue clients.
+//        discoveryClient = new HAJournalDiscoveryClient(
+//                getServiceDiscoveryManager(),
+//                null/* serviceDiscoveryListener */, cacheMissTimeout);
 
         // Jini/River ServiceID.
         final ServiceID serviceID = getServiceID();
@@ -609,36 +645,46 @@ public class HAJournalServer extends AbstractServer {
          * Setup the Quorum / HAJournal.
          */
 
-        zkClientConfig = new ZookeeperClientConfig(config);
+//        zkClientConfig = new ZookeeperClientConfig(config);
+        final ZookeeperClientConfig zkClientConfig = getHAClient()
+                .getZookeeperClientConfig();
 
         // znode name for the logical service.
         logicalServiceId = (String) config.getEntry(
                 ConfigurationOptions.COMPONENT,
                 ConfigurationOptions.LOGICAL_SERVICE_ID, String.class); 
 
-        final String logicalServiceZPathPrefix = zkClientConfig.zroot + "/"
-                + HAJournalServer.class.getName();
-        
-        // zpath for the logical service.
-        logicalServiceZPath = logicalServiceZPathPrefix + "/"
-                + logicalServiceId;
-
-        final int replicationFactor = (Integer) config.getEntry(
-                ConfigurationOptions.COMPONENT,
-                ConfigurationOptions.REPLICATION_FACTOR, Integer.TYPE);        
-
         {
+
+            final String logicalServiceZPathPrefix = zkClientConfig.zroot + "/"
+                    + HAJournalServer.class.getName();
+            
+            // zpath for the logical service.
+            logicalServiceZPath = logicalServiceZPathPrefix + "/"
+                    + logicalServiceId;
+
+            /*
+             * Note: The replicationFactor is taken from the Configuration and
+             * is imposed on the QUORUM znode's QuorumTokenState data by the
+             * ZKQuorumImpl when the QuorumService starts.
+             */
+            final int replicationFactor = (Integer) config.getEntry(
+                    ConfigurationOptions.COMPONENT,
+                    ConfigurationOptions.REPLICATION_FACTOR, Integer.TYPE);        
 
             /*
              * Zookeeper quorum.
              */
             final Quorum<HAGlue, QuorumService<HAGlue>> quorum;
             {
-                final List<ACL> acl = zkClientConfig.acl;
-                final String zoohosts = zkClientConfig.servers;
-                final int sessionTimeout = zkClientConfig.sessionTimeout;
 
-                zka = new ZooKeeperAccessor(zoohosts, sessionTimeout);
+                final List<ACL> acl = zkClientConfig.acl;
+//                final String zoohosts = zkClientConfig.servers;
+//                final int sessionTimeout = zkClientConfig.sessionTimeout;
+
+
+                final ZooKeeperAccessor zka = getHAClient().getConnection()
+                        .getZookeeperAccessor();
 
                 if (!zka.awaitZookeeperConnected(10, TimeUnit.SECONDS)) {
 
@@ -919,22 +965,24 @@ public class HAJournalServer extends AbstractServer {
                  */
                 quorum.terminate();
 
-                /*
-                 * Close our zookeeper connection, invalidating all ephemeral
-                 * znodes for this service.
-                 * 
-                 * Note: This provides a decisive mechanism for removing this
-                 * service from the joined services, the pipeline, withdrawing
-                 * its vote, and removing it as a quorum member.
-                 */
-                if (haLog.isInfoEnabled())
-                    haLog.warn("FORCING UNCURABLE ZOOKEEPER DISCONNECT");
-                
-                if (zka != null) {
-
-                    zka.close();
-                    
-                }
+                // Note: handled by HAClient.disconnect().
+                // TODO Should we do that disconnect here?
+//                /*
+//                 * Close our zookeeper connection, invalidating all ephemeral
+//                 * znodes for this service.
+//                 * 
+//                 * Note: This provides a decisive mechanism for removing this
+//                 * service from the joined services, the pipeline, withdrawing
+//                 * its vote, and removing it as a quorum member.
+//                 */
+//                if (haLog.isInfoEnabled())
+//                    haLog.warn("FORCING UNCURABLE ZOOKEEPER DISCONNECT");
+//                
+//                if (zka != null) {
+//
+//                    zka.close();
+//                    
+//                }
 
             } catch (Throwable t) {
 
@@ -1480,8 +1528,8 @@ public class HAJournalServer extends AbstractServer {
         @Override
         public S getService(final UUID serviceId) {
             
-            final HAJournalDiscoveryClient discoveryClient = server
-                    .getDiscoveryClient();
+            final HAGlueServicesClient discoveryClient = server
+                    .getHAClient().getConnection().getHAGlueServicesClient();
 
             final ServiceItem serviceItem = discoveryClient
                     .getServiceItem(serviceId);
@@ -2083,17 +2131,7 @@ public class HAJournalServer extends AbstractServer {
 
             @Override
             protected Void doRun() throws Exception {
-                /*
-                 * FIXME WORM RESTORE: There is a problem with replication of
-                 * the WORM HALog files and backup/restore. The WORM HALog files
-                 * currently do not have the actual data on the leader. This
-                 * makes some of the code messier and also means that the HALog
-                 * files can not be binary equals on the leader and follower and
-                 * could cause problems if people harvest them from the file
-                 * system directly rather than through sendHALogFile() since
-                 * they will be missing the necessary state in the file system
-                 * if they were put there by the leader.
-                 */
+
                 while (true) {
 
                     final long commitCounter = journal.getRootBlockView()

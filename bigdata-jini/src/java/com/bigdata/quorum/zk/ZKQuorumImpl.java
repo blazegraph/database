@@ -926,7 +926,7 @@ public class ZKQuorumImpl<S extends Remote, C extends QuorumClient<S>> extends
                 }
                 // new local state object w/ the current token cleared.
                 final QuorumTokenState newState = new QuorumTokenState(oldState
-                        .lastValidToken(), Quorum.NO_QUORUM);
+                        .lastValidToken(), Quorum.NO_QUORUM, replicationFactor());
                 try {
 //    log.fatal("Setting quorum state: \noldState="+oldState+"\nnewState="+newState); 
                     zk.setData(logicalServiceId + "/" + QUORUM, SerializerUtil
@@ -1017,7 +1017,7 @@ public class ZKQuorumImpl<S extends Remote, C extends QuorumClient<S>> extends
                 try {
                     // new local state object.
                     final QuorumTokenState newState = new QuorumTokenState(
-                            newToken, newToken);
+                            newToken, newToken, replicationFactor());
 //    log.fatal("Setting quorum state: \noldState="+oldState+"\nnewState="+newState);
                     // update data (verifying the version!)
                     zk.setData(logicalServiceId + "/" + QUORUM, SerializerUtil
@@ -1270,7 +1270,7 @@ public class ZKQuorumImpl<S extends Remote, C extends QuorumClient<S>> extends
                 /*
                  * Setup the quorum state (lazily, eventually consistent).
                  */
-                setupQuorum(logicalServiceId, zka, acl);
+                setupQuorum(logicalServiceId, replicationFactor(), zka, acl);
 
                 // Setup the watchers.
                 setupWatchers(getZookeeper());
@@ -1593,7 +1593,8 @@ public class ZKQuorumImpl<S extends Remote, C extends QuorumClient<S>> extends
                  
                         final QuorumTokenState tmp = new QuorumTokenState(//
                                 tokenState.lastValidToken(),// lastValidToken
-                                Quorum.NO_QUORUM// currentToken
+                                Quorum.NO_QUORUM,// currentToken
+                                replicationFactor()//
                         );
 
                         // update znode unless version is changed.
@@ -2166,43 +2167,132 @@ public class ZKQuorumImpl<S extends Remote, C extends QuorumClient<S>> extends
      */
     @Override
     protected long getLastValidTokenFromQuorumState(final C client) {
-
-//        super.getLastValidTokenFromQuorumState(client);
+//      super.getLastValidTokenFromQuorumState(client);
         final String logicalServiceId = client.getLogicalServiceId();
-        final byte[] data;
-        try {
+        final String quorumZPath = logicalServiceId + "/" + QUORUM;
+        while (true) {
+            final byte[] data;
+            try {
 
-            final Stat stat = new Stat();
+                final Stat stat = new Stat();
 
-            data = zka
-                    .getZookeeper().getData(logicalServiceId + "/" + QUORUM,
-                            false/* watch */, stat);
-            
-            final QuorumTokenState tokenState = (QuorumTokenState) SerializerUtil
-                    .deserialize(data);
-            
-            if (log.isInfoEnabled())
-                log.info("Starting with quorum that has already met in the past: "
-                        + tokenState);
-            
-            return tokenState.lastValidToken();
-        } catch (NoNodeException e) {
-            // This is Ok. The node just does not exist yet.
-            return NO_QUORUM;
-        } catch (KeeperException e) {
-            // Anything else is a problem.
-            throw new RuntimeException(e);
-        } catch (InterruptedException e) {
-            throw new RuntimeException(e);
+                data = zka.getZookeeper().getData(quorumZPath,
+                        false/* watch */, stat);
+
+                final QuorumTokenState tokenState = (QuorumTokenState) SerializerUtil
+                        .deserialize(data);
+
+                if (log.isInfoEnabled())
+                    log.info("Starting with quorum that has already met in the past: "
+                            + tokenState);
+
+                if (tokenState.replicationFactor() == 0
+                        || tokenState.replicationFactor() != replicationFactor()) {
+
+                    /*
+                     * Either a data migration (the replication factor was not
+                     * originally in the QuorumTokenState) -OR- a change in the
+                     * replication factor for the HA cluster.
+                     */
+                    if (tokenState.token() != Quorum.NO_QUORUM) {
+
+                        /*
+                         * We must not change the replication factor of a quorum
+                         * that is already met (in fact, we should not change it
+                         * if there are any running HAGlue instances).
+                         */
+                        
+                        throw new QuorumException(
+                                "Can not change replication factor of a met quorum: newValue="
+                                        + replicationFactor() + ", oldValue="
+                                        + +tokenState.replicationFactor());
+
+                    }
+                    
+                    /*
+                     * Note: This detects a concurrent update and retries so the
+                     * [lastValidToken] returned below is known to be consistent
+                     * with the state of this znode at the time that it was
+                     * updated.
+                     */
+
+                    try {
+
+                        updateQuorumStateWithReplicationFactor(client,
+                                quorumZPath, tokenState/* oldState */, stat);
+
+                    } catch (BadVersionException e) {
+                        /*
+                         * If we get a version conflict, then just retry. Could
+                         * have been concurrently touched by another service.
+                         */
+                        log.warn("Concurrent update (retry): zpath="
+                                + quorumZPath);
+                        continue;
+                    }
+
+                }
+
+                return tokenState.lastValidToken();
+            } catch (NoNodeException e) {
+                // This is Ok. The node just does not exist yet.
+                return NO_QUORUM;
+            } catch (KeeperException e) {
+                // Anything else is a problem.
+                throw new RuntimeException(e);
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
         }
     }
-        
+
+    /**
+     * Migrate the {@link QuorumTokenState} to include the replicationFactor.
+     * The replicationFactor is specified to the constructor and is taken from
+     * {@link #replicationFactor()}. This imposes that replicationFactor onto
+     * the {@link QuorumTokenState}. This is used both for data migration (the
+     * replication factor was not originally in the {@link QuorumTokenState})
+     * and to change the replication factor when it is discovered to be changed
+     * after a quorum restart.
+     * 
+     * @throws BadVersionException
+     *             if the operation was not performed because the caller's
+     *             version information was no longer valid. The caller should
+     *             retry.
+     */
+    private void updateQuorumStateWithReplicationFactor(final C client,
+            final String quorumZPath, final QuorumTokenState oldState,
+            final Stat stat) throws BadVersionException {
+        final QuorumTokenState newState = new QuorumTokenState(
+                oldState.lastValidToken(), oldState.token(),
+                replicationFactor());
+        try {
+            zka.getZookeeper().setData(quorumZPath,
+                    SerializerUtil.serialize(newState), stat.getVersion());
+            // done.
+            log.warn("Set replicationFactor: zpath=" + quorumZPath
+                    + ", newState=" + newState);
+            return;
+        } catch (BadVersionException ex) {
+            throw (BadVersionException) ex;
+        } catch (KeeperException e) {
+            throw new RuntimeException(e);
+        } catch (InterruptedException e) {
+            // propagate the interrupt.
+            Thread.currentThread().interrupt();
+            return;
+        }
+    }
+    
     /**
      * Ensure that the zpaths for the {@link BigdataZooDefs#QUORUM} and its
      * various persistent children exist.
      * 
      * @param logicalServiceId
      *            The fully qualified logical service identifier.
+     * @param replicationFactor
+     *            The replication factor for the quorum (must be a non-negative,
+     *            odd integer).
      * @param zka
      *            The {@link ZooKeeperAccessor}.
      * @param acl
@@ -2212,13 +2302,15 @@ public class ZKQuorumImpl<S extends Remote, C extends QuorumClient<S>> extends
      * @throws InterruptedException
      */
     static public void setupQuorum(final String logicalServiceId,
+            final int replicationFactor,
             final ZooKeeperAccessor zka, final List<ACL> acl)
             throws KeeperException, InterruptedException {
 
         try {
             final QuorumTokenState tokenState = new QuorumTokenState(//
                     Quorum.NO_QUORUM,// lastValidToken
-                    Quorum.NO_QUORUM// currentToken
+                    Quorum.NO_QUORUM,// currentToken
+                    replicationFactor// replicationFactor
             );
             zka.getZookeeper().create(logicalServiceId + "/" + QUORUM,
                     SerializerUtil.serialize(tokenState), acl,
@@ -2262,7 +2354,7 @@ public class ZKQuorumImpl<S extends Remote, C extends QuorumClient<S>> extends
 //        return tokenState;
         
     }
-
+    
     /**
      * Compares string values representing <code>lastCommitTime</code> votes by
      * decoding them to <code>long</code> values.

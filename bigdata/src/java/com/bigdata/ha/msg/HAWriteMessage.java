@@ -77,6 +77,9 @@ public class HAWriteMessage extends HAWriteMessageBase implements
     /** The quorum token for which this message is valid. */
     private long quorumToken;
 
+    /** The replication factor for the quorum leader. */
+    private int replicationFactor;
+
     /** The length of the backing file on the disk. */
     private long fileExtent;
 
@@ -130,6 +133,11 @@ public class HAWriteMessage extends HAWriteMessageBase implements
         return quorumToken; 
     }
     
+    @Override
+    public int getReplicationFactor() {
+        return replicationFactor; 
+    }
+    
     /* (non-Javadoc)
      * @see com.bigdata.journal.ha.IHAWriteMessage#getFileExtent()
      */
@@ -163,6 +171,7 @@ public class HAWriteMessage extends HAWriteMessageBase implements
                 + ",storeType=" + getStoreType() //
                 + ",compressorKey=" + getCompressorKey() //
                 + ",quorumToken=" + getQuorumToken()//
+                + ",replicationFactor=" + getReplicationFactor() //
                 + ",fileExtent=" + getFileExtent() //
                 + ",firstOffset=" + getFirstOffset() //
                 + "}";
@@ -214,8 +223,9 @@ public class HAWriteMessage extends HAWriteMessageBase implements
             final long firstOffset) {
 
         this(uuid, commitCounter, commitTime, sequence, sze, chk, storeType,
-                quorumToken, fileExtent, firstOffset, null/* compressorKey */);
-        
+                quorumToken, 0/* replicationFactor */, fileExtent, firstOffset,
+                null/* compressorKey */);
+
     }
 
     /**
@@ -243,6 +253,8 @@ public class HAWriteMessage extends HAWriteMessageBase implements
      *            The type of backing store (RW or WORM).
      * @param quorumToken
      *            The quorum token for which this message is valid.
+     * @param replicationFactor
+     *            The replication factor in effect for the leader.
      * @param fileExtent
      *            The length of the backing file on the disk.
      * @param firstOffset
@@ -255,7 +267,9 @@ public class HAWriteMessage extends HAWriteMessageBase implements
     public HAWriteMessage(final UUID uuid, final long commitCounter,
                 final long commitTime, final long sequence, final int sze,
                 final int chk, final StoreTypeEnum storeType,
-                final long quorumToken, final long fileExtent,
+                final long quorumToken, 
+                final int replicationFactor,
+                final long fileExtent,
                 final long firstOffset,
                 final String compressorKey) {
 
@@ -282,6 +296,8 @@ public class HAWriteMessage extends HAWriteMessageBase implements
         this.fileExtent = fileExtent;
         
         this.firstOffset = firstOffset;
+      
+        this.replicationFactor = replicationFactor;
         
         this.compressorKey = compressorKey;
         
@@ -309,9 +325,15 @@ public class HAWriteMessage extends HAWriteMessageBase implements
     private static final byte VERSION2 = 0x2;
 
     /**
+     * Adds the {@link #replicationFactor} for the quorum leader (decodes as
+     * ZERO (0) for older versions).
+     */
+    private static final byte VERSION3 = 0x3;
+    
+    /**
      * The current version.
      */
-    private static final byte currentVersion = VERSION2; // VERSION2;
+    private static final byte currentVersion = VERSION3;
     
     /**
      * Determine whether message data is compressed
@@ -363,6 +385,7 @@ public class HAWriteMessage extends HAWriteMessageBase implements
 		case VERSION0:
 		    uuid = null; // Note: not available.
 			break;
+		case VERSION3: // fall through
         case VERSION2: {
             final boolean isNull = in.readBoolean();
             compressorKey = isNull ? null : in.readUTF();
@@ -382,6 +405,11 @@ public class HAWriteMessage extends HAWriteMessageBase implements
 		lastCommitTime = in.readLong();
 		sequence = in.readLong();
 		quorumToken = in.readLong();
+        if (version >= VERSION3) {
+            replicationFactor = in.readInt();
+        } else {
+            replicationFactor = 0;
+        }
 		fileExtent = in.readLong();
 		firstOffset = in.readLong();
 	}
@@ -406,6 +434,8 @@ public class HAWriteMessage extends HAWriteMessageBase implements
 		out.writeLong(lastCommitTime);
 		out.writeLong(sequence);
 		out.writeLong(quorumToken);
+        if (currentVersion >= VERSION3)
+            out.writeInt(replicationFactor);
 		out.writeLong(fileExtent);
 		out.writeLong(firstOffset);
 	}

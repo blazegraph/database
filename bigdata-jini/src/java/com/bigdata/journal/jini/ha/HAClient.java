@@ -20,7 +20,7 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-*/
+ */
 /*
  * Created on Mar 24, 2007
  */
@@ -28,7 +28,13 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.journal.jini.ha;
 
 import java.io.IOException;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
@@ -39,6 +45,7 @@ import net.jini.config.ConfigurationException;
 import net.jini.config.ConfigurationProvider;
 import net.jini.core.discovery.LookupLocator;
 import net.jini.core.lookup.ServiceItem;
+import net.jini.core.lookup.ServiceRegistrar;
 import net.jini.discovery.DiscoveryEvent;
 import net.jini.discovery.DiscoveryListener;
 import net.jini.discovery.LookupDiscoveryManager;
@@ -48,11 +55,26 @@ import net.jini.lookup.ServiceDiscoveryListener;
 import net.jini.lookup.ServiceDiscoveryManager;
 
 import org.apache.log4j.Logger;
+import org.apache.zookeeper.CreateMode;
+import org.apache.zookeeper.KeeperException;
+import org.apache.zookeeper.KeeperException.NoNodeException;
+import org.apache.zookeeper.KeeperException.NodeExistsException;
 import org.apache.zookeeper.ZooKeeper;
+import org.apache.zookeeper.data.ACL;
+import org.apache.zookeeper.data.Stat;
 
 import com.bigdata.ha.HAGlue;
+import com.bigdata.io.SerializerUtil;
 import com.bigdata.jini.start.config.ZookeeperClientConfig;
 import com.bigdata.jini.util.JiniUtil;
+import com.bigdata.quorum.AbstractQuorumClient;
+import com.bigdata.quorum.Quorum;
+import com.bigdata.quorum.QuorumClient;
+import com.bigdata.quorum.QuorumEvent;
+import com.bigdata.quorum.QuorumListener;
+import com.bigdata.quorum.zk.QuorumTokenState;
+import com.bigdata.quorum.zk.ZKQuorum;
+import com.bigdata.quorum.zk.ZKQuorumImpl;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.IService;
 import com.bigdata.service.IServiceShutdown;
@@ -70,47 +92,42 @@ import com.sun.jini.start.ServiceDescriptor;
  * be consistent with the configuration of the federation to which you wish to
  * connect.
  * 
- * FIXME Review how we connect to a specific logical HA replication cluster and
- * verify that we can connect to multiple such clusters in order to support RMI
- * operations across those clusters (as long as they are in the same space). It
- * might be that this is achieved through a HAConnection to each logical cluster
- * instance, or not. The quorums are certainly specific to a logical instance
- * and that is determined by the zkroot. Investigate!
- * 
- * FIXME Retro fit into HAJournalServer (discoveryClient) and AbstractServer.
- * 
- * FIXME This does not start up a quorum and set a quorum client. It should so
- * we can see the quorum events. That could be a useful thing to do in main().
- * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ *          TODO Refactor the HA3 test suite to use the HAClient class.
  */
 public class HAClient {
 
     private static final Logger log = Logger.getLogger(HAClient.class);
-    
+
     /**
      * Options understood by the {@link HAClient}.
      * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+     *         Thompson</a>
      */
-    public static interface Options { 
-        
+    public static interface ConfigurationOptions {
+
         /**
-         * The timeout in milliseconds that the client will await the discovery
-         * of a service if there is a cache miss (default
-         * {@value #DEFAULT_CACHE_MISS_TIMEOUT}).
-         * 
-         * @see HAJournalDiscoveryClient
+         * The namespace for the configuration options declared by this
+         * interface.
+         */
+        String COMPONENT = HAClient.class.getName();
+
+        /**
+         * The timeout in milliseconds to await the discovery of a service if
+         * there is a cache miss (default {@value #DEFAULT_CACHE_MISS_TIMEOUT}).
          */
         String CACHE_MISS_TIMEOUT = "cacheMissTimeout";
 
-        String DEFAULT_CACHE_MISS_TIMEOUT = "" + (2 * 1000);
-     
+        long DEFAULT_CACHE_MISS_TIMEOUT = 2000L;
+
     }
-    
+
     /**
-     * The value is the {@link HAConnection} and <code>null</code> iff not connected.
+     * The value is the {@link HAConnection} and <code>null</code> iff not
+     * connected.
      */
     private final AtomicReference<HAConnection> fed = new AtomicReference<HAConnection>();
 
@@ -125,15 +142,23 @@ public class HAClient {
     private final Lock connectLock = new ReentrantLock(false/* fair */);
 
     public boolean isConnected() {
-        
+
         return fed.get() != null;
-        
+
     }
-    
+
+    /**
+     * Get the current {@link HAConnection}.
+     * 
+     * @return The {@link HAConnection}.
+     * 
+     * @throws IllegalStateException
+     *             if the {@link HAClient} is not connected.
+     */
     public HAConnection getConnection() {
 
         final HAConnection fed = this.fed.get();
-        
+
         if (fed == null) {
 
             throw new IllegalStateException();
@@ -170,7 +195,7 @@ public class HAClient {
     public void disconnect(final boolean immediateShutdown) {
 
         connectLock.lock();
-        
+
         try {
 
             final HAConnection fed = this.fed.get();
@@ -212,7 +237,7 @@ public class HAClient {
                 fed = new HAConnection(jiniConfig, zooConfig);
 
                 this.fed.set(fed);
-                
+
                 fed.start(this);
 
             }
@@ -241,171 +266,171 @@ public class HAClient {
      * The {@link Configuration} object used to initialize this class.
      */
     private final Configuration config;
-    
+
     /**
      * The {@link JiniClientConfig}.
      */
     public JiniClientConfig getJiniClientConfig() {
-        
+
         return jiniConfig;
-        
+
     }
-    
+
     /**
      * The {@link ZooKeeper} client configuration.
      */
     public final ZookeeperClientConfig getZookeeperClientConfig() {
 
         return zooConfig;
-        
+
     }
-    
+
     /**
      * The {@link Configuration} object used to initialize this class.
      */
     public final Configuration getConfiguration() {
-        
+
         return config;
-        
+
     }
 
-//    /**
-//     * {@inheritDoc}
-//     * 
-//     * @see #getProperties(String component)
-//     */
-//    public Properties getProperties() {
-//        
-//        return properties;
-//        
-//    }
-    
-//    /**
-//     * Return the {@link Properties} for the {@link JiniClient} merged with
-//     * those for the named component in the {@link Configuration}. Any
-//     * properties found for the {@link JiniClient} "component" will be read
-//     * first. Properties for the named component are next, and therefore will
-//     * override those given for the {@link JiniClient}. You can specify
-//     * properties for either the {@link JiniClient} or the <i>component</i>
-//     * using:
-//     * 
-//     * <pre>
-//     * properties = NV[]{...};
-//     * </pre>
-//     * 
-//     * in the appropriate section of the {@link Configuration}. For example:
-//     * 
-//     * <pre>
-//     * 
-//     * // Jini client configuration
-//     * com.bigdata.service.jini.JiniClient {
-//     * 
-//     *     // ...
-//     * 
-//     *     // optional JiniClient properties.
-//     *     properties = new NV[] {
-//     *        
-//     *        new NV(&quot;foo&quot;,&quot;bar&quot;)
-//     *        
-//     *     };
-//     * 
-//     * }
-//     * </pre>
-//     * 
-//     * And overrides for a named component as:
-//     * 
-//     * <pre>
-//     * 
-//     * com.bigdata.service.FooBaz {
-//     * 
-//     *    properties = new NV[] {
-//     *    
-//     *        new NV(&quot;foo&quot;,&quot;baz&quot;),
-//     *        new NV(&quot;goo&quot;,&quot;12&quot;),
-//     *    
-//     *    };
-//     * 
-//     * }
-//     * </pre>
-//     * 
-//     * @param component
-//     *            The name of the component.
-//     * 
-//     * @return The properties specified for that component.
-//     * 
-//     * @see #getConfiguration()
-//     */
-//    public Properties getProperties(final String component)
-//            throws ConfigurationException {
-//
-//        return JiniClient.getProperties(component, getConfiguration());
-//
-//    }
-    
-//    /**
-//     * Read {@value JiniClientConfig.Options#PROPERTIES} for the optional
-//     * application or server class identified by [cls].
-//     * <p>
-//     * Note: Anything read for the specific class will overwrite any value for
-//     * the same properties specified for {@link JiniClient}.
-//     * 
-//     * @param className
-//     *            The class name of the client or service (optional). When
-//     *            specified, properties defined for that class in the
-//     *            configuration will be used and will override those specified
-//     *            for the {@value Options#NAMESPACE}.
-//     * @param config
-//     *            The {@link Configuration}.
-//     * 
-//     * @todo this could be replaced by explicit use of the java identifier
-//     *       corresponding to the Option and simply collecting all such
-//     *       properties into a Properties object using their native type (as
-//     *       reported by the ConfigurationFile).
-//     */
-//    static public Properties getProperties(final String className,
-//            final Configuration config) throws ConfigurationException {
-//    
-//        final NV[] a = (NV[]) config
-//                .getEntry(JiniClient.class.getName(),
-//                        JiniClientConfig.Options.PROPERTIES, NV[].class,
-//                        new NV[] {}/* defaultValue */);
-//
-//        final NV[] b;
-//        if (className != null) {
-//
-//            b = (NV[]) config.getEntry(className,
-//                    JiniClientConfig.Options.PROPERTIES, NV[].class,
-//                    new NV[] {}/* defaultValue */);
-//    
-//        } else
-//            b = null;
-//    
-//        final NV[] tmp = ConfigMath.concat(a, b);
-//    
-//        final Properties properties = new Properties();
-//
-//        for (NV nv : tmp) {
-//    
-//            properties.setProperty(nv.getName(), nv.getValue());
-//    
-//        }
-//
-//        if (log.isInfoEnabled() || BigdataStatics.debug) {
-//
-//            final String msg = "className=" + className + " : properties="
-//                    + properties.toString();
-//
-//            if (BigdataStatics.debug)
-//                System.err.println(msg);
-//
-//            if (log.isInfoEnabled())
-//                log.info(msg);
-//
-//        }
-//        
-//        return properties;
-//    
-//    }
+    // /**
+    // * {@inheritDoc}
+    // *
+    // * @see #getProperties(String component)
+    // */
+    // public Properties getProperties() {
+    //
+    // return properties;
+    //
+    // }
+
+    // /**
+    // * Return the {@link Properties} for the {@link JiniClient} merged with
+    // * those for the named component in the {@link Configuration}. Any
+    // * properties found for the {@link JiniClient} "component" will be read
+    // * first. Properties for the named component are next, and therefore will
+    // * override those given for the {@link JiniClient}. You can specify
+    // * properties for either the {@link JiniClient} or the <i>component</i>
+    // * using:
+    // *
+    // * <pre>
+    // * properties = NV[]{...};
+    // * </pre>
+    // *
+    // * in the appropriate section of the {@link Configuration}. For example:
+    // *
+    // * <pre>
+    // *
+    // * // Jini client configuration
+    // * com.bigdata.service.jini.JiniClient {
+    // *
+    // * // ...
+    // *
+    // * // optional JiniClient properties.
+    // * properties = new NV[] {
+    // *
+    // * new NV(&quot;foo&quot;,&quot;bar&quot;)
+    // *
+    // * };
+    // *
+    // * }
+    // * </pre>
+    // *
+    // * And overrides for a named component as:
+    // *
+    // * <pre>
+    // *
+    // * com.bigdata.service.FooBaz {
+    // *
+    // * properties = new NV[] {
+    // *
+    // * new NV(&quot;foo&quot;,&quot;baz&quot;),
+    // * new NV(&quot;goo&quot;,&quot;12&quot;),
+    // *
+    // * };
+    // *
+    // * }
+    // * </pre>
+    // *
+    // * @param component
+    // * The name of the component.
+    // *
+    // * @return The properties specified for that component.
+    // *
+    // * @see #getConfiguration()
+    // */
+    // public Properties getProperties(final String component)
+    // throws ConfigurationException {
+    //
+    // return JiniClient.getProperties(component, getConfiguration());
+    //
+    // }
+
+    // /**
+    // * Read {@value JiniClientConfig.Options#PROPERTIES} for the optional
+    // * application or server class identified by [cls].
+    // * <p>
+    // * Note: Anything read for the specific class will overwrite any value for
+    // * the same properties specified for {@link JiniClient}.
+    // *
+    // * @param className
+    // * The class name of the client or service (optional). When
+    // * specified, properties defined for that class in the
+    // * configuration will be used and will override those specified
+    // * for the {@value Options#NAMESPACE}.
+    // * @param config
+    // * The {@link Configuration}.
+    // *
+    // * @todo this could be replaced by explicit use of the java identifier
+    // * corresponding to the Option and simply collecting all such
+    // * properties into a Properties object using their native type (as
+    // * reported by the ConfigurationFile).
+    // */
+    // static public Properties getProperties(final String className,
+    // final Configuration config) throws ConfigurationException {
+    //
+    // final NV[] a = (NV[]) config
+    // .getEntry(JiniClient.class.getName(),
+    // JiniClientConfig.Options.PROPERTIES, NV[].class,
+    // new NV[] {}/* defaultValue */);
+    //
+    // final NV[] b;
+    // if (className != null) {
+    //
+    // b = (NV[]) config.getEntry(className,
+    // JiniClientConfig.Options.PROPERTIES, NV[].class,
+    // new NV[] {}/* defaultValue */);
+    //
+    // } else
+    // b = null;
+    //
+    // final NV[] tmp = ConfigMath.concat(a, b);
+    //
+    // final Properties properties = new Properties();
+    //
+    // for (NV nv : tmp) {
+    //
+    // properties.setProperty(nv.getName(), nv.getValue());
+    //
+    // }
+    //
+    // if (log.isInfoEnabled() || BigdataStatics.debug) {
+    //
+    // final String msg = "className=" + className + " : properties="
+    // + properties.toString();
+    //
+    // if (BigdataStatics.debug)
+    // System.err.println(msg);
+    //
+    // if (log.isInfoEnabled())
+    // log.info(msg);
+    //
+    // }
+    //
+    // return properties;
+    //
+    // }
 
     /**
      * Installs a {@link SecurityManager} and returns a new client.
@@ -434,7 +459,7 @@ public class HAClient {
         } catch (ConfigurationException e) {
 
             throw new RuntimeException(e);
-            
+
         }
 
     }
@@ -468,20 +493,20 @@ public class HAClient {
      * 
      * @throws ConfigurationException
      */
-    public HAClient(final Class cls, final Configuration config)
+    public HAClient(final Class<?> cls, final Configuration config)
             throws ConfigurationException {
 
         if (config == null)
             throw new IllegalArgumentException();
-        
-//        this.properties = JiniClient.getProperties(cls.getName(), config);
-        
+
+        // this.properties = JiniClient.getProperties(cls.getName(), config);
+
         this.jiniConfig = new JiniClientConfig(cls.getName(), config);
 
         this.zooConfig = new ZookeeperClientConfig(config);
 
         this.config = config;
-        
+
     }
 
     /**
@@ -494,11 +519,11 @@ public class HAClient {
     static protected void setSecurityManager() {
 
         final SecurityManager sm = System.getSecurityManager();
-        
+
         if (sm == null) {
 
             System.setSecurityManager(new SecurityManager());
-         
+
             if (log.isInfoEnabled())
                 log.info("Set security manager");
 
@@ -510,50 +535,50 @@ public class HAClient {
         }
 
     }
-    
-//    /**
-//     * Read and return the content of the properties file.
-//     * 
-//     * @param propertyFile
-//     *            The properties file.
-//     * 
-//     * @throws IOException
-//     */
-//    static protected Properties getProperties(final File propertyFile)
-//            throws IOException {
-//
-//        if(log.isInfoEnabled()) {
-//            
-//            log.info("Reading properties: file="+propertyFile);
-//            
-//        }
-//        
-//        final Properties properties = new Properties();
-//
-//        InputStream is = null;
-//
-//        try {
-//
-//            is = new BufferedInputStream(new FileInputStream(propertyFile));
-//
-//            properties.load(is);
-//
-//            if(log.isInfoEnabled()) {
-//                
-//                log.info("Read properties: " + properties);
-//                
-//            }
-//            
-//            return properties;
-//
-//        } finally {
-//
-//            if (is != null)
-//                is.close();
-//
-//        }
-//
-//    }
+
+    // /**
+    // * Read and return the content of the properties file.
+    // *
+    // * @param propertyFile
+    // * The properties file.
+    // *
+    // * @throws IOException
+    // */
+    // static protected Properties getProperties(final File propertyFile)
+    // throws IOException {
+    //
+    // if(log.isInfoEnabled()) {
+    //
+    // log.info("Reading properties: file="+propertyFile);
+    //
+    // }
+    //
+    // final Properties properties = new Properties();
+    //
+    // InputStream is = null;
+    //
+    // try {
+    //
+    // is = new BufferedInputStream(new FileInputStream(propertyFile));
+    //
+    // properties.load(is);
+    //
+    // if(log.isInfoEnabled()) {
+    //
+    // log.info("Read properties: " + properties);
+    //
+    // }
+    //
+    // return properties;
+    //
+    // } finally {
+    //
+    // if (is != null)
+    // is.close();
+    //
+    // }
+    //
+    // }
 
     /**
      * Invoked when a service join is noticed.
@@ -562,8 +587,12 @@ public class HAClient {
      *            The RMI interface for the service.
      * @param serviceUUID
      *            The service identifier.
+     * 
+     *            TODO It is pointless having this method and
+     *            {@link #serviceLeave(UUID)} without a facility to delegate
+     *            these methods to override them. Right now they just log.
      */
-    public void serviceJoin(final IService service, final UUID serviceUUID) {
+    protected void serviceJoin(final IService service, final UUID serviceUUID) {
 
         if (log.isInfoEnabled())
             log.info("service=" + service + ", serviceUUID" + serviceUUID);
@@ -573,9 +602,10 @@ public class HAClient {
     /**
      * Invoked when a service leave is noticed.
      * 
-     * @param serviceUUID The service identifier.
+     * @param serviceUUID
+     *            The service identifier.
      */
-    public void serviceLeave(final UUID serviceUUID) {
+    protected void serviceLeave(final UUID serviceUUID) {
 
         if (log.isInfoEnabled())
             log.info("serviceUUID=" + serviceUUID);
@@ -583,24 +613,22 @@ public class HAClient {
     }
 
     /**
-     * 
-     * TODO Pattern after JiniFederation. Take the DiscoveryListener, etc. from
-     * AbstractServer but compare to JiniFederation.
+     * A connection to discovered {@link HAGlue} services.
      */
     static public class HAConnection implements DiscoveryListener,
             ServiceDiscoveryListener, IServiceShutdown {
 
         private final JiniClientConfig jiniConfig;
-        
+
         private final ZookeeperClientConfig zooConfig;
-        
+
         /**
          * The {@link HAClient} reference. When non-<code>null</code> the client
          * is connected. When <code>null</code> it is disconnected.
          */
         private final AtomicReference<HAClient> clientRef = new AtomicReference<HAClient>();
-        
-        private ZooKeeperAccessor zooKeeperAccessor;
+
+        private ZooKeeperAccessor zka;
 
         private LookupDiscoveryManager lookupDiscoveryManager;
 
@@ -608,8 +636,21 @@ public class HAClient {
 
         /**
          * Caching discovery client for the {@link HAGlue} services.
-         */// TODO Rename as haGlueDiscoveryService
-        private HAJournalDiscoveryClient discoveryClient;
+         */
+        private HAGlueServicesClient discoveryClient;
+
+        /**
+         * The set of quorums that were accessed through the
+         * {@link HAConnection} class.
+         * <p>
+         * Note: Changes to this map are synchronized on {@link #quorums}. This
+         * is done solely to guard against current creates of a {@link Quorum}
+         * for the same logical service id. The map itself is thread-safe to
+         * avoid contentions for a lock in
+         * {@link #terminateDiscoveryProcesses()}.
+         */
+        private final Map<String, Quorum<HAGlue, QuorumClient<HAGlue>>> quorums = Collections
+                .synchronizedMap(new LinkedHashMap<String, Quorum<HAGlue, QuorumClient<HAGlue>>>());
 
         private HAConnection(final JiniClientConfig jiniConfig,
                 final ZookeeperClientConfig zooConfig) {
@@ -621,40 +662,50 @@ public class HAClient {
                 throw new IllegalArgumentException();
 
             this.jiniConfig = jiniConfig;
-            
+
             this.zooConfig = zooConfig;
 
         }
-        
+
         /**
          * Return the client object that was used to obtain the connection.
          * 
          * @return The {@link HAClient} reference. When non-<code>null</code>
          *         the client is connected. When <code>null</code> it is
          *         disconnected.
-         * 
-         * @throws IllegalStateException
-         *             if the client disconnected and this object is no longer
-         *             valid.
-         * 
-         *             TODO add getOpenClient() and use to verify that the
-         *             client is non-null for various internal methods. or use
-         *             lambda to make this safe for things that need to be done
-         *             conditionally.
          */
         public HAClient getClient() {
 
             return clientRef.get();
-            
+
+        }
+
+        /**
+         * Return the client object that was used to obtain the connection.
+         * 
+         * @return The {@link HAClient} reference and never <code>null</code>.
+         * 
+         * @throws IllegalStateException
+         *             if the client disconnected.
+         */
+        public HAClient getClientIfOpen() {
+
+            final HAClient client = clientRef.get();
+
+            if (client == null)
+                throw new IllegalStateException();
+
+            return client;
+
         }
 
         @Override
         public boolean isOpen() {
-            
+
             return getClient() != null;
-            
+
         }
-        
+
         private void assertOpen() {
 
             if (!isOpen()) {
@@ -665,19 +716,40 @@ public class HAClient {
 
         }
 
-        public synchronized void start(final HAClient client) {
+        /**
+         * Return the zookeeper client configuration.
+         */
+        public ZookeeperClientConfig getZooConfig() {
 
-            if(client == null)
+            return zooConfig;
+
+        }
+
+        /**
+         * Return an object that may be used to obtain a {@link ZooKeeper}
+         * client and that may be used to obtain the a new {@link ZooKeeper}
+         * client if the current session has been expired (an absorbing state
+         * for the {@link ZooKeeper} client).
+         */
+        public ZooKeeperAccessor getZookeeperAccessor() {
+
+            return zka;
+
+        }
+
+        private synchronized void start(final HAClient client) {
+
+            if (client == null)
                 throw new IllegalArgumentException();
-            
+
             if (isOpen())
                 throw new IllegalStateException();
 
             if (log.isInfoEnabled())
                 log.info(jiniConfig.toString());
-            
+
             final String[] groups = jiniConfig.groups;
-            
+
             final LookupLocator[] lookupLocators = jiniConfig.locators;
 
             try {
@@ -687,9 +759,9 @@ public class HAClient {
                  * zookeeper servers.
                  */
 
-                zooKeeperAccessor = new ZooKeeperAccessor(zooConfig.servers,
+                zka = new ZooKeeperAccessor(zooConfig.servers,
                         zooConfig.sessionTimeout);
-                
+
                 /*
                  * Note: This class will perform multicast discovery if
                  * ALL_GROUPS is specified and otherwise requires you to specify
@@ -712,49 +784,55 @@ public class HAClient {
                             lookupDiscoveryManager, new LeaseRenewalManager(),
                             client.getConfiguration());
 
-                } catch(IOException ex) {
-                    
+                } catch (IOException ex) {
+
                     throw new RuntimeException(
                             "Could not initiate service discovery manager", ex);
-                    
+
                 }
 
-                // FIXME Configuration [properties].
-//                final long cacheMissTimeout = Long.valueOf(client.getProperties()
-//                        .getProperty(JiniClient.Options.CACHE_MISS_TIMEOUT,
-//                                JiniClient.Options.DEFAULT_CACHE_MISS_TIMEOUT));
-                final long cacheMissTimeout = Long
-                        .valueOf(JiniClient.Options.DEFAULT_CACHE_MISS_TIMEOUT);
+                /**
+                 * The timeout in milliseconds to await the discovery of a
+                 * service if there is a cache miss (default
+                 * {@value #DEFAULT_CACHE_MISS_TIMEOUT}).
+                 */
+                final long cacheMissTimeout = (Long) client
+                        .getConfiguration()
+                        .getEntry(HAClient.ConfigurationOptions.COMPONENT,
+                                ConfigurationOptions.CACHE_MISS_TIMEOUT,
+                                Long.TYPE,
+                                ConfigurationOptions.DEFAULT_CACHE_MISS_TIMEOUT);
 
                 // Setup discovery for HAGlue clients.
-                // TODO Refactor out of HAJournalServer.
-                discoveryClient = new HAJournalDiscoveryClient(
+                discoveryClient = new HAGlueServicesClient(
                         serviceDiscoveryManager,
                         null/* serviceDiscoveryListener */, cacheMissTimeout);
 
                 // And set the reference. The client is now "connected".
                 this.clientRef.set(client);
-                
+
             } catch (Exception ex) {
 
-                log.fatal("Problem initiating service discovery: "
-                        + ex.getMessage(), ex);
+                log.fatal(
+                        "Problem initiating service discovery: "
+                                + ex.getMessage(), ex);
 
                 try {
 
                     shutdownNow();
-                    
+
                 } catch (Throwable t) {
-                    
+
                     log.error(t.getMessage(), t);
-                    
+
                 }
 
                 throw new RuntimeException(ex);
-                
+
             }
 
         }
+
         /**
          * {@inheritDoc}
          * <p>
@@ -762,18 +840,19 @@ public class HAClient {
          */
         @Override
         synchronized public void shutdown() {
-            
-            if(!isOpen()) return;
+
+            if (!isOpen())
+                return;
 
             if (log.isInfoEnabled())
                 log.info("begin");
-            
+
             // Disconnect.
             clientRef.set(null);
 
             final long begin = System.currentTimeMillis();
 
-//            super.shutdown();
+            // super.shutdown();
 
             terminateDiscoveryProcesses();
 
@@ -818,23 +897,23 @@ public class HAClient {
          * Stop various discovery processes.
          */
         private void terminateDiscoveryProcesses() {
-            
+
             /*
              * bigdata specific service discovery.
              */
-            
+
             if (discoveryClient != null) {
 
                 discoveryClient.terminate();
 
                 discoveryClient = null;
-                
+
             }
 
             /*
              * and the lower level jini processes.
              */
-            
+
             if (serviceDiscoveryManager != null) {
 
                 serviceDiscoveryManager.terminate();
@@ -851,17 +930,72 @@ public class HAClient {
 
             }
 
-            try {
+            // Terminate any quorums opened by the HAConnection.
+            for (Quorum<HAGlue, QuorumClient<HAGlue>> quorum : quorums.values()) {
 
-                // close the zookeeper client.
-                zooKeeperAccessor.close();
-
-            } catch (InterruptedException e) {
-
-                throw new RuntimeException(e);
+                quorum.terminate();
 
             }
-            
+
+            /*
+             * Close our zookeeper connection, invalidating all ephemeral znodes
+             * for this service.
+             * 
+             * Note: This provides a decisive mechanism for removing this
+             * service from the joined services, the pipeline, withdrawing its
+             * vote, and removing it as a quorum member.
+             */
+            log.warn("FORCING UNCURABLE ZOOKEEPER DISCONNECT");
+
+            if (zka != null) {
+
+                try {
+                    zka.close();
+                } catch (InterruptedException e) {
+                    // propagate the interrupt.
+                    Thread.currentThread().interrupt();
+                }
+
+            }
+            // try {
+            //
+            // // close the zookeeper client.
+            // zooKeeperAccessor.close();
+            //
+            // } catch (InterruptedException e) {
+            //
+            // throw new RuntimeException(e);
+            //
+            // }
+
+        }
+
+        /**
+         * An object used to manage jini service registrar discovery.
+         */
+        public LookupDiscoveryManager getDiscoveryManagement() {
+
+            return lookupDiscoveryManager;
+
+        }
+
+        /**
+         * An object used to lookup services using the discovered service
+         * registars.
+         */
+        public ServiceDiscoveryManager getServiceDiscoveryManager() {
+
+            return serviceDiscoveryManager;
+
+        }
+
+        /**
+         * Caching discovery client for the {@link HAGlue} services.
+         */
+        public HAGlueServicesClient getHAGlueServicesClient() {
+
+            return discoveryClient;
+
         }
 
         /**
@@ -881,7 +1015,7 @@ public class HAClient {
         public HAGlue getHAGlueService(final UUID serviceUUID) {
 
             return discoveryClient.getService();
-                    
+
         }
 
         /**
@@ -902,25 +1036,215 @@ public class HAClient {
 
         }
 
-        /**
-         * Return ANY {@link HAGlue} service which has been (or could be)
-         * discovered and which is part of the connected federation.
-         * 
-         * @return <code>null</code> if there are NO known {@link HAGlue}
-         *         services.
+        /*
+         * HAGlue Quorum
          */
-        public HAGlue getAnyHAGlueService() {
 
-            assertOpen();
+        /**
+         * Return the set of known logical service identifiers for HA
+         * replication clusters. These are extracted from zookeeper.
+         * 
+         * @return The known logical service identifiers.
+         * 
+         * @throws InterruptedException
+         * @throws KeeperException
+         */
+        public String[] getHALogicalServiceIds() throws KeeperException,
+                InterruptedException {
 
-            return discoveryClient.getService();
-            
+            final ZookeeperClientConfig zkClientConfig = getZooConfig();
+
+            // zpath dominating the HA replication clusters.
+            final String logicalServiceZPathPrefix = zkClientConfig.zroot + "/"
+                    + HAJournalServer.class.getName();
+
+            final String[] children = zka.getZookeeper()
+                    .getChildren(logicalServiceZPathPrefix, false/* watch */)
+                    .toArray(new String[0]);
+
+            return children;
+
+        }
+
+        /**
+         * Obtain an object that will reflect the state of the {@link Quorum}
+         * for the HA replication identified by the logical service identifier.
+         * <p>
+         * Note: Each quorum that you start has asynchronous threads and MUST be
+         * terminated.
+         * 
+         * @param logicalServiceId
+         *            The logical service identifier.
+         * 
+         * @return A {@link Quorum} that will monitor and reflect the state of
+         *         that HA replication cluster -or- <code>null</code> iff there
+         *         is no such logical service.
+         * 
+         * @throws InterruptedException
+         * @throws KeeperException
+         */
+        public Quorum<HAGlue, QuorumClient<HAGlue>> getHAGlueQuorum(
+                final String logicalServiceId) throws KeeperException,
+                InterruptedException {
+
+            /*
+             * Fast path. Check for an existing instance.
+             */
+            Quorum<HAGlue, QuorumClient<HAGlue>> quorum;
+            synchronized (quorums) {
+
+                quorum = quorums.get(logicalServiceId);
+
+                if (quorum != null) {
+
+                    return quorum;
+
+                }
+
+            }
+
+            /*
+             * Setup a new instance.
+             */
+
+            final ZookeeperClientConfig zkClientConfig = getZooConfig();
+
+            // zpath dominating the HA replication clusters.
+            final String logicalServiceZPathPrefix = zkClientConfig.zroot + "/"
+                    + HAJournalServer.class.getName();
+
+            // zpath for the logical service (child is "quorum" znode).
+            final String logicalServiceZPath = logicalServiceZPathPrefix + "/"
+                    + logicalServiceId;
+
+            // zpath for the QUORUM znode for the specified logical service.
+            final String quorumZPath = logicalServiceZPath + "/"
+                    + ZKQuorum.QUORUM;
+
+            final List<ACL> acl = zkClientConfig.acl;
+
+            /*
+             * Ensure key znodes exist.
+             */
+            try {
+                zka.getZookeeper().create(zkClientConfig.zroot,
+                        new byte[] {/* data */}, acl, CreateMode.PERSISTENT);
+            } catch (NodeExistsException ex) {
+                // ignore.
+            }
+            try {
+                zka.getZookeeper().create(logicalServiceZPathPrefix,
+                        new byte[] {/* data */}, acl, CreateMode.PERSISTENT);
+            } catch (NodeExistsException ex) {
+                // ignore.
+            }
+            try {
+                zka.getZookeeper().create(logicalServiceZPath,
+                        new byte[] {/* data */}, acl, CreateMode.PERSISTENT);
+            } catch (NodeExistsException ex) {
+                // ignore.
+            }
+
+            /*
+             * Extract replicationFactor from the quorum znode.
+             */
+            final int replicationFactor;
+            {
+                final byte[] data;
+                try {
+
+                    final Stat stat = new Stat();
+
+                    data = zka.getZookeeper().getData(quorumZPath,
+                            false/* watch */, stat);
+
+                    final QuorumTokenState tokenState = (QuorumTokenState) SerializerUtil
+                            .deserialize(data);
+
+                    if (log.isInfoEnabled())
+                        log.info("Starting with quorum that has already met in the past: "
+                                + tokenState);
+
+                    replicationFactor = tokenState.replicationFactor();
+
+                    if (replicationFactor == 0) {
+
+                        /*
+                         * The replication factor was not originally part of the
+                         * QuorumTokenState. It was introduced before the first
+                         * HA release along with an automated migration
+                         * mechanism. If the replicationFactor is not set, then
+                         * you need to restart one of the HAJournalServer
+                         * processes. It has the correct replication factor in
+                         * its Configuration file. ZKQuorumImpl will
+                         * automatically impose the replicationFactor when it is
+                         * started by the HAJournalServer. We can not do that
+                         * here because the HAClient does not know the
+                         * replication factor (that information is not part of
+                         * its configuration and can vary from one HA
+                         * replication cluster to another, which is why it needs
+                         * to be stored in zookeeper).
+                         */
+
+                        throw new UnsupportedOperationException(
+                                "The replicationFactor will be set when an HAJournalProcess is restarted: logicalServiceId="
+                                        + logicalServiceId);
+
+                    }
+
+                } catch (NoNodeException e) {
+                    // This is Ok. The node just does not exist yet.
+                    return null;
+                } catch (KeeperException e) {
+                    // Anything else is a problem.
+                    throw new RuntimeException(e);
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
+            }
+
+            synchronized (quorums) {
+
+                quorum = quorums.get(logicalServiceId);
+
+                if (quorum == null) {
+
+                    quorums.put(
+                            logicalServiceId,
+                            quorum = new ZKQuorumImpl<HAGlue, QuorumClient<HAGlue>>(
+                                    replicationFactor, zka, acl));
+
+                    quorum.start(new MyQuorumClient(logicalServiceZPath));
+
+                }
+
+            }
+
+            return quorum;
+
+        }
+
+        private class MyQuorumClient extends AbstractQuorumClient<HAGlue> {
+
+            protected MyQuorumClient(final String logicalServiceId) {
+
+                super(logicalServiceId);
+
+            }
+
+            @Override
+            public HAGlue getService(final UUID serviceId) {
+
+                return getHAGlueService(serviceId);
+
+            }
+
         }
 
         /*
          * ServiceDiscoveryListener
          */
-        
+
         /**
          * Invokes {@link HAClient#serviceJoin(IService, UUID)} if the newly
          * discovered service implements {@link IService}.
@@ -928,7 +1252,7 @@ public class HAClient {
          * {@inheritDoc}
          */
         public void serviceAdded(final ServiceDiscoveryEvent e) {
-            
+
             final ServiceItem serviceItem = e.getPostEventServiceItem();
 
             if (serviceItem.service instanceof IService) {
@@ -946,12 +1270,12 @@ public class HAClient {
                 }
 
             } else {
-                
+
                 if (log.isInfoEnabled())
                     log.info("Not an " + IService.class.getName() + " : " + e);
 
             }
-            
+
         }
 
         /**
@@ -961,7 +1285,9 @@ public class HAClient {
          */
         @Override
         public void serviceChanged(final ServiceDiscoveryEvent e) {
-            
+
+            // Ignored.
+
         }
 
         /**
@@ -971,7 +1297,7 @@ public class HAClient {
          */
         @Override
         public void serviceRemoved(final ServiceDiscoveryEvent e) {
-            
+
             final ServiceItem serviceItem = e.getPreEventServiceItem();
 
             final UUID serviceUUID = JiniUtil
@@ -984,7 +1310,7 @@ public class HAClient {
                 client.serviceLeave(serviceUUID);
 
             }
-            
+
         }
 
         /*
@@ -992,13 +1318,14 @@ public class HAClient {
          */
 
         /**
-         * Lock controlling access to the {@link #discoveryEvent} {@link Condition}.
+         * Lock controlling access to the {@link #discoveryEvent}
+         * {@link Condition}.
          */
         private final ReentrantLock discoveryEventLock = new ReentrantLock();
 
         /**
-         * Condition signaled any time there is a {@link DiscoveryEvent} delivered to
-         * our {@link DiscoveryListener}.
+         * Condition signaled any time there is a {@link DiscoveryEvent}
+         * delivered to our {@link DiscoveryListener}.
          */
         private final Condition discoveryEvent = discoveryEventLock
                 .newCondition();
@@ -1012,25 +1339,25 @@ public class HAClient {
         public void discarded(final DiscoveryEvent e) {
 
             try {
-                
+
                 discoveryEventLock.lockInterruptibly();
-                
+
                 try {
-                    
+
                     discoveryEvent.signalAll();
-                
+
                 } finally {
-                    
+
                     discoveryEventLock.unlock();
-                    
+
                 }
-                
+
             } catch (InterruptedException ex) {
-                
+
                 return;
-                
+
             }
-            
+
         }
 
         /**
@@ -1060,52 +1387,171 @@ public class HAClient {
                 return;
 
             }
-            
+
         }
-        
-    }
+
+        /*
+         * Misc methods.
+         */
+
+        /**
+         * Await discovery of at least one {@link ServiceRegistrar}.
+         * 
+         * @param timeout
+         *            The timeout.
+         * @param unit
+         *            The units for that timeout.
+         * 
+         * @throws IllegalArgumentException
+         *             if minCount is non-positive.
+         */
+        public ServiceRegistrar[] awaitServiceRegistrars(final long timeout,
+                final TimeUnit unit) throws TimeoutException,
+                InterruptedException {
+
+            final long begin = System.nanoTime();
+            final long nanos = unit.toNanos(timeout);
+            long remaining = nanos;
+
+            ServiceRegistrar[] registrars = null;
+
+            while ((registrars == null || registrars.length == 0)
+                    && remaining > 0) {
+
+                registrars = getDiscoveryManagement().getRegistrars();
+
+                Thread.sleep(100/* ms */);
+
+                final long elapsed = System.nanoTime() - begin;
+
+                remaining = nanos - elapsed;
+
+            }
+
+            if (registrars == null || registrars.length == 0) {
+
+                throw new RuntimeException(
+                        "Could not discover ServiceRegistrar(s)");
+
+            }
+
+            if (log.isInfoEnabled()) {
+
+                log.info("Found " + registrars.length + " service registrars");
+
+            }
+
+            return registrars;
+
+        }
+
+    } // class HAConnection
 
     /**
      * Simple main just connects and then disconnects after a few seconds. It
      * prints out all discovered {@link HAGlue} services before it shutsdown.
      * 
      * @param args
+     * 
      * @throws ConfigurationException
      * @throws InterruptedException
+     * @throws KeeperException
      */
     public static void main(final String[] args) throws ConfigurationException,
-            InterruptedException {
+            InterruptedException, KeeperException {
 
         final HAClient client = new HAClient(args);
 
         final HAConnection ctx = client.connect();
 
+        /*
+         * Note: If non-null, will connect to quorum for this logical service.
+         * 
+         * TODO Command line arg?
+         */
+        final String logicalServiceId = null;
+//        final String logicalServiceId = "test-1";
+
         try {
 
-            System.out.println("Connected - waiting for service discovery.");
-            
-            Thread.sleep(5000/* ms */);
+            /*
+             * Show the HA replication cluster instances (this data is in
+             * zookeeper).
+             */
+            {
 
-            // Get UUIDs for all discovered services.
-            final UUID[] serviceIds = ctx.getHAGlueServiceUUIDs(0/* maxCount */);
+                final String[] a = ctx.getHALogicalServiceIds();
 
-            System.out.println("Found " + serviceIds.length + " services.");
+                for (int i = 0; i < a.length; i++) {
 
-            for(UUID x : serviceIds) {
-                
-                System.out.println("service: " + x + " has proxy "
-                        + ctx.getHAGlueService(x));
-                
+                    System.out.println("logicalServiceId: " + a[i]);
+
+                }
+
             }
-            
+
+            if (logicalServiceId != null) {
+                /*
+                 * This shows up to lookup a known replication cluster.
+                 */
+                final Quorum<HAGlue, QuorumClient<HAGlue>> quorum = ctx
+                        .getHAGlueQuorum(logicalServiceId);
+
+                // Setup listener that logs quorum events @ TRACE.
+                quorum.addListener(new QuorumListener() {
+                    @Override
+                    public void notify(final QuorumEvent e) {
+                        // if (log.isInfoEnabled())
+                        // log.info(e);
+                        System.err.println("EVENT: " + e);
+                    }
+                });
+
+            }
+
+            /*
+             * Show the discoverable HAGlue services.
+             */
+            {
+                System.out
+                        .println("Connected - waiting for service discovery.");
+
+                Thread.sleep(1000/* ms */);
+
+                // Get UUIDs for all discovered services.
+                final UUID[] serviceIds = ctx
+                        .getHAGlueServiceUUIDs(0/* maxCount */);
+
+                System.out.println("Found " + serviceIds.length + " services.");
+
+                for (UUID x : serviceIds) {
+
+                    System.out.println("service: " + x + ", proxy: "
+                            + ctx.getHAGlueService(x));
+
+                }
+
+            }
+
+            if (logicalServiceId != null) {
+
+                /*
+                 * Sleep a bit to allow quorum messages to be written to the
+                 * console.
+                 */
+                
+                Thread.sleep(10000/* ms */);
+
+            }
+
         } finally {
 
             ctx.shutdown();
-            
+
         }
-        
+
         System.out.println("Bye");
-        
+
     }
-    
+
 }

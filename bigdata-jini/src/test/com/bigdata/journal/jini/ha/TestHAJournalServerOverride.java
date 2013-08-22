@@ -27,40 +27,24 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.journal.jini.ha;
 
 import java.util.UUID;
-import java.util.concurrent.Future;
-import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-
-import org.openrdf.model.Resource;
-import org.openrdf.model.URI;
-import org.openrdf.model.impl.URIImpl;
 
 import net.jini.config.Configuration;
 
 import com.bigdata.ha.HACommitGlue;
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.HAStatusEnum;
-import com.bigdata.ha.IndexManagerCallable;
 import com.bigdata.ha.msg.IHA2PhaseCommitMessage;
 import com.bigdata.ha.msg.IHA2PhasePrepareMessage;
 import com.bigdata.ha.msg.IHANotifyReleaseTimeRequest;
 import com.bigdata.journal.AbstractTask;
-import com.bigdata.journal.IIndexManager;
-import com.bigdata.journal.ITx;
-import com.bigdata.journal.jini.ha.AbstractHA3JournalServerTestCase.ABC;
-import com.bigdata.journal.jini.ha.AbstractHA3JournalServerTestCase.LargeLoadTask;
 import com.bigdata.journal.jini.ha.HAJournalTest.HAGlueTest;
 import com.bigdata.journal.jini.ha.HAJournalTest.SpuriousTestException;
 import com.bigdata.quorum.zk.ZKQuorum;
 import com.bigdata.quorum.zk.ZKQuorumImpl;
-import com.bigdata.rdf.sail.BigdataSail;
-import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
-import com.bigdata.rdf.sail.BigdataSailRepository;
 import com.bigdata.rdf.sail.webapp.client.HttpException;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
-import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.rdf.store.BD;
 import com.bigdata.util.ClocksNotSynchronizedException;
 import com.bigdata.util.InnerCause;
 
@@ -185,89 +169,19 @@ public class TestHAJournalServerOverride extends AbstractHA3JournalServerTestCas
      * break. It should simply discard the buffered write set for that
      * transactions.
      * 
+     * TODO Currently, there is a single unisolated connection commit protocol.
+     * When we add concurrent unisolated writers, the user level transaction
+     * abort will just discard the buffered writes for a specific
+     * {@link AbstractTask}.
+     * 
      * @throws Exception
      */
-	@SuppressWarnings("serial")
-	public void testStartABC_userLevelAbortDoesNotCauseQuorumBreak()
+    public void testStartABC_userLevelAbortDoesNotCauseQuorumBreak()
             throws Exception {
 
-        final ABC abc = new ABC(false/*sequential*/); // simultaneous start.
+        fail("write test");
 
-        final HAGlue serverA = abc.serverA, serverB = abc.serverB, serverC = abc.serverC;
-
-        // Verify quorum is FULLY met.
-        final long token = awaitFullyMetQuorum();
-
-        final HAGlueTest leader = (HAGlueTest) quorum.getClient().getLeader(token);
-        
-        leader.log("Calling RemoteUserLevelAbortt");
-        
-        final Future<Void> ft = leader.submit(new RemoteUserLevelAbort(), true);      
-        
-        // Await await user abort task.
-        try {
-        	ft.get();
-            leader.log("DONE: RemoteUserLevelAbort");
-       } catch (Exception e) {
-        	fail("Unexpected exception", e);
-        }
-
-        // quorum should remain met on original token
-        assertTrue(token == awaitFullyMetQuorum());
     }
-	
-	/**
-	 * RemoteUserLevel abort connects to Sail with an unisolated
-	 * connection, loads some data then closes the connection resulting
-	 * in a local abort on the leader.
-	 */
-	@SuppressWarnings("serial")
-	static class RemoteUserLevelAbort extends IndexManagerCallable<Void> {
-		
-		@Override
-		public Void call() throws Exception {
-			
-			HAJournal journal = (HAJournal) getIndexManager();
-			
-			
-	        final AbstractTripleStore tripleStore = (AbstractTripleStore) journal
-	                .getResourceLocator().locate("kb", ITx.UNISOLATED);
-
-	        if (tripleStore == null) {
-
-	            throw new RuntimeException("Not found: namespace=kb");
-
-	        }
-	        
-			log.warn("Establishing BigdataSail connection");
-
-	        final BigdataSail sail = new BigdataSail(tripleStore);
-
-	        final BigdataSailRepository repo = new BigdataSailRepository(sail);
-
-	        repo.initialize();
-	        
-			BigdataSailConnection conn = sail.getUnisolatedConnection();
-			
-            final String ns = BD.NAMESPACE;
-            
-            final URI mike = new URIImpl(ns+"User");
-            final URI bryan = new URIImpl(ns+"Level");
-            final URI martyn = new URIImpl(ns+"Abort");
-
-            conn.addStatement(mike, bryan, martyn, new Resource[]{});
-	        conn.flush();
-	        
-			log.warn("Added data");
-
-			// A close should trigger an abort - confirmed in log
-			conn.close();
-			
-			log.warn("Connection closed");
-
-			return null;
-		}
-	}
 
     /**
      * This test forces clock skew on one of the followers causing it to
@@ -589,7 +503,7 @@ public class TestHAJournalServerOverride extends AbstractHA3JournalServerTestCas
         // Enforce the join order.
         final ABC startup = new ABC(true /*sequential*/);
 
-        HAJournalTest.dumpThreads();
+        //HAJournalTest.dumpThreads();
         
         final long token = awaitFullyMetQuorum();
 

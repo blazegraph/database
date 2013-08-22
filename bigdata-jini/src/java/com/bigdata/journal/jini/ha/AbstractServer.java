@@ -58,7 +58,6 @@ import net.jini.core.lookup.ServiceID;
 import net.jini.core.lookup.ServiceRegistrar;
 import net.jini.discovery.DiscoveryEvent;
 import net.jini.discovery.DiscoveryListener;
-import net.jini.discovery.LookupDiscoveryManager;
 import net.jini.export.Exporter;
 import net.jini.jeri.BasicILFactory;
 import net.jini.jeri.BasicJeriExporter;
@@ -67,7 +66,6 @@ import net.jini.lease.LeaseListener;
 import net.jini.lease.LeaseRenewalEvent;
 import net.jini.lease.LeaseRenewalManager;
 import net.jini.lookup.JoinManager;
-import net.jini.lookup.ServiceDiscoveryManager;
 import net.jini.lookup.ServiceIDListener;
 import net.jini.lookup.entry.Name;
 
@@ -82,6 +80,7 @@ import com.bigdata.jini.lookup.entry.Hostname;
 import com.bigdata.jini.lookup.entry.ServiceUUID;
 import com.bigdata.jini.start.config.ZookeeperClientConfig;
 import com.bigdata.jini.util.JiniUtil;
+import com.bigdata.journal.jini.ha.HAClient.HAConnection;
 import com.bigdata.service.AbstractService;
 import com.bigdata.service.IService;
 import com.bigdata.service.IServiceShutdown;
@@ -152,6 +151,9 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
     /**
      * Configuration options.
      * <p>
+     * Note: The options declared by this interface are in the namespace for the
+     * concrete implementation of the {@link AbstractServer} class.
+     * <p>
      * Note: The {@link ServiceID} is optional and may be specified using the
      * {@link Entry}[] for the {@link JiniClientConfig} as a {@link ServiceUUID}
      * . If it is not specified, then a random {@link ServiceID} will be
@@ -162,7 +164,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
      * @see JiniClientConfig
      * @see ZookeeperClientConfig
      */
-    public interface ConfigurationOptions {
+    public interface ConfigurationOptions extends HAClient.ConfigurationOptions {
 
         /**
          * The pathname of the service directory as a {@link File} (required).
@@ -178,21 +180,13 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
          */
         String EXPORTER = "exporter";
 
-        /**
-         * The timeout in milliseconds to await the discovery of a service if
-         * there is a cache miss (default {@value #DEFAULT_CACHE_MISS_TIMEOUT}).
-         */
-        String CACHE_MISS_TIMEOUT = "cacheMissTimeout";
-
-        long DEFAULT_CACHE_MISS_TIMEOUT = 2000L;
-     
     }
 
-    /**
-     * The timeout in milliseconds to await the discovery of a service if there
-     * is a cache miss (default {@value #DEFAULT_CACHE_MISS_TIMEOUT}).
-     */
-    final protected long cacheMissTimeout;
+//    /**
+//     * The timeout in milliseconds to await the discovery of a service if there
+//     * is a cache miss (default {@value #DEFAULT_CACHE_MISS_TIMEOUT}).
+//     */
+//    final protected long cacheMissTimeout;
     
     /**
      * The {@link ServiceID} for this server is either read from a local file,
@@ -246,10 +240,15 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
     private RandomAccessFile lockFileRAF = null;
     private FileLock fileLock;
     private File lockFile;
-    
-    private LookupDiscoveryManager lookupDiscoveryManager;
 
-    private ServiceDiscoveryManager serviceDiscoveryManager;
+    /**
+     * The reference to the {@link HAClient}.
+     */
+    private final HAClient haClient;
+
+//    private LookupDiscoveryManager lookupDiscoveryManager;
+//
+//    private ServiceDiscoveryManager serviceDiscoveryManager;
 
     /**
      * Used to manage the join/leave of the service hosted by this server with
@@ -390,24 +389,33 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
         
     }
 
-    /**
-     * An object used to manage jini service registrar discovery.
-     */
-    public LookupDiscoveryManager getDiscoveryManagement() {
-        
-        return lookupDiscoveryManager;
-        
-    }
+//    /**
+//     * An object used to manage jini service registrar discovery.
+//     */
+//    public LookupDiscoveryManager getDiscoveryManagement() {
+//        
+//        return lookupDiscoveryManager;
+//        
+//    }
+//
+//    /**
+//     * An object used to lookup services using the discovered service registars.
+//     */
+//    public ServiceDiscoveryManager getServiceDiscoveryManager() {
+//        
+//        return serviceDiscoveryManager;
+//        
+//    }
 
     /**
-     * An object used to lookup services using the discovered service registars.
+     * The {@link HAClient}.
      */
-    public ServiceDiscoveryManager getServiceDiscoveryManager() {
+    protected final HAClient getHAClient() {
         
-        return serviceDiscoveryManager;
+        return haClient;
         
     }
-
+    
     /*
      * DiscoveryListener
      */
@@ -611,9 +619,9 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
 
             config = ConfigurationProvider.getInstance(args);
             
-            cacheMissTimeout = (Long) config.getEntry(COMPONENT,
-                    ConfigurationOptions.CACHE_MISS_TIMEOUT, Long.TYPE,
-                    ConfigurationOptions.DEFAULT_CACHE_MISS_TIMEOUT);
+//            cacheMissTimeout = (Long) config.getEntry(COMPONENT,
+//                    ConfigurationOptions.CACHE_MISS_TIMEOUT, Long.TYPE,
+//                    ConfigurationOptions.DEFAULT_CACHE_MISS_TIMEOUT);
 
             jiniClientConfig = new JiniClientConfig(
                     JiniClientConfig.Options.NAMESPACE, config);
@@ -881,45 +889,59 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
         Runtime.getRuntime().addShutdownHook(
                 new ShutdownThread(false/* destroy */, this));
 
+        final HAConnection ctx;
         try {
 
-            /*
-             * Note: This class will perform multicast discovery if ALL_GROUPS
-             * is specified and otherwise requires you to specify one or more
-             * unicast locators (URIs of hosts running discovery services). As
-             * an alternative, you can use LookupDiscovery, which always does
-             * multicast discovery.
-             */
-            lookupDiscoveryManager = new LookupDiscoveryManager(
-                    jiniClientConfig.groups, jiniClientConfig.locators,
-                    this /* DiscoveryListener */, config);
+            // Create client.
+            haClient = new HAClient(args);
 
-            /*
-             * Setup a helper class that will be notified as services join or
-             * leave the various registrars to which the data server is
-             * listening.
-             */
-            try {
-
-                serviceDiscoveryManager = new ServiceDiscoveryManager(
-                        lookupDiscoveryManager, new LeaseRenewalManager(),
-                        config);
-
-            } catch (IOException ex) {
-
-                throw new RuntimeException(
-                        "Could not initiate service discovery manager", ex);
-
-            }
-
-        } catch (IOException ex) {
-
-            fatal("Could not setup discovery", ex);
-            throw new AssertionError();// keep the compiler happy.
-
+            // Connect.
+            ctx = haClient.connect();
+            
+//            /*
+//             * Note: This class will perform multicast discovery if ALL_GROUPS
+//             * is specified and otherwise requires you to specify one or more
+//             * unicast locators (URIs of hosts running discovery services). As
+//             * an alternative, you can use LookupDiscovery, which always does
+//             * multicast discovery.
+//             */
+//            lookupDiscoveryManager = new LookupDiscoveryManager(
+//                    jiniClientConfig.groups, jiniClientConfig.locators,
+//                    this /* DiscoveryListener */, config);
+//
+//            /*
+//             * Setup a helper class that will be notified as services join or
+//             * leave the various registrars to which the data server is
+//             * listening.
+//             */
+//            try {
+//
+//                serviceDiscoveryManager = new ServiceDiscoveryManager(
+//                        lookupDiscoveryManager, new LeaseRenewalManager(),
+//                        config);
+//
+//            } catch (IOException ex) {
+//
+//                throw new RuntimeException(
+//                        "Could not initiate service discovery manager", ex);
+//
+//            }
+//
+//        } catch (IOException ex) {
+//
+//            fatal("Could not setup discovery", ex);
+//            throw new AssertionError();// keep the compiler happy.
+//
         } catch (ConfigurationException ex) {
 
-            fatal("Could not setup discovery", ex);
+            fatal("Configuration error: " + ex, ex);
+
+            throw new AssertionError();// keep the compiler happy.
+
+        } catch(Throwable ex) {
+            
+            fatal("Could not connect: " + ex, ex);
+
             throw new AssertionError();// keep the compiler happy.
 
         }
@@ -1000,7 +1022,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
                 joinManager = new JoinManager(proxy, // service proxy
                         attributes, // attr sets
                         serviceID, // ServiceID
-                        getDiscoveryManagement(), // DiscoveryManager
+                        ctx.getDiscoveryManagement(), // DiscoveryManager
                         new LeaseRenewalManager(), //
                         config);
                 
@@ -1013,7 +1035,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
                 joinManager = new JoinManager(proxy, // service proxy
                         attributes, // attr sets
                         this, // ServiceIDListener
-                        getDiscoveryManagement(), // DiscoveryManager
+                        ctx.getDiscoveryManagement(), // DiscoveryManager
                         new LeaseRenewalManager(), //
                         config);
             
@@ -1775,21 +1797,23 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
 
         }
         
-        if (serviceDiscoveryManager != null) {
+        haClient.disconnect(false/*immediateShutdown*/);
 
-            serviceDiscoveryManager.terminate();
-
-            serviceDiscoveryManager = null;
-
-        }
-
-        if (lookupDiscoveryManager != null) {
-
-            lookupDiscoveryManager.terminate();
-
-            lookupDiscoveryManager = null;
-
-        }
+//        if (serviceDiscoveryManager != null) {
+//
+//            serviceDiscoveryManager.terminate();
+//
+//            serviceDiscoveryManager = null;
+//
+//        }
+//
+//        if (lookupDiscoveryManager != null) {
+//
+//            lookupDiscoveryManager.terminate();
+//
+//            lookupDiscoveryManager = null;
+//
+//        }
         
 //        if (client != null) {
 //
@@ -1838,8 +1862,15 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
             log.warn("Could not set thread name: " + ex);
             
         }
-        
-        startUpHook();
+
+        boolean started = false;
+        try {
+            startUpHook();
+            started = true;
+        } finally {
+            if (!started)
+                shutdownNow(false/*destroy*/);
+        }
 
         if (runState.compareAndSet(RunState.Start, RunState.Running)) {
 

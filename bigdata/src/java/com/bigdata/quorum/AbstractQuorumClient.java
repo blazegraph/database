@@ -49,7 +49,8 @@ abstract public class AbstractQuorumClient<S extends Remote> implements
 
     private final String logicalServiceId;
 
-    public String getLogicalServiceId() {
+    @Override
+    final public String getLogicalServiceId() {
         
         return logicalServiceId;
         
@@ -71,6 +72,7 @@ abstract public class AbstractQuorumClient<S extends Remote> implements
      * @return The reference from an atomic variable that will be cleared if the
      *         quorum terminates.
      */
+    @Override
     public Quorum<?,?> getQuorum() {
 
         final Quorum<?,?> tmp = quorum.get();
@@ -82,6 +84,7 @@ abstract public class AbstractQuorumClient<S extends Remote> implements
 
     }
 
+    @Override
     public void start(final Quorum<?,?> quorum) {
 
         if (quorum == null)
@@ -95,12 +98,14 @@ abstract public class AbstractQuorumClient<S extends Remote> implements
     
     }
 
+    @Override
     public void terminate() {
         
         this.quorum.set(null);
         
     }
-    
+
+    @Override
     public S getLeader(final long token) {
         final Quorum<?,?> q = getQuorum();
         q.assertQuorum(token);
@@ -112,9 +117,12 @@ abstract public class AbstractQuorumClient<S extends Remote> implements
         return getService(leaderId);
     }
 
+    @Override
     abstract public S getService(UUID serviceId);
 
+    @Override
     public void notify(QuorumEvent e) {
+
     }
 
 }

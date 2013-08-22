@@ -229,7 +229,7 @@ public class AbstractHA3JournalServerTestCase extends
 
     private ServiceDiscoveryManager serviceDiscoveryManager = null;
 
-    private HAJournalDiscoveryClient discoveryClient = null;
+    private HAGlueServicesClient discoveryClient = null;
     
     /**
      * The {@link ZooKeeperAccessor} used by the {@link #quorum}.
@@ -301,7 +301,7 @@ public class AbstractHA3JournalServerTestCase extends
                 lookupDiscoveryManager, new LeaseRenewalManager(), config);
 
         // Setup discovery for HAGlue clients.
-        discoveryClient = new HAJournalDiscoveryClient(serviceDiscoveryManager,
+        discoveryClient = new HAGlueServicesClient(serviceDiscoveryManager,
                 null/* serviceDiscoveryListener */, cacheMissTimeout);
 
         // Setup quorum client.
