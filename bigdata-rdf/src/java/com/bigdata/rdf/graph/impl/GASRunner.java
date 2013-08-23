@@ -427,7 +427,17 @@ abstract public class GASRunner<VS, ES, ST> implements Callable<GASStats> {
 
         } finally {
 
-            jnl.close();
+            if (isTemporary) {
+
+                log.warn("Destroying temporary journal.");
+                
+                jnl.destroy();
+                
+            } else {
+                
+                jnl.close();
+                
+            }
 
         }
 
