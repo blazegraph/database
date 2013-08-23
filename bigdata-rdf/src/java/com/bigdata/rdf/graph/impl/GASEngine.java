@@ -578,9 +578,18 @@ public class GASEngine<VS, ES, ST> implements IGASEngine<VS, ES, ST>,
          */
         
         final long beginGather = System.nanoTime();
-        
-        final long gatherEdgeCount = gatherEdges(kb, gatherEdges,
-                pushDownApplyInGather);
+
+        final long gatherEdgeCount;
+        if (gatherEdges == EdgesEnum.NoEdges) {
+
+            gatherEdgeCount = 0L;
+
+        } else {
+
+            gatherEdgeCount = gatherEdges(kb, gatherEdges,
+                    pushDownApplyInGather);
+            
+        }
 
         final long elapsedGather = System.nanoTime() - beginGather;
 
@@ -609,10 +618,20 @@ public class GASEngine<VS, ES, ST> implements IGASEngine<VS, ES, ST>,
          */
         
         final long beginScatter = System.nanoTime();
+ 
+        final long scatterEdgeCount;
         
-        final long scatterEdgeCount = scatterEdges(kb, scatterEdges,
-                pushDownApplyInScatter);
+        if (scatterEdges == EdgesEnum.NoEdges) {
 
+            scatterEdgeCount = 0L;
+            
+        } else {
+
+            scatterEdgeCount = scatterEdges(kb, scatterEdges,
+                    pushDownApplyInScatter);
+
+        }
+       
         final long elapsedScatter = System.nanoTime() - beginScatter;
 
         /*
