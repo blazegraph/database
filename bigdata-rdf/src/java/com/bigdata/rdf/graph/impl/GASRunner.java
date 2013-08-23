@@ -38,6 +38,11 @@ abstract public class GASRunner<VS, ES, ST> implements Callable<GASStats> {
     private static final Logger log = Logger.getLogger(GASRunner.class);
 
     /**
+     * The seed used for the random number generator.
+     */
+    private final long seed;
+    
+    /**
      * Random number generated used for sampling the starting vertices.
      */
     private final Random r;
@@ -208,25 +213,16 @@ abstract public class GASRunner<VS, ES, ST> implements Callable<GASStats> {
         /*
          * Assign parsed values.
          */
+        this.seed = seed;
         this.nsamples = nsamples;
         this.nthreads = nthreads;
-        this.r = new Random(seed);
         this.namespaceOverride = namespace;
         this.bufferModeOverride = bufferMode;
         this.loadSet = loadSet.isEmpty() ? null : loadSet
                 .toArray(new String[loadSet.size()]);
 
-    }
-
-    /**
-     * Return a sample of random vertices.
-     * 
-     * @param kb
-     */
-    @SuppressWarnings("rawtypes")
-    protected IV[] getRandomSamples(final AbstractTripleStore kb) {
-
-        return GASGraphUtil.getRandomSample(r, kb, nsamples);
+        // Setup the random number generator.
+        this.r = new Random(seed);
 
     }
 
@@ -490,25 +486,33 @@ abstract public class GASRunner<VS, ES, ST> implements Callable<GASStats> {
      *            The KB namespace.
      * @return
      * @throws Exception
+     * 
+     * TODO What happened to the predicate summary/histogram/distribution code?
+     * 
+     * TODO Are we better off using sampling based on distinct vertices or with
+     * a bais based on the #of edges for those vertices.
      */
     private GASStats runAnalytic(final Journal jnl, final String namespace)
             throws Exception {
 
+        /*
+         * Use a read-only view (sampling depends on access to the BTree rather
+         * than the ReadCommittedIndex).
+         */
+        final AbstractTripleStore kb = (AbstractTripleStore) jnl
+                .getResourceLocator()
+                .locate(namespace, jnl.getLastCommitTime());
+
         @SuppressWarnings("rawtypes")
-        final IV[] samples;
-        {
-            /*
-             * Use a read-only view (sampling depends on access to the BTree
-             * rather than the ReadCommittedIndex).
-             */
-            final AbstractTripleStore kb = (AbstractTripleStore) jnl
-                    .getResourceLocator().locate(namespace,
-                            jnl.getLastCommitTime());
+        final IV[] samples = GASGraphUtil.getRandomSample(r, kb, nsamples);
 
-            samples = getRandomSamples(kb);
+        // total #of edges in that graph.
+        final long nedges = kb.getStatementCount();
 
-        }
-
+        /*
+         * Setup and run over those samples.
+         */
+        
         final IGASEngine<VS, ES, ST> gasEngine = new GASEngine<VS, ES, ST>(jnl,
                 namespace, ITx.READ_COMMITTED, newGASProgram(), nthreads);
 
@@ -522,12 +526,23 @@ abstract public class GASRunner<VS, ES, ST> implements Callable<GASStats> {
             gasEngine.init(startingVertex);
 
             // TODO Pure interface for this.
-            total.add((GASStats) gasEngine.call());
+            final GASStats stats = (GASStats) gasEngine.call();
 
+            total.add(stats);
+
+            if (log.isInfoEnabled()) {
+                log.info("Run complete: vertex[" + i + "] of " + samples.length
+                        + " : startingVertex=" + startingVertex
+                        + ", stats(sample)=" + stats);
+            }
+            
         }
-        
+
         // Total over all sampled vertices.
-        System.out.println("TOTAL: " + total);
+        System.out.println("TOTAL: nseed=" + seed + ", nsamples=" + nsamples
+                + ", nthreads=" + nthreads + ", bufferMode="
+                + jnl.getBufferStrategy().getBufferMode() + ", edges(kb)="
+                + nedges + ", stats(total)=" + total);
 
         return total;
 
