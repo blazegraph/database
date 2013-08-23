@@ -588,6 +588,22 @@ public class TestHAJournalServerOverride extends AbstractHA3JournalServerTestCas
      *      HAJournalServer needs to handle ZK client connection loss </a>
      */
     public void testStartAB_BounceFollower() throws Exception {
+    	doBounceFollower();
+    }
+    
+    public void _testStressStartAB_BounceFollower() throws Exception {
+    	for (int test = 0; test < 5; test++) {
+            try {
+            	doBounceFollower();
+            } catch (Throwable t) {
+                fail("Run " + test, t);
+            } finally {
+                destroyAll();
+            }
+    	}
+    }
+    
+    public void doBounceFollower() throws Exception {
         
         final HAGlue serverA = startA();
         final HAGlue serverB = startB();
@@ -636,7 +652,7 @@ public class TestHAJournalServerOverride extends AbstractHA3JournalServerTestCas
                 ((HAGlueTest) serverA).bounceZookeeperConnection().get();
 
             }
-            Thread.sleep(100000);
+            // Thread.sleep(100000); // sleep to allow thread dump for analysis
             // Okay, is the problem that the quorum doesn't break?
             // assertFalse(quorum.isQuorumMet());
             
