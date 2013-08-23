@@ -49,7 +49,7 @@ public class BigdataStatics {
      * The #of lines of output from a child process which will be echoed onto
      * {@link System#out} when that child process is executed. This makes it
      * easy to track down why a child process dies during service start. If you
-     * want to see more output from the child process, then you should set the
+     * want to see all output from the child process, then you should set the
      * log level for the {@link ProcessHelper} class to INFO.
      * <p>
      * Note: This needs to be more than the length of the {@link Banner} output
