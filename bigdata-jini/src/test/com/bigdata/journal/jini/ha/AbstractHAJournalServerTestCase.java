@@ -55,6 +55,8 @@ import org.apache.http.client.methods.HttpUriRequest;
 import org.apache.http.conn.ClientConnectionManager;
 import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.http.util.EntityUtils;
+import org.apache.log4j.Level;
+import org.apache.log4j.Logger;
 import org.openrdf.model.Value;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.TupleQueryResult;
@@ -68,6 +70,7 @@ import com.bigdata.ha.msg.HALogDigestRequest;
 import com.bigdata.ha.msg.HARootBlockRequest;
 import com.bigdata.ha.msg.HASnapshotDigestRequest;
 import com.bigdata.io.TestCase3;
+import com.bigdata.jini.start.process.ProcessHelper;
 import com.bigdata.journal.DumpJournal;
 import com.bigdata.journal.Journal;
 import com.bigdata.rdf.sail.TestConcurrentKBCreate;
@@ -145,6 +148,8 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
      */
     protected ClientConnectionManager ccm = null;
     
+    private Level oldProcessHelperLevel = null;
+    
     @Override
     protected void setUp() throws Exception {
 
@@ -152,6 +157,19 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
                 .newCachedThreadPool(new DaemonThreadFactory(getName()));
 
         ccm = DefaultClientConnectionManagerFactory.getInstance().newInstance();
+
+        /*
+         * Override the log level for the ProcessHelper to ensure that we
+         * observe all output from the child process in the console of the
+         * process running the unit test. This will allow us to observe any
+         * failures in the test startup.
+         */
+        final Logger tmp = Logger.getLogger(ProcessHelper.class);
+                
+        oldProcessHelperLevel = tmp.getLevel();
+        
+        // Must be at least INFO to see all output of the child processes.
+        tmp.setLevel(Level.INFO);
 
     }
 
@@ -174,6 +192,21 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
 
         }
 
+        /*
+         * Restore the log level for the utility class that logs the
+         * output of the child process to its default.
+         */
+        
+        if (oldProcessHelperLevel != null) {
+
+            final Logger tmp = Logger.getLogger(ProcessHelper.class);
+
+            tmp.setLevel(oldProcessHelperLevel);
+
+            oldProcessHelperLevel = null;
+            
+        }
+        
     }
 
     /**
