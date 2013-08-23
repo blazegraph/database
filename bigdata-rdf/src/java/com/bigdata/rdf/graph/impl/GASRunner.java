@@ -523,8 +523,10 @@ abstract public class GASRunner<VS, ES, ST> implements Callable<GASStats> {
          * Setup and run over those samples.
          */
         
+        final IGASProgram<VS, ES, ST> gasProgram = newGASProgram();
+
         final IGASEngine<VS, ES, ST> gasEngine = new GASEngine<VS, ES, ST>(jnl,
-                namespace, ITx.READ_COMMITTED, newGASProgram(), nthreads);
+                namespace, ITx.READ_COMMITTED, gasProgram, nthreads);
 
         final GASStats total = new GASStats();
 
@@ -549,10 +551,11 @@ abstract public class GASRunner<VS, ES, ST> implements Callable<GASStats> {
         }
 
         // Total over all sampled vertices.
-        System.out.println("TOTAL: nseed=" + seed + ", nsamples=" + nsamples
-                + ", nthreads=" + nthreads + ", bufferMode="
-                + jnl.getBufferStrategy().getBufferMode() + ", edges(kb)="
-                + nedges + ", stats(total)=" + total);
+        System.out.println("TOTAL: analytic="
+                + gasProgram.getClass().getSimpleName() + ", nseed=" + seed
+                + ", nsamples=" + nsamples + ", nthreads=" + nthreads
+                + ", bufferMode=" + jnl.getBufferStrategy().getBufferMode()
+                + ", edges(kb)=" + nedges + ", stats(total)=" + total);
 
         return total;
 
