@@ -388,11 +388,13 @@ abstract public class GASRunner<VS, ES, ST> implements Callable<GASStats> {
         try {
 
             // Locate/create KB.
+            final boolean newKB;
             {
                 final AbstractTripleStore kb;
                 if (isTemporary) {
 
                     kb = BigdataSail.createLTS(jnl, properties);
+                    newKB = true;
 
                 } else {
 
@@ -404,10 +406,12 @@ abstract public class GASRunner<VS, ES, ST> implements Callable<GASStats> {
 
                         // create.
                         kb = BigdataSail.createLTS(jnl, properties);
+                        newKB = true;
 
                     } else {
 
                         kb = tmp;
+                        newKB = kb.getStatementCount() == 0L;
 
                     }
 
@@ -417,7 +421,7 @@ abstract public class GASRunner<VS, ES, ST> implements Callable<GASStats> {
             /*
              * Load data sets.
              */
-            if (isTemporary || (loadSet != null && loadSet.length > 0)) {
+            if (newKB && (loadSet != null && loadSet.length > 0)) {
 
                 loadFiles(jnl, namespace, loadSet);
 
