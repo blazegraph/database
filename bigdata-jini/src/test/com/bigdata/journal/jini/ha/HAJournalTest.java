@@ -27,7 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.journal.jini.ha;
 
 import java.io.IOException;
-import java.io.Serializable;
 import java.lang.reflect.Method;
 import java.net.InetSocketAddress;
 import java.rmi.Remote;
@@ -36,7 +35,6 @@ import java.security.NoSuchAlgorithmException;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.BrokenBarrierException;
-import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
@@ -52,6 +50,7 @@ import net.jini.config.ConfigurationException;
 import org.apache.log4j.Logger;
 
 import com.bigdata.concurrent.FutureTaskMon;
+import com.bigdata.counters.PIDUtil;
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.HAStatusEnum;
 import com.bigdata.ha.QuorumService;
@@ -85,7 +84,6 @@ import com.bigdata.ha.msg.IHAWriteMessage;
 import com.bigdata.ha.msg.IHAWriteSetStateRequest;
 import com.bigdata.ha.msg.IHAWriteSetStateResponse;
 import com.bigdata.journal.AbstractJournal;
-import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.jini.ha.HAJournalServer.HAQuorumService;
 import com.bigdata.quorum.AsynchronousQuorumCloseException;
@@ -165,6 +163,15 @@ public class HAJournalTest extends HAJournal {
          *            The message.
          */
         public void log(String msg) throws IOException;
+
+        /**
+         * Have the child self-report its <code>pid</code>.
+         * 
+         * @return The child's PID.
+         * 
+         * @see PIDUtil
+         */
+        public int getPID() throws IOException;
         
         /**
          * Force the end point to enter into an error state from which it will
@@ -514,6 +521,14 @@ public class HAJournalTest extends HAJournal {
 
         }
 
+        @Override
+        public int getPID() throws IOException {
+            
+            // Best guess at the child's PID.
+            return PIDUtil.getPID();
+            
+        }
+        
         @Override
         public Future<Void> enterErrorState() {
 

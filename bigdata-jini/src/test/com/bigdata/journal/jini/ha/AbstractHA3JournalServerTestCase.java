@@ -81,6 +81,7 @@ import com.bigdata.jini.util.ConfigMath;
 import com.bigdata.jini.util.JiniUtil;
 import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.jini.ha.HAJournalServer.ConfigurationOptions;
+import com.bigdata.journal.jini.ha.HAJournalTest.HAGlueTest;
 import com.bigdata.quorum.AbstractQuorumClient;
 import com.bigdata.quorum.AsynchronousQuorumCloseException;
 import com.bigdata.quorum.Quorum;
@@ -129,6 +130,7 @@ public class AbstractHA3JournalServerTestCase extends
         private volatile HAGlue haGlue;
         private volatile ProcessHelper processHelper;
         private volatile boolean dead = false;
+        private volatile int childPID = 0;
         
         public ServiceListener() {
             
@@ -695,12 +697,94 @@ public class AbstractHA3JournalServerTestCase extends
                 log.warn("Service is down: " + t);
                 
             } else {
-                
+
                 // Some other problem.
                 log.error(t, t);
-                
+
+                if (serviceListener != null && serviceListener.childPID != 0) {
+
+                    final int childPID = serviceListener.childPID;
+
+                    // Try to request a thread dump.
+                    if (trySignal(SignalEnum.QUIT, childPID)) {
+
+                        // Give the child a moment to respond.
+                        try {
+                            Thread.sleep(2000/* ms */);
+                        } catch (InterruptedException e) {
+                            // Propagate the interrupt.
+                            Thread.currentThread().interrupt();
+                        }
+
+                    }
+
+                    // Sure kill on the child.
+                    trySignal(SignalEnum.KILL, childPID);
+
+                }
+
             }
             
+        }
+
+    }
+
+    /**
+     * Some signals understood by Java.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+     *         Thompson</a>
+     */
+    protected enum SignalEnum {
+      /** Heap dump. */
+      INT(2,"INT"),
+      /** Thread dump (^C). */
+      QUIT(3,"QUIT"),
+      /** Sure kill. */
+      KILL(9,"KILL");
+      private final int code;
+      private final String symbol;
+      private SignalEnum(int code, String symbol) {
+          this.code = code;
+          this.symbol = symbol;
+      }
+      public int code() {
+          return code;
+      }
+      public String symbol() {
+          return symbol;
+      }
+    };
+
+    /**
+     * Attempt to signal a process (presumably a child process).
+     * 
+     * @param signalEnum
+     *            The signal.
+     * @param pid
+     *            The pid of the process.
+     *            
+     * @return true unless an exception was encountered (a <code>true</code>
+     *         return is not a sure indicator of success).
+     */
+    protected boolean trySignal(final SignalEnum signalEnum, final int pid){
+
+        final String cmd = "kill -" + signalEnum.symbol() + " " + pid;
+
+        log.warn("SIGNAL: " + cmd);
+
+        try {
+        
+            Runtime.getRuntime().exec(cmd);
+
+            return true;
+            
+        } catch (IOException e) {
+
+            log.error("FAILED: " + cmd, e);
+            
+            return false;
+
         }
 
     }
@@ -1463,6 +1547,21 @@ public class AbstractHA3JournalServerTestCase extends
 
             // Set the HAGlue interface on the ServiceListener.
             serviceListener.setService(haGlue);
+
+            try {
+
+                // Have the child self-report its PID (best guess).
+                serviceListener.childPID = ((HAGlueTest) haGlue).getPID();
+
+                if (log.isInfoEnabled())
+                    log.info("CHILD: name=" + name + ", childPID="
+                            + serviceListener.childPID);
+
+            } catch (IOException ex) {
+
+                log.warn("Could not get childPID: " + ex, ex);
+
+            }
             
             /*
              * Wait until the server is running.

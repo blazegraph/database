@@ -26,6 +26,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.journal.jini.ha;
 
+import java.io.IOException;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -41,9 +42,7 @@ import com.bigdata.ha.msg.IHANotifyReleaseTimeRequest;
 import com.bigdata.journal.AbstractTask;
 import com.bigdata.journal.jini.ha.HAJournalTest.HAGlueTest;
 import com.bigdata.journal.jini.ha.HAJournalTest.SpuriousTestException;
-import com.bigdata.quorum.zk.ZKQuorum;
 import com.bigdata.quorum.zk.ZKQuorumImpl;
-import com.bigdata.rdf.sail.webapp.client.HttpException;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
 import com.bigdata.util.ClocksNotSynchronizedException;
 import com.bigdata.util.InnerCause;
@@ -779,5 +778,45 @@ public class TestHAJournalServerOverride extends AbstractHA3JournalServerTestCas
         }
         
     }
-    
+
+    /**
+     * Attempt to start a service. Once it is running, request a thread dump and
+     * then issue a sure kill - both of these operations are done using a SIGNAL
+     * rather than RMI. However, the SIGNAL depends on the child PID. That is
+     * obtained from {@link HAGlueTest#getPID()}.
+     * 
+     * @throws Exception 
+     */
+    public void testStartA_sureKill() throws Exception {
+
+        final HAGlue serverA = startA();
+
+        final int pidA = ((HAGlueTest)serverA).getPID();
+        
+        // Request thread dump of the child.
+        trySignal(SignalEnum.QUIT, pidA);
+
+        // Wait for the thread dump.
+        Thread.sleep(2000/*ms*/);
+        
+        // Child should still be there.
+        assertEquals(pidA, ((HAGlueTest) serverA).getPID());
+
+        // Request sure kill of the child.
+        trySignal(SignalEnum.KILL, pidA);
+
+        // Wait just a little bit.
+        Thread.sleep(100/* ms */);
+
+        // RMI should fail (child process should be dead).
+        try {
+            ((HAGlueTest) serverA).getPID();
+            fail("Expecting " + IOException.class);
+        } catch (IOException ex) {
+            if (log.isInfoEnabled())
+                log.info("Ignoring expected exception: " + ex);
+        }
+
+    }
+
 }
