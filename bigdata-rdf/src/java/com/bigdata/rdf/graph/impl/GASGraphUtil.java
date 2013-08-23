@@ -27,6 +27,11 @@ public class GASGraphUtil {
     private static final Logger log = Logger.getLogger(GASGraphUtil.class);
 
     /**
+     * Return a sample (without duplicates) of vertices from the graph.
+     * <p>
+     * Note: This sampling procedure has a bias in favor of the vertices with
+     * the most edges and properties (vertices are choosen randomly in
+     * proportion to the #of edges and properties for the vertex).
      * 
      * @param desiredSampleSize
      *            The desired sample size.
