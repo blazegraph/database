@@ -88,7 +88,9 @@ public class TestAll extends TestCase {
         suite.addTestSuite(TestCloseable.class);
 
         // @todo test Striterator
-        
+
+        suite.addTestSuite(TestArrayIterator.class);
+
         return suite;
 
     }
