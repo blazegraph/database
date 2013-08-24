@@ -697,7 +697,9 @@ public class GASEngine<VS, ES, ST> implements IGASEngine<VS, ES, ST>,
      * example, we can sort the new frontier within each thread that adds a
      * vertex to be scheduled for the new frontier (in the SCATTER phase). Those
      * per-thread frontiers could then be combined by a merge sort, either using
-     * multiple threads (pair-wise) or a single thread (N-way merge). 
+     * multiple threads (pair-wise) or a single thread (N-way merge).
+     * 
+     * 2/3rds of the time is CHM.toArray().  1/3 is the sort.
      */
     private IV[] getCompactFrontier() {
 
@@ -1012,17 +1014,18 @@ public class GASEngine<VS, ES, ST> implements IGASEngine<VS, ES, ST>,
     private class RunInCallersThreadFrontierStrategy extends
             AbstractFrontierStrategy {
 
+        final IV[] f;
+
         RunInCallersThreadFrontierStrategy(
-                final VertexTaskFactory<Long> taskFactory) {
+                final VertexTaskFactory<Long> taskFactory, final IV[] f) {
 
             super(taskFactory);
+
+            this.f = f;
 
         }
 
         public Long call() throws Exception {
-
-            // Compact, ordered frontier. No duplicates!
-            final IV[] f = getCompactFrontier();
 
             long nedges = 0L;
 
@@ -1052,7 +1055,7 @@ public class GASEngine<VS, ES, ST> implements IGASEngine<VS, ES, ST>,
             final VertexTaskFactory<Long> taskFactory, final IV[] f) {
 
         if (nthreads == 1)
-            return new RunInCallersThreadFrontierStrategy(taskFactory);
+            return new RunInCallersThreadFrontierStrategy(taskFactory, f);
 
         return new LatchedExecutorFrontierStrategy(taskFactory,
                 executorService, nthreads, f);
