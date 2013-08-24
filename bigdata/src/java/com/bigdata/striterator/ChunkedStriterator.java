@@ -50,12 +50,12 @@ import com.bigdata.btree.ITupleIterator;
 public class ChunkedStriterator<I extends IChunkedIterator<E>, E> extends
         Striterator<I, E> implements IChunkedStriterator<I, E> {
 
-    public ChunkedStriterator(I src) {
-        
-        super( src );
-        
+    public ChunkedStriterator(final I src) {
+
+        super(src);
+
         this.src = src;
-        
+
     }
     
     /**
@@ -65,8 +65,7 @@ public class ChunkedStriterator<I extends IChunkedIterator<E>, E> extends
      * @param src
      *            The source iterator.
      */
-    @SuppressWarnings("unchecked")
-    public ChunkedStriterator(Iterator<E> src) {
+    public ChunkedStriterator(final Iterator<E> src) {
      
         this(IChunkedIterator.DEFAULT_CHUNK_SIZE, src);
         
@@ -81,26 +80,26 @@ public class ChunkedStriterator<I extends IChunkedIterator<E>, E> extends
      *            The source iterator.
      */
     @SuppressWarnings("unchecked")
-    public ChunkedStriterator(int chunkSize, Iterator<E> src) {
+    public ChunkedStriterator(final int chunkSize, final Iterator<E> src) {
 
         this((I) new ChunkedWrappedIterator<E>(src, chunkSize,
                 null/* keyOrder */, null/* filter */));
-        
+
     }
 
     @Override
     final public E[] nextChunk() {
 
         return src.nextChunk();
-        
-    }
-
-    @Override
-    final public void close() {
-
-        ((ICloseableIterator<?>) src).close();
 
     }
+
+//    @Override
+//    final public void close() {
+//
+//        ((ICloseableIterator<?>) src).close();
+//
+//    }
 
     /**
      * Strengthened return type.
@@ -109,7 +108,7 @@ public class ChunkedStriterator<I extends IChunkedIterator<E>, E> extends
     public IChunkedStriterator<I, E> addFilter(final IFilter<I, ?, E> filter) {
 
         return (IChunkedStriterator<I, E>) super.addFilter(filter);
-        
+
     }
-    
+
 }
