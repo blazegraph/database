@@ -539,6 +539,9 @@ public class GASEngine<VS, ES, ST> implements IGASEngine<VS, ES, ST>,
          */
         newFrontier().clear();
 
+        // Compact, ordered frontier. No duplicates!
+        final IV[] f = getCompactFrontier();
+
         /*
          * TODO This logic allows us to push down the APPLY into the GATHER or
          * SCATTER depending on some characteristics of the algorithm. Is this
@@ -596,7 +599,7 @@ public class GASEngine<VS, ES, ST> implements IGASEngine<VS, ES, ST>,
 
         } else {
 
-            gatherEdgeCount = gatherEdges(kb, gatherEdges,
+            gatherEdgeCount = gatherEdges(kb, f, gatherEdges,
                     pushDownApplyInGather);
             
         }
@@ -613,7 +616,7 @@ public class GASEngine<VS, ES, ST> implements IGASEngine<VS, ES, ST>,
 
             final long beginApply = System.nanoTime();
 
-            apply();
+            apply(f);
 
             elapsedApply = System.nanoTime() - beginApply;
             
@@ -637,7 +640,7 @@ public class GASEngine<VS, ES, ST> implements IGASEngine<VS, ES, ST>,
             
         } else {
 
-            scatterEdgeCount = scatterEdges(kb, scatterEdges,
+            scatterEdgeCount = scatterEdges(kb, f, scatterEdges,
                     pushDownApplyInScatter);
 
         }
@@ -689,6 +692,12 @@ public class GASEngine<VS, ES, ST> implements IGASEngine<VS, ES, ST>,
     /**
      * Generate an ordered frontier to maximize the locality of reference within
      * the indices.
+     * 
+     * FIXME The frontier should be compacted using parallel threads. For
+     * example, we can sort the new frontier within each thread that adds a
+     * vertex to be scheduled for the new frontier (in the SCATTER phase). Those
+     * per-thread frontiers could then be combined by a merge sort, either using
+     * multiple threads (pair-wise) or a single thread (N-way merge). 
      */
     private IV[] getCompactFrontier() {
 
@@ -713,10 +722,7 @@ public class GASEngine<VS, ES, ST> implements IGASEngine<VS, ES, ST>,
     /**
      * Do APPLY.
      */
-    private void apply() {
-
-        // Compact, ordered frontier. No duplicates!
-        final IV[] f = getCompactFrontier();
+    private void apply(final IV[] f) {
 
         for (IV u : f) {
 
@@ -922,24 +928,26 @@ public class GASEngine<VS, ES, ST> implements IGASEngine<VS, ES, ST>,
 
         private final ExecutorService executorService;
         private final int nparallel;
-        
+        /** Compact, ordered frontier. No duplicates! */
+        private final IV[] f;
+
         LatchedExecutorFrontierStrategy(
                 final VertexTaskFactory<Long> taskFactory,
-                final ExecutorService executorService, final int nparallel) {
+                final ExecutorService executorService, final int nparallel,
+                final IV[] f) {
 
             super(taskFactory);
 
             this.executorService = executorService;
             
             this.nparallel = nparallel;
+
+            this.f = f;
             
         }
 
         @Override
         public Long call() throws Exception {
-
-            // Compact, ordered frontier. No duplicates!
-            final IV[] f = getCompactFrontier();
 
             final List<FutureTask<Long>> tasks = new ArrayList<FutureTask<Long>>(
                     f.length);
@@ -1041,13 +1049,13 @@ public class GASEngine<VS, ES, ST> implements IGASEngine<VS, ES, ST>,
      * @return The strategy that will map that task across the frontier.
      */
     private Callable<Long> newFrontierStrategy(
-            final VertexTaskFactory<Long> taskFactory) {
+            final VertexTaskFactory<Long> taskFactory, final IV[] f) {
 
         if (nthreads == 1)
             return new RunInCallersThreadFrontierStrategy(taskFactory);
 
         return new LatchedExecutorFrontierStrategy(taskFactory,
-                executorService, nthreads);
+                executorService, nthreads, f);
 
     }
 
@@ -1062,7 +1070,7 @@ public class GASEngine<VS, ES, ST> implements IGASEngine<VS, ES, ST>,
      * @throws ExecutionException
      * @throws InterruptedException
      */
-    private long scatterEdges(final AbstractTripleStore kb,
+    private long scatterEdges(final AbstractTripleStore kb, final IV[] f,
             final EdgesEnum scatterEdges, final boolean pushDownApply)
             throws InterruptedException, ExecutionException, Exception {
 
@@ -1087,7 +1095,7 @@ public class GASEngine<VS, ES, ST> implements IGASEngine<VS, ES, ST>,
             };
         }
 
-        return newFrontierStrategy(new ScatterVertexTaskFactory()).call();
+        return newFrontierStrategy(new ScatterVertexTaskFactory(), f).call();
 
     }
     
@@ -1101,7 +1109,7 @@ public class GASEngine<VS, ES, ST> implements IGASEngine<VS, ES, ST>,
      * @throws ExecutionException
      * @throws InterruptedException
      */
-    private long gatherEdges(final AbstractTripleStore kb,
+    private long gatherEdges(final AbstractTripleStore kb, final IV[] f,
             final EdgesEnum gatherEdges, final boolean pushDownApply)
             throws InterruptedException, ExecutionException, Exception {
 
@@ -1126,7 +1134,7 @@ public class GASEngine<VS, ES, ST> implements IGASEngine<VS, ES, ST>,
             };
         }
 
-        return newFrontierStrategy(new GatherVertexTaskFactory()).call();
+        return newFrontierStrategy(new GatherVertexTaskFactory(), f).call();
 
     }
 
