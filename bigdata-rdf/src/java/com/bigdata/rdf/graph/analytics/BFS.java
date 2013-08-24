@@ -2,8 +2,9 @@ package com.bigdata.rdf.graph.analytics;
 
 import com.bigdata.rdf.graph.EdgesEnum;
 import com.bigdata.rdf.graph.Factory;
-import com.bigdata.rdf.graph.IGASContext;
 import com.bigdata.rdf.graph.IGASProgram;
+import com.bigdata.rdf.graph.IGASState;
+import com.bigdata.rdf.graph.IScheduler;
 import com.bigdata.rdf.graph.impl.GASRunner;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.spo.ISPO;
@@ -116,8 +117,8 @@ public class BFS implements IGASProgram<BFS.VS, BFS.ES, Void> {
      * Not used.
      */
     @Override
-    public void init(IGASContext<BFS.VS, BFS.ES, Void> ctx, IV u) {
-        ctx.getState(u).visit(0);
+    public void init(IGASState<BFS.VS, BFS.ES, Void> state, IV u) {
+        state.getState(u).visit(0);
         
     }
     
@@ -125,7 +126,7 @@ public class BFS implements IGASProgram<BFS.VS, BFS.ES, Void> {
      * Not used.
      */
     @Override
-    public Void gather(IGASContext<BFS.VS, BFS.ES, Void> ctx, IV u, ISPO e) {
+    public Void gather(IGASState<BFS.VS, BFS.ES, Void> state, IV u, ISPO e) {
         throw new UnsupportedOperationException();
     }
 
@@ -141,7 +142,7 @@ public class BFS implements IGASProgram<BFS.VS, BFS.ES, Void> {
      * NOP
      */
     @Override
-    public BFS.VS apply(final IGASContext<BFS.VS, BFS.ES, Void> ctx, final IV u, 
+    public BFS.VS apply(final IGASState<BFS.VS, BFS.ES, Void> state, final IV u, 
             final Void sum) {
 
         return null;
@@ -152,7 +153,7 @@ public class BFS implements IGASProgram<BFS.VS, BFS.ES, Void> {
      * Returns <code>true</code>.
      */
     @Override
-    public boolean isChanged(IGASContext<VS, ES, Void> ctx, IV u) {
+    public boolean isChanged(IGASState<VS, ES, Void> state, IV u) {
 
         return true;
         
@@ -166,21 +167,21 @@ public class BFS implements IGASProgram<BFS.VS, BFS.ES, Void> {
      * {@link ISPO#s()}. The remote vertex is {@link ISPO#o()}.
      */
     @Override
-    public void scatter(final IGASContext<BFS.VS, BFS.ES, Void> ctx,
-            final IV u, final ISPO e) {
+    public void scatter(final IGASState<BFS.VS, BFS.ES, Void> state,
+            final IScheduler sch, final IV u, final ISPO e) {
 
         // remote vertex state.
-        final VS otherState = ctx.getState(e.o());
+        final VS otherState = state.getState(e.o());
 
         // visit.
-        if (otherState.visit(ctx.round() + 1)) {
+        if (otherState.visit(state.round() + 1)) {
 
             /*
              * This is the first visit for the remote vertex. Add it to the
              * schedule for the next iteration.
              */
 
-            ctx.schedule(e.o());
+            sch.schedule(e.o());
 
         }
 

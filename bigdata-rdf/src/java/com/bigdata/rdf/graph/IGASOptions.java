@@ -8,18 +8,6 @@ import com.bigdata.rdf.spo.ISPO;
  * may be declared by the {@link IGASProgram}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * 
- *         TODO Option to materialize Literals (or to declare the set of
- *         literals of interest). How do we do a gather of the attribute values
- *         for a vertex? That would be the SPO index for clustered access, so
- *         this should be done at the same time that we SCATTER over out-edges,
- *         which implies that the SCATTER gets pushed into the APPLY which makes
- *         sense.
- * 
- *         TODO Option for scalable state (HTree or BTree with buffered eviction
- *         as per the DISTINCT filter).
- * 
- *         TODO Option to materialize the VS for the target vertex in SCATTER.
  */
 public interface IGASOptions<VS, ES> {
 

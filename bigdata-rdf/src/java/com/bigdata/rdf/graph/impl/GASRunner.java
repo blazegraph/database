@@ -19,6 +19,7 @@ import com.bigdata.Banner;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
+import com.bigdata.rdf.graph.IGASContext;
 import com.bigdata.rdf.graph.IGASEngine;
 import com.bigdata.rdf.graph.IGASProgram;
 import com.bigdata.rdf.internal.IV;
@@ -31,7 +32,9 @@ import com.bigdata.rdf.store.AbstractTripleStore;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * 
- * TODO Need a different driver if the algorithm always visits all vertices.
+ *         TODO Do we need a different driver if the algorithm always visits all
+ *         vertices? For such algorithms, we just run them once per graph
+ *         (unless the graph is dynamic).
  */
 abstract public class GASRunner<VS, ES, ST> implements Callable<GASStats> {
 
@@ -420,7 +423,7 @@ abstract public class GASRunner<VS, ES, ST> implements Callable<GASStats> {
             }
 
             /*
-             * Load data sets. TODO Document that KB load is IFF empty!!! (Or change the code.)
+             * Load data sets (iff new KB).
              */
             if (newKB && (loadSet != null && loadSet.length > 0)) {
 
@@ -527,42 +530,51 @@ abstract public class GASRunner<VS, ES, ST> implements Callable<GASStats> {
         /*
          * Setup and run over those samples.
          */
-        
-        final IGASProgram<VS, ES, ST> gasProgram = newGASProgram();
+        final IGASEngine gasEngine = new GASEngine(jnl, nthreads);
 
-        final IGASEngine<VS, ES, ST> gasEngine = new GASEngine<VS, ES, ST>(jnl,
-                namespace, ITx.READ_COMMITTED, gasProgram, nthreads);
+        try {
 
-        final GASStats total = new GASStats();
+            final IGASProgram<VS, ES, ST> gasProgram = newGASProgram();
 
-        for (int i = 0; i < samples.length; i++) {
+            final IGASContext<VS, ES, ST> gasContext = gasEngine.newGASContext(
+                    namespace, jnl.getLastCommitTime(), gasProgram);
 
-            @SuppressWarnings("rawtypes")
-            final IV startingVertex = samples[i];
+            final GASStats total = new GASStats();
 
-            gasEngine.init(startingVertex);
+            for (int i = 0; i < samples.length; i++) {
 
-            // TODO Pure interface for this.
-            final GASStats stats = (GASStats) gasEngine.call();
+                @SuppressWarnings("rawtypes")
+                final IV startingVertex = samples[i];
 
-            total.add(stats);
+                gasContext.getGASState().init(startingVertex);
 
-            if (log.isInfoEnabled()) {
-                log.info("Run complete: vertex[" + i + "] of " + samples.length
-                        + " : startingVertex=" + startingVertex
-                        + ", stats(sample)=" + stats);
+                // TODO Pure interface for this.
+                final GASStats stats = (GASStats) gasContext.call();
+
+                total.add(stats);
+
+                if (log.isInfoEnabled()) {
+                    log.info("Run complete: vertex[" + i + "] of "
+                            + samples.length + " : startingVertex="
+                            + startingVertex + ", stats(sample)=" + stats);
+                }
+
             }
+
+            // Total over all sampled vertices.
+            System.out.println("TOTAL: analytic="
+                    + gasProgram.getClass().getSimpleName() + ", nseed=" + seed
+                    + ", nsamples=" + nsamples + ", nthreads=" + nthreads
+                    + ", bufferMode=" + jnl.getBufferStrategy().getBufferMode()
+                    + ", edges(kb)=" + nedges + ", stats(total)=" + total);
+
+            return total;
+
+        } finally {
+
+            gasEngine.shutdownNow();
             
         }
-
-        // Total over all sampled vertices.
-        System.out.println("TOTAL: analytic="
-                + gasProgram.getClass().getSimpleName() + ", nseed=" + seed
-                + ", nsamples=" + nsamples + ", nthreads=" + nthreads
-                + ", bufferMode=" + jnl.getBufferStrategy().getBufferMode()
-                + ", edges(kb)=" + nedges + ", stats(total)=" + total);
-
-        return total;
 
     }
 

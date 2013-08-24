@@ -5,8 +5,9 @@ import org.apache.log4j.Logger;
 import com.bigdata.rdf.graph.EdgesEnum;
 import com.bigdata.rdf.graph.Factory;
 import com.bigdata.rdf.graph.GASUtil;
-import com.bigdata.rdf.graph.IGASContext;
 import com.bigdata.rdf.graph.IGASProgram;
+import com.bigdata.rdf.graph.IGASState;
+import com.bigdata.rdf.graph.IScheduler;
 import com.bigdata.rdf.graph.impl.GASRunner;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.spo.ISPO;
@@ -153,10 +154,10 @@ public class SSSP implements IGASProgram<SSSP.VS, SSSP.ES, Integer/* dist */> {
      * {@inheritDoc}
      */
     @Override
-    public void init(final IGASContext<SSSP.VS, SSSP.ES, Integer> ctx,
+    public void init(final IGASState<SSSP.VS, SSSP.ES, Integer> state,
             final IV u) {
 
-        final VS us = ctx.getState(u);
+        final VS us = state.getState(u);
 
         synchronized (us) {
 
@@ -176,12 +177,12 @@ public class SSSP implements IGASProgram<SSSP.VS, SSSP.ES, Integer/* dist */> {
      * {@inheritDoc}
      */
     @Override
-    public Integer gather(final IGASContext<SSSP.VS, SSSP.ES, Integer> ctx,
+    public Integer gather(final IGASState<SSSP.VS, SSSP.ES, Integer> state,
             final IV u, final ISPO e) {
 
 //        assert e.o().equals(u);
 
-        final VS src = ctx.getState(e.s());
+        final VS src = state.getState(e.s());
         
         final int d = src.dist();
 
@@ -213,7 +214,7 @@ public class SSSP implements IGASProgram<SSSP.VS, SSSP.ES, Integer/* dist */> {
      * {@inheritDoc}
      */
     @Override
-    public SSSP.VS apply(IGASContext<SSSP.VS, SSSP.ES, Integer> ctx,
+    public SSSP.VS apply(final IGASState<SSSP.VS, SSSP.ES, Integer> state,
             final IV u, final Integer sum) {
 
         if (sum != null) {
@@ -221,7 +222,7 @@ public class SSSP implements IGASProgram<SSSP.VS, SSSP.ES, Integer/* dist */> {
 //            log.error("u=" + u + ", us=" + us + ", sum=" + sum);
 
             // Get the state for that vertex.
-            final SSSP.VS us = ctx.getState(u);
+            final SSSP.VS us = state.getState(u);
 
             final int minDist = sum;
 
@@ -243,10 +244,10 @@ public class SSSP implements IGASProgram<SSSP.VS, SSSP.ES, Integer/* dist */> {
     }
 
     @Override
-    public boolean isChanged(final IGASContext<SSSP.VS, SSSP.ES, Integer> ctx,
+    public boolean isChanged(final IGASState<SSSP.VS, SSSP.ES, Integer> state,
             final IV u) {
 
-        return ctx.getState(u).isChanged();
+        return state.getState(u).isChanged();
 
     }
 
@@ -277,14 +278,14 @@ public class SSSP implements IGASProgram<SSSP.VS, SSSP.ES, Integer/* dist */> {
      * </p>
      */
     @Override
-    public void scatter(final IGASContext<SSSP.VS, SSSP.ES, Integer> ctx,
-            final IV u, final ISPO e) {
+    public void scatter(final IGASState<SSSP.VS, SSSP.ES, Integer> state,
+            final IScheduler sch, final IV u, final ISPO e) {
 
         final IV other = GASUtil.getOtherVertex(u, e);
         
-        final VS selfState = ctx.getState(u);
+        final VS selfState = state.getState(u);
         
-        final VS otherState = ctx.getState(other);
+        final VS otherState = state.getState(other);
 
         // last observed distance for the remote vertex.
         final int otherDist = otherState.dist();
@@ -304,7 +305,7 @@ public class SSSP implements IGASProgram<SSSP.VS, SSSP.ES, Integer/* dist */> {
                         + ", scheduling: " + other + " with newDist=" + newDist);
 
             // Then add the remote vertex to the next frontier.
-            ctx.schedule(e.o());
+            sch.schedule(e.o());
 
         }
 

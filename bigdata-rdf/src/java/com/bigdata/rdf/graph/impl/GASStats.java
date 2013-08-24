@@ -7,9 +7,9 @@ import com.bigdata.rdf.graph.GASUtil;
 import com.bigdata.rdf.graph.IGASStats;
 
 /**
- * FIXME Refactor to a pure interface - see RuleStats.
+ * FIXME STATS: Refactor to a pure interface - see RuleStats.
  * 
- * FIXME Collect the details within round statistics and then lift the
+ * FIXME STATS: Collect the details within round statistics and then lift the
  * formatting of the statistics into this class (for the details within round
  * statistics).
  * 
@@ -79,7 +79,7 @@ public class GASStats implements IGASStats {
     public String toString() {
 
         return "nrounds=" + getNRounds()//
-                + ": fontierSize=" + getFrontierSize() //
+                + ", fontierSize=" + getFrontierSize() //
                 + ", ms=" + TimeUnit.NANOSECONDS.toMillis(getElapsedNanos())//
                 + ", edges=" + getNEdges()//
                 + ", teps=" + GASUtil.getTEPS(getNEdges(), getElapsedNanos())//
