@@ -61,7 +61,7 @@ public class QueueStatsPlugIn implements
     }
     
     /**
-     * Collects interesting statistics on the {@link #executorService}.
+     * Collects interesting statistics on the {@link ExecutorService}.
      * <p>
      * Note: Guarded by synchronized(this).
      * 
