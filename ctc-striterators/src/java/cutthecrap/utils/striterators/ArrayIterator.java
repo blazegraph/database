@@ -29,33 +29,54 @@ import java.util.Iterator;
 import java.util.NoSuchElementException;
 
 /**
- * Supports standard iteration over an object Array, allowing this to
- *	be used as a source for a <code>Striterator</code>.
+ * Supports standard iteration over an object Array, allowing this to be used as
+ * a source for a <code>Striterator</code>.
  */
-public class ArrayIterator implements Iterator {
-	
-    private Object[] m_src = null;
-	private int m_index = 0;
+public class ArrayIterator<T> implements Iterator<T> {
 
-	/** Constructor takes source object array **/
-	public ArrayIterator(final Object[] src) {
-		m_src = src;
-	}
+    /** Source array. */
+    private final T[] m_src;
+    
+    /** Current index (next to be visited). */
+	private int m_index;
+	
+	/** Exclusive upper bound. */
+	private final int m_last;
+
+    /** Constructor takes source object array **/
+    public ArrayIterator(final T[] src) {
+        this(src, 0, src.length);
+    }
+
+    /** Constructor takes source object array **/
+    public ArrayIterator(final T[] src, final int off, final int len) {
+        if (src == null)
+            throw new NullPointerException();
+        if (off < 0)
+            throw new IllegalArgumentException();
+        if (len < 0)
+            throw new IllegalArgumentException();
+        if (off + len > src.length)
+            throw new IllegalArgumentException();
+        m_src = src;
+        m_index = off;
+        m_last = off + len;
+    }
 
 	/** checks with current index and array size **/
 	public boolean hasNext() {
-		return m_src != null && m_src.length > m_index;
+		return m_last > m_index;
 	}
 
-	/** @return current index from array **/
-	public Object next() {
-		if (m_index < m_src.length)
-			return m_src[m_index++];
-		else
-			throw new NoSuchElementException();
-	}
+    /** @return current index from array **/
+    public T next() {
+        if (m_index < m_last)
+            return m_src[m_index++];
+        else
+            throw new NoSuchElementException();
+    }
 
-	/** void .. does nothing **/
-	public void remove() {
-	}
+    /** void .. does nothing **/
+    public void remove() {
+    }
 }
