@@ -50,6 +50,7 @@ import com.bigdata.service.IBigdataFederation;
 /**
  * Convenience class for passing around the various pieces of context necessary
  * to construct the bop pipeline.
+ *      FIXME Rolling back r7319 which broke UNION processing. 
  */
 public class AST2BOpContext implements IdFactory, IEvaluationContext {
 
@@ -64,13 +65,6 @@ public class AST2BOpContext implements IdFactory, IEvaluationContext {
 	 * @see #nextId()
 	 */
 	private final AtomicInteger idFactory;
-	
-	/**
-	 * Temporary "next id" bypasses the idFactory when we want to be explicit
-	 * about the next bop id.  Used for Tees (Unions).  nextId = -1 means use
-	 * the idFactory.
-	 */
-	private transient int nextId = -1;
 	
 	/**
 	 * The KB instance.
@@ -463,34 +457,10 @@ public class AST2BOpContext implements IdFactory, IEvaluationContext {
 
     }
     
-    /**
-     * Temporarily set the next bop Id to come out of the context.
-     */
-    public void setNextId(final int nextId) {
-    	
-    	this.nextId = nextId;
-    	
-    }
-    
-    /**
-     * Return the next id from the idFactory, unless there is a temporary
-     * bop id set, in which case return it and clear it.
-     */
+    /**      FIXME Rolling back r7319 which broke UNION processing. */
     public int nextId() {
 
-    	if (nextId == -1) {
-    		
-    		return idFactory.incrementAndGet();
-    		
-    	} else {
-    		
-    		final int tmp = nextId;
-    		
-    		nextId = -1;
-    		
-    		return tmp;
-    		
-    	}
+        return idFactory.incrementAndGet();
 
     }
 
