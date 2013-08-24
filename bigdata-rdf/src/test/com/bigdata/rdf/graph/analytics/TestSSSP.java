@@ -25,7 +25,9 @@ package com.bigdata.rdf.graph.analytics;
 
 import com.bigdata.journal.ITx;
 import com.bigdata.rdf.graph.AbstractGraphTestCase;
+import com.bigdata.rdf.graph.IGASContext;
 import com.bigdata.rdf.graph.IGASEngine;
+import com.bigdata.rdf.graph.IGASState;
 import com.bigdata.rdf.graph.impl.GASEngine;
 
 /**
@@ -47,28 +49,37 @@ public class TestSSSP extends AbstractGraphTestCase {
 
         final SmallGraphProblem p = setupSmallGraphProblem();
 
-        final IGASEngine<SSSP.VS, SSSP.ES, Integer> gasEngine = new GASEngine<SSSP.VS, SSSP.ES, Integer>(
-                sail.getDatabase().getIndexManager(), sail.getDatabase()
-                        .getNamespace(), ITx.READ_COMMITTED, new SSSP(), 1/* nthreads */);
+        final IGASEngine gasEngine = new GASEngine(sail.getDatabase()
+                .getIndexManager(), 1/* nthreads */);
 
-        // Initialize the froniter.
-        gasEngine.init(p.mike.getIV());
+        try {
 
-        // Converge.
-        gasEngine.call();
+            final IGASContext<SSSP.VS, SSSP.ES, Integer> gasContext = gasEngine
+                    .newGASContext(sail.getDatabase().getNamespace(),
+                            ITx.READ_COMMITTED, new SSSP());
 
-        assertEquals(0, gasEngine.getGASContext().getState(p.mike.getIV())
-                .dist());
+            final IGASState<SSSP.VS, SSSP.ES, Integer> gasState = gasContext.getGASState();
+            
+            // Initialize the froniter.
+            gasState.init(p.mike.getIV());
 
-        assertEquals(1, gasEngine.getGASContext()
-                .getState(p.foafPerson.getIV()).dist());
+            // Converge.
+            gasContext.call();
 
-        assertEquals(1, gasEngine.getGASContext().getState(p.bryan.getIV())
-                .dist());
+            assertEquals(0, gasState.getState(p.mike.getIV()).dist());
 
-        assertEquals(2, gasEngine.getGASContext().getState(p.martyn.getIV())
-                .dist());
-        
+            assertEquals(1, gasState.getState(p.foafPerson.getIV()).dist());
+
+            assertEquals(1, gasState.getState(p.bryan.getIV()).dist());
+
+            assertEquals(2, gasState.getState(p.martyn.getIV()).dist());
+
+        } finally {
+
+            gasEngine.shutdownNow();
+
+        }
+
     }
 
 }

@@ -48,7 +48,7 @@ public interface IReducer<VS,ES, ST, T> {
      *            The result from applying the procedure to a single index
      *            partition.
      */
-    public void visit(IGASContext<VS, ES, ST> ctx, @SuppressWarnings("rawtypes") IV u);
+    public void visit(IGASState<VS, ES, ST> ctx, @SuppressWarnings("rawtypes") IV u);
 
     /**
      * Return the aggregated results as an implementation dependent object.

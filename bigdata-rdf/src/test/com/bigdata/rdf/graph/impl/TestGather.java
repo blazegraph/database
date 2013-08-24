@@ -34,6 +34,8 @@ import com.bigdata.rdf.graph.Factory;
 import com.bigdata.rdf.graph.IGASContext;
 import com.bigdata.rdf.graph.IGASEngine;
 import com.bigdata.rdf.graph.IGASProgram;
+import com.bigdata.rdf.graph.IGASState;
+import com.bigdata.rdf.graph.IScheduler;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.spo.ISPO;
@@ -95,11 +97,15 @@ public class TestGather extends AbstractGraphTestCase {
 
         @Override
         public Factory<ISPO, Set<ISPO>> getEdgeStateFactory() {
+
             return null;
+            
         }
 
         @Override
-        public void init(IGASContext<Set<ISPO>, Set<ISPO>, Set<ISPO>> ctx, IV u) {
+        public void init(IGASState<Set<ISPO>, Set<ISPO>, Set<ISPO>> ctx, IV u) {
+
+            // NOP
             
         }
 
@@ -107,8 +113,9 @@ public class TestGather extends AbstractGraphTestCase {
          * Return the edge as a singleton set.
          */
         @Override
-        public Set<ISPO> gather(IGASContext<Set<ISPO>, Set<ISPO>, Set<ISPO>> ctx,
-                IV u, ISPO e) {
+        public Set<ISPO> gather(
+                final IGASState<Set<ISPO>, Set<ISPO>, Set<ISPO>> state,
+                final IV u, final ISPO e) {
 
             return Collections.singleton(e);
 
@@ -137,13 +144,13 @@ public class TestGather extends AbstractGraphTestCase {
          */
         @Override
         public Set<ISPO> apply(
-                final IGASContext<Set<ISPO>, Set<ISPO>, Set<ISPO>> ctx,
+                final IGASState<Set<ISPO>, Set<ISPO>, Set<ISPO>> state,
                 final IV u, final Set<ISPO> sum) {
  
             if (sum != null) {
 
                 // Get the state for that vertex.
-                final Set<ISPO> us = ctx.getState(u);
+                final Set<ISPO> us = state.getState(u);
 
                 // UNION with the accumulant.
                 us.addAll(sum);
@@ -159,15 +166,15 @@ public class TestGather extends AbstractGraphTestCase {
 
         @Override
         public boolean isChanged(
-                IGASContext<Set<ISPO>, Set<ISPO>, Set<ISPO>> ctx, IV u) {
+                IGASState<Set<ISPO>, Set<ISPO>, Set<ISPO>> state, IV u) {
 
             return true;
             
         }
 
         @Override
-        public void scatter(IGASContext<Set<ISPO>, Set<ISPO>, Set<ISPO>> ctx,
-                IV u, ISPO e) {
+        public void scatter(IGASState<Set<ISPO>, Set<ISPO>, Set<ISPO>> state,
+                final IScheduler sch, IV u, ISPO e) {
 
             throw new UnsupportedOperationException();
             
@@ -241,26 +248,38 @@ public class TestGather extends AbstractGraphTestCase {
     protected void doGatherTest(final EdgesEnum gatherEdges,
             final Set<ISPO> expected, final IV startingVertex) throws Exception {
 
-        final IGASEngine<Set<ISPO>, Set<ISPO>, Set<ISPO>> gasEngine = new GASEngine<Set<ISPO>, Set<ISPO>, Set<ISPO>>(
-                sail.getDatabase().getIndexManager(), sail.getDatabase()
-                        .getNamespace(), ITx.READ_COMMITTED,
-                new MockGASProgram(gatherEdges), 1/* nthreads */);
+        final IGASEngine gasEngine = new GASEngine(sail.getDatabase()
+                .getIndexManager(), 1/* nthreads */);
 
-        // Initialize the froniter.
-        gasEngine.init(startingVertex);
+        try {
+        
+            final IGASContext<Set<ISPO>, Set<ISPO>, Set<ISPO>> gasContext = gasEngine
+                    .newGASContext(sail.getDatabase().getNamespace(),
+                            ITx.READ_COMMITTED, new MockGASProgram(gatherEdges));
 
-        // Do one round.
-        gasEngine.doRound(new GASStats());
+            final IGASState<Set<ISPO>, Set<ISPO>, Set<ISPO>> gasState = gasContext
+                    .getGASState();
+            
+            // Initialize the froniter.
+            gasState.init(startingVertex);
 
-        /*
-         * Lookup the state for the starting vertex (this should be the only
-         * vertex whose state was modified since we did only one round).
-         */
-        final Set<ISPO> actual = gasEngine.getGASContext().getState(
-                startingVertex);
+            // Do one round.
+            gasContext.doRound(new GASStats());
 
-        // Verify against the expected state.
-        assertSameEdges(expected, actual);
+            /*
+             * Lookup the state for the starting vertex (this should be the only
+             * vertex whose state was modified since we did only one round).
+             */
+            final Set<ISPO> actual = gasState.getState(startingVertex);
+
+            // Verify against the expected state.
+            assertSameEdges(expected, actual);
+
+        } finally {
+
+            gasEngine.shutdownNow();
+
+        }
 
     }
 

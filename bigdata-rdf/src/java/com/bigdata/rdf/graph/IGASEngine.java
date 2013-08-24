@@ -1,74 +1,46 @@
 package com.bigdata.rdf.graph;
 
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutionException;
-
-import com.bigdata.rdf.internal.IV;
-
 /**
+ * The interface used to submit an {@link IGASProgram} for evaluation.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @param <VS>
- *            The generic type for the per-vertex state. This is scoped to the
- *            computation of the {@link IGASProgram}.
- * @param <ES>
- *            The generic type for the per-edge state. This is scoped to the
- *            computation of the {@link IGASProgram}.
- * @param <ST>
- *            The generic type for the SUM. This is often directly related to
- *            the generic type for the per-edge state, but that is not always
- *            true. The SUM type is scoped to the GATHER + SUM operation (NOT
- *            the computation).
- * 
- *            FIXME This should be refactored to allow a singleton for the
- *            {@link IGASEngine} (for a server process, much like a QueryEngine)
- *            and then to create an {@link IGASContext} to execute an
- *            {@link IGASProgram}. This would allow us to reuse resources within
- *            the {@link IGASEngine}.
  */
-public interface IGASEngine<VS, ES, ST> extends Callable<IGASStats> {
+public interface IGASEngine {
 
     /**
-     * Return the program that is being evaluated.
-     */
-    IGASProgram<VS, ES, ST> getGASProgram();
-    
-    /**
-     * The execution context for the {@link IGASEngine}.
-     */
-    IGASContext<VS, ES, ST> getGASContext();
-    
-    /**
-     * {@link #reset()} the computation state and populate the initial frontier.
+     * Obtain an execution context for the specified {@link IGASProgram}.
      * 
-     * @param v
-     *            One or more vertices that will be included in the initial
-     *            frontier.
+     * @param namespace
+     *            The namespace of the graph (KB instance).
+     * @param timestamp
+     *            The timestamp of the graph view (this should be a read-only
+     *            view for non-blocking index reads).
+     * @param program
+     *            The program to execute against that graph.
      * 
-     * @throws IllegalArgumentException
-     *             if no vertices are specified.
+     * @param <VS>
+     *            The generic type for the per-vertex state. This is scoped to
+     *            the computation of the {@link IGASProgram}.
+     * @param <ES>
+     *            The generic type for the per-edge state. This is scoped to the
+     *            computation of the {@link IGASProgram}.
+     * @param <ST>
+     *            The generic type for the SUM. This is often directly related
+     *            to the generic type for the per-edge state, but that is not
+     *            always true. The SUM type is scoped to the GATHER + SUM
+     *            operation (NOT the computation).
      */
-    void init(@SuppressWarnings("rawtypes") IV... v);
+    <VS, ES, ST> IGASContext<VS, ES, ST> newGASContext(String namespace,
+            long timestamp, IGASProgram<VS, ES, ST> program);
 
     /**
-     * Discard computation state (the frontier, vertex state, and edge state)
-     * and reset the round counter.
-     * <p>
-     * Note: The graph is NOT part of the computation and is not discared by
-     * this method.
+     * Polite shutdown.
      */
-    void reset();
-    
-    /**
-     * Execute one iteration.
-     * 
-     * @param stats
-     *            Used to report statistics about the execution of the
-     *            algorithm.
-     * 
-     * @return true iff the new frontier is empty.
-     */
-    boolean doRound(IGASStats stats) throws Exception, ExecutionException,
-            InterruptedException;
+    void shutdown();
 
+    /**
+     * Immediate shutdown.
+     */
+    void shutdownNow();
+    
 }

@@ -111,7 +111,7 @@ public interface IGASProgram<VS, ES, ST> extends IGASOptions<VS, ES> {
      * @param u
      *            The vertex.
      */
-    void init(IGASContext<VS, ES, ST> ctx, IV u);
+    void init(IGASState<VS, ES, ST> ctx, IV u);
     
     /**
      * GATHER is a map/reduce over the edges of the vertex. The SUM provides
@@ -133,12 +133,10 @@ public interface IGASProgram<VS, ES, ST> extends IGASOptions<VS, ES> {
      *         <p>
      *         Note: by lazily resolving the vertex and/or edge state in the GAS
      *         callback methods we avoid eagerly materializing data that we do
-     *         not need.
-     *         <p>
-     *         Note: However, this might cause problems with a powergraph style
-     *         decomposition onto a cluster since the state needs to be
-     *         communicated up front if it will be required by the gather() for
-     *         the edge.
+     *         not need. [Lazy resolution does not work on a cluster. The only
+     *         available semantics there are lazy resolution of state that was
+     *         materialized in order to support a gather() or scatter() for a
+     *         vertex.]
      *         <p>
      *         Note: The state associated with the source/target vertex and the
      *         edge should all be immutable for the GATHER. The vertex state
@@ -146,15 +144,8 @@ public interface IGASProgram<VS, ES, ST> extends IGASOptions<VS, ES> {
      *         and/or edge state MAY be mutable for the SCATTER, but that
      *         depends on the algorithm. How can we get these constraints into
      *         the API?
-     * 
-     *         TODO If gather/scatter over ALL edges, then do we need to pass
-     *         through a parameter so the caller can figure out what direction
-     *         the edge points in (alternatively, pass in the vertex for which
-     *         the gather is being performance and they can reference test both
-     *         [s] and [o] to see which one is the vertex on which the gather is
-     *         invoked and which one is the remote vertex.
      */
-    ST gather(IGASContext<VS, ES, ST> ctx, IV u, ISPO e);
+    ST gather(IGASState<VS, ES, ST> ctx, IV u, ISPO e);
     
     /**
      * SUM is a pair-wise reduction that is applied during the GATHER.
@@ -201,7 +192,7 @@ public interface IGASProgram<VS, ES, ST> extends IGASOptions<VS, ES> {
      *         when compared to either the frontier or the set of states that
      *         have been in the frontier during the computation.
      */
-    VS apply(IGASContext<VS, ES, ST> ctx, IV u, ST sum);
+    VS apply(IGASState<VS, ES, ST> ctx, IV u, ST sum);
 
     /**
      * Return <code>true</code> iff the vertex should run its SCATTER phase.
@@ -214,7 +205,7 @@ public interface IGASProgram<VS, ES, ST> extends IGASOptions<VS, ES> {
      *            The vertex.
      * @return
      */
-    boolean isChanged(IGASContext<VS, ES, ST> ctx, IV u);
+    boolean isChanged(IGASState<VS, ES, ST> ctx, IV u);
 
     /**
      * 
@@ -224,6 +215,6 @@ public interface IGASProgram<VS, ES, ST> extends IGASOptions<VS, ES> {
      * @param e
      *            The edge.
      */
-    void scatter(IGASContext<VS, ES, ST> ctx, IV u, ISPO e);
-     
+    void scatter(IGASState<VS, ES, ST> ctx, IScheduler sch, IV u, ISPO e);
+
 }
