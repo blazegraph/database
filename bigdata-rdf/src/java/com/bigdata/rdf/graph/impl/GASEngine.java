@@ -3,6 +3,7 @@ package com.bigdata.rdf.graph.impl;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -18,6 +19,11 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.log4j.Logger;
 import org.eclipse.jetty.util.ConcurrentHashSet;
 
+import com.bigdata.btree.IIndex;
+import com.bigdata.btree.IRangeQuery;
+import com.bigdata.btree.ITuple;
+import com.bigdata.btree.keys.IKeyBuilder;
+import com.bigdata.btree.keys.SuccessorUtil;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.TimestampUtility;
@@ -30,15 +36,19 @@ import com.bigdata.rdf.graph.IGASProgram;
 import com.bigdata.rdf.graph.IGASStats;
 import com.bigdata.rdf.graph.IReducer;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.IVUtility;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPOFilter;
+import com.bigdata.rdf.spo.SPOKeyOrder;
 import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.relation.accesspath.ElementFilter;
+import com.bigdata.relation.accesspath.EmptyCloseableIterator;
 import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.service.IBigdataFederation;
-import com.bigdata.striterator.ChunkedStriterator;
-import com.bigdata.striterator.EmptyChunkedIterator;
-import com.bigdata.striterator.IChunkedIterator;
+import com.bigdata.striterator.ICloseableIterator;
+import com.bigdata.striterator.Resolver;
+import com.bigdata.striterator.Striterator;
 import com.bigdata.util.concurrent.LatchedExecutor;
 
 /**
@@ -716,25 +726,48 @@ public class GASEngine<VS, ES, ST> implements IGASEngine<VS, ES, ST>,
 
     }
 
-    private IChunkedIterator<ISPO> getInEdges(final AbstractTripleStore kb,
-            final IV u) {
-
-        // in-edges: OSP / OCSP : [u] is the Object.
-        return kb
-                .getSPORelation()
-                .getAccessPath(null/* s */, null/* p */, u/* o */, null/* c */,
-                        edgeOnlyFilter).iterator();
-
+    private final SPOKeyOrder getKeyOrder(final AbstractTripleStore kb,
+            final boolean inEdges) {
+        final SPOKeyOrder keyOrder;
+        if (inEdges) {
+            // in-edges: OSP / OCSP : [u] is the Object.
+            keyOrder = kb.isQuads() ? SPOKeyOrder.OCSP : SPOKeyOrder.OSP;
+        } else {
+            // out-edges: SPO / (SPOC|SOPC) : [u] is the Subject.
+            keyOrder = kb.isQuads() ? SPOKeyOrder.SPOC : SPOKeyOrder.SPO;
+        }
+        return keyOrder;
     }
 
-    private IChunkedIterator<ISPO> getOutEdges(final AbstractTripleStore kb,
-            final IV u) {
+    @SuppressWarnings("unchecked")
+    private Striterator<Iterator<ISPO>,ISPO> getEdges(final AbstractTripleStore kb,
+            final boolean inEdges, final IV u) {
 
-        // out-edges: SPO / SPOC : [u] is the Subject.
-        return kb
-                .getSPORelation()
-                .getAccessPath(u/* s */, null/* p */, null/* o */,
-                        null/* c */, edgeOnlyFilter).iterator();
+        final SPOKeyOrder keyOrder = getKeyOrder(kb, inEdges);
+        
+        final IIndex ndx = kb.getSPORelation().getIndex(keyOrder);
+
+        final IKeyBuilder keyBuilder = ndx.getIndexMetadata().getKeyBuilder();
+
+        keyBuilder.reset();
+
+        IVUtility.encode(keyBuilder, u);
+
+        final byte[] fromKey = keyBuilder.getKey();
+
+        final byte[] toKey = SuccessorUtil.successor(fromKey.clone());
+
+        return (Striterator<Iterator<ISPO>,ISPO>) new Striterator(ndx.rangeIterator(
+                fromKey, toKey, 0/* capacity */, IRangeQuery.DEFAULT,
+                ElementFilter.newInstance(edgeOnlyFilter)))
+                .addFilter(new Resolver() {
+                    private static final long serialVersionUID = 1L;
+                    @Override
+                    protected Object resolve(final Object e) {
+                        final ITuple<ISPO> t = (ITuple<ISPO>) e;
+                        return t.getObject();
+                    }
+                });
 
     }
     
@@ -752,34 +785,93 @@ public class GASEngine<VS, ES, ST> implements IGASEngine<VS, ES, ST>,
      *         predicate, then that gives us S+P bound. If there are multiple
      *         predicates, then we have an IElementFilter on P (in addition to
      *         the filter that is removing the Literals from the scan).
-     * 
-     *         TODO Use the chunk parallelism? Explicit for(x : chunk)? This
-     *         could make it easier to collect the edges into an array (but that
-     *         is not required for powergraph).
      */
-    @SuppressWarnings("unchecked")
-    private IChunkedIterator<ISPO> getEdges(final AbstractTripleStore kb,
+    private ICloseableIterator<ISPO> getEdges(final AbstractTripleStore kb,
             final IV u, final EdgesEnum edges) {
 
         switch (edges) {
         case NoEdges:
-            return new EmptyChunkedIterator<ISPO>(null/* keyOrder */);
+            return new EmptyCloseableIterator<ISPO>();
         case InEdges:
-            return getInEdges(kb, u);
+            return (ICloseableIterator<ISPO>) getEdges(kb, true/*inEdges*/, u);
         case OutEdges:
-            return getOutEdges(kb, u);
+            return (ICloseableIterator<ISPO>) getEdges(kb, false/*inEdges*/, u);
         case AllEdges:{
-            final IChunkedIterator<ISPO> a = getInEdges(kb, u);
-            final IChunkedIterator<ISPO> b = getOutEdges(kb, u);
-            final IChunkedIterator<ISPO> c = (IChunkedIterator<ISPO>) new ChunkedStriterator<IChunkedIterator<ISPO>, ISPO>(
-                    a).append(b);
-            return c;
+            final Striterator<Iterator<ISPO>,ISPO> a = getEdges(kb, true/*inEdges*/, u);
+            final Striterator<Iterator<ISPO>,ISPO> b = getEdges(kb, false/*outEdges*/, u);
+            a.append(b);
+            return (ICloseableIterator<ISPO>) a;
         }
         default:
             throw new UnsupportedOperationException(edges.name());
         }
         
     }
+
+//    private IChunkedIterator<ISPO> getInEdges(final AbstractTripleStore kb,
+//            final IV u) {
+//
+//        // in-edges: OSP / OCSP : [u] is the Object.
+//        return kb
+//                .getSPORelation()
+//                .getAccessPath(null/* s */, null/* p */, u/* o */, null/* c */,
+//                        edgeOnlyFilter).iterator();
+//
+//    }
+//
+//    private IChunkedIterator<ISPO> getOutEdges(final AbstractTripleStore kb,
+//            final IV u) {
+//
+//        // out-edges: SPO / SPOC : [u] is the Subject.
+//        return kb
+//                .getSPORelation()
+//                .getAccessPath(u/* s */, null/* p */, null/* o */,
+//                        null/* c */, edgeOnlyFilter).iterator();
+//
+//    }
+//    
+//    /**
+//     * Return the edges for the vertex.
+//     * 
+//     * @param u
+//     *            The vertex.
+//     * @param edges
+//     *            Typesafe enumeration indicating which edges should be visited.
+//     * @return An iterator that will visit the edges for that vertex.
+//     * 
+//     *         TODO There should be a means to specify a filter on the possible
+//     *         predicates to be used for traversal. If there is a single
+//     *         predicate, then that gives us S+P bound. If there are multiple
+//     *         predicates, then we have an IElementFilter on P (in addition to
+//     *         the filter that is removing the Literals from the scan).
+//     * 
+//     *         TODO Use the chunk parallelism? Explicit for(x : chunk)? This
+//     *         could make it easier to collect the edges into an array (but that
+//     *         is not required for powergraph).
+//     */
+//    @SuppressWarnings("unchecked")
+//    private IChunkedIterator<ISPO> getEdges(final AbstractTripleStore kb,
+//            final IV u, final EdgesEnum edges) {
+//
+//        switch (edges) {
+//        case NoEdges:
+//            return new EmptyChunkedIterator<ISPO>(null/* keyOrder */);
+//        case InEdges:
+//            return getInEdges(kb, u);
+//        case OutEdges:
+//            return getOutEdges(kb, u);
+//        case AllEdges:{
+//            final IChunkedIterator<ISPO> a = getInEdges(kb, u);
+//            final IChunkedIterator<ISPO> b = getOutEdges(kb, u);
+//            final IChunkedIterator<ISPO> c = (IChunkedIterator<ISPO>) new ChunkedStriterator<IChunkedIterator<ISPO>, ISPO>(
+//                    a).append(b);
+//            return c;
+//        }
+//        default:
+//            throw new UnsupportedOperationException(edges.name());
+//        }
+//        
+//    }
     
     /**
      * A factory for tasks that are applied to each vertex in the frontier.
@@ -1115,7 +1207,8 @@ public class GASEngine<VS, ES, ST> implements IGASEngine<VS, ES, ST>,
              */
             long nedges = 0L;
 
-            final IChunkedIterator<ISPO> eitr = getEdges(kb, u, getEdgesEnum());
+            final ICloseableIterator<ISPO> eitr = getEdges(kb, u,
+                    getEdgesEnum());
 
             try {
 
@@ -1164,7 +1257,8 @@ public class GASEngine<VS, ES, ST> implements IGASEngine<VS, ES, ST>,
             
             long nedges = 0;
             
-            final IChunkedIterator<ISPO> eitr = getEdges(kb, u, getEdgesEnum());
+            final ICloseableIterator<ISPO> eitr = getEdges(kb, u,
+                    getEdgesEnum());
 
             try {
 

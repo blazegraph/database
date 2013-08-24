@@ -131,9 +131,10 @@ abstract public class GASRunner<VS, ES, ST> implements Callable<GASStats> {
      *            namespace will be <code>kb</code> if none was specified when
      *            the triple/quad store was created).</dd>
      *            <dt>-load</dt>
-     *            <dd>Loads the named resource. This option may appear multiple
-     *            times. The resources will be searched for as URLs, on the
-     *            CLASSPATH, and in the file system.</dd>
+     *            <dd>Loads the named resource IFF the KB is empty (or does not
+     *            exist) at the time this utility is executed. This option may
+     *            appear multiple times. The resources will be searched for as
+     *            URLs, on the CLASSPATH, and in the file system.</dd>
      *            <dt>-bufferMode</dt>
      *            <dd>Overrides the {@link BufferMode} (if any) specified in the
      *            <code>propertyFile</code>.</dd>
@@ -419,7 +420,7 @@ abstract public class GASRunner<VS, ES, ST> implements Callable<GASStats> {
             }
 
             /*
-             * Load data sets.
+             * Load data sets. TODO Document that KB load is IFF empty!!! (Or change the code.)
              */
             if (newKB && (loadSet != null && loadSet.length > 0)) {
 

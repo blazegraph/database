@@ -166,6 +166,17 @@ public class Striterator<I extends Iterator<E>, E> implements IStriterator<I,E> 
     }
 
     @Override
+    final public void close() {
+
+        if (src instanceof ICloseable) {
+
+            ((ICloseable) src).close();
+
+        }
+
+    }
+
+    @Override
     final public boolean hasMoreElements() {
 
         return src.hasNext();
