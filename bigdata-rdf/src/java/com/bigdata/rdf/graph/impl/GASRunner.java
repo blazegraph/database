@@ -340,6 +340,8 @@ abstract public class GASRunner<VS, ES, ST> implements Callable<GASStats> {
                 .valueOf(properties.getProperty(Journal.Options.BUFFER_MODE,
                         Journal.Options.DEFAULT_BUFFER_MODE)) : this.bufferModeOverride;
 
+        properties.setProperty(Journal.Options.BUFFER_MODE, bufferMode.name());
+
         final boolean isTransient = !bufferMode.isStable();
 
         final boolean isTemporary;
@@ -379,6 +381,8 @@ abstract public class GASRunner<VS, ES, ST> implements Callable<GASStats> {
         final String namespace = this.namespaceOverride == null ? properties
                 .getProperty(BigdataSail.Options.NAMESPACE,
                         BigdataSail.Options.DEFAULT_NAMESPACE) : this.namespaceOverride;
+
+        properties.setProperty(BigdataSail.Options.NAMESPACE, namespace);
 
         /*
          * TODO Could start NSS and use SPARQL UPDATE "LOAD" to load the data.
