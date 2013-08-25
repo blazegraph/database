@@ -23,4 +23,3 @@ interface VertexTaskFactory<T> {
     Callable<T> newVertexTask(@SuppressWarnings("rawtypes") IV u);
 
 }
-

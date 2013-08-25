@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.FutureTask;
 
 import com.bigdata.journal.IIndexManager;
@@ -15,7 +16,7 @@ import com.bigdata.rdf.graph.IGASProgram;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.service.IBigdataFederation;
-import com.bigdata.util.concurrent.LatchedExecutor;
+import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
  * {@link IGASEngine} for dynamic activation of vertices. This implementation
@@ -59,9 +60,11 @@ public class GASEngine implements IGASEngine {
     private final IIndexManager indexManager;
 
     /**
-     * The {@link ExecutorService} used to parallelize tasks.
+     * The {@link ExecutorService} used to parallelize tasks (iff
+     * {@link #nthreads} GT ONE).
      */
     private final ExecutorService executorService;
+    
     /**
      * The parallelism for the SCATTER and GATHER phases.
      */
@@ -101,9 +104,11 @@ public class GASEngine implements IGASEngine {
         this.indexManager = indexManager;
         
         this.nthreads = nthreads;
-        
-        this.executorService = indexManager.getExecutorService();
-        
+
+        this.executorService = nthreads == 0 ? null : Executors
+                .newFixedThreadPool(nthreads, new DaemonThreadFactory(
+                        GASEngine.class.getSimpleName()));
+
     }
 
     /**
@@ -130,20 +135,25 @@ public class GASEngine implements IGASEngine {
 
     }
 
-    /*
-     * TODO If we use our own thread pool, then we need to shut it down here. We
-     * also need to terminate each IGASContext.
-     */
-    
     @Override
     public void shutdown() {
-        // TODO Auto-generated method stub
+
+        if (executorService != null) {
+
+            executorService.shutdown();
+            
+        }
         
     }
 
     @Override
     public void shutdownNow() {
-        // TODO Auto-generated method stub
+
+        if (executorService != null) {
+        
+            executorService.shutdownNow();
+            
+        }
         
     }
 
@@ -204,8 +214,7 @@ public class GASEngine implements IGASEngine {
         if (nthreads == 1)
             return new RunInCallersThreadFrontierStrategy(taskFactory, f);
 
-        return new LatchedExecutorFrontierStrategy(taskFactory,
-                executorService, nthreads, f);
+        return new ParallelFrontierStrategy(taskFactory, f);
 
     }
 
@@ -273,23 +282,14 @@ public class GASEngine implements IGASEngine {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
      *         Thompson</a>
      */
-    private class LatchedExecutorFrontierStrategy extends
-            AbstractFrontierStrategy {
+    private class ParallelFrontierStrategy extends AbstractFrontierStrategy {
 
-        private final ExecutorService executorService;
-        private final int nparallel;
         private final IStaticFrontier f;
 
-        LatchedExecutorFrontierStrategy(
-                final VertexTaskFactory<Long> taskFactory,
-                final ExecutorService executorService, final int nparallel,
+        ParallelFrontierStrategy(final VertexTaskFactory<Long> taskFactory,
                 final IStaticFrontier f) {
 
             super(taskFactory);
-
-            this.executorService = executorService;
-
-            this.nparallel = nparallel;
 
             this.f = f;
 
@@ -302,10 +302,7 @@ public class GASEngine implements IGASEngine {
                     f.size());
 
             long nedges = 0L;
-
-            final LatchedExecutor e = new LatchedExecutor(executorService,
-                    nparallel);
-
+            
             try {
 
                 // For all vertices in the frontier.
@@ -319,7 +316,7 @@ public class GASEngine implements IGASEngine {
                     tasks.add(ft);
 
                     // Enqueue future for execution.
-                    e.execute(ft);
+                    executorService.execute(ft);
 
                 }
 
@@ -350,6 +347,22 @@ public class GASEngine implements IGASEngine {
 
         }
 
+    }
+
+    /**
+     * If there is an {@link ExecutorService} for the {@link GASEngine}, then
+     * return it (nthreads GT 1).
+     * 
+     * @throws UnsupportedOperationException
+     *             if nthreads==1.
+     */
+    public ExecutorService getGASThreadPool() {
+
+        if (executorService == null)
+            throw new UnsupportedOperationException();
+        
+        return executorService;
+        
     }
 
 } // GASEngine
