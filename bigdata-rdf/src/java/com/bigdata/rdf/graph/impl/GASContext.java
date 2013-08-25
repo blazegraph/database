@@ -169,6 +169,39 @@ public class GASContext<VS, ES, ST> implements IGASContext<VS, ES, ST> {
             ExecutionException, Exception {
 
         /*
+         * This is the new frontier. It is initially empty. All newly
+         * discovered vertices are inserted into this frontier.
+         * 
+         * TODO This assumes that only SCATTER can schedule new vertices. If
+         * we also permit scheduling during GATHER (or APPLY), then that
+         * will require us to communicate about the new frontier during
+         * operations other than SCATTER. On a cluster, the communication
+         * overhead is real. On a single machine, it is completely
+         * artificial. (Some GAS programs visit all vertices in every round
+         * and thus do not use a scheduler at all and would not need to
+         * implement a SCATTER phase, at least, not to schedule vertices.)
+         */
+
+        final IScheduler sch = state.getScheduler();
+
+        try {
+
+            return _doRound(stats, sch);
+            
+        } finally {
+            
+            // Ensure that thread-locals are released.
+            state.resetScheduler();
+            
+        }
+        
+        
+    }
+    
+    private boolean _doRound(final IGASStats stats, final IScheduler sch)
+            throws InterruptedException, ExecutionException, Exception {
+
+        /*
          * Obtain a view on the graph.
          * 
          * Note: This will automatically advance if there has been an
@@ -278,22 +311,6 @@ public class GASContext<VS, ES, ST> implements IGASContext<VS, ES, ST> {
             scatterEdgeCount = 0L;
 
         } else {
-
-            /*
-             * This is the new frontier. It is initially empty. All newly
-             * discovered vertices are inserted into this frontier.
-             * 
-             * TODO This assumes that only SCATTER can schedule new vertices. If
-             * we also permit scheduling during GATHER (or APPLY), then that
-             * will require us to communicate about the new frontier during
-             * operations other than SCATTER. On a cluster, the communication
-             * overhead is real. On a single machine, it is completely
-             * artificial. (Some GAS programs visit all vertices in every round
-             * and thus do not use a scheduler at all and would not need to
-             * implement a SCATTER phase, at least, not to schedule vertices.)
-             */
-
-            final IScheduler sch = state.getScheduler();
 
             scatterEdgeCount = scatterEdges(kb, f, sch, scatterEdges,
                     pushDownApplyInScatter);

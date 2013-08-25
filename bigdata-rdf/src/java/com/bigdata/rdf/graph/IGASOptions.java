@@ -7,6 +7,12 @@ import com.bigdata.rdf.spo.ISPO;
  * Interface for options that are understood by the {@link IGASEngine} and which
  * may be declared by the {@link IGASProgram}.
  * 
+ * TODO Add option to order the vertices to provide a serializable execution
+ * plan (like GraphChi). I believe that this reduces to computing a DAG over the
+ * frontier before executing the GATHER and then executing the frontier such
+ * that the parallel execution is constrained by arcs in the DAG that do not
+ * have mutual dependencies.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
 public interface IGASOptions<VS, ES> {
