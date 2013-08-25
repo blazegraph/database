@@ -22,6 +22,9 @@ import com.bigdata.journal.Journal;
 import com.bigdata.rdf.graph.IGASContext;
 import com.bigdata.rdf.graph.IGASEngine;
 import com.bigdata.rdf.graph.IGASProgram;
+import com.bigdata.rdf.graph.IGASState;
+import com.bigdata.rdf.graph.IScheduler;
+import com.bigdata.rdf.graph.impl.GASState.MyScheduler;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.rio.LoadStats;
 import com.bigdata.rdf.sail.BigdataSail;
@@ -76,6 +79,11 @@ abstract public class GASRunner<VS, ES, ST> implements Callable<GASStats> {
     private final String namespaceOverride;
 
     /**
+     * The {@link MyScheduler} class to use.
+     */
+    private final Class<MyScheduler> schedulerClassOverride;
+    
+    /**
      * When non-<code>null</code>, a list of zero or more resources to be
      * loaded. The resources will be searched for as URLs, on the CLASSPATH, and
      * in the file system.
@@ -129,6 +137,12 @@ abstract public class GASRunner<VS, ES, ST> implements Callable<GASStats> {
      *            <dt>-seed</dt>
      *            <dd>The seed for the random number generator (default is
      *            <code>217L</code>).</dd>
+     *            <dt>-bufferMode</dt>
+     *            <dd>Overrides the {@link BufferMode} (if any) specified in the
+     *            <code>propertyFile</code>.</dd>
+     *            <dt>-schedulerClass</dt>
+     *            <dd>Override the default {@link IScheduler}. Class must
+     *            implement {@link MyScheduler}.</dd>
      *            <dt>-namespace</dt>
      *            <dd>The namespace of the default SPARQL endpoint (the
      *            namespace will be <code>kb</code> if none was specified when
@@ -138,12 +152,10 @@ abstract public class GASRunner<VS, ES, ST> implements Callable<GASStats> {
      *            exist) at the time this utility is executed. This option may
      *            appear multiple times. The resources will be searched for as
      *            URLs, on the CLASSPATH, and in the file system.</dd>
-     *            <dt>-bufferMode</dt>
-     *            <dd>Overrides the {@link BufferMode} (if any) specified in the
-     *            <code>propertyFile</code>.</dd>
      *            </p>
+     * @throws ClassNotFoundException
      */
-    public GASRunner(final String[] args) {
+    public GASRunner(final String[] args) throws ClassNotFoundException {
 
         Banner.banner();
 
@@ -151,6 +163,7 @@ abstract public class GASRunner<VS, ES, ST> implements Callable<GASStats> {
         int nsamples = 100;
         int nthreads = 4;
         BufferMode bufferMode = null; // override only.
+        Class<MyScheduler> schedulerClass = null; // override only.
         String namespace = "kb";
         // Set of files to load (optional).
         LinkedHashSet<String> loadSet = new LinkedHashSet<String>();
@@ -182,6 +195,9 @@ abstract public class GASRunner<VS, ES, ST> implements Callable<GASStats> {
                 } else if (arg.equals("-bufferMode")) {
                     final String s = args[++i];
                     bufferMode = BufferMode.valueOf(s);
+                } else if (arg.equals("-schedulerClass")) {
+                    final String s = args[++i];
+                    schedulerClass = (Class<MyScheduler>) Class.forName(s);
                 } else if (arg.equals("-namespace")) {
                     final String s = args[++i];
                     namespace = s;
@@ -222,6 +238,7 @@ abstract public class GASRunner<VS, ES, ST> implements Callable<GASStats> {
         this.nthreads = nthreads;
         this.namespaceOverride = namespace;
         this.bufferModeOverride = bufferMode;
+        this.schedulerClassOverride = schedulerClass;
         this.loadSet = loadSet.isEmpty() ? null : loadSet
                 .toArray(new String[loadSet.size()]);
 
@@ -538,11 +555,20 @@ abstract public class GASRunner<VS, ES, ST> implements Callable<GASStats> {
 
         try {
 
+            if (schedulerClassOverride != null) {
+
+                ((GASEngine) gasEngine)
+                        .setSchedulerClass(schedulerClassOverride);
+
+            }
+            
             final IGASProgram<VS, ES, ST> gasProgram = newGASProgram();
 
             final IGASContext<VS, ES, ST> gasContext = gasEngine.newGASContext(
                     namespace, jnl.getLastCommitTime(), gasProgram);
 
+            final IGASState<VS, ES, ST> gasState = gasContext.getGASState();
+            
             final GASStats total = new GASStats();
 
             for (int i = 0; i < samples.length; i++) {
@@ -550,9 +576,9 @@ abstract public class GASRunner<VS, ES, ST> implements Callable<GASStats> {
                 @SuppressWarnings("rawtypes")
                 final IV startingVertex = samples[i];
 
-                gasContext.getGASState().init(startingVertex);
+                gasState.init(startingVertex);
 
-                // TODO Pure interface for this.
+                // TODO STATS: Pure interface.
                 final GASStats stats = (GASStats) gasContext.call();
 
                 total.add(stats);
@@ -566,11 +592,16 @@ abstract public class GASRunner<VS, ES, ST> implements Callable<GASStats> {
             }
 
             // Total over all sampled vertices.
-            System.out.println("TOTAL: analytic="
-                    + gasProgram.getClass().getSimpleName() + ", nseed=" + seed
-                    + ", nsamples=" + nsamples + ", nthreads=" + nthreads
+            System.out.println("TOTAL"//
+                    +": analytic=" + gasProgram.getClass().getSimpleName() //
+                    + ", nseed=" + seed
+                    + ", nsamples=" + nsamples //
+                    + ", nthreads=" + nthreads
                     + ", bufferMode=" + jnl.getBufferStrategy().getBufferMode()
-                    + ", edges(kb)=" + nedges + ", stats(total)=" + total);
+                    + ", scheduler=" + ((GASState<VS, ES, ST>)gasState).getScheduler().getClass().getSimpleName()
+                    + ", edges(kb)=" + nedges//
+                    + ", stats(total)=" + total//
+                    );
 
             return total;
 

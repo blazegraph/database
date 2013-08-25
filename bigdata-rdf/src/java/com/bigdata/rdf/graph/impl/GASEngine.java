@@ -1,11 +1,13 @@
 package com.bigdata.rdf.graph.impl;
 
+import java.lang.reflect.Constructor;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.FutureTask;
+import java.util.concurrent.atomic.AtomicReference;
 
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.ITx;
@@ -13,6 +15,8 @@ import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rdf.graph.IGASContext;
 import com.bigdata.rdf.graph.IGASEngine;
 import com.bigdata.rdf.graph.IGASProgram;
+import com.bigdata.rdf.graph.impl.GASState.CHMScheduler;
+import com.bigdata.rdf.graph.impl.GASState.MyScheduler;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.service.IBigdataFederation;
@@ -109,6 +113,10 @@ public class GASEngine implements IGASEngine {
                 .newFixedThreadPool(nthreads, new DaemonThreadFactory(
                         GASEngine.class.getSimpleName()));
 
+        this.schedulerClassRef = new AtomicReference<Class<MyScheduler>>();
+        
+        this.schedulerClassRef.set((Class)CHMScheduler.class);
+        
     }
 
     /**
@@ -365,4 +373,36 @@ public class GASEngine implements IGASEngine {
         
     }
 
+    private final AtomicReference<Class<MyScheduler>> schedulerClassRef;
+
+    void setSchedulerClass(final Class<MyScheduler> newValue) {
+
+        if(newValue == null)
+            throw new IllegalArgumentException();
+        
+        schedulerClassRef.set(newValue);
+        
+    }
+    
+    MyScheduler newScheduler(final GASContext<?, ?, ?> gasContext) {
+
+        final Class<MyScheduler> cls = schedulerClassRef.get();
+        
+        try {
+
+            final Constructor<MyScheduler> ctor = cls
+                    .getConstructor(new Class[] { GASEngine.class });
+            
+            final MyScheduler sch = ctor.newInstance(new Object[] { this });
+
+            return sch;
+            
+        } catch (Exception e) {
+            
+            throw new RuntimeException(e);
+            
+        }
+
+    }
+    
 } // GASEngine
