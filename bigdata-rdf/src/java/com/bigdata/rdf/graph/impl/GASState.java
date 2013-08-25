@@ -7,7 +7,6 @@ import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.NoSuchElementException;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
@@ -24,7 +23,6 @@ import com.bigdata.rdf.graph.IGASProgram;
 import com.bigdata.rdf.graph.IGASState;
 import com.bigdata.rdf.graph.IScheduler;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.IVUtility;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -34,12 +32,12 @@ import cutthecrap.utils.striterators.ArrayIterator;
 @SuppressWarnings("rawtypes")
 public class GASState<VS, ES, ST> implements IGASState<VS, ES, ST> {
 
-    private static final Logger log = Logger.getLogger(GASState.class);
+    static final Logger log = Logger.getLogger(GASState.class);
 
-    /**
-     * The {@link GASEngine} on which the {@link IGASProgram} will be run.
-     */
-    private final GASEngine gasEngine;
+//    /**
+//     * The {@link GASEngine} on which the {@link IGASProgram} will be run.
+//     */
+//    private final GASEngine gasEngine;
 
     /**
      * The {@link IGASProgram} to be run.
@@ -94,9 +92,11 @@ public class GASState<VS, ES, ST> implements IGASState<VS, ES, ST> {
      */
     private final ConcurrentMap<ISPO, ES> edgeState = null;
 
-    GASState(final GASEngine gasEngine, final IGASProgram<VS, ES, ST> program) {
+    GASState(final GASEngine gasEngine,
+            final GASContext<VS, ES, ST> gasContext,
+            final IGASProgram<VS, ES, ST> program) {
 
-        this.gasEngine = gasEngine;
+//        this.gasEngine = gasEngine;
         
         this.gasProgram = program;
         
@@ -106,17 +106,7 @@ public class GASState<VS, ES, ST> implements IGASState<VS, ES, ST> {
 
         this.frontier = new StaticFrontier();
         
-        /*
-         * TODO FRONTIER: Choose thread-local versus CHM implementation using a
-         * GASEngine option and then echo in the GASRunner reports.
-         */
-        if (false) {
-            this.scheduler = new SingleThreadScheduler();
-        } else if (false) {
-            this.scheduler = new CHMScheduler(gasEngine.getNThreads());
-        } else {
-            this.scheduler = new ThreadLocalScheduler(gasEngine);
-        }
+        this.scheduler = (MyScheduler) gasEngine.newScheduler(gasContext);
         
     }
 
@@ -403,7 +393,7 @@ public class GASState<VS, ES, ST> implements IGASState<VS, ES, ST> {
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      */
-    private interface MyScheduler extends IScheduler {
+    interface MyScheduler extends IScheduler {
 
         /**
          * Compact the schedule into the new frontier.
@@ -456,7 +446,7 @@ public class GASState<VS, ES, ST> implements IGASState<VS, ES, ST> {
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      */
-    static private class SingleThreadScheduler implements MyScheduler {
+    static class SingleThreadScheduler implements MyScheduler {
 
         private final Set<IV> vertices;
         
@@ -495,14 +485,14 @@ public class GASState<VS, ES, ST> implements IGASState<VS, ES, ST> {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
      *         Thompson</a>
      */
-    static private class CHMScheduler implements MyScheduler {
+    static class CHMScheduler implements MyScheduler {
 
         // FIXME This is a Jetty class. Unbundle it!  Use CHM instead.
         private final ConcurrentHashSet<IV> vertices;
 
-        public CHMScheduler(final int nthreads) {
+        public CHMScheduler(final GASEngine gasEngine) {
 
-            vertices = new ConcurrentHashSet<IV>();
+            vertices = new ConcurrentHashSet<IV>(/* TODO nthreads (CHM) */);
 
         }
 
@@ -542,7 +532,7 @@ public class GASState<VS, ES, ST> implements IGASState<VS, ES, ST> {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
      *         Thompson</a>
      */
-    static private class ThreadLocalScheduler implements MyScheduler {
+    static class ThreadLocalScheduler implements MyScheduler {
 
         private final GASEngine gasEngine;
         private final int nthreads;
@@ -607,18 +597,7 @@ public class GASState<VS, ES, ST> implements IGASState<VS, ES, ST> {
                 s.clear();
                 
             }
-
-//            if (false) {
-//                /*
-//                 * Note: This should not be required. It is a bit of a paranoid
-//                 * step. It could reduce the efficiency by forcing us to
-//                 * reallocate the backing data structures. We should keep those
-//                 * on hand for the life of the Scheduler, which is linked to the
-//                 * execution of the GASProgram.
-//                 */
-//                map.clear();
-//            }
-            
+      
         }
 
         @Override
@@ -724,279 +703,5 @@ public class GASState<VS, ES, ST> implements IGASState<VS, ES, ST> {
         }
 
     }
-
-    /**
-     * An N-way merge sort of N source iterators.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
-     *         Thompson</a>
-     */
-    private static class MergeSortIterator implements Iterator<IV> {
-
-        /**
-         * The #of source iterators.
-         */
-        private final int n;
-
-        /**
-         * The source iterators in the order given to the ctor.
-         */
-        private final Iterator<IV>[] sourceIterator;
-
-        /**
-         * The current value from each source and <code>null</code> if we need
-         * to get another value from that source. The value for a source
-         * iterator that has been exhausted will remain <code>null</code>. When
-         * all entries in this array are <code>null</code> there are no more
-         * values to be visited and we are done.
-         */
-        private final IV[] sourceTuple;
-
-        /**
-         * Index into {@link #sourceIterator} and {@link #sourceTuple} of the
-         * iterator whose value will be returned next -or- <code>-1</code> if we
-         * need to choose the next value to be visited.
-         */
-        private int current = -1;
-
-        /**
-         * 
-         * @param sourceIterators
-         *            Each source iterator MUST be in ascending {@link IV}
-         *            order.
-         */
-        public MergeSortIterator(final Iterator<IV>[] sourceIterators) {
-
-            assert sourceIterators != null;
-
-            assert sourceIterators.length > 0;
-
-            this.n = sourceIterators.length;
-
-            for (int i = 0; i < n; i++) {
-
-                assert sourceIterators[i] != null;
-
-            }
-
-            this.sourceIterator = sourceIterators;
-
-            sourceTuple = new IV[n];
-
-        }
-
-        @Override
-        public boolean hasNext() {
-
-            /*
-             * Until we find an undeleted tuple (or any tuple if DELETED is
-             * true).
-             */
-            while (true) {
-
-                if (current != -1) {
-
-                    if (log.isTraceEnabled())
-                        log.trace("Already matched: source=" + current);
-
-                    return true;
-
-                }
-
-                /*
-                 * First, make sure that we have a tuple for each source
-                 * iterator (unless that iterator is exhausted).
-                 */
-
-                int nexhausted = 0;
-
-                for (int i = 0; i < n; i++) {
-
-                    if (sourceTuple[i] == null) {
-
-                        if (sourceIterator[i].hasNext()) {
-
-                            sourceTuple[i] = sourceIterator[i].next();
-
-                            if (log.isTraceEnabled())
-                                log.trace("read sourceTuple[" + i + "]="
-                                        + sourceTuple[i]);
-
-                        } else {
-
-                            nexhausted++;
-
-                        }
-
-                    }
-
-                }
-
-                if (nexhausted == n) {
-
-                    // the aggregate iterator is exhausted.
-
-                    return false;
-
-                }
-
-                /*
-                 * Now consider the current tuple for each source iterator in
-                 * turn and choose the _first_ iterator having a tuple whose key
-                 * orders LTE all the others (or GTE if [reverseScan == true]).
-                 * This is the next tuple to be visited by the aggregate
-                 * iterator.
-                 */
-                {
-
-                    // current is index of the smallest key so far.
-                    assert current == -1;
-
-                    IV key = null; // smallest key so far.
-
-                    for (int i = 0; i < n; i++) {
-
-                        if (sourceTuple[i] == null) {
-
-                            // This source is exhausted.
-
-                            continue;
-
-                        }
-
-                        if (current == -1) {
-
-                            current = i;
-
-                            key = sourceTuple[i];
-
-                            assert key != null;
-
-                        } else {
-
-                            final IV tmp = sourceTuple[i];
-
-                            final int ret = IVUtility.compare(tmp, key);
-
-                            if (ret < 0) {
-
-                                /*
-                                 * This key orders LT the current key.
-                                 * 
-                                 * Note: This test MUST be strictly LT since LTE
-                                 * would break the precedence in which we are
-                                 * processing the source iterators and give us
-                                 * the key from the last source by preference
-                                 * when we need the key from the first source by
-                                 * preference.
-                                 */
-
-                                current = i;
-
-                                key = tmp;
-
-                            }
-
-                        }
-
-                    }
-
-                    assert current != -1;
-
-                }
-
-                if (log.isDebugEnabled()) {
-
-                    log.debug("Will visit next: source=" + current
-                            + ", tuple: " + sourceTuple[current]);
-
-                }
-
-                return true;
-
-            }
-
-        }
-
-        @Override
-        public IV next() {
-
-            if (!hasNext())
-                throw new NoSuchElementException();
-
-            return consumeLookaheadTuple();
-
-        }
-
-        /**
-         * Consume the {@link #current} source value.
-         * 
-         * @return The {@link #current} tuple.
-         */
-        private IV consumeLookaheadTuple() {
-
-            final IV t = sourceTuple[current];
-
-            // clear tuples from other sources having the same key as the
-            // current tuple.
-            clearCurrent();
-
-            return t;
-
-        }
-
-        /**
-         * <p>
-         * Clear tuples from other sources having the same key as the current
-         * tuple (eliminates duplicates).
-         * </p>
-         */
-        protected void clearCurrent() {
-
-            assert current != -1;
-
-            final IV key = sourceTuple[current];
-
-            for (int i = current + 1; i < n; i++) {
-
-                if (sourceTuple[i] == null) {
-
-                    // this iterator is exhausted.
-
-                    continue;
-
-                }
-
-                final IV tmp = sourceTuple[i];
-
-                final int ret = IVUtility.compare(key, tmp);
-
-                if (ret == 0) {
-
-                    // discard tuple.
-
-                    sourceTuple[i] = null;
-
-                }
-
-            }
-
-            // clear the tuple that we are returning so that we will read
-            // another from that source.
-            sourceTuple[current] = null;
-
-            // clear so that we will look again.
-            current = -1;
-
-        }
-
-        @Override
-        public void remove() {
-
-            throw new UnsupportedOperationException();
-
-        }
-
-    } // MergeSortIterator
 
 }

@@ -108,7 +108,7 @@ public class GASContext<VS, ES, ST> implements IGASContext<VS, ES, ST> {
 
         this.program = program;
 
-        this.state = new GASState<VS, ES, ST>(gasEngine, program);
+        this.state = new GASState<VS, ES, ST>(gasEngine, this, program);
 
     }
 
