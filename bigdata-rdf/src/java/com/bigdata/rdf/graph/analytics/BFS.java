@@ -7,7 +7,6 @@ import com.bigdata.rdf.graph.Factory;
 import com.bigdata.rdf.graph.IGASProgram;
 import com.bigdata.rdf.graph.IGASState;
 import com.bigdata.rdf.graph.IScheduler;
-import com.bigdata.rdf.graph.impl.GASRunner;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.spo.ISPO;
 
@@ -198,22 +197,22 @@ public class BFS implements IGASProgram<BFS.VS, BFS.ES, Void> {
 
     }
 
-    /**
-     * Performance testing harness.
-     */
-    public static void main(final String[] args) throws Exception {
-
-        new GASRunner<BFS.VS, BFS.ES, Void>(args) {
-
-            @Override
-            protected IGASProgram<BFS.VS, BFS.ES, Void> newGASProgram() {
-
-                return new BFS();
-
-            }
-
-        }.call();
-        
-    }
+//    /**
+//     * Performance testing harness.
+//     */
+//    public static void main(final String[] args) throws Exception {
+//
+//        new GASRunner<BFS.VS, BFS.ES, Void>(args) {
+//
+//            @Override
+//            protected IGASProgram<BFS.VS, BFS.ES, Void> newGASProgram() {
+//
+//                return new BFS();
+//
+//            }
+//
+//        }.call();
+//        
+//    }
 
 }

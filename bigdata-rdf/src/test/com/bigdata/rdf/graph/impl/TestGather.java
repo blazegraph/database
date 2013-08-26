@@ -27,7 +27,6 @@ import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
-import com.bigdata.journal.ITx;
 import com.bigdata.rdf.graph.AbstractGraphTestCase;
 import com.bigdata.rdf.graph.EdgesEnum;
 import com.bigdata.rdf.graph.Factory;
@@ -36,6 +35,7 @@ import com.bigdata.rdf.graph.IGASEngine;
 import com.bigdata.rdf.graph.IGASProgram;
 import com.bigdata.rdf.graph.IGASState;
 import com.bigdata.rdf.graph.IScheduler;
+import com.bigdata.rdf.graph.impl.GASEngine.BigdataGraphAccessor;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.spo.ISPO;
@@ -252,10 +252,15 @@ public class TestGather extends AbstractGraphTestCase {
                 .getIndexManager(), 1/* nthreads */);
 
         try {
-        
+
+            final BigdataGraphAccessor graphAccessor = ((GASEngine) gasEngine)
+                    .newGraphAccessor(sail.getDatabase().getNamespace(), sail
+                            .getDatabase().getIndexManager()
+                            .getLastCommitTime());
+
             final IGASContext<Set<ISPO>, Set<ISPO>, Set<ISPO>> gasContext = gasEngine
-                    .newGASContext(sail.getDatabase().getNamespace(),
-                            ITx.READ_COMMITTED, new MockGASProgram(gatherEdges));
+                    .newGASContext(graphAccessor, new MockGASProgram(
+                            gatherEdges));
 
             final IGASState<Set<ISPO>, Set<ISPO>, Set<ISPO>> gasState = gasContext
                     .getGASState();

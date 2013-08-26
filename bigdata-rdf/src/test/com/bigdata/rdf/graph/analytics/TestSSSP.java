@@ -23,12 +23,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.rdf.graph.analytics;
 
-import com.bigdata.journal.ITx;
 import com.bigdata.rdf.graph.AbstractGraphTestCase;
 import com.bigdata.rdf.graph.IGASContext;
 import com.bigdata.rdf.graph.IGASEngine;
 import com.bigdata.rdf.graph.IGASState;
 import com.bigdata.rdf.graph.impl.GASEngine;
+import com.bigdata.rdf.graph.impl.GASEngine.BigdataGraphAccessor;
 
 /**
  * Test class for SSP traversal.
@@ -54,9 +54,13 @@ public class TestSSSP extends AbstractGraphTestCase {
 
         try {
 
+            final BigdataGraphAccessor graphAccessor = ((GASEngine) gasEngine)
+                    .newGraphAccessor(sail.getDatabase().getNamespace(), sail
+                            .getDatabase().getIndexManager()
+                            .getLastCommitTime());
+
             final IGASContext<SSSP.VS, SSSP.ES, Integer> gasContext = gasEngine
-                    .newGASContext(sail.getDatabase().getNamespace(),
-                            ITx.READ_COMMITTED, new SSSP());
+                    .newGASContext(graphAccessor, new SSSP());
 
             final IGASState<SSSP.VS, SSSP.ES, Integer> gasState = gasContext.getGASState();
             

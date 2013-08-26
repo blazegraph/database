@@ -8,7 +8,6 @@ import com.bigdata.rdf.graph.GASUtil;
 import com.bigdata.rdf.graph.IGASProgram;
 import com.bigdata.rdf.graph.IGASState;
 import com.bigdata.rdf.graph.IScheduler;
-import com.bigdata.rdf.graph.impl.GASRunner;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.spo.ISPO;
 
@@ -311,22 +310,22 @@ public class SSSP implements IGASProgram<SSSP.VS, SSSP.ES, Integer/* dist */> {
 
     }
 
-    /**
-     * Performance test harness.
-     */
-    public static void main(final String[] args) throws Exception {
-
-        new GASRunner<SSSP.VS, SSSP.ES, Integer>(args) {
-
-            @Override
-            protected IGASProgram<SSSP.VS, SSSP.ES, Integer> newGASProgram() {
-
-                return new SSSP();
-
-            }
-
-        }.call();
-
-    }
+//    /**
+//     * Performance test harness.
+//     */
+//    public static void main(final String[] args) throws Exception {
+//
+//        new GASRunner<SSSP.VS, SSSP.ES, Integer>(args) {
+//
+//            @Override
+//            protected IGASProgram<SSSP.VS, SSSP.ES, Integer> newGASProgram() {
+//
+//                return new SSSP();
+//
+//            }
+//
+//        }.call();
+//
+//    }
 
 }
