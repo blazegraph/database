@@ -229,8 +229,9 @@ public class TestNanoSparqlServerWithProxyIndexManager<S extends IIndexManager>
         // BigdataSailRemoteRepository test (nano sparql server client-wrapper)
         suite.addTestSuite(TestBigdataSailRemoteRepository.class);
         
-        // TestInsertFilterFalse727
+        // Insert tests from trac issues
         suite.addTestSuite(TestInsertFilterFalse727.class);
+        suite.addTestSuite(TestCBD731.class);
         
 
         // SPARQL UPDATE test suite.
