@@ -32,7 +32,7 @@ import cutthecrap.utils.striterators.ArrayIterator;
 @SuppressWarnings("rawtypes")
 public class GASState<VS, ES, ST> implements IGASState<VS, ES, ST> {
 
-    static final Logger log = Logger.getLogger(GASState.class);
+    private final Logger log = Logger.getLogger(GASState.class);
 
 //    /**
 //     * The {@link GASEngine} on which the {@link IGASProgram} will be run.
@@ -446,11 +446,11 @@ public class GASState<VS, ES, ST> implements IGASState<VS, ES, ST> {
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      */
-    static class SingleThreadScheduler implements MyScheduler {
+    static class STScheduler implements MyScheduler {
 
         private final Set<IV> vertices;
         
-        public SingleThreadScheduler() {
+        public STScheduler(final GASEngine gasEngine) {
 
             this.vertices = new LinkedHashSet<IV>();
         
@@ -484,13 +484,15 @@ public class GASState<VS, ES, ST> implements IGASState<VS, ES, ST> {
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
      *         Thompson</a>
+     * 
+     *         FIXME SCHEDULER: This is a Jetty class. Unbundle it! Use CHM
+     *         instead. See {@link CHMScheduler}.
      */
-    static class CHMScheduler implements MyScheduler {
+    static class CHSScheduler implements MyScheduler {
 
-        // FIXME This is a Jetty class. Unbundle it!  Use CHM instead.
         private final ConcurrentHashSet<IV> vertices;
 
-        public CHMScheduler(final GASEngine gasEngine) {
+        public CHSScheduler(final GASEngine gasEngine) {
 
             vertices = new ConcurrentHashSet<IV>(/* TODO nthreads (CHM) */);
 
@@ -520,31 +522,70 @@ public class GASState<VS, ES, ST> implements IGASState<VS, ES, ST> {
     } // CHMScheduler
 
     /**
-     * This scheduler uses thread-local {@link LinkedHashSet}s to track
-     * the distinct vertices scheduled by each execution thread.  After
-     * the computation round, those per-thread segments of the frontier
-     * are combined into a single global, compact, and ordered frontier.
-     * To maximize the parallel activity, the per-thread frontiers are
-     * sorted using N threads (one per segment). Finally, the frontier
-     * segments are combined using a {@link MergeSortIterator} - this is
-     * a sequential step with a linear cost in the size of the frontier.
+     * A simple scheduler based on a {@link ConcurrentHashMap}.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
      *         Thompson</a>
      */
-    static class ThreadLocalScheduler implements MyScheduler {
+    static class CHMScheduler implements MyScheduler {
+
+        private final ConcurrentHashMap<IV,IV> vertices;
+
+        public CHMScheduler(final GASEngine gasEngine) {
+
+            vertices = new ConcurrentHashMap<IV,IV>(gasEngine.getNThreads());
+
+        }
+
+        @Override
+        public void schedule(final IV v) {
+
+            vertices.putIfAbsent(v,v);
+
+        }
+
+        @Override
+        public void clear() {
+            
+            vertices.clear();
+            
+        }
+
+        @Override
+        public void compactFrontier(final StaticFrontier frontier) {
+
+            frontier.resetFrontier(compactAndSort(vertices.keySet()));
+            
+        }
+
+    } // CHMScheduler
+
+    /**
+     * This scheduler uses thread-local buffers ({@link LinkedHashSet}) to track
+     * the distinct vertices scheduled by each execution thread. After the
+     * computation round, those per-thread segments of the frontier are combined
+     * into a single global, compact, and ordered frontier. To maximize the
+     * parallel activity, the per-thread frontiers are sorted using N threads
+     * (one per segment). Finally, the frontier segments are combined using a
+     * {@link MergeSortIterator} - this is a sequential step with a linear cost
+     * in the size of the frontier.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+     *         Thompson</a>
+     */
+    static class TLScheduler implements MyScheduler {
 
         private final GASEngine gasEngine;
         private final int nthreads;
-        private final ConcurrentHashMap<Long/*threadId*/,SingleThreadScheduler> map;
+        private final ConcurrentHashMap<Long/*threadId*/,STScheduler> map;
         
-        public ThreadLocalScheduler(final GASEngine gasEngine) {
+        public TLScheduler(final GASEngine gasEngine) {
 
             this.gasEngine = gasEngine;
             
             this.nthreads = gasEngine.getNThreads();
             
-            this.map = new ConcurrentHashMap<Long, SingleThreadScheduler>(
+            this.map = new ConcurrentHashMap<Long, STScheduler>(
                     nthreads/* initialCapacity */, .75f/* loadFactor */,
                     nthreads);
 
@@ -554,12 +595,12 @@ public class GASState<VS, ES, ST> implements IGASState<VS, ES, ST> {
 
             final Long id = Thread.currentThread().getId();
             
-            SingleThreadScheduler s = map.get(id);
+            STScheduler s = map.get(id);
             
             if (s == null) {
 
-                final IScheduler old = map.putIfAbsent(id,
-                        s = new SingleThreadScheduler());
+                final IScheduler old = map.putIfAbsent(id, s = new STScheduler(
+                        gasEngine));
 
                 if (old != null) {
                     
@@ -592,7 +633,7 @@ public class GASState<VS, ES, ST> implements IGASState<VS, ES, ST> {
              * Clear the per-thread maps, but do not discard. They will be
              * reused in the next round.
              */
-            for(SingleThreadScheduler s : map.values()) {
+            for(STScheduler s : map.values()) {
 
                 s.clear();
                 
@@ -614,8 +655,8 @@ public class GASState<VS, ES, ST> implements IGASState<VS, ES, ST> {
             {
                 final List<Callable<IV[]>> tasks = new ArrayList<Callable<IV[]>>(nthreads);
             
-                for (SingleThreadScheduler s : map.values()) {
-                    final SingleThreadScheduler t = s;
+                for (STScheduler s : map.values()) {
+                    final STScheduler t = s;
                     tasks.add(new Callable<IV[]>(){
                         @Override
                         public IV[] call() throws Exception {
@@ -672,9 +713,31 @@ public class GASState<VS, ES, ST> implements IGASState<VS, ES, ST> {
             }
             
             /*
-             * Now merge sort those arrays.
+             * Now merge sort those arrays and populate the new frontier.
              */
-            
+            mergeSortSourcesAndSetFrontier(nsources, nvertices, frontiers,
+                    frontier);
+
+        }
+
+        /**
+         * Now merge sort the ordered frontier segments and populate the new
+         * frontier.
+         * 
+         * @param nsources
+         *            The #of frontier segments.
+         * @param nvertices
+         *            The total #of vertice across those segments (may
+         *            double-count across segments).
+         * @param frontiers
+         *            The ordered, compact frontier segments
+         * @param frontier
+         *            The new frontier to be populated.
+         */
+        private void mergeSortSourcesAndSetFrontier(final int nsources,
+                final int nvertices, final IV[][] frontiers,
+                final StaticFrontier frontier) {
+
             // wrap IVs[] as Iterators.
             @SuppressWarnings("unchecked")
             final Iterator<IV>[] itrs = new Iterator[nsources];
@@ -687,7 +750,7 @@ public class GASState<VS, ES, ST> implements IGASState<VS, ES, ST> {
 
             // merge sort of those iterators.
             final Iterator<IV> itr = new MergeSortIterator(itrs);
-            
+
             // ensure enough capacity for the new frontier.
             frontier.ensureCapacity(nvertices);
 

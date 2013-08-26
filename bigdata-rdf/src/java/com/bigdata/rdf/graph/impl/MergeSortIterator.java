@@ -14,6 +14,8 @@ import com.bigdata.rdf.internal.IVUtility;
 @SuppressWarnings("rawtypes")
 class MergeSortIterator implements Iterator<IV> {
 
+//    private final static Logger log = Logger.getLogger(MergeSortIterator.class);
+    
     /**
      * The #of source iterators.
      */
@@ -75,8 +77,8 @@ class MergeSortIterator implements Iterator<IV> {
 
             if (current != -1) {
 
-                if (GASState.log.isTraceEnabled())
-                    GASState.log.trace("Already matched: source=" + current);
+//                if (log.isTraceEnabled())
+//                    log.trace("Already matched: source=" + current);
 
                 return true;
 
@@ -97,9 +99,9 @@ class MergeSortIterator implements Iterator<IV> {
 
                         sourceTuple[i] = sourceIterator[i].next();
 
-                        if (GASState.log.isTraceEnabled())
-                            GASState.log.trace("read sourceTuple[" + i + "]="
-                                    + sourceTuple[i]);
+//                        if (log.isTraceEnabled())
+//                            log.trace("read sourceTuple[" + i + "]="
+//                                    + sourceTuple[i]);
 
                     } else {
 
@@ -182,12 +184,9 @@ class MergeSortIterator implements Iterator<IV> {
 
             }
 
-            if (GASState.log.isDebugEnabled()) {
-
-                GASState.log.debug("Will visit next: source=" + current
-                        + ", tuple: " + sourceTuple[current]);
-
-            }
+//            if (log.isDebugEnabled())
+//                log.debug("Will visit next: source=" + current + ", tuple: "
+//                        + sourceTuple[current]);
 
             return true;
 

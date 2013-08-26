@@ -15,6 +15,7 @@ import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rdf.graph.IGASContext;
 import com.bigdata.rdf.graph.IGASEngine;
 import com.bigdata.rdf.graph.IGASProgram;
+import com.bigdata.rdf.graph.IScheduler;
 import com.bigdata.rdf.graph.impl.GASState.CHMScheduler;
 import com.bigdata.rdf.graph.impl.GASState.MyScheduler;
 import com.bigdata.rdf.internal.IV;
@@ -75,6 +76,11 @@ public class GASEngine implements IGASEngine {
     private final int nthreads;
 
     /**
+     * The factory for the {@link IScheduler}.
+     */
+    private final AtomicReference<Class<MyScheduler>> schedulerClassRef;
+
+    /**
      * The parallelism for the SCATTER and GATHER phases.
      */
     public int getNThreads() {
@@ -97,6 +103,7 @@ public class GASEngine implements IGASEngine {
      *            scale-out we want to partition the work and the VS/ES so that
      *            would imply a different {@link IGASEngine} design.
      */
+    @SuppressWarnings("unchecked")
     public GASEngine(final IIndexManager indexManager, final int nthreads) {
 
         if (indexManager == null)
@@ -115,8 +122,8 @@ public class GASEngine implements IGASEngine {
 
         this.schedulerClassRef = new AtomicReference<Class<MyScheduler>>();
         
-        this.schedulerClassRef.set((Class)CHMScheduler.class);
-        
+        this.schedulerClassRef.set((Class) CHMScheduler.class);
+
     }
 
     /**
@@ -372,8 +379,6 @@ public class GASEngine implements IGASEngine {
         return executorService;
         
     }
-
-    private final AtomicReference<Class<MyScheduler>> schedulerClassRef;
 
     void setSchedulerClass(final Class<MyScheduler> newValue) {
 

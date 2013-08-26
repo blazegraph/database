@@ -1,5 +1,7 @@
 package com.bigdata.rdf.graph.analytics;
 
+import java.util.concurrent.atomic.AtomicInteger;
+
 import com.bigdata.rdf.graph.EdgesEnum;
 import com.bigdata.rdf.graph.Factory;
 import com.bigdata.rdf.graph.IGASProgram;
@@ -25,25 +27,29 @@ public class BFS implements IGASProgram<BFS.VS, BFS.ES, Void> {
         /**
          * <code>-1</code> until visited. When visited, set to the current round
          * in order to assign each vertex its traversal depth.
+         * <p>
+         * Note: It is possible that the same vertex may be visited multiple
+         * times in a given expansion (from one or more source vertices that all
+         * target the same destination vertex). However, in this case the same
+         * value will be assigned by each visitor. Thus, synchronization is only
+         * required for visibility of the update within the round. As long as
+         * one thread reports that it modified the depth, the vertex will be
+         * scheduled.
          */
-        private int depth = -1;
+        private final AtomicInteger depth = new AtomicInteger(-1);
 
         /**
          * The depth at which this vertex was first visited (origin ZERO) and
          * <code>-1</code> if the vertex has not been visited.
          */
         public int depth() {
-            synchronized (this) {
-                return depth;
-            }
+//            synchronized (this) {
+                return depth.get();
+//            }
         }
 
         /**
          * Note: This marks the vertex at the current traversal depth.
-         * <p>
-         * Note: It is possible that the same vertex may be visited multiple
-         * times in a given expansion (from one or more source vertices that all
-         * target the same destination vertex).
          * 
          * @return <code>true</code> if the vertex was visited for the first
          *         time in this round and the calling thread is the thread that
@@ -51,13 +57,18 @@ public class BFS implements IGASProgram<BFS.VS, BFS.ES, Void> {
          *         scheduling of a vertex).
          */
         public boolean visit(final int depth) {
-            synchronized (this) {
-                if (this.depth == -1) {
-                    this.depth = depth;
-                    return true;
-                }
-                return false;
+            if (this.depth.compareAndSet(-1/* expect */, depth/* newValue */)) {
+                // Scheduled by this thread.
+                return true;
             }
+            return false;
+//            synchronized (this) {
+//                if (this.depth == -1) {
+//                    this.depth = depth;
+//                    return true;
+//                }
+//                return false;
+//            }
         }
 
         @Override
