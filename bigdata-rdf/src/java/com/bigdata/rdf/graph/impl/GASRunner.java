@@ -7,6 +7,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
+import java.lang.reflect.Constructor;
 import java.util.LinkedHashSet;
 import java.util.Properties;
 import java.util.Random;
@@ -24,6 +25,7 @@ import com.bigdata.rdf.graph.IGASEngine;
 import com.bigdata.rdf.graph.IGASProgram;
 import com.bigdata.rdf.graph.IGASState;
 import com.bigdata.rdf.graph.IScheduler;
+import com.bigdata.rdf.graph.impl.GASEngine.BigdataGraphAccessor;
 import com.bigdata.rdf.graph.impl.GASState.MyScheduler;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.rio.LoadStats;
@@ -39,7 +41,7 @@ import com.bigdata.rdf.store.AbstractTripleStore;
  *         vertices? For such algorithms, we just run them once per graph
  *         (unless the graph is dynamic).
  */
-abstract public class GASRunner<VS, ES, ST> implements Callable<GASStats> {
+public class GASRunner<VS, ES, ST> implements Callable<GASStats> {
 
     private static final Logger log = Logger.getLogger(GASRunner.class);
 
@@ -63,6 +65,11 @@ abstract public class GASRunner<VS, ES, ST> implements Callable<GASStats> {
      */
     private final int nthreads;
 
+    /**
+     * The analytic class to be executed.
+     */
+    private final Class<IGASProgram<VS, ES, ST>> analyticClass;
+    
     /**
      * The property file
      */
@@ -107,7 +114,7 @@ abstract public class GASRunner<VS, ES, ST> implements Callable<GASStats> {
 
         }
 
-        System.err.println("[options] propertyFile");
+        System.err.println("[options] analyticClass propertyFile");
 
         System.exit(status);
 
@@ -118,7 +125,7 @@ abstract public class GASRunner<VS, ES, ST> implements Callable<GASStats> {
      * 
      * @param args
      *            USAGE:<br/>
-     *            <code>(options) propertyFile</code>
+     *            <code>(options) analyticClass propertyFile</code>
      *            <p>
      *            <i>Where:</i>
      *            <dl>
@@ -217,12 +224,24 @@ abstract public class GASRunner<VS, ES, ST> implements Callable<GASStats> {
          * Check for the remaining (required) argument(s).
          */
         final int nremaining = args.length - i;
-        if (nremaining != 1) {
+        if (nremaining != 2) {
             /*
              * There are either too many or too few arguments remaining.
              */
             usage(1/* status */, nremaining < 1 ? "Too few arguments."
                     : "Too many arguments");
+        }
+
+        /*
+         * The analytic to be executed.
+         */
+        {
+
+            final String s = args[i++];
+
+            this.analyticClass = (Class<IGASProgram<VS, ES, ST>>) Class
+                    .forName(s);
+
         }
 
         /*
@@ -248,9 +267,29 @@ abstract public class GASRunner<VS, ES, ST> implements Callable<GASStats> {
     }
 
     /**
-     * Return the {@link IGASProgram} to be evaluated.
+     * Return an instance of the {@link IGASProgram} to be evaluated.
      */
-    abstract protected IGASProgram<VS, ES, ST> newGASProgram();
+    protected IGASProgram<VS, ES, ST> newGASProgram() {
+
+        final Class<IGASProgram<VS, ES, ST>> cls = analyticClass;
+
+        try {
+
+            final Constructor<IGASProgram<VS, ES, ST>> ctor = cls
+                    .getConstructor(new Class[] {});
+
+            final IGASProgram<VS, ES, ST> gasProgram = ctor
+                    .newInstance(new Object[] {});
+
+            return gasProgram;
+
+        } catch (Exception e) {
+            
+            throw new RuntimeException(e);
+            
+        }
+        
+    }
 
     private Properties getProperties(final String resource) throws IOException {
 
@@ -564,8 +603,11 @@ abstract public class GASRunner<VS, ES, ST> implements Callable<GASStats> {
             
             final IGASProgram<VS, ES, ST> gasProgram = newGASProgram();
 
+            final BigdataGraphAccessor graphAccessor = ((GASEngine) gasEngine)
+                    .newGraphAccessor(namespace, jnl.getLastCommitTime());
+
             final IGASContext<VS, ES, ST> gasContext = gasEngine.newGASContext(
-                    namespace, jnl.getLastCommitTime(), gasProgram);
+                    graphAccessor, gasProgram);
 
             final IGASState<VS, ES, ST> gasState = gasContext.getGASState();
             
@@ -610,6 +652,18 @@ abstract public class GASRunner<VS, ES, ST> implements Callable<GASStats> {
             gasEngine.shutdownNow();
             
         }
+
+    }
+
+    /**
+     * Performance testing harness.
+     * 
+     * @see #GASRunner(String[])
+     */
+    @SuppressWarnings("rawtypes")
+    public static void main(final String[] args) throws Exception {
+
+        new GASRunner(args).call();
 
     }
 

@@ -15,6 +15,7 @@ import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rdf.graph.IGASContext;
 import com.bigdata.rdf.graph.IGASEngine;
 import com.bigdata.rdf.graph.IGASProgram;
+import com.bigdata.rdf.graph.IGraphAccessor;
 import com.bigdata.rdf.graph.IScheduler;
 import com.bigdata.rdf.graph.impl.GASState.CHMScheduler;
 import com.bigdata.rdf.graph.impl.GASState.MyScheduler;
@@ -142,11 +143,12 @@ public class GASEngine implements IGASEngine {
      */
     @Override
     public <VS, ES, ST> IGASContext<VS, ES, ST> newGASContext(
-            final String namespace, final long timestamp,
+            final IGraphAccessor graphAccessor,
             final IGASProgram<VS, ES, ST> program) {
 
-        return new GASContext<VS, ES, ST>(this/* GASEngine */, namespace,
-                timestamp, program);
+        final BigdataGraphAccessor tmp = (BigdataGraphAccessor) graphAccessor;
+
+        return new GASContext<VS, ES, ST>(this/* GASEngine */, tmp, program);
 
     }
 
@@ -170,48 +172,6 @@ public class GASEngine implements IGASEngine {
             
         }
         
-    }
-
-    /**
-     * Return a view of the specified graph (aka KB) as of the specified
-     * timestamp.
-     * 
-     * @param namespace
-     *            The namespace of the graph.
-     * @param timestamp
-     *            The timestamp of the view.
-     * @return The graph.
-     * 
-     * @throws RuntimeException
-     *             if the graph could not be resolved.
-     */
-    protected AbstractTripleStore getKB(final String namespace, long timestamp) {
-
-        if (timestamp == ITx.READ_COMMITTED) {
-
-            /**
-             * Note: This code is request the view as of the the last commit
-             * time. If we use ITx.READ_COMMITTED here then it will cause the
-             * Journal to provide us with a ReadCommittedIndex and that has a
-             * synchronization hot spot!
-             */
-
-            timestamp = indexManager.getLastCommitTime();
-
-        }
-
-        final AbstractTripleStore kb = (AbstractTripleStore) indexManager
-                .getResourceLocator().locate(namespace, timestamp);
-
-        if (kb == null) {
-
-            throw new RuntimeException("Not found: namespace=" + namespace
-                    + ", timestamp=" + TimestampUtility.toString(timestamp));
-
-        }
-
-        return kb;
-
     }
 
     /**
@@ -408,6 +368,91 @@ public class GASEngine implements IGASEngine {
             
         }
 
+    }
+
+    public class BigdataGraphAccessor implements IGraphAccessor {
+
+        private final String namespace;
+        private final long timestamp;
+        
+        /**
+         * 
+         * @param namespace
+         *            The namespace of the graph.
+         * @param timestamp
+         *            The timestamp of the view.
+         */
+        private BigdataGraphAccessor(final String namespace,final long timestamp) {
+    
+            this.namespace = namespace;
+            this.timestamp = timestamp;
+            
+        }
+        
+        /**
+         * Return a view of the specified graph (aka KB) as of the specified
+         * timestamp.
+         * 
+         * @return The graph.
+         * 
+         * @throws RuntimeException
+         *             if the graph could not be resolved.
+         */
+        public AbstractTripleStore getKB() {
+
+            long timestamp = this.timestamp;
+
+            if (timestamp == ITx.READ_COMMITTED) {
+
+                /**
+                 * Note: This code is request the view as of the the last commit
+                 * time. If we use ITx.READ_COMMITTED here then it will cause
+                 * the Journal to provide us with a ReadCommittedIndex and that
+                 * has a synchronization hot spot!
+                 */
+
+                timestamp = indexManager.getLastCommitTime();
+
+            }
+
+            final AbstractTripleStore kb = (AbstractTripleStore) indexManager
+                    .getResourceLocator().locate(namespace, timestamp);
+
+            if (kb == null) {
+
+                throw new RuntimeException("Not found: namespace=" + namespace
+                        + ", timestamp=" + TimestampUtility.toString(timestamp));
+
+            }
+
+            return kb;
+
+        }
+
+        public String getNamespace() {
+            return namespace;
+        }
+
+        public Long getTimestamp() {
+            return timestamp;
+        }
+
+    }
+
+    /**
+     * 
+     * 
+     * @param namespace
+     *            The namespace of the graph.
+     * @param timestamp
+     *            The timestamp of the view.
+     * @return
+     */
+    public BigdataGraphAccessor newGraphAccessor(final String namespace,
+            final long timestamp) {
+
+        return new BigdataGraphAccessor(namespace, timestamp);
+        
     }
     
 } // GASEngine

@@ -12,7 +12,6 @@ import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.SuccessorUtil;
-import com.bigdata.journal.ITx;
 import com.bigdata.rdf.graph.EdgesEnum;
 import com.bigdata.rdf.graph.GASUtil;
 import com.bigdata.rdf.graph.IGASContext;
@@ -21,6 +20,7 @@ import com.bigdata.rdf.graph.IGASState;
 import com.bigdata.rdf.graph.IGASStats;
 import com.bigdata.rdf.graph.IReducer;
 import com.bigdata.rdf.graph.IScheduler;
+import com.bigdata.rdf.graph.impl.GASEngine.BigdataGraphAccessor;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVUtility;
 import com.bigdata.rdf.spo.ISPO;
@@ -57,16 +57,9 @@ public class GASContext<VS, ES, ST> implements IGASContext<VS, ES, ST> {
     private final GASEngine gasEngine;
 
     /**
-     * The graph (a KB instance).
+     * Used to access the graph (a KB instance).
      */
-    private final String namespace;
-
-    /**
-     * The timestamp of the view of that graph. This MAY be
-     * {@link ITx#READ_COMMITTED} to use the current committed view of the graph
-     * for each iteration (dynamic graph).
-     */
-    private final long timestamp;
+    private final BigdataGraphAccessor graphAccessor;
 
     /**
      * This {@link IGASState}.
@@ -88,23 +81,22 @@ public class GASContext<VS, ES, ST> implements IGASContext<VS, ES, ST> {
      * @param program
      *            The program to execute against that graph.
      */
-    public GASContext(final GASEngine gasEngine, final String namespace,
-            final long timestamp, final IGASProgram<VS, ES, ST> program) {
+    public GASContext(final GASEngine gasEngine,
+            final BigdataGraphAccessor graphAccessor,
+            final IGASProgram<VS, ES, ST> program) {
 
         if (gasEngine == null)
             throw new IllegalArgumentException();
 
-        if (program == null)
+        if (graphAccessor == null)
             throw new IllegalArgumentException();
-
-        if (namespace == null)
+        
+        if (program == null)
             throw new IllegalArgumentException();
 
         this.gasEngine = gasEngine;
 
-        this.namespace = namespace;
-
-        this.timestamp = timestamp;
+        this.graphAccessor = graphAccessor;
 
         this.program = program;
 
@@ -140,7 +132,7 @@ public class GASContext<VS, ES, ST> implements IGASContext<VS, ES, ST> {
         if (log.isInfoEnabled())
             log.info("Done: " + total);
 
-        state.traceState(gasEngine.getKB(namespace, timestamp));
+        state.traceState(graphAccessor.getKB());
 
         // Done
         return total;
@@ -207,7 +199,7 @@ public class GASContext<VS, ES, ST> implements IGASContext<VS, ES, ST> {
          * Note: This will automatically advance if there has been an
          * intervening commit and the caller specified ITx.READ_COMMITTED.
          */
-        final AbstractTripleStore kb = gasEngine.getKB(namespace, timestamp);
+        final AbstractTripleStore kb = graphAccessor.getKB();
 
         // The fontier for this round.
         final IStaticFrontier f = state.frontier();

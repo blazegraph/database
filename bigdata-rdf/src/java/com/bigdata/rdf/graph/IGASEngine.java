@@ -10,11 +10,8 @@ public interface IGASEngine {
     /**
      * Obtain an execution context for the specified {@link IGASProgram}.
      * 
-     * @param namespace
-     *            The namespace of the graph (KB instance).
-     * @param timestamp
-     *            The timestamp of the graph view (this should be a read-only
-     *            view for non-blocking index reads).
+     * @param graphAccessor
+     *            Indicates the graph to be processed.
      * @param program
      *            The program to execute against that graph.
      * 
@@ -30,8 +27,8 @@ public interface IGASEngine {
      *            always true. The SUM type is scoped to the GATHER + SUM
      *            operation (NOT the computation).
      */
-    <VS, ES, ST> IGASContext<VS, ES, ST> newGASContext(String namespace,
-            long timestamp, IGASProgram<VS, ES, ST> program);
+    <VS, ES, ST> IGASContext<VS, ES, ST> newGASContext(
+            IGraphAccessor graphAccessor, IGASProgram<VS, ES, ST> program);
 
     /**
      * Polite shutdown.
