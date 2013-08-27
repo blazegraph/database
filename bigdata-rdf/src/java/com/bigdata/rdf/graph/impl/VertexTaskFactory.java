@@ -10,7 +10,7 @@ import com.bigdata.rdf.internal.IV;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
  *         Thompson</a>
  */
-interface VertexTaskFactory<T> {
+public interface VertexTaskFactory<T> {
 
     /**
      * Return a new task that will evaluate the vertex.

@@ -45,16 +45,5 @@ public interface IGASContext<VS, ES, ST> extends Callable<IGASStats> {
      */
     boolean doRound(IGASStats stats) throws Exception, ExecutionException,
             InterruptedException;
-
-    /**
-     * Compute a reduction over the vertex state table (all vertices that have
-     * had their vertex state materialized).
-     * 
-     * @param op
-     *            The reduction operation.
-     * 
-     * @return The reduction.
-     */
-    <T> T reduce(IReducer<VS, ES, ST, T> op);
     
 }

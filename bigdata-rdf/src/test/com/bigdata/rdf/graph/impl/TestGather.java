@@ -34,8 +34,9 @@ import com.bigdata.rdf.graph.IGASContext;
 import com.bigdata.rdf.graph.IGASEngine;
 import com.bigdata.rdf.graph.IGASProgram;
 import com.bigdata.rdf.graph.IGASState;
-import com.bigdata.rdf.graph.IScheduler;
-import com.bigdata.rdf.graph.impl.GASEngine.BigdataGraphAccessor;
+import com.bigdata.rdf.graph.IGASScheduler;
+import com.bigdata.rdf.graph.impl.bd.BigdataGASEngine;
+import com.bigdata.rdf.graph.impl.bd.BigdataGASEngine.BigdataGraphAccessor;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.spo.ISPO;
@@ -174,9 +175,16 @@ public class TestGather extends AbstractGraphTestCase {
 
         @Override
         public void scatter(IGASState<Set<ISPO>, Set<ISPO>, Set<ISPO>> state,
-                final IScheduler sch, IV u, ISPO e) {
+                final IGASScheduler sch, IV u, ISPO e) {
 
             throw new UnsupportedOperationException();
+            
+        }
+
+        @Override
+        public boolean nextRound(IGASContext ctx) {
+
+            return true;
             
         }
 
@@ -248,12 +256,12 @@ public class TestGather extends AbstractGraphTestCase {
     protected void doGatherTest(final EdgesEnum gatherEdges,
             final Set<ISPO> expected, final IV startingVertex) throws Exception {
 
-        final IGASEngine gasEngine = new GASEngine(sail.getDatabase()
+        final IGASEngine gasEngine = new BigdataGASEngine(sail.getDatabase()
                 .getIndexManager(), 1/* nthreads */);
 
         try {
 
-            final BigdataGraphAccessor graphAccessor = ((GASEngine) gasEngine)
+            final BigdataGraphAccessor graphAccessor = ((BigdataGASEngine) gasEngine)
                     .newGraphAccessor(sail.getDatabase().getNamespace(), sail
                             .getDatabase().getIndexManager()
                             .getLastCommitTime());

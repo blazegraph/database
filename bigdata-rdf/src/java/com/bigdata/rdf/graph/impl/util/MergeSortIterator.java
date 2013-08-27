@@ -1,4 +1,4 @@
-package com.bigdata.rdf.graph.impl;
+package com.bigdata.rdf.graph.impl.util;
 
 import java.util.Iterator;
 import java.util.NoSuchElementException;
@@ -7,15 +7,16 @@ import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVUtility;
 
 /**
- * An N-way merge sort of N source iterators.
+ * An N-way merge sort of N source iterators visiting {@link IV}s.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
 @SuppressWarnings("rawtypes")
-class MergeSortIterator implements Iterator<IV> {
+public class MergeSortIterator implements Iterator<IV> {
 
-//    private final static Logger log = Logger.getLogger(MergeSortIterator.class);
-    
+    // private final static Logger log =
+    // Logger.getLogger(MergeSortIterator.class);
+
     /**
      * The #of source iterators.
      */
@@ -77,8 +78,8 @@ class MergeSortIterator implements Iterator<IV> {
 
             if (current != -1) {
 
-//                if (log.isTraceEnabled())
-//                    log.trace("Already matched: source=" + current);
+                // if (log.isTraceEnabled())
+                // log.trace("Already matched: source=" + current);
 
                 return true;
 
@@ -99,9 +100,9 @@ class MergeSortIterator implements Iterator<IV> {
 
                         sourceTuple[i] = sourceIterator[i].next();
 
-//                        if (log.isTraceEnabled())
-//                            log.trace("read sourceTuple[" + i + "]="
-//                                    + sourceTuple[i]);
+                        // if (log.isTraceEnabled())
+                        // log.trace("read sourceTuple[" + i + "]="
+                        // + sourceTuple[i]);
 
                     } else {
 
@@ -184,9 +185,9 @@ class MergeSortIterator implements Iterator<IV> {
 
             }
 
-//            if (log.isDebugEnabled())
-//                log.debug("Will visit next: source=" + current + ", tuple: "
-//                        + sourceTuple[current]);
+            // if (log.isDebugEnabled())
+            // log.debug("Will visit next: source=" + current + ", tuple: "
+            // + sourceTuple[current]);
 
             return true;
 

@@ -5,9 +5,10 @@ import org.apache.log4j.Logger;
 import com.bigdata.rdf.graph.EdgesEnum;
 import com.bigdata.rdf.graph.Factory;
 import com.bigdata.rdf.graph.GASUtil;
+import com.bigdata.rdf.graph.IGASContext;
 import com.bigdata.rdf.graph.IGASProgram;
 import com.bigdata.rdf.graph.IGASState;
-import com.bigdata.rdf.graph.IScheduler;
+import com.bigdata.rdf.graph.IGASScheduler;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.spo.ISPO;
 
@@ -278,7 +279,7 @@ public class SSSP implements IGASProgram<SSSP.VS, SSSP.ES, Integer/* dist */> {
      */
     @Override
     public void scatter(final IGASState<SSSP.VS, SSSP.ES, Integer> state,
-            final IScheduler sch, final IV u, final ISPO e) {
+            final IGASScheduler sch, final IV u, final ISPO e) {
 
         final IV other = GASUtil.getOtherVertex(u, e);
         
@@ -310,22 +311,11 @@ public class SSSP implements IGASProgram<SSSP.VS, SSSP.ES, Integer/* dist */> {
 
     }
 
-//    /**
-//     * Performance test harness.
-//     */
-//    public static void main(final String[] args) throws Exception {
-//
-//        new GASRunner<SSSP.VS, SSSP.ES, Integer>(args) {
-//
-//            @Override
-//            protected IGASProgram<SSSP.VS, SSSP.ES, Integer> newGASProgram() {
-//
-//                return new SSSP();
-//
-//            }
-//
-//        }.call();
-//
-//    }
+    @Override
+    public boolean nextRound(IGASContext ctx) {
+
+        return true;
+        
+    }
 
 }

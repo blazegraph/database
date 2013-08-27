@@ -39,7 +39,7 @@ import com.bigdata.btree.BTree;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.Tuple;
 import com.bigdata.journal.Journal;
-import com.bigdata.rdf.graph.impl.GASGraphUtil;
+import com.bigdata.rdf.graph.impl.bd.BigdataGASUtil;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPOFilter;
@@ -402,7 +402,7 @@ public class TestBFS0 {
 
             final Random r = new Random(217L);
             
-            final IV[] samples = GASGraphUtil
+            final IV[] samples = BigdataGASUtil
                     .getRandomSample(r, kb, 100/* desiredSampleSize */);
 
             for (int i = 0; i < samples.length; i++) {

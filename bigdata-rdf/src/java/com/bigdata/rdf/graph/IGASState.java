@@ -85,5 +85,47 @@ public interface IGASState<VS,ES, ST> {
      * @see IGASProgram#getEdgeStateFactory()
      */
     ES getState(ISPO e);
- 
+
+    /**
+     * The current frontier.
+     */
+    IStaticFrontier frontier();
+
+    /**
+     * Return the {@link IGASSchedulerImpl}.
+     */
+    IGASSchedulerImpl getScheduler();
+
+    /**
+     * Compute a reduction over the vertex state table (all vertices that have
+     * had their vertex state materialized).
+     * 
+     * @param op
+     *            The reduction operation.
+     * 
+     * @return The reduction.
+     */
+    <T> T reduce(IReducer<VS, ES, ST, T> op);
+
+    /**
+     * End the current round, advance the round counter, and compact the new
+     * frontier.
+     */
+    void endRound();
+
+    /**
+     * Conditionally log various interesting information about the state of the
+     * computation.
+     */
+    void traceState();
+
+    /**
+     * Return a useful representation of an edge (non-batch API, debug only).
+     * 
+     * @param e
+     *            The edge.
+     * @return The representation of that edge.
+     */
+    String toString(ISPO e);
+
 }
