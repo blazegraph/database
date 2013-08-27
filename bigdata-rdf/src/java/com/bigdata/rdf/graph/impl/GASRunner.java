@@ -23,10 +23,12 @@ import com.bigdata.journal.Journal;
 import com.bigdata.rdf.graph.IGASContext;
 import com.bigdata.rdf.graph.IGASEngine;
 import com.bigdata.rdf.graph.IGASProgram;
+import com.bigdata.rdf.graph.IGASScheduler;
+import com.bigdata.rdf.graph.IGASSchedulerImpl;
 import com.bigdata.rdf.graph.IGASState;
-import com.bigdata.rdf.graph.IScheduler;
-import com.bigdata.rdf.graph.impl.GASEngine.BigdataGraphAccessor;
-import com.bigdata.rdf.graph.impl.GASState.MyScheduler;
+import com.bigdata.rdf.graph.impl.bd.BigdataGASEngine;
+import com.bigdata.rdf.graph.impl.bd.BigdataGASEngine.BigdataGraphAccessor;
+import com.bigdata.rdf.graph.impl.bd.BigdataGASUtil;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.rio.LoadStats;
 import com.bigdata.rdf.sail.BigdataSail;
@@ -86,9 +88,9 @@ public class GASRunner<VS, ES, ST> implements Callable<GASStats> {
     private final String namespaceOverride;
 
     /**
-     * The {@link MyScheduler} class to use.
+     * The {@link IGASSchedulerImpl} class to use.
      */
-    private final Class<MyScheduler> schedulerClassOverride;
+    private final Class<IGASSchedulerImpl> schedulerClassOverride;
     
     /**
      * When non-<code>null</code>, a list of zero or more resources to be
@@ -148,8 +150,8 @@ public class GASRunner<VS, ES, ST> implements Callable<GASStats> {
      *            <dd>Overrides the {@link BufferMode} (if any) specified in the
      *            <code>propertyFile</code>.</dd>
      *            <dt>-schedulerClass</dt>
-     *            <dd>Override the default {@link IScheduler}. Class must
-     *            implement {@link MyScheduler}.</dd>
+     *            <dd>Override the default {@link IGASScheduler}. Class must
+     *            implement {@link IGASSchedulerImpl}.</dd>
      *            <dt>-namespace</dt>
      *            <dd>The namespace of the default SPARQL endpoint (the
      *            namespace will be <code>kb</code> if none was specified when
@@ -170,7 +172,7 @@ public class GASRunner<VS, ES, ST> implements Callable<GASStats> {
         int nsamples = 100;
         int nthreads = 4;
         BufferMode bufferMode = null; // override only.
-        Class<MyScheduler> schedulerClass = null; // override only.
+        Class<IGASSchedulerImpl> schedulerClass = null; // override only.
         String namespace = "kb";
         // Set of files to load (optional).
         LinkedHashSet<String> loadSet = new LinkedHashSet<String>();
@@ -204,7 +206,7 @@ public class GASRunner<VS, ES, ST> implements Callable<GASStats> {
                     bufferMode = BufferMode.valueOf(s);
                 } else if (arg.equals("-schedulerClass")) {
                     final String s = args[++i];
-                    schedulerClass = (Class<MyScheduler>) Class.forName(s);
+                    schedulerClass = (Class<IGASSchedulerImpl>) Class.forName(s);
                 } else if (arg.equals("-namespace")) {
                     final String s = args[++i];
                     namespace = s;
@@ -582,7 +584,7 @@ public class GASRunner<VS, ES, ST> implements Callable<GASStats> {
                 .locate(namespace, jnl.getLastCommitTime());
 
         @SuppressWarnings("rawtypes")
-        final IV[] samples = GASGraphUtil.getRandomSample(r, kb, nsamples);
+        final IV[] samples = BigdataGASUtil.getRandomSample(r, kb, nsamples);
 
         // total #of edges in that graph.
         final long nedges = kb.getStatementCount();
@@ -590,7 +592,7 @@ public class GASRunner<VS, ES, ST> implements Callable<GASStats> {
         /*
          * Setup and run over those samples.
          */
-        final IGASEngine gasEngine = new GASEngine(jnl, nthreads);
+        final IGASEngine gasEngine = new BigdataGASEngine(jnl, nthreads);
 
         try {
 
@@ -603,7 +605,7 @@ public class GASRunner<VS, ES, ST> implements Callable<GASStats> {
             
             final IGASProgram<VS, ES, ST> gasProgram = newGASProgram();
 
-            final BigdataGraphAccessor graphAccessor = ((GASEngine) gasEngine)
+            final BigdataGraphAccessor graphAccessor = ((BigdataGASEngine) gasEngine)
                     .newGraphAccessor(namespace, jnl.getLastCommitTime());
 
             final IGASContext<VS, ES, ST> gasContext = gasEngine.newGASContext(

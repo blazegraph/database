@@ -1,7 +1,7 @@
 package com.bigdata.rdf.graph.impl;
 
 import java.lang.reflect.Constructor;
-import java.util.ArrayList;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
@@ -9,19 +9,15 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.atomic.AtomicReference;
 
-import com.bigdata.journal.IIndexManager;
-import com.bigdata.journal.ITx;
-import com.bigdata.journal.TimestampUtility;
-import com.bigdata.rdf.graph.IGASContext;
 import com.bigdata.rdf.graph.IGASEngine;
 import com.bigdata.rdf.graph.IGASProgram;
+import com.bigdata.rdf.graph.IGASScheduler;
+import com.bigdata.rdf.graph.IGASSchedulerImpl;
+import com.bigdata.rdf.graph.IGASState;
 import com.bigdata.rdf.graph.IGraphAccessor;
-import com.bigdata.rdf.graph.IScheduler;
-import com.bigdata.rdf.graph.impl.GASState.CHMScheduler;
-import com.bigdata.rdf.graph.impl.GASState.MyScheduler;
+import com.bigdata.rdf.graph.IStaticFrontier;
+import com.bigdata.rdf.graph.impl.scheduler.CHMScheduler;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.service.IBigdataFederation;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
@@ -56,14 +52,9 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
 @SuppressWarnings("rawtypes")
-public class GASEngine implements IGASEngine {
+abstract public class GASEngine implements IGASEngine {
 
 //    private static final Logger log = Logger.getLogger(GASEngine.class);
-
-    /**
-     * The {@link IIndexManager} is used to access the graph.
-     */
-    private final IIndexManager indexManager;
 
     /**
      * The {@link ExecutorService} used to parallelize tasks (iff
@@ -77,9 +68,9 @@ public class GASEngine implements IGASEngine {
     private final int nthreads;
 
     /**
-     * The factory for the {@link IScheduler}.
+     * The factory for the {@link IGASScheduler}.
      */
-    private final AtomicReference<Class<MyScheduler>> schedulerClassRef;
+    private final AtomicReference<Class<IGASSchedulerImpl>> schedulerClassRef;
 
     /**
      * The parallelism for the SCATTER and GATHER phases.
@@ -97,58 +88,22 @@ public class GASEngine implements IGASEngine {
      * @param nthreads
      *            The number of threads to use for the SCATTER and GATHER
      *            phases.
-     * 
-     *            TODO Scale-out: The {@link IIndexmanager} MAY be an
-     *            {@link IBigdataFederation}. The {@link GASEngine} would
-     *            automatically use remote indices. However, for proper
-     *            scale-out we want to partition the work and the VS/ES so that
-     *            would imply a different {@link IGASEngine} design.
      */
     @SuppressWarnings("unchecked")
-    public GASEngine(final IIndexManager indexManager, final int nthreads) {
-
-        if (indexManager == null)
-            throw new IllegalArgumentException();
+    public GASEngine(final int nthreads) {
 
         if (nthreads <= 0)
             throw new IllegalArgumentException();
 
-        this.indexManager = indexManager;
-        
         this.nthreads = nthreads;
 
         this.executorService = nthreads == 0 ? null : Executors
                 .newFixedThreadPool(nthreads, new DaemonThreadFactory(
                         GASEngine.class.getSimpleName()));
 
-        this.schedulerClassRef = new AtomicReference<Class<MyScheduler>>();
+        this.schedulerClassRef = new AtomicReference<Class<IGASSchedulerImpl>>();
         
         this.schedulerClassRef.set((Class) CHMScheduler.class);
-
-    }
-
-    /**
-     * {@inheritDoc}
-     * 
-     * FIXME Dynamic graphs: Allowing {@link ITx#READ_COMMITTED} to be specified
-     * for the timestamp this class provides some support for dynamic graphs,
-     * but for some use cases we would want to synchronize things such the
-     * iteration is performed (or re-converged) with each commit point or to
-     * replay a series of commit points (either through the commit record index
-     * or through the history index).
-     * <p>
-     * Note: READ_COMMITTED is NOT a good idea. It will use the wrong kind of
-     * index object (ReadCommittedView, which has a nasty synchronization hot
-     * spot).
-     */
-    @Override
-    public <VS, ES, ST> IGASContext<VS, ES, ST> newGASContext(
-            final IGraphAccessor graphAccessor,
-            final IGASProgram<VS, ES, ST> program) {
-
-        final BigdataGraphAccessor tmp = (BigdataGraphAccessor) graphAccessor;
-
-        return new GASContext<VS, ES, ST>(this/* GASEngine */, tmp, program);
 
     }
 
@@ -176,14 +131,18 @@ public class GASEngine implements IGASEngine {
 
     /**
      * Factory for the parallelism strategy that is used to map a task across
-     * the frontier.
+     * the frontier. The returned {@link Callable} should be executed in the
+     * caller's thread. The {@link Callable} will schedule tasks that consume
+     * the frontier. A variety of frontier strategies are implemented. Those
+     * that execute in parallel do so using the thread pool associated with the
+     * {@link IGASEngine}.
      * 
      * @param taskFactory
      *            The task to be mapped across the frontier.
      * 
      * @return The strategy that will map that task across the frontier.
      */
-    Callable<Long> newFrontierStrategy(
+    protected Callable<Long> newFrontierStrategy(
             final VertexTaskFactory<Long> taskFactory, final IStaticFrontier f) {
 
         if (nthreads == 1)
@@ -273,8 +232,20 @@ public class GASEngine implements IGASEngine {
         @Override
         public Long call() throws Exception {
 
-            final List<FutureTask<Long>> tasks = new ArrayList<FutureTask<Long>>(
-                    f.size());
+            /*
+             * Note: This places the tasks onto the queue for the executor
+             * service in the caller's thread. Tasks begin executing as soon as
+             * they are submitted. This allows the threads that will consume the
+             * frontier to get started before all of the tasks have been
+             * created.
+             * 
+             * TODO This does not check the futures until all tasks have been
+             * created. It would be nicer if we had a queue model going with one
+             * queue to submit the tasks and another to drain them. This would
+             * require either non-blocking operations in a single thread or two
+             * threads.
+             */
+            final List<FutureTask<Long>> tasks = new LinkedList<FutureTask<Long>>();
 
             long nedges = 0L;
             
@@ -340,7 +311,7 @@ public class GASEngine implements IGASEngine {
         
     }
 
-    void setSchedulerClass(final Class<MyScheduler> newValue) {
+    public void setSchedulerClass(final Class<IGASSchedulerImpl> newValue) {
 
         if(newValue == null)
             throw new IllegalArgumentException();
@@ -349,110 +320,42 @@ public class GASEngine implements IGASEngine {
         
     }
     
-    MyScheduler newScheduler(final GASContext<?, ?, ?> gasContext) {
+    public Class<IGASSchedulerImpl> getSchedulerClass() {
 
-        final Class<MyScheduler> cls = schedulerClassRef.get();
+        return schedulerClassRef.get();
         
+    }
+    
+    public IGASSchedulerImpl newScheduler() {
+
+        final Class<IGASSchedulerImpl> cls = schedulerClassRef.get();
+
         try {
 
-            final Constructor<MyScheduler> ctor = cls
+            final Constructor<IGASSchedulerImpl> ctor = cls
                     .getConstructor(new Class[] { GASEngine.class });
-            
-            final MyScheduler sch = ctor.newInstance(new Object[] { this });
+
+            final IGASSchedulerImpl sch = ctor
+                    .newInstance(new Object[] { this });
 
             return sch;
-            
+
         } catch (Exception e) {
-            
+
             throw new RuntimeException(e);
-            
+
         }
 
     }
 
-    public class BigdataGraphAccessor implements IGraphAccessor {
+    public <VS, ES, ST> IGASState<VS, ES, ST> newGASState(
+            final IGraphAccessor graphAccessor,
+            final IGASProgram<VS, ES, ST> gasProgram) {
 
-        private final String namespace;
-        private final long timestamp;
-        
-        /**
-         * 
-         * @param namespace
-         *            The namespace of the graph.
-         * @param timestamp
-         *            The timestamp of the view.
-         */
-        private BigdataGraphAccessor(final String namespace,final long timestamp) {
-    
-            this.namespace = namespace;
-            this.timestamp = timestamp;
-            
-        }
-        
-        /**
-         * Return a view of the specified graph (aka KB) as of the specified
-         * timestamp.
-         * 
-         * @return The graph.
-         * 
-         * @throws RuntimeException
-         *             if the graph could not be resolved.
-         */
-        public AbstractTripleStore getKB() {
+        final IGASSchedulerImpl gasScheduler = newScheduler();
 
-            long timestamp = this.timestamp;
-
-            if (timestamp == ITx.READ_COMMITTED) {
-
-                /**
-                 * Note: This code is request the view as of the the last commit
-                 * time. If we use ITx.READ_COMMITTED here then it will cause
-                 * the Journal to provide us with a ReadCommittedIndex and that
-                 * has a synchronization hot spot!
-                 */
-
-                timestamp = indexManager.getLastCommitTime();
-
-            }
-
-            final AbstractTripleStore kb = (AbstractTripleStore) indexManager
-                    .getResourceLocator().locate(namespace, timestamp);
-
-            if (kb == null) {
-
-                throw new RuntimeException("Not found: namespace=" + namespace
-                        + ", timestamp=" + TimestampUtility.toString(timestamp));
-
-            }
-
-            return kb;
-
-        }
-
-        public String getNamespace() {
-            return namespace;
-        }
-
-        public Long getTimestamp() {
-            return timestamp;
-        }
+        return new GASState<VS, ES, ST>(graphAccessor, gasScheduler, gasProgram);
 
     }
 
-    /**
-     * 
-     * 
-     * @param namespace
-     *            The namespace of the graph.
-     * @param timestamp
-     *            The timestamp of the view.
-     * @return
-     */
-    public BigdataGraphAccessor newGraphAccessor(final String namespace,
-            final long timestamp) {
-
-        return new BigdataGraphAccessor(namespace, timestamp);
-        
-    }
-    
 } // GASEngine

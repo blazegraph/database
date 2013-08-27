@@ -4,9 +4,10 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import com.bigdata.rdf.graph.EdgesEnum;
 import com.bigdata.rdf.graph.Factory;
+import com.bigdata.rdf.graph.IGASContext;
 import com.bigdata.rdf.graph.IGASProgram;
 import com.bigdata.rdf.graph.IGASState;
-import com.bigdata.rdf.graph.IScheduler;
+import com.bigdata.rdf.graph.IGASScheduler;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.spo.ISPO;
 
@@ -178,7 +179,7 @@ public class BFS implements IGASProgram<BFS.VS, BFS.ES, Void> {
      */
     @Override
     public void scatter(final IGASState<BFS.VS, BFS.ES, Void> state,
-            final IScheduler sch, final IV u, final ISPO e) {
+            final IGASScheduler sch, final IV u, final ISPO e) {
 
         // remote vertex state.
         final VS otherState = state.getState(e.o());
@@ -197,22 +198,11 @@ public class BFS implements IGASProgram<BFS.VS, BFS.ES, Void> {
 
     }
 
-//    /**
-//     * Performance testing harness.
-//     */
-//    public static void main(final String[] args) throws Exception {
-//
-//        new GASRunner<BFS.VS, BFS.ES, Void>(args) {
-//
-//            @Override
-//            protected IGASProgram<BFS.VS, BFS.ES, Void> newGASProgram() {
-//
-//                return new BFS();
-//
-//            }
-//
-//        }.call();
-//        
-//    }
+    @Override
+    public boolean nextRound(IGASContext ctx) {
+
+        return true;
+        
+    }
 
 }

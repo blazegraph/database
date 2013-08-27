@@ -17,9 +17,13 @@ import com.bigdata.rdf.spo.ISPO;
  *            the generic type for the per-edge state, but that is not always
  *            true. The SUM type is scoped to the GATHER + SUM operation (NOT
  *            the computation).
- *            
- * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
- *         Thompson</a>
+ * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * 
+ *         TODO There should be a means to specify a filter on the possible
+ *         predicates to be used for traversal. If there is a single predicate,
+ *         then that gives us S+P bound. If there are multiple predicates, then
+ *         we have an IElementFilter on P (in addition to the filter that is
+ *         removing the Literals from the scan).
  */
 @SuppressWarnings("rawtypes")
 public interface IGASProgram<VS, ES, ST> extends IGASOptions<VS, ES> {
@@ -111,7 +115,7 @@ public interface IGASProgram<VS, ES, ST> extends IGASOptions<VS, ES> {
      * @param u
      *            The vertex.
      */
-    void init(IGASState<VS, ES, ST> ctx, IV u);
+    void init(IGASState<VS, ES, ST> state, IV u);
     
     /**
      * GATHER is a map/reduce over the edges of the vertex. The SUM provides
@@ -145,7 +149,7 @@ public interface IGASProgram<VS, ES, ST> extends IGASOptions<VS, ES> {
      *         depends on the algorithm. How can we get these constraints into
      *         the API?
      */
-    ST gather(IGASState<VS, ES, ST> ctx, IV u, ISPO e);
+    ST gather(IGASState<VS, ES, ST> state, IV u, ISPO e);
     
     /**
      * SUM is a pair-wise reduction that is applied during the GATHER.
@@ -192,7 +196,7 @@ public interface IGASProgram<VS, ES, ST> extends IGASOptions<VS, ES> {
      *         when compared to either the frontier or the set of states that
      *         have been in the frontier during the computation.
      */
-    VS apply(IGASState<VS, ES, ST> ctx, IV u, ST sum);
+    VS apply(IGASState<VS, ES, ST> state, IV u, ST sum);
 
     /**
      * Return <code>true</code> iff the vertex should run its SCATTER phase.
@@ -200,21 +204,40 @@ public interface IGASProgram<VS, ES, ST> extends IGASOptions<VS, ES> {
      * on the APPLY) that the vertex has not changed. This can save a
      * substantial amount of effort.
      * 
-     * @param ctx
+     * @param state
      * @param u
      *            The vertex.
      * @return
      */
-    boolean isChanged(IGASState<VS, ES, ST> ctx, IV u);
+    boolean isChanged(IGASState<VS, ES, ST> state, IV u);
 
     /**
      * 
-     * @param ctx
+     * @param state
      * @param u
      *            The vertex for which the scatter will being performed.
      * @param e
      *            The edge.
      */
-    void scatter(IGASState<VS, ES, ST> ctx, IScheduler sch, IV u, ISPO e);
+    void scatter(IGASState<VS, ES, ST> state, IGASScheduler sch, IV u, ISPO e);
 
+    /**
+     * Return <code>true</code> iff the algorithm should continue. This is
+     * invoked after every iteration, once the new frontier has been computed
+     * and {@link IGASState#round()} has been advanced. An implementation may
+     * simple return <code>true</code>, in which case the algorithm will
+     * continue IFF the current frontier is not empty.
+     * <p>
+     * Note: While this can be used to make custom decisions concerning the
+     * halting criteria, it can also be used as an opportunity to handshake with
+     * a custom {@link IGraphAccessor} in order to process a dynamic graph.
+     * 
+     * @param ctx
+     *            The evaluation context.
+     * 
+     * @return <code>true</code> if the algorithm should continue (as long as
+     *         the frontier is non-empty).
+     */
+    boolean nextRound(IGASContext ctx);
+    
 }

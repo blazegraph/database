@@ -1,8 +1,8 @@
 package com.bigdata.rdf.graph.impl;
 
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicLong;
 
+import com.bigdata.counters.CAT;
 import com.bigdata.rdf.graph.GASUtil;
 import com.bigdata.rdf.graph.IGASStats;
 
@@ -17,33 +17,33 @@ import com.bigdata.rdf.graph.IGASStats;
  */
 public class GASStats implements IGASStats {
 
-    private final AtomicLong nrounds = new AtomicLong();
-    private final AtomicLong frontierSize = new AtomicLong();
-    private final AtomicLong nedges = new AtomicLong();
-    private final AtomicLong elapsedNanos = new AtomicLong();
+    private final CAT nrounds = new CAT();
+    private final CAT frontierSize = new CAT();
+    private final CAT nedges = new CAT();
+    private final CAT elapsedNanos = new CAT();
 
     public void add(final long frontierSize, final long nedges,
             final long elapsedNanos) {
 
-        this.nrounds.incrementAndGet();
+        this.nrounds.increment();
         
-        this.frontierSize.addAndGet(frontierSize);
+        this.frontierSize.add(frontierSize);
 
-        this.nedges.addAndGet(nedges);
+        this.nedges.add(nedges);
 
-        this.elapsedNanos.addAndGet(elapsedNanos);
+        this.elapsedNanos.add(elapsedNanos);
 
     }
 
     public void add(final GASStats o) {
 
-        nrounds.addAndGet(o.getNRounds());
+        nrounds.add(o.getNRounds());
         
-        frontierSize.addAndGet(o.getFrontierSize());
+        frontierSize.add(o.getFrontierSize());
         
-        nedges.addAndGet(o.getNEdges());
+        nedges.add(o.getNEdges());
 
-        elapsedNanos.addAndGet(o.getElapsedNanos());
+        elapsedNanos.add(o.getElapsedNanos());
         
     }
 

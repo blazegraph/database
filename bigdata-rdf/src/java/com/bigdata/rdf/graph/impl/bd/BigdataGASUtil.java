@@ -1,4 +1,4 @@
-package com.bigdata.rdf.graph.impl;
+package com.bigdata.rdf.graph.impl.bd;
 
 import java.util.HashSet;
 import java.util.Random;
@@ -15,16 +15,18 @@ import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
  * Utility class for operations on the backing graph (sampling and the like).
+ * These operations are specific to the bigdata backend (they are index and
+ * index manager aware).
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * 
- * TODO Add a utility to find the vertex with the maximum degree. That requires
- * a scan on SPO (or a distinct term advancer that computes the range count of
- * the skipped interval).
+ *         TODO Add a utility to find the vertex with the maximum degree. That
+ *         requires a scan on SPO (or a distinct term advancer that computes the
+ *         range count of the skipped interval).
  */
-public class GASGraphUtil {
+public class BigdataGASUtil {
 
-    private static final Logger log = Logger.getLogger(GASGraphUtil.class);
+    private static final Logger log = Logger.getLogger(BigdataGASUtil.class);
 
     /**
      * Return a sample (without duplicates) of vertices from the graph.
@@ -67,7 +69,7 @@ public class GASGraphUtil {
         int round = 0;
         while (samples.size() < desiredSampleSize && round++ < limit) {
     
-            final IV iv = GASGraphUtil.getRandomVertex(r, kb);
+            final IV iv = BigdataGASUtil.getRandomVertex(r, kb);
     
             samples.add(iv);
     

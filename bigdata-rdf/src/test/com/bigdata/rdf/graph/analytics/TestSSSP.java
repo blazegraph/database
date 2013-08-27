@@ -27,8 +27,8 @@ import com.bigdata.rdf.graph.AbstractGraphTestCase;
 import com.bigdata.rdf.graph.IGASContext;
 import com.bigdata.rdf.graph.IGASEngine;
 import com.bigdata.rdf.graph.IGASState;
-import com.bigdata.rdf.graph.impl.GASEngine;
-import com.bigdata.rdf.graph.impl.GASEngine.BigdataGraphAccessor;
+import com.bigdata.rdf.graph.impl.bd.BigdataGASEngine;
+import com.bigdata.rdf.graph.impl.bd.BigdataGASEngine.BigdataGraphAccessor;
 
 /**
  * Test class for SSP traversal.
@@ -49,12 +49,12 @@ public class TestSSSP extends AbstractGraphTestCase {
 
         final SmallGraphProblem p = setupSmallGraphProblem();
 
-        final IGASEngine gasEngine = new GASEngine(sail.getDatabase()
+        final IGASEngine gasEngine = new BigdataGASEngine(sail.getDatabase()
                 .getIndexManager(), 1/* nthreads */);
 
         try {
 
-            final BigdataGraphAccessor graphAccessor = ((GASEngine) gasEngine)
+            final BigdataGraphAccessor graphAccessor = ((BigdataGASEngine) gasEngine)
                     .newGraphAccessor(sail.getDatabase().getNamespace(), sail
                             .getDatabase().getIndexManager()
                             .getLastCommitTime());
