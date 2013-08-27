@@ -33,6 +33,7 @@ import com.bigdata.btree.filter.ITupleFilter;
 import com.bigdata.btree.filter.TupleFilter;
 
 import cutthecrap.utils.striterators.IFilter;
+import cutthecrap.utils.striterators.IFilterTest;
 
 /**
  * Align the predicate's {@link IElementFilter} constraint with
@@ -69,6 +70,26 @@ public class ElementFilter<R> extends TupleFilter<R> {
         
     }
 
+    /**
+     * Helper method conditionally wraps the <i>test</i>.
+     * 
+     * @param <R>
+     * @param test
+     *            The test.
+     * 
+     * @return The wrapper test -or- <code>null</code> iff the <i>test</i> is
+     *         <code>null</code>.
+     */
+    @SuppressWarnings("rawtypes")
+    public static <R> IFilter newInstance(final IFilterTest test) {
+
+        if (test == null)
+            return null;
+        
+        return new ElementFilter(test);
+        
+    }
+
     public ElementFilter(final IElementFilter<R> test) {
 
         if (test == null)
@@ -78,6 +99,37 @@ public class ElementFilter<R> extends TupleFilter<R> {
 
     }
 
+    @SuppressWarnings("unchecked")
+    public ElementFilter(final IFilterTest test) {
+
+        if (test == null)
+            throw new IllegalArgumentException();
+
+        this.test = new FilterTestWrapper(test);
+
+    }
+    
+    @SuppressWarnings("rawtypes")
+    private static class FilterTestWrapper implements IElementFilter {
+        private static final long serialVersionUID = 1L;
+        private final IFilterTest test;
+        private FilterTestWrapper(final IFilterTest test) {
+            this.test = test;
+        }
+
+        @Override
+        public boolean isValid(final Object e) {
+            return test.isValid(e);
+        }
+
+        @Override
+        public boolean canAccept(Object o) {
+            return true;
+        }
+
+    }
+
+    @Override
     public boolean isValid(final ITuple<R> tuple) {
 
         final R obj = (R) tuple.getObject();

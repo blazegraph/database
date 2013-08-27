@@ -1,5 +1,6 @@
 package com.bigdata.rdf.graph.impl;
 
+import java.util.Iterator;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -14,10 +15,10 @@ import com.bigdata.rdf.graph.IGASScheduler;
 import com.bigdata.rdf.graph.IGASState;
 import com.bigdata.rdf.graph.IGASStats;
 import com.bigdata.rdf.graph.IGraphAccessor;
+import com.bigdata.rdf.graph.IReducer;
 import com.bigdata.rdf.graph.IStaticFrontier;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.spo.ISPO;
-import com.bigdata.striterator.ICloseableIterator;
 
 @SuppressWarnings("rawtypes")
 public class GASContext<VS, ES, ST> implements IGASContext<VS, ES, ST> {
@@ -321,6 +322,12 @@ public class GASContext<VS, ES, ST> implements IGASContext<VS, ES, ST> {
      * TODO The apply() should be parallelized. For some algorithms, there is a
      * moderate amount of work per vertex in apply(). Use {@link #nthreads} to
      * set the parallelism.
+     * <p>
+     * Note: This is very similar to the {@link IGASState#reduce(IReducer)}
+     * operation. This operates over the frontier. reduce() operates over the
+     * activated vertices. Both need fine grained parallelism. Both can have
+     * either light or moderately heavy operations (a dot product would be an
+     * example of a heavier operation).
      */
     private void apply(final IStaticFrontier f) {
 
@@ -519,7 +526,7 @@ public class GASContext<VS, ES, ST> implements IGASContext<VS, ES, ST> {
 
             final IGASScheduler sch = scheduler();
 
-            final ICloseableIterator<ISPO> eitr = graphAccessor.getEdges(u,
+            final Iterator<ISPO> eitr = graphAccessor.getEdges(program, u,
                     getEdgesEnum());
 
             try {
@@ -540,7 +547,7 @@ public class GASContext<VS, ES, ST> implements IGASContext<VS, ES, ST> {
 
             } finally {
 
-                eitr.close();
+//                eitr.close();
 
             }
 
@@ -569,7 +576,7 @@ public class GASContext<VS, ES, ST> implements IGASContext<VS, ES, ST> {
 
             long nedges = 0;
 
-            final ICloseableIterator<ISPO> eitr = graphAccessor.getEdges(u,
+            final Iterator<ISPO> eitr = graphAccessor.getEdges(program, u,
                     getEdgesEnum());
 
             try {
@@ -622,7 +629,7 @@ public class GASContext<VS, ES, ST> implements IGASContext<VS, ES, ST> {
 
             } finally {
 
-                eitr.close();
+//                eitr.close();
 
             }
 

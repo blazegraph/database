@@ -18,12 +18,6 @@ import com.bigdata.rdf.spo.ISPO;
  *            true. The SUM type is scoped to the GATHER + SUM operation (NOT
  *            the computation).
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * 
- *         TODO There should be a means to specify a filter on the possible
- *         predicates to be used for traversal. If there is a single predicate,
- *         then that gives us S+P bound. If there are multiple predicates, then
- *         we have an IElementFilter on P (in addition to the filter that is
- *         removing the Literals from the scan).
  */
 @SuppressWarnings("rawtypes")
 public interface IGASProgram<VS, ES, ST> extends IGASOptions<VS, ES> {
@@ -238,6 +232,6 @@ public interface IGASProgram<VS, ES, ST> extends IGASOptions<VS, ES> {
      * @return <code>true</code> if the algorithm should continue (as long as
      *         the frontier is non-empty).
      */
-    boolean nextRound(IGASContext ctx);
+    boolean nextRound(IGASContext<VS, ES, ST> ctx);
     
 }

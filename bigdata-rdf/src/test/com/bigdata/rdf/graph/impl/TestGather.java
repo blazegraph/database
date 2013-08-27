@@ -32,15 +32,16 @@ import com.bigdata.rdf.graph.EdgesEnum;
 import com.bigdata.rdf.graph.Factory;
 import com.bigdata.rdf.graph.IGASContext;
 import com.bigdata.rdf.graph.IGASEngine;
-import com.bigdata.rdf.graph.IGASProgram;
-import com.bigdata.rdf.graph.IGASState;
 import com.bigdata.rdf.graph.IGASScheduler;
+import com.bigdata.rdf.graph.IGASState;
 import com.bigdata.rdf.graph.impl.bd.BigdataGASEngine;
 import com.bigdata.rdf.graph.impl.bd.BigdataGASEngine.BigdataGraphAccessor;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPO;
+
+import cutthecrap.utils.striterators.IStriterator;
 
 /**
  * Test class for GATHER.
@@ -65,8 +66,8 @@ public class TestGather extends AbstractGraphTestCase {
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      */
-    private static class MockGASProgram implements
-            IGASProgram<Set<ISPO>, Set<ISPO>, Set<ISPO>> {
+    private static class MockGASProgram extends
+            BaseGASProgram<Set<ISPO>, Set<ISPO>, Set<ISPO>> {
 
         private final EdgesEnum gatherEdges;
         
@@ -84,6 +85,18 @@ public class TestGather extends AbstractGraphTestCase {
         @Override
         public EdgesEnum getScatterEdges() {
             return EdgesEnum.NoEdges;
+        }
+
+        /**
+         * {@inheritDoc}
+         * <p>
+         * Overridden to only visit the edges of the graph.
+         */
+        @Override
+        public IStriterator constrainFilter(IStriterator itr) {
+
+            return itr.addFilter(edgeOnlyFilter);
+            
         }
 
         @Override

@@ -273,7 +273,12 @@ public class GASState<VS, ES, ST> implements IGASState<VS, ES, ST> {
         
     }
 
-    // TODO REDUCE : parallelize with nthreads.
+    /**
+     * {@inheritDoc}
+     * 
+     * TODO REDUCE : parallelize with nthreads. The reduce operations are often
+     * lightweight, so maybe a fork/join pool would work better?
+     */
     @Override
     public <T> T reduce(final IReducer<VS, ES, ST, T> op) {
 

@@ -5,11 +5,13 @@ import java.util.concurrent.atomic.AtomicInteger;
 import com.bigdata.rdf.graph.EdgesEnum;
 import com.bigdata.rdf.graph.Factory;
 import com.bigdata.rdf.graph.IGASContext;
-import com.bigdata.rdf.graph.IGASProgram;
-import com.bigdata.rdf.graph.IGASState;
 import com.bigdata.rdf.graph.IGASScheduler;
+import com.bigdata.rdf.graph.IGASState;
+import com.bigdata.rdf.graph.impl.BaseGASProgram;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.spo.ISPO;
+
+import cutthecrap.utils.striterators.IStriterator;
 
 /**
  * Breadth First Search (BFS) is an iterative graph traversal primitive. The
@@ -20,7 +22,7 @@ import com.bigdata.rdf.spo.ISPO;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
 @SuppressWarnings("rawtypes")
-public class BFS implements IGASProgram<BFS.VS, BFS.ES, Void> {
+public class BFS extends BaseGASProgram<BFS.VS, BFS.ES, Void> {
 
     static class VS {
 
@@ -125,10 +127,23 @@ public class BFS implements IGASProgram<BFS.VS, BFS.ES, Void> {
     }
 
     /**
+     * {@inheritDoc}
+     * <p>
+     * Overridden to only visit the edges of the graph.
+     */
+    @Override
+    public IStriterator constrainFilter(IStriterator itr) {
+
+        return itr.addFilter(edgeOnlyFilter);
+        
+    }
+
+    /**
      * Not used.
      */
     @Override
-    public void init(IGASState<BFS.VS, BFS.ES, Void> state, IV u) {
+    public void init(final IGASState<BFS.VS, BFS.ES, Void> state, final IV u) {
+
         state.getState(u).visit(0);
         
     }
