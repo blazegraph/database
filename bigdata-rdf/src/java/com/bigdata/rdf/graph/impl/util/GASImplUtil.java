@@ -1,10 +1,11 @@
 package com.bigdata.rdf.graph.impl.util;
 
-import java.util.Collections;
 import java.util.Iterator;
 import java.util.Set;
 
 import com.bigdata.rdf.internal.IV;
+
+import cutthecrap.utils.striterators.EmptyIterator;
 
 /**
  * Some utility method for the GAS Engine implementation.
@@ -14,7 +15,7 @@ import com.bigdata.rdf.internal.IV;
 public class GASImplUtil {
 
     @SuppressWarnings({ "unchecked", "rawtypes" })
-    public static final Iterator<IV> EMPTY_VERTICES_ITERATOR = (Iterator) Collections.emptyIterator();
+    public static final Iterator<IV> EMPTY_VERTICES_ITERATOR = EmptyIterator.DEFAULT;
 
     /**
      * Compact a collection of vertices into an ordered frontier.
