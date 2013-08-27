@@ -29,10 +29,10 @@
 	
    <target name="run-gas-engine"
           description="Run a GAS Engine performance test.">
-      <java classname="com.bigdata.rdf.graph.analytics.${analytic}"
+      <java classname="com.bigdata.rdf.graph.impl.GASRunner"
             fork="true" failonerror="true"
             >
-         <arg line="-bufferMode ${bufferMode} -namespace ${namespace} -seed ${seed} -nsamples ${nsamples} -nthreads ${nthreads} ${journalPropertyFile}" />
+         <arg line="-bufferMode ${bufferMode} -namespace ${namespace} -seed ${seed} -nsamples ${nsamples} -nthreads ${nthreads} ${load} com.bigdata.rdf.graph.analytics.${analytic} ${journalPropertyFile}" />
          <!-- specify/override the journal file name. -->
          <jvmarg line="${jvmArgs}" />
          <classpath>
