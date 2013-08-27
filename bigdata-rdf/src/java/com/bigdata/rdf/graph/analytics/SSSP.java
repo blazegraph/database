@@ -2,15 +2,15 @@ package com.bigdata.rdf.graph.analytics;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.rdf.graph.EdgesEnum;
 import com.bigdata.rdf.graph.Factory;
 import com.bigdata.rdf.graph.GASUtil;
-import com.bigdata.rdf.graph.IGASContext;
-import com.bigdata.rdf.graph.IGASProgram;
-import com.bigdata.rdf.graph.IGASState;
 import com.bigdata.rdf.graph.IGASScheduler;
+import com.bigdata.rdf.graph.IGASState;
+import com.bigdata.rdf.graph.impl.BaseGASProgram;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.spo.ISPO;
+
+import cutthecrap.utils.striterators.IStriterator;
 
 /**
  * SSSP (Single Source, Shortest Path). This analytic computes the shortest path
@@ -32,7 +32,7 @@ import com.bigdata.rdf.spo.ISPO;
  *         undirected scatter/gather. Add unit test for undirected.
  */
 @SuppressWarnings("rawtypes")
-public class SSSP implements IGASProgram<SSSP.VS, SSSP.ES, Integer/* dist */> {
+public class SSSP extends BaseGASProgram<SSSP.VS, SSSP.ES, Integer/* dist */> {
 
     private static final Logger log = Logger.getLogger(SSSP.class);
 
@@ -43,10 +43,16 @@ public class SSSP implements IGASProgram<SSSP.VS, SSSP.ES, Integer/* dist */> {
      * a pattern to get the link attributes materialized with the {@link ISPO}
      * for the link. That could be done using a read-ahead filter on the
      * striterator if the link weights are always clustered with the ground
-     * triple.
-     * 
+     * triple. See {@link #decodeStatement(IV)}.
+     * <P>
      * When we make this change, the distance should be of the same type as the
      * link weight or generalized as <code>double</code>.
+     * <p>
+     * Maybe add a factory method or alternative constructor for the version of
+     * SSSP that uses link weights? All we need to do is filter out anything
+     * that is not a link weight. In addition, it will often be true that there
+     * is a single link attribute type that is of interest, so the caller should
+     * also be able to specify that.
      */
     private final static int EDGE_LENGTH = 1;
     
@@ -127,25 +133,37 @@ public class SSSP implements IGASProgram<SSSP.VS, SSSP.ES, Integer/* dist */> {
 
     }
 
+//    @Override
+//    public Factory<ISPO, SSSP.ES> getEdgeStateFactory() {
+//
+//        return null;
+//
+//    }
+//
+//    @Override
+//    public EdgesEnum getGatherEdges() {
+//
+//        return EdgesEnum.InEdges;
+//
+//    }
+//
+//    @Override
+//    public EdgesEnum getScatterEdges() {
+//
+//        return EdgesEnum.OutEdges;
+//
+//    }
+
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Overridden to only visit the edges of the graph.
+     */
     @Override
-    public Factory<ISPO, SSSP.ES> getEdgeStateFactory() {
+    public IStriterator constrainFilter(IStriterator itr) {
 
-        return null;
-
-    }
-
-    @Override
-    public EdgesEnum getGatherEdges() {
-
-        return EdgesEnum.InEdges;
-
-    }
-
-    @Override
-    public EdgesEnum getScatterEdges() {
-
-        return EdgesEnum.OutEdges;
-
+        return itr.addFilter(edgeOnlyFilter);
+                
     }
 
     /**
@@ -259,8 +277,8 @@ public class SSSP implements IGASProgram<SSSP.VS, SSSP.ES, Integer/* dist */> {
      * <p>
      * {@inheritDoc}
      * 
-     * FIXME Test both variations on a variety of data sets and see which is
-     * better:
+     * FIXME OPTIMIZE: Test both variations on a variety of data sets and see
+     * which is better:
      * 
      * <p>
      * Zhisong wrote: In the original GASengine, the scatter operator only need
@@ -311,11 +329,11 @@ public class SSSP implements IGASProgram<SSSP.VS, SSSP.ES, Integer/* dist */> {
 
     }
 
-    @Override
-    public boolean nextRound(IGASContext ctx) {
-
-        return true;
-        
-    }
+//    @Override
+//    public boolean nextRound(IGASContext ctx) {
+//
+//        return true;
+//        
+//    }
 
 }

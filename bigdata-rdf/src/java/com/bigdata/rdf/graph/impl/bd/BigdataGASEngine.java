@@ -6,6 +6,7 @@ import java.util.Iterator;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
+import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.SuccessorUtil;
 import com.bigdata.journal.IIndexManager;
@@ -23,16 +24,15 @@ import com.bigdata.rdf.graph.impl.GASEngine;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVUtility;
 import com.bigdata.rdf.spo.ISPO;
-import com.bigdata.rdf.spo.SPOFilter;
 import com.bigdata.rdf.spo.SPOKeyOrder;
 import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.relation.accesspath.ElementFilter;
 import com.bigdata.relation.accesspath.EmptyCloseableIterator;
-import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.service.IBigdataFederation;
-import com.bigdata.striterator.ICloseableIterator;
-import com.bigdata.striterator.Resolver;
-import com.bigdata.striterator.Striterator;
+
+import cutthecrap.utils.striterators.Filter;
+import cutthecrap.utils.striterators.IStriterator;
+import cutthecrap.utils.striterators.Resolver;
+import cutthecrap.utils.striterators.Striterator;
 
 /**
  * {@link IGASEngine} for dynamic activation of vertices. This implementation
@@ -102,21 +102,6 @@ import com.bigdata.striterator.Striterator;
 public class BigdataGASEngine extends GASEngine {
 
 //    private static final Logger log = Logger.getLogger(GASEngine.class);
-
-    /**
-     * Filter visits only edges (filters out attribute values).
-     * <p>
-     * Note: This filter is pushed down onto the AP and evaluated close to the
-     * data.
-     */
-    static private final IElementFilter<ISPO> edgeOnlyFilter = new SPOFilter<ISPO>() {
-        private static final long serialVersionUID = 1L;
-
-        @Override
-        public boolean isValid(final Object e) {
-            return ((ISPO) e).o().isURI();
-        }
-    };
 
     /**
      * The {@link IIndexManager} is used to access the graph.
@@ -317,48 +302,127 @@ public class BigdataGASEngine extends GASEngine {
         }
 
         @SuppressWarnings({ "unchecked", "rawtypes" })
-        private Striterator<Iterator<ISPO>, ISPO> getEdges(
-                final AbstractTripleStore kb, final boolean inEdges, final IV u) {
+        private IStriterator getEdges(final AbstractTripleStore kb,
+                final boolean inEdges, final IGASProgram<?, ?, ?> program,
+                final IV u) {
 
-            final SPOKeyOrder keyOrder = getKeyOrder(kb, inEdges);
+            final SPOKeyOrder keyOrder;
+            final IIndex ndx;
+            final IKeyBuilder keyBuilder;
+            final IV linkTypeIV = program.getLinkType();
+            /*
+             * Optimize case where P is a constant and O is known (2 bound).
+             * 
+             * P is a constant.
+             * 
+             * [u] gets bound on O.
+             * 
+             * We use the POS(C) index. The S values give us the out-edges for
+             * that [u] and the specified link type.
+             * 
+             * FIXME POS OPTIMIZATION: write unit test for this option to make
+             * sure that the right filter is imposed. write performance test to
+             * verify expected benefit. Watch out for the in-edges vs out-edges
+             * since only one is optimized.
+             */
+            final boolean posOptimization = linkTypeIV != null
+                    && !inEdges;
 
-            final IIndex ndx = kb.getSPORelation().getIndex(keyOrder);
+            if (posOptimization) {
+            
+                /*
+                 * POS(C)
+                 */
+                keyOrder = kb.isQuads() ? SPOKeyOrder.POCS : SPOKeyOrder.POS;
 
-            final IKeyBuilder keyBuilder = ndx.getIndexMetadata().getKeyBuilder();
+                ndx = kb.getSPORelation().getIndex(keyOrder);
 
-            keyBuilder.reset();
+                keyBuilder = ndx.getIndexMetadata().getKeyBuilder();
 
-            IVUtility.encode(keyBuilder, u);
+                keyBuilder.reset();
+
+                // Bind P as a constant.
+                IVUtility.encode(keyBuilder, linkTypeIV);
+
+                // Bind O for this key-range scan.
+                IVUtility.encode(keyBuilder, u);
+                
+            } else {
+                
+                /*
+                 * SPO(C) or OSP(C)
+                 */
+                
+                keyOrder = getKeyOrder(kb, inEdges);
+
+                ndx = kb.getSPORelation().getIndex(keyOrder);
+
+                keyBuilder = ndx.getIndexMetadata().getKeyBuilder();
+
+                keyBuilder.reset();
+
+                IVUtility.encode(keyBuilder, u);
+
+            }
 
             final byte[] fromKey = keyBuilder.getKey();
 
             final byte[] toKey = SuccessorUtil.successor(fromKey.clone());
 
-            return (Striterator<Iterator<ISPO>, ISPO>) new Striterator(
-                    ndx.rangeIterator(fromKey, toKey, 0/* capacity */,
-                            IRangeQuery.DEFAULT,
-                            ElementFilter.newInstance(edgeOnlyFilter)))
-                    .addFilter(new Resolver() {
-                        private static final long serialVersionUID = 1L;
-                        @Override
-                        protected Object resolve(final Object e) {
-                            final ITuple<ISPO> t = (ITuple<ISPO>) e;
-                            return t.getObject();
-                        }
-                    });
+            final ITupleIterator<ISPO> titr = ndx.rangeIterator(fromKey, toKey,
+                    0/* capacity */, IRangeQuery.DEFAULT, null/* filter */);
+
+            final IStriterator sitr = new Striterator(titr);
+
+            sitr.addFilter(new Resolver() {
+                private static final long serialVersionUID = 1L;
+                @Override
+                protected Object resolve(final Object e) {
+                    final ITuple<ISPO> t = (ITuple<ISPO>) e;
+                    return t.getObject();
+                }
+            });
+
+            if (linkTypeIV != null && !posOptimization) {
+                /*
+                 * A link type constraint was specified, but we were not able to
+                 * use the POS(C) index optimization. In this case we have to
+                 * add a filter to impose that link type constraint.
+                 */
+                sitr.addFilter(new Filter() {
+                    private static final long serialVersionUID = 1L;
+                    @Override
+                    public boolean isValid(final Object e) {
+                        return ((ISPO) e).p().equals(linkTypeIV);
+                    }
+                });
+            }
+            
+            /*
+             * Optionally wrap the program specified filter. This filter will be
+             * pushed down onto the index. If the index is remote, then this is
+             * much more efficient. (If the index is local, then simply stacking
+             * striterators is just as efficient.)
+             */
+            return program.constrainFilter(sitr);
 
         }
 
         /**
          * Return the edges for the vertex.
          * 
+         * @param p
+         *            The {@link IGASProgram}.
          * @param u
          *            The vertex.
          * @param edges
-         *            Typesafe enumeration indicating which edges should be visited.
+         *            Typesafe enumeration indicating which edges should be
+         *            visited.
+         * 
          * @return An iterator that will visit the edges for that vertex.
          */
-        public ICloseableIterator<ISPO> getEdges(
+        @SuppressWarnings("unchecked")
+        public Iterator<ISPO> getEdges(final IGASProgram<?, ?, ?> p,
                 @SuppressWarnings("rawtypes") final IV u, final EdgesEnum edges) {
 
             final AbstractTripleStore kb = getKB();
@@ -367,17 +431,14 @@ public class BigdataGASEngine extends GASEngine {
             case NoEdges:
                 return new EmptyCloseableIterator<ISPO>();
             case InEdges:
-                return (ICloseableIterator<ISPO>) getEdges(kb, true/* inEdges */, u);
+                return getEdges(kb, true/* inEdges */, p, u);
             case OutEdges:
-                return (ICloseableIterator<ISPO>) getEdges(kb, false/* inEdges */,
-                        u);
+                return getEdges(kb, false/* inEdges */, p, u);
             case AllEdges: {
-                final Striterator<Iterator<ISPO>, ISPO> a = getEdges(kb,
-                        true/* inEdges */, u);
-                final Striterator<Iterator<ISPO>, ISPO> b = getEdges(kb,
-                        false/* outEdges */, u);
+                final IStriterator a = getEdges(kb, true/* inEdges */, p, u);
+                final IStriterator b = getEdges(kb, false/* outEdges */, p, u);
                 a.append(b);
-                return (ICloseableIterator<ISPO>) a;
+                return a;
             }
             default:
                 throw new UnsupportedOperationException(edges.name());

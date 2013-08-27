@@ -3,6 +3,8 @@ package com.bigdata.rdf.graph;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.spo.ISPO;
 
+import cutthecrap.utils.striterators.IStriterator;
+
 /**
  * Interface for options that are understood by the {@link IGASEngine} and which
  * may be declared by the {@link IGASProgram}.
@@ -11,7 +13,10 @@ import com.bigdata.rdf.spo.ISPO;
  * plan (like GraphChi). I believe that this reduces to computing a DAG over the
  * frontier before executing the GATHER and then executing the frontier such
  * that the parallel execution is constrained by arcs in the DAG that do not
- * have mutual dependencies.
+ * have mutual dependencies. This is really an option that would be implemented
+ * by the {@link IGASContext}, which would have to place a partial ordering over
+ * the vertices in the frontier and then process the frontier with limited
+ * parallelism based on that partial ordering.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
@@ -46,4 +51,65 @@ public interface IGASOptions<VS, ES> {
      */
     Factory<ISPO, ES> getEdgeStateFactory();
 
+    /**
+     * Return non-<code>null</code> iff there is a single link type to be
+     * visited. This corresponds to a view of the graph as a sparse connectivity
+     * matrix. The {@link IGASEngine} can optimize traversal patterns using the
+     * <code>POS</code> index.
+     * <p>
+     * Note: When this option is used, the scatter and gather will not visit the
+     * property set for the vertex. The graph is treated as if it were an
+     * unattributed graph and only mined for the connectivity data.
+     * 
+     * @return The {@link IV} for the predicate that identifies the desired link
+     *         type (there can be many types of links - the return value
+     *         specifies which attribute is of interest).
+     * 
+     * @see #getLinkAttribType()
+     */
+    @SuppressWarnings("rawtypes")
+    IV getLinkType();
+
+//    /**
+//     * Return non-<code>null</code> iff there is a single link type to be
+//     * visited. This corresponds to a view of the graph as a sparse matrix where
+//     * the data in the matrix provides the link weights. The type of the visited
+//     * link weights is specified by the return value for this method. The
+//     * {@link IGASEngine} can optimize traversal patterns using the
+//     * <code>POS</code> index.
+//     * <p>
+//     * Note: When this option is used, the scatter and gather will not visit the
+//     * property set for the vertex. The graph is treated as if it were an
+//     * unattributed graph and only mined for the connectivity data.
+//     * 
+//     * @return The {@link IV} for the predicate that identifies the desired link
+//     *         attribute type (a link can have many attributes - the return
+//     *         value specifies which attribute is of interest).
+//     * 
+//     * @see #getLinkType()
+//     */
+//    IV getLinkAttribType();
+//    
+//    /**
+//     * When non-<code>null</code>, the specified {@link Filter} will be used to
+//     * restrict the visited edges. For example, you can restrict the visitation
+//     * to a subset of the predicates that are of interest, to only visit edges
+//     * that have link edges, to visit only select property values, etc. Some
+//     * useful filters are defined in an abstract implementation of this
+//     * interface.
+//     * 
+//     * @see #visitPropertySet()
+//     */
+//    IFilterTest getEdgeFilter();
+
+    /**
+     * Hook to impose a constraint on the visited edges and/or property values.
+     * 
+     * @param itr
+     *            The iterator visiting those edges and/or property values.
+     *            
+     * @return Either the same iterator or a constrained iterator.
+     */
+    IStriterator constrainFilter(IStriterator eitr);
+    
 }
