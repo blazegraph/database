@@ -32,6 +32,8 @@ public class StaticFrontier2 implements IStaticFrontier {
      */
     private IArraySlice<IV> vertices;
 
+    private boolean compact = true;
+    
     StaticFrontier2() {
 
         /*
@@ -47,6 +49,19 @@ public class StaticFrontier2 implements IStaticFrontier {
 
     }
 
+    @Override
+    public boolean isCompact() {
+
+        return compact;
+        
+    }
+    
+    public void setCompact(final boolean newValue) {
+        
+        this.compact = newValue;
+        
+    }
+    
     @Override
     public int size() {
 
@@ -67,6 +82,65 @@ public class StaticFrontier2 implements IStaticFrontier {
         return vertices.iterator();
 
     }
+
+    /**
+     * Grow the backing array iff necessary. Regardless, the entries from end of
+     * the current view to the first non-<code>null</code> are cleared. This is
+     * done to faciltiate GC by clearing references that would otherwise remain
+     * if/when the frontier contracted.
+     * 
+     * @param minCapacity
+     *            The required minimum capacity.
+     */
+    public void resetAndEnsureCapacity(final int minCapacity) {
+
+        final int len0 = size();
+
+        backing.ensureCapacity(minCapacity);
+
+        final int len1 = backing.len();
+
+        if (len1 > len0) {
+
+            final IV[] a = backing.array();
+
+            for (int i = len0; i < len1; i++) {
+
+                if (a[i] == null)
+                    break;
+
+                a[i] = null;
+
+            }
+
+        }
+
+        /*
+         * Replace the view. The caller will need to copy the data into the
+         * backing array before it will appear in the new view.
+         */
+        this.vertices = backing.slice(0/* off */, minCapacity/* len */);
+        
+    }
+    
+    /**
+     * Copy a slice into the backing array. This method is intended for use by
+     * parallel threads. The backing array MUST have sufficient capacity. The
+     * threads MUST write to offsets that are known to not overlap. NO checking
+     * is done to ensure that the concurrent copy of these slices will not
+     * overlap.
+     * 
+     * @param off
+     *            The offset at which to copy the slice.
+     * @param slice
+     *            The slice.
+     */
+    public void copyIntoResetFrontier(final int off, final IArraySlice<IV> slice) {
+
+        backing.put(off/* dstoff */, slice.array()/* src */,
+                slice.off()/* srcoff */, slice.len()/* srclen */);
+
+    }
     
     /**
      * Setup the same static frontier object for the new compact fronter (it is
@@ -77,7 +151,7 @@ public class StaticFrontier2 implements IStaticFrontier {
             final Iterator<IV> itr) {
 
         copyScheduleIntoFrontier(minCapacity, itr);
-        
+
         if (!ordered) {
 
             /*
@@ -129,7 +203,7 @@ public class StaticFrontier2 implements IStaticFrontier {
                 break;
             a[i] = null;
         }
-        
+
         /*
          * Take a slice of the backing showing only the valid entries and use it
          * to replace the view of the backing array.
@@ -138,4 +212,12 @@ public class StaticFrontier2 implements IStaticFrontier {
 
     }
 
+    @Override
+    public String toString() {
+
+        return getClass().getName() + "{size=" + size() + ",compact="
+                + isCompact() + ",capacity=" + backing.capacity() + "}";
+        
+    }
+    
 }

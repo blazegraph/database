@@ -235,8 +235,8 @@ public class ManagedArray<T> implements IManagedArray<T> {
 
         final int capacity = Math.max(required, capacity() * 2);
 
-        if (log.isInfoEnabled())
-            log.info("Extending buffer to capacity=" + capacity + " bytes.");
+        if (log.isDebugEnabled())
+            log.debug("Extending buffer to capacity=" + capacity + " bytes.");
 
         return capacity;
 
