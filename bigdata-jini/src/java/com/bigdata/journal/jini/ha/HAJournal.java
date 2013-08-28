@@ -245,6 +245,18 @@ public class HAJournal extends Journal {
     }
 
     /**
+     * Return the {@link HAClient} instance that is in use by the
+     * {@link HAJournalServer}.
+     * 
+     * @see HAClient#getConnection()
+     */
+    public HAClient getHAClient() {
+        
+        return server.getHAClient();
+        
+    }
+    
+    /**
      * The {@link HAJournalServer} instance that is managing this
      * {@link HAJournal}.
      */
