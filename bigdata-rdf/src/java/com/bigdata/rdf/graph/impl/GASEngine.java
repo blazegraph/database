@@ -1,6 +1,7 @@
 package com.bigdata.rdf.graph.impl;
 
 import java.lang.reflect.Constructor;
+import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.Callable;
@@ -219,6 +220,17 @@ abstract public class GASEngine implements IGASEngine {
     private class ParallelFrontierStrategy extends AbstractFrontierStrategy {
 
         private final IStaticFrontier f;
+        
+        /**
+         * Used to eliminate duplicates from the frontier at the time that we
+         * schedule the tasks. This shifts the duplicate elimination burden from
+         * the period between the rounds into the execution of the round. Since
+         * we schedule the tasks that consume the frontier from a single thread,
+         * we do not need to use a thread-safe collection. We also do not care
+         * about order for this collection. It is only there to filter out
+         * duplicate work.
+         */
+        private final HashSet<IV> scheduled;
 
         ParallelFrontierStrategy(final VertexTaskFactory<Long> taskFactory,
                 final IStaticFrontier f) {
@@ -226,6 +238,16 @@ abstract public class GASEngine implements IGASEngine {
             super(taskFactory);
 
             this.f = f;
+
+            /*
+             * Pre-allocate based on the known size of the frontier. The
+             * frontier may have duplicates (depending on its implementation) so
+             * this size is conservative.
+             * 
+             * If the frontier is known to be compact, then this map is not
+             * initialized and is not used.
+             */
+            this.scheduled = f.isCompact() ? null : new HashSet<IV>(f.size());
 
         }
 
@@ -253,6 +275,25 @@ abstract public class GASEngine implements IGASEngine {
 
                 // For all vertices in the frontier.
                 for (IV u : f) {
+
+                    if (scheduled != null) {
+
+// null values are NOT expected. 
+//                        
+//                        if (u == null) {
+//                            
+//                            // null references are ignored for non-compact
+//                            // frontiers.
+//                            continue;
+//                        }
+
+                        if (!scheduled.add(u)) {
+
+                            // already scheduled.
+                            continue;
+
+                        }
+                    }
 
                     // Future will compute scatter for vertex.
                     final FutureTask<Long> ft = new FutureTask<Long>(
