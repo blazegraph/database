@@ -119,6 +119,18 @@ public class StaticFrontier2 implements IStaticFrontier {
         }
 
         /*
+         * Null fill until the end of the last frontier. That will help out GC.
+         * Otherwise those IV references are pinned and can hang around. We
+         * could track the high water mark on the backing array for this
+         * purpose.
+         */
+        for (int i = nvertices; i < a.length; i++) {
+            if (a[i] == null)
+                break;
+            a[i] = null;
+        }
+        
+        /*
          * Take a slice of the backing showing only the valid entries and use it
          * to replace the view of the backing array.
          */

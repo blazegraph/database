@@ -122,13 +122,16 @@ public class TLScheduler implements IGASSchedulerImpl {
         /*
          * Clear the per-thread maps, but do not discard. They will be reused in
          * the next round.
+         * 
+         * FIXME This is a big cost. Try simply clearing [map] and see if that
+         * is less expensive.
          */
-        for (STScheduler s : map.values()) {
-
-            s.clear();
-
-        }
-
+//        for (STScheduler s : map.values()) {
+//
+//            s.clear();
+//
+//        }
+        map.clear();
     }
 
     @Override
