@@ -26,9 +26,7 @@ package com.bigdata.journal.jini.ha;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.io.PrintWriter;
 import java.io.Serializable;
-import java.io.StringWriter;
 import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -309,7 +307,7 @@ public class DumpLogDigests extends SimpleDiscovery {
 	        for (long cc = startCC; cc <= endCC; cc++) {
 	        	final long cur = cc;
 	        	
-	        	final Future res = es.submit(new Callable<Void>() {
+	        	final Future<Void> res = es.submit(new Callable<Void>() {
 					@Override
 					public Void call() throws Exception {
 						try {
@@ -351,7 +349,7 @@ public class DumpLogDigests extends SimpleDiscovery {
     }
     
     @SuppressWarnings("serial")
-	static public class HALogInfo implements Serializable, Comparable {
+	static public class HALogInfo implements Serializable, Comparable<HALogInfo> {
     	final public String logName;
     	final public boolean isOpen;
     	final public byte[] digest;
@@ -363,11 +361,7 @@ public class DumpLogDigests extends SimpleDiscovery {
     	}
 
 		@Override
-		public int compareTo(Object o) {
-			if (! (o instanceof HALogInfo))
-				return -1;
-			final HALogInfo other = (HALogInfo) o;
-			
+		public int compareTo(HALogInfo other) {
 			return logName.compareTo(other.logName);
 		}
     }
