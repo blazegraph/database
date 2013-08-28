@@ -14,11 +14,10 @@ import com.bigdata.rdf.graph.IGASSchedulerImpl;
 import com.bigdata.rdf.graph.IStaticFrontier;
 import com.bigdata.rdf.graph.impl.GASEngine;
 import com.bigdata.rdf.graph.impl.util.GASImplUtil;
+import com.bigdata.rdf.graph.impl.util.IArraySlice;
 import com.bigdata.rdf.graph.impl.util.ManagedArray;
 import com.bigdata.rdf.graph.impl.util.MergeSortIterator;
 import com.bigdata.rdf.internal.IV;
-
-import cutthecrap.utils.striterators.ArrayIterator;
 
 /**
  * This scheduler uses thread-local buffers ({@link LinkedHashSet}) to track the
@@ -34,35 +33,35 @@ import cutthecrap.utils.striterators.ArrayIterator;
 @SuppressWarnings("rawtypes")
 public class TLScheduler implements IGASSchedulerImpl {
 
-//    /**
-//     * Class bundles a reusable, extensible array for sorting the thread-local
-//     * frontier.
-//     * 
-//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
-//     *         Thompson</a>
-//     */
-//    private static class MySTScheduler extends STScheduler {
-//
-//        /**
-//         * This is used to sort the thread-local frontier (that is, the frontier
-//         * for a single thread). The backing array will grow as necessary and is
-//         * reused in each round.
-//         */
-//        private final ManagedArray<IV> tmp;
-//
-//        public MySTScheduler(final GASEngine gasEngine) {
-//
-//            super(gasEngine);
-//
-//            tmp = new ManagedArray<IV>(IV.class, 64);
-//
-//        }
-//        
-//    }
+    /**
+     * Class bundles a reusable, extensible array for sorting the thread-local
+     * frontier.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+     *         Thompson</a>
+     */
+    private static class MySTScheduler extends STScheduler {
+
+        /**
+         * This is used to sort the thread-local frontier (that is, the frontier
+         * for a single thread). The backing array will grow as necessary and is
+         * reused in each round.
+         */
+        private final ManagedArray<IV> tmp;
+
+        public MySTScheduler(final GASEngine gasEngine) {
+
+            super(gasEngine);
+
+            tmp = new ManagedArray<IV>(IV.class, 64);
+
+        }
+        
+    } // class MySTScheduler
     
     private final GASEngine gasEngine;
     private final int nthreads;
-    private final ConcurrentHashMap<Long/* threadId */, STScheduler> map;
+    private final ConcurrentHashMap<Long/* threadId */, MySTScheduler> map;
 
     public TLScheduler(final GASEngine gasEngine) {
 
@@ -70,7 +69,7 @@ public class TLScheduler implements IGASSchedulerImpl {
 
         this.nthreads = gasEngine.getNThreads();
 
-        this.map = new ConcurrentHashMap<Long, STScheduler>(
+        this.map = new ConcurrentHashMap<Long, MySTScheduler>(
                 nthreads/* initialCapacity */, .75f/* loadFactor */, nthreads);
 
     }
@@ -79,11 +78,11 @@ public class TLScheduler implements IGASSchedulerImpl {
 
         final Long id = Thread.currentThread().getId();
 
-        STScheduler s = map.get(id);
+        MySTScheduler s = map.get(id);
 
         if (s == null) {
 
-            final IGASScheduler old = map.putIfAbsent(id, s = new STScheduler(
+            final IGASScheduler old = map.putIfAbsent(id, s = new MySTScheduler(
                     gasEngine));
 
             if (old != null) {
@@ -131,38 +130,38 @@ public class TLScheduler implements IGASSchedulerImpl {
         /*
          * Extract a sorted, compact frontier from each thread local frontier.
          */
-        final IV[][] frontiers = new IV[nthreads][];
+        @SuppressWarnings("unchecked")
+        final IArraySlice<IV>[] frontiers = new IArraySlice[nthreads];
 
         int nsources = 0;
         int nvertices = 0;
         {
-            final List<Callable<IV[]>> tasks = new ArrayList<Callable<IV[]>>(
+            final List<Callable<IArraySlice<IV>>> tasks = new ArrayList<Callable<IArraySlice<IV>>>(
                     nthreads);
 
-            for (STScheduler s : map.values()) {
-                final STScheduler t = s;
-                tasks.add(new Callable<IV[]>() {
+            for (MySTScheduler s : map.values()) {
+                final MySTScheduler t = s;
+                tasks.add(new Callable<IArraySlice<IV>>() {
                     @Override
-                    public IV[] call() throws Exception {
-                        return GASImplUtil.compactAndSort(t.vertices);
+                    public IArraySlice<IV> call() throws Exception {
+                        return GASImplUtil.compactAndSort(t.vertices, t.tmp);
                     }
                 });
 
             }
             // invokeAll() - futures will be done() before it returns.
-            final List<Future<IV[]>> futures;
+            final List<Future<IArraySlice<IV>>> futures;
             try {
                 futures = gasEngine.getGASThreadPool().invokeAll(tasks);
             } catch (InterruptedException e) {
                 throw new RuntimeException(e);
             }
 
-            for (Future<IV[]> f : futures) {
+            for (Future<IArraySlice<IV>> f : futures) {
 
-                final IV[] b;
                 try {
-                    b = frontiers[nsources] = f.get();
-                    nvertices += b.length;
+                    final IArraySlice<IV> b = frontiers[nsources] = f.get();
+                    nvertices += b.len();
                     nsources++;
                 } catch (InterruptedException e) {
                     throw new RuntimeException(e);
@@ -223,7 +222,7 @@ public class TLScheduler implements IGASSchedulerImpl {
      *            The new frontier to be populated.
      */
     private void mergeSortSourcesAndSetFrontier(final int nsources,
-            final int nvertices, final IV[][] frontiers,
+            final int nvertices, final IArraySlice<IV>[] frontiers,
             final IStaticFrontier frontier) {
 
         // wrap IVs[] as Iterators.
@@ -232,7 +231,7 @@ public class TLScheduler implements IGASSchedulerImpl {
 
         for (int i = 0; i < nsources; i++) {
 
-            itrs[i] = new ArrayIterator<IV>(frontiers[i]);
+            itrs[i] = frontiers[i].iterator();
 
         }
 
