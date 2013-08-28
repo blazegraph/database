@@ -46,6 +46,13 @@ public class TLScheduler implements IGASSchedulerImpl {
          * This is used to sort the thread-local frontier (that is, the frontier
          * for a single thread). The backing array will grow as necessary and is
          * reused in each round.
+         * <P>
+         * Note: The schedule (for each thread) is using a set - see the
+         * {@link STScheduler} base class. This means that the schedule (for
+         * each thread) is compact, but not ordered. We need to use (and re-use)
+         * an array to order that compact per-thread schedule. The compact
+         * per-thread schedules are then combined into a single compact frontier
+         * for the new round.
          */
         private final ManagedArray<IV> tmp;
 
