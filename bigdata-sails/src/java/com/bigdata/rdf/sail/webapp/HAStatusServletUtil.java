@@ -156,7 +156,7 @@ public class HAStatusServletUtil {
             p.text("quorumToken=" + quorumToken + ", lastValidToken="
                     + lastValidToken).node("br").close();
 
-            p.text("logicalServiceId=" + quorumService.getLogicalServiceId())
+            p.text("logicalServiceZPath=" + quorumService.getLogicalServiceZPath())
                     .node("br").close();
 
             // Note: This is the *local* value of getHAStatus().
@@ -648,7 +648,7 @@ public class HAStatusServletUtil {
                         quorum.getZookeeper());
 
                 dump.dump(out, true/* showDatatrue */,
-                        quorumService.getLogicalServiceId()/* zpath */,
+                        quorumService.getLogicalServiceZPath()/* zpath */,
                         0/* depth */);
 
             } catch (InterruptedException e) {

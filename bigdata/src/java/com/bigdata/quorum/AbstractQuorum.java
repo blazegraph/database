@@ -445,7 +445,7 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
             // addListener(client);
             if (client instanceof QuorumMember<?>) {
                 // create actor for that service.
-                this.actor = newActor(client.getLogicalServiceId(),
+                this.actor = newActor(client.getLogicalServiceZPath(),
                         ((QuorumMember<?>) client).getServiceId());
             }
             if (singleThreadWatcher) {
@@ -464,7 +464,7 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
             // Reach out to the durable quorum and get the lastValidToken
             this.lastValidToken = getLastValidTokenFromQuorumState(client);
             // Setup the watcher.
-            this.watcher = newWatcher(client.getLogicalServiceId());
+            this.watcher = newWatcher(client.getLogicalServiceZPath());
             this.eventService = (sendSynchronous ? null : Executors
                     .newSingleThreadExecutor(new DaemonThreadFactory(
                             "QuorumEventService")));

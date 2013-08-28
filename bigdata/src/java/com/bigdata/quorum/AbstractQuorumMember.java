@@ -43,7 +43,8 @@ abstract public class AbstractQuorumMember<S extends Remote> extends
 
     private final UUID serviceId;
 
-    protected AbstractQuorumMember(final String logicalServiceId, UUID serviceId) {
+    protected AbstractQuorumMember(final String logicalServiceId,
+            final UUID serviceId) {
 
         super(logicalServiceId);
         
