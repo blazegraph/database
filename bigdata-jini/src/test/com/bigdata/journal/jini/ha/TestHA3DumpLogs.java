@@ -29,6 +29,14 @@ import java.util.Iterator;
 
 public class TestHA3DumpLogs extends AbstractHA3JournalServerTestCase {
 
+	public TestHA3DumpLogs() {
+		
+	}
+	
+    public TestHA3DumpLogs(final String name) {
+        super(name);
+    }
+
     public void testSimpleDumpLogs() throws Exception {
         // only start 2 services to ensure logs are maintained
     	startA();
