@@ -32,6 +32,7 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.NoSuchElementException;
+import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.ExecutionException;
@@ -49,7 +50,10 @@ import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.IndexManagerCallable;
 import com.bigdata.ha.halog.IHALogReader;
 import com.bigdata.journal.ITransactionService;
+import com.bigdata.journal.jini.ha.HAClient.HAConnection;
 import com.bigdata.journal.jini.ha.HALogIndex.IHALogRecord;
+import com.bigdata.quorum.Quorum;
+import com.bigdata.quorum.QuorumClient;
 
 import cutthecrap.utils.striterators.EmptyIterator;
 
@@ -79,19 +83,33 @@ import cutthecrap.utils.striterators.EmptyIterator;
  * @author Martyn Cutcher
  *
  */
-public class DumpLogDigests extends SimpleDiscovery {
+public class DumpLogDigests {
 
     private static final Logger log = Logger.getLogger(DumpLogDigests.class);
     
 	private static final int DEFAULT_SERVICE_THREADS = 5;
 	private static final int DEFAULT_BATCH = 50;
 
-    /**
-     * Just needs the configuration file for the discovery service and the local zookeeper port
-     */
-    public DumpLogDigests(final String[] configFiles) throws ConfigurationException, IOException, InterruptedException {
-    	super(configFiles);
-    }
+	final HAClient client;
+
+	/**
+	 * Just needs the configuration file for the discovery service and the local
+	 * zookeeper port
+	 */
+	public DumpLogDigests(final String[] configFiles)
+			throws ConfigurationException, IOException, InterruptedException {
+
+		// wait for zk services to register!
+		Thread.sleep(1000);
+
+		client = new HAClient(configFiles);
+	}
+	
+	public void shutdown() {
+		client.disconnect(true);
+	}
+
+
     
     public Iterator<ServiceLogs> summary(final String serviceRoot) throws IOException, ExecutionException {
     	return summary(dump(serviceRoot, DEFAULT_BATCH, DEFAULT_SERVICE_THREADS));
@@ -546,5 +564,27 @@ public class DumpLogDigests extends SimpleDiscovery {
 		
 		return tmp;
     }
-    
+ 
+
+	private List<HAGlue> services(final String serviceRoot) throws IOException,
+			ExecutionException, KeeperException, InterruptedException {
+		
+		
+		final List<HAGlue> ret = new ArrayList<HAGlue>();
+		
+		final HAConnection cnxn = client.connect();
+		
+		final Quorum<HAGlue, QuorumClient<HAGlue>> quorum = cnxn.getHAGlueQuorum(serviceRoot);
+		final UUID[] uuids = quorum.getJoined();
+		
+		QuorumClient<HAGlue> qclient = quorum.getClient();
+
+		for (UUID uuid : uuids) {
+			ret.add(qclient.getService(uuid));
+		}
+		
+		return ret;
+
+	}
+   
 }

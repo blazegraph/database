@@ -28,11 +28,17 @@ package com.bigdata.journal.jini.ha;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.StringWriter;
+import java.net.InetAddress;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.Iterator;
+import java.util.List;
 import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.ScheduledExecutorService;
@@ -41,18 +47,31 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.apache.zookeeper.ZooKeeper;
+
 import net.jini.config.Configuration;
+import net.jini.config.ConfigurationException;
+import net.jini.config.ConfigurationProvider;
+import net.jini.core.lookup.ServiceItem;
+import net.jini.discovery.LookupDiscoveryManager;
+import net.jini.lease.LeaseRenewalManager;
+import net.jini.lookup.ServiceDiscoveryManager;
 
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.HAStatusEnum;
 import com.bigdata.ha.halog.HALogWriter;
 import com.bigdata.ha.halog.IHALogReader;
 import com.bigdata.ha.msg.HARootBlockRequest;
+import com.bigdata.io.SerializerUtil;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.quorum.Quorum;
+import com.bigdata.quorum.zk.QuorumServiceState;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
 import com.bigdata.service.jini.JiniClientConfig;
 import com.bigdata.util.NV;
+import com.bigdata.util.config.NicUtil;
+import com.bigdata.zookeeper.ZooHelper;
+import com.bigdata.zookeeper.ZooKeeperAccessor;
 
 /**
  * Test suites for an {@link HAJournalServer} quorum with a replication factor
@@ -268,6 +287,49 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
         
     }
 
+    public void _testStartABCSimultaneousLookupRestarts() throws Exception {
+    	
+        final ABC abc = new ABC(false/*sequential*/); // simultaneous start.
+
+        final HAGlue serverA = abc.serverA, serverB = abc.serverB, serverC = abc.serverC;
+
+        // Verify quorum is FULLY met.
+        final long t1 = awaitFullyMetQuorum();
+
+//        // Verify KB exists on leader.
+//        final HAGlue leader = quorum.getClient().getLeader(token);
+
+        // await the KB create commit point to become visible on each service.
+        awaitCommitCounter(1L, new HAGlue[] { serverA, serverB, serverC });
+
+        // Verify binary equality of ALL journals.
+        assertDigestsEquals(new HAGlue[] { serverA, serverB, serverC });
+
+        // Now let's stop zookeeper
+        
+        ((HAJournalTest.HAGlueTest) abc.serverA).log("About to stop zookeeper");
+            
+        System.err.println("stop zookeeper");
+        for (int i = 5; i > 0; i--) {
+        	Thread.sleep(1000);
+        	System.err.println("WAIT: " + i);
+        }
+               
+        ((HAJournalTest.HAGlueTest) abc.serverA).log("About to start zookeeper");
+        System.err.println("ServerA: " + abc.serverA.getHAStatus());
+
+        System.err.println("start zookeeper");
+        
+        Thread.sleep(5000);
+                
+        ((HAJournalTest.HAGlueTest) abc.serverA).log("Waiting for quorum meet");
+
+        // Verify quorum is FULLY met.
+        final long t2 = awaitFullyMetQuorum();
+        
+        assertFalse(t1 == t2);
+    }
+    
     /**
      * Start 3 services. Verify quorum meets and is fully met and that the
      * journal digests are equals. Verify that there are no HALog files since
@@ -2252,7 +2314,7 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
      */
     // disable from standard test runs
     public void _testSANDBOXStressABC_Restart() throws Exception {
-        for (int i = 1; i <= 20; i++) {
+        for (int i = 1; i <= 40; i++) {
             try {
                 new ABC(true/* sequential */);
 

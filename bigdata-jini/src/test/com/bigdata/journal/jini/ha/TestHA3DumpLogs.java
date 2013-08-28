@@ -29,7 +29,6 @@ import java.util.Iterator;
 import java.util.UUID;
 
 import com.bigdata.ha.HAGlue;
-import com.bigdata.ha.HAStatusEnum;
 
 public class TestHA3DumpLogs extends AbstractHA3JournalServerTestCase {
 
@@ -47,6 +46,7 @@ public class TestHA3DumpLogs extends AbstractHA3JournalServerTestCase {
     	startB();
     	
     	awaitMetQuorum();
+    	
         final UUID leaderId = quorum.getLeaderId();
         final HAGlue leader = quorum.getClient().getService(leaderId);
         awaitNSSAndHAReady(leader);
@@ -76,10 +76,11 @@ public class TestHA3DumpLogs extends AbstractHA3JournalServerTestCase {
     
     public void testBatchDumpLogs() throws Exception {
         // only start 2 services to ensure logs are maintained
-        startA();
-        startB();
+    	startA();
+    	startB();
     	
-        awaitMetQuorum();
+    	awaitMetQuorum();
+    	
         final UUID leaderId = quorum.getLeaderId();
         final HAGlue leader = quorum.getClient().getService(leaderId);
         awaitNSSAndHAReady(leader);
@@ -124,8 +125,8 @@ public class TestHA3DumpLogs extends AbstractHA3JournalServerTestCase {
         try {
 	        final StringWriter sw = new StringWriter();
 	        final PrintWriter pw = new PrintWriter(sw);
-	        
-	        final Iterator<DumpLogDigests.ServiceLogs> serviceLogInfo = dlds.dump(logicalServiceZPath, 20/*batchlogs*/, 5/*serviceThreads*/);
+	        final String logicalServiceId = getLogicalServiceId();
+	        final Iterator<DumpLogDigests.ServiceLogs> serviceLogInfo = dlds.dump(logicalServiceId /*logicalServiceZPath*/, 20/*batchlogs*/, 5/*serviceThreads*/);
 	        
 	        while (serviceLogInfo.hasNext()) {
 	        	DumpLogDigests.ServiceLogs info  = serviceLogInfo.next();
@@ -143,13 +144,14 @@ public class TestHA3DumpLogs extends AbstractHA3JournalServerTestCase {
 
     /**
      * Tests main entry for DumpLogDigests
-     * @param b 
+     * @param summary 
      */
     private void mainShowLogs(boolean summary) throws Exception {
+        final String logicalServiceId = getLogicalServiceId();
         DumpLogDigests.main(
         	new String[] {
                 	SRC_PATH + "dumpFile.config",
-                	logicalServiceZPath,
+                	logicalServiceId /*logicalServiceZPath*/,
                 	(summary ? "summary" : "full")
         	}	
         );

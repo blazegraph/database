@@ -1241,7 +1241,7 @@ public class AbstractHA3JournalServerTestCase extends
      * test and a {@link UUID} in order to keep HAJournalServer processes that
      * do not die nicely from causing crosstalk between the unit tests.
      */
-    private String getLogicalServiceId() {
+    protected String getLogicalServiceId() {
     
         return logicalServiceId;
 
