@@ -19,6 +19,7 @@ import com.bigdata.rdf.graph.IGASProgram;
 import com.bigdata.rdf.graph.IGASSchedulerImpl;
 import com.bigdata.rdf.graph.IGASState;
 import com.bigdata.rdf.graph.IGraphAccessor;
+import com.bigdata.rdf.graph.IStaticFrontier;
 import com.bigdata.rdf.graph.impl.GASContext;
 import com.bigdata.rdf.graph.impl.GASEngine;
 import com.bigdata.rdf.internal.IV;
@@ -138,10 +139,13 @@ public class BigdataGASEngine extends GASEngine {
             final IGraphAccessor graphAccessor,
             final IGASProgram<VS, ES, ST> gasProgram) {
 
+        final IStaticFrontier frontier = newStaticFrontier();
+
         final IGASSchedulerImpl gasScheduler = newScheduler();
 
         return new BigdataGASState<VS, ES, ST>(
-                (BigdataGraphAccessor) graphAccessor, gasScheduler, gasProgram);
+                (BigdataGraphAccessor) graphAccessor, frontier, gasScheduler,
+                gasProgram);
 
     }
 

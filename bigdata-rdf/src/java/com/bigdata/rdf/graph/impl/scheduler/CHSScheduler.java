@@ -5,10 +5,7 @@ import org.eclipse.jetty.util.ConcurrentHashSet;
 import com.bigdata.rdf.graph.IGASSchedulerImpl;
 import com.bigdata.rdf.graph.IStaticFrontier;
 import com.bigdata.rdf.graph.impl.GASEngine;
-import com.bigdata.rdf.graph.impl.util.GASImplUtil;
 import com.bigdata.rdf.internal.IV;
-
-import cutthecrap.utils.striterators.ArrayIterator;
 
 /**
  * A simple scheduler based on a concurrent hash collection
@@ -47,9 +44,8 @@ public class CHSScheduler implements IGASSchedulerImpl {
     @Override
     public void compactFrontier(final IStaticFrontier frontier) {
 
-        final IV[] a = GASImplUtil.compactAndSort(vertices);
-        
-        frontier.resetFrontier(a.length, new ArrayIterator<IV>(a));
+        frontier.resetFrontier(vertices.size()/* minCapacity */,
+                false/* ordered */, vertices.iterator());
         
     }
 

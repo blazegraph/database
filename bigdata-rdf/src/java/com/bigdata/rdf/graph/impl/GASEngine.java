@@ -326,6 +326,18 @@ abstract public class GASEngine implements IGASEngine {
         
     }
     
+    /**
+     * Return an {@link IStaticFrontier} - this is the object that models the
+     * frontier that is consumed during a given round of evaluation.
+     * 
+     * TODO Config overrides
+     */
+    public IStaticFrontier newStaticFrontier() {
+    
+        return new StaticFrontier2();
+        
+    }
+    
     public IGASSchedulerImpl newScheduler() {
 
         final Class<IGASSchedulerImpl> cls = schedulerClassRef.get();
@@ -352,9 +364,11 @@ abstract public class GASEngine implements IGASEngine {
             final IGraphAccessor graphAccessor,
             final IGASProgram<VS, ES, ST> gasProgram) {
 
+        final IStaticFrontier frontier = newStaticFrontier();
+
         final IGASSchedulerImpl gasScheduler = newScheduler();
 
-        return new GASState<VS, ES, ST>(graphAccessor, gasScheduler, gasProgram);
+        return new GASState<VS, ES, ST>(graphAccessor, frontier, gasScheduler, gasProgram);
 
     }
 

@@ -9,6 +9,7 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.rdf.graph.IGASProgram;
 import com.bigdata.rdf.graph.IGASSchedulerImpl;
+import com.bigdata.rdf.graph.IStaticFrontier;
 import com.bigdata.rdf.graph.impl.GASState;
 import com.bigdata.rdf.graph.impl.bd.BigdataGASEngine.BigdataGraphAccessor;
 import com.bigdata.rdf.internal.IV;
@@ -28,10 +29,11 @@ public class BigdataGASState<VS, ES, ST> extends GASState<VS, ES, ST> {
     }
     
     public BigdataGASState(final BigdataGraphAccessor graphAccessor,
+            final IStaticFrontier frontier,
             final IGASSchedulerImpl gasScheduler,
             final IGASProgram<VS, ES, ST> gasProgram) {
 
-        super(graphAccessor, gasScheduler, gasProgram);
+        super(graphAccessor, frontier, gasScheduler, gasProgram);
 
     }
 
