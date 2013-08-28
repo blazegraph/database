@@ -67,25 +67,39 @@ public class StaticFrontier2 implements IStaticFrontier {
         return vertices.iterator();
 
     }
-
-    // private void clear() {
-    //
-    // vertices.clear();
-    //
-    // }
-
-    // private void schedule(IV v) {
-    //
-    // vertices.add(v);
-    //
-    // }
-
+    
     /**
      * Setup the same static frontier object for the new compact fronter (it is
      * reused in each round).
      */
     @Override
     public void resetFrontier(final int minCapacity, final boolean ordered,
+            final Iterator<IV> itr) {
+
+        copyScheduleIntoFrontier(minCapacity, itr);
+        
+        if (!ordered) {
+
+            /*
+             * Sort the current slice of the backing array.
+             */
+
+            Arrays.sort(backing.array(), 0/* fromIndex */, vertices.len()/* toIndex */);
+
+        }
+
+    }
+
+    /**
+     * Copy the data from the iterator into the backing array and update the
+     * slice which provides our exposed view of the backing array.
+     * 
+     * @param minCapacity
+     *            The minimum required capacity for the backing array.
+     * @param itr
+     *            The source from which we will repopulate the backing array.
+     */
+    private void copyScheduleIntoFrontier(final int minCapacity,
             final Iterator<IV> itr) {
 
         // ensure enough capacity for the new frontier.
@@ -104,18 +118,11 @@ public class StaticFrontier2 implements IStaticFrontier {
 
         }
 
-        if (!ordered) {
-
-            // Sort.
-            Arrays.sort(a, 0/* fromIndex */, nvertices/* toIndex */);
-            
-        }
-        
-        // take a slice of the backing showing only the valid entries.
-        final IArraySlice<IV> tmp = backing.slice(0/* off */, nvertices);
-
-        // update the view.
-        this.vertices = tmp;
+        /*
+         * Take a slice of the backing showing only the valid entries and use it
+         * to replace the view of the backing array.
+         */
+        this.vertices = backing.slice(0/* off */, nvertices);
 
     }
 
