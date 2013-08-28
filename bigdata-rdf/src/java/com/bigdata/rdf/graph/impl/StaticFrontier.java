@@ -16,6 +16,7 @@ import cutthecrap.utils.striterators.ArrayIterator;
  * kinds of mutation.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * @deprecated by {@link StaticFrontier2}, which is more efficient.
  */
 @SuppressWarnings("rawtypes")
 public class StaticFrontier implements IStaticFrontier {
