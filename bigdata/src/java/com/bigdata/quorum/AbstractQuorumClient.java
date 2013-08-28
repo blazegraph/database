@@ -47,21 +47,27 @@ abstract public class AbstractQuorumClient<S extends Remote> implements
 
     private final AtomicReference<Quorum<?, ?>> quorum = new AtomicReference<Quorum<?, ?>>();
 
-    private final String logicalServiceId;
+    private final String logicalServiceZPath;
 
     @Override
-    final public String getLogicalServiceId() {
+    final public String getLogicalServiceZPath() {
         
-        return logicalServiceId;
+        return logicalServiceZPath;
         
     }
     
-    protected AbstractQuorumClient(final String logicalServiceId) {
+    /**
+     * 
+     * @param logicalServiceZPath
+     *            the fully qualified logical service identifier (for zookeeper,
+     *            this is the logicalServiceZPath).
+     */
+    protected AbstractQuorumClient(final String logicalServiceZPath) {
 
-        if(logicalServiceId == null)
+        if(logicalServiceZPath == null)
             throw new IllegalArgumentException();
         
-        this.logicalServiceId = logicalServiceId;
+        this.logicalServiceZPath = logicalServiceZPath;
         
     }
 

@@ -109,7 +109,10 @@ import com.sun.jini.start.ServiceDescriptor;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- *          TODO Refactor the HA3 test suite to use the HAClient class.
+ * @see <a href="http://sourceforge.net/apps/trac/bigdata/ticket/728" > Refactor
+ *      to create HAClient</a>
+ * 
+ *      TODO Refactor the HA3 test suite to use the HAClient class.
  */
 public class HAClient {
 
@@ -820,7 +823,7 @@ public class HAClient {
                 // Setup discovery for HAGlue clients.
                 discoveryClient = new HAGlueServicesClient(
                         serviceDiscoveryManager,
-                        null/* serviceDiscoveryListener */, cacheMissTimeout);
+                        this/* serviceDiscoveryListener */, cacheMissTimeout);
 
                 // And set the reference. The client is now "connected".
                 this.clientRef.set(client);
@@ -1028,7 +1031,29 @@ public class HAClient {
          */
         public HAGlue getHAGlueService(final UUID serviceUUID) {
 
-            return discoveryClient.getService();
+            return discoveryClient.getService(serviceUUID);
+
+        }
+
+        /**
+         * Resolve the array of service {@link UUID}s to their RMI proxies.
+         * 
+         * @param serviceUUIDs
+         *            The service {@link UUID}s.
+         * 
+         * @return The correlated array of RMI proxies.
+         */
+        public HAGlue[] getHAGlueService(final UUID[] serviceUUIDs) {
+
+            final HAGlue[] a = new HAGlue[serviceUUIDs.length];
+
+            for (int i = 0; i < a.length; i++) {
+
+                a[i] = discoveryClient.getService(serviceUUIDs[i]);
+
+            }
+
+            return a;
 
         }
 
@@ -1058,7 +1083,8 @@ public class HAClient {
          * Return the set of known logical service identifiers for HA
          * replication clusters. These are extracted from zookeeper.
          * 
-         * @return The known logical service identifiers.
+         * @return The known logical service identifiers (just the last
+         *         component of the zpath).
          * 
          * @throws InterruptedException
          * @throws KeeperException
@@ -1240,9 +1266,9 @@ public class HAClient {
 
         private class MyQuorumClient extends AbstractQuorumClient<HAGlue> {
 
-            protected MyQuorumClient(final String logicalServiceId) {
+            protected MyQuorumClient(final String logicalServiceZPath) {
 
-                super(logicalServiceId);
+                super(logicalServiceZPath);
 
             }
 
@@ -1265,6 +1291,7 @@ public class HAClient {
          * <p>
          * {@inheritDoc}
          */
+        @Override
         public void serviceAdded(final ServiceDiscoveryEvent e) {
 
             final ServiceItem serviceItem = e.getPostEventServiceItem();
@@ -1368,6 +1395,8 @@ public class HAClient {
 
             } catch (InterruptedException ex) {
 
+                // Propagate interrupt.
+                Thread.currentThread().interrupt();
                 return;
 
             }
@@ -1398,6 +1427,8 @@ public class HAClient {
 
             } catch (InterruptedException ex) {
 
+                // Propagate interrupt.
+                Thread.currentThread().interrupt();
                 return;
 
             }

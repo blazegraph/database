@@ -26,6 +26,10 @@ package com.bigdata.journal.jini.ha;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.util.Iterator;
+import java.util.UUID;
+
+import com.bigdata.ha.HAGlue;
+import com.bigdata.ha.HAStatusEnum;
 
 public class TestHA3DumpLogs extends AbstractHA3JournalServerTestCase {
 
@@ -43,6 +47,9 @@ public class TestHA3DumpLogs extends AbstractHA3JournalServerTestCase {
     	startB();
     	
     	awaitMetQuorum();
+        final UUID leaderId = quorum.getLeaderId();
+        final HAGlue leader = quorum.getClient().getService(leaderId);
+        awaitNSSAndHAReady(leader);
 
         // Run through a few transactions to generate some log files
         simpleTransaction();       
@@ -69,10 +76,13 @@ public class TestHA3DumpLogs extends AbstractHA3JournalServerTestCase {
     
     public void testBatchDumpLogs() throws Exception {
         // only start 2 services to ensure logs are maintained
-    	startA();
-    	startB();
+        startA();
+        startB();
     	
-    	awaitMetQuorum();
+        awaitMetQuorum();
+        final UUID leaderId = quorum.getLeaderId();
+        final HAGlue leader = quorum.getClient().getService(leaderId);
+        awaitNSSAndHAReady(leader);
 
         // Run through a few transactions to generate some log files
     	// Ensure that services use multiple batches

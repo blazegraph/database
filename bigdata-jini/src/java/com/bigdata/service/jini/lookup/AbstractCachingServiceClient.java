@@ -329,6 +329,8 @@ abstract public class AbstractCachingServiceClient<S extends Remote> {
             if (log.isInfoEnabled())
                 log.info("Interrupted - no match.");
 
+            // Propagate the interrupt.
+            Thread.currentThread().interrupt();
             return null;
 
         }
@@ -428,6 +430,8 @@ abstract public class AbstractCachingServiceClient<S extends Remote> {
             if (log.isInfoEnabled())
                 log.info("Interrupted - no match.");
 
+            // Propagate the interrupt.
+            Thread.currentThread().interrupt();
             return null;
 
         }
@@ -448,20 +452,45 @@ abstract public class AbstractCachingServiceClient<S extends Remote> {
             log.info("Found: " + item);
 
         /**
-         * Verify that the discovered item was entered into the ServiceCache.
-         * The ServiceCache implements the ServiceDiscoveryListener interface.
-         * The LookupCache should have delivered a ServiceDiscoverEvent to the
-         * ServiceDiscoveryListener intercace on the ServiceCache when we
-         * performed the lookup at the top of this method.
+         * Note: See below. We can not verify this. [Verify that the discovered
+         * item was entered into the ServiceCache. The ServiceCache implements
+         * the ServiceDiscoveryListener interface. The LookupCache should have
+         * delivered a ServiceDiscoverEvent to the ServiceDiscoveryListener
+         * interface on the ServiceCache when we performed the lookup at the top
+         * of this method. If you hit this, then a likely explanation is that
+         * the service interface specified to the constructor was not compatible
+         * with the template (i.e., one or the other was incorrect).]
          * 
-         * Note: If you hit this, then a likely explanation is that the service
-         * interface specified to the constructor was not compatible with the
-         * template (i.e., one or the other was incorrect).
+         * Note: The ServiceDiscoveryEvent messages are delivered by a thread
+         * started by the ServiceDiscoveryManager as observed in the trace below
+         * (the serviceAdded() method was modified to generate this trace and
+         * does not normally throw the UnsupportedOperationException). This is
+         * the reason why the asserts below are sometimes tripped. The event
+         * delivery in another thread amounts to a data race between the lookup
+         * of the service (above) and its insert into the ServiceCache (which is
+         * asynchronous).
+         * 
+         * <pre>
+         * Aug 28, 2013 9:35:00 AM com.sun.jini.thread.TaskManager$TaskThread run
+         * WARNING: Task.run exception
+         * java.lang.UnsupportedOperationException
+         *     at com.bigdata.journal.jini.ha.HAClient$HAConnection.serviceAdded(HAClient.java:1270)
+         *     at com.bigdata.service.jini.lookup.ServiceCache.serviceAdded(ServiceCache.java:125)
+         *     at net.jini.lookup.ServiceDiscoveryManager$LookupCacheImpl.serviceNotifyDo(ServiceDiscoveryManager.java:2181)
+         *     at net.jini.lookup.ServiceDiscoveryManager$LookupCacheImpl.serviceNotifyDo(ServiceDiscoveryManager.java:2168)
+         *     at net.jini.lookup.ServiceDiscoveryManager$LookupCacheImpl.addServiceNotify(ServiceDiscoveryManager.java:2128)
+         *     at net.jini.lookup.ServiceDiscoveryManager$LookupCacheImpl.access$2200(ServiceDiscoveryManager.java:843)
+         *     at net.jini.lookup.ServiceDiscoveryManager$LookupCacheImpl$NewOldServiceTask.run(ServiceDiscoveryManager.java:1417)
+         *     at com.sun.jini.thread.TaskManager$TaskThread.run(TaskManager.java:331)
+         * </pre>
          * 
          * @see <a href="http://sourceforge.net/apps/trac/bigdata/ticket/687" >
          *      HAJournalServer Cache not populated </a>
+         * 
+         * @see <a href="http://sourceforge.net/apps/trac/bigdata/ticket/728" >
+         *      Refactor to create HAClient</a>
          */
-        assert serviceCache.getServiceItemByID(serviceId) != null;
+//        assert serviceCache.getServiceItemByID(serviceId) != null;
 //        if (serviceCache.getServiceItemByID(serviceId) == null) {
 //            throw new AssertionError(
 //                    "Failed to install service into cache: serviceId="

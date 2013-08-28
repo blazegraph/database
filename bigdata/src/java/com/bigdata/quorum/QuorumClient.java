@@ -44,13 +44,22 @@ import java.util.UUID;
 public interface QuorumClient<S extends Remote> extends QuorumListener {
 
     /**
-     * The identifier of the logical service whose quorum state will be
-     * monitored. A highly available service is comprised of multiple physical
-     * services which are instances of the same logical service.
+     * The fully qualified identifier of the logical service whose quorum state
+     * will be monitored (for zookeeper, this is the logicalServiceZPath). A
+     * highly available service is comprised of multiple physical services which
+     * are instances of the same logical service.
+     * <p>
+     * Note: The method was renamed from <code>getLogicalServiceId()</code> to
+     * {@link #getLogicalServiceZPath()} to avoid confusion with the zookeeper
+     * integration which has both a logicalServiceId (just the last component of
+     * the zpath) and a logicalServiceZPath. The {@link Quorum} and
+     * {@link QuorumClient} interfaces only understand a single logical service
+     * identifier - this is what corresponds to the
+     * <code?logicalServiceZPath</code> for the zookeeper integration.
      * 
      * @see QuorumMember#getServiceId()
      */
-    String getLogicalServiceId();
+    String getLogicalServiceZPath();
     
     /**
      * Life cycle message sent when the client will begin to receive messages

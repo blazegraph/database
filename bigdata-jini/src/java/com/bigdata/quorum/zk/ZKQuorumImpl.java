@@ -2168,8 +2168,8 @@ public class ZKQuorumImpl<S extends Remote, C extends QuorumClient<S>> extends
     @Override
     protected long getLastValidTokenFromQuorumState(final C client) {
 //      super.getLastValidTokenFromQuorumState(client);
-        final String logicalServiceId = client.getLogicalServiceId();
-        final String quorumZPath = logicalServiceId + "/" + QUORUM;
+        final String logicalServiceZPath = client.getLogicalServiceZPath();
+        final String quorumZPath = logicalServiceZPath + "/" + QUORUM;
         while (true) {
             final byte[] data;
             try {

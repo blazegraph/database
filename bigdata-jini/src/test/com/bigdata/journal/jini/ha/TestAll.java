@@ -110,6 +110,9 @@ public class TestAll extends TestCase {
 //        // Test suite for the global write lock.
 //        suite.addTestSuite(TestHAJournalServerGlobalWriteLock.class);
 
+        // Test suite for utility to compute and compare HALog digests.
+        suite.addTestSuite(TestHA3DumpLogs.class);
+
         // Test suite for direct IBufferStrategy data xfer tests.
         suite.addTestSuite(TestRawTransfers.class);
 

@@ -108,6 +108,7 @@ public class ServiceCache implements ServiceDiscoveryListener {
      * this class is listening. The set of distinct joined services is
      * accessible via the {@link LookupCache}.
      */
+    @Override
     public void serviceAdded(final ServiceDiscoveryEvent e) {
 
         final ServiceItem item = e.getPostEventServiceItem();
@@ -130,6 +131,7 @@ public class ServiceCache implements ServiceDiscoveryListener {
     /**
      * updates the map and delegates to the {@link #listener}.
      */
+    @Override
     public void serviceChanged(final ServiceDiscoveryEvent e) {
 
         final ServiceItem item = e.getPostEventServiceItem();
@@ -157,6 +159,7 @@ public class ServiceCache implements ServiceDiscoveryListener {
      * explanation for those transients is that the host with the service is
      * swapping and has failed to keep up its pings to the jini registrar(s).
      */
+    @Override
     public void serviceRemoved(final ServiceDiscoveryEvent e) {
 
         final ServiceItem item = e.getPreEventServiceItem();
@@ -164,6 +167,9 @@ public class ServiceCache implements ServiceDiscoveryListener {
         final ServiceID serviceID = item.serviceID;
         
         final Object service = item.service;
+
+        if (log.isInfoEnabled())
+            log.info("" + e + ", class=" + item);
 
         if (service instanceof IService) {
             
@@ -183,9 +189,6 @@ public class ServiceCache implements ServiceDiscoveryListener {
             
         }
                 
-        if (log.isInfoEnabled())
-            log.info("" + e + ", class=" + item);
-
         serviceIdMap.remove(serviceID);
 
         if (listener != null) {
