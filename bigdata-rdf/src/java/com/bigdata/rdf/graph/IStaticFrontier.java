@@ -33,9 +33,11 @@ public interface IStaticFrontier extends Iterable<IV> {
      *            The minimum capacity of the new frontier. (A minimum capacity
      *            is specified since many techniques to compact the frontier can
      *            only estimate the required capacity.)
+     * @param ordered
+     *            <code>true</code> iff the frontier is known to be ordered.
      * @param vertices
      *            The vertices in the new frontier.
      */
-    void resetFrontier(int minCapacity, Iterator<IV> vertices);
-    
+    void resetFrontier(int minCapacity, boolean ordered, Iterator<IV> vertices);
+
 }

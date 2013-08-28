@@ -14,6 +14,7 @@ import com.bigdata.rdf.graph.IGASSchedulerImpl;
 import com.bigdata.rdf.graph.IStaticFrontier;
 import com.bigdata.rdf.graph.impl.GASEngine;
 import com.bigdata.rdf.graph.impl.util.GASImplUtil;
+import com.bigdata.rdf.graph.impl.util.ManagedArray;
 import com.bigdata.rdf.graph.impl.util.MergeSortIterator;
 import com.bigdata.rdf.internal.IV;
 
@@ -33,6 +34,32 @@ import cutthecrap.utils.striterators.ArrayIterator;
 @SuppressWarnings("rawtypes")
 public class TLScheduler implements IGASSchedulerImpl {
 
+//    /**
+//     * Class bundles a reusable, extensible array for sorting the thread-local
+//     * frontier.
+//     * 
+//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+//     *         Thompson</a>
+//     */
+//    private static class MySTScheduler extends STScheduler {
+//
+//        /**
+//         * This is used to sort the thread-local frontier (that is, the frontier
+//         * for a single thread). The backing array will grow as necessary and is
+//         * reused in each round.
+//         */
+//        private final ManagedArray<IV> tmp;
+//
+//        public MySTScheduler(final GASEngine gasEngine) {
+//
+//            super(gasEngine);
+//
+//            tmp = new ManagedArray<IV>(IV.class, 64);
+//
+//        }
+//        
+//    }
+    
     private final GASEngine gasEngine;
     private final int nthreads;
     private final ConcurrentHashMap<Long/* threadId */, STScheduler> map;
@@ -155,7 +182,7 @@ public class TLScheduler implements IGASSchedulerImpl {
              * The new frontier is empty.
              */
 
-            frontier.resetFrontier(0/* minCapacity */,
+            frontier.resetFrontier(0/* minCapacity */, true/* ordered */,
                     GASImplUtil.EMPTY_VERTICES_ITERATOR);
 
             return;
@@ -212,19 +239,8 @@ public class TLScheduler implements IGASSchedulerImpl {
         // merge sort of those iterators.
         final Iterator<IV> itr = new MergeSortIterator(itrs);
 
-        frontier.resetFrontier(nvertices/* minCapacity */, itr);
-
-        // // ensure enough capacity for the new frontier.
-        // frontier.ensureCapacity(nvertices);
-        //
-        // // and populate the new frontier.
-        // while (itr.hasNext()) {
-        //
-        // final IV v = itr.next();
-        //
-        // frontier.vertices.add(v);
-        //
-        // }
+        frontier.resetFrontier(nvertices/* minCapacity */, true/* ordered */,
+                itr);
 
     }
 

@@ -1,9 +1,6 @@
 package com.bigdata.rdf.graph.impl;
 
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -21,8 +18,6 @@ import com.bigdata.rdf.graph.IStaticFrontier;
 import com.bigdata.rdf.graph.impl.util.GASImplUtil;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.spo.ISPO;
-
-import cutthecrap.utils.striterators.ArrayIterator;
 
 @SuppressWarnings("rawtypes")
 public class GASState<VS, ES, ST> implements IGASState<VS, ES, ST> {
@@ -54,11 +49,11 @@ public class GASState<VS, ES, ST> implements IGASState<VS, ES, ST> {
      * <p>
      * Note: This data structure is reused for each round.
      * 
-     * @see StaticFrontier
-     * @see CHMScheduler
+     * @see IStaticFrontier
+     * @see IGASSchedulerImpl
      * @see #scheduler
      */
-    private final StaticFrontier frontier;
+    private final IStaticFrontier frontier;
 
     /**
      * Used to schedule the new frontier and then compact it onto
@@ -94,11 +89,15 @@ public class GASState<VS, ES, ST> implements IGASState<VS, ES, ST> {
     private IGraphAccessor graphAccessor;
 
     public GASState(final IGraphAccessor graphAccessor, //
+            final IStaticFrontier frontier,//
             final IGASSchedulerImpl gasScheduler,//
             final IGASProgram<VS, ES, ST> gasProgram//
-            ) {
+    ) {
 
         if (graphAccessor == null)
+            throw new IllegalArgumentException();
+
+        if (frontier == null)
             throw new IllegalArgumentException();
 
         if (gasScheduler == null)
@@ -110,12 +109,12 @@ public class GASState<VS, ES, ST> implements IGASState<VS, ES, ST> {
         this.graphAccessor = graphAccessor;
 
         this.gasProgram = gasProgram;
-        
+
         this.vsf = gasProgram.getVertexStateFactory();
 
         this.esf = gasProgram.getEdgeStateFactory();
 
-        this.frontier = new StaticFrontier();
+        this.frontier = frontier;
         
         this.scheduler = gasScheduler;
         
@@ -209,7 +208,8 @@ public class GASState<VS, ES, ST> implements IGASState<VS, ES, ST> {
         if (edgeState != null)
             edgeState.clear();
 
-        frontier.resetFrontier(0/* minCapacity */, GASImplUtil.EMPTY_VERTICES_ITERATOR);
+        frontier.resetFrontier(0/* minCapacity */, true/* ordered */,
+                GASImplUtil.EMPTY_VERTICES_ITERATOR);
 
     }
     
@@ -230,26 +230,20 @@ public class GASState<VS, ES, ST> implements IGASState<VS, ES, ST> {
             
             
         }
-
-        // dense vector.
-        final IV[] a = tmp.toArray(new IV[tmp.size()]);
-        
-        // Ascending order
-        Arrays.sort(a);
         
         /*
          * Callback to initialize the vertex state before the first
          * iteration.
          */
-        for(IV v : a) {
+        for(IV v : tmp) {
             
             gasProgram.init(this, v);
 
         }
 
         // Reset the frontier.
-        frontier.resetFrontier(a.length/* minCapacity */,
-                new ArrayIterator<IV>(a));
+        frontier.resetFrontier(tmp.size()/* minCapacity */, false/* ordered */,
+                tmp.iterator());
 
     }
 
@@ -289,88 +283,6 @@ public class GASState<VS, ES, ST> implements IGASState<VS, ES, ST> {
         }
 
         return op.get();
-
-    }
-
-    /**
-     * Simple implementation of a "static" frontier.
-     * <p>
-     * Note: This implementation has package private methods that permit certain
-     * kinds of mutation.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     */
-    static class StaticFrontier implements IStaticFrontier {
-
-        private final ArrayList<IV> vertices;
-
-        private StaticFrontier() {
-
-            vertices = new ArrayList<IV>();
-
-        }
-
-        @Override
-        public int size() {
-
-            return vertices.size();
-
-        }
-
-        @Override
-        public boolean isEmpty() {
-            
-            return vertices.isEmpty();
-            
-        }
-        
-        @Override
-        public Iterator<IV> iterator() {
-
-            return vertices.iterator();
-
-        }
-
-        private void ensureCapacity(final int minCapacity) {
-            
-            vertices.ensureCapacity(minCapacity);
-            
-        }
-        
-//        private void clear() {
-//            
-//            vertices.clear();
-//            
-//        }
-        
-//        private void schedule(IV v) {
-//            
-//            vertices.add(v);
-//            
-//        }
-
-        /**
-         * Setup the same static frontier object for the new compact fronter (it
-         * is reused in each round).
-         */
-        @Override
-        public void resetFrontier(final int minCapacity, final Iterator<IV> itr) {
-
-            // clear the old frontier.
-            vertices.clear();
-
-            // ensure enough capacity for the new frontier.
-            ensureCapacity(minCapacity);
-
-            while (itr.hasNext()) {
-
-                final IV v = itr.next();
-
-                vertices.add(v);
-
-            }
-
-        }
 
     }
 
