@@ -142,6 +142,7 @@ public class SPO implements ISPO, java.io.Serializable {
     private static int SIDABLE_BIT = 6;
 	
 	
+    @Override
     @SuppressWarnings("rawtypes")
     final public IV get(final int index) {
         switch(index) {
@@ -153,21 +154,25 @@ public class SPO implements ISPO, java.io.Serializable {
         }
     }
     
+    @Override
     @SuppressWarnings("rawtypes")
     final public IV s() {
         return s;
     }
 
+    @Override
     @SuppressWarnings("rawtypes")
     final public IV p() {
         return p;
     }
 
+    @Override
     @SuppressWarnings("rawtypes")
     final public IV o() {
         return o;
     }
 
+    @Override
     @SuppressWarnings("rawtypes")
     final public IV c() {
     	
@@ -180,6 +185,7 @@ public class SPO implements ISPO, java.io.Serializable {
         
     }
 
+    @Override
     public final void setStatementIdentifier(final boolean sid) {
 
         if (sid && type() != StatementEnum.Explicit) {
@@ -208,18 +214,21 @@ public class SPO implements ISPO, java.io.Serializable {
 
     }
 
+    @Override
     final public boolean hasStatementIdentifier() {
         
         return sidable();
         
     }
     
+    @Override
     public void setOverride(final boolean override) {
 
         override(override);
         
     }
 
+    @Override
     public boolean isOverride() {
         
         return override();
@@ -411,6 +420,7 @@ public class SPO implements ISPO, java.io.Serializable {
     /**
      * Return <code>true</code> IFF the {@link SPO} is marked as {@link StatementEnum#Explicit}. 
      */
+    @Override
     public final boolean isExplicit() {
         
         return type() == StatementEnum.Explicit;
@@ -420,6 +430,7 @@ public class SPO implements ISPO, java.io.Serializable {
     /**
      * Return <code>true</code> IFF the {@link SPO} is marked as {@link StatementEnum#Inferred}. 
      */
+    @Override
     public final boolean isInferred() {
         
         return type() == StatementEnum.Inferred;
@@ -429,6 +440,7 @@ public class SPO implements ISPO, java.io.Serializable {
     /**
      * Return <code>true</code> IFF the {@link SPO} is marked as {@link StatementEnum#Axiom}. 
      */
+    @Override
     public final boolean isAxiom() {
         
         return type() == StatementEnum.Axiom;
@@ -438,6 +450,7 @@ public class SPO implements ISPO, java.io.Serializable {
     /**
      * Return <code>true</code> IFF the {@link SPO} has the user flag bit set. 
      */
+    @Override
     public final boolean getUserFlag() {
         
         return userFlag();
@@ -449,6 +462,7 @@ public class SPO implements ISPO, java.io.Serializable {
      * 
      * @parm userFlag boolean flag
      */
+    @Override
     public final void setUserFlag(final boolean userFlag) {
         
         userFlag(userFlag);
@@ -461,6 +475,7 @@ public class SPO implements ISPO, java.io.Serializable {
      * Hash code for the (s,p,o) per Sesame's {@link Statement#hashCode()}. It
      * DOES NOT consider the context position.
      */
+    @Override
     public int hashCode() {
 
         if (hashCode == 0) {
@@ -488,6 +503,7 @@ public class SPO implements ISPO, java.io.Serializable {
 
     }
 
+    @Override
     public boolean equals(final Object o) {
         
         if (this == o)
@@ -529,6 +545,7 @@ public class SPO implements ISPO, java.io.Serializable {
      * 
      * @see ITripleStore#toString(IV, IV, IV)
      */
+    @Override
     public String toString() {
 
         return ("< " + toString(s) + ", " + toString(p) + ", " + toString(o))
@@ -547,6 +564,7 @@ public class SPO implements ISPO, java.io.Serializable {
      *            The term identifier.
      * @return
      */
+    @SuppressWarnings("rawtypes")
     public static String toString(final IV iv) {
 
         if (iv == null)
@@ -567,6 +585,7 @@ public class SPO implements ISPO, java.io.Serializable {
      * 
      * @return The externalized representation of the statement.
      */
+    @Override
     public String toString(final IRawTripleStore store) {
         
         if (store != null) {
@@ -595,18 +614,21 @@ public class SPO implements ISPO, java.io.Serializable {
         
     }
 
+    @Override
     final public boolean isFullyBound() {
     
         return s != null && p != null && o != null;
 
     }
 
+    @Override
     final public StatementEnum getStatementType() {
 
         return type();
 
     }
 
+    @Override
     final public void setStatementType(final StatementEnum type) {
         
         if(this.type() != null && this.type() != type) {
@@ -619,24 +641,28 @@ public class SPO implements ISPO, java.io.Serializable {
         
     }
     
+    @Override
     final public boolean hasStatementType() {
         
         return type() != null;
         
     }
 
+    @Override
     public boolean isModified() {
         
         return modified() != ModifiedEnum.NONE;
         
     }
 
+    @Override
     public void setModified(final ModifiedEnum modified) {
 
         modified(modified);
 
     }
     
+    @Override
     public ModifiedEnum getModified() {
         
         return modified();
