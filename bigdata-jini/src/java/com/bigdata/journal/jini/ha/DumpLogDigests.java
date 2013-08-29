@@ -99,8 +99,8 @@ public class DumpLogDigests {
 	public DumpLogDigests(final String[] configFiles)
 			throws ConfigurationException, IOException, InterruptedException {
 
-		// wait for zk services to register!
-		Thread.sleep(1000);
+		// Sleeping should not be necessary
+		// Thread.sleep(1000); // wait for zk services to register!
 
 		client = new HAClient(configFiles);
 	}
@@ -577,10 +577,10 @@ public class DumpLogDigests {
 		final Quorum<HAGlue, QuorumClient<HAGlue>> quorum = cnxn.getHAGlueQuorum(serviceRoot);
 		final UUID[] uuids = quorum.getJoined();
 		
-		QuorumClient<HAGlue> qclient = quorum.getClient();
-
-		for (UUID uuid : uuids) {
-			ret.add(qclient.getService(uuid));
+		final HAGlue[] haglues = cnxn.getHAGlueService(uuids);
+		
+		for (HAGlue haglue : haglues) {
+			ret.add(haglue);
 		}
 		
 		return ret;
