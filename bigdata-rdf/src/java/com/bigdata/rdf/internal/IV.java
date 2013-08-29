@@ -47,7 +47,7 @@ import com.bigdata.rdf.vocab.Vocabulary;
  *            The generic type for the inline value.
  */
 public interface IV<V extends BigdataValue, T> extends Serializable, 
-        Comparable<IV>, IVCache<V,T> {
+        Comparable<IV>, IVCache<V,T>, Value {
 
     /**
      * The value of the flags representing the {@link VTE} and the {@link DTE}.

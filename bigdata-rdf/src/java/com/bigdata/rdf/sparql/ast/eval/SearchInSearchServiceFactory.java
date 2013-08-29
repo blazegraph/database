@@ -535,7 +535,7 @@ public class SearchInSearchServiceFactory implements ServiceFactory {
             	final IV o = (IV) src.next().getDocId();
             	
             	final Iterator<ISPO> it = 
-            			store.getAccessPath(null, null, o).iterator();
+            			store.getAccessPath((IV)null, (IV)null, o).iterator();
             	
             	while (it.hasNext()) {
             		
