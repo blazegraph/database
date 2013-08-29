@@ -97,7 +97,9 @@ import org.openrdf.rio.RDFWriterRegistry;
 import org.xml.sax.Attributes;
 import org.xml.sax.ext.DefaultHandler2;
 
-import com.bigdata.rdf.sparql.ast.service.RemoteServiceOptions;
+// Note: Do not import. Not part of the bigdata-client.jar
+//
+//import com.bigdata.rdf.sparql.ast.service.RemoteServiceOptions;
 
 
 /**
@@ -235,8 +237,6 @@ public class RemoteRepository {
      *            The method which may be "POST" or "GET".
      * 
      * @see #getQueryMethod()
-     * 
-     * @see RemoteServiceOptions#setGET(boolean)
      */
     public void setQueryMethod(final String method) {
 
