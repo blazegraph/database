@@ -3,9 +3,63 @@
 <title>GAS Engine API</title>
 </head>
 <body>
-<p>
-The GAS (Gather Apply Scatter) API was developed for PowerGraph.  This is
-a port of that API to the Java platform.
-</p>
+	<p>The GAS (Gather Apply Scatter) API was developed for PowerGraph
+		(aka GraphLab 2.1). This is a port of that API to the Java platform
+		and schema-flexible attributed graphs using RDF.</p>
+	<p>Graph algorithms are stated using the GAS (Gather, Apply,
+		Scatter) API. This API provides a vertex-centric approach to graph
+		processing ("think like a vertex") that can be used to write a large
+		number of graph algorithms (page rank, triangle counting, connected
+		components, SSSP, betweenness centrality, etc.). The GAS API allows
+		the GATHER operation to be efficently decomposed using fine-grained
+		parallelism over a cluster.</p>
+	<p>Part of our effort under the XDATA program is to examine how
+		fine-grained parallelism can be leveraged on GPUs and other many-core
+		devices to deliver extreme performance on graph algorithms. We are
+		looking at how the GAS abstraction can be evolved to expose more
+		parallelism.</p>
+	<p>The interfaces of this API are stated in terms of RDF {@link
+		org.openrdf.model.Value} objects (for vertices) and {@link
+		org.openrdf.model.Statement} objects (for edges). Link attributes are
+		handled efficiently by the bigdata implementation, which co-locates
+		them in the indices with the links and then applies prefix compression
+		to deliver a compact on disk foot print. See the section on
+		Reification Done Right (below) for more details.</p>
+	<h2>Reification Done Right and Property Graphs</h2>
+	<p>
+		<a href="http://www.bigdata.com/whitepapers/reifSPARQL.pdf">Reification
+			Done Right</a> (RDR) explains the relationship between the somewhat
+		opaque concept of RDF reification (which we use only for interchange)
+		and statements about statements (more generally, the ability to turn
+		any edge into a vertex and make statements about that vertex). There
+		are different ways to handle statemetns about statements efficiently
+		in the database, however these are internal physical schema design
+		questions. From a user perspective, the main concern should be the
+		performance of the database platform when using this feature. Bigdata
+		uses a combination of inlining and prefix compression to provide a
+		dense fast, bi-directional encoding of statements about statements and
+		fast access paths whether querying by vertices, property values, or
+		link attributes. You can also write queries using a high-level query
+		language (SPARQL) that are automatically optimized and executed
+		against the graph.
+	</p>
+	<p>
+		The RDR approach is more general than the
+		<a
+			href="https://github.com/tinkerpop/blueprints/wiki/Property-Graph-Model">
+			Property Graph Model </a> - <em>anything</em> that you can do with a
+		property graph you can at as efficiently in an intelligently designed
+		RDF database. Further, RDF graphs allow efficient handling of the
+		following cases that are disallowed under the property graph model:
+	</p>
+	<ul>
+      <li>A vertex may have multiple property values for the same key.</li>
+      <li>A link may have multiple link attributes for the same key.</li>
+		<li>A link may serve as a vertex - thus you may have links whose
+			sources or targets are other links (hypergraphs).</li>
+	</ul>
+	<p>Because of its lack of cardinality constraints on property values
+		and generality, RDF data sets may be freely combined and then
+		leveraged. Data-level collisions simply do not occur.</p>
 </body>
 </html>
