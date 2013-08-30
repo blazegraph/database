@@ -87,7 +87,7 @@ public class ASTRangeOptimizer extends AbstractJoinGroupOptimizer
         }
         if (!rangeSafe)
         	return;
-    	
+        
 		final Map<VarNode, RangeNode> ranges = 
 				new LinkedHashMap<VarNode, RangeNode>();
     	
