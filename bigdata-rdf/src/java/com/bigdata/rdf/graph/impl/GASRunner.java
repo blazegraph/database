@@ -664,6 +664,7 @@ public class GASRunner<VS, ES, ST> implements Callable<GASStats> {
             // Total over all sampled vertices.
             System.out.println("TOTAL"//
                     +": analytic=" + gasProgram.getClass().getSimpleName() //
+                    + ", namespace=" + namespace//
                     + ", nseed=" + seed
                     + ", nsamples=" + nsamples //
                     + ", nthreads=" + nthreads
