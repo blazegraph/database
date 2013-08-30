@@ -11,7 +11,6 @@ import java.lang.reflect.UndeclaredThrowableException;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.http.HttpEntity;
 import org.apache.http.util.EntityUtils;
@@ -33,9 +32,11 @@ import org.openrdf.repository.sparql.query.QueueCursor;
 public class BackgroundTupleResult extends TupleQueryResultImpl implements
 		TupleQueryResult, Runnable, TupleQueryResultHandler {
 
+	final private Object closeLock = new Object();
+
 	private volatile boolean closed;
 
-	private volatile Thread parserThread;
+	private Thread parserThread;
 
 	final private TupleQueryResultParser parser;
 
@@ -45,7 +46,9 @@ public class BackgroundTupleResult extends TupleQueryResultImpl implements
 
 	final private QueueCursor<BindingSet> queue;
 
-	final private AtomicReference<List<String>> bindingNamesRef;
+	// No need to synchronize this field because visibility is guaranteed
+	// by happens-before of CountDownLatch's countDown() and await()
+	private List<String> bindingNames;
 
 	final private CountDownLatch bindingNamesReady = new CountDownLatch(1);
 
@@ -59,19 +62,22 @@ public class BackgroundTupleResult extends TupleQueryResultImpl implements
     public BackgroundTupleResult(final QueueCursor<BindingSet> queue,
             final TupleQueryResultParser parser, final InputStream in,
             final HttpEntity entity) {
-        super(Collections.EMPTY_LIST, queue);
+        super(Collections.<String>emptyList(), queue);
 		this.queue = queue;
 		this.parser = parser;
 		this.in = in;
 		this.entity = entity;
-		this.bindingNamesRef = new AtomicReference<List<String>>();
 	}
 
     @Override
-	public synchronized void close() throws QueryEvaluationException {
-		closed = true;
-		if (parserThread != null) {
-			parserThread.interrupt();
+	public void close() throws QueryEvaluationException {
+		synchronized (closeLock) {
+			if (!closed) {
+				closed = true;
+				if (parserThread != null) {
+					parserThread.interrupt();
+				}
+			}
 		}
 	}
 
@@ -86,7 +92,9 @@ public class BackgroundTupleResult extends TupleQueryResultImpl implements
              */
 		    bindingNamesReady.await();
 			queue.checkException();
-			return bindingNamesRef.get();
+			if (closed)
+				throw new UndeclaredThrowableException(null, "Result closed");
+			return bindingNames;
 		} catch (InterruptedException e) {
 			throw new UndeclaredThrowableException(e);
 		} catch (QueryEvaluationException e) {
@@ -96,8 +104,16 @@ public class BackgroundTupleResult extends TupleQueryResultImpl implements
 
     @Override
 	public void run() {
+		synchronized (closeLock) {
+			if (closed) {
+				// Result was closed before it was run.
+				// Need to unblock latch
+				bindingNamesReady.countDown();
+				return;
+			}
+			parserThread = Thread.currentThread();
+		}
 		boolean completed = false;
-		parserThread = Thread.currentThread();
 		try {
 			parser.setTupleQueryResultHandler(this);
 			parser.parse(in);
@@ -111,7 +127,9 @@ public class BackgroundTupleResult extends TupleQueryResultImpl implements
 		} catch (IOException e) {
 			queue.toss(e);
 		} finally {
-			parserThread = null;
+			synchronized (closeLock) {
+				parserThread = null;
+			}
 			queue.done();
 			bindingNamesReady.countDown();
 			if (!completed) {
@@ -125,7 +143,7 @@ public class BackgroundTupleResult extends TupleQueryResultImpl implements
 	@Override
 	public void startQueryResult(final List<String> bindingNames)
 			throws TupleQueryResultHandlerException {
-		this.bindingNamesRef.set(bindingNames);
+		this.bindingNames = bindingNames;
 		bindingNamesReady.countDown();
 	}
 
