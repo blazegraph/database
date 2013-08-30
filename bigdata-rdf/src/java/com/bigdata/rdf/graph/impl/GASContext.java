@@ -254,8 +254,7 @@ public class GASContext<VS, ES, ST> implements IGASContext<VS, ES, ST> {
 
         final long totalEdges = scatterEdgeCount + gatherEdgeCount;
 
-        // TODO pure interface for this.
-        ((GASStats) stats).add(f.size(), totalEdges, totalElapsed);
+        stats.add(f.size(), totalEdges, totalElapsed);
 
         if (log.isInfoEnabled()) {
 

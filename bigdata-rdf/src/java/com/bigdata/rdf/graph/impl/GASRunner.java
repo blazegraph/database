@@ -27,6 +27,7 @@ import com.bigdata.rdf.graph.IGASProgram;
 import com.bigdata.rdf.graph.IGASScheduler;
 import com.bigdata.rdf.graph.IGASSchedulerImpl;
 import com.bigdata.rdf.graph.IGASState;
+import com.bigdata.rdf.graph.IGASStats;
 import com.bigdata.rdf.graph.impl.bd.BigdataGASEngine;
 import com.bigdata.rdf.graph.impl.bd.BigdataGASEngine.BigdataGraphAccessor;
 import com.bigdata.rdf.rio.LoadStats;
@@ -42,7 +43,7 @@ import com.bigdata.rdf.store.AbstractTripleStore;
  *         vertices? For such algorithms, we just run them once per graph
  *         (unless the graph is dynamic).
  */
-public class GASRunner<VS, ES, ST> implements Callable<GASStats> {
+public class GASRunner<VS, ES, ST> implements Callable<IGASStats> {
 
     private static final Logger log = Logger.getLogger(GASRunner.class);
 
@@ -413,7 +414,7 @@ public class GASRunner<VS, ES, ST> implements Callable<GASStats> {
      * create if the effective buffer mode is non-transient, then we can get all
      * this information.
      */
-    public GASStats call() throws Exception {
+    public IGASStats call() throws Exception {
 
         final Properties properties = getProperties(propertyFile);
 
@@ -600,7 +601,7 @@ public class GASRunner<VS, ES, ST> implements Callable<GASStats> {
      * TODO Are we better off using sampling based on distinct vertices or with
      * a bais based on the #of edges for those vertices.
      */
-    private GASStats runAnalytic(final Journal jnl, final String namespace)
+    private IGASStats runAnalytic(final Journal jnl, final String namespace)
             throws Exception {
 
         /*
@@ -638,7 +639,7 @@ public class GASRunner<VS, ES, ST> implements Callable<GASStats> {
 
             final IGASState<VS, ES, ST> gasState = gasContext.getGASState();
             
-            final GASStats total = new GASStats();
+            final IGASStats total = new GASStats();
 
             final Value[] samples = graphAccessor.getRandomSample(r, nsamples);
 
@@ -648,8 +649,7 @@ public class GASRunner<VS, ES, ST> implements Callable<GASStats> {
 
                 gasState.init(startingVertex);
 
-                // TODO STATS: Pure interface.
-                final GASStats stats = (GASStats) gasContext.call();
+                final IGASStats stats = (IGASStats) gasContext.call();
 
                 total.add(stats);
 

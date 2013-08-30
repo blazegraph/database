@@ -7,11 +7,7 @@ import com.bigdata.rdf.graph.GASUtil;
 import com.bigdata.rdf.graph.IGASStats;
 
 /**
- * FIXME STATS: Refactor to a pure interface - see RuleStats.
- * 
- * FIXME STATS: Collect the details within round statistics and then lift the
- * formatting of the statistics into this class (for the details within round
- * statistics).
+ * Statistics for GAS algorithms.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
@@ -22,6 +18,10 @@ public class GASStats implements IGASStats {
     private final CAT nedges = new CAT();
     private final CAT elapsedNanos = new CAT();
 
+    /* (non-Javadoc)
+     * @see com.bigdata.rdf.graph.impl.IFOO#add(long, long, long)
+     */
+    @Override
     public void add(final long frontierSize, final long nedges,
             final long elapsedNanos) {
 
@@ -35,7 +35,11 @@ public class GASStats implements IGASStats {
 
     }
 
-    public void add(final GASStats o) {
+    /* (non-Javadoc)
+     * @see com.bigdata.rdf.graph.impl.IFOO#add(com.bigdata.rdf.graph.impl.IFOO)
+     */
+    @Override
+    public void add(final IGASStats o) {
 
         nrounds.add(o.getNRounds());
         
@@ -47,27 +51,34 @@ public class GASStats implements IGASStats {
         
     }
 
+    /* (non-Javadoc)
+     * @see com.bigdata.rdf.graph.impl.IFOO#getNRounds()
+     */
+    @Override
     public long getNRounds() {
         return nrounds.get();
     }
     
-    /**
-     * The cumulative size of the frontier across the iterations.
+    /* (non-Javadoc)
+     * @see com.bigdata.rdf.graph.impl.IFOO#getFrontierSize()
      */
+    @Override
     public long getFrontierSize() {
         return frontierSize.get();
     }
 
-    /**
-     * The number of traversed edges across the iterations.
+    /* (non-Javadoc)
+     * @see com.bigdata.rdf.graph.impl.IFOO#getNEdges()
      */
+    @Override
     public long getNEdges() {
         return nedges.get();
     }
 
-    /**
-     * The elapsed nanoseconds across the iterations.
+    /* (non-Javadoc)
+     * @see com.bigdata.rdf.graph.impl.IFOO#getElapsedNanos()
      */
+    @Override
     public long getElapsedNanos() {
         return elapsedNanos.get();
     }
