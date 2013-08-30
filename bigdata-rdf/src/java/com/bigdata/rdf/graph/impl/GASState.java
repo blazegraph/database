@@ -7,6 +7,7 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.log4j.Logger;
+import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
@@ -329,7 +330,7 @@ public class GASState<VS, ES, ST> implements IGASState<VS, ES, ST> {
 
     @Override
     public boolean isEdge(final Statement e) {
-        return e.getObject() instanceof URI; // FIXME CORRECTNESS (instanceof Resource)
+        return e.getObject() instanceof Resource;
     }
    
     @Override

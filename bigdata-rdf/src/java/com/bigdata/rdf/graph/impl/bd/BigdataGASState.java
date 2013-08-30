@@ -117,8 +117,22 @@ public class BigdataGASState<VS, ES, ST> extends GASState<VS, ES, ST> {
     public boolean isEdge(final Statement e) {
 
         final ISPO spo = (ISPO) e;
-        
-        return spo.o().isURI(); // FIXME CORRECTNESS : isResource()
+
+        /**
+         * For the early development of the GAS API, this test was written using
+         * o.isURI() rather than o.isResource(). That caused edges that ended in
+         * a bnode to be ignored, which means that a lot of the FOAF data set we
+         * were using was ignored. This was changed in r7365 to use
+         * isResource(). That change invalidates the historical baseline for the
+         * BFS and SSSP performance. This is also documented at the ticket
+         * below.
+         * 
+         * @see <a
+         *      href="https://sourceforge.net/apps/trac/bigdata/ticket/629#comment:33">
+         *      Graph Mining API </a>
+         */
+        return spo.o().isResource(); 
+//        return spo.o().isURI(); 
         
     }
    
