@@ -2,7 +2,7 @@ package com.bigdata.rdf.graph;
 
 import java.util.Iterator;
 
-import com.bigdata.rdf.internal.IV;
+import org.openrdf.model.Value;
 
 /**
  * Interface abstracts the fixed frontier as known on entry into a new
@@ -11,8 +11,7 @@ import com.bigdata.rdf.internal.IV;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
  *         Thompson</a>
  */
-@SuppressWarnings("rawtypes")
-public interface IStaticFrontier extends Iterable<IV> {
+public interface IStaticFrontier extends Iterable<Value> {
 
     /**
      * The number of vertices in the frontier.
@@ -43,7 +42,7 @@ public interface IStaticFrontier extends Iterable<IV> {
     boolean isCompact();
 
     /**
-     * Reset the frontier from the {@link IV}s.
+     * Reset the frontier from the supplied vertices.
      * 
      * @param minCapacity
      *            The minimum capacity of the new frontier. (A minimum capacity
@@ -53,7 +52,15 @@ public interface IStaticFrontier extends Iterable<IV> {
      *            <code>true</code> iff the frontier is known to be ordered.
      * @param vertices
      *            The vertices in the new frontier.
+     * 
+     *            FIXME The MergeSortIterator and ordered frontiers should only
+     *            be used when the graph is backed by indices. The cache
+     *            efficiency concerns for ordered frontiers apply when accessing
+     *            indices. However, we should not presump that order of
+     *            traversal matters for other backends. For example, a backend
+     *            based on hash collections over RDF Statement objects will not
+     *            benefit from an ordering based on the RDF Value objects.
      */
-    void resetFrontier(int minCapacity, boolean ordered, Iterator<IV> vertices);
+    void resetFrontier(int minCapacity, boolean ordered, Iterator<Value> vertices);
 
 }

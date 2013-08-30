@@ -2,14 +2,15 @@ package com.bigdata.rdf.graph.analytics;
 
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.openrdf.model.Statement;
+import org.openrdf.model.Value;
+
 import com.bigdata.rdf.graph.EdgesEnum;
 import com.bigdata.rdf.graph.Factory;
 import com.bigdata.rdf.graph.IGASContext;
 import com.bigdata.rdf.graph.IGASScheduler;
 import com.bigdata.rdf.graph.IGASState;
 import com.bigdata.rdf.graph.impl.BaseGASProgram;
-import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.spo.ISPO;
 
 import cutthecrap.utils.striterators.IStriterator;
 
@@ -21,7 +22,6 @@ import cutthecrap.utils.striterators.IStriterator;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
-@SuppressWarnings("rawtypes")
 public class BFS extends BaseGASProgram<BFS.VS, BFS.ES, Void> {
 
     static class VS {
@@ -87,10 +87,10 @@ public class BFS extends BaseGASProgram<BFS.VS, BFS.ES, Void> {
 
     }
 
-    private static final Factory<IV, BFS.VS> vertexStateFactory = new Factory<IV, BFS.VS>() {
+    private static final Factory<Value, BFS.VS> vertexStateFactory = new Factory<Value, BFS.VS>() {
 
         @Override
-        public BFS.VS initialValue(final IV value) {
+        public BFS.VS initialValue(final Value value) {
 
             return new VS();
 
@@ -99,14 +99,14 @@ public class BFS extends BaseGASProgram<BFS.VS, BFS.ES, Void> {
     };
 
     @Override
-    public Factory<IV, BFS.VS> getVertexStateFactory() {
+    public Factory<Value, BFS.VS> getVertexStateFactory() {
 
         return vertexStateFactory;
 
     }
 
     @Override
-    public Factory<ISPO, BFS.ES> getEdgeStateFactory() {
+    public Factory<Statement, BFS.ES> getEdgeStateFactory() {
 
         return null;
 
@@ -132,17 +132,18 @@ public class BFS extends BaseGASProgram<BFS.VS, BFS.ES, Void> {
      * Overridden to only visit the edges of the graph.
      */
     @Override
-    public IStriterator constrainFilter(IStriterator itr) {
+    public IStriterator constrainFilter(
+            final IGASContext<BFS.VS, BFS.ES, Void> ctx, final IStriterator itr) {
 
-        return itr.addFilter(edgeOnlyFilter);
-        
+        return itr.addFilter(getEdgeOnlyFilter(ctx));
+
     }
 
     /**
      * Not used.
      */
     @Override
-    public void init(final IGASState<BFS.VS, BFS.ES, Void> state, final IV u) {
+    public void init(final IGASState<BFS.VS, BFS.ES, Void> state, final Value u) {
 
         state.getState(u).visit(0);
         
@@ -152,7 +153,7 @@ public class BFS extends BaseGASProgram<BFS.VS, BFS.ES, Void> {
      * Not used.
      */
     @Override
-    public Void gather(IGASState<BFS.VS, BFS.ES, Void> state, IV u, ISPO e) {
+    public Void gather(IGASState<BFS.VS, BFS.ES, Void> state, Value u, Statement e) {
         throw new UnsupportedOperationException();
     }
 
@@ -168,7 +169,7 @@ public class BFS extends BaseGASProgram<BFS.VS, BFS.ES, Void> {
      * NOP
      */
     @Override
-    public BFS.VS apply(final IGASState<BFS.VS, BFS.ES, Void> state, final IV u, 
+    public BFS.VS apply(final IGASState<BFS.VS, BFS.ES, Void> state, final Value u, 
             final Void sum) {
 
         return null;
@@ -179,7 +180,7 @@ public class BFS extends BaseGASProgram<BFS.VS, BFS.ES, Void> {
      * Returns <code>true</code>.
      */
     @Override
-    public boolean isChanged(IGASState<VS, ES, Void> state, IV u) {
+    public boolean isChanged(IGASState<VS, ES, Void> state, Value u) {
 
         return true;
         
@@ -190,14 +191,15 @@ public class BFS extends BaseGASProgram<BFS.VS, BFS.ES, Void> {
      * visited.
      * <p>
      * Note: We are scattering to out-edges. Therefore, this vertex is
-     * {@link ISPO#s()}. The remote vertex is {@link ISPO#o()}.
+     * {@link Statement#getSubject()}. The remote vertex is
+     * {@link Statement#getObject()}.
      */
     @Override
     public void scatter(final IGASState<BFS.VS, BFS.ES, Void> state,
-            final IGASScheduler sch, final IV u, final ISPO e) {
+            final IGASScheduler sch, final Value u, final Statement e) {
 
         // remote vertex state.
-        final VS otherState = state.getState(e.o());
+        final VS otherState = state.getState(e.getObject());
 
         // visit.
         if (otherState.visit(state.round() + 1)) {
@@ -207,14 +209,14 @@ public class BFS extends BaseGASProgram<BFS.VS, BFS.ES, Void> {
              * schedule for the next iteration.
              */
 
-            sch.schedule(e.o());
+            sch.schedule(e.getObject());
 
         }
 
     }
 
     @Override
-    public boolean nextRound(IGASContext ctx) {
+    public boolean nextRound(IGASContext<BFS.VS, BFS.ES, Void> ctx) {
 
         return true;
         

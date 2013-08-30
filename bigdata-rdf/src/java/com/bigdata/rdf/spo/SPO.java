@@ -23,14 +23,19 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.rdf.spo;
 
+import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
+import org.openrdf.model.URI;
+import org.openrdf.model.Value;
 
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.rdf.inf.Justification;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.IVCache;
 import com.bigdata.rdf.internal.IVUtility;
+import com.bigdata.rdf.internal.NotMaterializedException;
 import com.bigdata.rdf.internal.impl.bnode.SidIV;
 import com.bigdata.rdf.model.BigdataResource;
 import com.bigdata.rdf.model.BigdataStatement;
@@ -817,5 +822,69 @@ public class SPO implements ISPO, java.io.Serializable {
 	private void sidable(final boolean sidable) {
 		flags = Bits.set(flags, SIDABLE_BIT, sidable);
 	}
+
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Note: This methods rely on the fact that IV implements Value. The
+     * returned IV will act like a Value if it is inline or if it has been
+     * materialized. If the IV is not-inline and its value has not been
+     * materialized from the appropriate index or explicitly set through
+     * {@link IVCache#setValue(BigdataValue)}, then an attempt to access the
+     * state of the {@link Value} through its {@link Value} interface will throw
+     * a {@link NotMaterializedException}.
+     */
+    @Override
+    public Resource getContext() {
+        return (Resource) c();
+    }
+
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Note: This methods rely on the fact that IV implements Value. The
+     * returned IV will act like a Value if it is inline or if it has been
+     * materialized. If the IV is not-inline and its value has not been
+     * materialized from the appropriate index or explicitly set through
+     * {@link IVCache#setValue(BigdataValue)}, then an attempt to access the
+     * state of the {@link Value} through its {@link Value} interface will throw
+     * a {@link NotMaterializedException}.
+     */
+    @Override
+    public Value getObject() {
+        return (Value) o();
+    }
+
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Note: This methods rely on the fact that IV implements Value. The
+     * returned IV will act like a Value if it is inline or if it has been
+     * materialized. If the IV is not-inline and its value has not been
+     * materialized from the appropriate index or explicitly set through
+     * {@link IVCache#setValue(BigdataValue)}, then an attempt to access the
+     * state of the {@link Value} through its {@link Value} interface will throw
+     * a {@link NotMaterializedException}.
+     */
+    @Override
+    public URI getPredicate() {
+        return (URI) p();
+    }
+
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Note: This methods rely on the fact that IV implements Value. The
+     * returned IV will act like a Value if it is inline or if it has been
+     * materialized. If the IV is not-inline and its value has not been
+     * materialized from the appropriate index or explicitly set through
+     * {@link IVCache#setValue(BigdataValue)}, then an attempt to access the
+     * state of the {@link Value} through its {@link Value} interface will throw
+     * a {@link NotMaterializedException}.
+     */
+    @Override
+    public Resource getSubject() {
+        return (Resource) s();
+    }
 
 }

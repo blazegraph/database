@@ -1,10 +1,13 @@
 package com.bigdata.rdf.graph;
 
 
+import java.util.Iterator;
 import java.util.concurrent.TimeUnit;
 
-import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.spo.ISPO;
+import org.openrdf.model.Statement;
+import org.openrdf.model.Value;
+
+import cutthecrap.utils.striterators.EmptyIterator;
 
 /**
  * Utility class for operations on the public interfaces.
@@ -14,31 +17,6 @@ import com.bigdata.rdf.spo.ISPO;
 public class GASUtil {
 
 //    private static final Logger log = Logger.getLogger(GASUtil.class);
-
-    /**
-     * Return the other end of a link.
-     * 
-     * @param u
-     *            One end of the link.
-     * @param e
-     *            The link.
-     * 
-     * @return The other end of the link.
-     * 
-     *         FIXME We can optimize this to use reference testing if we are
-     *         careful in the GATHER and SCATTER implementations to always use
-     *         the {@link IV} values on the {@link ISPO} object that is exposed
-     *         to the {@link IGASProgram}.
-     */
-    @SuppressWarnings("rawtypes")
-    public static IV getOtherVertex(final IV u, final ISPO e) {
-
-        if (e.s().equals(u))
-            return e.o();
-        
-        return e.s();
-
-    }
 
     /**
      * The average fan out of the frontier.
@@ -85,5 +63,17 @@ public class GASUtil {
         return r;
 
     }
+
+    /**
+     * An empty vertex iterator.
+     */
+    @SuppressWarnings({ "unchecked" })
+    public static final Iterator<Value> EMPTY_VERTICES_ITERATOR = EmptyIterator.DEFAULT;
+
+    /**
+     * An empty edge iterator.
+     */
+    @SuppressWarnings({ "unchecked" })
+    public static final Iterator<Statement> EMPTY_EDGES_ITERATOR = EmptyIterator.DEFAULT;
 
 }

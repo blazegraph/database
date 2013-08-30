@@ -1,14 +1,14 @@
 package com.bigdata.rdf.graph.analytics;
 
 import org.apache.log4j.Logger;
+import org.openrdf.model.Statement;
+import org.openrdf.model.Value;
 
 import com.bigdata.rdf.graph.Factory;
-import com.bigdata.rdf.graph.GASUtil;
+import com.bigdata.rdf.graph.IGASContext;
 import com.bigdata.rdf.graph.IGASScheduler;
 import com.bigdata.rdf.graph.IGASState;
 import com.bigdata.rdf.graph.impl.BaseGASProgram;
-import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.spo.ISPO;
 
 import cutthecrap.utils.striterators.IStriterator;
 
@@ -31,7 +31,6 @@ import cutthecrap.utils.striterators.IStriterator;
  *         getOtherVertex(e) method to figure out the other edge when using
  *         undirected scatter/gather. Add unit test for undirected.
  */
-@SuppressWarnings("rawtypes")
 public class SSSP extends BaseGASProgram<SSSP.VS, SSSP.ES, Integer/* dist */> {
 
     private static final Logger log = Logger.getLogger(SSSP.class);
@@ -40,10 +39,10 @@ public class SSSP extends BaseGASProgram<SSSP.VS, SSSP.ES, Integer/* dist */> {
      * The length of an edge.
      * 
      * FIXME RDR: This should be modified to use link weights with RDR. We need
-     * a pattern to get the link attributes materialized with the {@link ISPO}
+     * a pattern to get the link attributes materialized with the {@link Statement}
      * for the link. That could be done using a read-ahead filter on the
      * striterator if the link weights are always clustered with the ground
-     * triple. See {@link #decodeStatement(IV)}.
+     * triple. See {@link #decodeStatement(Value)}.
      * <P>
      * When we make this change, the distance should be of the same type as the
      * link weight or generalized as <code>double</code>.
@@ -115,10 +114,10 @@ public class SSSP extends BaseGASProgram<SSSP.VS, SSSP.ES, Integer/* dist */> {
 
     }
 
-    private static final Factory<IV, SSSP.VS> vertexStateFactory = new Factory<IV, SSSP.VS>() {
+    private static final Factory<Value, SSSP.VS> vertexStateFactory = new Factory<Value, SSSP.VS>() {
 
         @Override
-        public SSSP.VS initialValue(final IV value) {
+        public SSSP.VS initialValue(final Value value) {
 
             return new VS();
 
@@ -127,7 +126,7 @@ public class SSSP extends BaseGASProgram<SSSP.VS, SSSP.ES, Integer/* dist */> {
     };
 
     @Override
-    public Factory<IV, SSSP.VS> getVertexStateFactory() {
+    public Factory<Value, SSSP.VS> getVertexStateFactory() {
 
         return vertexStateFactory;
 
@@ -160,9 +159,11 @@ public class SSSP extends BaseGASProgram<SSSP.VS, SSSP.ES, Integer/* dist */> {
      * Overridden to only visit the edges of the graph.
      */
     @Override
-    public IStriterator constrainFilter(IStriterator itr) {
+    public IStriterator constrainFilter(
+            final IGASContext<SSSP.VS, SSSP.ES, Integer> ctx,
+            final IStriterator itr) {
 
-        return itr.addFilter(edgeOnlyFilter);
+        return itr.addFilter(getEdgeOnlyFilter(ctx));
                 
     }
 
@@ -173,7 +174,7 @@ public class SSSP extends BaseGASProgram<SSSP.VS, SSSP.ES, Integer/* dist */> {
      */
     @Override
     public void init(final IGASState<SSSP.VS, SSSP.ES, Integer> state,
-            final IV u) {
+            final Value u) {
 
         final VS us = state.getState(u);
 
@@ -196,11 +197,11 @@ public class SSSP extends BaseGASProgram<SSSP.VS, SSSP.ES, Integer/* dist */> {
      */
     @Override
     public Integer gather(final IGASState<SSSP.VS, SSSP.ES, Integer> state,
-            final IV u, final ISPO e) {
+            final Value u, final Statement e) {
 
 //        assert e.o().equals(u);
 
-        final VS src = state.getState(e.s());
+        final VS src = state.getState(e.getSubject());
         
         final int d = src.dist();
 
@@ -233,7 +234,7 @@ public class SSSP extends BaseGASProgram<SSSP.VS, SSSP.ES, Integer/* dist */> {
      */
     @Override
     public SSSP.VS apply(final IGASState<SSSP.VS, SSSP.ES, Integer> state,
-            final IV u, final Integer sum) {
+            final Value u, final Integer sum) {
 
         if (sum != null) {
 
@@ -263,7 +264,7 @@ public class SSSP extends BaseGASProgram<SSSP.VS, SSSP.ES, Integer/* dist */> {
 
     @Override
     public boolean isChanged(final IGASState<SSSP.VS, SSSP.ES, Integer> state,
-            final IV u) {
+            final Value u) {
 
         return state.getState(u).isChanged();
 
@@ -273,7 +274,8 @@ public class SSSP extends BaseGASProgram<SSSP.VS, SSSP.ES, Integer/* dist */> {
      * The remote vertex is scheduled if this vertex is changed.
      * <p>
      * Note: We are scattering to out-edges. Therefore, this vertex is
-     * {@link ISPO#s()}. The remote vertex is {@link ISPO#o()}.
+     * {@link Statement#getSubect()}. The remote vertex is
+     * {@link Statement#getObject()}.
      * <p>
      * {@inheritDoc}
      * 
@@ -297,9 +299,9 @@ public class SSSP extends BaseGASProgram<SSSP.VS, SSSP.ES, Integer/* dist */> {
      */
     @Override
     public void scatter(final IGASState<SSSP.VS, SSSP.ES, Integer> state,
-            final IGASScheduler sch, final IV u, final ISPO e) {
+            final IGASScheduler sch, final Value u, final Statement e) {
 
-        final IV other = GASUtil.getOtherVertex(u, e);
+        final Value other = state.getOtherVertex(u, e);
         
         final VS selfState = state.getState(u);
         
@@ -323,7 +325,7 @@ public class SSSP extends BaseGASProgram<SSSP.VS, SSSP.ES, Integer/* dist */> {
                         + ", scheduling: " + other + " with newDist=" + newDist);
 
             // Then add the remote vertex to the next frontier.
-            sch.schedule(e.o());
+            sch.schedule(e.getObject());
 
         }
 

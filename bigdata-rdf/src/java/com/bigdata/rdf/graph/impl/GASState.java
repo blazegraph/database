@@ -7,42 +7,42 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.log4j.Logger;
+import org.openrdf.model.Statement;
+import org.openrdf.model.URI;
+import org.openrdf.model.Value;
 
 import com.bigdata.rdf.graph.Factory;
+import com.bigdata.rdf.graph.GASUtil;
 import com.bigdata.rdf.graph.IGASProgram;
 import com.bigdata.rdf.graph.IGASSchedulerImpl;
 import com.bigdata.rdf.graph.IGASState;
 import com.bigdata.rdf.graph.IGraphAccessor;
 import com.bigdata.rdf.graph.IReducer;
 import com.bigdata.rdf.graph.IStaticFrontier;
-import com.bigdata.rdf.graph.impl.util.GASImplUtil;
-import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.spo.ISPO;
 
-@SuppressWarnings("rawtypes")
 public class GASState<VS, ES, ST> implements IGASState<VS, ES, ST> {
 
     private static final Logger log = Logger.getLogger(GASState.class);
 
-//    /**
-//     * The {@link GASEngine} on which the {@link IGASProgram} will be run.
-//     */
-//    private final GASEngine gasEngine;
+    // /**
+    // * The {@link GASEngine} on which the {@link IGASProgram} will be run.
+    // */
+    // private final GASEngine gasEngine;
 
     /**
      * The {@link IGASProgram} to be run.
      */
     private final IGASProgram<VS, ES, ST> gasProgram;
-    
+
     /**
      * Factory for the vertex state objects.
      */
-    private final Factory<IV, VS> vsf;
+    private final Factory<Value, VS> vsf;
 
     /**
      * Factory for the edge state objects.
      */
-    private final Factory<ISPO, ES> esf;
+    private final Factory<Statement, ES> esf;
 
     /**
      * The set of vertices that were identified in the current iteration.
@@ -60,7 +60,7 @@ public class GASState<VS, ES, ST> implements IGASState<VS, ES, ST> {
      * {@link #frontier} at the end of the round.
      */
     private final IGASSchedulerImpl scheduler;
-    
+
     /**
      * The current evaluation round.
      */
@@ -74,13 +74,13 @@ public class GASState<VS, ES, ST> implements IGASState<VS, ES, ST> {
      * visited sets using a full traveral strategy, but overflow to an HTree or
      * (if fixed stride) a MemStore or BigArray could help).
      */
-    protected final ConcurrentMap<IV, VS> vertexState = new ConcurrentHashMap<IV, VS>();
+    protected final ConcurrentMap<Value, VS> vertexState = new ConcurrentHashMap<Value, VS>();
 
     /**
      * TODO EDGE STATE: state needs to be configurable. When disabled, leave
      * this as <code>null</code>.
      */
-    protected final ConcurrentMap<ISPO, ES> edgeState = null;
+    protected final ConcurrentMap<Statement, ES> edgeState = null;
 
     /**
      * Provides access to the backing graph. Used to decode vertices and edges
@@ -115,9 +115,9 @@ public class GASState<VS, ES, ST> implements IGASState<VS, ES, ST> {
         this.esf = gasProgram.getEdgeStateFactory();
 
         this.frontier = frontier;
-        
+
         this.scheduler = gasScheduler;
-        
+
     }
 
     /**
@@ -127,9 +127,9 @@ public class GASState<VS, ES, ST> implements IGASState<VS, ES, ST> {
     protected IGraphAccessor getGraphAccessor() {
 
         return graphAccessor;
-        
+
     }
-    
+
     @Override
     public IStaticFrontier frontier() {
 
@@ -145,7 +145,7 @@ public class GASState<VS, ES, ST> implements IGASState<VS, ES, ST> {
     }
 
     @Override
-    public VS getState(final IV v) {
+    public VS getState(final Value v) {
 
         VS vs = vertexState.get(v);
 
@@ -167,7 +167,7 @@ public class GASState<VS, ES, ST> implements IGASState<VS, ES, ST> {
     }
 
     @Override
-    public ES getState(final ISPO e) {
+    public ES getState(final Statement e) {
 
         if (edgeState == null)
             return null;
@@ -209,12 +209,12 @@ public class GASState<VS, ES, ST> implements IGASState<VS, ES, ST> {
             edgeState.clear();
 
         frontier.resetFrontier(0/* minCapacity */, true/* ordered */,
-                GASImplUtil.EMPTY_VERTICES_ITERATOR);
+                GASUtil.EMPTY_VERTICES_ITERATOR);
 
     }
-    
+
     @Override
-    public void init(final IV... vertices) {
+    public void init(final Value... vertices) {
 
         if (vertices == null)
             throw new IllegalArgumentException();
@@ -222,21 +222,19 @@ public class GASState<VS, ES, ST> implements IGASState<VS, ES, ST> {
         reset();
 
         // Used to ensure that the initial frontier is distinct.
-        final Set<IV> tmp = new HashSet<IV>();
+        final Set<Value> tmp = new HashSet<Value>();
 
-        for (IV v : vertices) {
-            
+        for (Value v : vertices) {
+
             tmp.add(v);
-            
-            
+
         }
-        
+
         /*
-         * Callback to initialize the vertex state before the first
-         * iteration.
+         * Callback to initialize the vertex state before the first iteration.
          */
-        for(IV v : tmp) {
-            
+        for (Value v : tmp) {
+
             gasProgram.init(this, v);
 
         }
@@ -258,13 +256,13 @@ public class GASState<VS, ES, ST> implements IGASState<VS, ES, ST> {
 
     @Override
     public void endRound() {
-        
+
         round.incrementAndGet();
 
         scheduler.compactFrontier(frontier);
 
         scheduler.clear();
-        
+
     }
 
     /**
@@ -276,7 +274,7 @@ public class GASState<VS, ES, ST> implements IGASState<VS, ES, ST> {
     @Override
     public <T> T reduce(final IReducer<VS, ES, ST, T> op) {
 
-        for (IV v : vertexState.keySet()) {
+        for (Value v : vertexState.keySet()) {
 
             op.visit(this, v);
 
@@ -287,10 +285,83 @@ public class GASState<VS, ES, ST> implements IGASState<VS, ES, ST> {
     }
 
     @Override
-    public String toString(final ISPO e) {
+    public String toString(final Statement e) {
 
         return e.toString();
-        
+
     }
-    
+
+    /*
+     * This is a set of methods for making tests concerning the nature of an
+     * edge, vertex, link attribute, or property value. These tests are gathered
+     * together in one place because (a) the openrdf data model does not provide
+     * efficient link attribute management; and (b) it is not safe to use
+     * instanceof tests on the IV implementations to decide these questions.
+     * 
+     * The IV interface classes can actually declare multiple interfaces that
+     * are distinct in the openrdf model. For example, a TermId can be any kind
+     * of Value and implements the URI, BNode, and Literal interfaces. Thus,
+     * interface testing on a TermId IV is not diagnostic. However, the IVs are
+     * explicitly marked with isURI(), isBNode(), and isLiteral() methods. These
+     * methods must be used in preference to interface tests (instanceof tests
+     * will provide unexpected behavior).
+     * 
+     * FIXME TESTS: We need a test suite for compliance of these methods.
+     */
+
+    /**
+     * {@inheritDoc}
+     * <p>
+     * FIXME We can optimize this to use reference testing if we are careful in
+     * the GATHER and SCATTER implementations to impose a canonical mapping over
+     * the vertex objects for the edges that are exposed to the
+     * {@link IGASProgram} during a single round.
+     */
+    @Override
+    public Value getOtherVertex(final Value u, final Statement e) {
+
+        if (e.getSubject().equals(u))
+            return e.getObject();
+
+        return e.getSubject();
+
+    }
+
+    @Override
+    public boolean isEdge(final Statement e) {
+        return e.getObject() instanceof URI; // FIXME CORRECTNESS (instanceof Resource)
+    }
+   
+    @Override
+    public boolean isAttrib(final Statement e) {
+        return !isEdge(e);
+    }
+   
+    /**
+     * {@inheritDoc}
+     * <p>
+     * The openrdf implementation does not support link attributes and this
+     * method always returns <code>false</code>.
+     * 
+     * @return <code>false</code>
+     */
+    @Override
+    public boolean isLinkAttrib(final Statement e,
+            final URI linkAttribType) {
+        return false;
+    }
+
+    /**
+     * {@inheritDoc}
+     * <p>
+     * The openrdf implementation does not support link attributes and this
+     * method always returns <code>null</code>.
+     * 
+     * @return <code>null</code>
+     */
+    @Override
+    public Statement decodeStatement(final Value v) {
+        return null;
+    }
+
 }

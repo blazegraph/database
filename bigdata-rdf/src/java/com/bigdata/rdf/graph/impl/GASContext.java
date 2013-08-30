@@ -6,6 +6,8 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.log4j.Logger;
+import org.openrdf.model.Statement;
+import org.openrdf.model.Value;
 
 import com.bigdata.rdf.graph.EdgesEnum;
 import com.bigdata.rdf.graph.GASUtil;
@@ -17,10 +19,7 @@ import com.bigdata.rdf.graph.IGASStats;
 import com.bigdata.rdf.graph.IGraphAccessor;
 import com.bigdata.rdf.graph.IReducer;
 import com.bigdata.rdf.graph.IStaticFrontier;
-import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.spo.ISPO;
 
-@SuppressWarnings("rawtypes")
 public class GASContext<VS, ES, ST> implements IGASContext<VS, ES, ST> {
 
     private static final Logger log = Logger.getLogger(GASContext.class);
@@ -331,7 +330,7 @@ public class GASContext<VS, ES, ST> implements IGASContext<VS, ES, ST> {
      */
     private void apply(final IStaticFrontier f) {
 
-        for (IV u : f) {
+        for (Value u : f) {
 
             program.apply(gasState, u, null/* sum */);
 
@@ -360,7 +359,7 @@ public class GASContext<VS, ES, ST> implements IGASContext<VS, ES, ST> {
 
         class ScatterVertexTaskFactory implements VertexTaskFactory<Long> {
 
-            public Callable<Long> newVertexTask(final IV u) {
+            public Callable<Long> newVertexTask(final Value u) {
 
                 return new ScatterTask(u) {
                     @Override
@@ -411,7 +410,7 @@ public class GASContext<VS, ES, ST> implements IGASContext<VS, ES, ST> {
 
         class GatherVertexTaskFactory implements VertexTaskFactory<Long> {
 
-            public Callable<Long> newVertexTask(final IV u) {
+            public Callable<Long> newVertexTask(final Value u) {
 
                 return new GatherTask(u) {
                     @Override
@@ -458,9 +457,9 @@ public class GASContext<VS, ES, ST> implements IGASContext<VS, ES, ST> {
      */
     abstract private class VertexEdgesTask implements Callable<Long> {
 
-        protected final IV u;
+        protected final Value u;
 
-        public VertexEdgesTask(final IV u) {
+        public VertexEdgesTask(final Value u) {
 
             this.u = u;
 
@@ -484,7 +483,7 @@ public class GASContext<VS, ES, ST> implements IGASContext<VS, ES, ST> {
      */
     abstract private class ScatterTask extends VertexEdgesTask {
 
-        public ScatterTask(final IV u) {
+        public ScatterTask(final Value u) {
 
             super(u);
 
@@ -526,15 +525,15 @@ public class GASContext<VS, ES, ST> implements IGASContext<VS, ES, ST> {
 
             final IGASScheduler sch = scheduler();
 
-            final Iterator<ISPO> eitr = graphAccessor.getEdges(program, u,
-                    getEdgesEnum());
+            final Iterator<Statement> eitr = graphAccessor.getEdges(
+                    GASContext.this, u, getEdgesEnum());
 
             try {
 
                 while (eitr.hasNext()) {
 
                     // edge
-                    final ISPO e = eitr.next();
+                    final Statement e = eitr.next();
 
                     nedges++;
 
@@ -565,7 +564,7 @@ public class GASContext<VS, ES, ST> implements IGASContext<VS, ES, ST> {
      */
     abstract private class GatherTask extends VertexEdgesTask {
 
-        public GatherTask(final IV u) {
+        public GatherTask(final Value u) {
 
             super(u);
 
@@ -576,8 +575,8 @@ public class GASContext<VS, ES, ST> implements IGASContext<VS, ES, ST> {
 
             long nedges = 0;
 
-            final Iterator<ISPO> eitr = graphAccessor.getEdges(program, u,
-                    getEdgesEnum());
+            final Iterator<Statement> eitr = graphAccessor.getEdges(
+                    GASContext.this, u, getEdgesEnum());
 
             try {
 
@@ -591,7 +590,7 @@ public class GASContext<VS, ES, ST> implements IGASContext<VS, ES, ST> {
 
                 while (eitr.hasNext()) {
 
-                    final ISPO e = eitr.next();
+                    final Statement e = eitr.next();
 
                     if (log.isTraceEnabled()) // TODO Batch resolve if @ TRACE
                         log.trace("u=" + u + ", e=" + gasState.toString(e) + ", sum="

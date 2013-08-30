@@ -10,6 +10,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.atomic.AtomicReference;
 
+import org.openrdf.model.Value;
+
 import com.bigdata.rdf.graph.IGASEngine;
 import com.bigdata.rdf.graph.IGASProgram;
 import com.bigdata.rdf.graph.IGASScheduler;
@@ -18,7 +20,6 @@ import com.bigdata.rdf.graph.IGASState;
 import com.bigdata.rdf.graph.IGraphAccessor;
 import com.bigdata.rdf.graph.IStaticFrontier;
 import com.bigdata.rdf.graph.impl.scheduler.CHMScheduler;
-import com.bigdata.rdf.internal.IV;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
@@ -198,7 +199,7 @@ abstract public class GASEngine implements IGASEngine {
             long nedges = 0L;
 
             // For all vertices in the frontier.
-            for (IV u : f) {
+            for (Value u : f) {
 
                 nedges += taskFactory.newVertexTask(u).call();
 
@@ -230,7 +231,7 @@ abstract public class GASEngine implements IGASEngine {
          * about order for this collection. It is only there to filter out
          * duplicate work.
          */
-        private final HashSet<IV> scheduled;
+        private final HashSet<Value> scheduled;
 
         ParallelFrontierStrategy(final VertexTaskFactory<Long> taskFactory,
                 final IStaticFrontier f) {
@@ -247,7 +248,7 @@ abstract public class GASEngine implements IGASEngine {
              * If the frontier is known to be compact, then this map is not
              * initialized and is not used.
              */
-            this.scheduled = f.isCompact() ? null : new HashSet<IV>(f.size());
+            this.scheduled = f.isCompact() ? null : new HashSet<Value>(f.size());
 
         }
 
@@ -274,7 +275,7 @@ abstract public class GASEngine implements IGASEngine {
             try {
 
                 // For all vertices in the frontier.
-                for (IV u : f) {
+                for (Value u : f) {
 
                     if (scheduled != null) {
 

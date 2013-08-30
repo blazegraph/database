@@ -14,6 +14,7 @@ import java.util.Random;
 import java.util.concurrent.Callable;
 
 import org.apache.log4j.Logger;
+import org.openrdf.model.Value;
 import org.openrdf.rio.RDFFormat;
 
 import com.bigdata.Banner;
@@ -28,8 +29,6 @@ import com.bigdata.rdf.graph.IGASSchedulerImpl;
 import com.bigdata.rdf.graph.IGASState;
 import com.bigdata.rdf.graph.impl.bd.BigdataGASEngine;
 import com.bigdata.rdf.graph.impl.bd.BigdataGASEngine.BigdataGraphAccessor;
-import com.bigdata.rdf.graph.impl.bd.BigdataGASUtil;
-import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.rio.LoadStats;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -583,9 +582,6 @@ public class GASRunner<VS, ES, ST> implements Callable<GASStats> {
                 .getResourceLocator()
                 .locate(namespace, jnl.getLastCommitTime());
 
-        @SuppressWarnings("rawtypes")
-        final IV[] samples = BigdataGASUtil.getRandomSample(r, kb, nsamples);
-
         // total #of edges in that graph.
         final long nedges = kb.getStatementCount();
 
@@ -615,10 +611,11 @@ public class GASRunner<VS, ES, ST> implements Callable<GASStats> {
             
             final GASStats total = new GASStats();
 
+            final Value[] samples = graphAccessor.getRandomSample(r, nsamples);
+
             for (int i = 0; i < samples.length; i++) {
 
-                @SuppressWarnings("rawtypes")
-                final IV startingVertex = samples[i];
+                final Value startingVertex = samples[i];
 
                 gasState.init(startingVertex);
 

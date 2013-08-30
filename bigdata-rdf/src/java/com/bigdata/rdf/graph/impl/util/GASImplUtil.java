@@ -1,11 +1,9 @@
 package com.bigdata.rdf.graph.impl.util;
 
-import java.util.Iterator;
 import java.util.Set;
 
-import com.bigdata.rdf.internal.IV;
+import org.openrdf.model.Value;
 
-import cutthecrap.utils.striterators.EmptyIterator;
 
 /**
  * Some utility method for the GAS Engine implementation.
@@ -13,9 +11,6 @@ import cutthecrap.utils.striterators.EmptyIterator;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
 public class GASImplUtil {
-
-    @SuppressWarnings({ "unchecked", "rawtypes" })
-    public static final Iterator<IV> EMPTY_VERTICES_ITERATOR = EmptyIterator.DEFAULT;
 
 //    /**
 //     * Compact a collection of vertices into an ordered frontier.
@@ -32,9 +27,9 @@ public class GASImplUtil {
 //     */
 //    @Deprecated
 //    @SuppressWarnings("rawtypes")
-//    public static IV[] compactAndSort(final Set<IV> vertices) {
+//    public static Value[] compactAndSort(final Set<Value> vertices) {
 //    
-//        final IV[] a;
+//        final Value[] a;
 //    
 //        final int size = vertices.size();
 //    
@@ -43,7 +38,7 @@ public class GASImplUtil {
 //         * all time in the profiler. The #1 hot spot with the CHMScheduler. We
 //         * need to reuse the target array!!!
 //         */
-//        vertices.toArray(a = new IV[size]);
+//        vertices.toArray(a = new Value[size]);
 //    
 //        /*
 //         * Order for index access. An ordered scan on a B+Tree is 10X faster
@@ -68,9 +63,8 @@ public class GASImplUtil {
      *            
      * @return A slice onto just the new frontier.
      */
-    @SuppressWarnings("rawtypes")
-    public static IArraySlice<IV> compactAndSort(final Set<IV> vertices,
-            final IManagedArray<IV> buffer) {
+    public static IArraySlice<Value> compactAndSort(final Set<Value> vertices,
+            final IManagedArray<Value> buffer) {
 
         final int nvertices = vertices.size();
 
@@ -78,11 +72,11 @@ public class GASImplUtil {
         buffer.ensureCapacity(nvertices);
 
         // backing array reference (presized above).
-        final IV[] a = buffer.array();
+        final Value[] a = buffer.array();
 
         // copy frontier into backing array.
         int i = 0;
-        for (IV v : vertices) {
+        for (Value v : vertices) {
 
             a[i++] = v;
 

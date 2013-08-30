@@ -1,7 +1,7 @@
 package com.bigdata.rdf.graph;
 
-import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.spo.ISPO;
+import org.openrdf.model.Statement;
+import org.openrdf.model.Value;
 
 /**
  * Abstract interface for GAS programs.
@@ -19,87 +19,7 @@ import com.bigdata.rdf.spo.ISPO;
  *            the computation).
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
-@SuppressWarnings("rawtypes")
-public interface IGASProgram<VS, ES, ST> extends IGASOptions<VS, ES> {
-
-    /*
-     * TODO Unfortunately this pattern of hiding our more complex interfaces can
-     * not be made to work without creating wrapper objects that implement the
-     * derived interface, even though we would just like to use it as a marker
-     * interface. It might be workable if we put this under the IV and ISPO
-     * interfaces (as simpler interfaces without generic types).
-     */
-    
-//    /**
-//     * A shorthand for the {@link IV} interface that cleans up the generic type
-//     * warnings. An {@link IV} corresponds to a vertex of the graph or the value
-//     * of an attribute. {@link IV}s may be materialized or not. For efficiency,
-//     * it is better to operate without materialization of the corresponding RDF
-//     * {@link Value}. Many {@link IV}s are <em>inline</em> can be immediately
-//     * interpreted as if they were materialized RDF {@link Value}s - for
-//     * example, this is true by default for all <code>xsd</code> numeric
-//     * datatypes. It may also be true of other kinds of {@link Value}s depending
-//     * on how the KB was configured.
-//     * 
-//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
-//     *         Thompson</a>
-//     */
-//    @SuppressWarnings("rawtypes")
-//    private interface IV extends com.bigdata.rdf.internal.IV {
-//        
-//    }
-//
-//    /**
-//     * An edge is comprised of a Subject (s), Predicate (p), and Object (o).
-//     * Depending on the KB configuration, there may also be an Context (c)
-//     * position on the edge - when present the Context supports the concept of
-//     * SPARQL named graphs.
-//     * <dl>
-//     * <dt>Subject</dt>
-//     * <dd>The Subject is either a {@link URI} or a {@link BNode}.</dd>
-//     * <dt>Predicate</dt>
-//     * <dd>The Predicate is always a {@link URI}.</dd>
-//     * <dt>Object</dt>
-//     * <dd>The Object is either a {@link URI} (in which case the "edge" is a
-//     * link) or a {@link Literal} (in which case the edge is a property value).</dd>
-//     * <dt>Context</dt>
-//     * <dd>The Context is either a {@link URI} or a {@link BNode}.</dd>
-//     * </dl>
-//     * Note that the Subject, Predicate, Object, and Context will be {@link IV}
-//     * instances and hence might or might not be materialized RDF {@link Value}s
-//     * and might or might not be <em>inline</em> and hence directly inspectable
-//     * as if they were materialized RDF {@link Value}s.
-//     * 
-//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
-//     *         Thompson</a>
-//     */
-//    private interface ISPO extends com.bigdata.rdf.spo.ISPO {
-//
-//        /**
-//         * {@inheritDoc}
-//         */
-//        @Override
-//        IV s();
-//
-//        /**
-//         * {@inheritDoc}
-//         */
-//        @Override
-//        IV p();
-//
-//        /**
-//         * {@inheritDoc}
-//         */
-//        @Override
-//        IV o();
-//
-//        /**
-//         * {@inheritDoc}
-//         */
-//        @Override
-//        IV c();
-//        
-//    }
+public interface IGASProgram<VS, ES, ST> extends IGASOptions<VS, ES, ST> {
 
     /**
      * Callback to initialize the state for each vertex in the initial frontier
@@ -109,7 +29,7 @@ public interface IGASProgram<VS, ES, ST> extends IGASOptions<VS, ES> {
      * @param u
      *            The vertex.
      */
-    void init(IGASState<VS, ES, ST> state, IV u);
+    void init(IGASState<VS, ES, ST> state, Value u);
     
     /**
      * GATHER is a map/reduce over the edges of the vertex. The SUM provides
@@ -143,7 +63,7 @@ public interface IGASProgram<VS, ES, ST> extends IGASOptions<VS, ES> {
      *         depends on the algorithm. How can we get these constraints into
      *         the API?
      */
-    ST gather(IGASState<VS, ES, ST> state, IV u, ISPO e);
+    ST gather(IGASState<VS, ES, ST> state, Value u, Statement e);
     
     /**
      * SUM is a pair-wise reduction that is applied during the GATHER.
@@ -190,7 +110,7 @@ public interface IGASProgram<VS, ES, ST> extends IGASOptions<VS, ES> {
      *         when compared to either the frontier or the set of states that
      *         have been in the frontier during the computation.
      */
-    VS apply(IGASState<VS, ES, ST> state, IV u, ST sum);
+    VS apply(IGASState<VS, ES, ST> state, Value u, ST sum);
 
     /**
      * Return <code>true</code> iff the vertex should run its SCATTER phase.
@@ -203,7 +123,7 @@ public interface IGASProgram<VS, ES, ST> extends IGASOptions<VS, ES> {
      *            The vertex.
      * @return
      */
-    boolean isChanged(IGASState<VS, ES, ST> state, IV u);
+    boolean isChanged(IGASState<VS, ES, ST> state, Value u);
 
     /**
      * 
@@ -213,7 +133,7 @@ public interface IGASProgram<VS, ES, ST> extends IGASOptions<VS, ES> {
      * @param e
      *            The edge.
      */
-    void scatter(IGASState<VS, ES, ST> state, IGASScheduler sch, IV u, ISPO e);
+    void scatter(IGASState<VS, ES, ST> state, IGASScheduler sch, Value u, Statement e);
 
     /**
      * Return <code>true</code> iff the algorithm should continue. This is

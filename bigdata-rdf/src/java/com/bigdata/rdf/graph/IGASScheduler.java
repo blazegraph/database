@@ -1,6 +1,6 @@
 package com.bigdata.rdf.graph;
 
-import com.bigdata.rdf.internal.IV;
+import org.openrdf.model.Value;
 
 /**
  * Interface schedules a vertex for execution. This interface is exposed to the
@@ -16,6 +16,6 @@ public interface IGASScheduler {
      * @param v
      *            The vertex.
      */
-    void schedule(@SuppressWarnings("rawtypes") IV v);
+    void schedule(Value v);
 
 }

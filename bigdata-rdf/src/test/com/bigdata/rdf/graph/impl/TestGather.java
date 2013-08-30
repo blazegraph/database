@@ -27,6 +27,9 @@ import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
+import org.openrdf.model.Statement;
+import org.openrdf.model.Value;
+
 import com.bigdata.rdf.graph.AbstractGraphTestCase;
 import com.bigdata.rdf.graph.EdgesEnum;
 import com.bigdata.rdf.graph.Factory;
@@ -38,7 +41,6 @@ import com.bigdata.rdf.graph.impl.bd.BigdataGASEngine;
 import com.bigdata.rdf.graph.impl.bd.BigdataGASEngine.BigdataGraphAccessor;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.StatementEnum;
-import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPO;
 
 import cutthecrap.utils.striterators.IStriterator;
@@ -67,7 +69,7 @@ public class TestGather extends AbstractGraphTestCase {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      */
     private static class MockGASProgram extends
-            BaseGASProgram<Set<ISPO>, Set<ISPO>, Set<ISPO>> {
+            BaseGASProgram<Set<Statement>, Set<Statement>, Set<Statement>> {
 
         private final EdgesEnum gatherEdges;
         
@@ -93,31 +95,33 @@ public class TestGather extends AbstractGraphTestCase {
          * Overridden to only visit the edges of the graph.
          */
         @Override
-        public IStriterator constrainFilter(IStriterator itr) {
+        public IStriterator constrainFilter(
+                final IGASContext<Set<Statement>, Set<Statement>, Set<Statement>> ctx,
+                final IStriterator itr) {
 
-            return itr.addFilter(edgeOnlyFilter);
-            
+            return itr.addFilter(getEdgeOnlyFilter(ctx));
+
         }
 
         @Override
-        public Factory<IV, Set<ISPO>> getVertexStateFactory() {
-            return new Factory<IV, Set<ISPO>>() {
+        public Factory<Value, Set<Statement>> getVertexStateFactory() {
+            return new Factory<Value, Set<Statement>>() {
                 @Override
-                public Set<ISPO> initialValue(IV value) {
-                    return new LinkedHashSet<ISPO>();
+                public Set<Statement> initialValue(Value value) {
+                    return new LinkedHashSet<Statement>();
                 }
             };
         }
 
         @Override
-        public Factory<ISPO, Set<ISPO>> getEdgeStateFactory() {
+        public Factory<Statement, Set<Statement>> getEdgeStateFactory() {
 
             return null;
             
         }
 
         @Override
-        public void init(IGASState<Set<ISPO>, Set<ISPO>, Set<ISPO>> ctx, IV u) {
+        public void init(IGASState<Set<Statement>, Set<Statement>, Set<Statement>> ctx, Value u) {
 
             // NOP
             
@@ -127,9 +131,9 @@ public class TestGather extends AbstractGraphTestCase {
          * Return the edge as a singleton set.
          */
         @Override
-        public Set<ISPO> gather(
-                final IGASState<Set<ISPO>, Set<ISPO>, Set<ISPO>> state,
-                final IV u, final ISPO e) {
+        public Set<Statement> gather(
+                final IGASState<Set<Statement>, Set<Statement>, Set<Statement>> state,
+                final Value u, final Statement e) {
 
             return Collections.singleton(e);
 
@@ -139,13 +143,13 @@ public class TestGather extends AbstractGraphTestCase {
          * Set UNION over the GATHERed edges.
          */
         @Override
-        public Set<ISPO> sum(Set<ISPO> left, Set<ISPO> right) {
+        public Set<Statement> sum(Set<Statement> left, Set<Statement> right) {
             
             /*
              * Note: This happens to preserve the visitation order. That is not
              * essential, but it is nice.
              */
-            final Set<ISPO> tmp = new LinkedHashSet<ISPO>(left);
+            final Set<Statement> tmp = new LinkedHashSet<Statement>(left);
             
             tmp.addAll(right);
             
@@ -157,14 +161,14 @@ public class TestGather extends AbstractGraphTestCase {
          * UNION the gathered edges with those already decorating the vertex.
          */
         @Override
-        public Set<ISPO> apply(
-                final IGASState<Set<ISPO>, Set<ISPO>, Set<ISPO>> state,
-                final IV u, final Set<ISPO> sum) {
+        public Set<Statement> apply(
+                final IGASState<Set<Statement>, Set<Statement>, Set<Statement>> state,
+                final Value u, final Set<Statement> sum) {
  
             if (sum != null) {
 
                 // Get the state for that vertex.
-                final Set<ISPO> us = state.getState(u);
+                final Set<Statement> us = state.getState(u);
 
                 // UNION with the accumulant.
                 us.addAll(sum);
@@ -180,15 +184,15 @@ public class TestGather extends AbstractGraphTestCase {
 
         @Override
         public boolean isChanged(
-                IGASState<Set<ISPO>, Set<ISPO>, Set<ISPO>> state, IV u) {
+                IGASState<Set<Statement>, Set<Statement>, Set<Statement>> state, Value u) {
 
             return true;
             
         }
 
         @Override
-        public void scatter(IGASState<Set<ISPO>, Set<ISPO>, Set<ISPO>> state,
-                final IGASScheduler sch, IV u, ISPO e) {
+        public void scatter(IGASState<Set<Statement>, Set<Statement>, Set<Statement>> state,
+                final IGASScheduler sch, Value u, Statement e) {
 
             throw new UnsupportedOperationException();
             
@@ -210,7 +214,7 @@ public class TestGather extends AbstractGraphTestCase {
         // gather no-edges for :mike
         {
             
-            final Set<ISPO> expected = set();
+            final Set<Statement> expected = set();
 
             doGatherTest(EdgesEnum.NoEdges, expected, p.mike.getIV()/* startingVertex */);
         
@@ -219,8 +223,8 @@ public class TestGather extends AbstractGraphTestCase {
         // gather in-edges for :mike
         {
             
-            final Set<ISPO> expected = set(//
-            (ISPO) new SPO(p.bryan.getIV(), p.foafKnows.getIV(), p.mike.getIV(),
+            final Set<Statement> expected = set(//
+            (Statement) new SPO(p.bryan.getIV(), p.foafKnows.getIV(), p.mike.getIV(),
                     StatementEnum.Explicit)//
             );
 
@@ -231,10 +235,10 @@ public class TestGather extends AbstractGraphTestCase {
         // gather out-edges for :mike
         {
             
-            final Set<ISPO> expected = set(//
-                    (ISPO) new SPO(p.mike.getIV(), p.rdfType.getIV(), p.foafPerson.getIV(),
+            final Set<Statement> expected = set(//
+                    (Statement) new SPO(p.mike.getIV(), p.rdfType.getIV(), p.foafPerson.getIV(),
                             StatementEnum.Explicit),//
-                    (ISPO) new SPO(p.mike.getIV(), p.foafKnows.getIV(), p.bryan.getIV(),
+                    (Statement) new SPO(p.mike.getIV(), p.foafKnows.getIV(), p.bryan.getIV(),
                             StatementEnum.Explicit)//
             );
 
@@ -245,12 +249,12 @@ public class TestGather extends AbstractGraphTestCase {
         // gather all-edges for :mike 
         {
             
-            final Set<ISPO> expected = set(//
-                    (ISPO) new SPO(p.bryan.getIV(), p.foafKnows.getIV(), p.mike.getIV(),
+            final Set<Statement> expected = set(//
+                    (Statement) new SPO(p.bryan.getIV(), p.foafKnows.getIV(), p.mike.getIV(),
                             StatementEnum.Explicit),//
-                    (ISPO) new SPO(p.mike.getIV(), p.rdfType.getIV(), p.foafPerson.getIV(),
+                    (Statement) new SPO(p.mike.getIV(), p.rdfType.getIV(), p.foafPerson.getIV(),
                             StatementEnum.Explicit),//
-                    (ISPO) new SPO(p.mike.getIV(), p.foafKnows.getIV(), p.bryan.getIV(),
+                    (Statement) new SPO(p.mike.getIV(), p.foafKnows.getIV(), p.bryan.getIV(),
                             StatementEnum.Explicit)//
             );
 
@@ -267,7 +271,7 @@ public class TestGather extends AbstractGraphTestCase {
      * @throws Exception 
      */
     protected void doGatherTest(final EdgesEnum gatherEdges,
-            final Set<ISPO> expected, final IV startingVertex) throws Exception {
+            final Set<Statement> expected, final IV startingVertex) throws Exception {
 
         final IGASEngine gasEngine = new BigdataGASEngine(sail.getDatabase()
                 .getIndexManager(), 1/* nthreads */);
@@ -279,11 +283,11 @@ public class TestGather extends AbstractGraphTestCase {
                             .getDatabase().getIndexManager()
                             .getLastCommitTime());
 
-            final IGASContext<Set<ISPO>, Set<ISPO>, Set<ISPO>> gasContext = gasEngine
+            final IGASContext<Set<Statement>, Set<Statement>, Set<Statement>> gasContext = gasEngine
                     .newGASContext(graphAccessor, new MockGASProgram(
                             gatherEdges));
 
-            final IGASState<Set<ISPO>, Set<ISPO>, Set<ISPO>> gasState = gasContext
+            final IGASState<Set<Statement>, Set<Statement>, Set<Statement>> gasState = gasContext
                     .getGASState();
             
             // Initialize the froniter.
@@ -296,7 +300,7 @@ public class TestGather extends AbstractGraphTestCase {
              * Lookup the state for the starting vertex (this should be the only
              * vertex whose state was modified since we did only one round).
              */
-            final Set<ISPO> actual = gasState.getState(startingVertex);
+            final Set<Statement> actual = gasState.getState(startingVertex);
 
             // Verify against the expected state.
             assertSameEdges(expected, actual);

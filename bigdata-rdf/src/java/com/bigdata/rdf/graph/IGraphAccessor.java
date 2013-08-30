@@ -1,9 +1,10 @@
 package com.bigdata.rdf.graph;
 
 import java.util.Iterator;
+import java.util.Random;
 
-import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.spo.ISPO;
+import org.openrdf.model.Statement;
+import org.openrdf.model.Value;
 
 /**
  * Interface abstracts access to a backend graph implementation.
@@ -15,15 +16,17 @@ public interface IGraphAccessor {
     /**
      * Return the edges for the vertex.
      * 
-     * @param p The {@link IGASProgram}
+     * @param p
+     *            The {@link IGASContext}.
      * @param u
      *            The vertex.
      * @param edges
      *            Typesafe enumeration indicating which edges should be visited.
+     *            
      * @return An iterator that will visit the edges for that vertex.
      */
-    @SuppressWarnings("rawtypes")
-    Iterator<ISPO> getEdges(IGASProgram<?, ?, ?> p, IV u, EdgesEnum edges);
+    Iterator<Statement> getEdges(IGASContext<?, ?, ?> p, Value u,
+            EdgesEnum edges);
 
     /**
      * Hook to advance the view of the graph. This is invoked at the end of each
@@ -31,4 +34,19 @@ public interface IGraphAccessor {
      */
     void advanceView();
 
+    /**
+     * Return a sample (without duplicates) of vertices from the graph.
+     * 
+     * @param desiredSampleSize
+     *            The desired sample size.
+     * 
+     * @return The distinct samples that were found.
+     * 
+     *         FIXME Specify whether the sample must be uniform over the
+     *         vertices, proportional to the #of (in/out)edges for those
+     *         vertices, etc. Without a clear specification, we will not
+     *         have the same behavior across different backends.
+     */
+    Value[] getRandomSample(final Random r, final int desiredSampleSize);
+    
 }

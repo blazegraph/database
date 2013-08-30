@@ -2,10 +2,11 @@ package com.bigdata.rdf.graph.impl.scheduler;
 
 import java.util.concurrent.ConcurrentHashMap;
 
+import org.openrdf.model.Value;
+
 import com.bigdata.rdf.graph.IGASSchedulerImpl;
 import com.bigdata.rdf.graph.IStaticFrontier;
 import com.bigdata.rdf.graph.impl.GASEngine;
-import com.bigdata.rdf.internal.IV;
 
 /**
  * A simple scheduler based on a {@link ConcurrentHashMap}.
@@ -13,19 +14,18 @@ import com.bigdata.rdf.internal.IV;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
  *         Thompson</a>
  */
-@SuppressWarnings("rawtypes")
 public class CHMScheduler implements IGASSchedulerImpl {
 
-    private final ConcurrentHashMap<IV,IV> vertices;
+    private final ConcurrentHashMap<Value,Value> vertices;
 
     public CHMScheduler(final GASEngine gasEngine) {
 
-        vertices = new ConcurrentHashMap<IV,IV>(gasEngine.getNThreads());
+        vertices = new ConcurrentHashMap<Value, Value>(gasEngine.getNThreads());
 
     }
 
     @Override
-    public void schedule(final IV v) {
+    public void schedule(final Value v) {
 
         vertices.putIfAbsent(v,v);
 

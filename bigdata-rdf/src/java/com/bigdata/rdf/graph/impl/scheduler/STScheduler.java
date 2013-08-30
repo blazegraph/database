@@ -3,29 +3,29 @@ package com.bigdata.rdf.graph.impl.scheduler;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
+import org.openrdf.model.Value;
+
 import com.bigdata.rdf.graph.IGASSchedulerImpl;
 import com.bigdata.rdf.graph.IStaticFrontier;
 import com.bigdata.rdf.graph.impl.GASEngine;
-import com.bigdata.rdf.internal.IV;
 
 /**
  * A scheduler suitable for a single thread.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
-@SuppressWarnings("rawtypes")
 public class STScheduler implements IGASSchedulerImpl {
 
-    final Set<IV> vertices;
+    final Set<Value> vertices;
     
     public STScheduler(final GASEngine gasEngine) {
 
-        this.vertices = new LinkedHashSet<IV>();
+        this.vertices = new LinkedHashSet<Value>();
     
     }
     
     @Override
-    public void schedule(final IV v) {
+    public void schedule(final Value v) {
     
         vertices.add(v);
         

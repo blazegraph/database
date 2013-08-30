@@ -3,11 +3,12 @@ package com.bigdata.rdf.graph.impl;
 import java.util.Arrays;
 import java.util.Iterator;
 
+import org.openrdf.model.Value;
+
 import com.bigdata.rdf.graph.IStaticFrontier;
 import com.bigdata.rdf.graph.impl.util.IArraySlice;
 import com.bigdata.rdf.graph.impl.util.IManagedArray;
 import com.bigdata.rdf.graph.impl.util.ManagedArray;
-import com.bigdata.rdf.internal.IV;
 
 /**
  * An implementation of a "static" frontier that grows and reuses the backing
@@ -18,19 +19,18 @@ import com.bigdata.rdf.internal.IV;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
-@SuppressWarnings("rawtypes")
 public class StaticFrontier2 implements IStaticFrontier {
 
     /**
      * The backing structure.
      */
-    private final IManagedArray<IV> backing;
+    private final IManagedArray<Value> backing;
     
     /**
      * A slice onto the {@link #backing} structure for the current frontier.
      * This gets replaced when the frontier is changed.
      */
-    private IArraySlice<IV> vertices;
+    private IArraySlice<Value> vertices;
 
     private boolean compact = true;
     
@@ -39,7 +39,7 @@ public class StaticFrontier2 implements IStaticFrontier {
         /*
          * The managed backing array.
          */
-        backing = new ManagedArray<IV>(IV.class);
+        backing = new ManagedArray<Value>(Value.class);
 
         /*
          * Initialize with an empty slice. The backing [] will grow as
@@ -77,7 +77,7 @@ public class StaticFrontier2 implements IStaticFrontier {
     }
 
     @Override
-    public Iterator<IV> iterator() {
+    public Iterator<Value> iterator() {
 
         return vertices.iterator();
 
@@ -102,7 +102,7 @@ public class StaticFrontier2 implements IStaticFrontier {
 
         if (len1 > len0) {
 
-            final IV[] a = backing.array();
+            final Value[] a = backing.array();
 
             for (int i = len0; i < len1; i++) {
 
@@ -135,7 +135,8 @@ public class StaticFrontier2 implements IStaticFrontier {
      * @param slice
      *            The slice.
      */
-    public void copyIntoResetFrontier(final int off, final IArraySlice<IV> slice) {
+    public void copyIntoResetFrontier(final int off,
+            final IArraySlice<Value> slice) {
 
         backing.put(off/* dstoff */, slice.array()/* src */,
                 slice.off()/* srcoff */, slice.len()/* srclen */);
@@ -148,7 +149,7 @@ public class StaticFrontier2 implements IStaticFrontier {
      */
     @Override
     public void resetFrontier(final int minCapacity, final boolean ordered,
-            final Iterator<IV> itr) {
+            final Iterator<Value> itr) {
 
         copyScheduleIntoFrontier(minCapacity, itr);
 
@@ -174,19 +175,19 @@ public class StaticFrontier2 implements IStaticFrontier {
      *            The source from which we will repopulate the backing array.
      */
     private void copyScheduleIntoFrontier(final int minCapacity,
-            final Iterator<IV> itr) {
+            final Iterator<Value> itr) {
 
         // ensure enough capacity for the new frontier.
         backing.ensureCapacity(minCapacity);
 
         // the actual backing array. should not changed since pre-extended.
-        final IV[] a = backing.array();
+        final Value[] a = backing.array();
 
         int nvertices = 0;
 
         while (itr.hasNext()) {
 
-            final IV v = itr.next();
+            final Value v = itr.next();
 
             a[nvertices++] = v;
 

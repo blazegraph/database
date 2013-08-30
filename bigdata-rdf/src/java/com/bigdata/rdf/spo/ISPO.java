@@ -28,6 +28,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.spo;
 
+import org.openrdf.model.Statement;
+
 import com.bigdata.bop.IElement;
 import com.bigdata.rdf.inf.Justification;
 import com.bigdata.rdf.inf.TruthMaintenance;
@@ -66,7 +68,7 @@ import com.bigdata.striterator.IChunkedOrderedIterator;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface ISPO extends IElement {
+public interface ISPO extends IElement, Statement {
 
     /**
      * The term identifier for the subject position (slot 0) -or- {@link #NULL}.
