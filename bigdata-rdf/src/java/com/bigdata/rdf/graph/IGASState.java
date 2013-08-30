@@ -1,7 +1,8 @@
 package com.bigdata.rdf.graph;
 
-import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.spo.ISPO;
+import org.openrdf.model.Statement;
+import org.openrdf.model.URI;
+import org.openrdf.model.Value;
 
 /**
  * Interface exposes access to the VS and ES that is visible during a GATHER or
@@ -42,7 +43,7 @@ public interface IGASState<VS,ES, ST> {
      * @throws IllegalArgumentException
      *             if no vertices are specified.
      */
-    void init(@SuppressWarnings("rawtypes") IV... v);
+    void init(Value... v);
 
     /**
      * Discard computation state (the frontier, vertex state, and edge state)
@@ -70,7 +71,7 @@ public interface IGASState<VS,ES, ST> {
      * 
      * @see IGASProgram#getVertexStateFactory()
      */
-    VS getState(@SuppressWarnings("rawtypes") IV v);
+    VS getState(Value v);
 
     /**
      * Get the state for the edge using the appropriate factory. If this is the
@@ -84,7 +85,7 @@ public interface IGASState<VS,ES, ST> {
      * 
      * @see IGASProgram#getEdgeStateFactory()
      */
-    ES getState(ISPO e);
+    ES getState(Statement e);
 
     /**
      * The current frontier.
@@ -120,12 +121,96 @@ public interface IGASState<VS,ES, ST> {
     void traceState();
 
     /**
+     * Return the other end of a link.
+     * 
+     * @param u
+     *            One end of the link.
+     * @param e
+     *            The link.
+     * 
+     * @return The other end of the link.
+     */
+    Value getOtherVertex(Value u, Statement e);
+    
+    /**
      * Return a useful representation of an edge (non-batch API, debug only).
+     * This method is only required when the edge objects are internal database
+     * objects lacking fully materialized RDF {@link Value}s. In this case, it
+     * will materialize the RDF Values and present a pleasant view of the edge.
+     * The materialization step is a random access, which is why this method is
+     * for debug only. Efficient, vectored mechanisms exist to materialize RDF
+     * {@link Value}s for other purposes, e.g., when exporting a set of edges as
+     * as graph in a standard interchange syntax.
      * 
      * @param e
      *            The edge.
      * @return The representation of that edge.
      */
-    String toString(ISPO e);
+    String toString(Statement e);
 
+    /**
+     * Return <code>true</code> iff the given {@link Statement} models an edge
+     * that connects two vertices ({@link Statement}s also model property
+     * values).
+     * 
+     * @param e
+     *            The statement.
+     *            
+     * @return <code>true</code> iff that {@link Statement} is an edge of the
+     *         graph.
+     */
+    boolean isEdge(final Statement e);
+    
+    /**
+     * Return <code>true</code> iff the given {@link Statement} models an
+     * property value for a vertex of the graph ({@link Statement}s also model
+     * edges).
+     * 
+     * @param e
+     *            The statement.
+     * @return <code>true</code> iff that {@link Statement} is an edge of the
+     *         graph.
+     */
+    boolean isAttrib(Statement e);
+    
+    /**
+     * Return <code>true</code> iff the statement models a link attribute having
+     * the specified link type. When this method returns <code>true</code>, the
+     * {@link Statement#getSubject()} may be decoded to obtain the link
+     * described by that link attribute using {@link #decodeStatement(Value)}.
+     * 
+     * @param e
+     *            The statement.
+     * @param linkAttribType
+     *            The type for the link attribute.
+     * 
+     * @return <code>true</code> iff the statement is an instance of a link
+     *         attribute for the specified link type.
+     */
+    boolean isLinkAttrib(Statement e, URI linkAttribType);
+    
+    /**
+     * If the vertex is actually an edge, then return the decoded edge.
+     * <p>
+     * Note: A vertex may be an edge. A link attribute is modeled by treating
+     * the link as a vertex and then asserting a property value about that
+     * "link vertex". For bigdata, this is handled efficiently as inline
+     * statements about statements. This approach subsumes the property graph
+     * model (property graphs do not permit recursive nesting of these
+     * relationships) and is 100% consistent with RDF reification, except that
+     * the link attributes are modeled efficiently inline with the links. This
+     * is what we call <a
+     * href="http://www.bigdata.com/whitepapers/reifSPARQL.pdf" > Reification
+     * Done Right </a>.
+     * 
+     * @param v
+     *            The vertex.
+     * 
+     * @return The edge decoded from that vertex and <code>null</code> iff the
+     *         vertex is not an edge.
+     * 
+     *         TODO RDR : Link to an RDR wiki page as well.
+     */
+    Statement decodeStatement(Value v);
+    
 }

@@ -35,8 +35,9 @@ import java.util.LinkedHashSet;
 import java.util.Properties;
 import java.util.Set;
 
-import junit.framework.TestCase2;
+import junit.framework.TestCase;
 
+import org.apache.log4j.Logger;
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.rio.RDFFormat;
 
@@ -55,8 +56,11 @@ import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.vocab.decls.FOAFVocabularyDecl;
 
-public class AbstractGraphTestCase extends TestCase2 {
+public class AbstractGraphTestCase extends TestCase {
 
+    private static final Logger log = Logger
+            .getLogger(AbstractGraphTestCase.class);
+    
     public AbstractGraphTestCase() {
     }
 
@@ -66,7 +70,6 @@ public class AbstractGraphTestCase extends TestCase2 {
 
     protected BigdataSail sail = null;
 
-    @Override
     public Properties getProperties() {
         
         final Properties p = new Properties();
@@ -117,32 +120,15 @@ public class AbstractGraphTestCase extends TestCase2 {
      * 
      * @param resource
      *            A filename that is relative to the base of the project.
+     *            
+     * @throws URISyntaxException
+     * @throws IOException
      * 
      */
-    protected void loadGraph(final String resource) {
+    protected void loadGraph(final String resource) throws IOException,
+            URISyntaxException {
 
-        try {
-
-            _loadGraph(resource, sail.getDatabase());
-            
-//            final RDFFormat rdfFormat = RDFFormat.forFileName(resource);
-//
-//            // Load data.
-//            final LoadStats loadStats = sail.getDatabase().getDataLoader()
-//                    .loadData(resource, "file:" + resource, rdfFormat);
-//
-//            if (log.isInfoEnabled())
-//                log.info(loadStats.toString());
-
-        } catch (IOException ex) {
-
-            fail(resource + " : " + ex, ex);
-
-        } catch (URISyntaxException ex) {
-
-            fail(resource + " : " + ex, ex);
-
-        }
+        _loadGraph(resource, sail.getDatabase());
 
         // Commit.
         sail.getDatabase().commit();
@@ -348,7 +334,7 @@ public class AbstractGraphTestCase extends TestCase2 {
         public final BigdataURI rdfType, foafKnows, foafPerson, mike, bryan,
                 martyn;
 
-        public SmallGraphProblem() {
+        public SmallGraphProblem() throws IOException, URISyntaxException {
 
             loadGraph(smallGraph);
             
@@ -388,8 +374,12 @@ public class AbstractGraphTestCase extends TestCase2 {
 
     /**
      * Load and setup the {@link SmallGraphProblem}.
+     * 
+     * @throws URISyntaxException
+     * @throws IOException
      */
-    protected SmallGraphProblem setupSmallGraphProblem() {
+    protected SmallGraphProblem setupSmallGraphProblem() throws IOException,
+            URISyntaxException {
 
         return new SmallGraphProblem();
 

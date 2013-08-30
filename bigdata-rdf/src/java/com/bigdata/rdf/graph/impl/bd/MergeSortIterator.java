@@ -1,18 +1,20 @@
-package com.bigdata.rdf.graph.impl.util;
+package com.bigdata.rdf.graph.impl.bd;
 
 import java.util.Iterator;
 import java.util.NoSuchElementException;
+
+import org.openrdf.model.Value;
 
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVUtility;
 
 /**
- * An N-way merge sort of N source iterators visiting {@link IV}s.
+ * An N-way merge sort of N source iterators visiting {@link Value}s (which are
+ * actually {@link IV}s).
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
-@SuppressWarnings("rawtypes")
-public class MergeSortIterator implements Iterator<IV> {
+public class MergeSortIterator implements Iterator<Value> {
 
     // private final static Logger log =
     // Logger.getLogger(MergeSortIterator.class);
@@ -25,7 +27,7 @@ public class MergeSortIterator implements Iterator<IV> {
     /**
      * The source iterators in the order given to the ctor.
      */
-    private final Iterator<IV>[] sourceIterator;
+    private final Iterator<Value>[] sourceIterator;
 
     /**
      * The current value from each source and <code>null</code> if we need to
@@ -34,7 +36,7 @@ public class MergeSortIterator implements Iterator<IV> {
      * this array are <code>null</code> there are no more values to be visited
      * and we are done.
      */
-    private final IV[] sourceTuple;
+    private final Value[] sourceTuple;
 
     /**
      * Index into {@link #sourceIterator} and {@link #sourceTuple} of the
@@ -46,9 +48,9 @@ public class MergeSortIterator implements Iterator<IV> {
     /**
      * 
      * @param sourceIterators
-     *            Each source iterator MUST be in ascending {@link IV} order.
+     *            Each source iterator MUST be in ascending {@link Value} order.
      */
-    public MergeSortIterator(final Iterator<IV>[] sourceIterators) {
+    public MergeSortIterator(final Iterator<Value>[] sourceIterators) {
 
         assert sourceIterators != null;
 
@@ -64,7 +66,7 @@ public class MergeSortIterator implements Iterator<IV> {
 
         this.sourceIterator = sourceIterators;
 
-        sourceTuple = new IV[n];
+        sourceTuple = new Value[n];
 
     }
 
@@ -133,7 +135,7 @@ public class MergeSortIterator implements Iterator<IV> {
                 // current is index of the smallest key so far.
                 assert current == -1;
 
-                IV key = null; // smallest key so far.
+                Value key = null; // smallest key so far.
 
                 for (int i = 0; i < n; i++) {
 
@@ -155,9 +157,9 @@ public class MergeSortIterator implements Iterator<IV> {
 
                     } else {
 
-                        final IV tmp = sourceTuple[i];
+                        final Value tmp = sourceTuple[i];
 
-                        final int ret = IVUtility.compare(tmp, key);
+                        final int ret = compare(tmp, key);
 
                         if (ret < 0) {
 
@@ -196,7 +198,7 @@ public class MergeSortIterator implements Iterator<IV> {
     }
 
     @Override
-    public IV next() {
+    public Value next() {
 
         if (!hasNext())
             throw new NoSuchElementException();
@@ -210,9 +212,9 @@ public class MergeSortIterator implements Iterator<IV> {
      * 
      * @return The {@link #current} tuple.
      */
-    private IV consumeLookaheadTuple() {
+    private Value consumeLookaheadTuple() {
 
-        final IV t = sourceTuple[current];
+        final Value t = sourceTuple[current];
 
         // clear tuples from other sources having the same key as the
         // current tuple.
@@ -232,7 +234,7 @@ public class MergeSortIterator implements Iterator<IV> {
 
         assert current != -1;
 
-        final IV key = sourceTuple[current];
+        final Value key = sourceTuple[current];
 
         for (int i = current + 1; i < n; i++) {
 
@@ -244,9 +246,9 @@ public class MergeSortIterator implements Iterator<IV> {
 
             }
 
-            final IV tmp = sourceTuple[i];
+            final Value tmp = sourceTuple[i];
 
-            final int ret = IVUtility.compare(key, tmp);
+            final int ret = compare(key, tmp);
 
             if (ret == 0) {
 
@@ -274,4 +276,14 @@ public class MergeSortIterator implements Iterator<IV> {
 
     }
 
-} // MergeSortIterator
+    /**
+     * Compare two {@link Value}s (which are actually {@link IV}s).
+     */
+    @SuppressWarnings("rawtypes")
+    private int compare(final Value a, final Value b) {
+
+        return IVUtility.compare((IV) a, (IV) b);
+        
+    }
+
+}

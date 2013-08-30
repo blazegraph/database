@@ -2,7 +2,7 @@ package com.bigdata.rdf.graph.impl;
 
 import java.util.concurrent.Callable;
 
-import com.bigdata.rdf.internal.IV;
+import org.openrdf.model.Value;
 
 /**
  * A factory for tasks that are applied to each vertex in the frontier.
@@ -20,6 +20,6 @@ public interface VertexTaskFactory<T> {
      * 
      * @return The task.
      */
-    Callable<T> newVertexTask(@SuppressWarnings("rawtypes") IV u);
+    Callable<T> newVertexTask(Value u);
 
 }

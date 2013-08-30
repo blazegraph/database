@@ -9,17 +9,18 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
 import org.apache.log4j.Logger;
+import org.openrdf.model.Value;
 
+import com.bigdata.rdf.graph.GASUtil;
 import com.bigdata.rdf.graph.IGASScheduler;
 import com.bigdata.rdf.graph.IGASSchedulerImpl;
 import com.bigdata.rdf.graph.IStaticFrontier;
 import com.bigdata.rdf.graph.impl.GASEngine;
 import com.bigdata.rdf.graph.impl.StaticFrontier2;
+import com.bigdata.rdf.graph.impl.bd.MergeSortIterator;
 import com.bigdata.rdf.graph.impl.util.GASImplUtil;
 import com.bigdata.rdf.graph.impl.util.IArraySlice;
 import com.bigdata.rdf.graph.impl.util.ManagedArray;
-import com.bigdata.rdf.graph.impl.util.MergeSortIterator;
-import com.bigdata.rdf.internal.IV;
 
 /**
  * This scheduler uses thread-local buffers ({@link LinkedHashSet}) to track the
@@ -32,7 +33,6 @@ import com.bigdata.rdf.internal.IV;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
-@SuppressWarnings("rawtypes")
 public class TLScheduler2 implements IGASSchedulerImpl {
 
     private static final Logger log = Logger.getLogger(TLScheduler2.class);
@@ -58,13 +58,13 @@ public class TLScheduler2 implements IGASSchedulerImpl {
          * per-thread schedules are then combined into a single compact frontier
          * for the new round.
          */
-        private final ManagedArray<IV> tmp;
+        private final ManagedArray<Value> tmp;
 
         public MySTScheduler(final GASEngine gasEngine) {
 
             super(gasEngine);
 
-            tmp = new ManagedArray<IV>(IV.class, 64);
+            tmp = new ManagedArray<Value>(Value.class, 64);
 
         }
         
@@ -114,7 +114,7 @@ public class TLScheduler2 implements IGASSchedulerImpl {
     }
 
     @Override
-    public void schedule(final IV v) {
+    public void schedule(final Value v) {
 
         threadLocalScheduler().schedule(v);
 
@@ -182,7 +182,7 @@ public class TLScheduler2 implements IGASSchedulerImpl {
              */
 
             frontier.resetFrontier(0/* minCapacity */, true/* ordered */,
-                    GASImplUtil.EMPTY_VERTICES_ITERATOR);
+                    GASUtil.EMPTY_VERTICES_ITERATOR);
 
             return;
 
@@ -200,7 +200,7 @@ public class TLScheduler2 implements IGASSchedulerImpl {
 //         * Extract a sorted, compact frontier from each thread local frontier.
 //         */
 //        @SuppressWarnings("unchecked")
-//        final IArraySlice<IV>[] frontiers = new IArraySlice[nsources];
+//        final IArraySlice<Value>[] frontiers = new IArraySlice[nsources];
 
         // TODO Requires a specific class to work! API!
         final StaticFrontier2 f2 = (StaticFrontier2) frontier;
@@ -210,17 +210,17 @@ public class TLScheduler2 implements IGASSchedulerImpl {
             f2.resetAndEnsureCapacity(nvertices);
             f2.setCompact(false); // NOT COMPACT!
             
-            final List<Callable<IArraySlice<IV>>> tasks = new ArrayList<Callable<IArraySlice<IV>>>(
+            final List<Callable<IArraySlice<Value>>> tasks = new ArrayList<Callable<IArraySlice<Value>>>(
                     nsources);
 
             int i = 0;
             for (MySTScheduler s : map.values()) { // TODO Paranoia suggests to put these into an [] so we know that we have the same traversal order as above. That might not be guaranteed.
                 final MySTScheduler t = s;
                 final int index = i++;
-                tasks.add(new Callable<IArraySlice<IV>>() {
+                tasks.add(new Callable<IArraySlice<Value>>() {
                     @Override
-                    public IArraySlice<IV> call() throws Exception {
-                        final IArraySlice<IV> orderedSegment = GASImplUtil
+                    public IArraySlice<Value> call() throws Exception {
+                        final IArraySlice<Value> orderedSegment = GASImplUtil
                                 .compactAndSort(t.vertices, t.tmp);
                         f2.copyIntoResetFrontier(off[index], orderedSegment);
                         return orderedSegment; // TODO CAN RETURN Void now!
@@ -229,18 +229,18 @@ public class TLScheduler2 implements IGASSchedulerImpl {
             }
             
             // invokeAll() - futures will be done() before it returns.
-            final List<Future<IArraySlice<IV>>> futures;
+            final List<Future<IArraySlice<Value>>> futures;
             try {
                 futures = gasEngine.getGASThreadPool().invokeAll(tasks);
             } catch (InterruptedException e) {
                 throw new RuntimeException(e);
             }
 
-            for (Future<IArraySlice<IV>> f : futures) {
+            for (Future<IArraySlice<Value>> f : futures) {
 
                 try {
                     f.get();
-//                    final IArraySlice<IV> b = frontiers[nsources] = f.get();
+//                    final IArraySlice<Value> b = frontiers[nsources] = f.get();
 //                    nvertices += b.len();
 //                    nsources++;
                 } catch (InterruptedException e) {
@@ -276,12 +276,12 @@ public class TLScheduler2 implements IGASSchedulerImpl {
 //     *            The new frontier to be populated.
 //     */
 //    private void mergeSortSourcesAndSetFrontier(final int nsources,
-//            final int nvertices, final IArraySlice<IV>[] frontiers,
+//            final int nvertices, final IArraySlice<Value>[] frontiers,
 //            final IStaticFrontier frontier) {
 //
-//        // wrap IVs[] as Iterators.
+//        // wrap Values[] as Iterators.
 //        @SuppressWarnings("unchecked")
-//        final Iterator<IV>[] itrs = new Iterator[nsources];
+//        final Iterator<Value>[] itrs = new Iterator[nsources];
 //
 //        for (int i = 0; i < nsources; i++) {
 //
@@ -290,7 +290,7 @@ public class TLScheduler2 implements IGASSchedulerImpl {
 //        }
 //
 //        // merge sort of those iterators.
-//        final Iterator<IV> itr = new MergeSortIterator(itrs);
+//        final Iterator<Value> itr = new MergeSortIterator(itrs);
 //
 //        frontier.resetFrontier(nvertices/* minCapacity */, true/* ordered */,
 //                itr);

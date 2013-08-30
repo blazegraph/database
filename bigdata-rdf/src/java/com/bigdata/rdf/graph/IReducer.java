@@ -26,7 +26,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.rdf.graph;
 
-import com.bigdata.rdf.internal.IV;
+import org.openrdf.model.Value;
 
 /**
  * An interface for computing reductions over the vertices of a graph.
@@ -48,7 +48,7 @@ public interface IReducer<VS,ES, ST, T> {
      *            The result from applying the procedure to a single index
      *            partition.
      */
-    public void visit(IGASState<VS, ES, ST> ctx, @SuppressWarnings("rawtypes") IV u);
+    public void visit(IGASState<VS, ES, ST> ctx, Value u);
 
     /**
      * Return the aggregated results as an implementation dependent object.

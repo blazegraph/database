@@ -2,6 +2,10 @@ package com.bigdata.rdf.graph.impl.bd;
 
 import java.lang.ref.WeakReference;
 import java.util.Iterator;
+import java.util.Random;
+
+import org.openrdf.model.Statement;
+import org.openrdf.model.Value;
 
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IRangeQuery;
@@ -27,9 +31,9 @@ import com.bigdata.rdf.internal.IVUtility;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPOKeyOrder;
 import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.relation.accesspath.EmptyCloseableIterator;
 import com.bigdata.service.IBigdataFederation;
 
+import cutthecrap.utils.striterators.EmptyIterator;
 import cutthecrap.utils.striterators.Filter;
 import cutthecrap.utils.striterators.IStriterator;
 import cutthecrap.utils.striterators.Resolver;
@@ -197,13 +201,14 @@ public class BigdataGASEngine extends GASEngine {
          * @param timestamp
          *            The timestamp of the view.
          */
-        private BigdataGraphAccessor(final String namespace,final long timestamp) {
-    
+        private BigdataGraphAccessor(final String namespace,
+                final long timestamp) {
+
             this.namespace = namespace;
             this.timestamp = timestamp;
-            
+
         }
-        
+
         @Override
         public void advanceView() {
 
@@ -307,13 +312,13 @@ public class BigdataGASEngine extends GASEngine {
 
         @SuppressWarnings({ "unchecked", "rawtypes" })
         private IStriterator getEdges(final AbstractTripleStore kb,
-                final boolean inEdges, final IGASProgram<?, ?, ?> program,
+                final boolean inEdges, final IGASContext<?, ?, ?> ctx,
                 final IV u) {
 
             final SPOKeyOrder keyOrder;
             final IIndex ndx;
             final IKeyBuilder keyBuilder;
-            final IV linkTypeIV = program.getLinkType();
+            final IV linkTypeIV = (IV) ctx.getGASProgram().getLinkType();
             /*
              * Optimize case where P is a constant and O is known (2 bound).
              * 
@@ -408,32 +413,20 @@ public class BigdataGASEngine extends GASEngine {
              * much more efficient. (If the index is local, then simply stacking
              * striterators is just as efficient.)
              */
-            return program.constrainFilter(sitr);
+            return ((IGASProgram) ctx.getGASProgram()).constrainFilter(ctx,
+                    sitr);
 
         }
 
-        /**
-         * Return the edges for the vertex.
-         * 
-         * @param p
-         *            The {@link IGASProgram}.
-         * @param u
-         *            The vertex.
-         * @param edges
-         *            Typesafe enumeration indicating which edges should be
-         *            visited.
-         * 
-         * @return An iterator that will visit the edges for that vertex.
-         */
         @SuppressWarnings("unchecked")
-        public Iterator<ISPO> getEdges(final IGASProgram<?, ?, ?> p,
+        private Iterator<ISPO> _getEdges(final IGASContext<?, ?, ?> p,
                 @SuppressWarnings("rawtypes") final IV u, final EdgesEnum edges) {
 
             final AbstractTripleStore kb = getKB();
             
             switch (edges) {
             case NoEdges:
-                return new EmptyCloseableIterator<ISPO>();
+                return EmptyIterator.DEFAULT;
             case InEdges:
                 return getEdges(kb, true/* inEdges */, p, u);
             case OutEdges:
@@ -447,6 +440,24 @@ public class BigdataGASEngine extends GASEngine {
             default:
                 throw new UnsupportedOperationException(edges.name());
             }
+
+        }
+
+        @SuppressWarnings({ "unchecked", "rawtypes" })
+        @Override
+        public Iterator<Statement> getEdges(final IGASContext<?, ?, ?> ctx,
+                final Value u, final EdgesEnum edges) {
+
+            return (Iterator) _getEdges(ctx, (IV) u, edges);
+
+        }
+
+        @Override
+        public Value[] getRandomSample(final Random r,
+                final int desiredSampleSize) {
+
+            return BigdataGASUtil
+                    .getRandomSample(r, getKB(), desiredSampleSize);
 
         }
 

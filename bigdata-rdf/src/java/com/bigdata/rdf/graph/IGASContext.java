@@ -45,5 +45,11 @@ public interface IGASContext<VS, ES, ST> extends Callable<IGASStats> {
      */
     boolean doRound(IGASStats stats) throws Exception, ExecutionException,
             InterruptedException;
+ 
+    /**
+     * Execute the associated {@link IGASProgram}.
+     */
+    @Override
+    IGASStats call() throws Exception;
     
 }

@@ -1,7 +1,7 @@
 package com.bigdata.rdf.graph;
 
-import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.spo.ISPO;
+import org.openrdf.model.Statement;
+import org.openrdf.model.Value;
 
 import cutthecrap.utils.striterators.IStriterator;
 
@@ -20,7 +20,7 @@ import cutthecrap.utils.striterators.IStriterator;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
-public interface IGASOptions<VS, ES> {
+public interface IGASOptions<VS, ES, ST> {
 
     /**
      * Return the set of edges to which the GATHER is applied -or-
@@ -41,15 +41,14 @@ public interface IGASOptions<VS, ES> {
      * map, so if the algorithm does not use vertex state, then the factory
      * should return a singleton instance each time it is invoked.
      */
-    @SuppressWarnings("rawtypes")
-    Factory<IV, VS> getVertexStateFactory();
+    Factory<Value, VS> getVertexStateFactory();
 
     /**
      * Return a factory for edge state objects -or- <code>null</code> if the
      * {@link IGASProgram} does not use edge state (in which case the edge state
      * will not be allocated or maintained).
      */
-    Factory<ISPO, ES> getEdgeStateFactory();
+    Factory<Statement, ES> getEdgeStateFactory();
 
     /**
      * Return non-<code>null</code> iff there is a single link type to be
@@ -61,55 +60,30 @@ public interface IGASOptions<VS, ES> {
      * property set for the vertex. The graph is treated as if it were an
      * unattributed graph and only mined for the connectivity data.
      * 
-     * @return The {@link IV} for the predicate that identifies the desired link
-     *         type (there can be many types of links - the return value
+     * @return The {@link Value} for the predicate that identifies the desired
+     *         link type (there can be many types of links - the return value
      *         specifies which attribute is of interest).
      * 
      * @see #getLinkAttribType()
      */
-    @SuppressWarnings("rawtypes")
-    IV getLinkType();
-
-//    /**
-//     * Return non-<code>null</code> iff there is a single link type to be
-//     * visited. This corresponds to a view of the graph as a sparse matrix where
-//     * the data in the matrix provides the link weights. The type of the visited
-//     * link weights is specified by the return value for this method. The
-//     * {@link IGASEngine} can optimize traversal patterns using the
-//     * <code>POS</code> index.
-//     * <p>
-//     * Note: When this option is used, the scatter and gather will not visit the
-//     * property set for the vertex. The graph is treated as if it were an
-//     * unattributed graph and only mined for the connectivity data.
-//     * 
-//     * @return The {@link IV} for the predicate that identifies the desired link
-//     *         attribute type (a link can have many attributes - the return
-//     *         value specifies which attribute is of interest).
-//     * 
-//     * @see #getLinkType()
-//     */
-//    IV getLinkAttribType();
-//    
-//    /**
-//     * When non-<code>null</code>, the specified {@link Filter} will be used to
-//     * restrict the visited edges. For example, you can restrict the visitation
-//     * to a subset of the predicates that are of interest, to only visit edges
-//     * that have link edges, to visit only select property values, etc. Some
-//     * useful filters are defined in an abstract implementation of this
-//     * interface.
-//     * 
-//     * @see #visitPropertySet()
-//     */
-//    IFilterTest getEdgeFilter();
+    Value getLinkType();
 
     /**
      * Hook to impose a constraint on the visited edges and/or property values.
      * 
      * @param itr
      *            The iterator visiting those edges and/or property values.
-     *            
+     * 
      * @return Either the same iterator or a constrained iterator.
+     * 
+     *         TODO Rename as constrainEdgeFilter or even split into a
+     *         constrainGatherFilter and a constraintScatterFilter.
+     * 
+     *         FIXME APPLY : If we need access to the vertex property values in
+     *         APPLY (which we probably do, at least optionally), then there
+     *         should be a similar method to decide whether the property values
+     *         for the vertex are made available during the APPLY.
      */
-    IStriterator constrainFilter(IStriterator eitr);
+    IStriterator constrainFilter(IGASContext<VS, ES, ST> ctx, IStriterator eitr);
     
 }

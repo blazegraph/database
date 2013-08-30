@@ -1,13 +1,14 @@
 package com.bigdata.rdf.graph.impl;
 
+import org.openrdf.model.Statement;
+import org.openrdf.model.URI;
+import org.openrdf.model.Value;
+
 import com.bigdata.rdf.graph.EdgesEnum;
 import com.bigdata.rdf.graph.Factory;
 import com.bigdata.rdf.graph.IGASContext;
 import com.bigdata.rdf.graph.IGASProgram;
 import com.bigdata.rdf.graph.IGASState;
-import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.impl.bnode.SidIV;
-import com.bigdata.rdf.spo.ISPO;
 
 import cutthecrap.utils.striterators.Filter;
 import cutthecrap.utils.striterators.IFilter;
@@ -21,105 +22,8 @@ import cutthecrap.utils.striterators.IStriterator;
  * @param <ES>
  * @param <ST>
  */
-@SuppressWarnings("rawtypes")
 abstract public class BaseGASProgram<VS, ES, ST> implements
         IGASProgram<VS, ES, ST> {
-
-    /**
-     * Filter visits only edges (filters out attribute values).
-     * <p>
-     * Note: This filter is pushed down onto the AP and evaluated close to the
-     * data.
-     */
-    protected static final IFilter edgeOnlyFilter = new Filter() {
-        private static final long serialVersionUID = 1L;
-
-        @Override
-        public boolean isValid(final Object e) {
-            return ((ISPO) e).o().isURI();
-        }
-    };
-
-    /**
-     * Return <code>true</code> iff the visited {@link ISPO} is an instance
-     * of the specified link attribute type.
-     * 
-     * @return
-     */
-    protected static final IFilter newLinkAttribFilter(final IV linkAttribType) {
-
-        return new LinkAttribFilter(linkAttribType);
-        
-    }
-
-    static class LinkAttribFilter extends Filter {
-
-        private static final long serialVersionUID = 1L;
-
-        private final IV linkAttribType;
-        
-        public LinkAttribFilter(final IV linkAttribType) {
-         
-            if (linkAttribType == null)
-                throw new IllegalArgumentException();
-
-            this.linkAttribType = linkAttribType;
-            
-        }
-
-        @Override
-        public boolean isValid(final Object e) {
-            final ISPO edge = (ISPO) e;
-            if(!edge.p().equals(linkAttribType)) {
-                // Edge does not use the specified link attribute type.
-                return false;
-            }
-            if (!(edge.s() instanceof SidIV)) {
-                // The subject of the edge is not a Statement.
-                return false;
-            }
-            return true;
-        }
-
-    }
-    
-    /**
-     * If the vertex is actually an edge, then return the decoded edge.
-     * <p>
-     * Note: A vertex may be an edge. A link attribute is modeled by treating
-     * the link as a vertex and then asserting a property value about that
-     * "link vertex". For bigdata, this is handled efficiently as inline
-     * statements about statements. This approach subsumes the property graph
-     * model (property graphs do not permit recursive nesting of these
-     * relationships) and is 100% consistent with RDF reification, except that
-     * the link attributes are modeled efficiently inline with the links. This
-     * is what we call <a
-     * href="http://www.bigdata.com/whitepapers/reifSPARQL.pdf" > Reification
-     * Done Right </a>.
-     * 
-     * @param v
-     *            The vertex.
-     * 
-     * @return The edge decoded from that vertex and <code>null</code> iff the
-     *         vertex is not an edge.
-     * 
-     *         TODO RDR : Link to an RDR wiki page as well.
-     * 
-     *         TODO We can almost write the same logic at the openrdf layer
-     *         using <code>v instanceof Statement</code>. However, v can not be
-     *         a Statement for openrdf and there is no way to decode the vertex
-     *         as a Statement in openrdf.
-     */
-    protected ISPO decodeStatement(final IV v) {
-
-        if (!v.isStatement())
-            return null;
-
-        final ISPO decodedEdge = (ISPO) v.getInlineValue();
-
-        return decodedEdge;
-
-    }
 
     /**
      * {@inheritDoc}
@@ -128,7 +32,7 @@ abstract public class BaseGASProgram<VS, ES, ST> implements
      * connectivity matrix (returns <code>null</code>).
      */
     @Override
-    public IV getLinkType() {
+    public Value getLinkType() {
         
         return null;
         
@@ -140,12 +44,95 @@ abstract public class BaseGASProgram<VS, ES, ST> implements
      * The default implementation returns its argument.
      */
     @Override
-    public IStriterator constrainFilter(IStriterator itr) {
-        
+    public IStriterator constrainFilter(final IGASContext<VS, ES, ST> ctx,
+            final IStriterator itr) {
+
         return itr;
         
     }
     
+    /**
+     * Return an {@link IFilter} that will only visit the edges of the graph.
+     * 
+     * @see IGASState#isEdge(Statement)
+     */
+    protected IFilter getEdgeOnlyFilter(final IGASContext<VS, ES, ST> ctx) {
+
+        return new EdgeOnlyFilter(ctx);
+        
+    }
+    
+    /**
+     * Filter visits only edges (filters out attribute values).
+     * <p>
+     * Note: This filter is pushed down onto the AP and evaluated close to the
+     * data.
+     */
+    private class EdgeOnlyFilter extends Filter {
+        private static final long serialVersionUID = 1L;
+        private final IGASState<VS, ES, ST> gasState;
+        private EdgeOnlyFilter(final IGASContext<VS, ES, ST> ctx) {
+            this.gasState = ctx.getGASState();
+        }
+        @Override
+        public boolean isValid(final Object e) {
+            return gasState.isEdge((Statement) e);
+        }
+    };
+    
+    /**
+     * Return a filter that only visits the edges of graph that are instances of
+     * the specified link attribute type.
+     * <p>
+     * Note: For bigdata, the visited edges can be decoded to recover the
+     * original link as well. 
+     * 
+     * @see IGASState#isLinkAttrib(Statement, URI)
+     * @see IGASState#decodeStatement(Value)
+     */
+    protected IFilter getLinkAttribFilter(final IGASContext<VS, ES, ST> ctx,
+            final URI linkAttribType) {
+
+        return new LinkAttribFilter(ctx, linkAttribType);
+
+    }
+
+    /**
+     * Filter visits only edges where the {@link Statement} is an instance of
+     * the specified link attribute type. For bigdata, the visited edges can be
+     * decoded to recover the original link as well.
+     */
+    private class LinkAttribFilter extends Filter {
+        private static final long serialVersionUID = 1L;
+
+        private final IGASState<VS, ES, ST> gasState;
+        private final URI linkAttribType;
+        
+        public LinkAttribFilter(final IGASContext<VS, ES, ST> ctx,
+                final URI linkAttribType) {
+            if (linkAttribType == null)
+                throw new IllegalArgumentException();
+            this.gasState = ctx.getGASState();
+            this.linkAttribType = linkAttribType;
+        }
+
+        @Override
+        public boolean isValid(final Object e) {
+            return gasState.isLinkAttrib((Statement) e, linkAttribType);
+        }
+    }
+    
+//    /**
+//     * If the vertex is actually an edge, then return the decoded edge.
+//     * 
+//     * @see GASUtil#decodeStatement(Value)
+//     */
+//    protected Statement decodeStatement(final Value v) {
+//       
+//        return GASUtil.decodeStatement(v);
+//        
+//    }
+
     /**
      * {@inheritDoc}
      * <p>
@@ -176,13 +163,13 @@ abstract public class BaseGASProgram<VS, ES, ST> implements
      * The default is a NOP.
      */
     @Override
-    public void init(final IGASState<VS, ES, ST> state, final IV u) {
+    public void init(final IGASState<VS, ES, ST> state, final Value u) {
 
         // NOP
 
     }
 
-//    public Factory<IV, VS> getVertexStateFactory();
+//    public Factory<Value, VS> getVertexStateFactory();
 
     /**
      * {@inheritDoc}
@@ -191,7 +178,7 @@ abstract public class BaseGASProgram<VS, ES, ST> implements
      * the algorithm uses per-edge computation state.
      */
     @Override
-    public Factory<ISPO, ES> getEdgeStateFactory() {
+    public Factory<Statement, ES> getEdgeStateFactory() {
 
         return null;
 
@@ -204,7 +191,7 @@ abstract public class BaseGASProgram<VS, ES, ST> implements
      * you know whether or not the computation state of this vertex has changed.
      */
     @Override
-    public boolean isChanged(IGASState<VS, ES, ST> state, IV u) {
+    public boolean isChanged(IGASState<VS, ES, ST> state, Value u) {
 
         return true;
 
