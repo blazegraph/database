@@ -168,7 +168,7 @@ public class ConditionalRoutingOp extends PipelineOp {
 
                     for(int i=0; i<chunk.length; i++) {
 
-                        final IBindingSet bset = chunk[i];
+                        final IBindingSet bset = chunk[i].clone();
 
                         if (condition.accept(bset)) {
 
@@ -209,7 +209,7 @@ public class ConditionalRoutingOp extends PipelineOp {
                 return null;
                 
             } finally {
-                
+                source.close();
                 sink.close();
                 if (sink2 != null)
                 	sink2.close();
