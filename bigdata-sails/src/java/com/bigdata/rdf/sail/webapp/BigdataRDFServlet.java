@@ -110,7 +110,11 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
     /**
      * RDF/XML.
      */
-    static public final transient String MIME_RDF_XML = "application/rdf+xml"; 
+    static public final transient String MIME_RDF_XML = "application/rdf+xml";
+
+	public static final String MIME_SPARQL_QUERY = "application/sparql-query";
+
+	public static final String MIME_SPARQL_UPDATE = "application/sparql-update";
 
     /**
      * 

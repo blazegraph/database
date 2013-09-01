@@ -23,14 +23,19 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.rdf.spo;
 
+import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
+import org.openrdf.model.URI;
+import org.openrdf.model.Value;
 
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.rdf.inf.Justification;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.IVCache;
 import com.bigdata.rdf.internal.IVUtility;
+import com.bigdata.rdf.internal.NotMaterializedException;
 import com.bigdata.rdf.internal.impl.bnode.SidIV;
 import com.bigdata.rdf.model.BigdataResource;
 import com.bigdata.rdf.model.BigdataStatement;
@@ -142,6 +147,7 @@ public class SPO implements ISPO, java.io.Serializable {
     private static int SIDABLE_BIT = 6;
 	
 	
+    @Override
     @SuppressWarnings("rawtypes")
     final public IV get(final int index) {
         switch(index) {
@@ -153,21 +159,25 @@ public class SPO implements ISPO, java.io.Serializable {
         }
     }
     
+    @Override
     @SuppressWarnings("rawtypes")
     final public IV s() {
         return s;
     }
 
+    @Override
     @SuppressWarnings("rawtypes")
     final public IV p() {
         return p;
     }
 
+    @Override
     @SuppressWarnings("rawtypes")
     final public IV o() {
         return o;
     }
 
+    @Override
     @SuppressWarnings("rawtypes")
     final public IV c() {
     	
@@ -180,6 +190,7 @@ public class SPO implements ISPO, java.io.Serializable {
         
     }
 
+    @Override
     public final void setStatementIdentifier(final boolean sid) {
 
         if (sid && type() != StatementEnum.Explicit) {
@@ -208,18 +219,21 @@ public class SPO implements ISPO, java.io.Serializable {
 
     }
 
+    @Override
     final public boolean hasStatementIdentifier() {
         
         return sidable();
         
     }
     
+    @Override
     public void setOverride(final boolean override) {
 
         override(override);
         
     }
 
+    @Override
     public boolean isOverride() {
         
         return override();
@@ -411,6 +425,7 @@ public class SPO implements ISPO, java.io.Serializable {
     /**
      * Return <code>true</code> IFF the {@link SPO} is marked as {@link StatementEnum#Explicit}. 
      */
+    @Override
     public final boolean isExplicit() {
         
         return type() == StatementEnum.Explicit;
@@ -420,6 +435,7 @@ public class SPO implements ISPO, java.io.Serializable {
     /**
      * Return <code>true</code> IFF the {@link SPO} is marked as {@link StatementEnum#Inferred}. 
      */
+    @Override
     public final boolean isInferred() {
         
         return type() == StatementEnum.Inferred;
@@ -429,6 +445,7 @@ public class SPO implements ISPO, java.io.Serializable {
     /**
      * Return <code>true</code> IFF the {@link SPO} is marked as {@link StatementEnum#Axiom}. 
      */
+    @Override
     public final boolean isAxiom() {
         
         return type() == StatementEnum.Axiom;
@@ -438,6 +455,7 @@ public class SPO implements ISPO, java.io.Serializable {
     /**
      * Return <code>true</code> IFF the {@link SPO} has the user flag bit set. 
      */
+    @Override
     public final boolean getUserFlag() {
         
         return userFlag();
@@ -449,6 +467,7 @@ public class SPO implements ISPO, java.io.Serializable {
      * 
      * @parm userFlag boolean flag
      */
+    @Override
     public final void setUserFlag(final boolean userFlag) {
         
         userFlag(userFlag);
@@ -461,6 +480,7 @@ public class SPO implements ISPO, java.io.Serializable {
      * Hash code for the (s,p,o) per Sesame's {@link Statement#hashCode()}. It
      * DOES NOT consider the context position.
      */
+    @Override
     public int hashCode() {
 
         if (hashCode == 0) {
@@ -488,6 +508,7 @@ public class SPO implements ISPO, java.io.Serializable {
 
     }
 
+    @Override
     public boolean equals(final Object o) {
         
         if (this == o)
@@ -529,6 +550,7 @@ public class SPO implements ISPO, java.io.Serializable {
      * 
      * @see ITripleStore#toString(IV, IV, IV)
      */
+    @Override
     public String toString() {
 
         return ("< " + toString(s) + ", " + toString(p) + ", " + toString(o))
@@ -547,6 +569,7 @@ public class SPO implements ISPO, java.io.Serializable {
      *            The term identifier.
      * @return
      */
+    @SuppressWarnings("rawtypes")
     public static String toString(final IV iv) {
 
         if (iv == null)
@@ -567,6 +590,7 @@ public class SPO implements ISPO, java.io.Serializable {
      * 
      * @return The externalized representation of the statement.
      */
+    @Override
     public String toString(final IRawTripleStore store) {
         
         if (store != null) {
@@ -595,18 +619,21 @@ public class SPO implements ISPO, java.io.Serializable {
         
     }
 
+    @Override
     final public boolean isFullyBound() {
     
         return s != null && p != null && o != null;
 
     }
 
+    @Override
     final public StatementEnum getStatementType() {
 
         return type();
 
     }
 
+    @Override
     final public void setStatementType(final StatementEnum type) {
         
         if(this.type() != null && this.type() != type) {
@@ -619,24 +646,28 @@ public class SPO implements ISPO, java.io.Serializable {
         
     }
     
+    @Override
     final public boolean hasStatementType() {
         
         return type() != null;
         
     }
 
+    @Override
     public boolean isModified() {
         
         return modified() != ModifiedEnum.NONE;
         
     }
 
+    @Override
     public void setModified(final ModifiedEnum modified) {
 
         modified(modified);
 
     }
     
+    @Override
     public ModifiedEnum getModified() {
         
         return modified();
@@ -791,5 +822,69 @@ public class SPO implements ISPO, java.io.Serializable {
 	private void sidable(final boolean sidable) {
 		flags = Bits.set(flags, SIDABLE_BIT, sidable);
 	}
+
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Note: This methods rely on the fact that IV implements Value. The
+     * returned IV will act like a Value if it is inline or if it has been
+     * materialized. If the IV is not-inline and its value has not been
+     * materialized from the appropriate index or explicitly set through
+     * {@link IVCache#setValue(BigdataValue)}, then an attempt to access the
+     * state of the {@link Value} through its {@link Value} interface will throw
+     * a {@link NotMaterializedException}.
+     */
+    @Override
+    public Resource getContext() {
+        return (Resource) c();
+    }
+
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Note: This methods rely on the fact that IV implements Value. The
+     * returned IV will act like a Value if it is inline or if it has been
+     * materialized. If the IV is not-inline and its value has not been
+     * materialized from the appropriate index or explicitly set through
+     * {@link IVCache#setValue(BigdataValue)}, then an attempt to access the
+     * state of the {@link Value} through its {@link Value} interface will throw
+     * a {@link NotMaterializedException}.
+     */
+    @Override
+    public Value getObject() {
+        return (Value) o();
+    }
+
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Note: This methods rely on the fact that IV implements Value. The
+     * returned IV will act like a Value if it is inline or if it has been
+     * materialized. If the IV is not-inline and its value has not been
+     * materialized from the appropriate index or explicitly set through
+     * {@link IVCache#setValue(BigdataValue)}, then an attempt to access the
+     * state of the {@link Value} through its {@link Value} interface will throw
+     * a {@link NotMaterializedException}.
+     */
+    @Override
+    public URI getPredicate() {
+        return (URI) p();
+    }
+
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Note: This methods rely on the fact that IV implements Value. The
+     * returned IV will act like a Value if it is inline or if it has been
+     * materialized. If the IV is not-inline and its value has not been
+     * materialized from the appropriate index or explicitly set through
+     * {@link IVCache#setValue(BigdataValue)}, then an attempt to access the
+     * state of the {@link Value} through its {@link Value} interface will throw
+     * a {@link NotMaterializedException}.
+     */
+    @Override
+    public Resource getSubject() {
+        return (Resource) s();
+    }
 
 }

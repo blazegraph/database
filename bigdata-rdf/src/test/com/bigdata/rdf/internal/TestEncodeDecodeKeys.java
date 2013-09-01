@@ -87,7 +87,7 @@ public class TestEncodeDecodeKeys extends AbstractEncodeDecodeKeysTestCase {
         super(name);
     }
 
-	public void test_InlineValue() {
+    public void test_InlineValue() {
 
         for (VTE vte : VTE.values()) {
 
@@ -105,6 +105,7 @@ public class TestEncodeDecodeKeys extends AbstractEncodeDecodeKeysTestCase {
                         return false;
                     }
                     
+                    @Override
                     public int byteLength() {
                         throw new UnsupportedOperationException();
                     }
@@ -114,30 +115,41 @@ public class TestEncodeDecodeKeys extends AbstractEncodeDecodeKeysTestCase {
                         return 0;
                     }
 
+                    @Override
                     public IV<?, ?> clone(boolean clearCache) {
                         throw new UnsupportedOperationException();
                     }
                     
+                    @Override
                     public int _compareTo(IV o) {
                         throw new UnsupportedOperationException();
                     }
 
+                    @Override
                     public BigdataValue asValue(final LexiconRelation lex)
                             throws UnsupportedOperationException {
                         return null;
                     }
 
+                    @Override
                     public Object getInlineValue()
                             throws UnsupportedOperationException {
                         return null;
                     }
 
+                    @Override
                     public boolean isInline() {
                         return true;
                     }
                     
+                    @Override
                     public boolean needsMaterialization() {
-                    	return false;
+                        return false;
+                    }
+
+                    @Override
+                    public String stringValue() {
+                        throw new UnsupportedOperationException();
                     }
 
                 };
@@ -433,7 +445,7 @@ public class TestEncodeDecodeKeys extends AbstractEncodeDecodeKeysTestCase {
         final EpochExtension<BigdataValue> ext = 
             new EpochExtension<BigdataValue>(new IDatatypeURIResolver() {
             public BigdataURI resolve(final URI uri) {
-            	final BigdataURI buri = vf.createURI(uri.stringValue());
+                final BigdataURI buri = vf.createURI(uri.stringValue());
                 buri.setIV(newTermId(VTE.URI));
                 return buri;
             }
@@ -510,31 +522,31 @@ public class TestEncodeDecodeKeys extends AbstractEncodeDecodeKeysTestCase {
 
         final DateTimeExtension<BigdataValue> ext = 
             new DateTimeExtension<BigdataValue>(new IDatatypeURIResolver() {
-	            public BigdataURI resolve(URI uri) {
-	                final BigdataURI buri = vf.createURI(uri.stringValue());
-	                buri.setIV(newTermId(VTE.URI));
-	                return buri;
-	            }
-	        },
-	        TimeZone.getDefault()
+                public BigdataURI resolve(URI uri) {
+                    final BigdataURI buri = vf.createURI(uri.stringValue());
+                    buri.setIV(newTermId(VTE.URI));
+                    return buri;
+                }
+            },
+            TimeZone.getDefault()
             );
         
         final BigdataLiteral[] dt = {
-    		vf.createLiteral(
-        		df.newXMLGregorianCalendar("2001-10-26T21:32:52")),
-    		vf.createLiteral(
-        		df.newXMLGregorianCalendar("2001-10-26T21:32:52+02:00")),
-    		vf.createLiteral(
-        		df.newXMLGregorianCalendar("2001-10-26T19:32:52Z")),
-    		vf.createLiteral(
-        		df.newXMLGregorianCalendar("2001-10-26T19:32:52+00:00")),
-    		vf.createLiteral(
-        		df.newXMLGregorianCalendar("-2001-10-26T21:32:52")),
-    		vf.createLiteral(
-        		df.newXMLGregorianCalendar("2001-10-26T21:32:52.12679")),
-    		vf.createLiteral(
-        		df.newXMLGregorianCalendar("1901-10-26T21:32:52")),
-        		};
+            vf.createLiteral(
+                df.newXMLGregorianCalendar("2001-10-26T21:32:52")),
+            vf.createLiteral(
+                df.newXMLGregorianCalendar("2001-10-26T21:32:52+02:00")),
+            vf.createLiteral(
+                df.newXMLGregorianCalendar("2001-10-26T19:32:52Z")),
+            vf.createLiteral(
+                df.newXMLGregorianCalendar("2001-10-26T19:32:52+00:00")),
+            vf.createLiteral(
+                df.newXMLGregorianCalendar("-2001-10-26T21:32:52")),
+            vf.createLiteral(
+                df.newXMLGregorianCalendar("2001-10-26T21:32:52.12679")),
+            vf.createLiteral(
+                df.newXMLGregorianCalendar("1901-10-26T21:32:52")),
+                };
         
         final IV<?, ?>[] e = new IV[dt.length];
         
@@ -547,13 +559,13 @@ public class TestEncodeDecodeKeys extends AbstractEncodeDecodeKeysTestCase {
         final IV<?, ?>[] a = doEncodeDecodeTest(e);
 
         if (log.isInfoEnabled()) {
-        	for (int i = 0; i < e.length; i++) {
+            for (int i = 0; i < e.length; i++) {
                 log.info("original: " + dt[i]);
                 log.info("asValue : " + ext.asValue((LiteralExtensionIV<?>) e[i], vf));
                 log.info("decoded : " + ext.asValue((LiteralExtensionIV<?>) a[i], vf));
                 log.info("");
-	        }
-//        	log.info(svf.createLiteral(
+            }
+//          log.info(svf.createLiteral(
 //                df.newXMLGregorianCalendar("2001-10-26T21:32:52.12679")));
         }
         
@@ -637,21 +649,21 @@ public class TestEncodeDecodeKeys extends AbstractEncodeDecodeKeysTestCase {
 
         final DerivedNumericsExtension<BigdataValue> ext = 
             new DerivedNumericsExtension<BigdataValue>(new IDatatypeURIResolver() {
-	            public BigdataURI resolve(URI uri) {
-	                final BigdataURI buri = vf.createURI(uri.stringValue());
-	                buri.setIV(newTermId(VTE.URI));
-	                return buri;
-	            }
-	        });
+                public BigdataURI resolve(URI uri) {
+                    final BigdataURI buri = vf.createURI(uri.stringValue());
+                    buri.setIV(newTermId(VTE.URI));
+                    return buri;
+                }
+            });
         
         final BigdataLiteral[] dt = {
-    		vf.createLiteral("1", XSD.POSITIVE_INTEGER),
-    		vf.createLiteral("-1", XSD.NEGATIVE_INTEGER),
-    		vf.createLiteral("-1", XSD.NON_POSITIVE_INTEGER),
-    		vf.createLiteral("1", XSD.NON_NEGATIVE_INTEGER),
-    		vf.createLiteral("0", XSD.NON_POSITIVE_INTEGER),
-    		vf.createLiteral("0", XSD.NON_NEGATIVE_INTEGER),
-        		};
+            vf.createLiteral("1", XSD.POSITIVE_INTEGER),
+            vf.createLiteral("-1", XSD.NEGATIVE_INTEGER),
+            vf.createLiteral("-1", XSD.NON_POSITIVE_INTEGER),
+            vf.createLiteral("1", XSD.NON_NEGATIVE_INTEGER),
+            vf.createLiteral("0", XSD.NON_POSITIVE_INTEGER),
+            vf.createLiteral("0", XSD.NON_NEGATIVE_INTEGER),
+                };
         
         final IV<?, ?>[] e = new IV[dt.length];
         
@@ -664,13 +676,13 @@ public class TestEncodeDecodeKeys extends AbstractEncodeDecodeKeysTestCase {
         final IV<?, ?>[] a = doEncodeDecodeTest(e);
 
         if (log.isInfoEnabled()) {
-        	for (int i = 0; i < e.length; i++) {
+            for (int i = 0; i < e.length; i++) {
                 log.info("original: " + dt[i]);
                 log.info("asValue : " + ext.asValue((LiteralExtensionIV<?>) e[i], vf));
                 log.info("decoded : " + ext.asValue((LiteralExtensionIV<?>) a[i], vf));
                 log.info("");
-	        }
-//        	log.info(svf.createLiteral(
+            }
+//          log.info(svf.createLiteral(
 //                df.newXMLGregorianCalendar("2001-10-26T21:32:52.12679")));
         }
         
@@ -745,22 +757,22 @@ public class TestEncodeDecodeKeys extends AbstractEncodeDecodeKeysTestCase {
         
     }
 
-	/**
-	 * Unit test for a fully inlined representation of a URI based on a
-	 * <code>byte</code> code. The flags byte looks like:
-	 * <code>VTE=URI, inline=true, extension=false,
-	 * DTE=XSDByte</code>. It is followed by a <code>unsigned byte</code> value
-	 * which is the index of the URI in the {@link Vocabulary} class for the
-	 * triple store.
-	 */
+    /**
+     * Unit test for a fully inlined representation of a URI based on a
+     * <code>byte</code> code. The flags byte looks like:
+     * <code>VTE=URI, inline=true, extension=false,
+     * DTE=XSDByte</code>. It is followed by a <code>unsigned byte</code> value
+     * which is the index of the URI in the {@link Vocabulary} class for the
+     * triple store.
+     */
     public void test_encodeDecode_URIByteIV() {
 
         final IV<?, ?>[] e = {//
-				new VocabURIByteIV<BigdataURI>((byte) Byte.MIN_VALUE),//
-				new VocabURIByteIV<BigdataURI>((byte) -1),//
-				new VocabURIByteIV<BigdataURI>((byte) 0),//
-				new VocabURIByteIV<BigdataURI>((byte) 1),//
-				new VocabURIByteIV<BigdataURI>((byte) Byte.MAX_VALUE),//
+                new VocabURIByteIV<BigdataURI>((byte) Byte.MIN_VALUE),//
+                new VocabURIByteIV<BigdataURI>((byte) -1),//
+                new VocabURIByteIV<BigdataURI>((byte) 0),//
+                new VocabURIByteIV<BigdataURI>((byte) 1),//
+                new VocabURIByteIV<BigdataURI>((byte) Byte.MAX_VALUE),//
         };
 
         doEncodeDecodeTest(e);
@@ -769,22 +781,22 @@ public class TestEncodeDecodeKeys extends AbstractEncodeDecodeKeysTestCase {
 
     }
 
-	/**
-	 * Unit test for a fully inlined representation of a URI based on a
-	 * <code>short</code> code. The flags byte looks like:
-	 * <code>VTE=URI, inline=true, extension=false,
-	 * DTE=XSDShort</code>. It is followed by an <code>unsigned short</code>
-	 * value which is the index of the URI in the {@link Vocabulary} class for
-	 * the triple store.
-	 */
+    /**
+     * Unit test for a fully inlined representation of a URI based on a
+     * <code>short</code> code. The flags byte looks like:
+     * <code>VTE=URI, inline=true, extension=false,
+     * DTE=XSDShort</code>. It is followed by an <code>unsigned short</code>
+     * value which is the index of the URI in the {@link Vocabulary} class for
+     * the triple store.
+     */
     public void test_encodeDecode_URIShortIV() {
 
         final IV<?, ?>[] e = {//
-				new VocabURIShortIV<BigdataURI>((short) Short.MIN_VALUE),//
-				new VocabURIShortIV<BigdataURI>((short) -1),//
-				new VocabURIShortIV<BigdataURI>((short) 0),//
-				new VocabURIShortIV<BigdataURI>((short) 1),//
-				new VocabURIShortIV<BigdataURI>((short) Short.MAX_VALUE),//
+                new VocabURIShortIV<BigdataURI>((short) Short.MIN_VALUE),//
+                new VocabURIShortIV<BigdataURI>((short) -1),//
+                new VocabURIShortIV<BigdataURI>((short) 0),//
+                new VocabURIShortIV<BigdataURI>((short) 1),//
+                new VocabURIShortIV<BigdataURI>((short) Short.MAX_VALUE),//
         };
 
         doEncodeDecodeTest(e);

@@ -1,0 +1,44 @@
+<!-- $Id: build.xml 5779 2011-12-14 18:17:54Z thompsonbry $ -->
+<!--                                                        -->
+<!-- do "ant bundle-jar" in the parent directory first.     -->
+<!--                                                        -->
+<project name="gas" basedir=".">
+
+	<property file="build.properties" />
+
+	<path id="runtime.classpath">
+		<!-- The bigdata dependencies (for the nano-server). -->
+		<fileset dir="${bigdata.build.dir}/lib">
+			<include name="**/*.jar" />
+		</fileset>
+	</path>
+
+	<target name="start-sparql-server"
+		    description="Start a small http server fronting for a bigdata database instance.">
+		<java classname="com.bigdata.rdf.sail.webapp.NanoSparqlServer"
+		      fork="true" failonerror="true"
+		      >
+			<arg line="${nanoServerPort} ${namespace} ${journalPropertyFile}" />
+			<!-- specify/override the journal file name. -->
+			<jvmarg line="${jvmArgs}" />
+			<classpath>
+				<path refid="runtime.classpath" />
+			</classpath>
+		</java>
+	</target>
+	
+   <target name="run-gas-engine"
+          description="Run a GAS Engine performance test.">
+      <java classname="com.bigdata.rdf.graph.impl.GASRunner"
+            fork="true" failonerror="true"
+            >
+         <arg line="-bufferMode ${bufferMode} -namespace ${namespace} -seed ${seed} -nsamples ${nsamples} -nthreads ${nthreads} ${scheduler} ${load} com.bigdata.rdf.graph.analytics.${analytic} ${journalPropertyFile}" />
+         <!-- specify/override the journal file name. -->
+         <jvmarg line="${jvmArgs}" />
+         <classpath>
+            <path refid="runtime.classpath" />
+         </classpath>
+      </java>
+   </target>
+
+</project>

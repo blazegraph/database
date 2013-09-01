@@ -1,5 +1,6 @@
 package com.bigdata.rdf.sparql.ast;
 
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
@@ -271,12 +272,12 @@ public abstract class GroupNodeBase<E extends IGroupMemberNode> extends
             final IVariable<?>[] joinVars = t.getJoinVars();
 
             if (joinVars != null)
-                sb.append(" [joinVars=" + joinVars + "]");
+                sb.append(" [joinVars=" + Arrays.toString(joinVars) + "]");
 
             final IVariable<?>[] projectInVars = t.getProjectInVars();
 
             if (projectInVars != null)
-                sb.append(" [projectInVars=" + projectInVars + "]");
+                sb.append(" [projectInVars=" + Arrays.toString(projectInVars) + "]");
 
         }
 

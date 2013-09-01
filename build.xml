@@ -230,6 +230,8 @@ public class BuildInfo {
          <src path="${bigdata.dir}/bigdata-rdf/src/java" />
 			<src path="${bigdata.dir}/bigdata-sails/src/java" />
          <src path="${bigdata.dir}/bigdata-gom/src/java" />
+         <src path="${bigdata.dir}/bigdata-ganglia/src/java" />
+         <src path="${bigdata.dir}/bigdata-gas/src/java" />
 			<src path="${bigdata.dir}/ctc-striterators/src/java" />
 			<!-- Do not include the unit tests @todo conditionally include?
             <src path="${bigdata.dir}/bigdata/src/test"/>
@@ -262,6 +264,10 @@ public class BuildInfo {
             <exclude name="**/*.java" />
             <exclude name="**/package.html" />
          </fileset>
+         <fileset dir="${bigdata.dir}/bigdata-gas/src/java">
+            <exclude name="**/*.java" />
+            <exclude name="**/package.html" />
+         </fileset>
 		    <!-- Note: This simple copy works so long as there is just one service
 		         provider file per interface.  It will not combine (append) multiple
 		         files for the same interface. -->
@@ -288,6 +294,7 @@ public class BuildInfo {
             <fileset dir="${bigdata.dir}/bigdata/src/java" />
             <fileset dir="${bigdata.dir}/bigdata/src/samples" />
             <fileset dir="${bigdata.dir}/bigdata-ganglia/src/java" />
+            <fileset dir="${bigdata.dir}/bigdata-gas/src/java" />
             <fileset dir="${bigdata.dir}/bigdata-gom/src/java" />
             <fileset dir="${bigdata.dir}/bigdata-jini/src/java" />
             <fileset dir="${bigdata.dir}/bigdata-rdf/src/java" />
@@ -901,8 +908,10 @@ ${postInstallMessage}</echo>
             tofile="${dist.lib}/lgplutils.jar" />
       <copy file="${bigdata.lib}/unimi/fastutil-${fastutil.version}.jar"
             tofile="${dist.lib}/fastutil.jar" />
-      <copy file="${bigdata.lib}/bigdata-ganglia-1.0.1.jar"
+      <copy file="${bigdata.lib}/bigdata-ganglia-${ganglia-version}.jar"
             tofile="${dist.lib}/bigdata-ganglia.jar" />
+      <!--copy file="${bigdata.lib}/bigdata-gas-${gas.version}.jar"
+            tofile="${dist.lib}/bigdata-gas.jar" -->
       <copy file="${bigdata.lib}/icu/icu4j-${icu.version}.jar"
             tofile="${dist.lib}/icu4j.jar" />
       <copy file="${bigdata.lib}/icu/icu4j-charset-${icu.version}.jar"
@@ -1216,6 +1225,9 @@ ${postInstallMessage}</echo>
       <copy toDir="${build.dir}/bigdata-ganglia/src">
         <fileset dir="${bigdata.dir}/bigdata-ganglia/src" />
       </copy>
+      <copy toDir="${build.dir}/bigdata-gas/src">
+        <fileset dir="${bigdata.dir}/bigdata-gas/src" />
+      </copy>
 
       <!-- stage library dependencies. -->
       <mkdir dir="${build.dir}/bigdata/lib" />
@@ -1296,6 +1308,7 @@ ${postInstallMessage}</echo>
           <include name="ctc-striterators/src/**" />
           <include name="lgpl-utils/src/**" />
           <include name="bigdata-ganglia/src/**" />
+          <include name="bigdata-gas/src/**" />
           <include name="bigdata/lib/**" />
           <include name="bigdata-jini/lib/**" />
           <include name="bigdata-rdf/lib/**" />
@@ -1565,6 +1578,7 @@ ${postInstallMessage}</echo>
       <mkdir dir="${bigdata-test.lib}" />
       <property name="bigdata-test.jar" location="${bigdata-test.lib}/bigdata-test.jar" />
 
+    	<!-- TODO ${path.separator}${dist.lib}/bigdata-gas.jar -->
       <property name="javac.test.classpath"
                value="${classes.dir}${path.separator}${junit.jar}${path.separator}${junit-ext.jar}${path.separator}${sesame-sparql-test.jar}${path.separator}${sesame-store-test.jar}${path.separator}${sesame-rio-test.jar}${path.separator}${dist.lib}/classserver.jar${path.separator}${dist.lib}/highscalelib.jar${path.separator}${dist.lib}/dsiutils.jar${path.separator}${dist.lib}/lgplutils.jar${path.separator}${dist.lib}/fastutil.jar${path.separator}${dist.lib}/bigdata-ganglia.jar${path.separator}${dist.lib}/icu4j.jar${path.separator}${dist.lib}/icu4j-charset.jar${path.separator}${dist.lib}/log4j.jar${path.separator}${dist.lib}/lucene-analyzer.jar${path.separator}${dist.lib}/lucene-core.jar${path.separator}${path.separator}${dist.lib}/openrdf-sesame.jar${path.separator}${dist.lib}/slf4j.jar${path.separator}${dist.lib}/jsk-lib.jar${path.separator}${dist.lib}/jsk-platform.jar${path.separator}${dist.lib}/nxparser.jar${path.separator}${dist.lib}/zookeeper.jar${path.separator}${dist.lib}/jetty-continuation.jar${path.separator}${dist.lib}/jetty-http.jar${path.separator}${dist.lib}/jetty-io.jar${path.separator}${dist.lib}/jetty-server.jar${path.separator}${dist.lib}/jetty-util.jar${path.separator}${dist.lib}/jetty-webapp.jar${path.separator}${dist.lib}/jetty-servlet.jar${path.separator}${dist.lib}/jetty-security.jar${path.separator}${dist.lib}/jetty-xml.jar${path.separator}${dist.lib}/servlet-api.jar${path.separator}${dist.lib}/commons-codec.jar${path.separator}${dist.lib}/commons-fileupload.jar${path.separator}${dist.lib}/commons-io.jar${path.separator}${dist.lib}/commons-logging.jar${path.separator}${dist.lib}/httpclient.jar${path.separator}${dist.lib}/httpclient-cache.jar${path.separator}${dist.lib}/httpcore.jar${path.separator}${dist.lib}/httpmime.jar" />
 
@@ -1612,6 +1626,8 @@ ${postInstallMessage}</echo>
         <src path="${bigdata.dir}/bigdata-rdf/src/test" />
         <src path="${bigdata.dir}/bigdata-sails/src/test" />
         <src path="${bigdata.dir}/bigdata-gom/src/test" />
+        <src path="${bigdata.dir}/bigdata-gas/src/test" />
+        <src path="${bigdata.dir}/bigdata-ganglia/src/test" />
         <src path="${bigdata.dir}/ctc-striterators/src/test" />
 <!--
         <src path="${bigdata.dir}/bigdata-gom/src/test" />
@@ -1902,6 +1918,7 @@ ${postInstallMessage}</echo>
         <pathelement location="${dist.lib}/lgplutils.jar" />
         <pathelement location="${dist.lib}/fastutil.jar" />
         <pathelement location="${dist.lib}/bigdata-ganglia.jar" />
+        <!--pathelement location="${dist.lib}/bigdata-gas.jar" -->
         <pathelement location="${dist.lib}/icu4j.jar" />
         <pathelement location="${dist.lib}/icu4j-charset.jar" />
         <pathelement location="${dist.lib}/jsk-lib.jar" />
@@ -1937,7 +1954,7 @@ ${postInstallMessage}</echo>
       </path>
 
       <property name="run.class.path"
-               value="${junit.jar}${path.separator}${bigdata-test.jar}${path.separator}${junit-ext.jar}${path.separator}${sesame-sparql-test.jar}${path.separator}${sesame-store-test.jar}${path.separator}${sesame-rio-test.jar}${path.separator}${dist.lib}/bigdata.jar${path.separator}${dist.lib}/colt.jar${path.separator}${dist.lib}/highscalelib.jar${path.separator}${dist.lib}/dsiutils.jar${path.separator}${dist.lib}/lgplutils.jar${path.separator}${dist.lib}/fastutil.jar${path.separator}${dist.lib}/bigdata-ganglia.jar${path.separator}${dist.lib}/icu4j.jar${path.separator}${dist.lib}/icu4j-charset.jar${path.separator}${dist.lib}/jsk-lib.jar${path.separator}${dist.lib}/jsk-platform.jar${path.separator}${dist.lib}/log4j.jar${path.separator}${dist.lib}/lucene-analyzer.jar${path.separator}${dist.lib}/lucene-core.jar${path.separator}${dist.lib}/openrdf-sesame.jar${path.separator}${dist.lib}/slf4j.jar${path.separator}${dist.lib}/slf4j-log4j.jar${path.separator}${dist.lib}/nxparser.jar${path.separator}${dist.lib}/zookeeper.jar${path.separator}${dist.lib}/jetty-continuation.jar${path.separator}${dist.lib}/jetty-http.jar${path.separator}${dist.lib}/jetty-io.jar${path.separator}${dist.lib}/jetty-server.jar${path.separator}${dist.lib}/jetty-util.jar${path.separator}${dist.lib}/jetty-webapp.jar${path.separator}${dist.lib}/jetty-servlet.jar${path.separator}${dist.lib}/jetty-security.jar${path.separator}${dist.lib}/jetty-xml.jar${path.separator}${dist.lib}/servlet-api.jar${path.separator}${dist.lib}/commons-codec.jar${path.separator}${dist.lib}/commons-fileupload.jar${path.separator}${dist.lib}/commons-io.jar${path.separator}${dist.lib}/commons-logging.jar${path.separator}${dist.lib}/httpclient.jar${path.separator}${dist.lib}/httpclient-cache.jar${path.separator}${dist.lib}/httpcore.jar${path.separator}${dist.lib}/httpmime.jar" />
+               value="${junit.jar}${path.separator}${bigdata-test.jar}${path.separator}${junit-ext.jar}${path.separator}${sesame-sparql-test.jar}${path.separator}${sesame-store-test.jar}${path.separator}${sesame-rio-test.jar}${path.separator}${dist.lib}/bigdata.jar${path.separator}${dist.lib}/colt.jar${path.separator}${dist.lib}/highscalelib.jar${path.separator}${dist.lib}/dsiutils.jar${path.separator}${dist.lib}/lgplutils.jar${path.separator}${dist.lib}/fastutil.jar${path.separator}${dist.lib}/bigdata-ganglia.jar${path.separator}${dist.lib}/bigdata-gas${path.separator}${dist.lib}/icu4j.jar${path.separator}${dist.lib}/icu4j-charset.jar${path.separator}${dist.lib}/jsk-lib.jar${path.separator}${dist.lib}/jsk-platform.jar${path.separator}${dist.lib}/log4j.jar${path.separator}${dist.lib}/lucene-analyzer.jar${path.separator}${dist.lib}/lucene-core.jar${path.separator}${dist.lib}/openrdf-sesame.jar${path.separator}${dist.lib}/slf4j.jar${path.separator}${dist.lib}/slf4j-log4j.jar${path.separator}${dist.lib}/nxparser.jar${path.separator}${dist.lib}/zookeeper.jar${path.separator}${dist.lib}/jetty-continuation.jar${path.separator}${dist.lib}/jetty-http.jar${path.separator}${dist.lib}/jetty-io.jar${path.separator}${dist.lib}/jetty-server.jar${path.separator}${dist.lib}/jetty-util.jar${path.separator}${dist.lib}/jetty-webapp.jar${path.separator}${dist.lib}/jetty-servlet.jar${path.separator}${dist.lib}/jetty-security.jar${path.separator}${dist.lib}/jetty-xml.jar${path.separator}${dist.lib}/servlet-api.jar${path.separator}${dist.lib}/commons-codec.jar${path.separator}${dist.lib}/commons-fileupload.jar${path.separator}${dist.lib}/commons-io.jar${path.separator}${dist.lib}/commons-logging.jar${path.separator}${dist.lib}/httpclient.jar${path.separator}${dist.lib}/httpclient-cache.jar${path.separator}${dist.lib}/httpcore.jar${path.separator}${dist.lib}/httpmime.jar" />
 
       <echo>    classpath:    ${run.class.path}
 </echo>
@@ -2070,6 +2087,7 @@ ${postInstallMessage}</echo>
         <sysproperty key="lgplutils.jar" value="${dist.lib}/lgplutils.jar" />
         <sysproperty key="fastutil.jar" value="${dist.lib}/fastutil.jar" />
         <sysproperty key="bigdata-ganglia.jar" value="${dist.lib}/bigdata-ganglia.jar" />
+        <!--sysproperty key="bigdata-gas.jar" value="${dist.lib}/bigdata-gas.jar" -->
         <sysproperty key="icu4j.jar" value="${dist.lib}/icu4j.jar" />
         <sysproperty key="icu4j-charset.jar" value="${dist.lib}/icu4j-charset.jar" />
         <sysproperty key="jsk-lib.jar" value="${dist.lib}/jsk-lib.jar" />

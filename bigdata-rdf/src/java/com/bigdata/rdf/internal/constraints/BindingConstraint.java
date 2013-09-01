@@ -29,7 +29,11 @@ import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 
+@SuppressWarnings({ "unchecked", "rawtypes" })
 public class BindingConstraint extends com.bigdata.bop.constraint.Constraint {
+
+    private static final long serialVersionUID = 1L;
+
     public BindingConstraint(final BOp[] args, final Map<String, Object> annotations) {
         super(args, annotations);
     }

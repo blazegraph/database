@@ -56,6 +56,7 @@ import com.bigdata.cache.ConcurrentWeakValueCacheWithTimeout;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.constraints.RangeBOp;
 import com.bigdata.rdf.internal.impl.literal.XSDNumericIV;
+import com.bigdata.rdf.sparql.ast.FilterNode;
 import com.bigdata.rdf.sparql.ast.GroupNodeBase;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
@@ -254,6 +255,13 @@ public class SliceServiceFactory extends AbstractServiceFactory
     	StatementPatternNode sp = null;
     	
     	for (IGroupMemberNode node : group) {
+    		
+    		if (node instanceof FilterNode) {
+    			
+    			// ok to have filters with ranges
+    			continue;
+    			
+    		}
     		
     		if (!(node instanceof StatementPatternNode)) {
     			

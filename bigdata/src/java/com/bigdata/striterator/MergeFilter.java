@@ -48,13 +48,13 @@ public class MergeFilter<I extends Iterator<E>, E extends Comparable<E>>
     private final int chunkSize;
     private final I src2;
     
-    public MergeFilter(I src2) {
+    public MergeFilter(final I src2) {
 
         this( IChunkedIterator.DEFAULT_CHUNK_SIZE, src2 );
         
     }
     
-    public MergeFilter(int chunkSize, I src2) {
+    public MergeFilter(final int chunkSize, final I src2) {
 
         if (chunkSize <= 0)
             throw new IllegalArgumentException();
@@ -68,7 +68,7 @@ public class MergeFilter<I extends Iterator<E>, E extends Comparable<E>>
         
     }
     
-    @SuppressWarnings("unchecked")
+    @SuppressWarnings({ "unchecked", "rawtypes" })
     public I filter(I src) {
 
         return (I) new MergedIterator(chunkSize, src, src2);
@@ -89,8 +89,8 @@ public class MergeFilter<I extends Iterator<E>, E extends Comparable<E>>
         private final int chunkSize;
         private final I src1;
         private final I src2;
-        
-        public MergedIterator(int chunkSize, I src1, I src2) {
+
+        public MergedIterator(final int chunkSize, final I src1, final I src2) {
 
             this.chunkSize = chunkSize;
             
@@ -100,23 +100,24 @@ public class MergeFilter<I extends Iterator<E>, E extends Comparable<E>>
             
         }
         
-        @SuppressWarnings("unchecked")
+        @Override
         public void close() {
             
             if(src1 instanceof ICloseableIterator) {
                 
-                ((ICloseableIterator)src1).close();
+                ((ICloseableIterator<?>)src1).close();
                 
             }
             
             if(src2 instanceof ICloseableIterator) {
                 
-                ((ICloseableIterator)src2).close();
+                ((ICloseableIterator<?>)src2).close();
                 
             }
             
         }
 
+        @Override
         public boolean hasNext() {
 
             return tmp1 != null || tmp2 != null || src1.hasNext()
@@ -127,6 +128,7 @@ public class MergeFilter<I extends Iterator<E>, E extends Comparable<E>>
         private E tmp1;
         private E tmp2;
         
+        @Override
         public E next() {
 
             if (!hasNext())
@@ -196,6 +198,7 @@ public class MergeFilter<I extends Iterator<E>, E extends Comparable<E>>
             
         }
 
+        @Override
         public void remove() {
 
             throw new UnsupportedOperationException();
@@ -206,6 +209,7 @@ public class MergeFilter<I extends Iterator<E>, E extends Comparable<E>>
          * The next chunk of elements in whatever order they were visited by
          * {@link #next()}.
          */
+        @Override
         @SuppressWarnings("unchecked")
         public E[] nextChunk() {
 

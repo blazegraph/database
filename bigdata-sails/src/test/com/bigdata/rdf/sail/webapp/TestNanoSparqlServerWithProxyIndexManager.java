@@ -34,6 +34,7 @@ import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestListener;
 import junit.framework.TestResult;
+import junit.framework.TestSuite;
 import junit.textui.ResultPrinter;
 
 import com.bigdata.journal.BufferMode;
@@ -79,6 +80,10 @@ import com.bigdata.service.jini.JiniFederation;
  */
 public class TestNanoSparqlServerWithProxyIndexManager<S extends IIndexManager>
         extends AbstractIndexManagerTestCase<S> {
+	
+	static {
+		ProxySuiteHelper.proxyIndexManagerTestingHasStarted = true;
+	}
 
 	/**
 	 * The {@link IIndexManager} for the backing persistence engine (may be a
@@ -109,7 +114,7 @@ public class TestNanoSparqlServerWithProxyIndexManager<S extends IIndexManager>
 
 	}
 
-	static private Journal getTemporaryJournal() {
+	static Journal getTemporaryJournal() {
 
 		final Properties properties = new Properties();
 
@@ -196,18 +201,10 @@ public class TestNanoSparqlServerWithProxyIndexManager<S extends IIndexManager>
 	 * Return suite running in the given mode against the given
 	 * {@link IIndexManager}.
 	 */
-	public static Test suite(final IIndexManager indexManager,
+	public static TestSuite suite(final IIndexManager indexManager,
 			final TestMode testMode) {
 
-		final TestNanoSparqlServerWithProxyIndexManager<?> delegate = new TestNanoSparqlServerWithProxyIndexManager(
-				null/* name */, indexManager, testMode); // !!!! THIS CLASS !!!!
-
-        /*
-         * Use a proxy test suite and specify the delegate.
-         */
-
-        final ProxyTestSuite suite = new ProxyTestSuite(delegate,
-                "NanoSparqlServer Proxied Test Suite");
+		final ProxyTestSuite suite = createProxyTestSuite(indexManager,testMode);
 
         /*
          * List any non-proxied tests (typically bootstrapping tests).
@@ -219,6 +216,9 @@ public class TestNanoSparqlServerWithProxyIndexManager<S extends IIndexManager>
         /*
          * Proxied test suites.
          */
+		
+		//Protocol
+		suite.addTest(TestProtocolAll.suite());
         
         // Multi-tenancy API.
         suite.addTestSuite(TestMultiTenancyAPI.class);
@@ -228,6 +228,11 @@ public class TestNanoSparqlServerWithProxyIndexManager<S extends IIndexManager>
 
         // BigdataSailRemoteRepository test (nano sparql server client-wrapper)
         suite.addTestSuite(TestBigdataSailRemoteRepository.class);
+        
+        // Insert tests from trac issues
+        suite.addTestSuite(TestInsertFilterFalse727.class);
+        suite.addTestSuite(TestCBD731.class);
+        
 
         // SPARQL UPDATE test suite.
         switch(testMode) {
@@ -250,6 +255,19 @@ public class TestNanoSparqlServerWithProxyIndexManager<S extends IIndexManager>
         return suite;
     
     }
+
+	static ProxyTestSuite createProxyTestSuite(final IIndexManager indexManager, final TestMode testMode) {
+		final TestNanoSparqlServerWithProxyIndexManager<?> delegate = new TestNanoSparqlServerWithProxyIndexManager(
+				null/* name */, indexManager, testMode); // !!!! THIS CLASS !!!!
+
+        /*
+         * Use a proxy test suite and specify the delegate.
+         */
+
+        final ProxyTestSuite suite = new ProxyTestSuite(delegate,
+                "NanoSparqlServer Proxied Test Suite");
+		return suite;
+	}
 
 	@SuppressWarnings("unchecked")
     public S getIndexManager() {
