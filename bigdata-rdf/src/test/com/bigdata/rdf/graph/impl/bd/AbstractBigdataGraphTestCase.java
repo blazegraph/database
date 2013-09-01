@@ -108,7 +108,7 @@ public class AbstractBigdataGraphTestCase extends AbstractGraphTestCase {
         /**
          * The data file.
          */
-        static private final String smallGraph = "bigdata-rdf/src/test/com/bigdata/rdf/graph/data/smallGraph.ttl";
+        static private final String smallGraph = "bigdata-gas/src/test/com/bigdata/rdf/graph/data/smallGraph.ttl";
 
         private final BigdataURI rdfType, foafKnows, foafPerson, mike, bryan,
                 martyn;

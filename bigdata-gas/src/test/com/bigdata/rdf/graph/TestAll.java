@@ -49,8 +49,6 @@ public class TestAll extends TestCase {
 
         final TestSuite suite = new TestSuite("GAS API");
 
-        suite.addTest(com.bigdata.rdf.graph.impl.bd.TestAll.suite());
-
         suite.addTest(com.bigdata.rdf.graph.impl.sail.TestAll.suite());
 
         suite.addTest(com.bigdata.rdf.graph.analytics.TestAll.suite());
