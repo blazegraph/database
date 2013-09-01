@@ -85,7 +85,11 @@ public class TestAll extends TestCase {
 
         // test the bulk data loader : @todo use proxy tests and move into per-store suites?
         suite.addTest( com.bigdata.rdf.load.TestAll.suite() );
-        
+
+        // test RDF graph mining/analytics
+        suite.addTest(com.bigdata.rdf.graph.TestAll.suite());
+        suite.addTest(com.bigdata.rdf.graph.impl.bd.TestAll.suite());
+
         return suite;
         
     }

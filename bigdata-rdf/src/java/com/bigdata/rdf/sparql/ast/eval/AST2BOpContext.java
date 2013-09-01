@@ -50,6 +50,7 @@ import com.bigdata.service.IBigdataFederation;
 /**
  * Convenience class for passing around the various pieces of context necessary
  * to construct the bop pipeline.
+ *      FIXME Rolling back r7319 which broke UNION processing. 
  */
 public class AST2BOpContext implements IdFactory, IEvaluationContext {
 
@@ -456,6 +457,7 @@ public class AST2BOpContext implements IdFactory, IEvaluationContext {
 
     }
     
+    /**      FIXME Rolling back r7319 which broke UNION processing. */
     public int nextId() {
 
         return idFactory.incrementAndGet();

@@ -164,6 +164,7 @@ import cutthecrap.utils.striterators.NOPFilter;
  * @see <a href=
  *      "https://sourceforge.net/apps/mediawiki/bigdata/index.php?title=QueryEvaluation"
  *      >Query Evaluation</a>.
+ *      
  */
 public class AST2BOpUtility extends AST2BOpJoins {
 
@@ -2242,6 +2243,8 @@ public class AST2BOpUtility extends AST2BOpJoins {
             /*
              * Need to make sure the first operator in the group has the right
              * Id.
+             * 
+             * FIXME Rolling back r7319 which broke UNION processing. 
              */
             left = new CopyOp(leftOrEmpty(left), NV.asMap(new NV[] {//
                     new NV(Predicate.Annotations.BOP_ID, subqueryIds[i++]),//

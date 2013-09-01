@@ -1591,12 +1591,12 @@ abstract public class AbstractTripleStore extends
 
             }
 
-            spoRelation = new SPORelation(this/* container */,
+            spoRelationRef.set(new SPORelation(this/* container */,
                     getIndexManager(), SPO_NAMESPACE, getTimestamp(),
                     new Properties(tmp)// Note: must wrap properties!
-            );
+                    ));
 
-            spoRelation.create();//assignedSplits);
+            spoRelationRef.get().create();
 
             /*
              * The axioms require the lexicon to pre-exist. The axioms also
@@ -1775,7 +1775,7 @@ abstract public class AbstractTripleStore extends
                     spo.destroy();
             }
 
-            spoRelation = null;
+            spoRelationRef.set(null/* clearRef */);
             
             super.destroy();
             
@@ -1919,21 +1919,38 @@ abstract public class AbstractTripleStore extends
     /**
      * The {@link SPORelation} (triples and their access paths).
      */
-    final synchronized public SPORelation getSPORelation() {
-    
-        if (spoRelation == null) {
+    final public SPORelation getSPORelation() {
 
-            spoRelation = (SPORelation) getIndexManager().getResourceLocator()
-                    .locate(getNamespace() + "." + SPORelation.NAME_SPO_RELATION,
-                            getTimestamp());
+        if (spoRelationRef.get() == null) {
+
+            /*
+             * Note: double-checked locking pattern (mostly non-blocking). Only
+             * synchronized if not yet resolved. The AtomicReference is reused
+             * as the monitor to serialize the resolution of the SPORelation in
+             * order to have that operation not contend with any other part of
+             * the API.
+             */
+            synchronized (this) {
+            
+                if (spoRelationRef.get() == null) {
+
+                    spoRelationRef.set((SPORelation) getIndexManager()
+                            .getResourceLocator().locate(
+                                    getNamespace() + "."
+                                            + SPORelation.NAME_SPO_RELATION,
+                                    getTimestamp()));
+
+                }
+                
+            }
 
         }
 
-        return spoRelation;
+        return spoRelationRef.get();
 
     }
 
-    private SPORelation spoRelation;
+    private final AtomicReference<SPORelation> spoRelationRef = new AtomicReference<SPORelation>();
 
     /**
      * The {@link LexiconRelation} handles all things related to the indices
@@ -2103,14 +2120,14 @@ abstract public class AbstractTripleStore extends
 
         }
 
-        if (spoRelation != null) {
+        final SPORelation tmp = spoRelationRef.getAndSet(null/* clearRef */);
 
-            locator.discard(spoRelation, false/*destroyed*/);
+        if (tmp != null) {
 
-            spoRelation = null;
+            locator.discard(tmp, false/* destroyed */);
 
         }
-        
+
     }
 
     /**

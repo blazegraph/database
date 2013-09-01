@@ -42,8 +42,9 @@ import java.util.Iterator;
  * @todo appender and excluder patterns. These are just filters so we only
  *       really need a single {@link #addFilter(IFilter)} method.
  */
-public interface IStriterator<I extends Iterator<E>,E> extends Iterator<E>, Enumeration<E> {
-    
+public interface IStriterator<I extends Iterator<E>, E> extends
+        ICloseableIterator<E>, Enumeration<E> {
+
     /**
      * Stack a filter on the source iterator.
      * 

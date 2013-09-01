@@ -164,5 +164,12 @@ public class TestConneg extends TestCase2 {
         }
 
     }
+    
+    public void test_conneg_ask_json() {
+    	final ConnegUtil util = new ConnegUtil(BigdataRDFServlet.MIME_SPARQL_RESULTS_JSON);
+    	final BooleanQueryResultFormat format = util
+                .getBooleanQueryResultFormat(BooleanQueryResultFormat.SPARQL);
+    	assertFalse(format.toString(),format.toString().toLowerCase().contains("xml"));
+    }
 
 }

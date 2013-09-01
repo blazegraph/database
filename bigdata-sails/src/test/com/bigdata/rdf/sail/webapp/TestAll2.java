@@ -57,9 +57,9 @@ public class TestAll2 extends TestCase {
 
         final TestSuite suite = new TestSuite("WebApp");
 
-//        suite.addTest(TestNanoSparqlServerWithProxyIndexManager2.suite(TestMode.triples));
-//        
-//        suite.addTest(TestNanoSparqlServerWithProxyIndexManager2.suite(TestMode.sids));
+        suite.addTest(TestNanoSparqlServerWithProxyIndexManager2.suite(TestMode.triples));
+        
+        suite.addTest(TestNanoSparqlServerWithProxyIndexManager2.suite(TestMode.sids));
         
         suite.addTest(TestNanoSparqlServerWithProxyIndexManager2.suite(TestMode.quads));
         

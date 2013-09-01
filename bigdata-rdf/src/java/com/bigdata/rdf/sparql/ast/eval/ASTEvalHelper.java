@@ -566,33 +566,37 @@ public class ASTEvalHelper {
                         );
 
         final CloseableIteration<BigdataStatement, QueryEvaluationException> src2;
-        switch (describeMode) {
-        case SymmetricOneStep: // No expansion step.
-        case ForwardOneStep: // No expansion step.
-            src2 = src;
-            break;
-        case CBD:
-        case SCBD:
-//        case CBDNR:
-//        case SCBDNR: 
-        {
-            /*
-             * Concise Bounded Description (of any flavor) requires a fixed
-             * point expansion.
-             * 
-             * TODO CBD : The expansion should monitor a returned iterator so
-             * the query can be cancelled by the openrdf client. Right now the
-             * expansion is performed before the iteration is returned to the
-             * client, so there is no opportunity to cancel a running CBD
-             * DESCRIBE.
-             */
-            src2 = new CBD(store, describeMode, describeIterationLimit,
-                    describeStatementlimit, bnodes).computeClosure(src);
-            break;
-        }
-        default:
-            throw new UnsupportedOperationException("describeMode="
-                    + describeMode);
+        if (isDescribe) {
+        	switch (describeMode) {
+        	case SymmetricOneStep: // No expansion step.
+        	case ForwardOneStep: // No expansion step.
+        		src2 = src;
+        		break;
+        	case CBD:
+        	case SCBD:
+        		//        case CBDNR:
+        		//        case SCBDNR: 
+        	{
+        		/*
+        		 * Concise Bounded Description (of any flavor) requires a fixed
+        		 * point expansion.
+        		 * 
+        		 * TODO CBD : The expansion should monitor a returned iterator so
+        		 * the query can be cancelled by the openrdf client. Right now the
+        		 * expansion is performed before the iteration is returned to the
+        		 * client, so there is no opportunity to cancel a running CBD
+        		 * DESCRIBE.
+        		 */
+        		src2 = new CBD(store, describeMode, describeIterationLimit,
+        				describeStatementlimit, bnodes).computeClosure(src);
+        		break;
+        	}
+        	default:
+        		throw new UnsupportedOperationException("describeMode="
+        				+ describeMode);
+        	}
+        } else {
+        	src2 = src;
         }
         final CloseableIteration<BigdataStatement, QueryEvaluationException> src3;
 

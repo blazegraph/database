@@ -1480,6 +1480,11 @@ public class BigdataRDFContext extends BigdataBaseContext {
             
             this.resp = resp;
             
+            /** Content Type header is required:
+            http://www.w3.org/Protocols/rfc2616/rfc2616-sec7.html#sec7.2.1
+            */
+            resp.setContentType("text/html; charset="+charset.name());
+            
             this.os = os;
             
             this.charset = charset;
