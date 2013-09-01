@@ -1,3 +1,18 @@
+/**
+   Copyright (C) SYSTAP, LLC 2006-2012.  All rights reserved.
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
 package com.bigdata.rdf.graph.impl.scheduler;
 
 import java.util.ArrayList;
@@ -11,16 +26,16 @@ import java.util.concurrent.Future;
 import org.apache.log4j.Logger;
 import org.openrdf.model.Value;
 
-import com.bigdata.rdf.graph.GASUtil;
 import com.bigdata.rdf.graph.IGASScheduler;
 import com.bigdata.rdf.graph.IGASSchedulerImpl;
 import com.bigdata.rdf.graph.IStaticFrontier;
 import com.bigdata.rdf.graph.impl.GASEngine;
-import com.bigdata.rdf.graph.impl.StaticFrontier2;
 import com.bigdata.rdf.graph.impl.bd.MergeSortIterator;
+import com.bigdata.rdf.graph.impl.frontier.StaticFrontier2;
 import com.bigdata.rdf.graph.impl.util.GASImplUtil;
 import com.bigdata.rdf.graph.impl.util.IArraySlice;
 import com.bigdata.rdf.graph.impl.util.ManagedArray;
+import com.bigdata.rdf.graph.util.GASUtil;
 
 /**
  * This scheduler uses thread-local buffers ({@link LinkedHashSet}) to track the
@@ -181,7 +196,7 @@ public class TLScheduler2 implements IGASSchedulerImpl {
              * The new frontier is empty.
              */
 
-            frontier.resetFrontier(0/* minCapacity */, true/* ordered */,
+            frontier.resetFrontier(0/* minCapacity */, false/* sortFrontier */,
                     GASUtil.EMPTY_VERTICES_ITERATOR);
 
             return;
@@ -196,12 +211,6 @@ public class TLScheduler2 implements IGASSchedulerImpl {
          * duplicate work.
          */
         
-//        /*
-//         * Extract a sorted, compact frontier from each thread local frontier.
-//         */
-//        @SuppressWarnings("unchecked")
-//        final IArraySlice<Value>[] frontiers = new IArraySlice[nsources];
-
         // TODO Requires a specific class to work! API!
         final StaticFrontier2 f2 = (StaticFrontier2) frontier;
         {
@@ -210,39 +219,36 @@ public class TLScheduler2 implements IGASSchedulerImpl {
             f2.resetAndEnsureCapacity(nvertices);
             f2.setCompact(false); // NOT COMPACT!
             
-            final List<Callable<IArraySlice<Value>>> tasks = new ArrayList<Callable<IArraySlice<Value>>>(
+            final List<Callable<Void>> tasks = new ArrayList<Callable<Void>>(
                     nsources);
 
             int i = 0;
             for (MySTScheduler s : map.values()) { // TODO Paranoia suggests to put these into an [] so we know that we have the same traversal order as above. That might not be guaranteed.
                 final MySTScheduler t = s;
                 final int index = i++;
-                tasks.add(new Callable<IArraySlice<Value>>() {
+                tasks.add(new Callable<Void>() {
                     @Override
-                    public IArraySlice<Value> call() throws Exception {
+                    public Void call() throws Exception {
                         final IArraySlice<Value> orderedSegment = GASImplUtil
                                 .compactAndSort(t.vertices, t.tmp);
                         f2.copyIntoResetFrontier(off[index], orderedSegment);
-                        return orderedSegment; // TODO CAN RETURN Void now!
+                        return (Void) null;
                     }
                 });
             }
             
             // invokeAll() - futures will be done() before it returns.
-            final List<Future<IArraySlice<Value>>> futures;
+            final List<Future<Void>> futures;
             try {
                 futures = gasEngine.getGASThreadPool().invokeAll(tasks);
             } catch (InterruptedException e) {
                 throw new RuntimeException(e);
             }
 
-            for (Future<IArraySlice<Value>> f : futures) {
+            for (Future<Void> f : futures) {
 
                 try {
                     f.get();
-//                    final IArraySlice<Value> b = frontiers[nsources] = f.get();
-//                    nvertices += b.len();
-//                    nsources++;
                 } catch (InterruptedException e) {
                     throw new RuntimeException(e);
                 } catch (ExecutionException e) {

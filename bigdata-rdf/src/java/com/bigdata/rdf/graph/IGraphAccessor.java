@@ -1,3 +1,18 @@
+/**
+   Copyright (C) SYSTAP, LLC 2006-2012.  All rights reserved.
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
 package com.bigdata.rdf.graph;
 
 import java.util.Iterator;
@@ -5,6 +20,8 @@ import java.util.Random;
 
 import org.openrdf.model.Statement;
 import org.openrdf.model.Value;
+
+import com.bigdata.rdf.graph.impl.util.VertexDistribution;
 
 /**
  * Interface abstracts access to a backend graph implementation.
@@ -35,18 +52,36 @@ public interface IGraphAccessor {
     void advanceView();
 
     /**
-     * Return a sample (without duplicates) of vertices from the graph.
+     * Obtain a weighted distribution of the vertices in the graph from which
+     * samples may then be taken. The weight is the #of in-edges and out-edges
+     * in which a given vertex appears. Statements that model property values
+     * and statement that model link attributes SHOULD NOT be counted in this
+     * sample.
      * 
-     * @param desiredSampleSize
-     *            The desired sample size.
+     * @param r
+     *            A random number generator that (a) MAY be used to select the
+     *            sample distribution (the distribution does not need to be
+     *            exhaustive so long as it obeys the sampling requirements); and
+     *            (b) WILL be used to select vertices from that distribution.
      * 
-     * @return The distinct samples that were found.
+     * @return The distribution.
      * 
-     *         FIXME Specify whether the sample must be uniform over the
-     *         vertices, proportional to the #of (in/out)edges for those
-     *         vertices, etc. Without a clear specification, we will not
-     *         have the same behavior across different backends.
+     *         TODO SAMPLING: While the same distribution is used for all SAIL
+     *         implementations, and while all implementations accept and use a
+     *         random seed, there is NOT a guarantee the different
+     *         implementations will sample the same vertices from the same
+     *         graph. This is because the order in which the vertex sample is
+     *         collected and the natural order of the vertices currently depends
+     *         on the implementation objects.
+     *         <p>
+     *         This COULD be fixed if we required the implementation to put the
+     *         sampled vertices into an order based on their external
+     *         representation as RDF Values, but still reporting their internal
+     *         since that is what is used to actually specify a starting vertex
+     *         of the GAS program. However, even then, implementation specific
+     *         characteristics might not provide us with the same vertices
+     *         (e.g., bigdata imposes a canonical mapping on xsd:dateTime).
      */
-    Value[] getRandomSample(final Random r, final int desiredSampleSize);
-    
+    VertexDistribution getDistribution(Random r);
+
 }

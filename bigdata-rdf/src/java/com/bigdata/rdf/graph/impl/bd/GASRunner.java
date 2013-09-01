@@ -1,4 +1,4 @@
-package com.bigdata.rdf.graph.impl;
+package com.bigdata.rdf.graph.impl.bd;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -15,7 +15,7 @@ import java.util.concurrent.Callable;
 
 import org.apache.log4j.Logger;
 import org.openrdf.model.Value;
-import org.openrdf.rio.RDFFormat;
+import org.openrdf.sail.SailConnection;
 
 import com.bigdata.Banner;
 import com.bigdata.journal.BufferMode;
@@ -28,9 +28,12 @@ import com.bigdata.rdf.graph.IGASScheduler;
 import com.bigdata.rdf.graph.IGASSchedulerImpl;
 import com.bigdata.rdf.graph.IGASState;
 import com.bigdata.rdf.graph.IGASStats;
-import com.bigdata.rdf.graph.impl.bd.BigdataGASEngine;
+import com.bigdata.rdf.graph.impl.GASEngine;
+import com.bigdata.rdf.graph.impl.GASState;
+import com.bigdata.rdf.graph.impl.GASStats;
 import com.bigdata.rdf.graph.impl.bd.BigdataGASEngine.BigdataGraphAccessor;
-import com.bigdata.rdf.rio.LoadStats;
+import com.bigdata.rdf.graph.impl.util.VertexDistribution;
+import com.bigdata.rdf.graph.util.GASUtil;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.store.AbstractTripleStore;
 
@@ -42,6 +45,10 @@ import com.bigdata.rdf.store.AbstractTripleStore;
  *         TODO Do we need a different driver if the algorithm always visits all
  *         vertices? For such algorithms, we just run them once per graph
  *         (unless the graph is dynamic).
+ * 
+ *         FIXME API: GASRunner needs to use a factory pattern for different
+ *         backends. It should then be moved to the util package and the
+ *         bigdata-gas module.
  */
 public class GASRunner<VS, ES, ST> implements Callable<IGASStats> {
 
@@ -553,9 +560,38 @@ public class GASRunner<VS, ES, ST> implements Callable<IGASStats> {
      *            The files.
      * @throws IOException 
      */
-    private LoadStats loadFiles(final Journal jnl, final String namespace,
+    private void loadFiles(final Journal jnl, final String namespace,
             final String[] loadSet) throws IOException {
 
+        // Load data using the unisolated view.
+        final AbstractTripleStore kb = (AbstractTripleStore) jnl
+                .getResourceLocator().locate(namespace, ITx.UNISOLATED);
+        final BigdataSail sail = new BigdataSail(kb);
+        try {
+            try {
+                sail.initialize();
+                boolean ok = false;
+                final SailConnection cxn = sail.getUnisolatedConnection();
+                try {
+                    for (String f : loadSet) {
+                        new GASUtil()
+                                .loadGraph(cxn, null/* fallback */, f/* resource */);
+                    }
+                    cxn.commit();
+                    ok = true;
+                } finally {
+                    if (!ok)
+                        cxn.rollback();
+                    cxn.close();
+                }
+            } finally {
+                if (sail.isOpen())
+                    sail.shutDown();
+            }
+        } catch (Exception ex) {
+            throw new RuntimeException(ex);
+        }
+        
         // final String path = "bigdata-rdf/src/resources/data/foaf";
         // final String dataFile[] = new String[] {//
         // path + "/data-0.nq.gz",//
@@ -563,26 +599,26 @@ public class GASRunner<VS, ES, ST> implements Callable<IGASStats> {
         // path + "/data-2.nq.gz",//
         // path + "/data-3.nq.gz",//
         // };
-        final String baseUrl[] = new String[loadSet.length];
-        for (int i = 0; i < loadSet.length; i++) {
-            baseUrl[i] = "file:" + loadSet[i];
-        }
-        // fall back RDFFormat.
-        final RDFFormat[] rdfFormat = new RDFFormat[loadSet.length];
-        for (int i = 0; i < loadSet.length; i++) {
-            rdfFormat[i] = RDFFormat.RDFXML;
-        }
-
-        // Load data using the unisolated view.
-        final AbstractTripleStore kb = (AbstractTripleStore) jnl
-                .getResourceLocator().locate(namespace, ITx.UNISOLATED);
-
-        final LoadStats stats = kb.getDataLoader().loadData(loadSet, baseUrl,
-                rdfFormat);
-
-        System.out.println(stats.toString());
-
-        return stats;
+//        final String baseUrl[] = new String[loadSet.length];
+//        for (int i = 0; i < loadSet.length; i++) {
+//            baseUrl[i] = "file:" + loadSet[i];
+//        }
+//        // fall back RDFFormat.
+//        final RDFFormat[] rdfFormat = new RDFFormat[loadSet.length];
+//        for (int i = 0; i < loadSet.length; i++) {
+//            rdfFormat[i] = RDFFormat.RDFXML;
+//        }
+//
+//        // Load data using the unisolated view.
+//        final AbstractTripleStore kb = (AbstractTripleStore) jnl
+//                .getResourceLocator().locate(namespace, ITx.UNISOLATED);
+//
+//        final LoadStats stats = kb.getDataLoader().loadData(loadSet, baseUrl,
+//                rdfFormat);
+//
+//        System.out.println(stats.toString());
+//
+//        return stats;
 
     }
     
@@ -631,8 +667,8 @@ public class GASRunner<VS, ES, ST> implements Callable<IGASStats> {
             
             final IGASProgram<VS, ES, ST> gasProgram = newGASProgram();
 
-            final BigdataGraphAccessor graphAccessor = ((BigdataGASEngine) gasEngine)
-                    .newGraphAccessor(namespace, jnl.getLastCommitTime());
+            final BigdataGraphAccessor graphAccessor = new BigdataGraphAccessor(
+                    jnl, namespace, jnl.getLastCommitTime());
 
             final IGASContext<VS, ES, ST> gasContext = gasEngine.newGASContext(
                     graphAccessor, gasProgram);
@@ -641,7 +677,9 @@ public class GASRunner<VS, ES, ST> implements Callable<IGASStats> {
             
             final IGASStats total = new GASStats();
 
-            final Value[] samples = graphAccessor.getRandomSample(r, nsamples);
+            final VertexDistribution dist = graphAccessor.getDistribution(r);
+            
+            final Value[] samples = dist.getWeightedSample(nsamples);
 
             for (int i = 0; i < samples.length; i++) {
 

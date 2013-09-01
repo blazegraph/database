@@ -1,4 +1,4 @@
-package com.bigdata.rdf.graph.analytics;
+package com.bigdata.rdf.graph.impl.sail;
 
 import junit.framework.Test;
 import junit.framework.TestCase;
@@ -32,11 +32,15 @@ public class TestAll extends TestCase {
     public static Test suite()
     {
 
-        final TestSuite suite = new TestSuite("Graph Analytics");
-        
-        suite.addTestSuite(TestBFS.class);
+        final TestSuite suite = new TestSuite("SAIL Graph Engine");
 
-        suite.addTestSuite(TestSSSP.class);
+        /*
+         * Only core functionality tests for the SAIL backend belong here. The
+         * analytic test suites are written to the SAIL backend so there is good
+         * coverage there.
+         */
+
+        suite.addTestSuite(TestGather.class);
         
         return suite;
         

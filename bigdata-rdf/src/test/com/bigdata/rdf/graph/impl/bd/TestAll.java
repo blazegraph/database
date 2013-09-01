@@ -21,7 +21,7 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
-package com.bigdata.rdf.graph.impl;
+package com.bigdata.rdf.graph.impl.bd;
 
 import junit.framework.Test;
 import junit.framework.TestCase;
@@ -55,9 +55,21 @@ public class TestAll extends TestCase {
     public static Test suite()
     {
 
-        final TestSuite suite = new TestSuite("Graph Engine");
+        final TestSuite suite = new TestSuite("Bigdata Graph Engine");
         
+        /*
+         * Some basic correctness tests against the bigdata backend.
+         * 
+         * FIXME TEST: Extend/override the analytic test suite to also work for
+         * the bigdata backend. This is a bit tricky because the bigdata backend
+         * opererates in IV and ISPO objects that are not automatically resolved
+         * to Value and Statement objects. Maybe we can add a resolution pattern
+         * to the test suites (wrapping the GAS outputs) and get better reuse
+         * out of them?
+         */
         suite.addTestSuite(TestGather.class);
+        suite.addTestSuite(TestBFS.class);
+        suite.addTestSuite(TestSSSP.class);
         
         return suite;
         

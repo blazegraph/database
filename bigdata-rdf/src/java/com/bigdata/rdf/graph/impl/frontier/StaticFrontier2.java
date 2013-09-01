@@ -1,4 +1,19 @@
-package com.bigdata.rdf.graph.impl;
+/**
+   Copyright (C) SYSTAP, LLC 2006-2012.  All rights reserved.
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
+package com.bigdata.rdf.graph.impl.frontier;
 
 import java.util.Arrays;
 import java.util.Iterator;
@@ -34,7 +49,7 @@ public class StaticFrontier2 implements IStaticFrontier {
 
     private boolean compact = true;
     
-    StaticFrontier2() {
+    public StaticFrontier2() {
 
         /*
          * The managed backing array.
@@ -143,17 +158,13 @@ public class StaticFrontier2 implements IStaticFrontier {
 
     }
     
-    /**
-     * Setup the same static frontier object for the new compact fronter (it is
-     * reused in each round).
-     */
     @Override
-    public void resetFrontier(final int minCapacity, final boolean ordered,
+    public void resetFrontier(final int minCapacity, final boolean sort,
             final Iterator<Value> itr) {
 
         copyScheduleIntoFrontier(minCapacity, itr);
 
-        if (!ordered) {
+        if (sort) {
 
             /*
              * Sort the current slice of the backing array.

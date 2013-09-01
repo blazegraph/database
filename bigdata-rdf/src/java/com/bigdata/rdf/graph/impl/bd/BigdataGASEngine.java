@@ -1,16 +1,23 @@
 package com.bigdata.rdf.graph.impl.bd;
 
 import java.lang.ref.WeakReference;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Random;
+import java.util.Set;
 
+import org.apache.log4j.Logger;
+import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
 import org.openrdf.model.Value;
+import org.openrdf.sail.Sail;
 
+import com.bigdata.btree.BTree;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
+import com.bigdata.btree.Tuple;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.SuccessorUtil;
 import com.bigdata.journal.IIndexManager;
@@ -24,10 +31,11 @@ import com.bigdata.rdf.graph.IGASSchedulerImpl;
 import com.bigdata.rdf.graph.IGASState;
 import com.bigdata.rdf.graph.IGraphAccessor;
 import com.bigdata.rdf.graph.IStaticFrontier;
-import com.bigdata.rdf.graph.impl.GASContext;
 import com.bigdata.rdf.graph.impl.GASEngine;
+import com.bigdata.rdf.graph.impl.util.VertexDistribution;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVUtility;
+import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPOKeyOrder;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -106,13 +114,28 @@ import cutthecrap.utils.striterators.Striterator;
  */
 public class BigdataGASEngine extends GASEngine {
 
-//    private static final Logger log = Logger.getLogger(GASEngine.class);
+    private static final Logger log = Logger.getLogger(GASEngine.class);
+
+//    /**
+//     * The {@link IIndexManager} is used to access the graph.
+//     */
+//    private final IIndexManager indexManager;
 
     /**
-     * The {@link IIndexManager} is used to access the graph.
+     * Convenience constructor
+     * 
+     * @param sail
+     *            The sail (must be a {@link BigdataSail}).
+     * @param nthreads
+     *            The number of threads to use for the SCATTER and GATHER
+     *            phases.
      */
-    private final IIndexManager indexManager;
-
+    public BigdataGASEngine(final Sail sail, final int nthreads) {
+     
+        this(((BigdataSail) sail).getDatabase().getIndexManager(), nthreads);
+        
+    }
+    
     /**
      * 
      * @param indexManager
@@ -134,7 +157,7 @@ public class BigdataGASEngine extends GASEngine {
         if (indexManager == null)
             throw new IllegalArgumentException();
 
-        this.indexManager = indexManager;
+//        this.indexManager = indexManager;
 
     }
 
@@ -147,65 +170,65 @@ public class BigdataGASEngine extends GASEngine {
 
         final IGASSchedulerImpl gasScheduler = newScheduler();
 
-        return new BigdataGASState<VS, ES, ST>(
+        return new BigdataGASState<VS, ES, ST>(this,
                 (BigdataGraphAccessor) graphAccessor, frontier, gasScheduler,
                 gasProgram);
 
     }
 
-    @Override
-    public <VS, ES, ST> IGASContext<VS, ES, ST> newGASContext(
-            final IGraphAccessor graphAccessor,
-            final IGASProgram<VS, ES, ST> gasProgram) {
-
-        final BigdataGraphAccessor tmp = (BigdataGraphAccessor) graphAccessor;
-
-        final IGASState<VS, ES, ST> gasState = newGASState(tmp, gasProgram);
-        
-        return new GASContext<VS, ES, ST>(this/* GASEngine */, tmp, gasState,
-                gasProgram);
-
-    }
-
     /**
-     * 
-     * 
-     * @param namespace
-     *            The namespace of the graph.
-     * @param timestamp
-     *            The timestamp of the view. If you specify
-     *            {@link ITx#READ_COMMITTED}, then
-     *            {@link IIndexManager#getLastCommitTime()} will be used to
-     *            locate the most recently committed view of the graph at the
-     *            start of each iteration. This provides one mechanism for
-     *            dynamic graphs.
-     * @return
+     * Returns <code>true</code> since the IOs will be vectored if the
+     * frontier is sorted.
      */
-    public BigdataGraphAccessor newGraphAccessor(final String namespace,
-            final long timestamp) {
-
-        return new BigdataGraphAccessor(namespace, timestamp);
-        
+    @Override
+    public boolean getSortFrontier() {
+        return true;
     }
-    
-    public class BigdataGraphAccessor implements IGraphAccessor {
 
+    static public class BigdataGraphAccessor implements IGraphAccessor {
+
+        private final IIndexManager indexManager;
         private final String namespace;
         private final long timestamp;
         private volatile WeakReference<AbstractTripleStore> kbRef;
         
         /**
          * 
+         * @param indexManager
+         *            The index manager.
          * @param namespace
          *            The namespace of the graph.
          * @param timestamp
-         *            The timestamp of the view.
+         *            The timestamp of the view. If you specify
+         *            {@link ITx#READ_COMMITTED}, then
+         *            {@link IIndexManager#getLastCommitTime()} will be used to
+         *            locate the most recently committed view of the graph at
+         *            the start of each iteration. This provides one mechanism
+         *            for dynamic graphs.
          */
-        private BigdataGraphAccessor(final String namespace,
-                final long timestamp) {
+        public BigdataGraphAccessor(final IIndexManager indexManager,
+                final String namespace, final long timestamp) {
 
+            if(indexManager == null)
+                throw new IllegalArgumentException();
+            
+            if (namespace == null)
+                throw new IllegalArgumentException();
+
+            this.indexManager = indexManager;
             this.namespace = namespace;
             this.timestamp = timestamp;
+
+        }
+
+        /**
+         * Obtain a view of the default KB instance as of the last commit time on
+         * the database.
+         */
+        public BigdataGraphAccessor(final IIndexManager indexManager) {
+
+            this(indexManager, BigdataSail.Options.DEFAULT_NAMESPACE,
+                    indexManager.getLastCommitTime());
 
         }
 
@@ -453,80 +476,156 @@ public class BigdataGASEngine extends GASEngine {
         }
 
         @Override
-        public Value[] getRandomSample(final Random r,
-                final int desiredSampleSize) {
+        public VertexDistribution getDistribution(final Random r) {
 
-            return BigdataGASUtil
-                    .getRandomSample(r, getKB(), desiredSampleSize);
+            final VertexDistribution sample = new VertexDistribution(r);
+
+            @SuppressWarnings("unchecked")
+            final ITupleIterator<ISPO> titr = getKB().getSPORelation()
+                    .getPrimaryIndex().rangeIterator();
+
+            while (titr.hasNext()) {
+
+                final ISPO spo = titr.next().getObject();
+
+                if (!(spo.o().isResource())) {
+
+                    // Not an edge.
+                    continue;
+                }
+
+                sample.addSample((Resource) spo.s());
+
+                sample.addSample((Resource) spo.o());
+
+            }
+
+            return sample;
 
         }
 
-        // private IChunkedIterator<ISPO> getInEdges(final AbstractTripleStore kb,
-        // final IV u) {
-        //
-        // // in-edges: OSP / OCSP : [u] is the Object.
-        // return kb
-        // .getSPORelation()
-        // .getAccessPath(null/* s */, null/* p */, u/* o */, null/* c */,
-        // edgeOnlyFilter).iterator();
-        //
-        // }
-        //
-        // private IChunkedIterator<ISPO> getOutEdges(final AbstractTripleStore kb,
-        // final IV u) {
-        //
-        // // out-edges: SPO / SPOC : [u] is the Subject.
-        // return kb
-        // .getSPORelation()
-        // .getAccessPath(u/* s */, null/* p */, null/* o */,
-        // null/* c */, edgeOnlyFilter).iterator();
-        //
-        // }
-        //
-        // /**
-        // * Return the edges for the vertex.
-        // *
-        // * @param u
-        // * The vertex.
-        // * @param edges
-        // * Typesafe enumeration indicating which edges should be visited.
-        // * @return An iterator that will visit the edges for that vertex.
-        // *
-        // * TODO There should be a means to specify a filter on the possible
-        // * predicates to be used for traversal. If there is a single
-        // * predicate, then that gives us S+P bound. If there are multiple
-        // * predicates, then we have an IElementFilter on P (in addition to
-        // * the filter that is removing the Literals from the scan).
-        // *
-        // * TODO Use the chunk parallelism? Explicit for(x : chunk)? This
-        // * could make it easier to collect the edges into an array (but that
-        // * is not required for powergraph).
-        // */
-        // @SuppressWarnings("unchecked")
-        // private IChunkedIterator<ISPO> getEdges(final AbstractTripleStore kb,
-        // final IV u, final EdgesEnum edges) {
-        //
-        // switch (edges) {
-        // case NoEdges:
-        // return new EmptyChunkedIterator<ISPO>(null/* keyOrder */);
-        // case InEdges:
-        // return getInEdges(kb, u);
-        // case OutEdges:
-        // return getOutEdges(kb, u);
-        // case AllEdges:{
-        // final IChunkedIterator<ISPO> a = getInEdges(kb, u);
-        // final IChunkedIterator<ISPO> b = getOutEdges(kb, u);
-        // final IChunkedIterator<ISPO> c = (IChunkedIterator<ISPO>) new
-        // ChunkedStriterator<IChunkedIterator<ISPO>, ISPO>(
-        // a).append(b);
-        // return c;
-        // }
-        // default:
-        // throw new UnsupportedOperationException(edges.name());
-        // }
-        //
-        // }
+        /**
+         * Return a sample (without duplicates) of vertices from the graph.
+         * <p>
+         * Note: This sampling procedure has a bias in favor of the vertices
+         * with the most edges and properties (vertices are choosen randomly in
+         * proportion to the #of edges and properties for the vertex).
+         * 
+         * @param desiredSampleSize
+         *            The desired sample size.
+         * 
+         * @return The distinct samples that were found.
+         * 
+         *         TODO This is a (MUCH) more efficient way to create a biased
+         *         sample. However, having a representative sample is probably
+         *         more important than being efficient. Keep this code or
+         *         discard? Maybe we could refactor the code to produce a
+         *         {@link VertexDistribution} that was a sample of the total
+         *         population, from which we then took a sample using the
+         *         {@link VertexDistribution} API? That could be useful for
+         *         large graphs (better than scanning the SPO(C) index!)
+         */
+        @SuppressWarnings("rawtypes")
+        private IV[] getRandomSample(final Random r,
+                final AbstractTripleStore kb, final int desiredSampleSize) {
+
+            // Maximum number of samples to attempt.
+            final int limit = (int) Math.min(desiredSampleSize * 3L,
+                    Integer.MAX_VALUE);
+
+            final Set<IV> samples = new HashSet<IV>();
+
+            int round = 0;
+            while (samples.size() < desiredSampleSize && round++ < limit) {
+
+                final IV iv = getRandomVertex(r, kb);
+
+                samples.add(iv);
+
+            }
+
+            return samples.toArray(new IV[samples.size()]);
+
+        }
+
+        /**
+         * Return a random vertex.
+         * <p>
+         * The vertex is sampled in proportion to the number of statements
+         * having that vertex as a subject, hence the sample is proportional to
+         * the #of property values and out-links for a given vertex (in-links
+         * are not considered by this sampling procedure).
+         */
+        @SuppressWarnings("rawtypes")
+        private IV getRandomVertex(final Random r, final AbstractTripleStore kb) {
+
+            /*
+             * TODO This assumes a local, non-sharded index. The specific
+             * approach to identifying a starting vertex relies on the
+             * ILinearList API. If the caller is specifying the starting vertex
+             * then we do not need to do this.
+             */
+            final BTree ndx = (BTree) kb.getSPORelation().getPrimaryIndex();
+
+            // Select a random starting vertex.
+            IV startingVertex = null;
+            {
+
+                // Truncate at MAX_INT.
+                final int size = (int) Math.min(ndx.rangeCount(),
+                        Integer.MAX_VALUE);
+
+                while (size > 0L && startingVertex == null) {
+
+                    final int rindex = r.nextInt(size);
+
+                    /*
+                     * Use tuple that will return both the key and the value so
+                     * we can decode the entire tuple.
+                     */
+                    final Tuple<ISPO> tuple = new Tuple<ISPO>(ndx,
+                            IRangeQuery.KEYS | IRangeQuery.VALS);
+
+                    if (ndx.valueAt(rindex, tuple) == null) {
+
+                        /*
+                         * This is a deleted tuple. Try again.
+                         * 
+                         * Note: This retry is NOT safe for production use. The
+                         * index might not have any undeleted tuples. However,
+                         * we should not be using an index without any undeleted
+                         * tuples for a test harness, so this should be safe
+                         * enough here. If you want to use this production, at a
+                         * mimimum make sure that you limit the #of attempts for
+                         * the outer loop.
+                         */
+                        continue;
+
+                    }
+
+                    // Decode the selected edge.
+                    final ISPO edge = (ISPO) ndx.getIndexMetadata()
+                            .getTupleSerializer().deserialize(tuple);
+
+                    // Use the subject for that edge as the starting vertex.
+                    startingVertex = edge.s();
+
+                    if (log.isInfoEnabled())
+                        log.info("Starting vertex: " + startingVertex);
+
+                }
+
+            }
+
+            if (startingVertex == null)
+                throw new RuntimeException("No starting vertex: nedges="
+                        + ndx.rangeCount());
+
+            return startingVertex;
+
+        }
 
     }
+
 
 } // BigdataGASEngine

@@ -1,3 +1,18 @@
+/**
+   Copyright (C) SYSTAP, LLC 2006-2012.  All rights reserved.
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
 package com.bigdata.rdf.graph.impl;
 
 import java.util.HashSet;
@@ -13,13 +28,14 @@ import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 
 import com.bigdata.rdf.graph.Factory;
-import com.bigdata.rdf.graph.GASUtil;
+import com.bigdata.rdf.graph.IGASEngine;
 import com.bigdata.rdf.graph.IGASProgram;
 import com.bigdata.rdf.graph.IGASSchedulerImpl;
 import com.bigdata.rdf.graph.IGASState;
 import com.bigdata.rdf.graph.IGraphAccessor;
 import com.bigdata.rdf.graph.IReducer;
 import com.bigdata.rdf.graph.IStaticFrontier;
+import com.bigdata.rdf.graph.util.GASUtil;
 
 public class GASState<VS, ES, ST> implements IGASState<VS, ES, ST> {
 
@@ -30,6 +46,11 @@ public class GASState<VS, ES, ST> implements IGASState<VS, ES, ST> {
     // */
     // private final GASEngine gasEngine;
 
+    /**
+     * When <code>true</code> the frontier will be sorted.
+     */
+    private final boolean sortFrontier;
+    
     /**
      * The {@link IGASProgram} to be run.
      */
@@ -89,11 +110,15 @@ public class GASState<VS, ES, ST> implements IGASState<VS, ES, ST> {
      */
     private IGraphAccessor graphAccessor;
 
-    public GASState(final IGraphAccessor graphAccessor, //
+    public GASState(final IGASEngine gasEngine,//
+            final IGraphAccessor graphAccessor, //
             final IStaticFrontier frontier,//
             final IGASSchedulerImpl gasScheduler,//
             final IGASProgram<VS, ES, ST> gasProgram//
     ) {
+
+        if (gasEngine == null)
+            throw new IllegalArgumentException();
 
         if (graphAccessor == null)
             throw new IllegalArgumentException();
@@ -107,6 +132,8 @@ public class GASState<VS, ES, ST> implements IGASState<VS, ES, ST> {
         if (gasProgram == null)
             throw new IllegalArgumentException();
 
+        this.sortFrontier = gasEngine.getSortFrontier();
+        
         this.graphAccessor = graphAccessor;
 
         this.gasProgram = gasProgram;
@@ -209,7 +236,7 @@ public class GASState<VS, ES, ST> implements IGASState<VS, ES, ST> {
         if (edgeState != null)
             edgeState.clear();
 
-        frontier.resetFrontier(0/* minCapacity */, true/* ordered */,
+        frontier.resetFrontier(0/* minCapacity */, false/* sortFrontier */,
                 GASUtil.EMPTY_VERTICES_ITERATOR);
 
     }
@@ -241,8 +268,8 @@ public class GASState<VS, ES, ST> implements IGASState<VS, ES, ST> {
         }
 
         // Reset the frontier.
-        frontier.resetFrontier(tmp.size()/* minCapacity */, false/* ordered */,
-                tmp.iterator());
+        frontier.resetFrontier(tmp.size()/* minCapacity */, tmp.size() > 1
+                && sortFrontier, tmp.iterator());
 
     }
 

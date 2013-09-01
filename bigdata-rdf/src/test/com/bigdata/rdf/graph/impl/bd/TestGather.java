@@ -21,7 +21,7 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
-package com.bigdata.rdf.graph.impl;
+package com.bigdata.rdf.graph.impl.bd;
 
 import java.util.Collections;
 import java.util.LinkedHashSet;
@@ -30,16 +30,15 @@ import java.util.Set;
 import org.openrdf.model.Statement;
 import org.openrdf.model.Value;
 
-import com.bigdata.rdf.graph.AbstractGraphTestCase;
 import com.bigdata.rdf.graph.EdgesEnum;
 import com.bigdata.rdf.graph.Factory;
 import com.bigdata.rdf.graph.IGASContext;
 import com.bigdata.rdf.graph.IGASEngine;
 import com.bigdata.rdf.graph.IGASScheduler;
 import com.bigdata.rdf.graph.IGASState;
-import com.bigdata.rdf.graph.impl.bd.BigdataGASEngine;
-import com.bigdata.rdf.graph.impl.bd.BigdataGASEngine.BigdataGraphAccessor;
-import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.graph.IGraphAccessor;
+import com.bigdata.rdf.graph.impl.BaseGASProgram;
+import com.bigdata.rdf.graph.impl.GASStats;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.spo.SPO;
 
@@ -51,7 +50,7 @@ import cutthecrap.utils.striterators.IStriterator;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
 @SuppressWarnings("rawtypes")
-public class TestGather extends AbstractGraphTestCase {
+public class TestGather extends AbstractBigdataGraphTestCase {
 
     public TestGather() {
         
@@ -216,7 +215,7 @@ public class TestGather extends AbstractGraphTestCase {
             
             final Set<Statement> expected = set();
 
-            doGatherTest(EdgesEnum.NoEdges, expected, p.mike.getIV()/* startingVertex */);
+            doGatherTest(EdgesEnum.NoEdges, expected, p.getMike()/* startingVertex */);
         
         }
 
@@ -224,11 +223,11 @@ public class TestGather extends AbstractGraphTestCase {
         {
             
             final Set<Statement> expected = set(//
-            (Statement) new SPO(p.bryan.getIV(), p.foafKnows.getIV(), p.mike.getIV(),
+            (Statement) new SPO(p.getBryan(), p.getFoafKnows(), p.getMike(),
                     StatementEnum.Explicit)//
             );
 
-            doGatherTest(EdgesEnum.InEdges, expected, p.mike.getIV()/* startingVertex */);
+            doGatherTest(EdgesEnum.InEdges, expected, p.getMike()/* startingVertex */);
 
         }
 
@@ -236,13 +235,13 @@ public class TestGather extends AbstractGraphTestCase {
         {
             
             final Set<Statement> expected = set(//
-                    (Statement) new SPO(p.mike.getIV(), p.rdfType.getIV(), p.foafPerson.getIV(),
+                    (Statement) new SPO(p.getMike(), p.getRdfType(), p.getFoafPerson(),
                             StatementEnum.Explicit),//
-                    (Statement) new SPO(p.mike.getIV(), p.foafKnows.getIV(), p.bryan.getIV(),
+                    (Statement) new SPO(p.getMike(), p.getFoafKnows(), p.getBryan(),
                             StatementEnum.Explicit)//
             );
 
-            doGatherTest(EdgesEnum.OutEdges, expected, p.mike.getIV()/* startingVertex */);
+            doGatherTest(EdgesEnum.OutEdges, expected, p.getMike()/* startingVertex */);
         
         }
 
@@ -250,15 +249,15 @@ public class TestGather extends AbstractGraphTestCase {
         {
             
             final Set<Statement> expected = set(//
-                    (Statement) new SPO(p.bryan.getIV(), p.foafKnows.getIV(), p.mike.getIV(),
+                    (Statement) new SPO(p.getBryan(), p.getFoafKnows(), p.getMike(),
                             StatementEnum.Explicit),//
-                    (Statement) new SPO(p.mike.getIV(), p.rdfType.getIV(), p.foafPerson.getIV(),
+                    (Statement) new SPO(p.getMike(), p.getRdfType(), p.getFoafPerson(),
                             StatementEnum.Explicit),//
-                    (Statement) new SPO(p.mike.getIV(), p.foafKnows.getIV(), p.bryan.getIV(),
+                    (Statement) new SPO(p.getMike(), p.getFoafKnows(), p.getBryan(),
                             StatementEnum.Explicit)//
             );
 
-            doGatherTest(EdgesEnum.AllEdges, expected, p.mike.getIV()/* startingVertex */);
+            doGatherTest(EdgesEnum.AllEdges, expected, p.getMike()/* startingVertex */);
 
         }
 
@@ -271,17 +270,16 @@ public class TestGather extends AbstractGraphTestCase {
      * @throws Exception 
      */
     protected void doGatherTest(final EdgesEnum gatherEdges,
-            final Set<Statement> expected, final IV startingVertex) throws Exception {
+            final Set<Statement> expected, final Value startingVertex)
+            throws Exception {
 
-        final IGASEngine gasEngine = new BigdataGASEngine(sail.getDatabase()
-                .getIndexManager(), 1/* nthreads */);
+        final IGASEngine gasEngine = getGraphFixture()
+                .newGASEngine(1/* nthreads */);
 
         try {
 
-            final BigdataGraphAccessor graphAccessor = ((BigdataGASEngine) gasEngine)
-                    .newGraphAccessor(sail.getDatabase().getNamespace(), sail
-                            .getDatabase().getIndexManager()
-                            .getLastCommitTime());
+            final IGraphAccessor graphAccessor = getGraphFixture()
+                    .newGraphAccessor(null/* connectionIsIgnored */);
 
             final IGASContext<Set<Statement>, Set<Statement>, Set<Statement>> gasContext = gasEngine
                     .newGASContext(graphAccessor, new MockGASProgram(

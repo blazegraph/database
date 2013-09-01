@@ -20,13 +20,13 @@ public class TestCloseable extends TestCase {
 	 */
 	public void test_simpleCloseOnEnd() {
 		Striterator iter = new Striterator(m_data.iterator());
-		assertTrue(iter.isOpen);
+		assertTrue(iter.isOpen());
 		while (iter.hasNext()) {
 			iter.next();
-			assertTrue(iter.isOpen);
+			assertTrue(iter.isOpen());
 		}
 		
-		assertTrue(!iter.isOpen);
+		assertTrue(!iter.isOpen());
 	}
 	
 	/**
@@ -42,7 +42,7 @@ public class TestCloseable extends TestCase {
 				assertTrue(!iter.hasNext());
 			}
 		}		
-		assertTrue(!iter.isOpen);
+		assertTrue(!iter.isOpen());
 		assertTrue(i == 10);
 	}
 	
@@ -67,7 +67,7 @@ public class TestCloseable extends TestCase {
 			}
 		}		
 		assertTrue(cls.get());
-		assertTrue(!iter.isOpen);
+		assertTrue(!iter.isOpen());
 		assertTrue(i == 10);
 	}
 	
@@ -92,7 +92,7 @@ public class TestCloseable extends TestCase {
 			}
 		}		
 		assertTrue(cls.get());
-		assertTrue(!iter.isOpen);
+		assertTrue(!iter.isOpen());
 		assertTrue(i == 10);
 	}
 }
