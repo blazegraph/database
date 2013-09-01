@@ -13,24 +13,18 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-package com.bigdata.rdf.graph;
-
-import org.openrdf.model.Value;
+package com.bigdata.rdf.graph.util;
 
 /**
- * Interface schedules a vertex for execution. This interface is exposed to the
- * {@link IGASProgram}.
- * 
- * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * Factory for {@link IGraphFixture}.
  */
-public interface IGASScheduler {
+public interface IGraphFixtureFactory {
 
     /**
-     * Add the vertex to the schedule.
+     * Factory method to create a new {@link IGraphFixture}.
      * 
-     * @param v
-     *            The vertex.
+     * @throws Exception
      */
-    void schedule(Value v);
+    IGraphFixture newGraphFixture() throws Exception;
 
 }

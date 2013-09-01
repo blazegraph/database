@@ -12,6 +12,7 @@ import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 
+import com.bigdata.rdf.graph.IGASEngine;
 import com.bigdata.rdf.graph.IGASProgram;
 import com.bigdata.rdf.graph.IGASSchedulerImpl;
 import com.bigdata.rdf.graph.IStaticFrontier;
@@ -35,12 +36,13 @@ public class BigdataGASState<VS, ES, ST> extends GASState<VS, ES, ST> {
 
     }
 
-    public BigdataGASState(final BigdataGraphAccessor graphAccessor,
+    public BigdataGASState(final IGASEngine gasEngine, //
+            final BigdataGraphAccessor graphAccessor,//
             final IStaticFrontier frontier,
             final IGASSchedulerImpl gasScheduler,
             final IGASProgram<VS, ES, ST> gasProgram) {
 
-        super(graphAccessor, frontier, gasScheduler, gasProgram);
+        super(gasEngine, graphAccessor, frontier, gasScheduler, gasProgram);
 
     }
 

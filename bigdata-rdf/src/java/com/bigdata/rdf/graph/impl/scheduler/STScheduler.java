@@ -1,3 +1,18 @@
+/**
+   Copyright (C) SYSTAP, LLC 2006-2012.  All rights reserved.
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
 package com.bigdata.rdf.graph.impl.scheduler;
 
 import java.util.LinkedHashSet;
@@ -16,11 +31,16 @@ import com.bigdata.rdf.graph.impl.GASEngine;
  */
 public class STScheduler implements IGASSchedulerImpl {
 
-    final Set<Value> vertices;
+    /**
+     * The scheduled vertices.
+     */// Note: package private. Exposed to TLScheduler.
+    /*private*/ final Set<Value> vertices;
+    private final boolean sortFrontier;
     
     public STScheduler(final GASEngine gasEngine) {
 
         this.vertices = new LinkedHashSet<Value>();
+        this.sortFrontier = gasEngine.getSortFrontier();
     
     }
     
@@ -34,8 +54,8 @@ public class STScheduler implements IGASSchedulerImpl {
     @Override
     public void compactFrontier(final IStaticFrontier frontier) {
 
-        frontier.resetFrontier(vertices.size()/* minCapacity */,
-                false/* ordered */, vertices.iterator());
+        frontier.resetFrontier(vertices.size()/* minCapacity */, sortFrontier,
+                vertices.iterator());
 
     }
 

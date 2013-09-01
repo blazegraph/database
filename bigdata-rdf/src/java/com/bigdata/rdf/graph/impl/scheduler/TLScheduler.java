@@ -1,3 +1,18 @@
+/**
+   Copyright (C) SYSTAP, LLC 2006-2012.  All rights reserved.
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
 package com.bigdata.rdf.graph.impl.scheduler;
 
 import java.util.ArrayList;
@@ -11,7 +26,6 @@ import java.util.concurrent.Future;
 
 import org.openrdf.model.Value;
 
-import com.bigdata.rdf.graph.GASUtil;
 import com.bigdata.rdf.graph.IGASScheduler;
 import com.bigdata.rdf.graph.IGASSchedulerImpl;
 import com.bigdata.rdf.graph.IStaticFrontier;
@@ -20,6 +34,7 @@ import com.bigdata.rdf.graph.impl.bd.MergeSortIterator;
 import com.bigdata.rdf.graph.impl.util.GASImplUtil;
 import com.bigdata.rdf.graph.impl.util.IArraySlice;
 import com.bigdata.rdf.graph.impl.util.ManagedArray;
+import com.bigdata.rdf.graph.util.GASUtil;
 
 /**
  * This scheduler uses thread-local buffers ({@link LinkedHashSet}) to track the
@@ -34,7 +49,6 @@ import com.bigdata.rdf.graph.impl.util.ManagedArray;
  * 
  * TODO Discard if dominated by {@link TLScheduler2}.
  */
-@SuppressWarnings("rawtypes")
 public class TLScheduler implements IGASSchedulerImpl {
 
     /**
@@ -192,7 +206,7 @@ public class TLScheduler implements IGASSchedulerImpl {
              * The new frontier is empty.
              */
 
-            frontier.resetFrontier(0/* minCapacity */, true/* ordered */,
+            frontier.resetFrontier(0/* minCapacity */, false/* sortFrontier */,
                     GASUtil.EMPTY_VERTICES_ITERATOR);
 
             return;
@@ -249,8 +263,12 @@ public class TLScheduler implements IGASSchedulerImpl {
         // merge sort of those iterators.
         final Iterator<Value> itr = new MergeSortIterator(itrs);
 
-        frontier.resetFrontier(nvertices/* minCapacity */, true/* ordered */,
-                itr);
+        /*
+         * Note: The merge iterator visits the vertices in the natural order and
+         * does not need to be sorted.
+         */
+        frontier.resetFrontier(nvertices/* minCapacity */,
+                false/* sortFrontier */, itr);
 
     }
 

@@ -1,3 +1,18 @@
+/**
+   Copyright (C) SYSTAP, LLC 2006-2012.  All rights reserved.
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
 package com.bigdata.rdf.graph;
 
 import java.util.Iterator;
@@ -49,18 +64,12 @@ public interface IStaticFrontier extends Iterable<Value> {
      *            is specified since many techniques to compact the frontier can
      *            only estimate the required capacity.)
      * @param ordered
-     *            <code>true</code> iff the frontier is known to be ordered.
+     *            <code>true</code> iff the vertices are not known to be ordered
+     *            and SHOULD be ordered (some backends do not benefit from
+     *            ordering the vertices).
      * @param vertices
      *            The vertices in the new frontier.
-     * 
-     *            FIXME The MergeSortIterator and ordered frontiers should only
-     *            be used when the graph is backed by indices. The cache
-     *            efficiency concerns for ordered frontiers apply when accessing
-     *            indices. However, we should not presump that order of
-     *            traversal matters for other backends. For example, a backend
-     *            based on hash collections over RDF Statement objects will not
-     *            benefit from an ordering based on the RDF Value objects.
      */
-    void resetFrontier(int minCapacity, boolean ordered, Iterator<Value> vertices);
+    void resetFrontier(int minCapacity, boolean sort, Iterator<Value> vertices);
 
 }

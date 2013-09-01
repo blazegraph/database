@@ -32,25 +32,36 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 
+import com.bigdata.striterator.ICloseable;
+import com.bigdata.striterator.ICloseableIterator;
+
 import cutthecrap.utils.striterators.IStriterator.ITailOp;
-import com.bigdata.striterator.*;
 
 /**
- * Striterator
- *
- * Allows wrapping of an iterator so that extensions may add type specific next<Type> methods.
- *
- * The IFilter objects passed to addFilter allow selection criteria for the iterated objects.
- *	The <code>addTypeFilter</code> method allows easy specification of a class type restriction.
+ * Striterator (streaming iterator pattern).
+ * <p>
+ * Allows wrapping of an iterator so that extensions may add type specific
+ * next<Type> methods.
+ * <p>
+ * The {@link IFilter} objects passed to addFilter allow selection criteria for
+ * the iterated objects. The <code>addTypeFilter</code> method allows easy
+ * specification of a class type restriction.
  */
 public class Striterator implements IStriterator, ITailOp, ICloseableIterator {
-	volatile List<IFilter> filters = null; // Note: NOT serializable.
+
+    private volatile List<IFilter> filters = null; // Note: NOT serializable.
     private volatile Iterator realSource;
 	private volatile Iterator m_src = null;
 	
-	/* field accessible to sub-classes */
-	protected boolean isOpen = true;
+	private boolean isOpen = true;
 
+	/*
+	 * package private method used by the unit tests.
+	 */
+	boolean isOpen() {
+	    return isOpen;
+	}
+	
     /**
      * Deserialization constructor.
      */
@@ -77,6 +88,7 @@ public class Striterator implements IStriterator, ITailOp, ICloseableIterator {
     }
 
     /** delegates hasNext request to source iterator **/
+    @Override
     public boolean hasNext() {
     	if (!isOpen)
     		return false;
@@ -92,6 +104,7 @@ public class Striterator implements IStriterator, ITailOp, ICloseableIterator {
     }
 
     /** delegates next request to source iterator **/
+    @Override
     public Object next() {
         if (m_src == null)
             compile(realSource);
@@ -105,21 +118,25 @@ public class Striterator implements IStriterator, ITailOp, ICloseableIterator {
 	}
 
 	/** Enumeration version of hasNext() **/
+    @Override
 	public boolean hasMoreElements() {
 		return hasNext();
 	}
 
 	/** Enumeration version of next() **/
+    @Override
 	public Object nextElement() {
 		return next();
 	}
 
 	/** delegates remove request to source iterator **/
+    @Override
 	public void remove() {
 		m_src.remove();
 	}
 
 	/** creates a Filterator to apply the filter **/
+    @Override
 	public IStriterator addFilter(final IFilter filter) {
         if (filters == null) {
             synchronized (this) {
@@ -155,6 +172,7 @@ public class Striterator implements IStriterator, ITailOp, ICloseableIterator {
     }
 	
 	/** check each object against cls.isInstance(object) **/
+    @Override
 	public IStriterator addTypeFilter(final Class cls) {
         addFilter(new Filter() {
         public boolean isValid(Object obj) {
@@ -168,6 +186,7 @@ public class Striterator implements IStriterator, ITailOp, ICloseableIterator {
   }
 
 	/** check each object against cls.isInstance(object) **/
+    @Override
 	public IStriterator addInstanceOfFilter(final Class cls) {
         addFilter(new Filter() {
         public boolean isValid(Object obj) {
@@ -179,21 +198,25 @@ public class Striterator implements IStriterator, ITailOp, ICloseableIterator {
   }
 
 	/** exclude the object from the iteration  **/
+    @Override
 	public IStriterator exclude(Object object) {
 		return addFilter(new ExclusionFilter(object));
   }
 
 	/** exclude the object from the iteration  **/
+    @Override
 	public IStriterator makeUnique() {
 		return addFilter(new UniquenessFilter());
   }
 
 	/** append the iteration  **/
+    @Override
 	public IStriterator append(Iterator iter) {
 		return addFilter(new Appender(iter));
   }
 	
 	/** map the clients method against the Iteration, the Method MUST take a single Object valued parameter **/
+    @Override
 	public IStriterator map(Object client, Method method) {
 		return addFilter(new Mapper(client, method));
 	}
@@ -201,6 +224,7 @@ public class Striterator implements IStriterator, ITailOp, ICloseableIterator {
     /**
      * Human readable representation of the filter chain.
      */
+    @Override
     public String toString() {
         final StringBuilder sb = new StringBuilder();
         sb.append(super.toString());
@@ -222,7 +246,7 @@ public class Striterator implements IStriterator, ITailOp, ICloseableIterator {
      * 
      * @return
      */
-    boolean doneone = false;
+//    private boolean doneone = false;
 	public Iterator availableTailOp() {
 		final boolean avail =  Striterator.class == this.getClass();
 		
@@ -239,9 +263,10 @@ public class Striterator implements IStriterator, ITailOp, ICloseableIterator {
 	 * Users should override this method for any required side-effects but must also invoke
 	 * this "super" method.
 	 */
+	@Override
 	public void close() {
-		if (isOpen && realSource instanceof ICloseableIterator)
-			((ICloseableIterator) realSource).close();
+		if (isOpen && realSource instanceof ICloseable)
+			((ICloseable) realSource).close();
 		
 		isOpen = false;
 	}
