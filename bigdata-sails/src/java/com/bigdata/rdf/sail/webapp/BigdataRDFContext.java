@@ -78,6 +78,7 @@ import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.join.PipelineJoin;
 import com.bigdata.btree.IndexMetadata;
+import com.bigdata.counters.CAT;
 import com.bigdata.io.NullOutputStream;
 import com.bigdata.journal.IBufferStrategy;
 import com.bigdata.journal.IIndexManager;
@@ -85,6 +86,8 @@ import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.RWStrategy;
 import com.bigdata.journal.TimestampUtility;
+import com.bigdata.rdf.changesets.IChangeLog;
+import com.bigdata.rdf.changesets.IChangeRecord;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSailBooleanQuery;
 import com.bigdata.rdf.sail.BigdataSailGraphQuery;
@@ -1329,7 +1332,29 @@ public class BigdataRDFContext extends BigdataBaseContext {
          */
         protected void doQuery(final BigdataSailRepositoryConnection cxn,
                 final OutputStream os) throws Exception {
-
+            
+            /*
+             * Setup a change listener. It will notice the #of mutations.
+             */
+            final CAT mutationCount = new CAT();
+            cxn.addChangeLog(new IChangeLog(){
+                @Override
+                public void changeEvent(final IChangeRecord record) {
+                    mutationCount.increment();
+                }
+                @Override
+                public void transactionBegin() {
+                }
+                @Override
+                public void transactionPrepare() {
+                }
+                @Override
+                public void transactionCommited(long commitTime) {
+                }
+                @Override
+                public void transactionAborted() {
+                }});
+            
             // Prepare the UPDATE request.
             final BigdataSailUpdate update = setupUpdate(cxn);
 
@@ -1353,7 +1378,8 @@ public class BigdataRDFContext extends BigdataBaseContext {
 
                 // This will write the response entity.
                 listener = new SparqlUpdateResponseWriter(resp, os, charset,
-                        true /* reportLoadProgress */, true/* flushEachEvent */);
+                        true /* reportLoadProgress */, true/* flushEachEvent */,
+                        mutationCount);
 
             } else {
 
@@ -1376,7 +1402,8 @@ public class BigdataRDFContext extends BigdataBaseContext {
                 baos = new ByteArrayOutputStream();
 
                 listener = new SparqlUpdateResponseWriter(resp, baos, charset,
-                        false/* reportLoadProgress */, false/* flushEachEvent */);
+                        false/* reportLoadProgress */, false/* flushEachEvent */,
+                        mutationCount);
 
             }
 
@@ -1442,6 +1469,8 @@ public class BigdataRDFContext extends BigdataBaseContext {
         private final XMLBuilder.Node body;
         private final boolean reportLoadProgress;
         private final boolean flushEachEvent;
+        private final CAT mutationCount;
+        
         /**
          * Used to correlate incremental LOAD progress messages.
          */
@@ -1464,12 +1493,14 @@ public class BigdataRDFContext extends BigdataBaseContext {
          *            When <code>true</code>, each the {@link Writer} will be
          *            flushed after each logged event in order to ensure timely
          *            delivery to the client.
-         * 
+         * @param mutationCount
+         *            A counter that is updated as mutations are applied.
          * @throws IOException
          */
         public SparqlUpdateResponseWriter(final HttpServletResponse resp,
                 final OutputStream os, final Charset charset,
-                final boolean reportLoadProgress, final boolean flushEachEvent)
+                final boolean reportLoadProgress, final boolean flushEachEvent,
+                final CAT mutationCount)
                 throws IOException {
 
             if (resp == null)
@@ -1496,6 +1527,8 @@ public class BigdataRDFContext extends BigdataBaseContext {
             this.reportLoadProgress = reportLoadProgress;
             
             this.flushEachEvent = flushEachEvent;
+        
+            this.mutationCount = mutationCount;
             
             this.begin = System.nanoTime();
             
@@ -1691,7 +1724,8 @@ public class BigdataRDFContext extends BigdataBaseContext {
 
             body.node("p")
                     .text("COMMIT: totalElapsed=" + totalElapsedMillis
-                            + "ms, commitTime=" + commitTime)//
+                            + "ms, commitTime=" + commitTime
+                            + ", mutationCount=" + mutationCount.get())//
                     .close();
 
         }
