@@ -44,6 +44,7 @@ import com.bigdata.rdf.changesets.ChangeRecord;
 import com.bigdata.rdf.changesets.IChangeLog;
 import com.bigdata.rdf.changesets.IChangeRecord;
 import com.bigdata.rdf.changesets.InMemChangeLog;
+import com.bigdata.rdf.changesets.InferenceChangeLogReporter;
 import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.spo.ModifiedEnum;
@@ -549,6 +550,10 @@ public class TestChangeSets extends ProxyBigdataSailTestCase {
 
             final InMemChangeLog changeLog = new InMemChangeLog();
             cxn.addChangeLog(changeLog);
+
+            final InferenceChangeLogReporter changeLog2 = new InferenceChangeLogReporter(
+                    sail.getDatabase());
+            cxn.addChangeLog(changeLog2);
         
             final BigdataValueFactory vf = (BigdataValueFactory) sail.getValueFactory();
             
@@ -604,6 +609,8 @@ public class TestChangeSets extends ProxyBigdataSailTestCase {
                 }
                 
                 compare(expected, changeLog.getLastCommit(sail.getDatabase()));
+                assertSameIteratorAnyOrder(inferred, changeLog2.addedIterator());
+                assertSameIteratorAnyOrder(new BigdataStatement[]{}, changeLog2.removedIterator());
             }
             
             for (BigdataStatement stmt : upgrades) {
@@ -655,6 +662,10 @@ public class TestChangeSets extends ProxyBigdataSailTestCase {
 
             final InMemChangeLog changeLog = new InMemChangeLog();
             cxn.addChangeLog(changeLog);
+
+            final InferenceChangeLogReporter changeLog2 = new InferenceChangeLogReporter(
+                    sail.getDatabase());
+            cxn.addChangeLog(changeLog2);
 
         	final BigdataValueFactory vf = (BigdataValueFactory) sail.getValueFactory();
             
@@ -714,9 +725,14 @@ public class TestChangeSets extends ProxyBigdataSailTestCase {
                 }
                 
                 compare(expected, changeLog.getLastCommit(sail.getDatabase()));
+                assertSameIteratorAnyOrder(inferredAdd, changeLog2.addedIterator());
+                assertSameIteratorAnyOrder(new BigdataStatement[]{}, changeLog2.removedIterator());
             
             }
         
+            // reset
+            changeLog2.clear();
+            
             for (BigdataStatement stmt : explicitRemove) {
                 cxn.remove(stmt);
             }
@@ -735,7 +751,9 @@ public class TestChangeSets extends ProxyBigdataSailTestCase {
                 }
                 
                 compare(expected, changeLog.getLastCommit(sail.getDatabase()));
-            
+                assertSameIteratorAnyOrder(new BigdataStatement[]{}, changeLog2.addedIterator());
+                assertSameIteratorAnyOrder(inferredRemove, changeLog2.removedIterator());
+
             }
         
             if (log.isDebugEnabled()) {
