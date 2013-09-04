@@ -1,0 +1,16 @@
+
+prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+
+SELECT ?A ?B
+WHERE {
+    { 
+      { ?A rdf:type  <os:ClassA> }
+      UNION
+      {  ?A rdf:type  / rdfs:subClassOf + <os:ClassA> 
+      }
+    }
+    ?A   rdf:value ?B .
+    ?B rdf:type  / rdfs:subClassOf *
+            <os:ClassB>
+}

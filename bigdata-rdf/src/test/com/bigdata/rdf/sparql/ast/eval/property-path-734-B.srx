@@ -1,0 +1,88 @@
+<?xml version="1.0"?>
+<sparql
+    xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+    xmlns:xs="http://www.w3.org/2001/XMLSchema#"
+    xmlns="http://www.w3.org/2005/sparql-results#" >
+  <head>
+    <variable name="A"/>
+    <variable name="B"/>
+  </head>
+  <results>
+    <result>
+      <binding name="A">
+      	<uri>os:0</uri>
+      </binding>
+      <binding name="B">
+      	<uri>os:1</uri>
+      </binding>
+    </result>
+    <result>
+      <binding name="A">
+      	<uri>os:0</uri>
+      </binding>
+      <binding name="B">
+      	<uri>os:1a</uri>
+      </binding>
+    </result>
+    <result>
+      <binding name="A">
+      	<uri>os:0</uri>
+      </binding>
+      <binding name="B">
+      	<uri>os:1b</uri>
+      </binding>
+    </result>
+    
+    
+    <result>
+      <binding name="A">
+      	<uri>os:0a</uri>
+      </binding>
+      <binding name="B">
+      	<uri>os:1</uri>
+      </binding>
+    </result>
+    <result>
+      <binding name="A">
+      	<uri>os:0a</uri>
+      </binding>
+      <binding name="B">
+      	<uri>os:1a</uri>
+      </binding>
+    </result>
+    <result>
+      <binding name="A">
+      	<uri>os:0a</uri>
+      </binding>
+      <binding name="B">
+      	<uri>os:1b</uri>
+      </binding>
+    </result>
+    
+    
+    <result>
+      <binding name="A">
+      	<uri>os:0b</uri>
+      </binding>
+      <binding name="B">
+      	<uri>os:1</uri>
+      </binding>
+    </result>
+    <result>
+      <binding name="A">
+      	<uri>os:0b</uri>
+      </binding>
+      <binding name="B">
+      	<uri>os:1a</uri>
+      </binding>
+    </result>
+    <result>
+      <binding name="A">
+      	<uri>os:0b</uri>
+      </binding>
+      <binding name="B">
+      	<uri>os:1b</uri>
+      </binding>
+    </result>
+  </results>
+</sparql>
