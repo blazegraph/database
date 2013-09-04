@@ -19,12 +19,11 @@ import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.relation.accesspath.BlockingBuffer;
-import com.bigdata.relation.rule.eval.ISolution;
 import com.bigdata.striterator.AbstractChunkedResolverator;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 
 /**
- * Efficiently resolve term identifiers in Bigdata {@link ISolution}s to RDF
+ * Efficiently resolve term identifiers in Bigdata {@link ISPO}s to RDF
  * {@link BigdataValue}s.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
