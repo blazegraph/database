@@ -360,8 +360,7 @@ public class ArbitraryLengthPathOp extends PipelineOp {
                 	 * 
                 	 * :a (:p*)* ?y
                 	 */
-                	if (lowerBound == 0 && gearing.outVar != null && 
-                			!childSolutionIn.isBound(gearing.outVar)) {
+                	if (lowerBound == 0 && canBind(gearing, childSolutionIn, seed)) {
                 		
                 		final IBindingSet bs = parentSolutionIn.clone();
                 		
@@ -648,6 +647,20 @@ public class ArbitraryLengthPathOp extends PipelineOp {
 //          return runningSubquery;
                 
         } // processChunk method
+
+        /**
+         * Is it possible to bind the out of the gearing to the seed?
+         * This may be because it is an unbound variable, or it may be that it is already the seed 
+         * (either as a const or as a var) 
+         */
+		@SuppressWarnings("unchecked")
+		private boolean canBind(final Gearing gearing, IBindingSet childSolutionIn, IConstant<?> seed) {
+			if ( gearing.outVar == null ) 
+				return seed.equals(gearing.outConst);
+			if ( !childSolutionIn.isBound(gearing.outVar) ) 
+				return true;
+			return seed.equals(childSolutionIn.get(gearing.outVar));
+		}
         
         /**
          * Choose forward or reverse gear based on the scematics of the operator
