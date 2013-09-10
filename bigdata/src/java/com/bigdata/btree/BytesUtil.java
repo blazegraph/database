@@ -237,8 +237,18 @@ public class BytesUtil {
 	 *       ant installer and the result reported. Do the same for ICU4JNI.
 	 */
 	final public static int compareBytes(final byte[] a, final byte[] b) {
-		if (a == b)
+		if (a == b) // includes a and b both null
 			return 0;
+		
+		// Handle null values
+		if (a == null) {
+			return -1;
+		}
+		if (b == null) {
+			return 1;
+		}
+		
+		// neither are null
 		final int alen = a.length;
 		final int blen = b.length;
 		if (linked && alen > minlen && blen > minlen) {
