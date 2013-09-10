@@ -52,6 +52,7 @@ import com.bigdata.ha.halog.IHALogReader;
 import com.bigdata.journal.ITransactionService;
 import com.bigdata.journal.jini.ha.HAClient.HAConnection;
 import com.bigdata.journal.jini.ha.HALogIndex.IHALogRecord;
+import com.bigdata.journal.jini.ha.SnapshotIndex.ISnapshotRecord;
 import com.bigdata.quorum.Quorum;
 import com.bigdata.quorum.QuorumClient;
 
@@ -60,8 +61,6 @@ import cutthecrap.utils.striterators.EmptyIterator;
 /**
  * Accesses Zookeeper state and then connects to each service member to
  * retrieve log digest information.
- * 
- * The states are pinned by starting a read transaction on any of the services.
  * 
  * This task will return an object with the transaction reference to be released
  * and the range of commit counters for the logs to be checked.
@@ -135,7 +134,7 @@ public class DumpLogDigests {
 		    final LogDigestParams params = pinner.submit(new PinLogs(), false).get();
 		    
 		    if (log.isInfoEnabled())
-		    	log.info("Pinning startCC: " + params.startCC + ", endCC: " + params.endCC);
+		    	log.info("Pinning startCC: " + params.startCC + ", endCC: " + params.endCC + ", last snapshot: " + params.snapshotCC);
 		    
 		    /**
 		     *  Now access serviceIDs so that we can use discovery to gain HAGlue interface.
@@ -217,18 +216,26 @@ public class DumpLogDigests {
      * LogDigestParams with PinLogs and UnpinLogs tasks ensure that
      * transactions (and logs?) will not be removed while the digests
      * are computed.
-     * TODO: Check if this will really pin the logs?
+     * <p>
+     * In fact creating a transaction does not protect the halog files,
+     * which are now protected from removal during a digest computation
+     * by a protectDigest call on the HALogNexus in GetLogInfo.
+     * <p>
+     * TODO: The read transaction is currently retained but should be removed
+     * if/when it becomes clear that it has no use.
      */
     @SuppressWarnings("serial")
 	static public class LogDigestParams implements Serializable {
     	final public long tx;
     	final public long startCC;
     	final public long endCC;
+    	final public long snapshotCC;
     	
-    	LogDigestParams(final long tx, final long startCC, final long endCC) {
+    	LogDigestParams(final long tx, final long startCC, final long endCC, long sscc) {
     		this.tx = tx;
     		this.startCC = startCC;
     		this.endCC = endCC;
+    		this.snapshotCC = sscc;
     	}
     }
     
@@ -251,9 +258,14 @@ public class DumpLogDigests {
 				startCC = logs.next().getCommitCounter();
 			} else {
 				startCC = endCC;
-			}			
+			}
 			
-			return new LogDigestParams(tx, startCC, endCC);
+			final SnapshotManager ssmgr = ha.getSnapshotManager();
+			final ISnapshotRecord rec = ssmgr.getNewestSnapshot();
+			final long sscc = rec != null ? rec.getCommitCounter() : -1;
+			
+			// return new LogDigestParams(tx, startCC-3, endCC+3); // try asking for more logs than available
+			 return new LogDigestParams(tx, startCC, endCC, sscc);
 		}
     	
     }
@@ -283,7 +295,7 @@ public class DumpLogDigests {
      * The GetLogInfo callable is submitted to each service, retrieving a
      * List of HALogInfo data elements for each commit counter log
      * requested.
-     * 
+     * <p>
      * It is parameterized for start and end commit counters for the logs and
      * the number of serviceThreads to split the digest computations across.
      */
@@ -310,6 +322,8 @@ public class DumpLogDigests {
 			HAJournal ha = (HAJournal) this.getIndexManager();
 						
 			final HALogNexus nexus = ha.getHALogNexus();
+			nexus.protectDigest(startCC);
+			try {
 			long openCC = nexus.getCommitCounter();
 			log.warn("Open Commit Counter: " + openCC + ", startCC: " + startCC + ", endCC: " + endCC);
 			
@@ -340,11 +354,15 @@ public class DumpLogDigests {
 	
 				            r.computeDigest(digest);
 				            
-							infos.add(new HALogInfo(file.getName(), r.isLive(), digest.digest()));
+							infos.add(new HALogInfo(cur, r.isLive(), digest.digest()));
 						} catch (FileNotFoundException fnf) {
-							// half expected
+							// permitted
+							infos.add(new HALogInfo(cur, false, null /*digest*/));
 						} catch (Throwable t) {
 							log.warn("Unexpected error", t);
+							
+							// FIXME: what to do here?
+							infos.add(new HALogInfo(cur, false, "ERROR".getBytes()));
 						}
 						
 						return null;
@@ -362,25 +380,39 @@ public class DumpLogDigests {
 	        es.shutdown();
 			
 			return new ArrayList<HALogInfo>(infos);
+			} finally {
+				nexus.releaseProtectDigest();
+			}
 		}
     	
     }
     
     @SuppressWarnings("serial")
+    /**
+     * If the log does not exist then a null digest is defined.
+     */
 	static public class HALogInfo implements Serializable, Comparable<HALogInfo> {
-    	final public String logName;
+    	final public long commitCounter;
     	final public boolean isOpen;
     	final public byte[] digest;
     	
-    	HALogInfo(final String logName, final boolean isOpen, final byte[] bs) {
-    		this.logName = logName;
+    	HALogInfo(final long commitCounter, final boolean isOpen, final byte[] bs) {
+    		this.commitCounter = commitCounter;
     		this.isOpen = isOpen;
     		this.digest = bs;
     	}
 
 		@Override
 		public int compareTo(HALogInfo other) {
-			return logName.compareTo(other.logName);
+			
+			// should not be same commit counter!
+			assert commitCounter != other.commitCounter;
+			
+			return commitCounter < other.commitCounter ? -1 : 1;
+		}
+		
+		public boolean exists() {
+			return digest != null;
 		}
     }
     
@@ -406,8 +438,8 @@ public class DumpLogDigests {
     		StringBuilder sb = new StringBuilder();
     		sb.append("Service: " + service + "\n");
     		for (HALogInfo li : logInfos) {
-    			sb.append(li.logName);
-    			sb.append(" " + BytesUtil.toHexString(li.digest));
+    			sb.append("CC[" + li.commitCounter + "]");
+    			sb.append(" " + (li.digest == null ? "NOT FOUND" : BytesUtil.toHexString(li.digest)));
     			sb.append(" " + (li.isOpen ? "open" : "closed"));
     			sb.append("\n");
     		}
@@ -436,15 +468,18 @@ public class DumpLogDigests {
     }
     
     /**
-     * Two required arguments:
-     * <HA configuration file>
-     * <ServiceRoot>
-     * 
+     * There are two required arguments:
+     * <li>HA configuration file</li>
+     * <li>ServiceRoot</li>
+     * <p>
      * A third optional argument 
      * "summary"
-     * which, if present, only generates output for HALogInfo that is different for teh joined services.
-     * 
-     * The DumpLogDigests dump method returns an Iterator over the halog files.
+     * which, if present, only generates output for HALogInfo that is different for the joined services.
+     * <p>
+     * The DumpLogDigests dump method returns an Iterator over the halog files returning ServiceLog
+     * objects.
+     * <p>
+     * The command line invocation simply writes a string representation of the returned data to standard out.
      */
     static public void main(final String[] args) throws ConfigurationException, IOException, InterruptedException, ExecutionException {
     	if (args.length < 2 || args.length > 3) {
@@ -582,6 +617,8 @@ public class DumpLogDigests {
 		for (HAGlue haglue : haglues) {
 			ret.add(haglue);
 		}
+		
+		client.disconnect(true/*immediate shutdown*/);
 		
 		return ret;
 

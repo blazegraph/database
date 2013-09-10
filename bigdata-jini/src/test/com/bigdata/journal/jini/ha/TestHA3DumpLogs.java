@@ -25,6 +25,7 @@ package com.bigdata.journal.jini.ha;
 
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.util.Calendar;
 import java.util.Iterator;
 import java.util.UUID;
 
@@ -32,7 +33,58 @@ import com.bigdata.ha.HAGlue;
 
 public class TestHA3DumpLogs extends AbstractHA3JournalServerTestCase {
 
-	public TestHA3DumpLogs() {
+    @Override
+    protected String[] getOverrides() {
+
+        /*
+         * We need to set the time at which the DefaultSnapshotPolicy runs to
+         * some point in the Future in order to avoid test failures due to
+         * violated assumptions when the policy runs up self-triggering (based
+         * on the specified run time) during a CI run.
+         */
+        final String neverRun = getNeverRunSnapshotTime();
+        
+        return new String[]{
+                "com.bigdata.journal.jini.ha.HAJournalServer.restorePolicy=new com.bigdata.journal.jini.ha.DefaultRestorePolicy(0L,1,0)",
+                "com.bigdata.journal.jini.ha.HAJournalServer.snapshotPolicy=new com.bigdata.journal.jini.ha.DefaultSnapshotPolicy("+neverRun+",0)",
+                "com.bigdata.journal.jini.ha.HAJournalServer.onlineDisasterRecovery=true"
+        };
+        
+    }
+
+    /**
+     * We need to set the time at which the {@link DefaultSnapshotPolicy} runs
+     * to some point in the future in order to avoid test failures due to
+     * violated assumptions when the policy runs up self-triggering (based on
+     * the specified run time) during a CI run.
+     * <p>
+     * We do this by adding one hour to [now] and then converting it into the
+     * 'hhmm' format as an integer.
+     * 
+     * @return The "never run" time as hhmm.
+     */
+    static protected String getNeverRunSnapshotTime() {
+        
+        // Right now.
+        final Calendar c = Calendar.getInstance();
+        
+        // Plus an hour.
+        c.add(Calendar.HOUR_OF_DAY, 1);
+        
+        // Get the hour.
+        final int hh = c.get(Calendar.HOUR_OF_DAY);
+        
+        // And the minutes.
+        final int mm = c.get(Calendar.MINUTE);
+        
+        // Format as hhmm.
+        final String neverRun = "" + hh + (mm < 10 ? "0" : "") + mm;
+
+        return neverRun;
+        
+    }
+
+    public TestHA3DumpLogs() {
 		
 	}
 	
