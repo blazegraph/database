@@ -32,6 +32,7 @@ import org.openrdf.model.Value;
  *            the generic type for the per-edge state, but that is not always
  *            true. The SUM type is scoped to the GATHER + SUM operation (NOT
  *            the computation).
+ *            
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
 public interface IGASProgram<VS, ES, ST> extends IGASOptions<VS, ES, ST> {
