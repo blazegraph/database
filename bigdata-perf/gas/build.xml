@@ -28,12 +28,25 @@
 	</target>
 	
    <target name="run-gas-engine"
-          description="Run a GAS Engine performance test.">
-      <java classname="com.bigdata.rdf.graph.impl.GASRunner"
+          description="Run a Bigdata GAS Engine performance test.">
+      <java classname="com.bigdata.rdf.graph.impl.bd.BigdataGASRunner"
             fork="true" failonerror="true"
             >
          <arg line="-bufferMode ${bufferMode} -namespace ${namespace} -seed ${seed} -nsamples ${nsamples} -nthreads ${nthreads} ${scheduler} ${load} com.bigdata.rdf.graph.analytics.${analytic} ${journalPropertyFile}" />
          <!-- specify/override the journal file name. -->
+         <jvmarg line="${jvmArgs}" />
+         <classpath>
+            <path refid="runtime.classpath" />
+         </classpath>
+      </java>
+   </target>
+
+   <target name="run-sail-gas-engine"
+          description="Run a SAIL GAS Engine performance test.">
+      <java classname="com.bigdata.rdf.graph.impl.sail.SAILGASRunner"
+            fork="true" failonerror="true"
+            >
+         <arg line="-seed ${seed} -nsamples ${nsamples} -nthreads ${nthreads} ${scheduler} ${load} com.bigdata.rdf.graph.analytics.${analytic} ${journalPropertyFile}" />
          <jvmarg line="${jvmArgs}" />
          <classpath>
             <path refid="runtime.classpath" />
