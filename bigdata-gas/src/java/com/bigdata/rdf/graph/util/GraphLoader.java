@@ -158,19 +158,20 @@ abstract public class GraphLoader {
                                 
                             }
 
+                            // recursion.
                             loadGraph(fallback, f.toString());
 
                         }
 
-                    } else {
-
-                        is = new FileInputStream(file);
-
-                        // set for file as URI.
-                        baseURI = file.toURI().toString();
-
+                        // end of directory.
+                        return;
                     }
-                    
+
+                    is = new FileInputStream(file);
+
+                    // set for file as URI.
+                    baseURI = file.toURI().toString();
+
                 } else {
                     
                     throw new FileNotFoundException(
