@@ -563,7 +563,7 @@ public class HALogWriter implements IHALogWriter {
 
 	/**
 	 * Close the file (does not flush).
-	 */
+	 */ 
 	private void close() throws IOException { // Note: caller owns m_stateLock!
 		try {
 			if (m_state != null) {
@@ -611,7 +611,7 @@ public class HALogWriter implements IHALogWriter {
      * 
      * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/695">
      *      HAJournalServer reports "follower" but is in SeekConsensus and is
-     *      not participating in commits§</a>
+     *      not participating in commits</a>
      */
 	private void remove() throws IOException {
 
@@ -817,8 +817,8 @@ public class HALogWriter implements IHALogWriter {
                     // One less reader/writer.
                     --m_accessors;
                     if (m_accessors == 0) {
-                        if (haLog.isDebugEnabled())
-                            haLog.debug("Closing file");
+                        if (haLog.isInfoEnabled())
+                            haLog.info("Closing file", new StackInfoReport());
                         /*
                          * Note: Close the RandomAccessFile rather than the
                          * FileChannel. Potential fix for leaking open file
@@ -938,7 +938,7 @@ public class HALogWriter implements IHALogWriter {
             // Note: Must be synchronized for visibility and atomicity!
             synchronized (m_state) {
 
-			m_state.m_accessors++;
+            	m_state.m_accessors++;
                 
             }
 			
@@ -1051,7 +1051,7 @@ public class HALogWriter implements IHALogWriter {
 		         */
 		        synchronized(m_state) {
 		            
-		            if(m_state.m_accessors == 0) {
+		            if (m_state.m_accessors == 0) {
 
                         /**
                          * TODO This is a bit of a hack. The problem is that
@@ -1070,9 +1070,9 @@ public class HALogWriter implements IHALogWriter {
 		                
 		            }
 		            
-				m_state.close();
+					m_state.close();
+				}
 			}
-		}
 
 		}
 
