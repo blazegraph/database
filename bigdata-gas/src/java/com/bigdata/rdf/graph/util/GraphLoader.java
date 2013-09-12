@@ -139,12 +139,6 @@ abstract public class GraphLoader {
 
                 if (file.exists()) {
 
-                    if (file.isHidden()) {
-                        if (log.isDebugEnabled())
-                            log.debug("Skipping hidden file: " + file);
-                        return;
-                    }
-                    
                     if (file.isDirectory()) {
                         
                         /*
@@ -154,6 +148,15 @@ abstract public class GraphLoader {
                         final File[] a = file.listFiles();
 
                         for (File f : a) {
+
+                            if (file.isHidden()) {
+
+                                if (log.isDebugEnabled())
+                                    log.debug("Skipping hidden file: " + file);
+                                
+                                continue;
+                                
+                            }
 
                             loadGraph(fallback, f.toString());
 
