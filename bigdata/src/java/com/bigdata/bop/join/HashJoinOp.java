@@ -51,7 +51,8 @@ import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IBindingSetAccessPath;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.UnsyncLocalOutputBuffer;
-import com.bigdata.striterator.ICloseableIterator;
+
+import cutthecrap.utils.striterators.ICloseableIterator;
 
 /**
  * Abstract base class for both JVM and native memory hash join against an

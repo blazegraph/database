@@ -70,7 +70,8 @@ import com.bigdata.relation.accesspath.EmptyCloseableIterator;
 import com.bigdata.relation.accesspath.ThickCloseableIterator;
 import com.bigdata.search.Hiterator;
 import com.bigdata.search.IHit;
-import com.bigdata.striterator.ICloseableIterator;
+
+import cutthecrap.utils.striterators.ICloseableIterator;
 
 /**
  * A factory for a "search in search" service. 

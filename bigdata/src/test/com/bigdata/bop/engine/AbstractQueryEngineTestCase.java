@@ -91,7 +91,8 @@ import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.striterator.Dechunkerator;
-import com.bigdata.striterator.ICloseableIterator;
+
+import cutthecrap.utils.striterators.ICloseableIterator;
 
 /**
  * Base class adds some static methods used with unit tests of the

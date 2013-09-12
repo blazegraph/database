@@ -36,7 +36,8 @@ import org.openrdf.query.TupleQueryResult;
 import com.bigdata.rdf.sail.Sesame2BigdataIterator;
 import com.bigdata.rdf.sail.webapp.client.ConnectOptions;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
-import com.bigdata.striterator.ICloseableIterator;
+
+import cutthecrap.utils.striterators.ICloseableIterator;
 
 /**
  * This class handles vectored remote service invocation by generating an

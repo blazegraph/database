@@ -32,6 +32,8 @@ import java.util.NoSuchElementException;
 
 import com.bigdata.btree.IRangeQuery;
 
+import cutthecrap.utils.striterators.ICloseableIterator;
+
 /**
  * An iterator that is able visit items in chunks. The elements in the chunk
  * will be in the same order that they would be visited by

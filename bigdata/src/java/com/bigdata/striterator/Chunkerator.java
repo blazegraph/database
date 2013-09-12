@@ -32,6 +32,8 @@ import java.util.NoSuchElementException;
 
 import com.bigdata.relation.accesspath.IElementFilter;
 
+import cutthecrap.utils.striterators.ICloseableIterator;
+
 /**
  * Iterator "chunks" up another iterator, visiting arrays of elements at a time.
  * 

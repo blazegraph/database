@@ -37,6 +37,8 @@ import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.util.InnerCause;
 
+import cutthecrap.utils.striterators.ICloseableIterator;
+
 /**
  * Wraps an {@link IChunkedIterator} and asynchronously resolves chunks.
  * 

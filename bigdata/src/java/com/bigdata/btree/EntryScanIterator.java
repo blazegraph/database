@@ -26,7 +26,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.btree;
 
-import com.bigdata.striterator.ICloseableIterator;
+import cutthecrap.utils.striterators.ICloseableIterator;
 
 /**
  * Iterator visits index entries (dereferencing visited tuples to the

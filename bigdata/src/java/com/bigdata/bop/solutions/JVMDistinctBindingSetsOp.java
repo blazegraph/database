@@ -42,7 +42,8 @@ import com.bigdata.bop.join.JVMDistinctFilter;
 import com.bigdata.bop.join.JVMHashJoinUtility;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.UnsyncLocalOutputBuffer;
-import com.bigdata.striterator.ICloseableIterator;
+
+import cutthecrap.utils.striterators.ICloseableIterator;
 
 /**
  * A pipelined DISTINCT operator based on a hash table.

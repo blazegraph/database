@@ -30,7 +30,8 @@ package com.bigdata.rdf.sparql.ast.ssets;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.rdf.sparql.ast.ISolutionSetStats;
 import com.bigdata.rdf.spo.ISPO;
-import com.bigdata.striterator.ICloseableIterator;
+
+import cutthecrap.utils.striterators.ICloseableIterator;
 
 /**
  * A management interface for named solution sets.

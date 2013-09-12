@@ -35,7 +35,8 @@ import com.bigdata.rdf.sparql.ast.ISolutionSetStats;
 import com.bigdata.relation.accesspath.AccessPath;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.stream.Stream;
-import com.bigdata.striterator.ICloseableIterator;
+
+import cutthecrap.utils.striterators.ICloseableIterator;
 
 /**
  * Interface for durable solution sets.

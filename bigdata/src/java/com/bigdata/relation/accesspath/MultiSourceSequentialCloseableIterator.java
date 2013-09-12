@@ -34,7 +34,7 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.striterator.ICloseableIterator;
+import cutthecrap.utils.striterators.ICloseableIterator;
 
 /**
  * Class allows new sources to be attached dynamically. If the existing sources

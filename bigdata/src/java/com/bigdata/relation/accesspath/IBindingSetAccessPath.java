@@ -31,7 +31,8 @@ import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IElement;
 import com.bigdata.bop.join.BaseJoinStats;
 import com.bigdata.relation.IRelation;
-import com.bigdata.striterator.ICloseableIterator;
+
+import cutthecrap.utils.striterators.ICloseableIterator;
 
 /**
  * An interface for access paths which visit solutions (versus {@link IElement}

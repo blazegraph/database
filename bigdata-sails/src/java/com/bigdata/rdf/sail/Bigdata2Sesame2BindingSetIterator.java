@@ -42,8 +42,9 @@ import com.bigdata.bop.IVariable;
 import com.bigdata.bop.engine.QueryTimeoutException;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataValue;
-import com.bigdata.striterator.ICloseableIterator;
 import com.bigdata.util.InnerCause;
+
+import cutthecrap.utils.striterators.ICloseableIterator;
 
 /**
  * Converts a bigdata {@link ICloseableIterator} {@link IBindingSet}s containing

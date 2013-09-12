@@ -48,7 +48,8 @@ import com.bigdata.rdf.internal.encoder.IVSolutionSetDecoder;
 import com.bigdata.rdf.internal.encoder.IVSolutionSetEncoder;
 import com.bigdata.relation.accesspath.EmptyCloseableIterator;
 import com.bigdata.relation.accesspath.ThickCloseableIterator;
-import com.bigdata.striterator.ICloseableIterator;
+
+import cutthecrap.utils.striterators.ICloseableIterator;
 
 /**
  * A thick version of this interface in which the chunk is sent inline with the

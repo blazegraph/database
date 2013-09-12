@@ -86,10 +86,10 @@ import com.bigdata.resources.IndexManager;
 import com.bigdata.resources.OverflowManager;
 import com.bigdata.service.DataService;
 import com.bigdata.service.Split;
-import com.bigdata.striterator.ICloseableIterator;
 import com.bigdata.util.concurrent.Computable;
 import com.bigdata.util.concurrent.Memoizer;
 
+import cutthecrap.utils.striterators.ICloseableIterator;
 import cutthecrap.utils.striterators.IFilter;
 
 /**

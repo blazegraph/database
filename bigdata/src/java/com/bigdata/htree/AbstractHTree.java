@@ -45,11 +45,11 @@ import com.bigdata.journal.IAtomicStore;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.resources.IndexManager;
 import com.bigdata.service.DataService;
-import com.bigdata.striterator.ICloseableIterator;
 import com.bigdata.util.concurrent.Computable;
 import com.bigdata.util.concurrent.Memoizer;
 
 import cutthecrap.utils.striterators.Filter;
+import cutthecrap.utils.striterators.ICloseableIterator;
 import cutthecrap.utils.striterators.Resolver;
 import cutthecrap.utils.striterators.Striterator;
 

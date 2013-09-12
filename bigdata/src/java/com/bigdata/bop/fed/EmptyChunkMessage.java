@@ -35,7 +35,8 @@ import com.bigdata.bop.engine.IChunkAccessor;
 import com.bigdata.bop.engine.IChunkMessage;
 import com.bigdata.bop.engine.IQueryClient;
 import com.bigdata.relation.accesspath.EmptyCloseableIterator;
-import com.bigdata.striterator.ICloseableIterator;
+
+import cutthecrap.utils.striterators.ICloseableIterator;
 
 
 /**

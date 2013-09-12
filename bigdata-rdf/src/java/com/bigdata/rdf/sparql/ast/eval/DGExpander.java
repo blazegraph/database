@@ -26,10 +26,10 @@ import com.bigdata.relation.rule.IAccessPathExpander;
 import com.bigdata.service.IBigdataClient;
 import com.bigdata.striterator.ChunkedWrappedIterator;
 import com.bigdata.striterator.IChunkedOrderedIterator;
-import com.bigdata.striterator.ICloseableIterator;
 import com.bigdata.striterator.IKeyOrder;
 import com.bigdata.util.concurrent.LatchedExecutor;
 
+import cutthecrap.utils.striterators.ICloseableIterator;
 import cutthecrap.utils.striterators.IFilter;
 import cutthecrap.utils.striterators.Striterator;
 

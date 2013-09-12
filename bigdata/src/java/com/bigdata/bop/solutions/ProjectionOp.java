@@ -40,7 +40,8 @@ import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.join.JoinAnnotations;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
-import com.bigdata.striterator.ICloseableIterator;
+
+import cutthecrap.utils.striterators.ICloseableIterator;
 
 /**
  * Operator projects only the identified variables.

@@ -35,6 +35,7 @@ import org.apache.log4j.Logger;
 import com.bigdata.relation.accesspath.IElementFilter;
 
 import cutthecrap.utils.striterators.Filter;
+import cutthecrap.utils.striterators.ICloseableIterator;
 import cutthecrap.utils.striterators.Striterator;
 
 /**

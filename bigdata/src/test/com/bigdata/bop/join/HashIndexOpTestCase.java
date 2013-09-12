@@ -36,8 +36,8 @@ import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.Journal;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.stream.Stream.StreamIndexMetadata;
-import com.bigdata.striterator.ICloseableIterator;
 
+import cutthecrap.utils.striterators.ICloseableIterator;
 import cutthecrap.utils.striterators.IStriterator;
 import cutthecrap.utils.striterators.Resolver;
 import cutthecrap.utils.striterators.Striterator;

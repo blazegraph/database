@@ -31,7 +31,8 @@ package com.bigdata.relation.accesspath;
 import junit.framework.TestCase2;
 
 import com.bigdata.io.SerializerUtil;
-import com.bigdata.striterator.ICloseableIterator;
+
+import cutthecrap.utils.striterators.ICloseableIterator;
 
 /**
  * Unit tests for {@link ThickCloseableIterator}.

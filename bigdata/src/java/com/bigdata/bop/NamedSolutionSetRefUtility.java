@@ -42,7 +42,8 @@ import com.bigdata.rdf.sparql.ast.ISolutionSetStats;
 import com.bigdata.rdf.sparql.ast.ssets.ISolutionSetManager;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.striterator.Chunkerator;
-import com.bigdata.striterator.ICloseableIterator;
+
+import cutthecrap.utils.striterators.ICloseableIterator;
 
 /**
  * Utility class for {@link INamedSolutionSetRef}s.

@@ -67,10 +67,11 @@ import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.rwstore.sector.IMemoryManager;
 import com.bigdata.rwstore.sector.MemoryManager;
 import com.bigdata.service.IBigdataFederation;
-import com.bigdata.striterator.ICloseableIterator;
 import com.bigdata.util.InnerCause;
 import com.bigdata.util.concurrent.Haltable;
 import com.bigdata.util.concurrent.IHaltable;
+
+import cutthecrap.utils.striterators.ICloseableIterator;
 
 /**
  * Abstract base class for various {@link IRunningQuery} implementations. The

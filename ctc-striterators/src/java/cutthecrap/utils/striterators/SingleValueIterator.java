@@ -15,7 +15,6 @@
 */
 package cutthecrap.utils.striterators;
 
-import com.bigdata.striterator.ICloseableIterator;
 
 
 /***************************************************************************

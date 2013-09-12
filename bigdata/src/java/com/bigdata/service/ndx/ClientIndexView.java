@@ -93,10 +93,10 @@ import com.bigdata.service.IMetadataService;
 import com.bigdata.service.Split;
 import com.bigdata.service.ndx.pipeline.IDuplicateRemover;
 import com.bigdata.service.ndx.pipeline.IndexWriteTask;
-import com.bigdata.striterator.ICloseableIterator;
 import com.bigdata.util.InnerCause;
 import com.bigdata.util.concurrent.ExecutionHelper;
 
+import cutthecrap.utils.striterators.ICloseableIterator;
 import cutthecrap.utils.striterators.IFilter;
 
 /**

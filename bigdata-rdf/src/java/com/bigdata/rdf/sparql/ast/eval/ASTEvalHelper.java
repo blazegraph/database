@@ -91,7 +91,8 @@ import com.bigdata.rdf.store.BigdataBindingSetResolverator;
 import com.bigdata.striterator.ChunkedWrappedIterator;
 import com.bigdata.striterator.Dechunkerator;
 import com.bigdata.striterator.IChunkedOrderedIterator;
-import com.bigdata.striterator.ICloseableIterator;
+
+import cutthecrap.utils.striterators.ICloseableIterator;
 
 /**
  * Helper class for evaluating SPARQL queries.

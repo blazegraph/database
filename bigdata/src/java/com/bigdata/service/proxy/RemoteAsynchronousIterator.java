@@ -37,7 +37,8 @@ import com.bigdata.bop.IBindingSet;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.rule.eval.ISolution;
 import com.bigdata.relation.rule.eval.pipeline.JoinTask;
-import com.bigdata.striterator.ICloseableIterator;
+
+import cutthecrap.utils.striterators.ICloseableIterator;
 
 /**
  * {@link Remote} interface declaring the API of {@link IAsynchronousIterator}

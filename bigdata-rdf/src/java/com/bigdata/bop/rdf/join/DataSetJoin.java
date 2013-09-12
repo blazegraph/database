@@ -46,7 +46,8 @@ import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.UnsynchronizedArrayBuffer;
-import com.bigdata.striterator.ICloseableIterator;
+
+import cutthecrap.utils.striterators.ICloseableIterator;
 
 /**
  * DataSetJoin(left)[var=g; graphs={graphIds}]

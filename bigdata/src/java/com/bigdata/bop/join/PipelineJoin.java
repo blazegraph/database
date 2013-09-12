@@ -77,10 +77,11 @@ import com.bigdata.relation.rule.IStarJoin.IStarConstraint;
 import com.bigdata.relation.rule.eval.ISolution;
 import com.bigdata.service.DataService;
 import com.bigdata.striterator.IChunkedOrderedIterator;
-import com.bigdata.striterator.ICloseableIterator;
 import com.bigdata.striterator.IKeyOrder;
 import com.bigdata.util.concurrent.Haltable;
 import com.bigdata.util.concurrent.LatchedExecutor;
+
+import cutthecrap.utils.striterators.ICloseableIterator;
 
 /**
  * Pipelined join operator for online (selective) queries. The pipeline join

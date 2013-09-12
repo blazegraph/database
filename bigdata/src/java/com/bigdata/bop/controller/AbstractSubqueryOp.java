@@ -44,8 +44,9 @@ import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.bset.Tee;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
-import com.bigdata.striterator.ICloseableIterator;
 import com.bigdata.util.concurrent.LatchedExecutor;
+
+import cutthecrap.utils.striterators.ICloseableIterator;
 
 /**
  * Executes each of the operands as a subquery. The operands are evaluated in

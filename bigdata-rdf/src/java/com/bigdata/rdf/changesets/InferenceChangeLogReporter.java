@@ -15,7 +15,8 @@ import com.bigdata.rdf.store.BigdataStatementIterator;
 import com.bigdata.rdf.store.BigdataStatementIteratorImpl;
 import com.bigdata.striterator.ChunkedWrappedIterator;
 import com.bigdata.striterator.IChunkedOrderedIterator;
-import com.bigdata.striterator.ICloseable;
+
+import cutthecrap.utils.striterators.ICloseable;
 
 /**
  * {@link IChangeLog} implementation reports inferences as RDF {@link Statement}

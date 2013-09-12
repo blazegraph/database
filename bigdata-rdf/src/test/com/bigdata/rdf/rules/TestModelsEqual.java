@@ -35,7 +35,8 @@ import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.TripleStoreUtility;
-import com.bigdata.striterator.ICloseableIterator;
+
+import cutthecrap.utils.striterators.ICloseableIterator;
 
 /**
  * Test suite for {@link TripleStoreUtility#modelsEqual(AbstractTripleStore, AbstractTripleStore)}

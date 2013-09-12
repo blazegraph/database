@@ -43,7 +43,8 @@ import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.UnsynchronizedArrayBuffer;
 import com.bigdata.service.IBigdataFederation;
-import com.bigdata.striterator.ICloseableIterator;
+
+import cutthecrap.utils.striterators.ICloseableIterator;
 
 /**
  * An operator which imposes an offset/limit on a binding set pipeline.

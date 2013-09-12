@@ -48,7 +48,8 @@ Modifications:
 package com.bigdata.rdf.store;
 
 import com.bigdata.rdf.model.BigdataValue;
-import com.bigdata.striterator.ICloseableIterator;
+
+import cutthecrap.utils.striterators.ICloseableIterator;
 
 /**
  * Iterator visiting {@link BigdataValue}s.

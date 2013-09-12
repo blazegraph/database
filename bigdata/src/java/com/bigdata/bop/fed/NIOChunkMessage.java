@@ -49,7 +49,8 @@ import com.bigdata.io.SerializerUtil;
 import com.bigdata.rdf.internal.encoder.IVSolutionSetEncoder;
 import com.bigdata.service.ManagedResourceService;
 import com.bigdata.service.ResourceService;
-import com.bigdata.striterator.ICloseableIterator;
+
+import cutthecrap.utils.striterators.ICloseableIterator;
 
 /**
  * An {@link IChunkMessage} where the payload is made available to the receiving

@@ -34,7 +34,8 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.io.DataInputBuffer;
-import com.bigdata.striterator.ICloseableIterator;
+
+import cutthecrap.utils.striterators.ICloseableIterator;
 
 /**
  * Stream decoder for solution sets (chunk oriented).

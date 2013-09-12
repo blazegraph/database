@@ -44,7 +44,8 @@ import com.bigdata.bop.controller.NamedSetAnnotations;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.UnsyncLocalOutputBuffer;
-import com.bigdata.striterator.ICloseableIterator;
+
+import cutthecrap.utils.striterators.ICloseableIterator;
 
 /**
  * This operator performs a nested loop join for solutions. Intermediate

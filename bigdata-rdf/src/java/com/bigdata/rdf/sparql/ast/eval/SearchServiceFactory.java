@@ -69,7 +69,8 @@ import com.bigdata.rdf.store.BD;
 import com.bigdata.rdf.store.BDS;
 import com.bigdata.search.Hiterator;
 import com.bigdata.search.IHit;
-import com.bigdata.striterator.ICloseableIterator;
+
+import cutthecrap.utils.striterators.ICloseableIterator;
 
 /**
  * A factory for a search service. It accepts a group consisting of search magic

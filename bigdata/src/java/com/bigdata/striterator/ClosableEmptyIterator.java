@@ -30,6 +30,8 @@ package com.bigdata.striterator;
 
 import java.util.NoSuchElementException;
 
+import cutthecrap.utils.striterators.ICloseableIterator;
+
 
 /**
  * A closable iterator that visits nothing.

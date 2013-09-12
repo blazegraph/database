@@ -30,7 +30,8 @@ import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.relation.accesspath.IBuffer;
-import com.bigdata.striterator.ICloseableIterator;
+
+import cutthecrap.utils.striterators.ICloseableIterator;
 
 /**
  * A "DISTINCT" filter for {@link IBindingSet}s.

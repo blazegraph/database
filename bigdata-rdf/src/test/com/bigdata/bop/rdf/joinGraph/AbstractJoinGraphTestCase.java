@@ -60,7 +60,8 @@ import com.bigdata.journal.Journal;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.Rule;
-import com.bigdata.striterator.ICloseableIterator;
+
+import cutthecrap.utils.striterators.ICloseableIterator;
 
 /**
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>

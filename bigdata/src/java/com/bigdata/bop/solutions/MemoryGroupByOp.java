@@ -55,8 +55,9 @@ import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.htree.HTree;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
-import com.bigdata.striterator.ICloseableIterator;
 import com.bigdata.util.InnerCause;
+
+import cutthecrap.utils.striterators.ICloseableIterator;
 
 /**
  * An in-memory at-once generalized aggregation operator.

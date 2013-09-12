@@ -66,7 +66,8 @@ import com.bigdata.rdf.vocab.decls.FOAFVocabularyDecl;
 import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.striterator.Chunkerator;
 import com.bigdata.striterator.CloseableIteratorWrapper;
-import com.bigdata.striterator.ICloseableIterator;
+
+import cutthecrap.utils.striterators.ICloseableIterator;
 
 /**
  * Test suite for both {@link HTreeHashJoinUtility} and {@link JVMHashJoinUtility}.

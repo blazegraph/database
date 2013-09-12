@@ -64,7 +64,8 @@ import com.bigdata.journal.IIndexManager;
 import com.bigdata.rawstore.IPSOutputStream;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.service.IBigdataFederation;
-import com.bigdata.striterator.ICloseableIterator;
+
+import cutthecrap.utils.striterators.ICloseableIterator;
 
 /**
  * A persistence capable stream of "index" entries. The stream maintains the

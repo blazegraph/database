@@ -3,6 +3,8 @@ package com.bigdata.striterator;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 
+import cutthecrap.utils.striterators.ICloseableIterator;
+
 
 /**
  * Allows pushback of the most recently visited element onto the iterator.

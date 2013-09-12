@@ -55,10 +55,10 @@ import com.bigdata.htree.HTree;
 import com.bigdata.rdf.internal.impl.literal.XSDBooleanIV;
 import com.bigdata.relation.accesspath.BufferClosedException;
 import com.bigdata.relation.accesspath.IBuffer;
-import com.bigdata.striterator.ICloseableIterator;
 import com.bigdata.util.InnerCause;
 
 import cutthecrap.utils.striterators.Expander;
+import cutthecrap.utils.striterators.ICloseableIterator;
 import cutthecrap.utils.striterators.IStriterator;
 import cutthecrap.utils.striterators.Resolver;
 import cutthecrap.utils.striterators.Striterator;

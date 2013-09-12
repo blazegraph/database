@@ -12,9 +12,9 @@ import org.openrdf.query.BindingSet;
 
 import com.bigdata.gom.om.IObjectManager;
 import com.bigdata.gom.om.ObjectMgrModel;
-import com.bigdata.striterator.ICloseableIterator;
 
 import cutthecrap.utils.striterators.EmptyIterator;
+import cutthecrap.utils.striterators.ICloseableIterator;
 
 /**
  * A (forward or reverse) link set.

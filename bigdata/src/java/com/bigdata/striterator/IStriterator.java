@@ -31,6 +31,8 @@ package com.bigdata.striterator;
 import java.util.Enumeration;
 import java.util.Iterator;
 
+import cutthecrap.utils.striterators.ICloseableIterator;
+
 /**
  * Streaming iterator pattern ala Martyn Cutcher with generics.
  * 

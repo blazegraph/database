@@ -29,7 +29,7 @@ package com.bigdata.relation.accesspath;
 
 import java.util.NoSuchElementException;
 
-import com.bigdata.striterator.ICloseableIterator;
+import cutthecrap.utils.striterators.ICloseableIterator;
 
 /**
  * An empty {@link ICloseableIterator}.

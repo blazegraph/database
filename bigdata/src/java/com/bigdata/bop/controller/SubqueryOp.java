@@ -53,7 +53,8 @@ import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.impl.literal.XSDBooleanIV;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
-import com.bigdata.striterator.ICloseableIterator;
+
+import cutthecrap.utils.striterators.ICloseableIterator;
 
 /**
  * Pipelined join with subquery.

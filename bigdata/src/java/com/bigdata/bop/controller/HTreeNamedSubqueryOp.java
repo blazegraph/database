@@ -53,8 +53,8 @@ import com.bigdata.bop.join.HTreeSolutionSetHashJoinOp;
 import com.bigdata.bop.join.JoinTypeEnum;
 import com.bigdata.bop.join.NamedSolutionSetStats;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
-import com.bigdata.striterator.ICloseableIterator;
 
+import cutthecrap.utils.striterators.ICloseableIterator;
 import cutthecrap.utils.striterators.SingleValueIterator;
 
 /**

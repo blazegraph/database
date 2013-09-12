@@ -49,11 +49,11 @@ import com.bigdata.rdf.sparql.ast.GroupNodeBase;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.striterator.CloseableIteratorWrapper;
-import com.bigdata.striterator.ICloseableIterator;
 
 import cutthecrap.utils.striterators.EmptyIterator;
 import cutthecrap.utils.striterators.Expander;
 import cutthecrap.utils.striterators.Filter;
+import cutthecrap.utils.striterators.ICloseableIterator;
 import cutthecrap.utils.striterators.SingleValueIterator;
 import cutthecrap.utils.striterators.Striterator;
 

@@ -31,6 +31,8 @@ package com.bigdata.striterator;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 
+import cutthecrap.utils.striterators.ICloseableIterator;
+
 
 /**
  * Merge sort of two iterators with duplicates suppressed. The elements must be

@@ -57,7 +57,8 @@ import com.bigdata.rdf.sparql.ast.cache.ICacheConnection;
 import com.bigdata.rdf.sparql.ast.cache.IDescribeCache;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.striterator.CloseableIteratorWrapper;
-import com.bigdata.striterator.ICloseableIterator;
+
+import cutthecrap.utils.striterators.ICloseableIterator;
 
 /**
  * An {@link IObjectManager} for use with an embedded database, including JSP

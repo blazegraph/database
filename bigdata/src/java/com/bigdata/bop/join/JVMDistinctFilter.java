@@ -37,7 +37,8 @@ import com.bigdata.bop.IVariable;
 import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.relation.accesspath.IBuffer;
-import com.bigdata.striterator.ICloseableIterator;
+
+import cutthecrap.utils.striterators.ICloseableIterator;
 
 /**
  * Utility class for imposing a DISTINCT filter on {@link IBindingSet}. This

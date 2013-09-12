@@ -38,10 +38,10 @@ import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOKeyOrder;
 import com.bigdata.rwstore.sector.MemStore;
 import com.bigdata.rwstore.sector.MemoryManager;
-import com.bigdata.striterator.ICloseable;
 
 import cutthecrap.utils.striterators.Filter;
 import cutthecrap.utils.striterators.Filterator;
+import cutthecrap.utils.striterators.ICloseable;
 import cutthecrap.utils.striterators.IPropertySet;
 
 /**

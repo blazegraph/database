@@ -7,7 +7,8 @@ import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.fed.FederatedRunningQuery;
 import com.bigdata.relation.accesspath.ThickCloseableIterator;
-import com.bigdata.striterator.ICloseableIterator;
+
+import cutthecrap.utils.striterators.ICloseableIterator;
 
 /**
  * A chunk of intermediate results which are ready to be consumed by some

@@ -32,7 +32,8 @@ import java.util.NoSuchElementException;
 import java.util.concurrent.TimeUnit;
 
 import com.bigdata.striterator.IChunkedIterator;
-import com.bigdata.striterator.ICloseableIterator;
+
+import cutthecrap.utils.striterators.ICloseableIterator;
 
 /**
  * An {@link IAsynchronousIterator} that wraps an {@link IChunkedIterator} or a
