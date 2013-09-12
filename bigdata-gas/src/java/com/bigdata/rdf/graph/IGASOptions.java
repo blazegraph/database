@@ -68,7 +68,7 @@ public interface IGASOptions<VS, ES, ST> {
 
     /**
      * Return non-<code>null</code> iff there is a single link type to be
-     * visited. This corresponds to a view of the graph as a sparse connectivity
+     * visited. This corresponds to a view of the graph as sparse connectivity
      * matrix. The {@link IGASEngine} can optimize traversal patterns using the
      * <code>POS</code> index.
      * <p>
