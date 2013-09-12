@@ -18,7 +18,6 @@ package com.bigdata.rdf.graph.impl.ram;
 import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
 import org.openrdf.rio.RDFHandlerException;
-import org.openrdf.sail.SailException;
 
 import com.bigdata.rdf.graph.impl.ram.RAMGASEngine.RAMGraph;
 import com.bigdata.rdf.graph.util.GraphLoader;
