@@ -15,6 +15,8 @@
 */
 package com.bigdata.rdf.graph.impl.sail;
 
+import java.io.FileNotFoundException;
+
 import org.openrdf.model.URI;
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.sail.Sail;
@@ -69,13 +71,20 @@ public class AbstractSailGraphTestCase extends AbstractGraphTestCase {
         /**
          * The data file.
          */
-        static private final String smallGraph = "bigdata-gas/src/test/com/bigdata/rdf/graph/data/smallGraph.ttl";
+        static private final String smallGraph1 = "bigdata-gas/src/test/com/bigdata/rdf/graph/data/smallGraph.ttl";
+        static private final String smallGraph2 = "src/test/com/bigdata/rdf/graph/data/smallGraph.ttl";
         
         private final URI rdfType, foafKnows, foafPerson, mike, bryan, martyn;
 
         public SmallGraphProblem() throws Exception {
 
-            getGraphFixture().loadGraph(smallGraph);
+            try {
+                // in eclipse with bigdata as the root dir.
+                getGraphFixture().loadGraph(smallGraph1);
+            } catch (FileNotFoundException ex) {
+                // from the ant build file with bigdata-gas as the root dir.
+                getGraphFixture().loadGraph(smallGraph2);
+            }
 
             final Sail sail = getGraphFixture().getSail();
 

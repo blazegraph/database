@@ -17,8 +17,6 @@ package com.bigdata.rdf.graph.impl.util;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.io.ByteArrayBuffer;
-
 /**
  * A view on a mutable int[] that may be extended.
  * <p>
@@ -283,8 +281,8 @@ public class ManagedIntArray implements IManagedIntArray {
     }
 
     /**
-     * A slice of the outer {@link ByteArrayBuffer}. The slice will always
-     * reflect the backing {@link #array()} for the instance of the outer class.
+     * A slice of the outer {@link ManagedArray}. The slice will always reflect
+     * the backing {@link #array()} for the instance of the outer class.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
      *         Thompson</a>
