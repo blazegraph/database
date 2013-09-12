@@ -3696,7 +3696,7 @@ public class HAJournalServer extends AbstractServer {
             }); // runWithBarrierLock()
 
             if (haLog.isInfoEnabled())
-                haLog.info("TRANSITION", new RuntimeException());
+                haLog.info("TRANSITION", new StackInfoReport());
             
             // Transition to RunMet.
             enterRunState(new RunMetTask(token, leaderId));

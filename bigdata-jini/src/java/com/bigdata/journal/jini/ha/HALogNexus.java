@@ -32,6 +32,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.Iterator;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -120,7 +121,7 @@ public class HALogNexus implements IHALogWriter {
      * Set to protect log files against deletion while a digest is
      * computed.  This is checked by deleteHALogs.
      */
-    private  final AtomicLong digestLog = new AtomicLong(-1L);
+    private  final AtomicInteger logAccessors = new AtomicInteger();
 
     /**
      * Filter visits all HALog files <strong>except</strong> the current HALog
@@ -819,15 +820,21 @@ public class HALogNexus implements IHALogWriter {
      * Protects logs from removal while a digest is being computed
      * @param earliestDigest
      */
-    void protectDigest(final long earliestDigest) {
-    	digestLog.set(earliestDigest);
+    void addAccessor() {
+    	if (logAccessors.incrementAndGet() == 1) {
+    		if (log.isInfoEnabled())
+    			log.info("Access protection added");
+    	}
     }
     
     /**
      * Releases current protection against log removal
      */
-    void releaseProtectDigest() {
-    	digestLog.set(-1L);
+    void releaseAccessor() {
+    	if (logAccessors.decrementAndGet() == 0) {
+    		if (log.isInfoEnabled())
+    			log.info("Access protection removed");
+    	}
     }
     
     /**
@@ -848,19 +855,13 @@ public class HALogNexus implements IHALogWriter {
 
         final Iterator<IHALogRecord> itr = getHALogs();
         
-        while(itr.hasNext()) {
+        while(itr.hasNext() && logAccessors.get() == 0) {
             
             final IHALogRecord r = itr.next();
 
             final long closingCommitCounter = r.getCommitCounter();
             
-            final boolean deleteFile;
-            if (closingCommitCounter < earliestRetainedSnapshotCommitCounter) {
-            	// now check if protected by the digestLog field (set to -1 if not active)
-        		deleteFile = digestLog.get() == -1 || closingCommitCounter < digestLog.get();
-        	} else {
-        		deleteFile = false;
-        	}
+            final boolean deleteFile = closingCommitCounter < earliestRetainedSnapshotCommitCounter;
 
             if (!deleteFile) {
 
