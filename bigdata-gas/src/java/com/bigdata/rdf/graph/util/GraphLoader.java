@@ -162,12 +162,14 @@ abstract public class GraphLoader {
 
                         }
 
-                    }
-                    
-                    is = new FileInputStream(file);
+                    } else {
 
-                    // set for file as URI.
-                    baseURI = file.toURI().toString();
+                        is = new FileInputStream(file);
+
+                        // set for file as URI.
+                        baseURI = file.toURI().toString();
+
+                    }
                     
                 } else {
                     
