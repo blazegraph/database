@@ -193,7 +193,12 @@ public class AccessPath<R> implements IAccessPath<R>, IBindingSetAccessPath<R> {
      * limit.
      * 
      * FIXME Array limits in truth maintenance code. This should probably be
-     * close to the branching factor or chunk capacity.
+     * close to the branching factor or chunk capacity. It has been temporarily
+     * raised to a very large value in order to support truth maintenance where
+     * the code assumes access to the fully buffered result. That change needs
+     * to be examined for an impact on query performance. It is effectively
+     * forcing all access path reads to be fully buffered rather than using an
+     * asynchronous iterator pattern.
      * 
      * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/606">
      *      Array limits in truth maintenance code. </a>
