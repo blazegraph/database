@@ -415,13 +415,13 @@ public abstract class GASRunnerBase<VS, ES, ST> implements
             
             final VertexDistribution dist = graphAccessor.getDistribution(opt.r);
             
-            final Value[] samples = dist.getWeightedSample(opt.nsamples);
+            final Value[] sampled = dist.getWeightedSample(opt.nsamples);
 
             final IGASStats total = new GASStats();
 
-            for (int i = 0; i < samples.length; i++) {
+            for (int i = 0; i < sampled.length; i++) {
 
-                final Value startingVertex = samples[i];
+                final Value startingVertex = sampled[i];
 
                 gasState.init(startingVertex);
 
@@ -431,7 +431,7 @@ public abstract class GASRunnerBase<VS, ES, ST> implements
 
                 if (log.isInfoEnabled()) {
                     log.info("Run complete: vertex[" + i + "] of "
-                            + samples.length + " : startingVertex="
+                            + sampled.length + " : startingVertex="
                             + startingVertex + ", stats(sample)=" + stats);
                 }
 
@@ -442,7 +442,8 @@ public abstract class GASRunnerBase<VS, ES, ST> implements
             sb.append("TOTAL");
             sb.append(": analytic=" + gasProgram.getClass().getSimpleName());
             sb.append(", nseed=" + opt.seed);
-            sb.append(", nsamples=" + opt.nsamples);
+            sb.append(", nsamples=" + opt.nsamples); // #desired samples
+            sb.append(", nsampled=" + sampled.length);// #actually sampled
             sb.append(", nthreads=" + opt.nthreads);
             sb.append(", scheduler=" + ((GASState<VS, ES, ST>)gasState).getScheduler().getClass().getSimpleName());
             sb.append(", gasEngine=" + gasEngine.getClass().getSimpleName());
