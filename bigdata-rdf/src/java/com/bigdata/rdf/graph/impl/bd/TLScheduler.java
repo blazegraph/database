@@ -13,9 +13,10 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-package com.bigdata.rdf.graph.impl.scheduler;
+package com.bigdata.rdf.graph.impl.bd;
 
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.concurrent.Callable;
@@ -23,15 +24,13 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
-import org.apache.log4j.Logger;
 import org.openrdf.model.Value;
 
 import com.bigdata.rdf.graph.IGASScheduler;
 import com.bigdata.rdf.graph.IGASSchedulerImpl;
 import com.bigdata.rdf.graph.IStaticFrontier;
 import com.bigdata.rdf.graph.impl.GASEngine;
-import com.bigdata.rdf.graph.impl.bd.MergeSortIterator;
-import com.bigdata.rdf.graph.impl.frontier.StaticFrontier2;
+import com.bigdata.rdf.graph.impl.scheduler.STScheduler;
 import com.bigdata.rdf.graph.impl.util.GASImplUtil;
 import com.bigdata.rdf.graph.impl.util.IArraySlice;
 import com.bigdata.rdf.graph.impl.util.ManagedArray;
@@ -47,11 +46,11 @@ import com.bigdata.rdf.graph.util.GASUtil;
  * is a sequential step with a linear cost in the size of the frontier.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * 
+ * TODO Discard if dominated by {@link TLScheduler2}.
  */
-public class TLScheduler2 implements IGASSchedulerImpl {
+public class TLScheduler implements IGASSchedulerImpl {
 
-    private static final Logger log = Logger.getLogger(TLScheduler2.class);
-    
     /**
      * Class bundles a reusable, extensible array for sorting the thread-local
      * frontier.
@@ -89,7 +88,7 @@ public class TLScheduler2 implements IGASSchedulerImpl {
     private final int nthreads;
     private final ConcurrentHashMap<Long/* threadId */, MySTScheduler> map;
 
-    public TLScheduler2(final GASEngine gasEngine) {
+    public TLScheduler(final GASEngine gasEngine) {
 
         this.gasEngine = gasEngine;
 
@@ -157,25 +156,61 @@ public class TLScheduler2 implements IGASSchedulerImpl {
     public void compactFrontier(final IStaticFrontier frontier) {
 
         /*
-         * Figure out the #of sources and the #of vertices across those sources.
-         * 
-         * This also computes the cumulative offsets into the new frontier for
-         * the different per-thread segments.
+         * Extract a sorted, compact frontier from each thread local frontier.
          */
-        final int[] off = new int[nthreads]; // zero for 1st thread.
-        final int nsources;
-        final int nvertices;
+        @SuppressWarnings("unchecked")
+        final IArraySlice<Value>[] frontiers = new IArraySlice[nthreads];
+
+        int nsources = 0;
+        int nvertices = 0;
         {
-            int ns = 0, nv = 0;
+            final List<Callable<IArraySlice<Value>>> tasks = new ArrayList<Callable<IArraySlice<Value>>>(
+                    nthreads);
+
             for (MySTScheduler s : map.values()) {
                 final MySTScheduler t = s;
-                final int sz = t.vertices.size();
-                off[ns] = nv; // starting index.
-                ns++;
-                nv += sz;
+                tasks.add(new Callable<IArraySlice<Value>>() {
+                    @Override
+                    public IArraySlice<Value> call() throws Exception {
+                        return GASImplUtil.compactAndSort(t.getVertices(), t.tmp);
+                    }
+                });
+
             }
-            nsources = ns;
-            nvertices = nv;
+            // invokeAll() - futures will be done() before it returns.
+            final List<Future<IArraySlice<Value>>> futures;
+            try {
+                futures = gasEngine.getGASThreadPool().invokeAll(tasks);
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+
+            for (Future<IArraySlice<Value>> f : futures) {
+
+                try {
+                    final IArraySlice<Value> b = frontiers[nsources] = f.get();
+                    nvertices += b.len();
+                    nsources++;
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                } catch (ExecutionException e) {
+                    throw new RuntimeException(e);
+                }
+
+            }
+        }
+
+        if (nvertices == 0) {
+
+            /*
+             * The new frontier is empty.
+             */
+
+            frontier.resetFrontier(0/* minCapacity */, false/* sortFrontier */,
+                    GASUtil.EMPTY_VERTICES_ITERATOR);
+
+            return;
+
         }
 
         if (nsources > nthreads) {
@@ -190,117 +225,51 @@ public class TLScheduler2 implements IGASSchedulerImpl {
 
         }
        
-        if (nvertices == 0) {
-
-            /*
-             * The new frontier is empty.
-             */
-
-            frontier.resetFrontier(0/* minCapacity */, false/* sortFrontier */,
-                    GASUtil.EMPTY_VERTICES_ITERATOR);
-
-            return;
-
-        }
-
         /*
-         * Parallel copy of the per-thread frontiers onto the new frontier.
-         * 
-         * Note: This DOES NOT produce a compact frontier! The code that maps
-         * the gather/reduce operations over the frontier will eliminate
-         * duplicate work.
+         * Now merge sort those arrays and populate the new frontier.
          */
-        
-        // TODO Requires a specific class to work! API!
-        final StaticFrontier2 f2 = (StaticFrontier2) frontier;
-        {
-            
-            // ensure sufficient capacity! 
-            f2.resetAndEnsureCapacity(nvertices);
-            f2.setCompact(false); // NOT COMPACT!
-            
-            final List<Callable<Void>> tasks = new ArrayList<Callable<Void>>(
-                    nsources);
-
-            int i = 0;
-            for (MySTScheduler s : map.values()) { // TODO Paranoia suggests to put these into an [] so we know that we have the same traversal order as above. That might not be guaranteed.
-                final MySTScheduler t = s;
-                final int index = i++;
-                tasks.add(new Callable<Void>() {
-                    @Override
-                    public Void call() throws Exception {
-                        final IArraySlice<Value> orderedSegment = GASImplUtil
-                                .compactAndSort(t.vertices, t.tmp);
-                        f2.copyIntoResetFrontier(off[index], orderedSegment);
-                        return (Void) null;
-                    }
-                });
-            }
-            
-            // invokeAll() - futures will be done() before it returns.
-            final List<Future<Void>> futures;
-            try {
-                futures = gasEngine.getGASThreadPool().invokeAll(tasks);
-            } catch (InterruptedException e) {
-                throw new RuntimeException(e);
-            }
-
-            for (Future<Void> f : futures) {
-
-                try {
-                    f.get();
-                } catch (InterruptedException e) {
-                    throw new RuntimeException(e);
-                } catch (ExecutionException e) {
-                    throw new RuntimeException(e);
-                }
-
-            }
-        }
-        if (log.isInfoEnabled())
-            log.info("Done: " + this.getClass().getCanonicalName()
-                    + ",frontier=" + frontier);
-//        /*
-//         * Now merge sort those arrays and populate the new frontier.
-//         */
-//        mergeSortSourcesAndSetFrontier(nsources, nvertices, frontiers, frontier);
+        mergeSortSourcesAndSetFrontier(nsources, nvertices, frontiers, frontier);
 
     }
 
-//    /**
-//     * Now merge sort the ordered frontier segments and populate the new
-//     * frontier.
-//     * 
-//     * @param nsources
-//     *            The #of frontier segments.
-//     * @param nvertices
-//     *            The total #of vertice across those segments (may double-count
-//     *            across segments).
-//     * @param frontiers
-//     *            The ordered, compact frontier segments
-//     * @param frontier
-//     *            The new frontier to be populated.
-//     */
-//    private void mergeSortSourcesAndSetFrontier(final int nsources,
-//            final int nvertices, final IArraySlice<Value>[] frontiers,
-//            final IStaticFrontier frontier) {
-//
-//        // wrap Values[] as Iterators.
-//        @SuppressWarnings("unchecked")
-//        final Iterator<Value>[] itrs = new Iterator[nsources];
-//
-//        for (int i = 0; i < nsources; i++) {
-//
-//            itrs[i] = frontiers[i].iterator();
-//
-//        }
-//
-//        // merge sort of those iterators.
-//        final Iterator<Value> itr = new MergeSortIterator(itrs);
-//
-//        frontier.resetFrontier(nvertices/* minCapacity */, true/* ordered */,
-//                itr);
-//
-//    }
+    /**
+     * Now merge sort the ordered frontier segments and populate the new
+     * frontier.
+     * 
+     * @param nsources
+     *            The #of frontier segments.
+     * @param nvertices
+     *            The total #of vertice across those segments (may double-count
+     *            across segments).
+     * @param frontiers
+     *            The ordered, compact frontier segments
+     * @param frontier
+     *            The new frontier to be populated.
+     */
+    private void mergeSortSourcesAndSetFrontier(final int nsources,
+            final int nvertices, final IArraySlice<Value>[] frontiers,
+            final IStaticFrontier frontier) {
+
+        // wrap Values[] as Iterators.
+        @SuppressWarnings("unchecked")
+        final Iterator<Value>[] itrs = new Iterator[nsources];
+
+        for (int i = 0; i < nsources; i++) {
+
+            itrs[i] = frontiers[i].iterator();
+
+        }
+
+        // merge sort of those iterators.
+        final Iterator<Value> itr = new MergeSortIterator(itrs);
+
+        /*
+         * Note: The merge iterator visits the vertices in the natural order and
+         * does not need to be sorted.
+         */
+        frontier.resetFrontier(nvertices/* minCapacity */,
+                false/* sortFrontier */, itr);
+
+    }
 
 }

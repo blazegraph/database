@@ -37,7 +37,6 @@ import com.bigdata.rdf.graph.IGraphAccessor;
 import com.bigdata.rdf.graph.IStaticFrontier;
 import com.bigdata.rdf.graph.impl.frontier.StaticFrontier2;
 import com.bigdata.rdf.graph.impl.scheduler.CHMScheduler;
-import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
  * {@link IGASEngine} for dynamic activation of vertices. This implementation

@@ -35,7 +35,6 @@ import com.bigdata.rdf.graph.IGASProgram;
 import com.bigdata.rdf.graph.IGraphAccessor;
 import com.bigdata.rdf.graph.impl.GASEngine;
 import com.bigdata.rdf.graph.impl.util.VertexDistribution;
-import com.bigdata.rdf.sail.Sesame2BigdataIterator;
 
 import cutthecrap.utils.striterators.EmptyIterator;
 import cutthecrap.utils.striterators.IStriterator;

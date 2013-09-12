@@ -33,8 +33,8 @@ public class STScheduler implements IGASSchedulerImpl {
 
     /**
      * The scheduled vertices.
-     */// Note: package private. Exposed to TLScheduler.
-    /*private*/ final Set<Value> vertices;
+     */
+    private final Set<Value> vertices;
     private final boolean sortFrontier;
     
     public STScheduler(final GASEngine gasEngine) {
@@ -42,6 +42,24 @@ public class STScheduler implements IGASSchedulerImpl {
         this.vertices = new LinkedHashSet<Value>();
         this.sortFrontier = gasEngine.getSortFrontier();
     
+    }
+    
+    /**
+     * The #of vertices in the frontier.
+     */
+    public int size() {
+
+        return vertices.size();
+        
+    }
+
+    /**
+     * The backing collection.
+     */
+    public Set<Value> getVertices() {
+        
+        return vertices;
+        
     }
     
     @Override

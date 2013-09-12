@@ -12,8 +12,10 @@
 		<pathelement location="${build.dir}/classes" />
 		<pathelement location="${build.dir}/test" />
 		<fileset dir="${build.lib.dir}">
-			<include name="junit*.jar" />
-			<include name="log4j*.jar" />
+<!--   	<include name="junit*.jar" />
+         <include name="log4j*.jar" />
+         <include name="ctc-striterators*.jar" />
+         <include name="openrdf*.jar" /> -->
 		</fileset>
 	</path>
 
@@ -74,7 +76,7 @@
 		</jar>
 	</target>
 
-	<target name="test" depends="compile">
+	<target name="test" depends="clean, compile">
 		<javac destdir="${build.dir}/test" debug="${javac.debug}" debuglevel="${javac.debuglevel}" verbose="${javac.verbose}" encoding="${javac.encoding}">
 			<classpath refid="test.classpath" />
 			<src path="${bigdata-gas.dir}/src/test" />
@@ -93,7 +95,7 @@
 			<!-- ant -DtestName=com.bigdata.cache.TestAll junit      -->
 			<test name="${testName}" todir="${test.results.dir}" if="testName" />
 			<!-- Test suites to run when -DtestName is not set -->
-			<test name="com.bigdata.gas.TestAll" todir="${test.results.dir}" unless="testName" />
+			<test name="com.bigdata.rdf.graph.TestAll" todir="${test.results.dir}" unless="testName" />
 		</junit>
 		<!-- Generate an HTML report. -->
 		<junitreport todir="${build.dir}">
