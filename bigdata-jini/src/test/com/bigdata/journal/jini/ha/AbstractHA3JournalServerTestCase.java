@@ -406,15 +406,15 @@ public class AbstractHA3JournalServerTestCase extends
             leaderListener = null;
         }
         
-        if (serverA != null && !serverA.equals(leader)) {
+        if (leader == null || !leader.equals(serverA)) {
             destroyA();
         }
 
-        if (serverB != null && !serverB.equals(leader)) {
+        if (leader == null || !leader.equals(serverB)) {
             destroyB();
         }
 
-        if (serverC != null && !serverC.equals(leader)) {
+        if (leader == null || !leader.equals(serverC)) {
             destroyC();
         }
         
@@ -676,8 +676,11 @@ public class AbstractHA3JournalServerTestCase extends
     protected void safeDestroy(final HAGlue haGlue, final File serviceDir,
             final ServiceListener serviceListener) {
 
-        if (haGlue == null)
+        if (haGlue == null) {
+        	tidyServiceDirectory(serviceDir); // ensure empty
+        	
             return;
+        }
 
         try {
 
@@ -724,11 +727,29 @@ public class AbstractHA3JournalServerTestCase extends
                 }
 
             }
+                    
+            // try and ensure serviceDir is tidied in any event
+            // Remove *.jnl, HALog/*, snapshot/*
+            log.warn("Need to clear directory explicitly: " + serviceDir.getAbsolutePath());
             
+            tidyServiceDirectory(serviceDir);
         }
 
     }
-
+    
+    private void tidyServiceDirectory(final File serviceDir) {
+    	if (serviceDir == null || !serviceDir.exists())
+    		return;
+    	
+        for (File file : serviceDir.listFiles()) {
+        	final String name = file.getName();
+        	
+        	if (name.endsWith(".jnl") || name.equals("snapshot") || name.equals("HALog")) {
+        		recursiveDelete(file);
+        	} 
+        }
+    }
+    
     /**
      * Some signals understood by Java.
      * 
@@ -826,6 +847,12 @@ public class AbstractHA3JournalServerTestCase extends
     	
     	serverC = null;
     	serviceListenerC = null;
+    }
+    
+    protected void kill(final HAGlue service) throws IOException {
+        final int pid = ((HAGlueTest) service).getPID();
+    	
+        trySignal(SignalEnum.KILL, pid);
     }
 
     /**
@@ -1582,6 +1609,7 @@ public class AbstractHA3JournalServerTestCase extends
                 }
             });
 
+            
             return haGlue;
 
         } catch (Throwable t) {

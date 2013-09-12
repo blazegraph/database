@@ -1426,6 +1426,96 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
 
     }
 
+    public void testQuorumABC_killC() throws Exception {
+
+        // Start 2 services.
+        final HAGlue serverA = startA();
+        final HAGlue serverB = startB();
+
+        // Wait for a quorum meet.
+        final long token = quorum.awaitQuorum(awaitQuorumTimeout,
+                TimeUnit.MILLISECONDS);
+
+//        // Verify KB exists.
+//        awaitKBExists(serverA);
+        
+        /*
+         * Note: The quorum was not fully met at the last 2-phase commit.
+         * Instead, 2 services participated in the 2-phase commit and the third
+         * service resynchronized when it came up and then went through a local
+         * commit. Therefore, the HALog files should exist on all nodes.
+         */
+
+        // Current commit point.
+        final long lastCommitCounter = 1;
+
+        // Await initial commit point (KB create).
+        awaitCommitCounter(lastCommitCounter, serverA, serverB);
+
+        /*
+         * Verify that HALog files were generated and are available for commit
+         * point ONE (1) on the services joined with the met quorum.
+         */
+        assertHALogDigestsEquals(1L/* firstCommitCounter */,
+                lastCommitCounter, new HAGlue[] { serverA, serverB });
+
+        // Verify binary equality of (A,B) journals.
+        assertDigestsEquals(new HAGlue[] { serverA, serverB });
+
+        // Start 3rd service.
+        final HAGlue serverC = startC();
+
+        // Wait until the quorum is fully met. The token should not change.
+        assertEquals(token, awaitFullyMetQuorum());
+
+        // The commit counter has not changed.
+        assertEquals(
+                lastCommitCounter,
+                serverA.getRootBlock(
+                        new HARootBlockRequest(null/* storeUUID */))
+                        .getRootBlock().getCommitCounter());
+
+        // HALog files now exist on ALL services.
+        assertHALogDigestsEquals(1L/* firstCommitCounter */, lastCommitCounter,
+                new HAGlue[] { serverA, serverB, serverC });
+
+        // Verify binary equality of ALL journals.
+        assertDigestsEquals(new HAGlue[] { serverA, serverB, serverC });
+
+        /*
+         * Now go through a commit point with a fully met quorum. The HALog
+         * files should be purged at that commit point.
+         */
+        simpleTransaction();
+
+        // Current commit point.
+        final long lastCommitCounter2 = serverA
+                .getRootBlock(new HARootBlockRequest(null/* storeUUID */))
+                .getRootBlock().getCommitCounter();
+
+        // There are TWO (2) commit points.
+        assertEquals(2L, lastCommitCounter2);
+
+        // Verify binary equality of ALL journals.
+        assertDigestsEquals(new HAGlue[] { serverA, serverB, serverC });
+
+        // Verify no HALog files since fully met quorum @ commit.
+        assertHALogNotFound(0L/* firstCommitCounter */, lastCommitCounter,
+                new HAGlue[] { serverA, serverB, serverC });
+        
+        // Now kill C - this will leave some file detritus
+        kill(serverC);
+        
+        // wait around to let the kill play out by waiting for [A, B] pipeline
+        awaitPipeline(new HAGlue[] {serverA, serverB});
+
+        // assert quorum remains met
+        assertTrue(quorum.isQuorumMet());
+        
+        // ...and with original token
+        assertTrue(token == quorum.token());
+    }
+
     /**
      * Test quorum breaks and reforms when original leader fails
      * 
@@ -1452,6 +1542,42 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
 		shutdownA();
 
 		// Now check that quorum meets around the remaining 2 services.
+		final long token2 = awaitNextQuorumMeet(token);
+
+		// Verify that we have a new leader for the quorum.
+		final HAGlue leader = quorum.getClient().getLeader(token2);
+
+        assertTrue(leader.equals(startup.serverB)
+                || leader.equals(startup.serverC));
+        
+	}
+    
+    /**
+     * Test quorum breaks and reforms when original leader fails
+     * 
+     * @throws Exception 
+     */
+	public void testQuorumBreaksABC_killLeader() throws Exception {
+
+		// Start 3 services in sequence
+		final ABC startup = new ABC(true/*sequential*/);
+
+		// Wait for a quorum meet.       
+		final long token = awaitMetQuorum();
+
+//		// Verify KB exists.
+//		awaitKBExists(startup.serverA);
+
+		// Verify A is the leader.
+		assertEquals(startup.serverA, quorum.getClient().getLeader(token));
+
+        // Verify A is fully up.
+        awaitNSSAndHAReady(startup.serverA);
+
+		// Now kill leader!
+ 		kill(startup.serverA);
+
+		// Check that quorum meets around the remaining 2 services.
 		final long token2 = awaitNextQuorumMeet(token);
 
 		// Verify that we have a new leader for the quorum.
