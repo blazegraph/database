@@ -25,7 +25,8 @@ import com.bigdata.gom.om.NanoSparqlObjectManager;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.sail.webapp.client.DefaultClientConnectionManagerFactory;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
-import com.bigdata.striterator.ICloseableIterator;
+
+import cutthecrap.utils.striterators.ICloseableIterator;
 
 /**
  * Simple graph program identifies friends of friends that are not directly

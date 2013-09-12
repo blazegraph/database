@@ -33,7 +33,8 @@ import java.util.concurrent.BlockingQueue;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.striterator.IChunkedIterator;
-import com.bigdata.striterator.ICloseableIterator;
+
+import cutthecrap.utils.striterators.ICloseableIterator;
 
 /**
  * API providing a variety of ways to access chunks of data (data are typically

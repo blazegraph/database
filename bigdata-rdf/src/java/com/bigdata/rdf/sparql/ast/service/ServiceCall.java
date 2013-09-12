@@ -30,7 +30,8 @@ package com.bigdata.rdf.sparql.ast.service;
 import org.openrdf.query.BindingSet;
 
 import com.bigdata.bop.IBindingSet;
-import com.bigdata.striterator.ICloseableIterator;
+
+import cutthecrap.utils.striterators.ICloseableIterator;
 
 /**
  * Service invocation interface.

@@ -45,7 +45,8 @@ import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.relation.AbstractResource;
 import com.bigdata.stream.Stream.StreamIndexMetadata;
 import com.bigdata.striterator.CloseableIteratorWrapper;
-import com.bigdata.striterator.ICloseableIterator;
+
+import cutthecrap.utils.striterators.ICloseableIterator;
 
 /**
  * A manager for named SOLUTION SETS scoped by some namespace and timestamp.

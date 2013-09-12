@@ -2,7 +2,7 @@ package com.bigdata.bop.engine;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import com.bigdata.striterator.ICloseableIterator;
+import cutthecrap.utils.striterators.ICloseableIterator;
 
 /**
  * Delegate pattern cancels the {@link IRunningQuery} when the iterator is

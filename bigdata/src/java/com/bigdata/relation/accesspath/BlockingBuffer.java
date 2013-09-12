@@ -50,8 +50,9 @@ import com.bigdata.rdf.store.BigdataSolutionResolverator;
 import com.bigdata.rdf.store.BigdataStatementIteratorImpl;
 import com.bigdata.relation.rule.IQueryOptions;
 import com.bigdata.relation.rule.IRule;
-import com.bigdata.striterator.ICloseableIterator;
 import com.bigdata.util.InnerCause;
+
+import cutthecrap.utils.striterators.ICloseableIterator;
 
 /**
  * <p>

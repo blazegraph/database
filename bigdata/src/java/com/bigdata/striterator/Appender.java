@@ -31,6 +31,8 @@ package com.bigdata.striterator;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 
+import cutthecrap.utils.striterators.ICloseableIterator;
+
 /**
  * Appender pattern tacks on another iterator when the source iterator is
  * exhausted.

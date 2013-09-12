@@ -70,9 +70,10 @@ import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.striterator.ChunkedArrayIterator;
-import com.bigdata.striterator.ICloseableIterator;
 import com.bigdata.util.InnerCause;
 import com.bigdata.util.concurrent.LatchedExecutor;
+
+import cutthecrap.utils.striterators.ICloseableIterator;
 
 /**
  * Test suite for the {@link QueryEngine} against a local database instance.

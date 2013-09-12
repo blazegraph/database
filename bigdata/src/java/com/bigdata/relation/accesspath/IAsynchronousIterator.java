@@ -32,7 +32,8 @@ import java.util.concurrent.TimeUnit;
 
 import com.bigdata.relation.rule.IQueryOptions;
 import com.bigdata.relation.rule.IRule;
-import com.bigdata.striterator.ICloseableIterator;
+
+import cutthecrap.utils.striterators.ICloseableIterator;
 
 /**
  * Interface for iterators that are running asynchronously. Such iterators are

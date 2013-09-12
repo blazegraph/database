@@ -18,7 +18,6 @@ package cutthecrap.utils.striterators;
 import java.util.Iterator;
 import java.io.Serializable;
 
-import com.bigdata.striterator.ICloseableIterator;
 
 
 /**

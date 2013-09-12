@@ -22,8 +22,6 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 
-import com.bigdata.striterator.ICloseable;
-import com.bigdata.striterator.ICloseableIterator;
 
 
 import cutthecrap.utils.striterators.IStriterator.ITailOp;

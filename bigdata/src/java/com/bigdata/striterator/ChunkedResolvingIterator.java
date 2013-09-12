@@ -30,6 +30,8 @@ package com.bigdata.striterator;
 
 import java.util.Arrays;
 
+import cutthecrap.utils.striterators.ICloseableIterator;
+
 /**
  * Converts the type of the source iterator using #resolve().
  * <p>

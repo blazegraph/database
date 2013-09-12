@@ -169,10 +169,11 @@ import com.bigdata.striterator.DelegateChunkedIterator;
 import com.bigdata.striterator.EmptyChunkedIterator;
 import com.bigdata.striterator.IChunkedIterator;
 import com.bigdata.striterator.IChunkedOrderedIterator;
-import com.bigdata.striterator.ICloseableIterator;
 import com.bigdata.striterator.IKeyOrder;
 import com.bigdata.util.InnerCause;
 import com.bigdata.util.PropertyUtil;
+
+import cutthecrap.utils.striterators.ICloseableIterator;
 
 /**
  * Abstract base class that implements logic for the {@link ITripleStore}

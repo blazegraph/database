@@ -35,6 +35,8 @@ import java.util.Set;
 
 import com.bigdata.service.ndx.PartitionedTupleIterator;
 
+import cutthecrap.utils.striterators.ICloseable;
+
 /**
  * Streaming iterator pattern.
  * 

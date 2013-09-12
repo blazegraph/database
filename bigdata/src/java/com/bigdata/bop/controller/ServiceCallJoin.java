@@ -69,10 +69,10 @@ import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.relation.accesspath.UnsyncLocalOutputBuffer;
 import com.bigdata.striterator.ChunkedArrayIterator;
-import com.bigdata.striterator.ICloseableIterator;
 import com.bigdata.util.InnerCause;
 import com.bigdata.util.concurrent.LatchedExecutor;
 
+import cutthecrap.utils.striterators.ICloseableIterator;
 import cutthecrap.utils.striterators.SingleValueIterator;
 
 /**

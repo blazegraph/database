@@ -52,7 +52,8 @@ import com.bigdata.rdf.store.BD;
 import com.bigdata.rdf.store.BigdataStatementIterator;
 import com.bigdata.rdf.vocab.NoVocabulary;
 import com.bigdata.relation.accesspath.IAccessPath;
-import com.bigdata.striterator.ICloseableIterator;
+
+import cutthecrap.utils.striterators.ICloseableIterator;
 
 /**
  * Test case for reverse lookup from SID to statement.

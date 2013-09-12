@@ -11,7 +11,8 @@ import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.solutions.SliceOp;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
-import com.bigdata.striterator.ICloseableIterator;
+
+import cutthecrap.utils.striterators.ICloseableIterator;
 
 /**
  * A operator which may be used at the end of query pipelines when there is a

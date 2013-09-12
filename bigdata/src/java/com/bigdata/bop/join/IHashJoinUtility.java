@@ -33,8 +33,9 @@ import com.bigdata.bop.IVariable;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.htree.HTree;
 import com.bigdata.relation.accesspath.IBuffer;
-import com.bigdata.striterator.ICloseableIterator;
 import com.ibm.icu.util.BytesTrie.Iterator;
+
+import cutthecrap.utils.striterators.ICloseableIterator;
 
 /**
  * Interface for hash index build and hash join operations.

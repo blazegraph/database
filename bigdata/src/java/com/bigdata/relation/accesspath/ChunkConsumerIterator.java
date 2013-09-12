@@ -6,8 +6,9 @@ import java.util.NoSuchElementException;
 import org.apache.log4j.Logger;
 
 import com.bigdata.striterator.IChunkedOrderedIterator;
-import com.bigdata.striterator.ICloseableIterator;
 import com.bigdata.striterator.IKeyOrder;
+
+import cutthecrap.utils.striterators.ICloseableIterator;
 
 /**
  * A class that aligns a buffer of <code>E[]</code>s (a buffer of chunks) with

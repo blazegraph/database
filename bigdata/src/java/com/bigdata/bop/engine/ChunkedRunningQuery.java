@@ -62,9 +62,10 @@ import com.bigdata.relation.accesspath.IMultiSourceCloseableIterator;
 import com.bigdata.relation.accesspath.MultiSourceSequentialCloseableIterator;
 import com.bigdata.rwstore.sector.IMemoryManager;
 import com.bigdata.service.IBigdataFederation;
-import com.bigdata.striterator.ICloseableIterator;
 import com.bigdata.util.concurrent.Memoizer;
 import com.sun.jini.thread.Executor;
+
+import cutthecrap.utils.striterators.ICloseableIterator;
 
 /**
  * {@link IRunningQuery} implementation based on the assignment of

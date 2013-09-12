@@ -3,7 +3,8 @@ package com.bigdata.rdf.sail;
 import java.util.NoSuchElementException;
 
 import com.bigdata.bop.engine.IRunningQuery;
-import com.bigdata.striterator.ICloseableIterator;
+
+import cutthecrap.utils.striterators.ICloseableIterator;
 
 /**
  * Iteration construct wraps an {@link IRunningQuery} with logic to (a) verify

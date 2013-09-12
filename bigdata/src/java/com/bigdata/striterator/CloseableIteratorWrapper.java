@@ -29,6 +29,9 @@ package com.bigdata.striterator;
 
 import java.util.Iterator;
 
+import cutthecrap.utils.striterators.ICloseable;
+import cutthecrap.utils.striterators.ICloseableIterator;
+
 /**
  * Wraps a normal {@link Iterator} as an {@link ICloseableIterator}.
  * 

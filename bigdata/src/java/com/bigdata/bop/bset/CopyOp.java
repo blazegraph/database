@@ -43,7 +43,8 @@ import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.IChunkAccessor;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.ThickAsynchronousIterator;
-import com.bigdata.striterator.ICloseableIterator;
+
+import cutthecrap.utils.striterators.ICloseableIterator;
 
 /**
  * This operator copies its source to its sink(s). Specializations exist which are

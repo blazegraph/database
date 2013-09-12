@@ -32,7 +32,8 @@ import java.util.NoSuchElementException;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IVariable;
 import com.bigdata.rdf.lexicon.LexiconRelation;
-import com.bigdata.striterator.ICloseableIterator;
+
+import cutthecrap.utils.striterators.ICloseableIterator;
 
 /**
  * Iterator pattern for chunked materialization.

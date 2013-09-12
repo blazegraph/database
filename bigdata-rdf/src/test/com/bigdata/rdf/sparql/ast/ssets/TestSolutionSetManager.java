@@ -62,7 +62,8 @@ import com.bigdata.rdf.sparql.ast.cache.CacheConnectionImpl;
 import com.bigdata.rdf.sparql.ast.eval.IEvaluationContext;
 import com.bigdata.striterator.CloseableIteratorWrapper;
 import com.bigdata.striterator.Dechunkerator;
-import com.bigdata.striterator.ICloseableIterator;
+
+import cutthecrap.utils.striterators.ICloseableIterator;
 
 /**
  * Test suite for managing named solution sets.

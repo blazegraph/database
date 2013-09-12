@@ -68,8 +68,8 @@ import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPOKeyOrder;
 import com.bigdata.rdf.spo.SPOPredicate;
 import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.striterator.ICloseable;
 
+import cutthecrap.utils.striterators.ICloseable;
 import cutthecrap.utils.striterators.IFilterTest;
 
 /**

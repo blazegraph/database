@@ -66,7 +66,8 @@ import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BD;
 import com.bigdata.relation.accesspath.EmptyCloseableIterator;
 import com.bigdata.relation.accesspath.ThickCloseableIterator;
-import com.bigdata.striterator.ICloseableIterator;
+
+import cutthecrap.utils.striterators.ICloseableIterator;
 
 /**
  * A factory for a statement pattern sampling service. 

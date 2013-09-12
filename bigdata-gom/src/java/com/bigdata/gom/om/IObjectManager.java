@@ -40,7 +40,8 @@ import org.openrdf.query.BindingSet;
 
 import com.bigdata.gom.gpo.IGPO;
 import com.bigdata.rdf.model.BigdataValueFactory;
-import com.bigdata.striterator.ICloseableIterator;
+
+import cutthecrap.utils.striterators.ICloseableIterator;
 
 /**
  * The object manager is the abstraction for a connection the back end.

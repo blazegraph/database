@@ -50,7 +50,8 @@ import com.bigdata.bop.bindingSet.EmptyBindingSet;
 import com.bigdata.bop.engine.AbstractRunningQuery;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
-import com.bigdata.striterator.ICloseableIterator;
+
+import cutthecrap.utils.striterators.ICloseableIterator;
 
 /**
  * Pipeline join incoming bindings against a special kind of subquery that

@@ -51,10 +51,10 @@ import com.bigdata.rdf.internal.encoder.SolutionSetStreamEncoder;
 import com.bigdata.rdf.sparql.ast.ISolutionSetStats;
 import com.bigdata.stream.Stream;
 import com.bigdata.striterator.Chunkerator;
-import com.bigdata.striterator.ICloseableIterator;
 
 import cutthecrap.utils.striterators.ArrayIterator;
 import cutthecrap.utils.striterators.Expander;
+import cutthecrap.utils.striterators.ICloseableIterator;
 import cutthecrap.utils.striterators.Striterator;
 
 /**

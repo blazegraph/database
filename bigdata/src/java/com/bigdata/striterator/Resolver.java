@@ -32,6 +32,8 @@ import java.util.Arrays;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 
+import cutthecrap.utils.striterators.ICloseableIterator;
+
 /**
  * Pattern for resolving elements of an iterator.
  * 

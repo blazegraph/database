@@ -63,7 +63,8 @@ import com.bigdata.bop.Var;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.AbstractTripleStoreTestCase;
-import com.bigdata.striterator.ICloseableIterator;
+
+import cutthecrap.utils.striterators.ICloseableIterator;
 
 /**
  * Unit tests for {@link AbstractTripleStore#match(Literal[], URI[], URI)}.

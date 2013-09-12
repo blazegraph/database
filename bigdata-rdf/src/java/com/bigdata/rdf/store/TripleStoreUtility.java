@@ -52,7 +52,8 @@ import com.bigdata.rdf.store.AbstractTripleStore.Options;
 import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.striterator.IChunkedOrderedIterator;
-import com.bigdata.striterator.ICloseableIterator;
+
+import cutthecrap.utils.striterators.ICloseableIterator;
 
 /**
  * Utility class for comparing graphs for equality, bulk export, etc.

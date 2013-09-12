@@ -31,6 +31,7 @@ import java.util.Arrays;
 import java.util.Iterator;
 
 import cutthecrap.utils.striterators.Expander;
+import cutthecrap.utils.striterators.ICloseableIterator;
 import cutthecrap.utils.striterators.Striterator;
 
 /**

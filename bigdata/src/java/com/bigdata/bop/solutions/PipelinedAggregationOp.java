@@ -27,8 +27,9 @@ import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
-import com.bigdata.striterator.ICloseableIterator;
 import com.bigdata.util.InnerCause;
+
+import cutthecrap.utils.striterators.ICloseableIterator;
 
 /**
  * A pipelined aggregation operator based on an in memory hash table associating

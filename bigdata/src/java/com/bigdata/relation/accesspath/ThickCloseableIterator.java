@@ -33,7 +33,7 @@ import java.io.ObjectInputStream;
 import java.io.Serializable;
 import java.util.NoSuchElementException;
 
-import com.bigdata.striterator.ICloseableIterator;
+import cutthecrap.utils.striterators.ICloseableIterator;
 
 /**
  * An {@link ICloseableIterator} that may be serialized and sent to a remote

@@ -48,8 +48,9 @@ import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.joinGraph.PartitionedJoinGroup;
 import com.bigdata.relation.accesspath.BufferClosedException;
-import com.bigdata.striterator.ICloseableIterator;
 import com.bigdata.util.concurrent.Haltable;
+
+import cutthecrap.utils.striterators.ICloseableIterator;
 
 /**
  * A join graph with annotations for estimated cardinality and other details in

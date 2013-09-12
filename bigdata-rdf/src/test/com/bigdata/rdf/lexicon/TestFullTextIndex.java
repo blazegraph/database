@@ -51,9 +51,10 @@ import com.bigdata.rdf.vocab.NoVocabulary;
 import com.bigdata.search.Hit;
 import com.bigdata.search.Hiterator;
 import com.bigdata.striterator.ChunkedWrappedIterator;
-import com.bigdata.striterator.ICloseableIterator;
 import com.bigdata.striterator.Resolver;
 import com.bigdata.striterator.Striterator;
+
+import cutthecrap.utils.striterators.ICloseableIterator;
 
 /**
  * Test of adding terms with the full text index enabled and of lookup of terms

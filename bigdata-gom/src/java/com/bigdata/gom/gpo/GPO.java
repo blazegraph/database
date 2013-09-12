@@ -28,9 +28,9 @@ import com.bigdata.gom.skin.GenericSkinRegistry;
 import com.bigdata.rdf.model.BigdataLiteralImpl;
 import com.bigdata.rdf.model.BigdataResource;
 import com.bigdata.rdf.model.BigdataStatement;
-import com.bigdata.striterator.ICloseableIterator;
 
 import cutthecrap.utils.striterators.EmptyIterator;
+import cutthecrap.utils.striterators.ICloseableIterator;
 
 /**
  * A TripleStore backed GPO yields a number of challenges.

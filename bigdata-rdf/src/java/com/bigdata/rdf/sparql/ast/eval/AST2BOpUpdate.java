@@ -129,8 +129,8 @@ import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BD;
 import com.bigdata.rdf.store.BigdataOpenRDFBindingSetsResolverator;
 import com.bigdata.striterator.Chunkerator;
-import com.bigdata.striterator.ICloseableIterator;
 
+import cutthecrap.utils.striterators.ICloseableIterator;
 import cutthecrap.utils.striterators.Resolver;
 import cutthecrap.utils.striterators.Striterator;
 

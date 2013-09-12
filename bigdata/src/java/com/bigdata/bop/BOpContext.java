@@ -61,7 +61,8 @@ import com.bigdata.striterator.ChunkedFilter;
 import com.bigdata.striterator.Chunkerator;
 import com.bigdata.striterator.CloseableIteratorWrapper;
 import com.bigdata.striterator.IChunkedIterator;
-import com.bigdata.striterator.ICloseableIterator;
+
+import cutthecrap.utils.striterators.ICloseableIterator;
 
 /**
  * The evaluation context for the operator (NOT serializable).

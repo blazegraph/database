@@ -38,8 +38,9 @@ import com.bigdata.bop.PipelineOp;
 import com.bigdata.btree.ILocalBTreeView;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.service.IBigdataFederation;
-import com.bigdata.striterator.ICloseableIterator;
 import com.bigdata.util.concurrent.IHaltable;
+
+import cutthecrap.utils.striterators.ICloseableIterator;
 
 /**
  * Non-Remote interface exposing a limited set of the state of an executing

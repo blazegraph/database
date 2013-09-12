@@ -31,7 +31,7 @@ import java.util.NoSuchElementException;
 
 import info.aduna.iteration.CloseableIteration;
 
-import com.bigdata.striterator.ICloseableIterator;
+import cutthecrap.utils.striterators.ICloseableIterator;
 
 /**
  * Class aligns a bigdata {@link ICloseableIterator} with a Sesame 2

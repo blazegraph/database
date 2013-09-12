@@ -48,8 +48,9 @@ import com.bigdata.relation.IRelation;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IBigdataFederation;
-import com.bigdata.striterator.ICloseableIterator;
 import com.bigdata.striterator.IKeyOrder;
+
+import cutthecrap.utils.striterators.ICloseableIterator;
 
 /**
  * This operator writes elements constructed from binding sets and an orders

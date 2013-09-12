@@ -83,10 +83,10 @@ import com.bigdata.striterator.ChunkedWrappedIterator;
 import com.bigdata.striterator.EmptyChunkedIterator;
 import com.bigdata.striterator.IChunkedIterator;
 import com.bigdata.striterator.IChunkedOrderedIterator;
-import com.bigdata.striterator.ICloseableIterator;
 import com.bigdata.striterator.IKeyOrder;
 
 import cutthecrap.utils.striterators.FilterBase;
+import cutthecrap.utils.striterators.ICloseableIterator;
 import cutthecrap.utils.striterators.IFilter;
 import cutthecrap.utils.striterators.NOPFilter;
 import cutthecrap.utils.striterators.Striterator;

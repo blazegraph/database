@@ -77,10 +77,10 @@ import com.bigdata.rwstore.sector.IMemoryManager;
 import com.bigdata.rwstore.sector.MemStore;
 import com.bigdata.striterator.Chunkerator;
 import com.bigdata.striterator.Dechunkerator;
-import com.bigdata.striterator.ICloseableIterator;
 import com.bigdata.util.InnerCause;
 
 import cutthecrap.utils.striterators.Expander;
+import cutthecrap.utils.striterators.ICloseableIterator;
 import cutthecrap.utils.striterators.IStriterator;
 import cutthecrap.utils.striterators.Resolver;
 import cutthecrap.utils.striterators.SingleValueIterator;
