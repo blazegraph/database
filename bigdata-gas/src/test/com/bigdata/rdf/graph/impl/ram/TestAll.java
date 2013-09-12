@@ -13,7 +13,7 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-package com.bigdata.rdf.graph;
+package com.bigdata.rdf.graph.impl.ram;
 
 import junit.framework.Test;
 import junit.framework.TestCase;
@@ -47,13 +47,15 @@ public class TestAll extends TestCase {
     public static Test suite()
     {
 
-        final TestSuite suite = new TestSuite("GAS API");
+        final TestSuite suite = new TestSuite("SAIL Graph Engine");
 
-        suite.addTest(com.bigdata.rdf.graph.impl.sail.TestAll.suite());
+        /*
+         * Only core functionality tests for the SAIL backend belong here. The
+         * analytic test suites are written to the SAIL backend so there is good
+         * coverage there.
+         */
 
-        suite.addTest(com.bigdata.rdf.graph.impl.ram.TestAll.suite());
-
-        suite.addTest(com.bigdata.rdf.graph.analytics.TestAll.suite());
+        suite.addTestSuite(TestGather.class);
         
         return suite;
         

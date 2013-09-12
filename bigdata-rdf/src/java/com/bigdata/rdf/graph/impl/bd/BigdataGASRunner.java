@@ -22,7 +22,8 @@ import com.bigdata.rdf.graph.IGASProgram;
 import com.bigdata.rdf.graph.IGraphAccessor;
 import com.bigdata.rdf.graph.impl.bd.BigdataGASEngine.BigdataGraphAccessor;
 import com.bigdata.rdf.graph.impl.util.GASRunnerBase;
-import com.bigdata.rdf.graph.util.GASUtil;
+import com.bigdata.rdf.graph.util.GraphLoader;
+import com.bigdata.rdf.graph.util.SailGraphLoader;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.store.AbstractTripleStore;
 
@@ -516,9 +517,9 @@ public class BigdataGASRunner<VS, ES, ST> extends GASRunnerBase<VS, ES, ST> {
         boolean ok = false;
         final SailConnection cxn = sail.getUnisolatedConnection();
         try {
+            final GraphLoader loader = new SailGraphLoader(cxn);
             for (String f : loadSet) {
-                new GASUtil()
-                        .loadGraph(cxn, null/* fallback */, f/* resource */);
+                loader.loadGraph(null/* fallback */, f/* resource */);
             }
             cxn.commit();
             ok = true;
