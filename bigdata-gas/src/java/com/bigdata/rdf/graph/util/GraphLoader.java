@@ -139,8 +139,14 @@ abstract public class GraphLoader {
 
                 if (file.exists()) {
 
+                    if (file.isHidden()) {
+                        if (log.isDebugEnabled())
+                            log.debug("Skipping hidden file: " + file);
+                        return;
+                    }
+                    
                     if (file.isDirectory()) {
-
+                        
                         /*
                          * Recursion.
                          */
