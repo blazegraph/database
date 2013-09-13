@@ -35,11 +35,11 @@ import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.log4j.Logger;
+import org.apache.zookeeper.KeeperException.SessionExpiredException;
 import org.apache.zookeeper.WatchedEvent;
 import org.apache.zookeeper.Watcher;
-import org.apache.zookeeper.ZooKeeper;
-import org.apache.zookeeper.KeeperException.SessionExpiredException;
 import org.apache.zookeeper.Watcher.Event.KeeperState;
+import org.apache.zookeeper.ZooKeeper;
 
 /**
  * Interface exposing a {@link ZooKeeper} client that may be transparently
@@ -117,19 +117,26 @@ public class ZooKeeperAccessor {
     private volatile ZooKeeper zookeeper;
 
     /**
-     * The hosts parameter.
+     * The <code>hosts</code> parameter.
      */
     public final String hosts;
 
     /**
-     * The session timeout parameter.
+     * The <code>session</code> timeout parameter (this is used by the client
+     * when establishing the connection to zookeeper - the negotiated timeout
+     * MAY be different and MAY change at each reconnect).
+     * 
+     * @see ZooKeeper#getSessionTimeout()
      */
     public final int sessionTimeout;
 
     /**
      * 
      * @param hosts
+     *            The <code>hosts</code> parameter.
      * @param sessionTimeout
+     *            The <code>session</code> timeout parameter.
+     *            
      * @throws InterruptedException
      *             if the caller's thread is interrupted while awaiting a
      *             zookeeper client connection.
