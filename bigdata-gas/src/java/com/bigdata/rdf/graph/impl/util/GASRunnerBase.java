@@ -444,6 +444,7 @@ public abstract class GASRunnerBase<VS, ES, ST> implements
             sb.append(", nseed=" + opt.seed);
             sb.append(", nsamples=" + opt.nsamples); // #desired samples
             sb.append(", nsampled=" + sampled.length);// #actually sampled
+            sb.append(", distSize=" + dist.size());// #available for sampling.
             sb.append(", nthreads=" + opt.nthreads);
             sb.append(", scheduler=" + ((GASState<VS, ES, ST>)gasState).getScheduler().getClass().getSimpleName());
             sb.append(", gasEngine=" + gasEngine.getClass().getSimpleName());

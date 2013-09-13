@@ -22,6 +22,17 @@ import org.openrdf.rio.RDFHandlerException;
 import com.bigdata.rdf.graph.impl.ram.RAMGASEngine.RAMGraph;
 import com.bigdata.rdf.graph.util.GraphLoader;
 
+/**
+ * TODO Blank nodes have global scope. We should have a bnode resolution scope
+ * to the source document to be consistent with RDF semantics. This could be
+ * imposed through the {@link RAMStatementHandler}.
+ * 
+ * TODO It is not possible to parallelize the load since the mutation operations
+ * on the {@link RAMGraph} assume a single writer (there is no built in
+ * synchronization). This makes load performance quite slow.
+ * 
+ * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ */
 public class RAMGraphLoader extends GraphLoader {
 
     private final RAMGraph g;
