@@ -109,6 +109,20 @@ public class VertexDistribution {
     }
 
     /**
+     * Return the #of samples in the distribution from which a called specified
+     * number of samples may then drawn using a random sampling without
+     * replacement technique.
+     * 
+     * @see #getUnweightedSample(int)
+     * @see #getWeightedSample(int)
+     */
+    public int size() {
+
+        return samples.size();
+        
+    }
+    
+    /**
      * Build a normalized vector over the sample frequences. The indices of the
      * sample vector are correlated with the {@link #indexOf} map. The values in
      * the normalized vector are in <code>[0:1]</code> and sum to
