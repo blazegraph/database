@@ -246,9 +246,16 @@ public class SAILGASEngine extends GASEngine {
                             continue;
                         }
 
-                        sample.addSample(st.getSubject());
+                        if (st.getSubject().equals(st.getObject())) {
 
-                        sample.addSample((Resource) st.getObject());
+                            // ignore self-loops.
+                            continue;
+
+                        }
+
+                        sample.addOutEdgeSample(st.getSubject());
+
+                        sample.addInEdgeSample((Resource) st.getObject());
 
                     }
 

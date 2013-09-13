@@ -230,11 +230,11 @@ public class RAMGASEngine extends GASEngine {
             boolean modified = false;
             if (o instanceof URI) {
                 // Edge
-                modified|=get(s, true/* create */).addOutEdge(st);
-                modified|=get(o, true/* create */).addInEdge(st);
+                modified |= get(s, true/* create */).addOutEdge(st);
+                modified |= get(o, true/* create */).addInEdge(st);
             } else {
                 // Property value.
-                modified|=get(s, true/* create */).addAttrib(st);
+                modified |= get(s, true/* create */).addAttrib(st);
             }
             return modified;
 
@@ -341,11 +341,26 @@ public class RAMGASEngine extends GASEngine {
 
             final VertexDistribution sample = new VertexDistribution(r);
 
-            for (Value v : g.vertices.keySet()) {
+            for (RAMGraph.Vertex vertex : g.vertices.values()) {
 
+                final Value v = vertex.v;
+                
                 if (v instanceof Resource) {
 
-                    sample.addSample((Resource) v);
+                    /*
+                     * FIXME This is not ignoring self-loops. Realistically, we
+                     * want to include them in the data since they are part of
+                     * the data, but we do not want to consider them in samples
+                     * since they do not actually go anywhere. The SAIL and BD
+                     * implementations of this method filter out self-loops, but
+                     * this implementation does not.
+                     */
+                    
+                    if (vertex.getInEdgeCount() > 0)
+                        sample.addInEdgeSample((Resource) v);
+
+                    if (vertex.getOutEdgeCount() > 0)
+                        sample.addOutEdgeSample((Resource) v);
 
                 }
 

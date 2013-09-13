@@ -9,6 +9,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.log4j.Logger;
 import org.openrdf.model.Value;
 
+import com.bigdata.rdf.graph.EdgesEnum;
 import com.bigdata.rdf.graph.IGASContext;
 import com.bigdata.rdf.graph.IGASEngine;
 import com.bigdata.rdf.graph.IGASProgram;
@@ -415,10 +416,24 @@ public abstract class GASRunnerBase<VS, ES, ST> implements
             
             final VertexDistribution dist = graphAccessor.getDistribution(opt.r);
             
-            final Value[] sampled = dist.getWeightedSample(opt.nsamples);
+            // Assume that a GATHER will be done for each starting vertex.
+            EdgesEnum edges = gasProgram.getGatherEdges();
+
+            if (edges == EdgesEnum.NoEdges) {
+
+                // If no GATHER is performed, then use the SCATTER edges.
+                edges = gasProgram.getScatterEdges();
+
+            }
+
+            final Value[] sampled = dist.getWeightedSample(opt.nsamples,
+                    edges);
 
             final IGASStats total = new GASStats();
 
+            // #of vertices that were not connected for that analytic.
+            long nunconnected = 0;
+            
             for (int i = 0; i < sampled.length; i++) {
 
                 final Value startingVertex = sampled[i];
@@ -427,6 +442,19 @@ public abstract class GASRunnerBase<VS, ES, ST> implements
 
                 final IGASStats stats = (IGASStats) gasContext.call();
 
+                if (stats.getFrontierSize() == 1) {
+                    /*
+                     * The starting vertex was not actually connected to any
+                     * other vertices by the traversal performed by the GAS
+                     * program.
+                     */
+                    if (log.isInfoEnabled())
+                        log.info("Ignoring unconnected startingVertex: "
+                                + startingVertex + ", stats=" + stats);
+                    nunconnected++;
+                    continue;
+                }
+                
                 total.add(stats);
 
                 if (log.isInfoEnabled()) {
@@ -445,6 +473,7 @@ public abstract class GASRunnerBase<VS, ES, ST> implements
             sb.append(", nsamples=" + opt.nsamples); // #desired samples
             sb.append(", nsampled=" + sampled.length);// #actually sampled
             sb.append(", distSize=" + dist.size());// #available for sampling.
+            sb.append(", nunconnected=" + nunconnected);// #unconnected vertices.
             sb.append(", nthreads=" + opt.nthreads);
             sb.append(", scheduler=" + ((GASState<VS, ES, ST>)gasState).getScheduler().getClass().getSimpleName());
             sb.append(", gasEngine=" + gasEngine.getClass().getSimpleName());

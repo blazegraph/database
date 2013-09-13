@@ -494,9 +494,16 @@ public class BigdataGASEngine extends GASEngine {
                     continue;
                 }
 
-                sample.addSample((Resource) spo.s());
+                if (spo.s().equals(spo.o())) {
 
-                sample.addSample((Resource) spo.o());
+                    // ignore self-loops.
+                    continue;
+
+                }
+
+                sample.addOutEdgeSample((Resource) spo.s());
+
+                sample.addInEdgeSample((Resource) spo.o());
 
             }
 
