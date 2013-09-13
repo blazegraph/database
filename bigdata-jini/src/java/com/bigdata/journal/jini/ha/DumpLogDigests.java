@@ -385,13 +385,15 @@ public class DumpLogDigests {
 								log.warn("Found log file: " + file.getName());
 
 								// compute file digest
+                                final MessageDigest digest = MessageDigest
+                                        .getInstance("MD5");
 								final IHALogReader r = nexus.getReader(cur);
-
-								final MessageDigest digest = MessageDigest
-										.getInstance("MD5");
-
-								r.computeDigest(digest);
-
+								try {
+								    r.computeDigest(digest);
+								} finally {
+								    // ensure file is closed.
+								    r.close();
+								}
 								infos.add(new HALogInfo(cur, r.isLive(), digest
 										.digest()));
 							} catch (FileNotFoundException fnf) {
