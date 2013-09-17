@@ -1600,6 +1600,14 @@ public class Name2Addr extends BTree {
      *         {@link Name2Addr#getKey(String)} and
      *         {@link Name2AddrTupleSerializer#serializeKey(Object)}
      *         implementation (depending on how the keys are being encoded).
+     *         <p>
+     *         Update: See <a
+     *         href="https://sourceforge.net/apps/trac/bigdata/ticket/743">
+     *         AbstractTripleStore.destroy() does not filter for correct prefix
+     *         </a> as well. Maybe the problem is just that we need to have the
+     *         "." appended to the namespace. This could be something that is
+     *         done automatically if the caller does not take care of it
+     *         themselves.
      */
     public static final Iterator<String> indexNameScan(final String prefix,
             final IIndex n2a) {

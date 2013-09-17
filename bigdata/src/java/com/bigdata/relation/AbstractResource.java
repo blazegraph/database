@@ -694,8 +694,8 @@ abstract public class AbstractResource<E> implements IMutableResource<E> {
          */
         {
 
-            final Iterator<String> itr = indexManager.indexNameScan(namespace,
-                    timestamp);
+            final Iterator<String> itr = indexManager.indexNameScan(namespace
+                    + ".", timestamp);
 
             while (itr.hasNext()) {
 

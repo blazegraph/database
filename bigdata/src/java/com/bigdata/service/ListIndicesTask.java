@@ -54,6 +54,13 @@ public class ListIndicesTask extends DataServiceCallable<String[]> {
      * @param namespace
      *            The namespace prefix for the indices to be returned (may be an
      *            empty string to return the names of all registered indices).
+     *            <p>
+     *            Note: This SHOULD include a "." if you want to restrict the
+     *            scan to only those indices in a given namespace. Otherwise you
+     *            can find indices in <code>kb2</code> if you provide the prefix
+     *            <code>kb</code> and both kb and kb2 are namespaces since the
+     *            indices spanned by <code>kb</code> would include both
+     *            <code>kb.xyz</code> and <code>kb2.xyx</code>.
      */
     public ListIndicesTask(final long ts, final String namespace) {
 

@@ -37,6 +37,7 @@ import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.ITx;
 import com.bigdata.rdf.lexicon.LexiconKeyOrder;
 import com.bigdata.rdf.spo.SPOKeyOrder;
+import com.bigdata.relation.AbstractResource;
 import com.bigdata.relation.RelationSchema;
 import com.bigdata.relation.locator.DefaultResourceLocator;
 import com.bigdata.sparse.ITPS;
@@ -282,4 +283,227 @@ public class TestLocalTripleStoreDestroy extends ProxyTestCase {
 
     }
     
+    /**
+     * Verify the namespace prefix for the triple store is imposed correctly in
+     * {@link AbstractResource#destroy()}. Create two KBs such that the
+     * namespace for one instance is a prefix of the namespace for the other
+     * instance, e.g.,
+     * 
+     * <pre>
+     * kb
+     * kb1
+     * </pre>
+     * 
+     * Verify that destroying <code>kb</code> does not cause the indices for
+     * <code>kb1</code> to be destroyed.
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/743">
+     *      AbstractTripleStore.destroy() does not filter for correct prefix
+     *      </a>
+     */
+    public void test_destroyTwo() {
+
+        final String namespace = "kb";
+        final String namespaceLexiconRelation = namespace + ".lex";
+        final String namespaceSPORelation = namespace + ".spo";
+        final String lexiconRelationIndexName = namespaceLexiconRelation + "."
+                + LexiconKeyOrder.TERM2ID.getIndexName();
+        final String primaryStatementIndexName = namespaceSPORelation + "."
+                + SPOKeyOrder.SPO.getIndexName();
+
+        final String namespace1 = "kb1";
+        final String namespaceLexiconRelation1 = namespace1 + ".lex";
+        final String namespaceSPORelation1 = namespace1 + ".spo";
+        final String lexiconRelationIndexName1 = namespaceLexiconRelation1
+                + "." + LexiconKeyOrder.TERM2ID.getIndexName();
+        final String primaryStatementIndexName1 = namespaceSPORelation1 + "."
+                + SPOKeyOrder.SPO.getIndexName();
+        
+        final Properties properties = new Properties();
+        properties.setProperty(com.bigdata.journal.Options.CREATE_TEMP_FILE, "true");
+        properties.setProperty(AbstractTripleStore.Options.BUFFER_MODE,BufferMode.DiskWORM.toString());
+        properties.setProperty(AbstractTripleStore.Options.TRIPLES_MODE,"true");
+        
+        final AbstractTripleStore kb = getStore(properties);
+
+        final IIndexManager indexManager = kb.getIndexManager();
+
+        try {
+
+            assertEquals(namespace, kb.getNamespace());
+
+            final AbstractTripleStore kb1 = new LocalTripleStore(indexManager,
+                    namespace1, ITx.UNISOLATED, properties);
+            kb1.create();
+
+            // make the tripleStore dirty so commit() will do something.
+            kb.addTerm(kb.getValueFactory().createLiteral("bigdata"));
+            kb1.addTerm(kb.getValueFactory().createLiteral("bigdata"));
+
+            // Verify post-conditions of the created KBs.
+            {
+
+                /*
+                 * Verify that both triple store declarations exist in the GRS.
+                 * 
+                 * Note: Will be in lexical order for Unicode.
+                 */
+                final String[] namespaces = getNamespaces(indexManager)
+                        .toArray(new String[] {});
+                assertEquals(new String[] { namespace, namespace1 }, namespaces);
+
+                /*
+                 * Verify that the unislolated versions of each triple stores is
+                 * the same reference that we obtained above when that triple
+                 * store was created.
+                 */
+                assertTrue(kb == indexManager.getResourceLocator().locate(
+                        kb.getNamespace(), ITx.UNISOLATED));
+                assertTrue(kb1 == indexManager.getResourceLocator().locate(
+                        kb1.getNamespace(), ITx.UNISOLATED));
+
+                /* Verify lexicon relations exist. */
+                assertTrue(kb.getLexiconRelation() == indexManager
+                        .getResourceLocator().locate(namespaceLexiconRelation,
+                                ITx.UNISOLATED));
+                assertTrue(kb1.getLexiconRelation() == indexManager
+                        .getResourceLocator().locate(namespaceLexiconRelation1,
+                                ITx.UNISOLATED));
+
+                /* Verify SPO relations exist. */
+                assertTrue(kb.getSPORelation() == indexManager
+                        .getResourceLocator().locate(namespaceSPORelation,
+                                ITx.UNISOLATED));
+                assertTrue(kb1.getSPORelation() == indexManager
+                        .getResourceLocator().locate(namespaceSPORelation1,
+                                ITx.UNISOLATED));
+
+                /* Verify lexicon index exists. */
+                assertNotNull(indexManager.getIndex(lexiconRelationIndexName,
+                        ITx.UNISOLATED));
+                assertNotNull(indexManager.getIndex(lexiconRelationIndexName1,
+                        ITx.UNISOLATED));
+
+                /* Verify primary SPO index exists. */
+                assertNotNull(indexManager.getIndex(primaryStatementIndexName,
+                        ITx.UNISOLATED));
+                assertNotNull(indexManager.getIndex(primaryStatementIndexName1,
+                        ITx.UNISOLATED));
+
+            }
+
+            /* Commit. */
+            final long commitTime = kb.commit();
+            assertTrue(commitTime > 0);
+            
+            /*
+             * Destroy the triple store whose namespace is a prefix of the 2nd
+             * triple store namespace.
+             */
+            {
+                kb.destroy();
+
+                // global row store entry is gone.
+                final String[] namespaces = getNamespaces(indexManager).toArray(
+                        new String[] {});
+                assertEquals(new String[] { namespace1 }, namespaces);
+
+                // resources can not be located.
+                assertTrue(null == indexManager.getResourceLocator().locate(
+                        namespace, ITx.UNISOLATED));
+                assertTrue(null == indexManager.getResourceLocator().locate(
+                        namespaceLexiconRelation, ITx.UNISOLATED));
+                assertTrue(null == indexManager.getResourceLocator().locate(
+                        namespaceSPORelation, ITx.UNISOLATED));
+
+                // indicies are gone.
+                assertNull(indexManager.getIndex(lexiconRelationIndexName,
+                        ITx.UNISOLATED));
+                assertNull(indexManager.getIndex(primaryStatementIndexName,
+                        ITx.UNISOLATED));
+
+                // The committed version of the triple store remains visible.
+                assertNotNull(indexManager.getResourceLocator().locate(
+                        namespace, commitTime - 1));
+            }
+            
+            /*
+             * Verify that the other kb still exists, including its GRS
+             * declaration and its indices.
+             */
+            {
+
+                /*
+                 * Verify that the triple store declaration exists in the GRS.
+                 * 
+                 * Note: Will be in lexical order for Unicode.
+                 */
+                final String[] namespaces = getNamespaces(indexManager).toArray(
+                        new String[] {});
+                assertEquals(new String[] { namespace1 }, namespaces);
+
+                /*
+                 * Verify that the unislolated versions of each triple stores is the
+                 * same reference that we obtained above when that triple store was
+                 * created.
+                 */
+                assertTrue(kb1 == indexManager.getResourceLocator().locate(
+                        kb1.getNamespace(), ITx.UNISOLATED));
+
+                /* Verify lexicon relations exist. */
+                assertTrue(kb1.getLexiconRelation() == indexManager
+                        .getResourceLocator().locate(namespaceLexiconRelation1,
+                                ITx.UNISOLATED));
+
+                /* Verify SPO relations exist. */
+                assertTrue(kb1.getSPORelation() == indexManager
+                        .getResourceLocator().locate(namespaceSPORelation1,
+                                ITx.UNISOLATED));
+                
+                /* Verify lexicon index exists. */
+                assertNotNull(indexManager.getIndex(lexiconRelationIndexName1,
+                        ITx.UNISOLATED));
+                
+                /* Verify primary SPO index exists. */
+                assertNotNull(indexManager.getIndex(primaryStatementIndexName1,
+                        ITx.UNISOLATED));
+                
+            }
+            
+            /*
+             * Destroy the other triple store.
+             */
+            {
+                kb1.destroy();
+
+                // global row store entry is gone.
+                assertTrue(getNamespaces(indexManager).isEmpty());
+
+                // resources can not be located.
+                assertTrue(null == indexManager.getResourceLocator().locate(
+                        namespace1, ITx.UNISOLATED));
+                assertTrue(null == indexManager.getResourceLocator().locate(
+                        namespaceLexiconRelation1, ITx.UNISOLATED));
+                assertTrue(null == indexManager.getResourceLocator().locate(
+                        namespaceSPORelation1, ITx.UNISOLATED));
+
+                // indicies are gone.
+                assertNull(indexManager.getIndex(lexiconRelationIndexName1,
+                        ITx.UNISOLATED));
+                assertNull(indexManager.getIndex(primaryStatementIndexName1,
+                        ITx.UNISOLATED));
+
+                // The committed version of the triple store remains visible.
+                assertNotNull(indexManager.getResourceLocator().locate(
+                        namespace1, commitTime - 1));
+            }
+
+        } finally {
+
+            indexManager.destroy();
+
+        }
+        
+    }
+
 }
