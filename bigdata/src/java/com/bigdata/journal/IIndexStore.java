@@ -62,7 +62,13 @@ public interface IIndexStore {
      * Iterator visits the names of all indices spanned by the given prefix.
      * 
      * @param prefix
-     *            The prefix (optional).
+     *            The prefix (optional). When given, this MUST include a
+     *            <code>.</code> if you want to restrict the scan to only those
+     *            indices in a given namespace. Otherwise you can find indices
+     *            in <code>kb2</code> if you provide the prefix <code>kb</code>
+     *            where both kb and kb2 are namespaces since the indices spanned
+     *            by <code>kb</code> would include both <code>kb.xyz</code> and
+     *            <code>kb2.xyx</code>.
      * @param timestamp
      *            A timestamp which represents either a possible commit time on
      *            the store or a read-only transaction identifier.
