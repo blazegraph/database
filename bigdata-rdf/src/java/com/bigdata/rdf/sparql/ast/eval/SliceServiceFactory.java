@@ -416,6 +416,10 @@ public class SliceServiceFactory extends AbstractServiceFactory
         	// Handle a range.
         	final RangeBOp rangeBOp = sp.getRange() != null ? sp.getRange().getRangeBOp() : null;
         	
+        	if (log.isTraceEnabled()) {
+        		log.trace("range: " + rangeBOp);
+        	}
+        	
         	// Create the predicate.
     		@SuppressWarnings("unchecked")
 			final IPredicate<ISPO> pred = (IPredicate<ISPO>)
@@ -461,7 +465,7 @@ public class SliceServiceFactory extends AbstractServiceFactory
 
 	    		startIndex = indexOf(ndx, startKey);
 	
-	    		final byte[] endKey = SuccessorUtil.successor(startKey.clone());
+	    		final byte[] endKey = keyOrder.getToKey(KeyBuilder.newInstance(), pred); //SuccessorUtil.successor(startKey.clone());
 	    		
 	    		endIndex = indexOf(ndx, endKey);
 	    		
