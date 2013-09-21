@@ -307,7 +307,7 @@ public class CBD {
         
         final boolean cutoffRounds = nrounds >= describeIterationLimit;
 
-        final boolean cutoffStatements =nrounds >= describeStatementLimit;
+        final boolean cutoffStatements = nstmts >= describeStatementLimit;
 
         return cutoffRounds && cutoffStatements;
 
