@@ -28,46 +28,44 @@ package com.bigdata.rdf.sparql.ast.eval;
 
 /**
  * Tests concerning:
- * 
+ * <pre>
 SELECT ?A
 WHERE {
     ?A rdf:type  / rdfs:subClassOf * <os:ClassA> ;
        rdf:value ?B .
     ?B rdf:type  / rdfs:subClassOf *  <os:ClassB> .
 }
-
+</pre>
 There is a work-around which is to replace a * with a UNION of a zero and a +
 
-
+<pre>
     { 
       { ?B rdf:type  <os:ClassB> }
       UNION
       {  ?B rdf:type  / rdfs:subClassOf + <os:ClassB> 
       }
     }
-    
+</pre>    
 In property-path-734-B-none.rq, this is taken as the following variant:
-
+<pre>
     { 
       { ?A rdf:type  / rdfs:subClassOf  ? <os:ClassA> }
       UNION
       {  ?A rdf:type  /  rdfs:subClassOf / rdfs:subClassOf + <os:ClassA> 
       }
     }
-    
+</pre>   
 and in property-path-734-B-workaround2.rq it is taken to (the broken):
-
-
+<pre>
     ?A rdf:type  / ( rdfs:subClassOf ? | ( rdfs:subClassOf + / rdfs:subClassOf  ) )
             <os:ClassA> .
-            
+</pre>            
             
 and in property-path-734-B-workaround3.rq it is taken to (the working):
-
-
+<pre>
     ?A ( ( rdf:type  / rdfs:subClassOf ? ) | ( rdf:type  / rdfs:subClassOf + / rdfs:subClassOf  ) )
             <os:ClassA> .
-            
+</pre>      
             
  */
 public class TestTwoPropertyPaths734 extends AbstractDataDrivenSPARQLTestCase {
