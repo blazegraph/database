@@ -237,7 +237,7 @@ public class AbstractBigdataExprBuilderTestCase extends TestCase {
     /**
      * Applies the {@link Bigdata2ASTSPARQLParser}.
      */
-    protected QueryRoot parse(final String queryStr, final String baseURI)
+    public QueryRoot parse(final String queryStr, final String baseURI)
             throws MalformedQueryException {
 
         final QueryRoot ast = new Bigdata2ASTSPARQLParser(tripleStore).parseQuery2(queryStr,

@@ -1,0 +1,35 @@
+base <http://example.org/>
+prefix sys: </bdm/api/kbobject/sys:>
+prefix base: </bdm/api/kbobject/base:>
+prefix syapse: </graph/syapse#>
+prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+
+SELECT *
+
+WITH {
+SELECT *
+
+WHERE {
+
+  OPTIONAL {
+    base:disease syapse:hasLiteralProperty $j2 .
+    ?Sample_A $j2 ?j1
+  }
+  OPTIONAL {
+    base:species syapse:hasLiteralProperty $j4 .
+    ?Sample_A $j4 ?j3
+  }
+  OPTIONAL {
+    ?Sample_A sys:name ?j5
+  }
+  ?Sample_A rdf:type / rdfs:subClassOf * base:MammalianCellLineSample
+}
+
+} AS %__UserQuery
+
+WHERE {
+
+INCLUDE %__UserQuery
+
+}

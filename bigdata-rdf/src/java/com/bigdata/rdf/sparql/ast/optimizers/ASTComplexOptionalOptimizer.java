@@ -36,6 +36,7 @@ import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IVariable;
 import com.bigdata.rdf.sparql.ast.ASTBase;
+import com.bigdata.rdf.sparql.ast.ArbitraryLengthPathNode;
 import com.bigdata.rdf.sparql.ast.AssignmentNode;
 import com.bigdata.rdf.sparql.ast.FilterNode;
 import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
@@ -346,7 +347,8 @@ public class ASTComplexOptionalOptimizer implements IASTOptimizer {
                         || t instanceof NamedSubqueryInclude
                         || t instanceof SubqueryRoot
                         || t instanceof ServiceNode
-                        || t instanceof UnionNode) {
+                        || t instanceof UnionNode
+                        || t instanceof ArbitraryLengthPathNode ) {
                     // Moved to the named subquery.
 //                    move.add(t);
                     group.removeChild(t);

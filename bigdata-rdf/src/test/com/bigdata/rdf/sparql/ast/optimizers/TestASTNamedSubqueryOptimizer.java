@@ -27,17 +27,28 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.optimizers;
 
+import java.io.IOException;
+import java.util.Collection;
+import java.util.Iterator;
 import java.util.LinkedHashSet;
+import java.util.LinkedList;
 
+import org.apache.commons.io.IOUtils;
 import org.openrdf.model.impl.URIImpl;
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
+import org.openrdf.query.MalformedQueryException;
 import org.openrdf.query.algebra.StatementPattern.Scope;
 
+import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.Var;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.sail.sparql.Bigdata2ASTSPARQLParser;
+import com.bigdata.rdf.sail.sparql.TestSubqueryPatterns;
+import com.bigdata.rdf.sail.sparql.ast.ParseException;
+import com.bigdata.rdf.sail.sparql.ast.TokenMgrError;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.AbstractASTEvaluationTestCase;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
@@ -52,6 +63,7 @@ import com.bigdata.rdf.sparql.ast.QueryType;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.StaticAnalysis;
 import com.bigdata.rdf.sparql.ast.SubqueryRoot;
+import com.bigdata.rdf.sparql.ast.ValueExpressionNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 import com.bigdata.rdf.vocab.decls.FOAFVocabularyDecl;
@@ -827,6 +839,35 @@ public class TestASTNamedSubqueryOptimizer extends
 
 //        System.err.println(new ASTSubGroupJoinVarOptimizer().optimize(context,
 //                actual/* queryNode */, bsets));
+
+    }
+    
+
+    /**
+     * Unit test for WITH {subquery} AS "name" and INCLUDE. The WITH must be in
+     * the top-level query. 
+     * 
+     * This is specifically for Trac 746 which crashed out during optimize.
+     * So the test simply runs that far, and does not verify anything
+     * other than the ability to optimize without an exception
+     * @throws IOException 
+     */
+    public void test_namedSubquery746() throws MalformedQueryException,
+            TokenMgrError, ParseException, IOException {
+
+        final String sparql = IOUtils.toString(getClass().getResourceAsStream("ticket746.txt"));
+
+
+        final QueryRoot ast = new Bigdata2ASTSPARQLParser(store).parseQuery2(sparql,
+                baseURI).getOriginalAST();
+        
+
+        final IASTOptimizer rewriter = new DefaultOptimizerList();
+        
+        final AST2BOpContext context = new AST2BOpContext(new ASTContainer(
+                ast), store);
+        rewriter.optimize(context, ast/* queryNode */, null);
+
 
     }
     
