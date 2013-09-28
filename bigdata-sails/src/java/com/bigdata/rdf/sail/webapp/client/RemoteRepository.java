@@ -1621,20 +1621,13 @@ public class RemoteRepository {
     public TupleQueryResult tupleResults(final ConnectOptions opts, final UUID queryId)
             throws Exception {
 
+    	HttpResponse response = null;
         HttpEntity entity = null;
         BackgroundTupleResult result = null;
-        boolean needToCancel = false;
+        TupleQueryResultImpl tqrImpl = null;
         try {
 
-        	/*
-        	 * If we put this after the doConnect we risk an interruption in
-        	 * between the doConnect and the setting the flag to true, which 
-        	 * would result in a query running on the server that should have
-        	 * been canceled.
-        	 */
-        	needToCancel = true;
-        	
-            final HttpResponse response = doConnect(opts);
+            response = doConnect(opts);
 
             checkResponseCode(response);
             
@@ -1679,7 +1672,7 @@ public class RemoteRepository {
             final List<String> list = new ArrayList<String>(
                     result.getBindingNames());
             
-            final TupleQueryResultImpl tqrImpl = new TupleQueryResultImpl(list, cursor) {
+            tqrImpl = new TupleQueryResultImpl(list, cursor) {
 
             	transient boolean done = false;
             	
@@ -1719,8 +1712,6 @@ public class RemoteRepository {
             	
             };
             
-            needToCancel = false;
-            
             return tqrImpl;
             
 //            final TupleQueryResultBuilder handler = new TupleQueryResultBuilder();
@@ -1742,7 +1733,7 @@ public class RemoteRepository {
                 } catch (IOException ex) { }
             }
             
-            if (needToCancel) {
+            if (response != null && tqrImpl == null) {
             	try {
             		cancel(queryId);
             	} catch(Exception ex) { }
