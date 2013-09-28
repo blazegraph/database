@@ -151,7 +151,7 @@ public class StatusServlet extends BigdataRDFServlet {
      * The name of a request parameter whose value is the {@link UUID} of a
      * top-level query.
      */
-    public static final String QUERY_ID = "queryId";
+    private static final String QUERY_ID = "queryId";
 
     /**
      * The name of a request parameter used to cancel a running query. At least
@@ -160,7 +160,7 @@ public class StatusServlet extends BigdataRDFServlet {
      * 
      * @see #QUERY_ID
      */
-    public static final String CANCEL_QUERY = "cancelQuery";
+    protected static final String CANCEL_QUERY = "cancelQuery";
 
     /**
      * Request a snapshot of the journal (HA only). The snapshot will be written

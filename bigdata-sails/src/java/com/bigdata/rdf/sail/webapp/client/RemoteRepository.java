@@ -99,8 +99,6 @@ import org.openrdf.rio.RDFWriterRegistry;
 import org.xml.sax.Attributes;
 import org.xml.sax.ext.DefaultHandler2;
 
-import com.bigdata.rdf.sail.webapp.StatusServlet;
-
 // Note: Do not import. Not part of the bigdata-client.jar
 //
 //import com.bigdata.rdf.sparql.ast.service.RemoteServiceOptions;
@@ -329,13 +327,13 @@ public class RemoteRepository {
 
         opts.method = "GET";
 
-        HttpResponse response = null;
+//        HttpResponse response = null;
 
         opts.setAcceptHeader(ConnectOptions.DEFAULT_GRAPH_ACCEPT_HEADER);
 
-        checkResponseCode(response = doConnect(opts));
+//        checkResponseCode(response = doConnect(opts));
 
-        return graphResults(response);
+        return graphResults(opts, null);
 
     }
 
@@ -531,11 +529,14 @@ public class RemoteRepository {
      */
     public void cancel(final UUID queryId) throws Exception {
         
+    	if (queryId == null)
+    		return;
+    	
         final ConnectOptions opts = newUpdateConnectOptions();
 
-        opts.addRequestParam(StatusServlet.CANCEL_QUERY);
+        opts.addRequestParam("cancelQuery");
 
-        opts.addRequestParam(StatusServlet.QUERY_ID, queryId.toString());
+        opts.addRequestParam("queryId", queryId.toString());
 
         checkResponseCode(doConnect(opts));
             
@@ -1037,13 +1038,9 @@ public class RemoteRepository {
         @Override
         public GraphQueryResult evaluate() throws Exception {
 
-            HttpResponse response = null;
-
             setupConnectOptions();
             
-            checkResponseCode(response = doConnect(opts));
-
-            return graphResults(response);
+            return graphResults(opts, getQueryId());
 
         }
 
@@ -1072,30 +1069,34 @@ public class RemoteRepository {
         
         @Override
         public boolean evaluate() throws Exception {
+           
+            setupConnectOptions();
             
-            HttpResponse response = null;
-            try {
+            return booleanResults(opts, getQueryId());
 
-                setupConnectOptions();
-                
-                checkResponseCode(response = doConnect(opts));
-                
-                return booleanResults(response);
-                
-            } finally {
-                
-                try {
-                    
-                    if (response != null)
-                        EntityUtils.consume(response.getEntity());
-                    
-                } catch (Exception ex) { 
-                    
-                      log.warn(ex);
-
-                }
-                
-            }
+//            HttpResponse response = null;
+//            try {
+//
+//                setupConnectOptions();
+//                
+//                checkResponseCode(response = doConnect(opts));
+//                
+//                return booleanResults(response);
+//                
+//            } finally {
+//                
+//                try {
+//                    
+//                    if (response != null)
+//                        EntityUtils.consume(response.getEntity());
+//                    
+//                } catch (Exception ex) { 
+//                    
+//                      log.warn(ex);
+//
+//                }
+//                
+//            }
             
         }
         
@@ -1535,90 +1536,6 @@ public class RemoteRepository {
      * @throws Exception
      *             If anything goes wrong.
      */
-    public TupleQueryResult tupleResults(final HttpResponse response)
-            throws Exception {
-
-        HttpEntity entity = null;
-        BackgroundTupleResult result = null;
-        try {
-
-            entity = response.getEntity();
-            
-            final String contentType = entity.getContentType().getValue();
-    
-            final MiniMime mimeType = new MiniMime(contentType);
-            
-            final TupleQueryResultFormat format = TupleQueryResultFormat
-                    .forMIMEType(mimeType.getMimeType());
-    
-            if (format == null)
-                throw new IOException(
-                        "Could not identify format for service response: serviceURI="
-                                + sparqlEndpointURL + ", contentType=" + contentType
-                                + " : response=" + getResponseBody(response));
-
-            final TupleQueryResultParserFactory parserFactory = TupleQueryResultParserRegistry
-                    .getInstance().get(format);
-
-            if (parserFactory == null)
-                throw new IOException(
-                        "No parser for format for service response: serviceURI="
-                                + sparqlEndpointURL + ", contentType=" + contentType
-                                + ", format=" + format + " : response="
-                                + getResponseBody(response));
-
-            final TupleQueryResultParser parser = parserFactory.getParser();
-    
-            final InputStream in = entity.getContent();
-            
-            result = new BackgroundTupleResult(parser, in, entity);
-            
-            executor.execute(result);
-            
-            final MapBindingSet bindings = new MapBindingSet();
-            
-            final InsertBindingSetCursor cursor = 
-                new InsertBindingSetCursor(result, bindings);
-            
-            final List<String> list = new ArrayList<String>(
-                    result.getBindingNames());
-            
-            return new TupleQueryResultImpl(list, cursor);
-            
-//            final TupleQueryResultBuilder handler = new TupleQueryResultBuilder();
-//    
-//            parser.setTupleQueryResultHandler(handler);
-//    
-//            parser.parse(entity.getContent());
-//    
-//            // done.
-//            return handler.getQueryResult();
-            
-        } finally {
-            
-//            // terminate the http connection.
-//            response.disconnect();
-            if (result == null) {
-                try {
-                    EntityUtils.consume(entity);
-                } catch (IOException ex) { }
-            }
-            
-        }
-
-    }
-    
-    /**
-     * Extracts the solutions from a SPARQL query.
-     * 
-     * @param response
-     *            The connection from which to read the results.
-     * 
-     * @return The results.
-     * 
-     * @throws Exception
-     *             If anything goes wrong.
-     */
     public TupleQueryResult tupleResults(final ConnectOptions opts, final UUID queryId)
             throws Exception {
 
@@ -1693,19 +1610,23 @@ public class RemoteRepository {
             	}
             	
             	@Override
-            	public synchronized void close() throws QueryEvaluationException {
+            	public void close() throws QueryEvaluationException {
             		
-        			super.close();
+            		try {
         			
-        			if (notDone.compareAndSet(true, false)) {
-        				
-        				try {
-        					cancel(queryId);
-        				} catch (Exception ex) {
-        					throw new QueryEvaluationException(ex);
-        				}
-        				
-        			}
+            			super.close();
+        			
+            		} finally {
+            			
+		    			if (notDone.compareAndSet(true, false)) {
+		    				
+		    				try {
+		    					cancel(queryId);
+		    				} catch (Exception ex) { }
+		    				
+		    			}
+		    			
+            		}
         			
             	};
             	
@@ -1726,7 +1647,7 @@ public class RemoteRepository {
             
 //            // terminate the http connection.
 //            response.disconnect();
-            if (result == null) {
+            if (entity != null && result == null) {
                 try {
                     EntityUtils.consume(entity);
                 } catch (IOException ex) { }
@@ -1753,12 +1674,18 @@ public class RemoteRepository {
      * @throws Exception
      *             If anything goes wrong.
      */
-    public GraphQueryResult graphResults(final HttpResponse response) throws Exception {
+    public GraphQueryResult graphResults(final ConnectOptions opts, final UUID queryId) 
+    		throws Exception {
 
+    	HttpResponse response = null;
         HttpEntity entity = null;
         BackgroundGraphResult result = null;
         try {
 
+            response = doConnect(opts);
+
+            checkResponseCode(response);
+            
             entity = response.getEntity();
 
             final String baseURI = "";
@@ -1808,10 +1735,52 @@ public class RemoteRepository {
                 // charset=application/rdf+xml
             }
             
-            result = new BackgroundGraphResult(
-                    parser, entity.getContent(), charset, baseURI, entity);
+            final BackgroundGraphResult tmp = new BackgroundGraphResult(
+                    parser, entity.getContent(), charset, baseURI, entity) {
+            	
+            	final AtomicBoolean notDone = new AtomicBoolean(true);
+            	
+            	@Override
+            	public boolean hasNext() throws QueryEvaluationException {
+            	
+            		final boolean hasNext = super.hasNext();
+            		
+            		if (hasNext == false) {
+            			
+            			notDone.set(false);
+            			
+            		}
+            		
+            		return hasNext;
+            		
+            	}
+            	
+            	@Override
+            	public void close() throws QueryEvaluationException {
+            		
+            		try {
+        			
+            			super.close();
+        			
+            		} finally {
+            			
+		    			if (notDone.compareAndSet(true, false)) {
+		    				
+		    				try {
+		    					cancel(queryId);
+		    				} catch (Exception ex) { }
+		    				
+		    			}
+		    			
+            		}
+        			
+            	};
+            	
+            };
             
-            executor.execute(result);
+            executor.execute(tmp);
+            
+            result = tmp;
             
             return result;
 
@@ -1828,10 +1797,14 @@ public class RemoteRepository {
 
 //            // terminate the http connection.
 //            response.disconnect();
-            if (result == null) {
+            if (response != null && result == null) {
                 try {
                     EntityUtils.consume(entity);
                 } catch (IOException ex) { }
+                
+                try {
+                	cancel(queryId);
+                } catch (Exception ex) { }
             }
 
         }
@@ -1851,11 +1824,17 @@ public class RemoteRepository {
      *             If anything goes wrong, including if the result set does not
      *             encode a single boolean value.
      */
-    protected boolean booleanResults(final HttpResponse response) throws Exception {
+    protected boolean booleanResults(final ConnectOptions opts, final UUID queryId) throws Exception {
 
+    	HttpResponse response = null;
         HttpEntity entity = null;
+        Boolean result = null;
         try {
 
+            response = doConnect(opts);
+
+            checkResponseCode(response);
+            
             entity = response.getEntity();
             
             final String contentType = entity.getContentType().getValue();
@@ -1879,7 +1858,7 @@ public class RemoteRepository {
 
             final BooleanQueryResultParser parser = factory.getParser();
 
-            final boolean result = parser.parse(entity.getContent());
+            result = parser.parse(entity.getContent());
             
             return result;
 
@@ -1887,9 +1866,15 @@ public class RemoteRepository {
 
 //            // terminate the http connection.
 //            response.disconnect();
-            try {
-                EntityUtils.consume(entity);
-            } catch (IOException ex) { }
+        	if (result == null) {
+	            try {
+	                EntityUtils.consume(entity);
+	            } catch (IOException ex) { }
+	            
+	            try {
+	            	cancel(queryId);
+	            } catch (Exception ex) { }
+        	}
 
         }
 
