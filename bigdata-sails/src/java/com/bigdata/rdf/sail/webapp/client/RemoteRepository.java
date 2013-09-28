@@ -41,6 +41,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.Executor;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
 import javax.xml.parsers.SAXParser;
@@ -1674,7 +1675,7 @@ public class RemoteRepository {
             
             tqrImpl = new TupleQueryResultImpl(list, cursor) {
 
-            	transient boolean done = false;
+            	final AtomicBoolean notDone = new AtomicBoolean(true);
             	
             	@Override
             	public boolean hasNext() throws QueryEvaluationException {
@@ -1683,7 +1684,7 @@ public class RemoteRepository {
             		
             		if (hasNext == false) {
             			
-            			done = true;
+            			notDone.set(false);
             			
             		}
             		
@@ -1696,15 +1697,13 @@ public class RemoteRepository {
             		
         			super.close();
         			
-        			if (!done) {
+        			if (notDone.compareAndSet(true, false)) {
         				
         				try {
         					cancel(queryId);
         				} catch (Exception ex) {
         					throw new QueryEvaluationException(ex);
         				}
-        				
-        				done = true;
         				
         			}
         			
