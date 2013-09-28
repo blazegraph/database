@@ -74,6 +74,7 @@ import org.openrdf.model.impl.URIImpl;
 import org.openrdf.model.impl.ValueFactoryImpl;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.GraphQueryResult;
+import org.openrdf.query.QueryEvaluationException;
 import org.openrdf.query.TupleQueryResult;
 import org.openrdf.query.TupleQueryResultHandlerBase;
 import org.openrdf.query.impl.MapBindingSet;
@@ -96,6 +97,8 @@ import org.openrdf.rio.RDFWriterFactory;
 import org.openrdf.rio.RDFWriterRegistry;
 import org.xml.sax.Attributes;
 import org.xml.sax.ext.DefaultHandler2;
+
+import com.bigdata.rdf.sail.webapp.StatusServlet;
 
 // Note: Do not import. Not part of the bigdata-client.jar
 //
@@ -529,9 +532,9 @@ public class RemoteRepository {
         
         final ConnectOptions opts = newUpdateConnectOptions();
 
-        opts.addRequestParam("cancelQuery");
+        opts.addRequestParam(StatusServlet.CANCEL_QUERY);
 
-        opts.addRequestParam("queryId", queryId.toString());
+        opts.addRequestParam(StatusServlet.QUERY_ID, queryId.toString());
 
         checkResponseCode(doConnect(opts));
             
@@ -1000,32 +1003,13 @@ public class RemoteRepository {
 
         }
 
+        @Override
         public TupleQueryResult evaluate() throws Exception {
             
-            HttpResponse response = null;
-//            try {
-
             setupConnectOptions();
 
-                checkResponseCode(response = doConnect(opts));
+            return tupleResults(opts, getQueryId());
                 
-                return tupleResults(response);
-                
-//            } finally {
-//                
-//                try {
-//                    
-//                    if (response != null)
-//                        EntityUtils.consume(response.getEntity());
-//                    
-//                } catch (Exception ex) {
-//
-//                    log.warn(ex);
-//
-//                }
-//                
-//            }
-            
         }
         
     }
@@ -1556,7 +1540,7 @@ public class RemoteRepository {
         HttpEntity entity = null;
         BackgroundTupleResult result = null;
         try {
-            
+
             entity = response.getEntity();
             
             final String contentType = entity.getContentType().getValue();
@@ -1617,6 +1601,151 @@ public class RemoteRepository {
                 try {
                     EntityUtils.consume(entity);
                 } catch (IOException ex) { }
+            }
+            
+        }
+
+    }
+    
+    /**
+     * Extracts the solutions from a SPARQL query.
+     * 
+     * @param response
+     *            The connection from which to read the results.
+     * 
+     * @return The results.
+     * 
+     * @throws Exception
+     *             If anything goes wrong.
+     */
+    public TupleQueryResult tupleResults(final ConnectOptions opts, final UUID queryId)
+            throws Exception {
+
+        HttpEntity entity = null;
+        BackgroundTupleResult result = null;
+        boolean needToCancel = false;
+        try {
+
+        	/*
+        	 * If we put this after the doConnect we risk an interruption in
+        	 * between the doConnect and the setting the flag to true, which 
+        	 * would result in a query running on the server that should have
+        	 * been canceled.
+        	 */
+        	needToCancel = true;
+        	
+            final HttpResponse response = doConnect(opts);
+
+            checkResponseCode(response);
+            
+            entity = response.getEntity();
+            
+            final String contentType = entity.getContentType().getValue();
+    
+            final MiniMime mimeType = new MiniMime(contentType);
+            
+            final TupleQueryResultFormat format = TupleQueryResultFormat
+                    .forMIMEType(mimeType.getMimeType());
+    
+            if (format == null)
+                throw new IOException(
+                        "Could not identify format for service response: serviceURI="
+                                + sparqlEndpointURL + ", contentType=" + contentType
+                                + " : response=" + getResponseBody(response));
+
+            final TupleQueryResultParserFactory parserFactory = TupleQueryResultParserRegistry
+                    .getInstance().get(format);
+
+            if (parserFactory == null)
+                throw new IOException(
+                        "No parser for format for service response: serviceURI="
+                                + sparqlEndpointURL + ", contentType=" + contentType
+                                + ", format=" + format + " : response="
+                                + getResponseBody(response));
+
+            final TupleQueryResultParser parser = parserFactory.getParser();
+    
+            final InputStream in = entity.getContent();
+            
+            result = new BackgroundTupleResult(parser, in, entity);
+            
+            executor.execute(result);
+            
+            final MapBindingSet bindings = new MapBindingSet();
+            
+            final InsertBindingSetCursor cursor = 
+                new InsertBindingSetCursor(result, bindings);
+            
+            final List<String> list = new ArrayList<String>(
+                    result.getBindingNames());
+            
+            final TupleQueryResultImpl tqrImpl = new TupleQueryResultImpl(list, cursor) {
+
+            	transient boolean done = false;
+            	
+            	@Override
+            	public boolean hasNext() throws QueryEvaluationException {
+            	
+            		final boolean hasNext = super.hasNext();
+            		
+            		if (hasNext == false) {
+            			
+            			done = true;
+            			
+            		}
+            		
+            		return hasNext;
+            		
+            	}
+            	
+            	@Override
+            	public synchronized void close() throws QueryEvaluationException {
+            		
+        			super.close();
+        			
+        			if (!done) {
+        				
+        				try {
+        					cancel(queryId);
+        				} catch (Exception ex) {
+        					throw new QueryEvaluationException(ex);
+        				}
+        				
+        				done = true;
+        				
+        			}
+        			
+            	};
+            	
+            };
+            
+            needToCancel = false;
+            
+            return tqrImpl;
+            
+//            final TupleQueryResultBuilder handler = new TupleQueryResultBuilder();
+//    
+//            parser.setTupleQueryResultHandler(handler);
+//    
+//            parser.parse(entity.getContent());
+//    
+//            // done.
+//            return handler.getQueryResult();
+            
+        } finally {
+            
+//            // terminate the http connection.
+//            response.disconnect();
+            if (result == null) {
+                try {
+                    EntityUtils.consume(entity);
+                } catch (IOException ex) { }
+            }
+            
+            if (needToCancel) {
+            	try {
+            		cancel(queryId);
+            	} catch(Exception ex) { }
             }
             
         }
