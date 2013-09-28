@@ -27,6 +27,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.service;
 
+import java.util.UUID;
+
 import org.apache.http.HttpResponse;
 import org.apache.http.impl.client.DefaultHttpClient;
 import org.openrdf.query.BindingSet;
@@ -134,7 +136,11 @@ public class RemoteServiceCallImpl implements RemoteServiceCall {
         
 //        opts.queryStr = queryStr;
         
+        final UUID queryId = UUID.randomUUID();
+        
         o.addRequestParam("query", queryStr);
+        
+        o.addRequestParam("queryId", queryId.toString());
 
         final RemoteRepository repo = new RemoteRepository(uriStr,
                 new DefaultHttpClient(params.getClientConnectionManager()),
@@ -152,14 +158,16 @@ public class RemoteServiceCallImpl implements RemoteServiceCall {
 
         try {
 
-            final HttpResponse resp = repo.doConnect(o);
-            
-            RemoteRepository.checkResponseCode(resp);
-            
-            queryResult = repo.tupleResults(resp);
-            
-//            queryResult = parseResults(checkResponseCode(doSparqlQuery(opts)));
+//            final HttpResponse resp = repo.doConnect(o);
+//            
+//            RemoteRepository.checkResponseCode(resp);
+//            
+//            queryResult = repo.tupleResults(resp);
+//            
+////            queryResult = parseResults(checkResponseCode(doSparqlQuery(opts)));
 
+            queryResult = repo.tupleResults(o, queryId);
+            
         } finally {
 
             /*

@@ -171,27 +171,29 @@ public class RemoteRepositoryManager extends RemoteRepository {
         
         opts.method = "GET";
 
-        HttpResponse response = null;
-        GraphQueryResult result = null;
+//        HttpResponse response = null;
+//        GraphQueryResult result = null;
         
         opts.setAcceptHeader(ConnectOptions.DEFAULT_GRAPH_ACCEPT_HEADER);
 
-        try {
-            // check response in try.
-            checkResponseCode(response = doConnect(opts));
-
-            // return asynchronous parse of result.
-            return result = graphResults(response);
-
-        } finally {
-            if (result == null) {
-                // Consume entity if bad response.
-                try {
-                    EntityUtils.consume(response.getEntity());
-                } catch (IOException ex) {
-                }
-            }
-        }
+        return graphResults(opts, null);
+        
+//        try {
+//            // check response in try.
+//            checkResponseCode(response = doConnect(opts));
+//
+//            // return asynchronous parse of result.
+//            return result = graphResults(response);
+//
+//        } finally {
+//            if (result == null) {
+//                // Consume entity if bad response.
+//                try {
+//                    EntityUtils.consume(response.getEntity());
+//                } catch (IOException ex) {
+//                }
+//            }
+//        }
     }
 
     /**
