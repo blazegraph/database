@@ -64,7 +64,28 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
         new TestHelper("test_ticket_384").runTest();
 
     }
+    
 
+    public void test_ticket_747() throws Exception {
+
+        new TestHelper("ticket747-bound",// testURI,
+                "ticket747-bound.rq",// queryFileURL
+                "ticket747-bound.ttl",// dataFileURL
+                "ticket747-bound.srx"// resultFileURL
+                ).runTest();
+
+    }
+
+
+    public void test_ticket_747a() throws Exception {
+
+        new TestHelper("ticket747A-bound",// testURI,
+                "ticket747A-bound.rq",// queryFileURL
+                "ticket747-bound.ttl",// dataFileURL
+                "ticket747-bound.srx"// resultFileURL
+                ).runTest();
+
+    }
     /**
      * <pre>
      * PREFIX ex: <http://example.org/>

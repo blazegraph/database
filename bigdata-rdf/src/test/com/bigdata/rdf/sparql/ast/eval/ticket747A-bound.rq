@@ -1,0 +1,16 @@
+# The query in ticket747 can be addressed by reordering the optimizers
+# However, it is a 'false' fix, and this more difficult variant requires fixing 
+# some other faulty logic
+
+SELECT *
+WHERE {
+  { BIND ( "y" as $Y ) 
+  }
+  UNION {
+    FILTER (false)
+  }
+    BIND ( "x" as $X )
+    FILTER( BOUND($Y) 
+# && True 
+    )
+}
