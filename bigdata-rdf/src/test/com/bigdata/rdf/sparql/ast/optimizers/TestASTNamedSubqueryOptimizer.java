@@ -843,32 +843,5 @@ public class TestASTNamedSubqueryOptimizer extends
     }
     
 
-    /**
-     * Unit test for WITH {subquery} AS "name" and INCLUDE. The WITH must be in
-     * the top-level query. 
-     * 
-     * This is specifically for Trac 746 which crashed out during optimize.
-     * So the test simply runs that far, and does not verify anything
-     * other than the ability to optimize without an exception
-     * @throws IOException 
-     */
-    public void test_namedSubquery746() throws MalformedQueryException,
-            TokenMgrError, ParseException, IOException {
-
-        final String sparql = IOUtils.toString(getClass().getResourceAsStream("ticket746.txt"));
-
-
-        final QueryRoot ast = new Bigdata2ASTSPARQLParser(store).parseQuery2(sparql,
-                baseURI).getOriginalAST();
-        
-
-        final IASTOptimizer rewriter = new DefaultOptimizerList();
-        
-        final AST2BOpContext context = new AST2BOpContext(new ASTContainer(
-                ast), store);
-        rewriter.optimize(context, ast/* queryNode */, null);
-
-
-    }
     
 }
