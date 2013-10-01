@@ -139,4 +139,13 @@ public class AssignmentNode extends GroupMemberValueExpressionNodeBase
         
     }
 
+
+    @Override
+    public int replaceAllWith(final BOp oldVal, final BOp newVal) {
+    	if (oldVal.equals(get(0)) && !(newVal instanceof VarNode)) {
+    		return 0;
+    	}
+    	return super.replaceAllWith(oldVal, newVal);
+    }
+
 }
