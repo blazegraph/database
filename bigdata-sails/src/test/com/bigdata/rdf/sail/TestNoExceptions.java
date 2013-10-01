@@ -25,28 +25,41 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Oct 1, 2013
  */
 
-package com.bigdata.rdf.sparql.ast.optimizers;
+package com.bigdata.rdf.sail;
 
 import java.io.IOException;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.LinkedList;
+import java.util.Properties;
 
 import org.apache.commons.io.IOUtils;
+import org.openrdf.model.ValueFactory;
 import org.openrdf.model.impl.URIImpl;
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.MalformedQueryException;
+import org.openrdf.query.QueryEvaluationException;
+import org.openrdf.query.QueryLanguage;
+import org.openrdf.query.TupleQuery;
+import org.openrdf.query.TupleQueryResult;
 import org.openrdf.query.algebra.StatementPattern.Scope;
 import org.openrdf.query.algebra.evaluation.QueryBindingSet;
+import org.openrdf.repository.RepositoryConnection;
+import org.openrdf.repository.RepositoryException;
+import org.openrdf.repository.sail.SailRepository;
+import org.openrdf.rio.RDFHandlerException;
+import org.openrdf.rio.RDFParseException;
+import org.openrdf.sail.memory.MemoryStore;
 
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.Var;
 import com.bigdata.bop.bindingSet.EmptyBindingSet;
+import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.sail.sparql.Bigdata2ASTSPARQLParser;
 import com.bigdata.rdf.sail.sparql.TestSubqueryPatterns;
@@ -69,11 +82,14 @@ import com.bigdata.rdf.sparql.ast.SubqueryRoot;
 import com.bigdata.rdf.sparql.ast.ValueExpressionNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
+import com.bigdata.rdf.sparql.ast.optimizers.DefaultOptimizerList;
+import com.bigdata.rdf.sparql.ast.optimizers.IASTOptimizer;
+import com.bigdata.rdf.vocab.NoVocabulary;
 import com.bigdata.rdf.vocab.decls.FOAFVocabularyDecl;
 
 /**
  * This test suite is for trac items where the failure mode is a 500 error caused
- * by a software error in the static optimizer.
+ * by a software error, often in the static optimizer.
  * 
  * The tests each consist of a test query in a file in this package.
  * The typical test succeeds if the optimizers run on this query without a disaster.
@@ -85,23 +101,65 @@ import com.bigdata.rdf.vocab.decls.FOAFVocabularyDecl;
  * The very limited goal is that no uncaught exceptions are thrown!
  * 
  */
-public class TestASTOptimizer500s extends
-        AbstractASTEvaluationTestCase {
+public class TestNoExceptions extends
+        QuadsTestCase {
 
     /**
      * 
      */
-    public TestASTOptimizer500s() {
+    public TestNoExceptions() {
     }
 
     /**
      * @param name
      */
-    public TestASTOptimizer500s(String name) {
+    public TestNoExceptions(String name) {
         super(name);
     }
 
+    public AbstractBigdataSailTestCase getOurDelegate() {
 
+        if (getDelegate() == null) {
+
+            String testClass = System.getProperty("testClass");
+            if (testClass != null) {
+            	return super.getOurDelegate();
+
+            }
+            setDelegate(new com.bigdata.rdf.sail.TestBigdataSailWithQuads());
+        }
+        return (AbstractBigdataSailTestCase) super.getDelegate();
+    }
+
+	/**
+	 * Please set your database properties here, except for your journal file,
+	 * please DO NOT SPECIFY A JOURNAL FILE.
+	 */
+	@Override
+	public Properties getProperties() {
+
+		final Properties props = super.getProperties();
+
+		/*
+		 * For example, here is a set of five properties that turns off
+		 * inference, truth maintenance, and the free text index.
+		 */
+		props.setProperty(BigdataSail.Options.AXIOMS_CLASS,
+				NoAxioms.class.getName());
+		props.setProperty(BigdataSail.Options.VOCABULARY_CLASS,
+				NoVocabulary.class.getName());
+		props.setProperty(BigdataSail.Options.TRUTH_MAINTENANCE, "false");
+		props.setProperty(BigdataSail.Options.JUSTIFY, "false");
+//		props.setProperty(BigdataSail.Options.INLINE_DATE_TIMES, "true");
+//		props.setProperty(BigdataSail.Options.ISOLATABLE_INDICES, "true");
+//		props.setProperty(BigdataSail.Options.EXACT_SIZE, "true");
+//		props.setProperty(BigdataSail.Options.ALLOW_SESAME_QUERY_EVALUATION,
+//				"false");
+		props.setProperty(BigdataSail.Options.STATEMENT_IDENTIFIERS, "false");
+
+		return props;
+
+	}
     /**
      * Unit test for WITH {subquery} AS "name" and INCLUDE. The WITH must be in
      * the top-level query. 
@@ -111,7 +169,7 @@ public class TestASTOptimizer500s extends
      * other than the ability to optimize without an exception
      * @throws IOException 
      */
-    public void test_namedSubquery746() throws MalformedQueryException,
+    public void test_namedSubquery746() throws Exception,
             TokenMgrError, ParseException, IOException {
         optimizeQuery("ticket746");
 
@@ -129,7 +187,7 @@ SELECT *
  * @throws ParseException
  * @throws IOException
  */
-    public void test_filterSubselect737() throws MalformedQueryException,
+    public void test_filterSubselect737() throws Exception,
             TokenMgrError, ParseException, IOException {
         optimizeQuery("filterSubselect737");
 
@@ -171,22 +229,44 @@ WHERE {
  * @throws ParseException
  * @throws IOException
  */
-    public void test_nestedSubselectsWithUnion737() throws MalformedQueryException,
+    public void test_nestedSubselectsWithUnion737() throws Exception,
             TokenMgrError, ParseException, IOException {
         optimizeQuery("nestedSubselectsWithUnion737");
 
     }
 
-	void optimizeQuery(final String queryfile) throws IOException, MalformedQueryException {
+	void optimizeQuery(final String queryfile) throws Exception {
 		final String sparql = IOUtils.toString(getClass().getResourceAsStream(queryfile+".rq"));
+		// try with Bigdata:
+		final BigdataSail sail = getSail();
+		try {
+			executeQuery(new BigdataSailRepository(sail),sparql);
+		} finally {
+			sail.__tearDownUnitTest();
+		}
 
+	}
 
-        final QueryRoot ast = new Bigdata2ASTSPARQLParser(store).parseQuery2(sparql,baseURI).getOriginalAST();
-
-        final IASTOptimizer rewriter = new DefaultOptimizerList();
-        
-        final AST2BOpContext context = new AST2BOpContext(new ASTContainer(ast), store);
-        rewriter.optimize(context, ast/* queryNode */, new IBindingSet[]{EmptyBindingSet.INSTANCE});
+	private void executeQuery(final SailRepository repo, final String query)
+			throws RepositoryException, MalformedQueryException,
+			QueryEvaluationException, RDFParseException, IOException,
+			RDFHandlerException {
+		try {
+			repo.initialize();
+			final RepositoryConnection conn = repo.getConnection();
+			conn.setAutoCommit(false);
+			try {
+				final ValueFactory vf = conn.getValueFactory();
+				conn.commit();
+				TupleQuery tq = conn.prepareTupleQuery(QueryLanguage.SPARQL, query);
+				TupleQueryResult tqr = tq.evaluate();
+				tqr.close();
+			} finally {
+				conn.close();
+			}
+		} finally {
+			repo.shutDown();
+		}
 	}
     
 }
