@@ -50,6 +50,7 @@ import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryType;
 import com.bigdata.rdf.sparql.ast.StaticAnalysis;
 import com.bigdata.rdf.sparql.ast.SubqueryRoot;
+import com.bigdata.rdf.sparql.ast.UnionNode;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.service.ServiceNode;
 
@@ -330,7 +331,7 @@ public class ASTSparql11SubqueryOptimizer implements IASTOptimizer {
 
         final NamedSubqueryInclude include = new NamedSubqueryInclude(newName);
 
-        final IGroupNode<IGroupMemberNode> parent = subqueryRoot.getParent();
+        final IGroupNode<?> parent = subqueryRoot.getParent();
 
         /*
          * Note: A SubqueryRoot normally starts out as the sole child of a
@@ -347,7 +348,8 @@ public class ASTSparql11SubqueryOptimizer implements IASTOptimizer {
          */
          
         if ((parent instanceof JoinGroupNode) && ((BOp) parent).arity() == 1
-                && parent.getParent() != null) {
+                && parent.getParent() != null && 
+                !((IGroupNode<?>)parent.getParent() instanceof UnionNode)) {
             
             final IGroupNode<IGroupMemberNode> pp = parent.getParent();
 
