@@ -1302,7 +1302,7 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
          */
         for (JoinGroupNode child : node) {
 
-            getDefinitelyProducedBindings(child, vars, recursive);
+            getMaybeProducedBindings(child, vars, recursive);
 
         }
 
