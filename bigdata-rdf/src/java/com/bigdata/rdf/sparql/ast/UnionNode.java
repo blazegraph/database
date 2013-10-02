@@ -37,10 +37,13 @@ public class UnionNode extends GraphPatternGroup<JoinGroupNode>  implements IReo
     public UnionNode(BOp[] args, Map<String, Object> anns) {
 
         super(args, anns);
+        for (BOp x:args) {
+        	assert x instanceof JoinGroupNode;
+        }
 
     }
 
-//    /**
+	//    /**
 //	 * Construct a non-optional union.
 //	 */
 	public UnionNode() {
@@ -111,5 +114,23 @@ public class UnionNode extends GraphPatternGroup<JoinGroupNode>  implements IReo
 		return true;
 	}
 
-    
+
+    @Override
+    public void addArg(final BOp newArg) {
+    	assert newArg instanceof JoinGroupNode;
+        super.addArg(newArg);
+    }
+
+    @Override
+    public void addArg(final int index, final BOp newArg) {
+    	assert newArg instanceof JoinGroupNode;
+        super.addArg(index, newArg);
+
+    }
+
+    @Override
+    public int replaceWith(final BOp oldChild, final BOp newChild) {
+    	assert newChild instanceof JoinGroupNode;
+    	return  super.replaceWith(oldChild, newChild);
+    }
 }
