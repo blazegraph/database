@@ -5,6 +5,7 @@ import java.util.Map;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariable;
+import com.bigdata.bop.ModifiableBOpBase;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpUtility;
 
@@ -48,6 +49,7 @@ public class AssignmentNode extends GroupMemberValueExpressionNodeBase
     public AssignmentNode(BOp[] args, Map<String, Object> anns) {
 
         super(args, anns);
+        assert args[0] instanceof VarNode;
 
     }
 
@@ -148,4 +150,17 @@ public class AssignmentNode extends GroupMemberValueExpressionNodeBase
     	return super.replaceAllWith(oldVal, newVal);
     }
 
+
+	@Override
+    public ModifiableBOpBase setArgs(final BOp[] args) {
+    	assert args[0] instanceof VarNode;
+    	return super.setArgs(args);
+    }
+    
+
+    @Override
+    public ModifiableBOpBase setArg(final int index, final BOp newArg) {
+    	assert index != 0 || newArg instanceof VarNode;
+    	return super.setArg(index, newArg);
+    }
 }
