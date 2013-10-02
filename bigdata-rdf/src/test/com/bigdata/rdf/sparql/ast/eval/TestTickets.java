@@ -86,6 +86,16 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
                 ).runTest();
 
     }
+
+    public void test_ticket_747b() throws Exception {
+
+        new TestHelper("ticket747B-bound",// testURI,
+                "ticket747B-bound.rq",// queryFileURL
+                "ticket747-bound.ttl",// dataFileURL
+                "ticket747-bound.srx"// resultFileURL
+                ).runTest();
+
+    }
     /**
      * <pre>
      * PREFIX ex: <http://example.org/>
