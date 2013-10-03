@@ -24,8 +24,10 @@ public class ProjectedConstraint extends com.bigdata.bop.constraint.Constraint {
     public boolean accept(IBindingSet bindingSet) {
         try {
             Object result = ((ConditionalBind) get(0)).get(bindingSet);
+            return  result != null;
         } catch (SparqlTypeErrorException stee) {
+        	// Extend(mu, var, expr) = mu if var not in dom(mu) and expr(mu) is an error (from the spec)
+            return true;
         }
-        return true;
     }
 }

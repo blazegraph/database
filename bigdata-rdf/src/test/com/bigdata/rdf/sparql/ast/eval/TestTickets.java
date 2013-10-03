@@ -66,7 +66,7 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
     }
     
 
-    public void test_ticket_747() throws Exception {
+    public void xtest_ticket_747() throws Exception {
 
         new TestHelper("ticket747-bound",// testURI,
                 "ticket747-bound.rq",// queryFileURL
@@ -87,12 +87,66 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
 
     }
 
-    public void test_ticket_747b() throws Exception {
+
+    public void xtest_ticket_747b() throws Exception {
 
         new TestHelper("ticket747B-bound",// testURI,
                 "ticket747B-bound.rq",// queryFileURL
                 "ticket747-bound.ttl",// dataFileURL
                 "ticket747-bound.srx"// resultFileURL
+                ).runTest();
+
+    }
+    
+    public void test_ticket_748() throws Exception {
+
+        new TestHelper("ticket748-subselect",// testURI,
+                "ticket748-subselect.rq",// queryFileURL
+                "ticket748-subselect.ttl",// dataFileURL
+                "ticket748-subselect.srx"// resultFileURL
+                ).runTest();
+
+    }
+
+
+    public void test_ticket_748a() throws Exception {
+
+        new TestHelper("ticket748A-subselect",// testURI,
+                "ticket748A-subselect.rq",// queryFileURL
+                "ticket748-subselect.ttl",// dataFileURL
+                "ticket748-subselect.srx"// resultFileURL
+                ).runTest();
+
+    }
+
+    public void test_ticket_two_subselects_748() throws Exception {
+
+        new TestHelper("ticket748-two-subselects",// testURI,
+                "ticket748-two-subselects.rq",// queryFileURL
+                "ticket748-two-subselects.ttl",// dataFileURL
+                "ticket748-two-subselects.srx"// resultFileURL
+                ).runTest();
+
+    }
+
+
+    public void test_ticket_two_subselects_748a() throws Exception {
+
+        new TestHelper("ticket748A-two-subselects",// testURI,
+                "ticket748A-two-subselects.rq",// queryFileURL
+                "ticket748-two-subselects.ttl",// dataFileURL
+                "ticket748-two-subselects.srx"// resultFileURL
+                ).runTest();
+
+    }
+
+
+    public void test_ticket_bad_projection_748() throws Exception {
+
+        new TestHelper("ticket748-bad-projection",// testURI,
+                "ticket748-bad-projection.rq",// queryFileURL
+                "ticket748-bad-projection.ttl",// dataFileURL
+                "ticket748-bad-projection.srx"// resultFileURL
                 ).runTest();
 
     }
