@@ -83,7 +83,6 @@ import com.bigdata.bop.solutions.SortOrder;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.constraints.BindingConstraint;
 import com.bigdata.rdf.internal.constraints.CoalesceBOp;
 import com.bigdata.rdf.internal.constraints.ConditionalBind;
 import com.bigdata.rdf.internal.constraints.ContextNotAvailableException;
@@ -3145,8 +3144,7 @@ public class AST2BOpUtility extends AST2BOpJoins {
                 assignmentNode.getVar(),
                 assignmentNode.getValueExpression(), projection);
 
-        IConstraint c = projection ? new ProjectedConstraint(b)
-                : new BindingConstraint(b);
+        IConstraint c = new ProjectedConstraint(b);
 
         /*
          * We might have already materialized everything we need for this
