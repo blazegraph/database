@@ -1,0 +1,8 @@
+SELECT * { 
+
+   { SELECT (1+"s" AS $X)
+     {
+     }
+    }
+
+}
