@@ -71,4 +71,22 @@ public class TestSubSelectFilterExist725 extends AbstractDataDrivenSPARQLTestCas
         
     } 
     
+
+    /**
+     * I fear that this test may not be in the right logical location.
+     * The test case was filed with defect trac725, which is why the test
+     * is here; bit it seems more related to other issues.
+     * @throws Exception
+     */
+    public void test_class_hierarchy() throws Exception {
+
+        new TestHelper(
+                "subclass-725",// testURI
+                "subclass-725.rq", // queryURI
+                "subclass-725.ttl", // dataURI
+                "subclass-725.srx" // resultURI
+                ).runTest();
+        
+    } 
+    
 }

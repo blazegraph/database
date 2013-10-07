@@ -1,0 +1,13 @@
+
+prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+
+SELECT ?s ?p ?o
+{
+   { SELECT (rdf:type as ?p) ?s ?o { 
+     ?s rdf:type  ?o .
+     ?o rdfs:subClassOf * ?sup .
+     FILTER ( ?sup = <eg:C> )
+     }
+   }
+}
