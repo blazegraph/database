@@ -539,12 +539,13 @@ public class CBD {
              */
             projection.setDescribeMode(describeExpansionMode);
             
+            int i=1;
             for (IV<?, ?> iv : bnodeIVs) {
 
                 if (!iv.hasValue())
                     throw new AssertionError("valueCache not set : " + iv);
 
-                final VarNode anonvar = new VarNode("-cbd-bnode-1");
+                final VarNode anonvar = new VarNode("-cbd-bnode-"+i++);
 
                 anonvar.setAnonymous(true);
 
