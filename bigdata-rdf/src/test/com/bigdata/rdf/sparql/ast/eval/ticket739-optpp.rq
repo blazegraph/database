@@ -1,0 +1,12 @@
+
+SELECT ?X
+WHERE {
+{ 
+?X <eg:part>  ?part .
+?part ?predicate <eg:o> .
+}
+UNION 
+{
+?X ?predicate <eg:o> .
+}
+}
