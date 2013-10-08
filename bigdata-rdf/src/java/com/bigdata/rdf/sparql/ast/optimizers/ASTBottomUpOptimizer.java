@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.optimizers;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -44,6 +45,7 @@ import com.bigdata.bop.Var;
 import com.bigdata.rdf.internal.constraints.SparqlTypeErrorBOp;
 import com.bigdata.rdf.sparql.ast.ASTBase;
 import com.bigdata.rdf.sparql.ast.FilterNode;
+import com.bigdata.rdf.sparql.ast.FunctionNode;
 import com.bigdata.rdf.sparql.ast.GlobalAnnotations;
 import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
 import com.bigdata.rdf.sparql.ast.IBindingProducerNode;
@@ -683,6 +685,18 @@ public class ASTBottomUpOptimizer implements IASTOptimizer {
                  * 
                  * Note: This is ONLY true when the [group] is OPTIONAL.
                  * Otherwise the variables in the parent are not visible.
+                 * 
+                 * Two fairly difficult test cases articulating the scope rules
+                 * are:
+                 * 
+                 * http://www.w3.org/2001/sw/DataAccess/tests/data-r2/algebra/filter-nested-2.rq
+                 * 
+                 * and
+                 * 
+                 * http://www.w3.org/2001/sw/DataAccess/tests/data-r2/optional-filter/manifest#dawg-optional-filter-005-not-simplified
+                 * (see 
+                 * http://www.w3.org/TR/2013/REC-sparql11-query-20130321/#convertGraphPattern)
+                 * 
                  */
 
                 // The "required" part of the optional is the parent group.
@@ -718,8 +732,22 @@ public class ASTBottomUpOptimizer implements IASTOptimizer {
                      * Re-generate the IVE for this filter.
                      */
 
-                    // clear the old value expression.
-                    filter.getValueExpressionNode().setValueExpression(null);
+                    // Recursively clear the old value expression.
+
+                	
+                	// gather subexpression (avoiding CCME)
+                	List<FunctionNode> subexpr = new ArrayList<FunctionNode>();
+                    final Iterator<FunctionNode> veitr = BOpUtility.visitAll(filter, FunctionNode.class);
+                    while (veitr.hasNext()) {
+                    	subexpr.add(veitr.next());
+                    }
+                	
+                    // clear
+                    for (FunctionNode ive:subexpr) {
+                    	ive.setValueExpression(null);
+                    }
+                    
+                    
                     
                     final GlobalAnnotations globals = new GlobalAnnotations(
                     		context.getLexiconNamespace(),
@@ -792,7 +820,7 @@ public class ASTBottomUpOptimizer implements IASTOptimizer {
                 
                 final IValueExpressionNode child = (IValueExpressionNode) tmp;
                 
-                modified |= rewriteUnboundVariablesInFilter(context,
+                modified |=  rewriteUnboundVariablesInFilter(context,
                         maybeBound, map, node, child);
                 
             }

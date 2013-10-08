@@ -1,0 +1,10 @@
+SELECT *
+WHERE {
+  BIND ( "y" as $Y ) .
+  {
+    BIND ( "x" as $X )
+    FILTER( BOUND($Y) 
+             && True 
+    )
+  }
+}
