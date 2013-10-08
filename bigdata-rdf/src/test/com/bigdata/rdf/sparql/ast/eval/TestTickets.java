@@ -127,7 +127,7 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
                 ).runTest();
 
     }
-    public void xtest_ticket_747() throws Exception {
+    public void test_ticket_747() throws Exception {
 
         new TestHelper("ticket747-bound",// testURI,
                 "ticket747-bound.rq",// queryFileURL
@@ -143,13 +143,13 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
         new TestHelper("ticket747A-bound",// testURI,
                 "ticket747A-bound.rq",// queryFileURL
                 "ticket747-bound.ttl",// dataFileURL
-                "ticket747-bound.srx"// resultFileURL
+                "ticket747A-bound.srx"// resultFileURL
                 ).runTest();
 
     }
 
 
-    public void xtest_ticket_747b() throws Exception {
+    public void test_ticket_747b() throws Exception {
 
         new TestHelper("ticket747B-bound",// testURI,
                 "ticket747B-bound.rq",// queryFileURL
@@ -158,7 +158,25 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
                 ).runTest();
 
     }
-    
+
+    public void test_ticket_747c() throws Exception {
+
+        new TestHelper("ticket747-bound",// testURI,
+                "ticket747C-bound.rq",// queryFileURL
+                "ticket747-bound.ttl",// dataFileURL
+                "ticket747-bound.srx"// resultFileURL
+                ).runTest();
+
+    }
+    public void test_ticket_747d() throws Exception {
+
+        new TestHelper("ticket747B-bound",// testURI,
+                "ticket747D-bound.rq",// queryFileURL
+                "ticket747-bound.ttl",// dataFileURL
+                "ticket747-bound.srx"// resultFileURL
+                ).runTest();
+
+    }
     public void test_ticket_748() throws Exception {
 
         new TestHelper("ticket748-subselect",// testURI,

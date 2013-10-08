@@ -8,5 +8,13 @@
     <variable name="Y"/>
   </head>
   <results>
+    <result>
+        <binding name="X">
+            <literal>x</literal>
+        </binding>
+        <binding name="Y">
+            <literal>y</literal>
+        </binding>
+    </result>
   </results>
 </sparql>

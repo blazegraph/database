@@ -124,7 +124,7 @@ import com.bigdata.rdf.sparql.ast.ssets.ISolutionSetManager;
  * <dt>{@link UnionNode}</dt>
  * <dd>The definitely bound variables is the intersection of the definitely
  * bound variables in the child join groups. The maybe bound variables is the
- * union of the definitely bound variables in the child join groups.</dd>
+ * union of the maybe bound variables in the child join groups.</dd>
  * 
  * <dt>{@link AssignmentNode}</dt>
  * <dd>BIND(expr AS var) in a group will not bind the variable if there is an
@@ -1379,7 +1379,7 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
          * 
          * 6. Projection of an exogenously bound variable which is in scope.
          * 
-         * TODO (5) is not yet handled! We need to know what variables are in
+         * TODO (6) is not yet handled! We need to know what variables are in
          * scope at each level as we descend into subqueries. Even if we know
          * the set of exogenous variables, the in scope exogenous varaibles are
          * not available in the typical invocation context.
@@ -1485,7 +1485,14 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
                      */
                     tmp.add(bind.getVar());
 
+                } else {
+                	/* 5. Projection of a select expression which is an aggregate.
+                	 * We do nothing
+                	 */
                 }
+            	/* 6. Projection of an exogenously bound variable which is in scope.
+            	 * We incorrectly do nothing
+            	 */
                 
             }
 
