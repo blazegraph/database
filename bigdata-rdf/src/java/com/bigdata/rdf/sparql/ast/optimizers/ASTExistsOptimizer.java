@@ -180,6 +180,12 @@ public class ASTExistsOptimizer implements IASTOptimizer {
 
             }
 
+            if (child instanceof SubqueryRoot) {
+                // Recursion.
+                SubqueryRoot subquery = (SubqueryRoot)child;
+				rewrite(sa, exogenousVars, subquery, subquery.getWhereClause() );
+            }
+
         }
 
     }

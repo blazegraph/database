@@ -156,6 +156,8 @@ public class TestAll extends TestCase {
          * Tests corresponding to various trouble tickets.
          */
         suite.addTestSuite(TestTickets.class);
+        
+        suite.addTestSuite(TestSubSelectFilterExist725.class);
         suite.addTestSuite(TestTwoPropertyPaths734.class);
         
         // test suite for inline constraints: GT, LT, GTE, LTE
