@@ -77,7 +77,7 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
     }
 
 
-    public void xtest_ticket_739a() throws Exception {
+    public void test_ticket_739a() throws Exception {
 
         new TestHelper("ticket739A-optpp",// testURI,
                 "ticket739A-optpp.rq",// queryFileURL
@@ -89,7 +89,7 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
 
 
 
-    public void xtest_ticket_739b() throws Exception {
+    public void test_ticket_739b() throws Exception {
 
         new TestHelper("ticket739B-optpp",// testURI,
                 "ticket739B-optpp.rq",// queryFileURL
@@ -118,7 +118,7 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
                 ).runTest();
 
     }
-    public void xtest_ticket_739e() throws Exception {
+    public void test_ticket_739e() throws Exception {
 
         new TestHelper("ticket739E-optpp",// testURI,
                 "ticket739E-optpp.rq",// queryFileURL
