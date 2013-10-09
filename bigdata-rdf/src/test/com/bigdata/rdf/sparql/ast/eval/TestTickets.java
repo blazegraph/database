@@ -253,4 +253,28 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
 
     }
    
+
+    public void test_ticket_min736() throws Exception {
+
+        new TestHelper("aggregate-min",// testURI,
+                "aggregate-min.rq",// queryFileURL
+                "aggregate-min-max.ttl",// dataFileURL
+                "aggregate-min.srx",// resultFileURL
+                false, // laxCardinality
+                true // checkOrder
+        ).runTest();
+
+    }
+
+    public void test_ticket_max736() throws Exception {
+
+        new TestHelper("aggregate-max",// testURI,
+                "aggregate-max.rq",// queryFileURL
+                "aggregate-min-max.ttl",// dataFileURL
+                "aggregate-max.srx",// resultFileURL
+                false, // laxCardinality
+                true // checkOrder
+        ).runTest();
+
+    }
 }
