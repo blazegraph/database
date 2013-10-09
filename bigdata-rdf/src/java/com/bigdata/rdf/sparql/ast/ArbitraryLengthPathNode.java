@@ -223,6 +223,22 @@ public class ArbitraryLengthPathNode
 		final JoinGroupNode group = subgroup();
 
 		/*
+		 * if lowerBound() is zero, and both ?s and ?o are
+		 * variables then we (notionally) match
+		 * any subject or object in the triple store,
+		 * see:
+		 * 
+		 * http://www.w3.org/TR/2013/REC-sparql11-query-20130321/#defn_evalPP_ZeroOrOnePath
+		 * 
+		 * Despite this not being implemented, the optimizer does better
+		 * knowing this correctly.
+		 */
+		if (lowerBound() == 0 && left() instanceof VarNode && right() instanceof VarNode) {
+			return Long.MAX_VALUE;	
+		}
+		
+		
+		/*
 		 * Only deal with singleton paths for now.
 		 * 
 		 * TODO finish the ASTCardinalityOptimizer
