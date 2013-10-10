@@ -1,6 +1,0 @@
-prefix :         <http://example/> 
-
-SELECT (MIN(?o) AS ?m)
-WHERE { 
-   ?s :q ?o 
-} 

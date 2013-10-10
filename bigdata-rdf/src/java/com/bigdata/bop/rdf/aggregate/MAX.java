@@ -32,7 +32,6 @@ import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.aggregate.AggregateBase;
-import com.bigdata.bop.solutions.IVComparator;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.constraints.CompareBOp;
 import com.bigdata.rdf.internal.constraints.INeedsMaterialization;
@@ -58,8 +57,6 @@ public class MAX extends AggregateBase<IV> implements INeedsMaterialization{
 	 *
 	 */
     private static final long serialVersionUID = 1L;
-    
-    private static IVComparator comparator = new IVComparator();
 
     public MAX(MAX op) {
         super(op);
@@ -124,7 +121,15 @@ public class MAX extends AggregateBase<IV> implements INeedsMaterialization{
 
             } else {
 
-                if (comparator.compare(iv, max)>0) {
+                /**
+                 * FIXME This needs to use the ordering define by ORDER_BY. The
+                 * CompareBOp imposes the ordering defined for the "<" operator
+                 * which is less robust and will throw a type exception if you
+                 * attempt to compare unlike Values.
+                 *
+                 * @see https://sourceforge.net/apps/trac/bigdata/ticket/300#comment:5
+                 */
+                if (CompareBOp.compare(iv, max, CompareOp.GT)) {
 
                     max = iv;
 

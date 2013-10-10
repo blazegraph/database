@@ -1,8 +1,0 @@
-
-prefix :         <http://example/> 
-
-SELECT (MAX(?o) AS ?m)
-WHERE { 
-   ?s ?p ?o 
-}
-
