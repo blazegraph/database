@@ -5507,10 +5507,17 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                 ((AbstractTransactionService) getLocalTransactionManager()
                         .getTransactionService()).abortAllTx();
                 
-                /*
+                /**
                  * Local abort (no quorum, so 2-phase abort not required).
                  * 
-                 * FIXME HA : Abort the unisolated connection? (esp for group commit).
+                 * FIXME HA : Abort the unisolated connection? (esp for group
+                 * commit and the NSS level SPARQL and REST API unisolated
+                 * operations).
+                 * 
+                 * @see <a
+                 *      href="https://sourceforge.net/apps/trac/bigdata/ticket/753"
+                 *      (HA doLocalAbort() should interrupt NSS requests and
+                 *      AbstractTasks </a>
                  */
                 doLocalAbort(); 
                 
