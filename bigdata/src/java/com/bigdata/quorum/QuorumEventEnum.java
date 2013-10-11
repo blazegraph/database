@@ -96,6 +96,11 @@ public enum QuorumEventEnum {
     /**
      * Event generated when a quorum breaks (aka when the token is cleared).
      */
-    QUORUM_BROKE;
+    QUORUM_BROKE,
+    /**
+     * Event generated when a service becomes disconnected from a remote quorum
+     * (such as a zookeeper ensemble).
+     */
+    QUORUM_DISCONNECTED;
 
 }

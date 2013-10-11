@@ -64,6 +64,10 @@ public abstract class FutureTaskInvariantMon<T> extends FutureTaskMon<T>
     private static final Logger log = Logger.getLogger(FutureTaskInvariantMon.class);
 
     private final Quorum<HAGlue, QuorumService<HAGlue>> m_quorum;
+    /**
+     * The quorum token on entry.
+     */
+    private final long token;
 
     private final List<QuorumEventInvariant> m_triggers = new CopyOnWriteArrayList<QuorumEventInvariant>();
 
@@ -77,6 +81,8 @@ public abstract class FutureTaskInvariantMon<T> extends FutureTaskMon<T>
 	    
 		m_quorum = quorum;
 		
+		token = quorum.token();
+		
 	}
 
     public FutureTaskInvariantMon(final Runnable runnable, final T result,
@@ -88,6 +94,8 @@ public abstract class FutureTaskInvariantMon<T> extends FutureTaskMon<T>
             throw new IllegalArgumentException();
 
         m_quorum = quorum;
+        
+        token = quorum.token();
         
     }
 
@@ -103,16 +111,24 @@ public abstract class FutureTaskInvariantMon<T> extends FutureTaskMon<T>
 	 * Hook to manage listener registration and establish invariants.
 	 */
 	@Override
-	public void run() {
-		m_quorum.addListener(this);
-		try {
-			establishInvariants();
-			
-			super.run();
-		} finally {
-			m_quorum.removeListener(this);
-		}
-	}
+    public void run() {
+        boolean didStart = false;
+        m_quorum.addListener(this);
+        try {
+            establishInvariants();
+
+            didStart = true;
+            super.run();
+        } finally {
+            m_quorum.removeListener(this);
+            if (!didStart) {
+                /*
+                 * Guarantee cancelled unless run() invoked.
+                 */
+                cancel(true/* mayInterruptIfRunning */);
+            }
+        }
+    }
 
     /**
      * Establish an invariant that the specified service is a member of the
@@ -176,7 +192,8 @@ public abstract class FutureTaskInvariantMon<T> extends FutureTaskMon<T>
     }
 
     /**
-     * Establish an invariant that the quorum is met.
+     * Establish an invariant that the quorum is met and remains met on the same
+     * token.
      */
     public void assertQuorumMet() {
         m_triggers.add(new QuorumEventInvariant(QuorumEventEnum.QUORUM_BROKE,
@@ -184,6 +201,8 @@ public abstract class FutureTaskInvariantMon<T> extends FutureTaskMon<T>
 
         // now check that quorum is met and break if not
         if (!m_quorum.isQuorumMet())
+            broken();
+        if (m_quorum.token() != token)
             broken();
     }
 
