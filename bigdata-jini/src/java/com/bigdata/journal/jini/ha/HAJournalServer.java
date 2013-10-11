@@ -1919,6 +1919,7 @@ public class HAJournalServer extends AbstractServer {
                         } catch (RuntimeException re) {
                             if (InnerCause.isInnerCause(re,
                                     KeeperException.class)) {
+                                // Do not retry in a tight loop.
                                 Thread.sleep(250/* ms */);
                                 // Retry.
                                 continue;
