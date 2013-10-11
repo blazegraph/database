@@ -40,7 +40,6 @@ import java.util.Iterator;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
-import java.util.concurrent.FutureTask;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.zip.GZIPInputStream;
@@ -54,6 +53,7 @@ import org.apache.log4j.Logger;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
+import com.bigdata.concurrent.FutureTaskInvariantMon;
 import com.bigdata.concurrent.FutureTaskMon;
 import com.bigdata.concurrent.NamedLock;
 import com.bigdata.ha.HAGlue;
@@ -1119,8 +1119,22 @@ public class SnapshotManager {
      */
     private Future<IHASnapshotResponse> takeSnapshotNow() {
 
-        final FutureTask<IHASnapshotResponse> ft = new FutureTaskMon<IHASnapshotResponse>(
-                new SnapshotTask(this));
+        final FutureTaskMon<IHASnapshotResponse> ft = new FutureTaskInvariantMon<IHASnapshotResponse>(
+                new SnapshotTask(this), journal.getQuorum()) {
+
+            @Override
+            protected void establishInvariants() {
+                /*
+                 * The snapshot is only taken if we have a consensus that this
+                 * service has state that is consistent with a met quorum. This
+                 * prevents the service from creating backups that are
+                 * potentially invalid.
+                 */
+                assertQuorumMet();
+                assertJoined(journal.getQuorum().getClient().getServiceId());
+            }
+
+        };
 
         // Run task.
         journal.getExecutorService().submit(ft);
@@ -1148,198 +1162,198 @@ public class SnapshotManager {
 
         }
 
-        public IHASnapshotResponse call() throws Exception {
+		public IHASnapshotResponse call() throws Exception {
 
-            // The quorum token (must remain valid through this operation).
-            final long token = journal.getQuorumToken();
+			// The quorum token (must remain valid through this operation).
+			final long token = journal.getQuorumToken();
 
-            if (!journal.getQuorum().getClient().isJoinedMember(token)) {
+			if (!journal.getQuorum().getClient().isJoinedMember(token)) {
 
-                /*
-                 * Note: The service must be joined with a met quorum to take a
-                 * snapshot. This is necessary in order to ensure that the
-                 * snapshots are copies of a journal state that the quorum
-                 * agrees on, otherwise we could later attempt to restore from
-                 * an invalid state.
-                 */
+				/*
+				 * Note: The service must be joined with a met quorum to take a
+				 * snapshot. This is necessary in order to ensure that the
+				 * snapshots are copies of a journal state that the quorum
+				 * agrees on, otherwise we could later attempt to restore from
+				 * an invalid state.
+				 */
 
-                throw new QuorumException("Service not joined with met quorum");
+				throw new QuorumException("Service not joined with met quorum");
 
-            }
+			}
 
-            // Grab a read lock.
-            final long txId = journal.newTx(ITx.READ_COMMITTED);
+			final Quorum<HAGlue, QuorumService<HAGlue>> quorum = journal
+					.getQuorum();
 
-            /*
-             * Get both root blocks (atomically).
-             * 
-             * Note: This is done AFTER we take the read-lock and BEFORE we copy
-             * the data from the backing store. These root blocks MUST be
-             * consistent for the leader's backing store because we are not
-             * recycling allocations (since the read lock has pinned them). The
-             * journal MIGHT go through a concurrent commit before we obtain
-             * these root blocks, but they are still valid for the data on the
-             * disk because of the read-lock.
-             */
-            final IRootBlockView[] rootBlocks = journal.getRootBlocks();
+			// Grab a read lock.
+			final long txId = journal.newTx(ITx.READ_COMMITTED);
 
-            final IRootBlockView currentRootBlock = RootBlockUtility
-                    .chooseRootBlock(rootBlocks[0], rootBlocks[1]);
+			/*
+			 * Get both root blocks (atomically).
+			 * 
+			 * Note: This is done AFTER we take the read-lock and BEFORE we copy
+			 * the data from the backing store. These root blocks MUST be
+			 * consistent for the leader's backing store because we are not
+			 * recycling allocations (since the read lock has pinned them). The
+			 * journal MIGHT go through a concurrent commit before we obtain
+			 * these root blocks, but they are still valid for the data on the
+			 * disk because of the read-lock.
+			 */
+			final IRootBlockView[] rootBlocks = journal.getRootBlocks();
 
-            final File file = snapshotManager.getSnapshotFile(currentRootBlock
-                    .getCommitCounter());
+			final IRootBlockView currentRootBlock = RootBlockUtility
+					.chooseRootBlock(rootBlocks[0], rootBlocks[1]);
 
-            if (file.exists() && file.length() != 0L) {
+			final File file = snapshotManager.getSnapshotFile(currentRootBlock
+					.getCommitCounter());
 
-                /*
-                 * Snapshot exists and is not (logically) empty.
-                 * 
-                 * Note: The SnapshotManager will not recommend taking a
-                 * snapshot if a snapshot already exists for the current commit
-                 * point since there is no committed delta that can be captured
-                 * by the snapshot.
-                 * 
-                 * This code makes sure that we do not attempt to overwrite a
-                 * snapshot if we already have one for the same commit point. If
-                 * you want to re-generate a snapshot for the same commit point
-                 * (e.g., because the existing one is corrupt) then you MUST
-                 * remove the pre-existing snapshot first.
-                 */
+			if (file.exists() && file.length() != 0L) {
 
-                throw new IOException("File exists: " + file);
+				/*
+				 * Snapshot exists and is not (logically) empty.
+				 * 
+				 * Note: The SnapshotManager will not recommend taking a
+				 * snapshot if a snapshot already exists for the current commit
+				 * point since there is no committed delta that can be captured
+				 * by the snapshot.
+				 * 
+				 * This code makes sure that we do not attempt to overwrite a
+				 * snapshot if we already have one for the same commit point. If
+				 * you want to re-generate a snapshot for the same commit point
+				 * (e.g., because the existing one is corrupt) then you MUST
+				 * remove the pre-existing snapshot first.
+				 */
 
-            }
+				throw new IOException("File exists: " + file);
 
-            final File parentDir = file.getParentFile();
+			}
 
-            // Make sure the parent directory(ies) exist.
-            if (!parentDir.exists())
-                if (!parentDir.mkdirs())
-                    throw new IOException("Could not create directory: "
-                            + parentDir);
-            
-            /*
-             * Create a temporary file. We will write the snapshot here. The
-             * file will be renamed onto the target file name iff the snapshot
-             * is successfully written.
-             */
-            final File tmp = File.createTempFile(
-                    SnapshotManager.SNAPSHOT_TMP_PREFIX,
-                    SnapshotManager.SNAPSHOT_TMP_SUFFIX, parentDir);
+			final File parentDir = file.getParentFile();
 
-            DataOutputStream os = null;
-            boolean success = false;
-            try {
+			// Make sure the parent directory(ies) exist.
+			if (!parentDir.exists())
+				if (!parentDir.mkdirs())
+					throw new IOException("Could not create directory: "
+							+ parentDir);
 
-                os = new DataOutputStream(new GZIPOutputStream(
-                        new FileOutputStream(tmp)));
+			/*
+			 * Create a temporary file. We will write the snapshot here. The
+			 * file will be renamed onto the target file name iff the snapshot
+			 * is successfully written.
+			 */
+			final File tmp = File.createTempFile(
+					SnapshotManager.SNAPSHOT_TMP_PREFIX,
+					SnapshotManager.SNAPSHOT_TMP_SUFFIX, parentDir);
 
-                // Write out the file header.
-                os.writeInt(FileMetadata.MAGIC);
-                os.writeInt(FileMetadata.CURRENT_VERSION);
+			DataOutputStream os = null;
+			boolean success = false;
+			try {
 
-                // write out the root blocks.
-                os.write(BytesUtil.toArray(rootBlocks[0].asReadOnlyBuffer()));
-                os.write(BytesUtil.toArray(rootBlocks[1].asReadOnlyBuffer()));
+				os = new DataOutputStream(new GZIPOutputStream(
+						new FileOutputStream(tmp)));
 
-                // write out the file data.
-                ((IHABufferStrategy) journal.getBufferStrategy())
-                        .writeOnStream(os, journal.getQuorum(), token);
+				// Write out the file header.
+				os.writeInt(FileMetadata.MAGIC);
+				os.writeInt(FileMetadata.CURRENT_VERSION);
 
-                // flush the output stream.
-                os.flush();
+				// write out the root blocks.
+				os.write(BytesUtil.toArray(rootBlocks[0].asReadOnlyBuffer()));
+				os.write(BytesUtil.toArray(rootBlocks[1].asReadOnlyBuffer()));
 
-                // done.
-                success = true;
-            } catch (Throwable t) {
-                /*
-                 * Log @ ERROR and launder throwable.
-                 */
-                log.error(t, t);
-                if (t instanceof Exception)
-                    throw (Exception) t;
-                else
-                    throw new RuntimeException(t);
-            } finally {
+				// write out the file data.
+				((IHABufferStrategy) journal.getBufferStrategy())
+						.writeOnStream(os, journal.getQuorum(), token);
 
-                // Release the read lock.
-                journal.abort(txId);
+				// flush the output stream.
+				os.flush();
 
-                if (os != null) {
-                    try {
-                        os.close();
-                    } finally {
-                        // ignore.
-                    }
-                }
+				// done.
+				success = true;
+			} catch (Throwable t) {
+				/*
+				 * Log @ ERROR and launder throwable.
+				 */
+				log.error(t, t);
+				if (t instanceof Exception)
+					throw (Exception) t;
+				else
+					throw new RuntimeException(t);
+			} finally {
 
-                /*
-                 * Either rename the temporary file onto the target filename or
-                 * delete the tempoary file. The snapshot is not considered to
-                 * be valid until it is found under the appropriate name.
-                 */
-                if (success) {
+				// Release the read lock.
+				journal.abort(txId);
 
-                    if (!journal.getQuorum().getClient().isJoinedMember(token)) {
-                        // Verify before putting down the root blocks.
-                        throw new QuorumException(
-                                "Snapshot aborted: service not joined with met quorum.");
-                    }
+				if (os != null) {
+					try {
+						os.close();
+					} finally {
+						// ignore.
+					}
+				}
 
-                    if (!tmp.renameTo(file)) {
+				/*
+				 * Either rename the temporary file onto the target filename or
+				 * delete the tempoary file. The snapshot is not considered to
+				 * be valid until it is found under the appropriate name.
+				 */
+				if (success) {
 
-                        log.error("Could not rename " + tmp + " as " + file);
+					if (!journal.getQuorum().getClient().isJoinedMember(token)) {
+						// Verify before putting down the root blocks.
+						throw new QuorumException(
+								"Snapshot aborted: service not joined with met quorum.");
+					}
 
-                    } else {
+					if (!tmp.renameTo(file)) {
 
-                        // Add to the set of known snapshots.
-                        snapshotManager.addSnapshot(file);
+						log.error("Could not rename " + tmp + " as " + file);
 
-                        if (haLog.isInfoEnabled())
-                            haLog.info("Captured snapshot: " + file
-                                    + ", commitCounter="
-                                    + currentRootBlock.getCommitCounter()
-                                    + ", length=" + file.length());
+					} else {
 
-                        /*
-                         * Attempt to purge older snapshots and HALogs.
-                         */
+						// Add to the set of known snapshots.
+						snapshotManager.addSnapshot(file);
 
-                        final Quorum<HAGlue, QuorumService<HAGlue>> quorum = journal
-                                .getQuorum();
+						if (haLog.isInfoEnabled())
+							haLog.info("Captured snapshot: " + file
+									+ ", commitCounter="
+									+ currentRootBlock.getCommitCounter()
+									+ ", length=" + file.length());
 
-                        if (quorum != null) {
+						/*
+						 * Attempt to purge older snapshots and HALogs.
+						 */
 
-                            // This quorum member.
-                            final QuorumService<HAGlue> localService = quorum
-                                    .getClient();
+						if (quorum != null) {
 
-                            if (localService != null) {
+							// This quorum member.
+							final QuorumService<HAGlue> localService = quorum
+									.getClient();
 
-                                localService.purgeHALogs(token);
+							if (localService != null) {
 
-                            }
+								localService.purgeHALogs(token);
 
-                        }
+							}
 
-                    }
+						}
 
-                } else {
+					}
 
-                    if (!tmp.delete()) {
+				} else {
 
-                        log.warn("Could not delete temporary file: " + tmp);
+					if (!tmp.delete()) {
 
-                    }
+						log.warn("Could not delete temporary file: " + tmp);
 
-                }
+					}
 
-            }
+				}
 
-            // Done.
-            return new HASnapshotResponse(currentRootBlock);
+			}
 
-        }
+			// Done.
+			return new HASnapshotResponse(currentRootBlock);
+
+		}
 
     } // class SnapshotTask
     

@@ -497,6 +497,11 @@ for(int i=0; i<3; i++)log.error("quorum["+i+"]:"+(stores[i].getQuorum()).toStrin
                 // TODO Auto-generated method stub
             }
 
+			@Override
+			protected long getRetrySendTimeoutNanos() {
+				return TimeUnit.MILLISECONDS.toNanos(100); // 100ms by default
+			}
+
         };
 
     }

@@ -73,6 +73,8 @@ import com.bigdata.io.TestCase3;
 import com.bigdata.jini.start.process.ProcessHelper;
 import com.bigdata.journal.DumpJournal;
 import com.bigdata.journal.Journal;
+import com.bigdata.journal.jini.ha.HAJournalServer.RunStateEnum;
+import com.bigdata.journal.jini.ha.HAJournalTest.HAGlueTest;
 import com.bigdata.rdf.sail.TestConcurrentKBCreate;
 import com.bigdata.rdf.sail.webapp.NanoSparqlServer;
 import com.bigdata.rdf.sail.webapp.client.ConnectOptions;
@@ -350,6 +352,23 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
             }
         }, 5, TimeUnit.SECONDS);
 
+    }
+
+    protected void awaitRunStateEnum(final RunStateEnum expected,
+            final HAGlue... haGlue) throws Exception {
+        assertCondition(new Runnable() {
+            public void run() {
+                try {
+                    for (HAGlue aService : haGlue) {
+                        final RunStateEnum actual = ((HAGlueTest) aService).getRunStateEnum();
+                        assertEquals("Service[" + aService + "]", expected,
+                                actual);
+                    }
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+            }
+        }, 5, TimeUnit.SECONDS);
     }
 
     /**

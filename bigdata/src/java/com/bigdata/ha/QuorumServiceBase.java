@@ -109,6 +109,13 @@ abstract public class QuorumServiceBase<S extends HAGlue, L extends AbstractJour
             }
             
             @Override
+            protected long getRetrySendTimeoutNanos() {
+
+                return QuorumServiceBase.this.getRetrySendTimeoutNanos();
+                
+            }
+            
+            @Override
             public UUID getStoreUUID() {
 
                 return QuorumServiceBase.this.getStoreUUID();
@@ -160,6 +167,8 @@ abstract public class QuorumServiceBase<S extends HAGlue, L extends AbstractJour
         
     }
     
+    abstract protected long getRetrySendTimeoutNanos();
+
     @Override
     public S getService() {
         

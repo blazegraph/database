@@ -169,22 +169,40 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> /*extends
             .getLogger(QuorumPipelineImpl.class);
 
     /**
-     * The timeouts for a sleep before the next retry. These timeouts are
+     * The timeout for a sleep before the next retry. These timeouts are
      * designed to allow some asynchronous processes to reconnect the
      * {@link HASendService} and the {@link HAReceiveService}s in write pipeline
      * such that a retransmit can succeed after a service has left the pipeline.
      * Depending on the nature of the error (i.e., a transient network problem
      * versus a pipeline reorganization), this can involve a number of zookeeper
-     * events. Hence the sleep latency is backed off through this array of
-     * values.
+     * events.
+     * <p>
+     * The retries will continue until {@link #getRetrySendTimeoutNanos()} has
+     * elapsed.
      * 
-     * TODO We do not want to induce too much latency here. It would be nice if
-     * we automatically retried after each relevant quorum event that might cure
-     * the problem as well as after a timeout. This would require a Condition
-     * that we await with a timeout and signaling the Condition if there are any
-     * relevant events (probably once we handle them locally).
+     * FIXME If this timeout is LTE 50ms, then ChecksumErrors can appear in the
+     * sudden kill tests. The root cause is the failure to consistently tear
+     * down and setup the pipeline when there are multiple requests queued for
+     * the pipeline. This issue has also shown up when there is a replicated
+     * write and a concurrent HALog replication. Specifically, an interrupt in
+     * sendHALog() does not cause the socket channel on which the payload is
+     * transmitted to be closed. See <a
+     * href="https://sourceforge.net/apps/trac/bigdata/ticket/724">HA wire
+     * pulling and sudden kill testing</a>.
      */
-    static protected final int RETRY_SLEEP[] = new int[] { 100, 200, 200, 500, 500, 1000 };
+    private final int RETRY_SLEEP = 100; //200; // 50; // milliseconds.
+    
+    /**
+     * Once this timeout is elapsed, retrySend() will fail.
+     * <p>
+     * Note: This gets overridden in the ZK aware version and set to a constant
+     * greater than the then-current negotiated timeout for the client.
+     */
+    protected long getRetrySendTimeoutNanos() {
+    
+        return TimeUnit.MILLISECONDS.toNanos(5000/*ms*/);
+        
+    }
 
     /**
      * The {@link QuorumMember}.
@@ -1442,6 +1460,8 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> /*extends
          */
         public Void call() throws Exception {
 
+            final long beginNanos = System.nanoTime();
+            
             /*
              * Note: This is tested outside of the try/catch. Do NOT retry if
              * the quorum state has become invalid.
@@ -1468,11 +1488,13 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> /*extends
 
                 if (!retrySend()) {
 
+                    final long elapsedNanos = System.nanoTime() - beginNanos;
+                    
                     // Rethrow the original exception.
                     throw new RuntimeException(
                             "Giving up. Could not send after "
-                                    + RETRY_SLEEP.length + " attempts : " + t,
-                            t);
+                                    + TimeUnit.NANOSECONDS.toMillis(elapsedNanos)
+                                    + "ms : " + t, t);
 
                 }
                 
@@ -1551,15 +1573,25 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> /*extends
          */
         private boolean retrySend() throws InterruptedException {
 
-            // we already tried once.
-            int tryCount = 1;
+            final long beginNanos = System.nanoTime();
+            final long nanos = getRetrySendTimeoutNanos();
+            final long retrySleepNanos = TimeUnit.MILLISECONDS.toNanos(RETRY_SLEEP);
+            
+            int tryCount = 1; // already retried once.
 
             // now try some more times.
-            for (; tryCount < RETRY_SLEEP.length; tryCount++) {
+            while (true) {
 
+                long remaining = nanos - (System.nanoTime() - beginNanos);
+
+                if (remaining <= retrySleepNanos)
+                    break;
+                
                 // Sleep before each retry (including the first).
-                Thread.sleep(RETRY_SLEEP[tryCount - 1]/* ms */);
+                Thread.sleep(RETRY_SLEEP/* ms */);
 
+                remaining = nanos - (System.nanoTime() - beginNanos);
+                
                 /*
                  * Note: Tested OUTSIDE of the try/catch so a quorum break will
                  * immediately stop the retry behavior.
@@ -1569,7 +1601,7 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> /*extends
                 try {
 
                     // send to 1st follower.
-                    innerReplicate(tryCount);
+                    innerReplicate(tryCount++);
 
                     // Success.
                     return true;
@@ -1586,8 +1618,14 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> /*extends
                     }
                     
                     // log and retry.
-                    log.error("retry=" + tryCount + " : " + t, t);
-                    
+                    log.error(
+                            "retry="
+                                    + tryCount
+                                    + ", elapsed="
+                                    + TimeUnit.NANOSECONDS.toMillis(System
+                                            .nanoTime() - beginNanos) + "ms : "
+                                    + t, t);
+
                     continue;
                     
                 }

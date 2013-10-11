@@ -53,7 +53,7 @@ import net.jini.jeri.tcp.TcpServerEndpoint;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.concurrent.FutureTaskMon;
+import com.bigdata.concurrent.FutureTaskInvariantMon;
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.QuorumService;
 import com.bigdata.ha.RunState;
@@ -189,6 +189,11 @@ public class HAJournal extends Journal {
      * @see HAJournalServer.ConfigurationOptions#MAXIMUM_CLOCK_SKEW
      */
     private final long maximumClockSkew;
+
+    /**
+     * @see HAJournalServer.ConfigurationOptions#HA_EXTRA_DELAY_FOR_RETRY_SEND
+     */
+    private final long haExtraDelayForRetrySend;
     
 //    /**
 //     * @see HAJournalServer.ConfigurationOptions#HA_LOG_DIR
@@ -388,6 +393,24 @@ public class HAJournal extends Journal {
 
         }
         
+        {
+            haExtraDelayForRetrySend = (Long) config
+                    .getEntry(
+                            HAJournalServer.ConfigurationOptions.COMPONENT,
+                            HAJournalServer.ConfigurationOptions.HA_EXTRA_DELAY_FOR_RETRY_SEND,
+                            Long.TYPE,
+                            HAJournalServer.ConfigurationOptions.DEFAULT_HA_EXTRA_DELAY_FOR_RETRY_SEND);
+
+            if (haExtraDelayForRetrySend < 0L) {
+                throw new ConfigurationException(
+                        HAJournalServer.ConfigurationOptions.HA_EXTRA_DELAY_FOR_RETRY_SEND
+                                + "="
+                                + haExtraDelayForRetrySend
+                                + " : must be non-negative");
+            }
+
+        }
+
         // HALog manager.
         haLogNexus = new HALogNexus(server, this, config);
         
@@ -470,41 +493,51 @@ public class HAJournal extends Journal {
      * Overridden to expose this method to the {@link HAJournalServer}.
      */
     @Override
+    protected final void clearQuorumToken(final long newValue) {
+    
+        super.clearQuorumToken(newValue);
+        
+    }
+    
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Overridden to expose this method to the {@link HAJournalServer}.
+     */
+    @Override
     protected final void setQuorumToken(final long newValue) {
     
         super.setQuorumToken(newValue);
 
-        if (getHAReady() == Quorum.NO_QUORUM) {
-
-            /*
-             * If there is a running snapshot, then cancel it since the quorum
-             * has broken (or this service has left the quorum). (HAReady will
-             * be NO_QUORUM if the quorum is still met, but this service is no
-             * longer joined with the met quorum.)
-             * 
-             * Note: The snapshot task will automatically terminate if it
-             * observes a quorum break or similar event. This is just being
-             * proactive.
-             * 
-             * done. This will not be called if the quorum remains met but the
-             * local service leaves the quorum. However, we should still cancel
-             * a running snapshot if that occurs (if we add a serviceLeave()
-             * handler then this will fix that). [there is no a serviceLeave()
-             * handler in HAJournalServer.]
-             */
-            
-            final Future<IHASnapshotResponse> ft = getSnapshotManager()
-                    .getSnapshotFuture();
-
-            if (ft != null && !ft.isDone()) {
-
-                haLog.info("Canceling snapshot.");
-
-                ft.cancel(true/* mayInterruptIfRunning */);
-
-            }
-
-        }
+        /*
+         * Note: This is now handled by an invariant listener in
+         * SnapshotManager.
+         */
+//        if (getHAReady() == Quorum.NO_QUORUM) {
+//
+//            /*
+//             * If there is a running snapshot, then cancel it since the quorum
+//             * has broken (or this service has left the quorum). (HAReady will
+//             * be NO_QUORUM if the quorum is still met, but this service is no
+//             * longer joined with the met quorum.)
+//             * 
+//             * Note: The snapshot task will automatically terminate if it
+//             * observes a quorum break or similar event. This is just being
+//             * proactive.
+//             */
+//            
+//            final Future<IHASnapshotResponse> ft = getSnapshotManager()
+//                    .getSnapshotFuture();
+//
+//            if (ft != null && !ft.isDone()) {
+//
+//                haLog.info("Canceling snapshot.");
+//
+//                ft.cancel(true/* mayInterruptIfRunning */);
+//
+//            }
+//
+//        }
         
     }
     
@@ -553,6 +586,18 @@ public class HAJournal extends Journal {
     public final long getMaximumClockSkewMillis() {
 
         return maximumClockSkew;
+        
+    }
+
+//  * {@inheritDoc}
+    /**
+     * 
+     * @see HAJournalServer.ConfigurationOptions#HA_EXTRA_DELAY_FOR_RETRY_SEND
+     */
+//    @Override
+    public final long getHAExtraDelayForRetrySend() {
+
+        return haExtraDelayForRetrySend;
         
     }
 
@@ -883,7 +928,17 @@ public class HAJournal extends Journal {
                     isLive = r.isLive();
 
                     // Task sends an HALog file along the pipeline.
-                    ft = new FutureTaskMon<Void>(new SendHALogTask(req, r));
+                    ft = new FutureTaskInvariantMon<Void>(new SendHALogTask(req, r), getQuorum()) {
+
+						@Override
+						protected void establishInvariants() {
+							assertQuorumMet();
+							assertJoined(getServiceId());
+							assertMember(req.getServiceId());
+							assertInPipeline(req.getServiceId());
+						}
+                    	
+                    };
 
                     // Run task.
                     getExecutorService().submit(ft);
@@ -963,86 +1018,96 @@ public class HAJournal extends Journal {
             }
 
             public Void call() throws Exception {
+				try {
 
-                try {
+					long nsent = 0;
+					boolean success = false;
 
-                long nsent = 0;
-                boolean success = false;
+					final IBufferAccess buf = DirectBufferPool.INSTANCE
+							.acquire();
 
-                    final IBufferAccess buf = DirectBufferPool.INSTANCE.acquire();
+					try {
 
-                try {
+						while (r.hasMoreBuffers()) {
 
-                    while (r.hasMoreBuffers()) {
+							// IHABufferStrategy
+							final IHABufferStrategy strategy = HAJournal.this
+									.getBufferStrategy();
 
-                        // IHABufferStrategy
-                        final IHABufferStrategy strategy = HAJournal.this
-                                .getBufferStrategy();
+							// get message and fill write cache buffer (unless
+							// WORM).
+							final IHAWriteMessage msg = r.processNextBuffer(buf
+									.buffer());
 
-                        // get message and fill write cache buffer (unless WORM).
-                        final IHAWriteMessage msg = r.processNextBuffer(buf.buffer());
-                        
-                        if (haLog.isDebugEnabled())
-                            haLog.debug("req=" + req + ", msg=" + msg);
+							if (haLog.isDebugEnabled())
+								haLog.debug("req=" + req + ", msg=" + msg);
 
-                        // drop them into the write pipeline.
-                        final Future<Void> ft = strategy.sendHALogBuffer(req, msg,
-                                buf);
+							// drop them into the write pipeline.
+							final Future<Void> ft = strategy.sendHALogBuffer(
+									req, msg, buf);
 
-                        try {
-                            // wait for message to make it through the pipeline.
-                            ft.get();
-                            nsent++;
-                        } finally {
-                            /*
-                             * DO NOT PROPAGATE THE INTERRUPT TO THE PIPELINE.
-                             * 
-                             * Note: Either the Future isDone() or *this* thread
-                             * was interrupted. If ft.isDone() then we do not
-                             * need to cancel the Future. If *this* thread was
-                             * interrupted, then we DO NOT propagate that
-                             * interrupt to the pipeline.
-                             * 
-                             * This thread will be interrupted if the service
-                             * that requested the HALog file is has caught up
-                             * and transitioned from Resync to RunMet.
-                             * 
-                             * Propagating the interrupt to the pipeline (by
-                             * calling ft.cancel(true)) would causes the socket
-                             * channel to be asynchronously closed. The sends on
-                             * the pipeline do not have a frame that marks off
-                             * one from the next, so the next queued send can
-                             * wind up being interrupted.
-                             * 
-                             * Because we do not cancel the Future, the send()
-                             * will complete normally. This is Ok. The receiver
-                             * can discard the message and payload.
-                             */
-//                            ft.cancel(true/* mayInterruptIfRunning */);
-                        }
-                        
-                    } // while(hasMoreBuffers())
+							try {
+								// wait for message to make it through the
+								// pipeline.
+								ft.get();
+								nsent++;
+							} finally {
+								/*
+								 * DO NOT PROPAGATE THE INTERRUPT TO THE
+								 * PIPELINE.
+								 * 
+								 * Note: Either the Future isDone() or *this*
+								 * thread was interrupted. If ft.isDone() then
+								 * we do not need to cancel the Future. If
+								 * *this* thread was interrupted, then we DO NOT
+								 * propagate that interrupt to the pipeline.
+								 * 
+								 * This thread will be interrupted if the
+								 * service that requested the HALog file is has
+								 * caught up and transitioned from Resync to
+								 * RunMet.
+								 * 
+								 * Propagating the interrupt to the pipeline (by
+								 * calling ft.cancel(true)) would causes the
+								 * socket channel to be asynchronously closed.
+								 * The sends on the pipeline do not have a frame
+								 * that marks off one from the next, so the next
+								 * queued send can wind up being interrupted.
+								 * 
+								 * Because we do not cancel the Future, the
+								 * send() will complete normally. This is Ok.
+								 * The receiver can discard the message and
+								 * payload.
+								 */
+								// ft.cancel(true/* mayInterruptIfRunning */);
+							}
 
-                    success = true;
+						} // while(hasMoreBuffers())
 
-                    return null;
+						success = true;
 
-                } finally {
+						return null;
 
-                    buf.release();
+					} catch (Exception e) {
+						if (haLog.isDebugEnabled())
+							haLog.debug("Interrupted", e);
 
-                    if (haLog.isDebugEnabled())
-                        haLog.debug("req=" + req + ", nsent=" + nsent
-                                + ", success=" + success);
-                    
-                }
+						throw e;
+					} finally {
 
-                } finally {
+						buf.release();
 
+						if (haLog.isDebugEnabled())
+							haLog.debug("req=" + req + ", nsent=" + nsent
+									+ ", success=" + success);
+
+					}
+
+				} finally {
                     // Close the open log file.
                     r.close();
 
-            }
+				}
 
             } // call()
 
@@ -1062,8 +1127,18 @@ public class HAJournal extends Journal {
                 haLog.debug("req=" + req);
 
             // Task sends an HALog file along the pipeline.
-            final FutureTask<IHASendStoreResponse> ft = new FutureTaskMon<IHASendStoreResponse>(
-                    new SendStoreTask(req));
+            final FutureTask<IHASendStoreResponse> ft = new FutureTaskInvariantMon<IHASendStoreResponse>(
+                    new SendStoreTask(req), getQuorum()) {
+
+						@Override
+						protected void establishInvariants() {
+							assertQuorumMet();
+							assertJoined(getServiceId());
+							assertMember(req.getServiceId());
+							assertInPipeline(req.getServiceId());
+						}
+            	
+            };
 
             // Run task.
             getExecutorService().submit(ft);
@@ -1091,7 +1166,7 @@ public class HAJournal extends Journal {
             
             public IHASendStoreResponse call() throws Exception {
                 
-                // The quorum token (must remain valid through this operation).
+            	// The quorum token (must remain valid through this operation).
                 final long quorumToken = getQuorumToken();
                 
                 // Grab a read lock.

@@ -40,8 +40,10 @@ import com.bigdata.ha.msg.IHA2PhaseCommitMessage;
 import com.bigdata.ha.msg.IHA2PhasePrepareMessage;
 import com.bigdata.ha.msg.IHANotifyReleaseTimeRequest;
 import com.bigdata.journal.AbstractTask;
+import com.bigdata.journal.jini.ha.HAJournalServer.RunStateEnum;
 import com.bigdata.journal.jini.ha.HAJournalTest.HAGlueTest;
 import com.bigdata.journal.jini.ha.HAJournalTest.SpuriousTestException;
+import com.bigdata.quorum.AsynchronousQuorumCloseException;
 import com.bigdata.quorum.zk.ZKQuorumImpl;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
 import com.bigdata.util.ClocksNotSynchronizedException;
@@ -793,6 +795,256 @@ public class TestHAJournalServerOverride extends AbstractHA3JournalServerTestCas
 
         }
         
+    }
+
+//    /**
+//     * 2 services start, quorum meets then we bounce the zookeeper connection
+//     * for the leader and verify that the quorum meets again.
+//     */
+//    public void testStartAB_DropReopenLeader() throws Exception {
+//        
+//        final HAGlue serverA = startA();
+//        final HAGlue serverB = startB();
+//
+//        final long token1 = quorum.awaitQuorum(awaitQuorumTimeout,
+//                TimeUnit.MILLISECONDS);
+//
+//        doNSSStatusRequest(serverA);
+//        doNSSStatusRequest(serverB);
+//
+//        // Await initial commit point (KB create).
+//        awaitCommitCounter(1L, serverA, serverB);
+//
+//        // Await [A] up and running as leader.
+//        assertEquals(HAStatusEnum.Leader, awaitNSSAndHAReady(serverA));
+//
+//        // Await [B] up and running as follower.
+//        assertEquals(HAStatusEnum.Follower, awaitNSSAndHAReady(serverB));
+//
+//        // Verify self-reports in role.
+//        awaitHAStatus(serverA, HAStatusEnum.Leader);
+//        awaitHAStatus(serverB, HAStatusEnum.Follower);
+//
+//        // Verify binary equality on the journal files.
+//        assertDigestsEquals(new HAGlue[] { serverA, serverB });
+//
+//        if (log.isInfoEnabled()) {
+//            log.info("Zookeeper before quorum meet:\n" + dumpZoo());
+//        }
+//
+//        /*
+//         * Bounce the leader. Verify that the service that was the follower is
+//         * now the leader. Verify that the quorum meets.
+//         */
+//        {
+//            
+//            final HAGlue leader = quorum.getClient().getLeader(token1);
+//
+////            final UUID leaderId1 = leader.getServiceId();
+//            
+//            ((HAGlueTest)leader).dropZookeeperConnection().get();
+//
+//            // without explicit reopen, will it recover?
+//            // ((HAGlueTest)leader).reopenZookeeperConnection().get();
+//
+//            // Wait for the quorum to break and then meet again.
+//            final long token2 = awaitNextQuorumMeet(token1);
+//
+//            if (log.isInfoEnabled()) {
+//                log.info("Zookeeper after quorum meet:\n" + dumpZoo());
+//            }
+//
+//            /*
+//             * Bouncing the connection broke the quorum, so verify that the
+//             * quorum token was advanced.
+//             */
+//            assertEquals(token1 + 1, token2);
+//
+//            // The leader MAY have changed.
+//            final HAGlue leader2 = quorum.getClient().getLeader(token2);
+//
+////            final UUID leaderId2 = leader2.getServiceId();
+////
+////            assertFalse(leaderId1.equals(leaderId2));
+//            
+//            // Verify leader self-reports in new role.
+//            awaitHAStatus(leader2, HAStatusEnum.Leader);
+//            
+//            /*
+//             * Verify we can read on the KB on both nodes.
+//             * 
+//             * Note: It is important to test the reads for the first commit on
+//             * both the leader and the follower.
+//             */
+//            for (HAGlue service : new HAGlue[] { serverA, serverB }) {
+//
+//                final RemoteRepository repo = getRemoteRepository(service);
+//
+//                // Should be empty.
+//                assertEquals(
+//                        0L,
+//                        countResults(repo.prepareTupleQuery(
+//                                "SELECT * {?a ?b ?c} LIMIT 10").evaluate()));
+//
+//            }
+//
+//        }
+//        
+//    }
+
+    public void testStartAB_StopStartZookeeper() throws Exception {
+        
+    	doStartAB_StopStartZookeeper();
+    }
+    
+    public void testStartAB_StopStartZookeeperA() throws Exception {
+        
+    	doStartAB_StopStartZookeeper();
+    }
+    
+    public void testStartAB_StopStartZookeeperB() throws Exception {
+        
+    	doStartAB_StopStartZookeeper();
+    }
+    
+    public void testStartAB_StopStartZookeeperC() throws Exception {
+        
+    	doStartAB_StopStartZookeeper();
+    }
+    
+    public void testStartAB_StopStartZookeeperD() throws Exception {
+        
+    	doStartAB_StopStartZookeeper();
+    }
+    
+    public void testStartAB_StopStartZookeeperE() throws Exception {
+        
+    	doStartAB_StopStartZookeeper();
+    }
+    
+    public void testStartAB_StopStartZookeeperF() throws Exception {
+        
+    	doStartAB_StopStartZookeeper();
+    }
+    
+    public void testStartAB_StopStartZookeeperG() throws Exception {
+        
+    	doStartAB_StopStartZookeeper();
+    }
+    
+    public void doStartAB_StopStartZookeeper() throws Exception {
+        
+        final HAGlue serverA = startA();
+        final HAGlue serverB = startB();
+
+        final long token1 = quorum.awaitQuorum(awaitQuorumTimeout,
+                TimeUnit.MILLISECONDS);
+        awaitNSSAndHAReady(serverA);
+        awaitNSSAndHAReady(serverB);
+        awaitCommitCounter(1L, serverA, serverB); // wait for the initial KB create.
+        
+        /*
+         * Shutdown zookeeper.
+         */
+        final int negotiatedSessionTimeout = ((ZKQuorumImpl) quorum)
+                .getZookeeper().getSessionTimeout();
+        ((HAGlueTest)serverA).log("WILL SHUTDOWN ZOOKEEPER");
+        stopZookeeper();
+        assertZookeeperNotRunning();
+        
+        /*
+         * Make sure that the clients know that they are disconnected (otherwise
+         * this can take up to the zk session timeout).
+         */
+//        ((HAGlueTest)serverA).dropZookeeperConnection();
+//        ((HAGlueTest)serverB).dropZookeeperConnection();
+
+        /*
+         * Sleep until the session timeout would have expired. This should cause
+         * the zk clients to notice that they are disconnected and trigger the
+         * error state transition.
+         */
+        Thread.sleep(negotiatedSessionTimeout + 2000/* ms */);
+        /*
+         * FIXME Restore this block of code once AbstractQuorum.getClient() no
+         * longer contents for a lock to provide access to the client reference
+         * (right now these operations can contend that lock and block during
+         * doServiceLeave() in the ErrorTask).
+         */
+//        /*
+//         * The services should be NotReady (their haReadyToken and haStatus
+//         * should all have been cleared).
+//         */
+//        awaitHAStatus(serverA, HAStatusEnum.NotReady);
+//        awaitHAStatus(serverB, HAStatusEnum.NotReady);
+//        if (log.isInfoEnabled()) {
+//            log.info("A:: " + serverA.getExtendedRunState());
+//            log.info("B:: " + serverB.getExtendedRunState());
+//        }
+//
+//        /*
+//         * The services should be in the Error state. They can not leave that
+//         * state until we restart zookeeper, at which point they can finish
+//         * their actor.doServiceLeave().
+//         */
+//        awaitRunStateEnum(RunStateEnum.Error, serverA);
+//        awaitRunStateEnum(RunStateEnum.Error, serverB);
+
+        log.warn("Start Zookeeper, met: " + quorum.isQuorumMet());
+        ((HAGlueTest)serverA).log("WILL START ZOOKEEPER");
+        ((HAGlueTest)serverB).log("WILL START ZOOKEEPER");
+        startZookeeper();
+        assertZookeeperRunning();
+        
+//        final Future<Boolean> res2 = serverA.submit(
+//                new InvariantTask.ServiceDoesntJoin(getServiceAId()), true);
+//
+//        // The task should note service join and return
+//        assertTrue(res2.get(30, TimeUnit.SECONDS));
+        
+        final long token2 =  awaitNextQuorumMeet(token1);
+        
+        log.warn("Met: " + quorum.isQuorumMet() + ", token: " + token2);
+
+//		assertTrue(token2 != token1);
+		
+    }
+    
+    public void _testStressStartAB_StopStartZookeeper() throws AsynchronousQuorumCloseException, InterruptedException, TimeoutException {
+       	for (int test = 0; test < 20; test++) {
+            log.warn("Starting run: " + test);
+            try {
+            	doStartAB_StopStartZookeeper();
+            } catch (Throwable t) {
+                fail("Run " + test, t);
+            } finally {
+            	Thread.sleep(3000); // wait for local state to settle?
+                destroyAll();
+            }
+    	}
+       	
+    	Thread.sleep(3000); // wait for local state to settle?
+    }
+
+    /**
+     * Verify ability to stop and restart the zookeeper process under test
+     * control.
+     * 
+     * @throws InterruptedException
+     * @throws IOException
+     */
+    public void testStopStartZookeeper() throws InterruptedException,
+            IOException {
+
+        assertZookeeperRunning();
+        stopZookeeper();
+        try {
+            Thread.sleep(3000);
+            assertZookeeperNotRunning();
+        } finally {
+            startZookeeper();
+            assertZookeeperRunning();
+        }
     }
 
     /**

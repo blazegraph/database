@@ -1360,7 +1360,7 @@ public class ZKQuorumImpl<S extends Remote, C extends QuorumClient<S>> extends
                         log.info(e.toString());
                     switch (e.getState()) {
                     case Disconnected:
-                        log.warn("DISCONNECTED: " + token());
+                        handleDisconnected();
                         return;
                     case SyncConnected:
                         break;
@@ -1421,6 +1421,8 @@ public class ZKQuorumImpl<S extends Remote, C extends QuorumClient<S>> extends
          * moving again.
          */
         private void handleExpired() {
+            log.error("ZOOKEEPER SESSION EXPIRED: token=" + token());
+            doNotifyClientDisconnected();
             while (true) {
                 try {
                     // wait for a valid ZooKeeper connection.
@@ -1439,6 +1441,30 @@ public class ZKQuorumImpl<S extends Remote, C extends QuorumClient<S>> extends
             }
         }
 
+        /**
+         * This service has become disconnected from the zookeeper ensemble.
+         * Invoke the {@link QuorumClient#disconnected()} method to allow the
+         * client to handle this in an application specific manner.
+         */
+        private void handleDisconnected() {
+            log.error("ZOOKEEPER CLIENT DISCONNECTED: token=" + token());
+            doNotifyClientDisconnected();
+        }
+        
+        private void doNotifyClientDisconnected() {
+            log.warn("ZOOKEEPER DISCONNECT NOTIFY: token=" + token());
+            final QuorumClient<?> client = getClient();
+            if (client != null) {
+                try {
+                    client.disconnected();
+                } catch (RuntimeException ex) {
+                    log.error(ex);
+                } catch (Exception ex) {
+                    log.error(ex);
+                }
+            }
+        }
+        
         /**
          * Sets up the watchers and pumps a mock event for each watcher to get
          * things rolling (it causes the data/children of the zpath to be

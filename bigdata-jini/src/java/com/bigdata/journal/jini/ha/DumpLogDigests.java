@@ -338,10 +338,11 @@ public class DumpLogDigests {
     
     @SuppressWarnings("serial")
 	static class GetLogInfo extends IndexManagerCallable<List<HALogInfo>> {
-    	long startCC;
-    	long endCC;
-    	int serviceThreads;
-    	GetLogInfo(long startCC, long endCC, int serviceThreads) {
+    private final long endCC;
+    private final long startCC;
+    private final int serviceThreads;
+
+	GetLogInfo(final long startCC, final long endCC, final int serviceThreads) {
     		this.startCC = startCC;
     		this.endCC = endCC;
     		this.serviceThreads = serviceThreads;

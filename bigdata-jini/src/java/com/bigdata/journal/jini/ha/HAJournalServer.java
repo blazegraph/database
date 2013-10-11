@@ -52,7 +52,9 @@ import net.jini.core.lookup.ServiceItem;
 
 import org.apache.log4j.Logger;
 import org.apache.zookeeper.CreateMode;
+import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.KeeperException.NodeExistsException;
+import org.apache.zookeeper.ZooKeeper;
 import org.apache.zookeeper.data.ACL;
 import org.eclipse.jetty.server.Server;
 
@@ -262,6 +264,30 @@ public class HAJournalServer extends AbstractServer {
          */
         long MIN_MAXIMUM_CLOCK_SKEW = 100;
         
+        /**
+         * The additional time to await successful replication beyond the
+         * negotiated session timeout for the zookeeper client ({@default
+         * #DEFAULT_HA_EXTRA_DELAY_FOR_RETRY_SEND})
+         * <p>
+         * The robust replication logic examines the negotiated session timeout
+         * for zookeeper to decide how long it will retry transmission before
+         * failing. Once transmission is failed, the associated update will
+         * fail. Since the zookeeper ensemble takes some non-zero time to notify
+         * the services that it has timed out a dead service, we need to add a
+         * some latency beyond the negotiated session timeout or a transaction
+         * will stochastically fail if a joined service is killed while the
+         * leader is attempting to replicate writes along the pipeline. In
+         * addition to the latency for the zookeeper ensemble to notify the
+         * servers, there is also possible latency due to GC pauses. This value
+         * thus provides some <em>additional</em> latency and is intended to
+         * allow updates to succeed even when a service is killed and in the
+         * face of other sources of latency in the processing of the ZK events
+         * that reflect that the service is no longer "live".
+         */
+        String HA_EXTRA_DELAY_FOR_RETRY_SEND = "haExtraDelayForRetrySend";
+
+        long DEFAULT_HA_EXTRA_DELAY_FOR_RETRY_SEND = 5000; // milliseconds.
+
         /**
          * The property whose value is the name of the directory in which write
          * ahead log files will be created to support resynchronization services
@@ -479,7 +505,7 @@ public class HAJournalServer extends AbstractServer {
      * Enum of the run states. The states are labeled by the goal of the run
      * state.
      */
-    static enum RunStateEnum {
+    static public enum RunStateEnum {
         /**
          * Roll forward the database by applying local HALog files GT current
          * commit point.
@@ -1125,7 +1151,7 @@ public class HAJournalServer extends AbstractServer {
              * The {@link RunStateEnum} for this task.
              */
             protected final RunStateEnum runState;
-
+            
             protected RunStateCallable(final RunStateEnum runState) {
 
                 if (runState == null)
@@ -1134,7 +1160,7 @@ public class HAJournalServer extends AbstractServer {
                 this.runState = runState;
                 
             }
-
+            
             final public T call() throws Exception {
 
                 /*
@@ -1142,7 +1168,7 @@ public class HAJournalServer extends AbstractServer {
                  * already shutting down.
                  */
                 setRunState(runState);
-
+                
                 try {
 
                     return doRun();
@@ -1177,8 +1203,22 @@ public class HAJournalServer extends AbstractServer {
                          * 
                          * Note: The ErrorTask can not interrupt itself even if
                          * it was the current task since the current task has
-                         * been terminated by the theows exception!
+                         * been terminated by the throws exception!
+                         * 
+                         * Note: The ErrorTask CAN terminate through an internal exception
+                         * so we need to check if this is the case and clear the runstateRef
+                         * so we will be able to enter a new ErrorTask. This was being observed
+                         * when we lose a zookeeper connection - the error task was unable to
+                         * obtain the new zk connection, which caused an error that required us
+                         * to retry the ErrorTask.  This is also handled inside of the ErrorTask
+                         * now, which explicitly retries to obtain the zk connection, but it is
+                         * handled here for the general case of unchecked errors thrown out of the
+                         * ErrorTask.
                          */
+                        if (runState == RunStateEnum.Error) {
+                            haLog.warn("Detected error from ErrorTask, so clear runStateRef to allow re-entry");
+                        	runStateRef.set(null);
+                        }
 
                         enterErrorState();
 
@@ -1256,6 +1296,70 @@ public class HAJournalServer extends AbstractServer {
         /**
          * {@inheritDoc}
          * <p>
+         * Overridden to report the negotiated zookeeper session timeout.
+         * 
+         * @throws QuorumException
+         *             if we are not connected to zookeeper.
+         */
+        @Override
+        protected long getRetrySendTimeoutNanos() {
+            
+            final ZooKeeperAccessor zka = journal
+                    .getHAClient()
+                    .getConnection()
+                    .getZookeeperAccessor();
+
+            int negotiatedSessionTimeoutMillis;
+//            try {
+                final ZooKeeper zk = zka.getZookeeperNoBlock();
+                if (zk == null || !zk.getState().isAlive()) {
+                    /*
+                     * This service is not connected to zookeeper.
+                     * 
+                     * Note: We do not wait AT ALL. This method is called from
+                     * within pipeline replication. If we are not connected,
+                     * then we have no business participating in the pipeline
+                     * replication and should fail fast.
+                     */
+                    throw new QuorumException("ZK not connected");
+                }
+//                if (!zka.awaitZookeeperConnected(
+//                        journal.getHAClient().zooConfig.sessionTimeout,
+//                        TimeUnit.MILLISECONDS)) {
+//                    /*
+//                     * This service is not connected to zookeeper.
+//                     * 
+//                     * Note: We are only waiting up to the desired session
+//                     * timeout for the client. If the client is not connected by
+//                     * the end of that timeout, then we will not wait further to
+//                     * determine the current negotiated session timeout for the
+//                     * client and the ZK Quorum.
+//                     */
+//                    throw new RuntimeException("ZK not connected");
+//                }
+                negotiatedSessionTimeoutMillis = zk//zka.getZookeeper()
+                        .getSessionTimeout();
+//            } catch (InterruptedException e) {
+//                throw new RuntimeException(e);
+//            }
+
+            /*
+             * Note: An additional delay is added in here to give the server a
+             * chance to handle messages that will start to arrive after the
+             * session timeout has caused some service to be expired.
+             */
+            final long ms = negotiatedSessionTimeoutMillis
+                    + journal.getHAExtraDelayForRetrySend();
+            
+            final long ns = TimeUnit.MILLISECONDS.toNanos(ms);
+            
+            return ns;
+            
+        }
+        
+        /**
+         * {@inheritDoc}
+         * <p>
          * Note: Invoked from {@link AbstractJournal#doLocalAbort()}.
          */
         @Override 
@@ -1301,7 +1405,7 @@ public class HAJournalServer extends AbstractServer {
         @Override
         public void enterErrorState() {
 
-            log.warn(new StackInfoReport());
+            log.warn(new StackInfoReport("Will enter error state"));
 
             enterRunState(new ErrorTask());
 
@@ -1385,17 +1489,24 @@ public class HAJournalServer extends AbstractServer {
                 if (runStateTask.runState
                         .equals(lastSubmittedRunStateRef.get())) {
                     
-                    /*
-                     * Do not re-enter the same run state.
-                     * 
-                     * Note: This was added to prevent re-entry of the
-                     * ErrorState when we are already in the ErrorState.
-                     */
-                    
-                    haLog.warn("Will not reenter active run state: "
-                            + runStateTask.runState);
+                    // But also need to check if future isDone
+                    final FutureTask<Void> ft = runStateFutureRef.get();
 
-                    return null;
+                    if (!(ft.isDone() || ft.isCancelled())) {
+                    
+                        /*
+                         * Do not re-enter the same run state.
+                         * 
+                         * Note: This was added to prevent re-entry of the
+                         * ErrorState when we are already in the ErrorState.
+                         */
+                        
+                        haLog.warn("Will not reenter active run state: "
+                                + runStateTask.runState);
+                        
+                        return null;
+                        
+                    }
 
                 }
                
@@ -1639,6 +1750,19 @@ public class HAJournalServer extends AbstractServer {
         }
 
         /**
+         * {@inheritDoc}
+         * <p>
+         * Force the service to enter the {@link ErrorTask} when if it becomes
+         * disconnected from the quorum.
+         */
+        @Override
+        public void disconnected() {
+            
+            enterErrorState();
+            
+        }
+        
+        /**
          * Transition to {@link RunStateEnum#Error}.
          */
         private class EnterErrorStateTask implements Callable<Void> {
@@ -1731,7 +1855,7 @@ public class HAJournalServer extends AbstractServer {
             
             @Override
             public Void doRun() throws Exception {
-
+            	
                 while (true) {
 
                     log.warn("Will do error handler.");
@@ -1748,14 +1872,6 @@ public class HAJournalServer extends AbstractServer {
                      * NOT want to call it here.
                      */
                     journal.doLocalAbort();
-
-                    /*
-                     * Do synchronous service leave.
-                     */
-
-                    log.warn("Will do SERVICE LEAVE");
-
-                    getActor().serviceLeave();
 
                     /*
                      * Set token. Journal will notice that it is no longer
@@ -1784,7 +1900,31 @@ public class HAJournalServer extends AbstractServer {
                                 + ", getQuorum().token()=: "
                                 + getQuorum().token());
 
-                    journal.setQuorumToken(getQuorum().token());
+                    journal.clearQuorumToken(getQuorum().token());
+
+                    /*
+                     * Do synchronous service leave.
+                     * 
+                     * If a Zookeeper Exception is detected then try again.
+                     * 
+                     * Note: This code will BLOCK until the service has a client
+                     * connection to zookeeper. Therefore, we handle the set
+                     * quorum token before the service leave.
+                     */
+                    log.warn("Will attempt SERVICE LEAVE");
+                    while (true) {
+                        try {
+                            getActor().serviceLeave();
+                            break;
+                        } catch (RuntimeException re) {
+                            if (InnerCause.isInnerCause(re,
+                                    KeeperException.class)) {
+                                // Retry.
+                                continue;
+                            }
+                            throw re;
+                        }
+                    }
 
                     /**
                      * Dispatch Events before entering SeekConsensus! Otherwise

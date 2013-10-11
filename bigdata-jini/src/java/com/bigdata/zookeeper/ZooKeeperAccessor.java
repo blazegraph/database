@@ -214,6 +214,16 @@ public class ZooKeeperAccessor {
     }
     
     /**
+     * Return the current zookeeper connection object. This object MAY be either
+     * null or invalid (not connected).
+     */
+    public ZooKeeper getZookeeperNoBlock() {
+
+        return zookeeper;
+        
+    }
+    
+    /**
      * Helper class isolates interrupts of the thread running the task from
      * the caller.
      * 

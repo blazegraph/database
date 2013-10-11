@@ -32,6 +32,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.net.InetAddress;
 import java.rmi.Remote;
 import java.util.Arrays;
 import java.util.LinkedList;
@@ -57,6 +58,7 @@ import net.jini.discovery.LookupDiscoveryManager;
 import net.jini.lease.LeaseRenewalManager;
 import net.jini.lookup.ServiceDiscoveryManager;
 
+import org.apache.system.SystemUtil;
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.KeeperException.ConnectionLossException;
@@ -92,6 +94,7 @@ import com.bigdata.rdf.sail.webapp.client.HttpException;
 import com.bigdata.service.jini.JiniClientConfig;
 import com.bigdata.service.jini.RemoteDestroyAdmin;
 import com.bigdata.util.InnerCause;
+import com.bigdata.util.config.NicUtil;
 import com.bigdata.zookeeper.DumpZookeeper;
 import com.bigdata.zookeeper.ZooHelper;
 import com.bigdata.zookeeper.ZooKeeperAccessor;
@@ -1454,6 +1457,18 @@ public class AbstractHA3JournalServerTestCase extends
         return new StartCTask(true/* restart */).call();
 
     }
+    
+    protected UUID getServiceAId() {
+    	return serverAId;
+    }
+    
+    protected UUID getServiceBId() {
+    	return serverBId;
+    }
+    
+    protected UUID getServiceCId() {
+    	return serverCId;
+    }
 
     private HAGlue startServer(final String name,
             final String sourceConfigFileName, final UUID serviceId,
@@ -2739,6 +2754,101 @@ public class AbstractHA3JournalServerTestCase extends
             }
 
         }, 10, TimeUnit.SECONDS);
+
+    }
+
+    /**
+     * Stop the zookeeper process under test control.
+     * 
+     * @see #zkCommand(String)
+     * 
+     * @throws InterruptedException
+     * @throws IOException
+     */
+    protected void stopZookeeper() throws InterruptedException, IOException {
+        log.warn("");
+        zkCommand("stop");
+    }
+
+    /**
+     * Start the zookeeper process under test control.
+     * 
+     * @see #zkCommand(String)
+     * 
+     * @throws InterruptedException
+     * @throws IOException
+     */
+    protected void startZookeeper() throws InterruptedException, IOException {
+        log.warn("");
+        zkCommand("start");
+    }
+
+    /**
+     * Execute a command to start or kill zookeeper using the zkServer script.
+     * This relies on the system property
+     * 
+     * <pre>
+     * test.zookeeper.installDir
+     * </pre>
+     * 
+     * That property must specify the location of the zookeeper installation.
+     * <p>
+     * Note: This same property is used by CI to locate the zookeeper install
+     * directory and start/stop the zookeeper process. When running these tests,
+     * you must specify this property in order to execute tests that stop and
+     * start the zookeeper process under test control.
+     */
+    protected void zkCommand(final String cmd) throws InterruptedException,
+            IOException {
+        final String pname = "test.zookeeper.installDir";
+        final String zookeeperDirStr = System.getProperty(pname);
+        if (zookeeperDirStr == null)
+            fail("System property not defined: " + pname);
+        final File zookeeperDir = new File(zookeeperDirStr);
+        if (!zookeeperDir.exists())
+            fail("No such file: " + pname);
+        final String executable = SystemUtil.isWindows() ? "zkServer.cmd"
+                : "zkServer.sh";
+        final ProcessBuilder pb = new ProcessBuilder("/bin/sh", executable, cmd);
+        pb.directory(new File(zookeeperDir, "bin"));
+        final int exitCode = pb.start().waitFor();
+        // Make sure that the command executed normally!
+        assertEquals("exitCode=" + exitCode, 0, exitCode);
+        // Wait for zk to start or stop.
+        Thread.sleep(1000/* ms */);
+    }
+
+    /** Verify zookeeper is running on the local host at the client port. */
+    protected void assertZookeeperRunning() {
+
+        final int clientPort = Integer.valueOf(System.getProperty(
+                "test.zookeeper.clientPort", "2081"));
+
+        final InetAddress localIpAddr = NicUtil.getInetAddress(null, 0, null,
+                true);
+        try {
+            ZooHelper.ruok(localIpAddr, clientPort);
+        } catch (Throwable t) {
+            fail("Zookeeper not running:: " + localIpAddr + ":" + clientPort, t);
+        }
+
+    }
+
+    /** Verify zookeeper is not running on the local host at the client port. */
+    protected void assertZookeeperNotRunning() {
+        final int clientPort = Integer.valueOf(System.getProperty(
+                "test.zookeeper.clientPort", "2081"));
+        final InetAddress localIpAddr = NicUtil.getInetAddress(null, 0, null,
+                true);
+        try {
+            ZooHelper.ruok(localIpAddr, clientPort);
+            fail("Zookeeper is running: localIpAddr=" + localIpAddr
+                    + ", clientPort=" + clientPort);
+        } catch (Throwable t) {
+            if (log.isInfoEnabled())
+                log.info("Zookeeper not running:: " + localIpAddr + ":"
+                        + clientPort);
+        }
 
     }
 

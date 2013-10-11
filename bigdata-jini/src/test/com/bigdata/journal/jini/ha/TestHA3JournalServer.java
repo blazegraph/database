@@ -28,17 +28,11 @@ package com.bigdata.journal.jini.ha;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.PrintWriter;
-import java.io.StringWriter;
-import java.net.InetAddress;
 import java.text.SimpleDateFormat;
 import java.util.Date;
-import java.util.Iterator;
-import java.util.List;
 import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.ScheduledExecutorService;
@@ -47,31 +41,18 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
 
-import org.apache.zookeeper.ZooKeeper;
-
 import net.jini.config.Configuration;
-import net.jini.config.ConfigurationException;
-import net.jini.config.ConfigurationProvider;
-import net.jini.core.lookup.ServiceItem;
-import net.jini.discovery.LookupDiscoveryManager;
-import net.jini.lease.LeaseRenewalManager;
-import net.jini.lookup.ServiceDiscoveryManager;
 
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.HAStatusEnum;
 import com.bigdata.ha.halog.HALogWriter;
 import com.bigdata.ha.halog.IHALogReader;
 import com.bigdata.ha.msg.HARootBlockRequest;
-import com.bigdata.io.SerializerUtil;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.quorum.Quorum;
-import com.bigdata.quorum.zk.QuorumServiceState;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
 import com.bigdata.service.jini.JiniClientConfig;
 import com.bigdata.util.NV;
-import com.bigdata.util.config.NicUtil;
-import com.bigdata.zookeeper.ZooHelper;
-import com.bigdata.zookeeper.ZooKeeperAccessor;
 
 /**
  * Test suites for an {@link HAJournalServer} quorum with a replication factor

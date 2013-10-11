@@ -86,6 +86,7 @@ import com.bigdata.ha.msg.IHAWriteSetStateResponse;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.jini.ha.HAJournalServer.HAQuorumService;
+import com.bigdata.journal.jini.ha.HAJournalServer.RunStateEnum;
 import com.bigdata.quorum.AsynchronousQuorumCloseException;
 import com.bigdata.quorum.Quorum;
 import com.bigdata.quorum.zk.ZKQuorumImpl;
@@ -197,6 +198,31 @@ public class HAJournalTest extends HAJournal {
         public Future<Void> bounceZookeeperConnection() throws IOException;
 
         /**
+         * This method may be issued to force the service to close
+         * its zookeeper connection. This is a drastic action which will
+         * cause all <i>ephemeral</i> tokens for that service to be retracted
+         * from zookeeper.
+         * <p>
+         * Note: This method is intended primarily as an aid in writing various
+         * HA unit tests.
+         * 
+         * @see http://wiki.apache.org/hadoop/ZooKeeper/FAQ#A4
+         */
+        public Future<Void> dropZookeeperConnection() throws IOException;
+
+//        /**
+//         * This method may be issued to force the service to reopen
+//         * its zookeeper connection. When the service reconnects, it will reestablish
+//         * services retracted on a previouse dropZookeeperConnection.
+//         * <p>
+//         * Note: This method is intended primarily as an aid in writing various
+//         * HA unit tests.
+//         * 
+//         * @see http://wiki.apache.org/hadoop/ZooKeeper/FAQ#A4
+//         */
+//        public Future<Void> reopenZookeeperConnection() throws IOException;
+
+        /**
          * Set a fail point on a future invocation of the specified methosuper. The
          * method must be declared by the {@link HAGlue} interface or by one of
          * the interfaces which it extends. The method will throw a
@@ -255,6 +281,11 @@ public class HAJournalTest extends HAJournal {
          * Enable remote lpgging of JVM thread state.
          */
         public void dumpThreads() throws IOException;
+
+        /**
+         * Report the internal run state of the {@link HAJournalServer}.
+         */
+        public RunStateEnum getRunStateEnum() throws IOException;
         
     }
 
@@ -549,12 +580,16 @@ public class HAJournalTest extends HAJournal {
                 final HAQuorumService<HAGlue, HAJournal> service = (HAQuorumService<HAGlue, HAJournal>) getQuorum()
                         .getClient();
 
-                // Note: Local method call on AbstractJournal.
-                final UUID serviceId = getServiceId();
+                if (service != null) {
 
-                haLog.warn("ENTERING ERROR STATE: " + serviceId);
+                    // Note: Local method call on AbstractJournal.
+                    final UUID serviceId = getServiceId();
 
-                service.enterErrorState();
+                    haLog.warn("ENTERING ERROR STATE: " + serviceId);
+
+                    service.enterErrorState();
+
+                }
 
             }
 
@@ -1010,11 +1045,117 @@ public class HAJournalTest extends HAJournal {
 
         }
 
+        @Override
+        public RunStateEnum getRunStateEnum() {
+            
+            @SuppressWarnings("unchecked")
+            final HAQuorumService<HAGlue, HAJournal> service = (HAQuorumService<HAGlue, HAJournal>) getQuorum()
+                    .getClient();
+            
+            if (service != null) {
+            
+                return service.getRunStateEnum();
+                
+            }
+
+            return null;
+        
+        }
+
+		@Override
+		public Future<Void> dropZookeeperConnection() throws IOException {
+
+            final FutureTask<Void> ft = new FutureTaskMon<Void>(
+                    new CloseZookeeperConnectionTask(), null/* result */);
+
+            ft.run();
+
+            return super.getProxy(ft);
+
+        }
+
+        private class CloseZookeeperConnectionTask implements Runnable {
+
+            @SuppressWarnings("rawtypes")
+            public void run() {
+
+                if (getQuorum() instanceof ZKQuorumImpl) {
+
+                    // Note: Local method call on AbstractJournal.
+                    final UUID serviceId = getServiceId();
+
+                    try {
+
+                        haLog.warn("DISCONNECTING FROM ZOOKEEPER: " + serviceId);
+
+                        // Close existing connection.
+                        ((ZKQuorumImpl) getQuorum()).getZookeeper().close();
+
+                    } catch (InterruptedException e) {
+
+                        // Propagate the interrupt.
+                        Thread.currentThread().interrupt();
+
+                    }
+
+                }
+            }
+
+        }
+
+//		@Override
+//		public Future<Void> reopenZookeeperConnection() throws IOException {
+//
+//            final FutureTask<Void> ft = new FutureTaskMon<Void>(
+//                    new ReopenZookeeperConnectionTask(), null/* result */);
+//
+//            ft.run();
+//
+//            return super.getProxy(ft);
+//
+//        }
+//
+//        private class ReopenZookeeperConnectionTask implements Runnable {
+//
+//            @SuppressWarnings("rawtypes")
+//            public void run() {
+//
+//                if (getQuorum() instanceof ZKQuorumImpl) {
+//
+//                    // Note: Local method call on AbstractJournal.
+//                    final UUID serviceId = getServiceId();
+//
+//                    try {
+//
+//                        // FIXME: hould already be closed, can we check this?
+//
+//                        // Obtain a new connection.
+//                        ((ZKQuorumImpl) getQuorum()).getZookeeper();
+//
+//                        haLog.warn("RECONNECTED TO ZOOKEEPER: " + serviceId);
+//
+//                    } catch (InterruptedException e) {
+//
+//                        // Propagate the interrupt.
+//                        Thread.currentThread().interrupt();
+//
+//                    }
+//
+//                }
+//            }
+//
+//        }
+
         // @Override
 
     } // class HAGlueTestImpl
 
     private static class MyPrepareMessage implements IHA2PhasePrepareMessage {
+        
+        /**
+         * 
+         */
+        private static final long serialVersionUID = 1L;
         
         private final IHA2PhasePrepareMessage delegate;
         
