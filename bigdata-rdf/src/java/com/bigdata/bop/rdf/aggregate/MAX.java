@@ -25,13 +25,11 @@ package com.bigdata.bop.rdf.aggregate;
 
 import java.util.Map;
 
-import org.openrdf.query.algebra.Compare.CompareOp;
-import org.openrdf.query.algebra.evaluation.util.ValueComparator;
-
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.aggregate.AggregateBase;
+import com.bigdata.bop.solutions.IVComparator;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.constraints.CompareBOp;
 import com.bigdata.rdf.internal.constraints.INeedsMaterialization;
@@ -43,7 +41,7 @@ import com.bigdata.rdf.internal.constraints.INeedsMaterialization;
  * <p>
  * Note: MIN (and MAX) are defined in terms of the ORDER_BY semantics for
  * SPARQL. Therefore, this must handle comparisons when the value is not an IV,
- * e.g., using {@link ValueComparator}.
+ * e.g., using {@link IVComparator}.
  *
  * @author thompsonbry
  *
@@ -58,15 +56,23 @@ public class MAX extends AggregateBase<IV> implements INeedsMaterialization{
 	 */
     private static final long serialVersionUID = 1L;
 
-    public MAX(MAX op) {
+    /**
+     * Provides SPARQL <em>ORDER BY</em> semantics.
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/736">
+     *      MIN() malfunction </a>
+     */
+    private static final transient IVComparator comparator = new IVComparator();
+
+    public MAX(final MAX op) {
         super(op);
     }
 
-    public MAX(BOp[] args, Map<String, Object> annotations) {
+    public MAX(final BOp[] args, final Map<String, Object> annotations) {
         super(args, annotations);
     }
 
-    public MAX(boolean distinct, IValueExpression...expr) {
+    public MAX(final boolean distinct, final IValueExpression...expr) {
         super(distinct, expr);
     }
 
@@ -103,46 +109,44 @@ public class MAX extends AggregateBase<IV> implements INeedsMaterialization{
     }
 
     private IV doGet(final IBindingSet bindingSet) {
+        
         for (int i = 0; i < arity(); i++) {
 
             final IValueExpression<IV<?, ?>> expr = (IValueExpression<IV<?, ?>>) get(i);
 
-        final IV iv = expr.get(bindingSet);
+            final IV iv = expr.get(bindingSet);
 
-        if (iv != null) {
+            if (iv != null) {
 
-            /*
-             * Aggregate non-null values.
-             */
-
-            if (max == null) {
-
-                max = iv;
-
-            } else {
-
-                /**
-                 * FIXME This needs to use the ordering define by ORDER_BY. The
-                 * CompareBOp imposes the ordering defined for the "<" operator
-                 * which is less robust and will throw a type exception if you
-                 * attempt to compare unlike Values.
-                 *
-                 * @see https://sourceforge.net/apps/trac/bigdata/ticket/300#comment:5
+                /*
+                 * Aggregate non-null values.
                  */
-                if (CompareBOp.compare(iv, max, CompareOp.GT)) {
+
+                if (max == null) {
 
                     max = iv;
+
+                } else {
+
+                    // Note: This is SPARQL GT semantics, not ORDER BY.
+//                   if (CompareBOp.compare(iv, max, CompareOp.GT)) {
+
+                    // SPARQL ORDER_BY semantics
+                    if (comparator.compare(iv, max) > 0) {
+
+                        max = iv;
+
+                    }
 
                 }
 
             }
-
-        }
         }
         return max;
 
     }
 
+    @Override
     synchronized public void reset() {
 
         max = null;
@@ -172,6 +176,7 @@ public class MAX extends AggregateBase<IV> implements INeedsMaterialization{
      *
      * FIXME MikeP: What is the right return value here?
      */
+    @Override
     public Requirement getRequirement() {
 
         return INeedsMaterialization.Requirement.ALWAYS;

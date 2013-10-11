@@ -51,7 +51,7 @@ import com.bigdata.rdf.model.BigdataLiteral;
 
 /**
  * A comparator that compares {@link IV}s according the SPARQL value ordering as
- * specified in <A
+ * specified in <a
  * href="http://www.w3.org/TR/rdf-sparql-query/#modOrderBy">SPARQL Query
  * Language for RDF</a>. This implementation is based on the openrdf
  * {@link ValueComparator} but has been modified to work with {@link IV}s.

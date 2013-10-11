@@ -115,19 +115,28 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
     
     /**
      * The #of times that we will use {@link BlockingQueue#offer(Object)} or
-     * {@link Queue#poll()} before converting to the variants of those methods
-     * which accept a timeout. The timeouts are used to reduce the contention
-     * for the queue if either the producer or the consumer is lagging.
+     * before converting to the variant of that method which accept a timeout.
+     * The timeouts are used to reduce the contention for the queue if either
+     * the consumer is lagging.
      */
-    private static final int NSPIN = 100;
-    
+    private static final int NSPIN_ADD = Integer.valueOf(System.getProperty(
+            BlockingBuffer.class.getName() + ".NSPIN.ADD", "100"));
+
+    /**
+     * The #of times that we will use {@link Queue#poll()} before converting to
+     * the variant of that method which accept a timeout. The timeouts are used
+     * to reduce the contention for the queue if either the producer is lagging.
+     */
+    private static final int NSPIN_READ = Integer.valueOf(System.getProperty(
+            BlockingBuffer.class.getName() + ".NSPIN.READ", "100"));
+
     /**
      * The timeout for offer() or poll() as a function of the #of tries that
      * have already been made to {@link #add(Object)} or read a chunk.
      * 
      * @param ntries
      *            The #of tries.
-     *            
+     * 
      * @return The timeout (milliseconds).
      */
     private static final long getTimeoutMillis(final int ntries) {
@@ -1038,7 +1047,7 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
 
                     final boolean added;
 
-                    if (ntries < NSPIN) {
+                    if (ntries < NSPIN_ADD) {
 
                         // offer (non-blocking).
                         added = queue.offer(e);
@@ -1804,7 +1813,7 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
                  * inside of poll(timeout,unit) [@todo This could be fixed by a poison pill.]
                  */
 
-                if (ntries < NSPIN) {
+                if (ntries < NSPIN_READ) {
 
                     /*
                      * This is basically a spin lock (it can spin without

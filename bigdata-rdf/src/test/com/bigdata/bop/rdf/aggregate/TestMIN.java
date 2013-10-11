@@ -34,7 +34,6 @@ import com.bigdata.bop.IVariable;
 import com.bigdata.bop.Var;
 import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.journal.ITx;
-import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.internal.XSD;
@@ -47,7 +46,6 @@ import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.BigdataValueFactoryImpl;
 import com.bigdata.rdf.sparql.ast.GlobalAnnotations;
-import com.bigdata.util.InnerCause;
 
 /**
  * Unit tests for {@link MIN}.
@@ -227,7 +225,19 @@ public class TestMIN extends TestCase2 {
 
     }
 
-    public void test_min_with_errors() {
+    /**
+     * MIN is defined in terms of SPARQL <code>ORDER BY</code> rather than
+     * <code>LT</code>.
+     * 
+     * @see <a href="http://www.w3.org/TR/rdf-sparql-query/#modOrderBy">SPARQL
+     *      Query Language for RDF</a>
+     * @see <a
+     *      href="http://www.w3.org/TR/2013/REC-sparql11-query-20130321/#op_lt">&lt;</a>
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/736">
+     *      MIN() malfunction </a>
+     */
+    public void test_min_uses_ORDER_BY_not_LT() {
         
         final BigdataValueFactory f = BigdataValueFactoryImpl.getInstance(getName());
         
@@ -261,7 +271,7 @@ public class TestMIN extends TestCase2 {
          * ?org  ?auth  ?book  ?lprice
          * org1  auth1  book1  9
          * org1  auth1  book3  5
-         * org1  auth2  book3  7
+         * org1  auth2  book3  auth2
          * org2  auth3  book4  7
          * </pre>
          */
@@ -285,43 +295,50 @@ public class TestMIN extends TestCase2 {
         assertFalse(op.isDistinct());
         assertFalse(op.isWildcard());
 
-        try {
-            op.reset();
-            for (IBindingSet bs : data) {
-                op.get(bs);
-            }
-            fail("Expecting: " + SparqlTypeErrorException.class);
-        } catch (RuntimeException ex) {
-            if (InnerCause.isInnerCause(ex, SparqlTypeErrorException.class)) {
-                if (log.isInfoEnabled()) {
-                    log.info("Ignoring expected exception: " + ex);
-                }
-            } else {
-                fail("Expecting: " + SparqlTypeErrorException.class, ex);
-            }
-        }
-
-        /*
-         * Now verify that the error is sticky.
-         */
-        try {
-            op.done();
-            fail("Expecting: " + SparqlTypeErrorException.class);
-        } catch (RuntimeException ex) {
-            if (InnerCause.isInnerCause(ex, SparqlTypeErrorException.class)) {
-                if (log.isInfoEnabled()) {
-                    log.info("Ignoring expected exception: " + ex);
-                }
-            } else {
-                fail("Expecting: " + SparqlTypeErrorException.class, ex);
-            }
-        }
-
-        /*
-         * Now verify that reset() clears the error.
-         */
         op.reset();
-        op.done();
+        for (IBindingSet bs : data) {
+            op.get(bs);
+        }
+        
+        assertEquals(auth2.get(), op.done());
+
+//        try {
+//            op.reset();
+//            for (IBindingSet bs : data) {
+//                op.get(bs);
+//            }
+//            fail("Expecting: " + SparqlTypeErrorException.class);
+//        } catch (RuntimeException ex) {
+//            if (InnerCause.isInnerCause(ex, SparqlTypeErrorException.class)) {
+//                if (log.isInfoEnabled()) {
+//                    log.info("Ignoring expected exception: " + ex);
+//                }
+//            } else {
+//                fail("Expecting: " + SparqlTypeErrorException.class, ex);
+//            }
+//        }
+//
+//        /*
+//         * Now verify that the error is sticky.
+//         */
+//        try {
+//            op.done();
+//            fail("Expecting: " + SparqlTypeErrorException.class);
+//        } catch (RuntimeException ex) {
+//            if (InnerCause.isInnerCause(ex, SparqlTypeErrorException.class)) {
+//                if (log.isInfoEnabled()) {
+//                    log.info("Ignoring expected exception: " + ex);
+//                }
+//            } else {
+//                fail("Expecting: " + SparqlTypeErrorException.class, ex);
+//            }
+//        }
+//
+//        /*
+//         * Now verify that reset() clears the error.
+//         */
+//        op.reset();
+//        op.done();
 
     }
 
