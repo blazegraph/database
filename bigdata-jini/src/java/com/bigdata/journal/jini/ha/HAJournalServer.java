@@ -93,6 +93,7 @@ import com.bigdata.journal.IHABufferStrategy;
 import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.RootBlockUtility;
 import com.bigdata.journal.WORMStrategy;
+import com.bigdata.quorum.AbstractQuorum;
 import com.bigdata.quorum.Quorum;
 import com.bigdata.quorum.QuorumEvent;
 import com.bigdata.quorum.QuorumException;
@@ -1859,7 +1860,7 @@ public class HAJournalServer extends AbstractServer {
                 while (true) {
 
                     log.warn("Will do error handler.");
-
+//                    ((AbstractQuorum<HAGlue, QuorumService<HAGlue>>) getQuorum()).interruptAll();
                     /*
                      * Discard the current write set.
                      * 

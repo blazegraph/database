@@ -733,21 +733,21 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
     
     @Override
     public C getClient() {
-//        lock.lock();
-//        try {
+        lock.lock();
+        try {
             final C client = this.client;
             if (client == null)
                 throw new IllegalStateException();
             return client;
-//        } finally {
-//            lock.unlock();
-//        }
+        } finally {
+            lock.unlock();
+        }
     }
 
     @Override
     public QuorumMember<S> getMember() {
-//        lock.lock();
-//        try {
+        lock.lock();
+        try {
             final C client = this.client;
             if (client == null)
                 throw new IllegalStateException();
@@ -755,9 +755,9 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
                 return (QuorumMember<S>) client;
             }
             throw new UnsupportedOperationException();
-//        } finally {
-//            lock.unlock();
-//        }
+        } finally {
+            lock.unlock();
+        }
     }
     
     /**
