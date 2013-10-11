@@ -36,14 +36,21 @@ import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.NV;
+import com.bigdata.bop.solutions.IVComparator;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.impl.literal.LiteralExtensionIV;
 import com.bigdata.rdf.model.BigdataValue;
-import com.bigdata.rdf.sparql.ast.GlobalAnnotations;
 
 /**
- * Perform open-world value comparison operations per the SPARQL spec.
+ * Perform open-world value comparison operations per the SPARQL spec (the LT
+ * operator). This does NOT implement the broader ordering for ORDER BY. That is
+ * handled by {@link IVComparator}.
+ * 
+ * @see <a
+ *      href="http://www.w3.org/TR/2013/REC-sparql11-query-20130321/#op_lt">&lt;</a>
+ * 
+ * @see IVComparator
  */
 public class CompareBOp extends XSDBooleanIVValueExpression
 		implements INeedsMaterialization {
