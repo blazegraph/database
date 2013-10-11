@@ -82,6 +82,15 @@ public interface QuorumClient<S extends Remote> extends QuorumListener {
     void terminate();
 
     /**
+     * The client has become disconnected from the quorum. This callback
+     * provides a hook to take any local actions that are required when the
+     * client can not longer rely on its role in the quorum state (if the client
+     * is disconnected from the quorum, then it is no longer part of the quorum,
+     * can not be a joined service, quorum member, etc).
+     */
+    void disconnected();
+    
+    /**
      * The quorum that is being monitored.
      * 
      * @throws QuorumException

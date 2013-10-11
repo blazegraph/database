@@ -111,6 +111,16 @@ abstract public class AbstractQuorumClient<S extends Remote> implements
         
     }
 
+    /**
+     * {@inheritDoc}
+     * <p>
+     * The default implementation is a NOP.
+     */
+    @Override
+    public void disconnected() {
+        
+    }
+
     @Override
     public S getLeader(final long token) {
         final Quorum<?,?> q = getQuorum();

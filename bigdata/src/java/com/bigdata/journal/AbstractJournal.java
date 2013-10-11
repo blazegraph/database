@@ -105,7 +105,6 @@ import com.bigdata.ha.PrepareRequest;
 import com.bigdata.ha.PrepareResponse;
 import com.bigdata.ha.QuorumService;
 import com.bigdata.ha.RunState;
-import com.bigdata.ha.HAGlue.IIndexManagerCallable;
 import com.bigdata.ha.msg.HANotifyReleaseTimeResponse;
 import com.bigdata.ha.msg.HAReadResponse;
 import com.bigdata.ha.msg.HARootBlockRequest;
@@ -5364,11 +5363,61 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
         
     }
 
-    
+    /**
+     * This method will update the quorum token on the journal and the
+     * associated values <em>as if</em> the service was not joined with a met
+     * quorum. This allows us to handle conditions where we know that the
+     * service will not be joined with the met quorum once it is able to observe
+     * the associated quorum events. However, those events can not be delivered
+     * until the service is connected to zookeeper and one of the common causes
+     * for entering the error state for the HAJournalServer is because the zk
+     * client connection has been closed, hence, no zk events.
+     * 
+     * @param newValue
+     *            The new value.
+     */
+    protected void clearQuorumToken(final long newValue) {
+        
+        // Lie to it.
+        final boolean isServiceJoined = false;
+
+        setQuorumToken2(newValue, isServiceJoined);
+
+    }
+
     protected void setQuorumToken(final long newValue) {
+        
+        // Protect for potential NPE
+        if (quorum == null)
+            return;
+
+        // This quorum member.
+        final QuorumService<HAGlue> localService = quorum.getClient();
+
+        final boolean isServiceJoined = localService != null
+                && localService.isJoinedMember(newValue);
+
+        setQuorumToken2(newValue, isServiceJoined);
+        
+    }
+
+    /**
+     * Update the {@link #quorumToken}, {@link #haReadyToken}, and
+     * {@link #hashCode()}.
+     * 
+     * @param newValue
+     *            The new quorum token value.
+     * @param isServiceJoined
+     *            <code>true</code> iff this service is known to be a service
+     *            that is joined with the met quorum.
+     */
+    private void setQuorumToken2(final long newValue,
+            final boolean isServiceJoined) {
     	
-        if(haLog.isInfoEnabled()) log.info("current: " + quorumToken + ", new: " + newValue);
-    	
+        if (haLog.isInfoEnabled())
+            log.info("current: " + quorumToken + ", new: " + newValue
+                    + ", joined=" + isServiceJoined);
+
         // Protect for potential NPE
         if (quorum == null)
             return;
@@ -5378,7 +5427,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
         // Figure out the state transitions involved.
         final QuorumTokenTransitions transitionState = new QuorumTokenTransitions(
-                quorumToken, newValue, localService, haReadyToken);
+                quorumToken, newValue, isServiceJoined, haReadyToken);
 
         if (haLog.isInfoEnabled())
             haLog.info(transitionState.toString());
@@ -5677,7 +5726,9 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
             lock.unlock();
             
         }
-        if(haLog.isInfoEnabled()) haLog.info("done: token="+quorumToken+", HAReady="+haReadyToken+", HAStatus="+haStatus);
+        if (haLog.isInfoEnabled())
+            haLog.info("done: token=" + quorumToken + ", HAReady="
+                    + haReadyToken + ", HAStatus=" + haStatus);
     }
     private final Condition haReadyCondition = _fieldReadWriteLock.writeLock().newCondition();
     private volatile long haReadyToken = Quorum.NO_QUORUM;

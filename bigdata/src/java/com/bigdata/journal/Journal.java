@@ -744,7 +744,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
                  * This sets up a task that will monitor the quorum state and
                  * then interrupt this Thread if it is blocked at the barrier
                  * [actually, it uses barrier.reset(), which appears to be a
-                 * litle safer].
+                 * little safer].
                  * 
                  * If this service is no longer the quorum leader or if any of
                  * the services leave that were joined with the met quorum when
