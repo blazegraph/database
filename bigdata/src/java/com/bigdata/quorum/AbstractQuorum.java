@@ -436,6 +436,7 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
      * and {@link QuorumWatcher} are created, and asynchronous discovery is
      * initialized for the {@link QuorumWatcher}.
      */
+    @Override
     public void start(final C client) {
         if (client == null)
             throw new IllegalArgumentException();
@@ -505,6 +506,15 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
         
     }
 
+    /**
+     * Ensure that any guarded regions are interrupted.
+     */
+    public void interruptAll() {
+       
+        threadGuard.interruptAll();
+        
+    }
+    
     @Override
     public void terminate() {
         boolean interrupted = false;
@@ -513,7 +523,7 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
             /*
              * Ensure that any guarded regions are interrupted.
              */
-            threadGuard.interruptAll();
+            interruptAll();
             if (client == null) {
                 // No client is attached.
                 return;
@@ -676,6 +686,7 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
      * inconsistent since the internal lock required for a consistent view is
      * NOT acquired.
      */
+    @Override
     public String toString() {
         /*
          * Note: This must run w/o the lock to avoid deadlocks so there may be
@@ -720,21 +731,23 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
         }
     }
     
+    @Override
     public C getClient() {
-        lock.lock();
-        try {
+//        lock.lock();
+//        try {
             final C client = this.client;
             if (client == null)
                 throw new IllegalStateException();
             return client;
-        } finally {
-            lock.unlock();
-        }
+//        } finally {
+//            lock.unlock();
+//        }
     }
 
+    @Override
     public QuorumMember<S> getMember() {
-        lock.lock();
-        try {
+//        lock.lock();
+//        try {
             final C client = this.client;
             if (client == null)
                 throw new IllegalStateException();
@@ -742,9 +755,9 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
                 return (QuorumMember<S>) client;
             }
             throw new UnsupportedOperationException();
-        } finally {
-            lock.unlock();
-        }
+//        } finally {
+//            lock.unlock();
+//        }
     }
     
     /**
@@ -785,6 +798,7 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
      * @throws IllegalStateException
      *             if the quorum is not running.
      */
+    @Override
     public QuorumActor<S, C> getActor() {
         lock.lock();
         try {
@@ -814,6 +828,7 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
         }
     }
 
+    @Override
     final public void addListener(final QuorumListener listener) {
         if (listener == null)
             throw new IllegalArgumentException();
@@ -822,6 +837,7 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
         listeners.add(listener);
     }
 
+    @Override
     final public void removeListener(final QuorumListener listener) {
         if (listener == null)
             throw new IllegalArgumentException();
@@ -830,6 +846,7 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
         listeners.remove(listener);
     }
 
+    @Override
     final public int replicationFactor() {
 
         // Note: [k] is final.
@@ -837,18 +854,21 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
         
     }
 
+    @Override
     public final boolean isQuorum(final int njoined) {
 
         return njoined >= kmeet;
 
     }
     
+    @Override
     final public boolean isHighlyAvailable() {
         
         return replicationFactor() > 1;
         
     }
 
+    @Override
     final public long lastValidToken() {
         lock.lock();
         try {
@@ -858,6 +878,7 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
         }
     }
 
+    @Override
     final public UUID[] getMembers() {
         lock.lock();
         try {
@@ -867,6 +888,7 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
         }
     }
 
+    @Override
     final public Map<Long, UUID[]> getVotes() {
         lock.lock();
         try {
@@ -889,6 +911,7 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
         }
     }
 
+    @Override
     final public Long getCastVote(final UUID serviceId) {
         lock.lock();
         try {
@@ -908,6 +931,7 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
         }
     }
 
+    @Override
     public Long getCastVoteIfConsensus(final UUID serviceId) {
         lock.lock();
         try {
@@ -971,6 +995,7 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
         return -1;
     }
 
+    @Override
     final public UUID[] getJoined() {
         lock.lock();
         try {
@@ -980,6 +1005,7 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
         }
     }
 
+    @Override
     final public UUID[] getPipeline() {
         lock.lock();
         try {
@@ -989,6 +1015,7 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
         }
     }
 
+    @Override
     final public UUID getLastInPipeline() {
         lock.lock();
         try {
@@ -1003,6 +1030,7 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
         }
     }
 
+    @Override
     final public UUID[] getPipelinePriorAndNext(final UUID serviceId) {
         if (serviceId == null)
             throw new IllegalArgumentException();
@@ -1030,6 +1058,7 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
         }
     }
 
+    @Override
     final public UUID getLeaderId() {
         UUID leaderId = null;
         final long tmp;
@@ -1060,6 +1089,7 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
         return leaderId;
     }
 
+    @Override
     final public long token() {
         // Note: volatile read.
         return token;
@@ -1079,6 +1109,7 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
 
     }
 
+    @Override
     final public void assertLeader(final long token) {
         if (token == NO_QUORUM) {
             // The quorum was not met when the client obtained that token.
@@ -1102,12 +1133,14 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
         assertQuorum(token);
     }
 
+    @Override
     final public boolean isQuorumMet() {
 
         return token != NO_QUORUM;
         
     }
     
+    @Override
     final public boolean isQuorumFullyMet(final long token) {
         
         lock.lock();
@@ -1140,6 +1173,7 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
      * This watches the current token and will return as soon as the token is
      * valid.
      */
+    @Override
     final public long awaitQuorum() throws InterruptedException,
             AsynchronousQuorumCloseException {
         lock.lock();
@@ -1155,6 +1189,7 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
         }
     }
 
+    @Override
     final public long awaitQuorum(final long timeout, final TimeUnit units)
             throws InterruptedException, TimeoutException,
             AsynchronousQuorumCloseException {
@@ -1181,6 +1216,7 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
         }
     }
 
+    @Override
     final public void awaitBreak() throws InterruptedException,
             AsynchronousQuorumCloseException {
         lock.lock();
@@ -1196,6 +1232,7 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
         }
     }
 
+    @Override
     final public void awaitBreak(final long timeout, final TimeUnit units)
             throws InterruptedException, TimeoutException,
             AsynchronousQuorumCloseException {
