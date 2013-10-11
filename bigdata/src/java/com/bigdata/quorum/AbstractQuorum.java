@@ -292,10 +292,15 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
 
     /**
      * The {@link QuorumClient}.
+     * <p>
+     * Note: This is volatile to allow visibility without holding the
+     * {@link #lock}. The field is only modified in {@link #start(QuorumClient)}
+     * and {@link #terminate()}, and those methods use the {@link #lock} to
+     * impose an appropriate ordering over events.
      * 
      * @see #start(QuorumClient)
      */
-    private C client;
+    private volatile C client;
 
     /**
      * An object which watches the distributed state of the quorum and informs
@@ -718,7 +723,8 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
     public C getClient() {
         lock.lock();
         try {
-            if (this.client == null)
+            final C client = this.client;
+            if (client == null)
                 throw new IllegalStateException();
             return client;
         } finally {
@@ -729,7 +735,8 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
     public QuorumMember<S> getMember() {
         lock.lock();
         try {
-            if (this.client == null)
+            final C client = this.client;
+            if (client == null)
                 throw new IllegalStateException();
             if (client instanceof QuorumMember<?>) {
                 return (QuorumMember<S>) client;
@@ -754,6 +761,8 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
      */
     private QuorumMember<S> getClientAsMember() {
 
+        final C client = this.client;
+        
         if (client instanceof QuorumMember<?>) {
 
             return (QuorumMember<S>) client;
@@ -3262,7 +3271,7 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
      * @param e
      *            The event.
      */
-    private void sendEvent(final QuorumEvent e) {
+    protected void sendEvent(final QuorumEvent e) {
         if (log.isTraceEnabled())
             log.trace("" + e);
         if (sendSynchronous) {
@@ -3423,7 +3432,7 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
      * @param t
      *            The throwable.
      */
-    private void launderThrowable(final Throwable t) {
+    protected void launderThrowable(final Throwable t) {
 
         if (InnerCause.isInnerCause(t, InterruptedException.class)) {
 

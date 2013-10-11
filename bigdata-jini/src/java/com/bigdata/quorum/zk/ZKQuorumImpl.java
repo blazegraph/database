@@ -60,6 +60,7 @@ import com.bigdata.quorum.AbstractQuorum;
 import com.bigdata.quorum.Quorum;
 import com.bigdata.quorum.QuorumActor;
 import com.bigdata.quorum.QuorumClient;
+import com.bigdata.quorum.QuorumEventEnum;
 import com.bigdata.quorum.QuorumException;
 import com.bigdata.quorum.QuorumMember;
 import com.bigdata.quorum.QuorumWatcher;
@@ -1457,12 +1458,12 @@ public class ZKQuorumImpl<S extends Remote, C extends QuorumClient<S>> extends
             if (client != null) {
                 try {
                     client.disconnected();
-                } catch (RuntimeException ex) {
-                    log.error(ex);
-                } catch (Exception ex) {
-                    log.error(ex);
+                } catch (Exception t) {
+                    launderThrowable(t);
                 }
             }
+            sendEvent(new E(QuorumEventEnum.QUORUM_DISCONNECTED,
+                    lastValidToken(), token(), null/* serviceId */));
         }
         
         /**

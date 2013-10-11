@@ -896,6 +896,9 @@ public class HAJournal extends Journal {
             // The commit counter of the desired closing root block.
             final long commitCounter = req.getCommitCounter();
 
+            // Note the token on entry.
+            final long token = getQuorum().token();
+            
             /*
              * Open the HALog file. If it exists, then we will run a task to
              * send it along the pipeline.
@@ -928,16 +931,25 @@ public class HAJournal extends Journal {
                     isLive = r.isLive();
 
                     // Task sends an HALog file along the pipeline.
-                    ft = new FutureTaskInvariantMon<Void>(new SendHALogTask(req, r), getQuorum()) {
+                    ft = new FutureTaskInvariantMon<Void>(new SendHALogTask(
+                            req, r), getQuorum()) {
 
-						@Override
-						protected void establishInvariants() {
-							assertQuorumMet();
-							assertJoined(getServiceId());
-							assertMember(req.getServiceId());
-							assertInPipeline(req.getServiceId());
-						}
-                    	
+                        @Override
+                        protected void establishInvariants() {
+                            assertQuorumMet();
+                            assertJoined(getServiceId());
+                            assertMember(req.getServiceId());
+                            assertInPipeline(req.getServiceId());
+                            /*
+                             * Note: This is a pre-condition, not an invariant.
+                             * We verify on entry that this service is the
+                             * leader. The invariant is that the quorum remains
+                             * met on the current token, which is handled by
+                             * assertQuorumMet().
+                             */
+                            getQuorum().assertLeader(token);
+                        }
+
                     };
 
                     // Run task.
@@ -1126,18 +1138,28 @@ public class HAJournal extends Journal {
             if (haLog.isDebugEnabled())
                 haLog.debug("req=" + req);
 
+            // Note the token on entry.
+            final long token = getQuorum().token();
+            
             // Task sends an HALog file along the pipeline.
             final FutureTask<IHASendStoreResponse> ft = new FutureTaskInvariantMon<IHASendStoreResponse>(
                     new SendStoreTask(req), getQuorum()) {
 
-						@Override
-						protected void establishInvariants() {
-							assertQuorumMet();
-							assertJoined(getServiceId());
-							assertMember(req.getServiceId());
-							assertInPipeline(req.getServiceId());
-						}
-            	
+                @Override
+                protected void establishInvariants() {
+                    assertQuorumMet();
+                    assertJoined(getServiceId());
+                    assertMember(req.getServiceId());
+                    assertInPipeline(req.getServiceId());
+                    /*
+                     * Note: This is a pre-condition, not an invariant. We
+                     * verify on entry that this service is the leader. The
+                     * invariant is that the quorum remains met on the current
+                     * token, which is handled by assertQuorumMet().
+                     */
+                    getQuorum().assertLeader(token);
+                }
+
             };
 
             // Run task.
