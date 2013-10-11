@@ -1321,11 +1321,19 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
      * definitely bound (in a subquery they are definitely bound if they are
      * projected into the subquery).
      * 
+     * TODO  In the case when the variable is bound to an expression
+     *       and the expression may execute with an error, this
+     *       method incorrectly reports that variable as definitely bound
+     *       see trac 750
+     * 
      * @see https://sourceforge.net/apps/trac/bigdata/ticket/412
      *      (StaticAnalysis#getDefinitelyBound() ignores exogenous variables.)
      *      
      * @see http://sourceforge.net/apps/trac/bigdata/ticket/430 (StaticAnalysis
      *      does not follow renames of projected variables)
+     *      
+     * @see http://sourceforge.net/apps/trac/bigdata/ticket/750
+     *      artificial test case fails, currently wontfix
      */
     // MUST : QueryBase
     public Set<IVariable<?>> getDefinitelyProducedBindings(final QueryBase queryBase) {
@@ -1367,6 +1375,11 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
          * 3. Projection of a variable under a different name.
          * 
          * 4. Projection of a select expression which is not an aggregate.
+         * 
+         * This case is the one explored in trac750, and the code
+         * below while usually correct is incorrect if the expression
+         * can evaluate with an error - in which case the variable
+         * will remain unbound.
          * 
          * 5. Projection of a select expression which is an aggregate. This case
          * is tricky. A select expression that is an aggregate which evaluates
@@ -1449,9 +1462,14 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
 
                     /*
                      * 4. The projection of a select expression which is not an
-                     * aggregate. The projected variable will be definitely
+                     * aggregate. Normally, the projected variable will be 
                      * bound if all components of the select expression are
-                     * definitely bound.
+                     * definitely bound: this comment ignores the possibility
+                     * that the expression may raise an error, in which case
+                     * this block of code is incorrect.
+                     * As of Oct 11, 2013 - we are no-fixing this
+                     * because of caution about the performance impact, 
+                     * and it seeming to be a corner case. See trac 750.
                      * 
                      * TODO Does coalesce() change the semantics for this
                      * analysis? If any of the values for coalesce() is
