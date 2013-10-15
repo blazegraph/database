@@ -64,10 +64,12 @@ public class JVMDistinctFilter implements IDistinctFilter {
             this.hash = java.util.Arrays.hashCode(vals);
         }
 
+        @Override
         public int hashCode() {
             return hash;
         }
 
+        @Override
         public boolean equals(final Object o) {
             if (this == o)
                 return true;
