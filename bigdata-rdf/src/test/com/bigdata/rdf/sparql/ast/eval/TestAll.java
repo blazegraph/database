@@ -127,6 +127,7 @@ public class TestAll extends TestCase {
 
         // Test suite for SPARQL 1.1 BINDINGS clause
         suite.addTestSuite(TestBindings.class);
+        suite.addTestSuite(TestBindHeisenbug708.class);
 
         // Complex queries.
         suite.addTestSuite(TestComplexQuery.class);
