@@ -1223,51 +1223,8 @@ public class BigdataSail extends SailBase implements Sail {
 
             }
 
-            if (txLog.isInfoEnabled())
-                txLog.info("SAIL-START-CONN : conn=" + this);
+            // Note: post-init moved to startConn().
 
-            if (!conn.isReadOnly()) {
-
-                /*
-                 * Give each registered ServiceFactory instance an opportunity
-                 * to intercept the start of this connection.
-                 */
-
-                final Iterator<CustomServiceFactory> itr = ServiceRegistry
-                        .getInstance().customServices();
-
-                while (itr.hasNext()) {
-
-                    final CustomServiceFactory f = itr.next();
-
-                    try {
-
-                        f.startConnection(conn);
-
-                    } catch (Throwable t) {
-
-                        log.error(t, t);
-
-                        continue;
-
-                    }
-
-                }
-
-                if (conn.changeLog != null) {
-
-                    /*
-                     * Note: The read/write tx will also do this after each
-                     * commit since it always starts a newTx() when the last one
-                     * is done.
-                     */
-                    
-                    conn.changeLog.transactionBegin();
-
-                }
-                
-            }
-            
             return conn;
             
         } catch (Exception ex) {
@@ -1359,7 +1316,7 @@ public class BigdataSail extends SailBase implements Sail {
 
 		// new writable connection.
 		final BigdataSailConnection conn = new BigdataSailConnection(database,
-				writeLock, true/* unisolated */);
+				writeLock, true/* unisolated */).startConn();
 
 		return conn;
 
@@ -1421,7 +1378,7 @@ public class BigdataSail extends SailBase implements Sail {
     private BigdataSailConnection _getReadOnlyConnection(final long timestamp)
             throws IOException {
 
-        return new BigdataSailReadOnlyConnection(timestamp);
+        return new BigdataSailReadOnlyConnection(timestamp).startConn();
 
     }
 
@@ -1435,28 +1392,28 @@ public class BigdataSail extends SailBase implements Sail {
     public BigdataSailConnection getReadWriteConnection() throws IOException {
 
         if (!isolatable) {
-            
+
             throw new UnsupportedOperationException(
                 "Read/write transactions are not allowed on this database. " +
                 "See " + Options.ISOLATABLE_INDICES);
-            
+
         }
-        
+
         final IIndexManager indexManager = database.getIndexManager();
 
-        if(indexManager instanceof IBigdataFederation<?>) {
+        if (indexManager instanceof IBigdataFederation<?>) {
 
         	throw new UnsupportedOperationException("Read/write transactions are not yet supported in scale-out.");
-        	
+
         }
-        
+
         final Lock readLock = lock.readLock();
         readLock.lock();
 
-        return new BigdataSailRWTxConnection(readLock);
-        
+        return new BigdataSailRWTxConnection(readLock).startConn();
+
     }
-    
+
     /**
      * Return the {@link ITransactionService}.
      */
@@ -1780,6 +1737,79 @@ public class BigdataSail extends SailBase implements Sail {
             this(lock, unisolated, database.isReadOnly());
 
             attach(database);
+
+        }
+        
+        /**
+         * Per-connection initialization. This method must be invoked after the
+         * constructor so that the connection is otherwise initialized.
+         * <p>
+         * This method currently will expose a mutable connection to any
+         * registered {@link CustomServiceFactory}.
+         * 
+         * @param conn
+         *            The connection.
+         * 
+         * @return The connection.
+         * 
+         * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/754">
+         *      Failure to setup SERVICE hook and changeLog for Unisolated and
+         *      Read/Write connections </a>
+         */
+        protected BigdataSailConnection startConn() {
+
+            if (txLog.isInfoEnabled())
+                txLog.info("SAIL-START-CONN : conn=" + this);
+
+            if (!isReadOnly()) {
+
+                /*
+                 * Give each registered ServiceFactory instance an opportunity to
+                 * intercept the start of this connection.
+                 */
+
+                final Iterator<CustomServiceFactory> itr = ServiceRegistry
+                        .getInstance().customServices();
+
+                while (itr.hasNext()) {
+
+                    final CustomServiceFactory f = itr.next();
+
+                    try {
+
+                        f.startConnection(this);
+
+                    } catch (Throwable t) {
+
+                        log.error(t, t);
+
+                        continue;
+
+                    }
+
+                }
+
+                if (this.changeLog != null) {
+
+                    /*
+                     * Note: The read/write tx will also do this after each
+                     * commit since it always starts a newTx() when the last one
+                     * is done.
+                     * 
+                     * TODO Is it possible to observe an event here? The
+                     * [changeLog] will be [null] when the BigdataSailConnection
+                     * constructor is done. startConn() is then invoked
+                     * immediately on the connection. Therefore, [changeLog]
+                     * SHOULD always be [null] here.
+                     */
+
+                    this.changeLog.transactionBegin();
+
+                }
+
+            }
+
+            return this;
             
         }
         
