@@ -440,9 +440,17 @@ public class ZKQuorumImpl<S extends Remote, C extends QuorumClient<S>> extends
                 Arrays.sort(children);
                 {
                     for (String s : children) {
+                        // Get the data for that znode.
+                        final byte[] b;
+                        try {
+                            b = zk.getData(zpath + "/" + s, false/* watch */,
+                                    null/* stat */);
+                        } catch (NoNodeException ex) {
+                            // Concurrent remove of some znode.
+                            continue;
+                        }
                         final QuorumServiceState state = (QuorumServiceState) SerializerUtil
-                                .deserialize(zk.getData(zpath + "/" + s,
-                                        false/* watch */, null/* stat */));
+                                .deserialize(b);
                         if (serviceId.equals(state.serviceUUID())) {
                             zk.delete(zpath + "/" + s, -1/* anyVersion */);
                             return;
@@ -858,9 +866,16 @@ public class ZKQuorumImpl<S extends Remote, C extends QuorumClient<S>> extends
                 {
                     for (String s : children) {
                         // Examine the data for that child.
+                        final byte[] b;
+                        try {
+                            b = zk.getData(zpath + "/" + s, false/* watch */,
+                                    null/* stat */);
+                        } catch (NoNodeException ex) {
+                            // Concurrent remove of some znode.
+                            continue;
+                        }
                         final QuorumServiceState state = (QuorumServiceState) SerializerUtil
-                                .deserialize(zk.getData(zpath + "/" + s,
-                                        false/* watch */, null/* stat */));
+                                .deserialize(b);
                         if (serviceId.equals(state.serviceUUID())) {
                             // Found this service.
                             zk.delete(zpath + "/" + s, -1/* anyVersion */);
