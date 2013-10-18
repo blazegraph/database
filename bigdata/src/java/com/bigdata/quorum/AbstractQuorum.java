@@ -27,6 +27,7 @@ import java.io.IOException;
 import java.rmi.Remote;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -34,11 +35,14 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.UUID;
+import java.util.concurrent.Callable;
 import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.FutureTask;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -50,6 +54,7 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.concurrent.FutureTaskMon;
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.HAPipelineGlue;
 import com.bigdata.ha.QuorumService;
@@ -335,7 +340,24 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
 //    private final long watcherShutdownTimeout = Long.MAX_VALUE; // ms
     private final long watcherShutdownTimeout = 3000; // ms
 
-    
+    /**
+     * A service used by {@link QuorumActorBase} to execute actions in a single
+     * thread.
+     */
+    private ThreadPoolExecutor actorActionService;
+
+    /**
+     * This may be used to force a behavior where the actor is taken in the
+     * caller's thread. This is not compatible with the use of timeouts for the
+     * actions.
+     */
+    private final boolean singleThreadActor = true;
+    private final long actorShutdownTimeout = watcherShutdownTimeout; // ms
+    /**
+     * Collector of queued or running futures for actor action tasks.
+     */
+    private final Set<FutureTask<Void>> knownActorTasks = new HashSet<FutureTask<Void>>();
+
     /**
      * A single threaded service used to pump events to clients outside of the
      * thread in which those events arise.
@@ -467,6 +489,16 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
                         .newCachedThreadPool(new DaemonThreadFactory(
                                 "WatcherActionService"));
             }
+            if (singleThreadActor) {
+                // run on a single-thread executor service.
+                this.actorActionService = new ThreadPoolExecutor(1, 1, 0L,
+                        TimeUnit.MILLISECONDS,
+                        new LinkedBlockingQueue<Runnable>(),
+                        new DaemonThreadFactory("ActorActionService"));
+            } else {
+                // run in the caller's thread.
+                this.actorActionService = null;
+            }
             // Reach out to the durable quorum and get the lastValidToken
             this.lastValidToken = getLastValidTokenFromQuorumState(client);
             // Setup the watcher.
@@ -510,9 +542,34 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
      * Ensure that any guarded regions are interrupted.
      */
     public void interruptAll() {
-       
-        threadGuard.interruptAll();
-        
+
+        // Cancel any queued or running action task.
+        synchronized (knownActorTasks) {
+            
+            for (Future<Void> ft : knownActorTasks) {
+            
+                ft.cancel(true/* mayInterruptIfRunning */);
+
+            }
+            /*
+             * Note: we do not need to clear this collection. Tasks will be
+             * removed from the collection when they are propagated through the
+             * actorActionService. Cancelled tasks will immediately drop through
+             * the service and have their futures removed from this collection.
+             * This allows us to assert that the future is properly removed from
+             * the collection in runActorTask().
+             */
+//            knownActorTasks.clear();
+
+            /*
+             * Interrupt any running actions.
+             * 
+             * TODO This is redundant with the cancel() of the knownActorTasks.
+             */
+            threadGuard.interruptAll();
+
+        }
+
     }
     
     @Override
@@ -611,6 +668,26 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
                      */
                     watcherActionService.shutdownNow();
                     watcherActionService = null;
+                }
+            }
+            if (actorActionService != null) {
+                actorActionService.shutdown();
+                try {
+                    if (!actorActionService.awaitTermination(
+                            actorShutdownTimeout, TimeUnit.MILLISECONDS)) {
+                        log.error("ActorActionService termination timeout");
+                    }
+                } catch (com.bigdata.concurrent.TimeoutException ex) {
+                    // Ignore.
+                } catch (InterruptedException ex) {
+                    // Will be propagated below.
+                    interrupted = true;
+                } finally {
+                    /*
+                     * Cancel any tasks which did terminate in a timely manner.
+                     */
+                    actorActionService.shutdownNow();
+                    actorActionService = null;
                 }
             }
             if (!sendSynchronous) {
@@ -1417,16 +1494,131 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
 
         }
 
+        @Override
         final public QuorumMember<S> getQuorumMember() {
             return (QuorumMember<S>) client;
         }
 
+        @Override
         final public Quorum<S, C> getQuourm() {
             return AbstractQuorum.this;
         }
 
+        @Override
         final public UUID getServiceId() {
             return serviceId;
+        }
+
+        /**
+         * Task used to run an action.
+         */
+        abstract protected class ActorTask implements Callable<Void> {
+            
+            @Override
+            public Void call() throws Exception {
+
+                lock.lockInterruptibly();
+                try {
+
+                    doAction();
+
+                    return null/* Void */;
+                    
+                } finally {
+                    
+                    lock.unlock();
+                    
+                }
+                
+            }
+
+            /**
+             * Execute the action - the lock is already held by the thread.
+             */
+            abstract protected void doAction() throws InterruptedException;
+            
+        }
+
+        private Executor getActorExecutor() {
+            return actorActionService;
+        }
+        
+        private void runActorTask(final ActorTask task) {
+            if (!singleThreadActor) {
+                /*
+                 * Run in the caller's thread.
+                 */
+                try {
+                    task.call();
+                    return;
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+            }
+            /*
+             * Run on the single-threaded executor.
+             */
+            final FutureTask<Void> ft = new FutureTaskMon<Void>(task);
+            synchronized(knownActorTasks) {
+                if (!knownActorTasks.add(ft))
+                    throw new AssertionError();
+            }
+            getActorExecutor().execute(ft);
+            try {
+                ft.get();
+            } catch (InterruptedException e) {
+                // Propagate interrupt
+                Thread.currentThread().interrupt();
+            } catch (ExecutionException e) {
+                throw new RuntimeException(e);
+            } finally {
+                ft.cancel(true/* mayInterruptIfRunning */);
+                synchronized (knownActorTasks) {
+                    if (!knownActorTasks.remove(ft))
+                        throw new AssertionError();
+                }
+            }
+        }
+
+        /**
+         * Variant method supporting a timeout.
+         * 
+         * @param task
+         * @param timeout
+         * @param unit
+         * @throws InterruptedException
+         * @throws ExecutionException
+         * @throws TimeoutException
+         * 
+         *             TODO Add variants of memberAdd() and friends that accept
+         *             a timeout. They should use this method rather than
+         *             {@link #runActorTask(ActorTask)}.
+         */
+        private void runActorTask(final ActorTask task, final long timeout,
+                final TimeUnit unit) throws InterruptedException,
+                ExecutionException, TimeoutException {
+            if (!singleThreadActor) {
+                /*
+                 * Timeout support requires an executor service to run the actor
+                 * tasks.
+                 */
+                throw new UnsupportedOperationException();
+            }
+            final FutureTask<Void> ft = new FutureTaskMon<Void>(task);
+            synchronized (knownActorTasks) {
+                if (!knownActorTasks.add(ft))
+                    throw new AssertionError();
+            }
+            getActorExecutor().execute(ft);
+            try {
+                ft.get(timeout, unit);
+            } finally {
+                ft.cancel(true/* mayInterruptIfRunning */);
+                synchronized (knownActorTasks) {
+                    if (!knownActorTasks.remove(ft))
+                        throw new AssertionError();
+                }
+            }
         }
 
         /*
@@ -1447,24 +1639,34 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
          * mutual recursion among the public API methods.
          */
         
+        @Override
         final public void memberAdd() {
-            lock.lock();
-            try {
-                conditionalMemberAddImpl();
-            } catch(InterruptedException e) {
-                // propagate the interrupt.
-                Thread.currentThread().interrupt();
-                return;
-            } finally {
-                lock.unlock();
-            }
+            runActorTask(new MemberAddTask());
         }
 
+        final private class MemberAddTask extends ActorTask {
+            @Override
+            protected void doAction() throws InterruptedException {
+                conditionalMemberAddImpl();
+            }
+        }
+        
+        @Override
         final public void castVote(final long lastCommitTime) {
-            if (lastCommitTime < 0)
-                throw new IllegalArgumentException();
-            lock.lock();
-            try {
+            runActorTask(new CastVoteTask(lastCommitTime));
+        }
+        
+        private final class CastVoteTask extends ActorTask {
+            private final long lastCommitTime;
+
+            public CastVoteTask(final long lastCommitTime) {
+                if (lastCommitTime < 0)
+                    throw new IllegalArgumentException();
+                this.lastCommitTime = lastCommitTime;
+            }
+
+            @Override
+            protected void doAction() throws InterruptedException {
                 if (!members.contains(serviceId))
                     throw new QuorumException(ERR_NOT_MEMBER + serviceId);
                 /*
@@ -1476,47 +1678,39 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
 //                if (!pipeline.contains(serviceId))
 //                    throw new QuorumException(ERR_NOT_PIPELINE + serviceId);
                 conditionalCastVoteImpl(lastCommitTime);
-            } catch(InterruptedException e) {
-                // propagate the interrupt.
-                Thread.currentThread().interrupt();
-                return;
-            } finally {
-                lock.unlock();
             }
         }
 
+        @Override
         final public void pipelineAdd() {
-            lock.lock();
-            try {
+            runActorTask(new PipelineAddTask());
+        }
+
+        private final class PipelineAddTask extends ActorTask {
+            @Override
+            protected void doAction() throws InterruptedException {
                 if (!members.contains(serviceId))
                     throw new QuorumException(ERR_NOT_MEMBER + serviceId);
                 conditionalPipelineAddImpl();
-            } catch(InterruptedException e) {
-                // propagate the interrupt.
-                Thread.currentThread().interrupt();
-                return;
-            } finally {
-                lock.unlock();
             }
         }
 
+        @Override
         final public void serviceJoin() {
-            lock.lock();
-            try {
+            runActorTask(new ServiceJoinTask());
+        }
+
+        private final class ServiceJoinTask extends ActorTask {
+            @Override
+            protected void doAction() throws InterruptedException {
                 if (!members.contains(serviceId))
                     throw new QuorumException(ERR_NOT_MEMBER + serviceId);
                 if (!pipeline.contains(serviceId))
                     throw new QuorumException(ERR_NOT_PIPELINE + serviceId);
                 conditionalServiceJoin();
-            } catch(InterruptedException e) {
-                // propagate the interrupt.
-                Thread.currentThread().interrupt();
-                return;
-            } finally {
-                lock.unlock();
             }
         }
-
+        
 //        final public void setLastValidToken(final long newToken) {
 //            lock.lock();
 //            try {
@@ -1553,9 +1747,21 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
 //            }
 //        }
 
+        @Override
         final public void setToken(final long newToken) {
-            lock.lock();
-            try {
+            runActorTask(new SetTokenTask(newToken));
+        }
+
+        private final class SetTokenTask extends ActorTask {
+
+            private final long newToken;
+
+            public SetTokenTask(final long newToken) {
+                this.newToken = newToken;
+            }
+
+            @Override
+            protected void doAction() throws InterruptedException {
                 if (!isQuorum(joined.size()))
                     throw new QuorumException(ERR_CAN_NOT_MEET
                             + " too few services are joined: #joined="
@@ -1567,25 +1773,18 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
                     throw new QuorumException(ERR_QUORUM_MET);
                 conditionalSetToken(newToken);
                 log.warn("Quorum meet.");
-            } catch(InterruptedException e) {
-                // propagate the interrupt.
-                Thread.currentThread().interrupt();
-                return;
-            } finally {
-                lock.unlock();
             }
         }
         
+        @Override
         final public void clearToken() {
-            lock.lock();
-            try {
+            runActorTask(new ClearTokenTask());
+        }
+
+        private final class ClearTokenTask extends ActorTask {
+            @Override
+            protected void doAction() throws InterruptedException {
                 conditionalClearToken();
-            } catch (InterruptedException e) {
-                // propagate the interrupt.
-                Thread.currentThread().interrupt();
-                return;
-            } finally {
-                lock.unlock();
             }
         }
 
@@ -1593,76 +1792,77 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
         // Public API "remove" methods.
         // 
         
+        @Override
         final public void memberRemove() {
-            lock.lock();
-            try {
-                memberRemoveInterruptable();
-            } catch(InterruptedException e) {
-                // propagate the interrupt.
-                Thread.currentThread().interrupt();
-                return;
-            } finally {
-                lock.unlock();
-            }
+            runActorTask(new MemberRemoveTask());
         }
-        
-        /**
-         * An interruptable version of {@link #memberRemove()}
-         */
-        protected void memberRemoveInterruptable() throws InterruptedException {
-            lock.lockInterruptibly();
-            try {
+
+        private final class MemberRemoveTask extends ActorTask {
+            @Override
+            protected void doAction() throws InterruptedException {
                 conditionalServiceLeaveImpl();
                 conditionalPipelineRemoveImpl();
                 conditionalWithdrawVoteImpl();
                 conditionalMemberRemoveImpl();
-            } finally {
-                lock.unlock();
             }
         }
 
+        /**
+         * An interruptable version of {@link #memberRemove()}.
+         * <p>
+         * Note: This is used by {@link AbstractQuorum#terminate()}. That code
+         * is already holding the lock in the caller's thread. Therefore it
+         * needs to run these operations in the same thread to avoid a deadlock
+         * with itself.
+         */
+        protected void memberRemoveInterruptable() throws InterruptedException {
+            if (!lock.isHeldByCurrentThread())
+                throw new IllegalMonitorStateException();
+            conditionalServiceLeaveImpl();
+            conditionalPipelineRemoveImpl();
+            conditionalWithdrawVoteImpl();
+            conditionalMemberRemoveImpl();
+        }
+
+        @Override
         final public void withdrawVote() {
-            lock.lock();
-            try {
+            runActorTask(new WithdrawVoteTask());
+        }
+
+        private final class WithdrawVoteTask extends ActorTask {
+            @Override
+            protected void doAction() throws InterruptedException {
                 conditionalServiceLeaveImpl();
                 conditionalPipelineRemoveImpl();
                 conditionalWithdrawVoteImpl();
-            } catch(InterruptedException e) {
-                // propagate the interrupt.
-                Thread.currentThread().interrupt();
-                return;
-            } finally {
-                lock.unlock();
             }
         }
-        
+    
+        @Override
         final public void pipelineRemove() {
-            lock.lock();
-            try {
+            runActorTask(new PipelineRemoveTask());
+        }
+
+        private final class PipelineRemoveTask extends ActorTask {
+            @Override
+            protected void doAction() throws InterruptedException {
                 conditionalWithdrawVoteImpl();
                 conditionalServiceLeaveImpl();
                 conditionalPipelineRemoveImpl();
-            } catch(InterruptedException e) {
-                // propagate the interrupt.
-                Thread.currentThread().interrupt();
-                return;
-            } finally {
-                lock.unlock();
             }
         }
 
+        @Override
         final public void serviceLeave() {
-            lock.lock();
-            try {
+            runActorTask(new ServiceLeaveTask());
+        }
+
+        private final class ServiceLeaveTask extends ActorTask {
+            @Override
+            protected void doAction() throws InterruptedException {
                 conditionalWithdrawVoteImpl();
                 conditionalPipelineRemoveImpl();
                 conditionalServiceLeaveImpl();
-            } catch(InterruptedException e) {
-                // propagate the interrupt.
-                Thread.currentThread().interrupt();
-                return;
-            } finally {
-                lock.unlock();
             }
         }
         
@@ -1741,23 +1941,36 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
         }
 
         private void conditionalWithdrawVoteImpl() throws InterruptedException {
-        	
             if (log.isDebugEnabled())
                 log.debug(new StackInfoReport());
-
-            final Long lastCommitTime = getCastVote(serviceId);
-            if (lastCommitTime != null) {
+            while (true) {
+                // check for a cast vote.
+                final Long lastCommitTime = getCastVote(serviceId);
+                if (lastCommitTime == null)
+                    break;
+                // cast vote exists. tell actor to withdraw vote.
+                if (log.isDebugEnabled())
+                    log.debug("will withdraw vote: serviceId=" + serviceId
+                            + ",lastCommitTime=" + lastCommitTime);
                 doWithdrawVote();
                 guard(new Guard() {
+                    // wait until the cast vote is withdrawn.
                     public void run() throws InterruptedException {
-                        while (getCastVote(serviceId) != null) {
+                        Long tmp;
+                        while ((tmp = getCastVote(serviceId)) != null) {
+                            if (!tmp.equals(lastCommitTime)) {
+                                log.warn("Concurrent vote change: old="
+                                        + lastCommitTime + ", new=" + tmp);
+                                return;
+                            }
                             votesChange.await();
                         }
+                        // a cast vote has been cleared.
+                        if (log.isDebugEnabled())
+                            log.debug("withdrew vote: serviceId=" + serviceId
+                                    + ",lastCommitTime=" + lastCommitTime);
                     }
                 });
-                if (log.isDebugEnabled())
-                    log.debug("withdrew vote: serviceId=" + serviceId
-                            + ",lastCommitTime=" + lastCommitTime);
             }
         }
 
