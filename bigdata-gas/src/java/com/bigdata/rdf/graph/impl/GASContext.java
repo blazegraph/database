@@ -104,10 +104,17 @@ public class GASContext<VS, ES, ST> implements IGASContext<VS, ES, ST> {
     }
 
     @Override
+    public IGraphAccessor getGraphAccessor() {
+        return graphAccessor;
+    }
+
+    @Override
     public IGASStats call() throws Exception {
 
         final GASStats total = new GASStats();
 
+        program.before(this);
+        
         while (!gasState.frontier().isEmpty()) {
 
             final GASStats roundStats = new GASStats();
@@ -123,6 +130,8 @@ public class GASContext<VS, ES, ST> implements IGASContext<VS, ES, ST> {
 
         gasState.traceState();
 
+        program.after(this);
+        
         // Done
         return total;
 
@@ -160,7 +169,7 @@ public class GASContext<VS, ES, ST> implements IGASContext<VS, ES, ST> {
          * SCATTER depending on some characteristics of the algorithm. Is this
          * worth while?
          * 
-         * TODO The ability to pushd down the APPLY for AllEdges for the GATHER
+         * Note: The ability to push down the APPLY for AllEdges for the GATHER
          * depends on our using the union of the in-edges and out-edges
          * iterators to visit those edges. That union means that we do not have
          * to preserve the accumulant across the in-edges and out-edges aspects
@@ -177,23 +186,18 @@ public class GASContext<VS, ES, ST> implements IGASContext<VS, ES, ST> {
         final boolean pushDownApplyInScatter;
         final boolean runApplyStage;
 
-        if (scatterEdges == EdgesEnum.NoEdges) {
+        if (gatherEdges != EdgesEnum.NoEdges) {
             // Do APPLY() in GATHER.
             pushDownApplyInGather = true;
             pushDownApplyInScatter = false;
             runApplyStage = false;
-        } else if (gatherEdges == EdgesEnum.NoEdges) {
+        } else if (scatterEdges != EdgesEnum.NoEdges) {
             // APPLY() in SCATTER.
             pushDownApplyInGather = false;
             pushDownApplyInScatter = true;
             runApplyStage = false;
         } else {
-            /*
-             * Do not push down the APPLY.
-             * 
-             * TODO We could still push down the apply into the GATHER if we are
-             * doing both stages.
-             */
+            // Do not push down the APPLY.
             pushDownApplyInGather = false;
             pushDownApplyInScatter = false;
             runApplyStage = true;
@@ -620,7 +624,7 @@ public class GASContext<VS, ES, ST> implements IGASContext<VS, ES, ST> {
 
                     } else {
 
-                        left = program.sum(left, right);
+                        left = program.sum(gasState, left, right);
 
                     }
 

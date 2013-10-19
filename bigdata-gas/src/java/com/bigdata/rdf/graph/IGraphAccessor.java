@@ -31,18 +31,37 @@ import com.bigdata.rdf.graph.impl.util.VertexDistribution;
 public interface IGraphAccessor {
 
     /**
-     * Return the edges for the vertex.
+     * Return the #of edges of the specified type for the given vertex.
+     * <p>
+     * Note: This is not always a flyweight operation due to the need to filter
+     * for only the observable edge types. If this information is required, it
+     * may be best to cache it on the vertex state object for a given
+     * {@link IGASProgram}.
      * 
-     * @param p
+     * @param ctx
      *            The {@link IGASContext}.
      * @param u
      *            The vertex.
      * @param edges
      *            Typesafe enumeration indicating which edges should be visited.
-     *            
+     * 
      * @return An iterator that will visit the edges for that vertex.
      */
-    Iterator<Statement> getEdges(IGASContext<?, ?, ?> p, Value u,
+    long getEdgeCount(IGASContext<?, ?, ?> ctx, Value u, EdgesEnum edges);
+
+    /**
+     * Return the edges for the given vertex.
+     * 
+     * @param ctx
+     *            The {@link IGASContext}.
+     * @param u
+     *            The vertex.
+     * @param edges
+     *            Typesafe enumeration indicating which edges should be visited.
+     * 
+     * @return An iterator that will visit the edges for that vertex.
+     */
+    Iterator<Statement> getEdges(IGASContext<?, ?, ?> ctx, Value u,
             EdgesEnum edges);
 
     /**

@@ -19,6 +19,7 @@ import com.bigdata.rdf.graph.IStaticFrontier;
 import com.bigdata.rdf.graph.impl.GASState;
 import com.bigdata.rdf.graph.impl.bd.BigdataGASEngine.BigdataGraphAccessor;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.IVUtility;
 import com.bigdata.rdf.internal.impl.TermId;
 import com.bigdata.rdf.internal.impl.bnode.SidIV;
 import com.bigdata.rdf.model.BigdataValue;
@@ -63,7 +64,13 @@ public class BigdataGASState<VS, ES, ST> extends GASState<VS, ES, ST> {
         final AbstractTripleStore kb = getGraphAccessor().getKB();
 
         // Get all terms in the frontier.
-        final Set<IV<?, ?>> tmp = new HashSet<IV<?, ?>>((Collection) frontier());
+        final Set<IV<?, ?>> tmp = new HashSet<IV<?, ?>>();
+        
+        for (Value v : frontier()) {
+        
+            tmp.add((IV) v);
+            
+        }
 
         // Add all IVs for the vertexState.
         tmp.addAll((Collection) vertexState.keySet());
@@ -176,4 +183,12 @@ public class BigdataGASState<VS, ES, ST> extends GASState<VS, ES, ST> {
 
     }
 
+    @SuppressWarnings("rawtypes")
+    @Override
+    public int compareTo(final Value u, final Value v) {
+
+        return IVUtility.compare((IV) u, (IV) v);
+
+    }
+    
 }

@@ -36,6 +36,8 @@ import com.bigdata.rdf.graph.IGASProgram;
 import com.bigdata.rdf.graph.IGraphAccessor;
 import com.bigdata.rdf.graph.impl.GASEngine;
 import com.bigdata.rdf.graph.impl.util.VertexDistribution;
+import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.store.AbstractTripleStore;
 
 import cutthecrap.utils.striterators.EmptyIterator;
 import cutthecrap.utils.striterators.IStriterator;
@@ -277,9 +279,29 @@ public class RAMGASEngine extends GASEngine {
             // NOP
         }
 
+        @Override
+        public long getEdgeCount(final IGASContext<?, ?, ?> ctx, final Value u,
+                final EdgesEnum edges) {
+
+            long n = 0L;
+            
+            final Iterator<Statement> itr = getEdges(ctx, u, edges);
+
+            while (itr.hasNext()) {
+
+                itr.next();
+                
+                n++;
+
+            }
+
+            return n;
+
+        }
+
         @SuppressWarnings("unchecked")
         @Override
-        public Iterator<Statement> getEdges(final IGASContext<?, ?, ?> p,
+        public Iterator<Statement> getEdges(final IGASContext<?, ?, ?> ctx,
                 final Value u, final EdgesEnum edges) {
 
             try {
@@ -287,12 +309,12 @@ public class RAMGASEngine extends GASEngine {
                 case NoEdges:
                     return EmptyIterator.DEFAULT;
                 case InEdges:
-                    return getEdges(true/* inEdges */, p, u);
+                    return getEdges(true/* inEdges */, ctx, u);
                 case OutEdges:
-                    return getEdges(false/* inEdges */, p, u);
+                    return getEdges(false/* inEdges */, ctx, u);
                 case AllEdges: {
-                    final IStriterator a = getEdges(true/* inEdges */, p, u);
-                    final IStriterator b = getEdges(false/* outEdges */, p, u);
+                    final IStriterator a = getEdges(true/* inEdges */, ctx, u);
+                    final IStriterator b = getEdges(false/* outEdges */, ctx, u);
                     a.append(b);
                     return a;
                 }

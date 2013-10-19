@@ -39,8 +39,28 @@ import cutthecrap.utils.striterators.IStriterator;
 public interface IGASOptions<VS, ES, ST> {
 
     /**
+     * Return the nature of the initial frontier for this algorithm.
+     */
+    FrontierEnum getInitialFrontierEnum();
+
+    /**
+     * Return the type of edges that must exist when sampling the vertices of
+     * the graph. If {@link EdgesEnum#InEdges} is specified, then each sampled
+     * vertex will have at least one in-edge. If {@link EdgesEnum#OutEdges} is
+     * specified, then each sampled vertex will have at least one out-edge. To
+     * sample all vertices regardless of their edges, specify
+     * {@value EdgesEnum#NoEdges}. To require that each vertex has at least one
+     * in-edge and one out-edge, specify {@link EdgesEnum#AllEdges}.
+     */
+    EdgesEnum getSampleEdgesFilter();
+    
+    /**
      * Return the set of edges to which the GATHER is applied -or-
      * {@link EdgesEnum#NoEdges} to skip the GATHER phase.
+     * 
+     * TODO We may need to set dynamically when visting the vertex in the
+     * frontier rather than having it be a one-time property of the vertex
+     * program.
      */
     EdgesEnum getGatherEdges();
 

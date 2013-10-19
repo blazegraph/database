@@ -15,16 +15,23 @@
 */
 package com.bigdata.rdf.graph.analytics;
 
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.openrdf.model.Statement;
 import org.openrdf.model.Value;
 
 import com.bigdata.rdf.graph.EdgesEnum;
 import com.bigdata.rdf.graph.Factory;
+import com.bigdata.rdf.graph.FrontierEnum;
 import com.bigdata.rdf.graph.IGASContext;
 import com.bigdata.rdf.graph.IGASScheduler;
 import com.bigdata.rdf.graph.IGASState;
+import com.bigdata.rdf.graph.IReducer;
 import com.bigdata.rdf.graph.impl.BaseGASProgram;
 
 import cutthecrap.utils.striterators.IStriterator;
@@ -39,6 +46,8 @@ import cutthecrap.utils.striterators.IStriterator;
  */
 public class BFS extends BaseGASProgram<BFS.VS, BFS.ES, Void> {
 
+//    private static final Logger log = Logger.getLogger(BFS.class);
+    
     public static class VS {
 
         /**
@@ -128,6 +137,13 @@ public class BFS extends BaseGASProgram<BFS.VS, BFS.ES, Void> {
     }
 
     @Override
+    public FrontierEnum getInitialFrontierEnum() {
+
+        return FrontierEnum.SingleVertex;
+        
+    }
+    
+    @Override
     public EdgesEnum getGatherEdges() {
 
         return EdgesEnum.NoEdges;
@@ -158,7 +174,8 @@ public class BFS extends BaseGASProgram<BFS.VS, BFS.ES, Void> {
      * Not used.
      */
     @Override
-    public void init(final IGASState<BFS.VS, BFS.ES, Void> state, final Value u) {
+    public void initVertex(final IGASContext<BFS.VS, BFS.ES, Void> ctx,
+            final IGASState<BFS.VS, BFS.ES, Void> state, final Value u) {
 
         state.getState(u).visit(0);
         
@@ -169,15 +186,20 @@ public class BFS extends BaseGASProgram<BFS.VS, BFS.ES, Void> {
      */
     @Override
     public Void gather(IGASState<BFS.VS, BFS.ES, Void> state, Value u, Statement e) {
+        
         throw new UnsupportedOperationException();
+        
     }
 
     /**
      * Not used.
      */
     @Override
-    public Void sum(Void left, Void right) {
+    public Void sum(final IGASState<BFS.VS, BFS.ES, Void> state,
+            final Void left, final Void right) {
+
         throw new UnsupportedOperationException();
+        
     }
 
     /**
@@ -231,10 +253,124 @@ public class BFS extends BaseGASProgram<BFS.VS, BFS.ES, Void> {
     }
 
     @Override
-    public boolean nextRound(IGASContext<BFS.VS, BFS.ES, Void> ctx) {
+    public boolean nextRound(final IGASContext<BFS.VS, BFS.ES, Void> ctx) {
 
         return true;
         
+    }
+
+    /**
+     * Reduce the active vertex stat, returning a histogram reporting the #of
+     * vertices at each distance from the starting vertex. There will always be
+     * one vertex at depth zero - this is the starting vertex. For each
+     * successive depth, the #of vertices that were labeled at that depth is
+     * reported. This is essentially the same as reporting the size of the
+     * frontier in each round of the traversal, but the histograph is reported
+     * based on the vertex state.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+     *         Thompson</a>
+     * 
+     *         TODO Do another reducer that reports the actual BFS tree rather
+     *         than a histogram. For each depth, it needs to have the set of
+     *         vertices that are at that number of hops from the starting
+     *         vertex. So, there is an outer map from depth to set. The inner
+     *         set should also be concurrent if we allow concurrent reduction of
+     *         the activated vertex state.
+     */
+    protected static class HistogramReducer implements
+            IReducer<VS, ES, Void, Map<Integer, AtomicLong>> {
+
+        private final ConcurrentHashMap<Integer, AtomicLong> values = new ConcurrentHashMap<Integer, AtomicLong>();
+
+        @Override
+        public void visit(final IGASState<VS, ES, Void> state, final Value u) {
+
+            final VS us = state.getState(u);
+
+            if (us != null) {
+
+                final Integer depth = Integer.valueOf(us.depth());
+
+                AtomicLong newval = values.get(depth);
+
+                if (newval == null) {
+
+                    final AtomicLong oldval = values.putIfAbsent(depth,
+                            newval = new AtomicLong());
+
+                    if (oldval != null) {
+
+                        // lost data race.
+                        newval = oldval;
+
+                    }
+
+                }
+
+                newval.incrementAndGet();
+
+            }
+
+        }
+
+        @Override
+        public Map<Integer, AtomicLong> get() {
+
+            return Collections.unmodifiableMap(values);
+            
+        }
+        
+    }
+    
+    @Override
+    public void after(final IGASContext<BFS.VS, BFS.ES, Void> ctx) {
+
+        final HistogramReducer r = new HistogramReducer();
+        
+        ctx.getGASState().reduce(r);
+
+        class NV implements Comparable<NV> {
+            public final int n;
+            public final long v;
+            public NV(final int n, final long v) {
+                this.n = n;
+                this.v = v;
+            }
+            @Override
+            public int compareTo(final NV o) {
+                if (o.n > this.n)
+                    return -1;
+                if (o.n < this.n)
+                    return 1;
+                return 0;
+            }
+        }
+
+        final Map<Integer, AtomicLong> h = r.get();
+
+        final NV[] a = new NV[h.size()];
+
+        int i = 0;
+
+        for (Map.Entry<Integer, AtomicLong> e : h.entrySet()) {
+
+            a[i++] = new NV(e.getKey().intValue(), e.getValue().get());
+
+        }
+
+        Arrays.sort(a);
+
+        System.out.println("distance, frontierSize, sumFrontierSize");
+        long sum = 0L;
+        for (NV t : a) {
+
+            System.out.println(t.n + ", " + t.v + ", " + sum);
+
+            sum += t.v;
+
+        }
+
     }
 
 }

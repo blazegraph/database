@@ -15,15 +15,22 @@
 */
 package com.bigdata.rdf.graph.impl;
 
+import java.util.Arrays;
+import java.util.Random;
+
+import org.apache.log4j.Logger;
+import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 
 import com.bigdata.rdf.graph.EdgesEnum;
 import com.bigdata.rdf.graph.Factory;
+import com.bigdata.rdf.graph.FrontierEnum;
 import com.bigdata.rdf.graph.IGASContext;
 import com.bigdata.rdf.graph.IGASProgram;
 import com.bigdata.rdf.graph.IGASState;
+import com.bigdata.rdf.graph.impl.util.VertexDistribution;
 
 import cutthecrap.utils.striterators.Filter;
 import cutthecrap.utils.striterators.IFilter;
@@ -40,6 +47,8 @@ import cutthecrap.utils.striterators.IStriterator;
 abstract public class BaseGASProgram<VS, ES, ST> implements
         IGASProgram<VS, ES, ST> {
 
+    private static final Logger log = Logger.getLogger(BaseGASProgram.class);
+    
     /**
      * {@inheritDoc}
      * <p>
@@ -151,6 +160,30 @@ abstract public class BaseGASProgram<VS, ES, ST> implements
     /**
      * {@inheritDoc}
      * <p>
+     * The default implementation returns {@link #getGatherEdges()} and the
+     * {@link #getScatterEdges()} if {@link #getGatherEdges()} returns
+     * {@value EdgesEnum#NoEdges}. 
+     */
+    @Override
+    public EdgesEnum getSampleEdgesFilter() {
+
+        // Assume that a GATHER will be done for each starting vertex.
+        EdgesEnum edges = getGatherEdges();
+
+        if (edges == EdgesEnum.NoEdges) {
+
+            // If no GATHER is performed, then use the SCATTER edges.
+            edges = getScatterEdges();
+
+        }
+
+        return edges;
+
+    }
+
+    /**
+     * {@inheritDoc}
+     * <p>
      * The default gathers on the {@link EdgesEnum#InEdges}.
      */
     @Override
@@ -175,10 +208,72 @@ abstract public class BaseGASProgram<VS, ES, ST> implements
     /**
      * {@inheritDoc}
      * <p>
+     * The default implementation populates the frontier IFF this is an
+     * {@link FrontierEnum#AllVertices} {@link IGASProgram}.
+     */
+    @Override
+    public void before(final IGASContext<VS, ES, ST> ctx) {
+        
+        switch (getInitialFrontierEnum()) {
+        case AllVertices: {
+            addAllVerticesToFrontier(ctx);
+            break;
+        }
+        }
+
+    }
+    
+    /**
+     * {@inheritDoc}
+     * <p>
+     * The default implementation is a NOP.
+     */
+    @Override
+    public void after(final IGASContext<VS, ES, ST> ctx) {
+    
+        // NOP
+        
+    }
+    
+    /**
+     * Populate the initial frontier using all vertices in the graph.
+     * 
+     * @param ctx
+     *            The graph evaluation context.
+     * 
+     *            TODO This has a random number generator whose initial seed is
+     *            not controlled by the caller. However, the desired use case
+     *            here is to produce a distribution over ALL vertices so the
+     *            random number should be ignored - perhaps we should pass it in
+     *            as <code>null</code>?
+     */
+    private void addAllVerticesToFrontier(final IGASContext<VS, ES, ST> ctx) {
+
+        final IGASState<VS, ES, ST> gasState = ctx.getGASState();
+
+        final EdgesEnum sampleEdges = getSampleEdgesFilter();
+
+        final VertexDistribution dist = ctx.getGraphAccessor().getDistribution(
+                new Random());
+
+        final Resource[] initialFrontier = dist.getUnweightedSample(
+                dist.size(), sampleEdges);
+        
+        if (log.isDebugEnabled())
+            log.debug("initialFrontier=" + Arrays.toString(initialFrontier));
+
+        gasState.setFrontier(ctx, initialFrontier);
+
+    }
+
+    /**
+     * {@inheritDoc}
+     * <p>
      * The default is a NOP.
      */
     @Override
-    public void init(final IGASState<VS, ES, ST> state, final Value u) {
+    public void initVertex(final IGASContext<VS, ES, ST> ctx,
+            final IGASState<VS, ES, ST> state, final Value u) {
 
         // NOP
 

@@ -15,6 +15,7 @@
 */
 package com.bigdata.rdf.graph.impl;
 
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -26,8 +27,10 @@ import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
+import org.openrdf.query.algebra.evaluation.util.ValueComparator;
 
 import com.bigdata.rdf.graph.Factory;
+import com.bigdata.rdf.graph.IGASContext;
 import com.bigdata.rdf.graph.IGASEngine;
 import com.bigdata.rdf.graph.IGASProgram;
 import com.bigdata.rdf.graph.IGASSchedulerImpl;
@@ -108,8 +111,13 @@ public class GASState<VS, ES, ST> implements IGASState<VS, ES, ST> {
      * Provides access to the backing graph. Used to decode vertices and edges
      * for {@link #traceState()}.
      */
-    private IGraphAccessor graphAccessor;
+    private final IGraphAccessor graphAccessor;
 
+    /**
+     * Used to establish a total ordering over RDF {@link Value}s.
+     */
+    private final Comparator<Value> valueComparator;
+    
     public GASState(final IGASEngine gasEngine,//
             final IGraphAccessor graphAccessor, //
             final IStaticFrontier frontier,//
@@ -146,6 +154,13 @@ public class GASState<VS, ES, ST> implements IGASState<VS, ES, ST> {
 
         this.scheduler = gasScheduler;
 
+        /*
+         * TODO This is the SPARQL value ordering. It might be not be total or
+         * stable. If not, we can use an ordering over the string values of the
+         * RDF Values, but that will push the heap.
+         */
+        this.valueComparator = new ValueComparator();
+        
     }
 
     /**
@@ -242,7 +257,7 @@ public class GASState<VS, ES, ST> implements IGASState<VS, ES, ST> {
     }
 
     @Override
-    public void init(final Value... vertices) {
+    public void setFrontier(final IGASContext<VS, ES, ST> ctx, final Value... vertices) {
 
         if (vertices == null)
             throw new IllegalArgumentException();
@@ -263,7 +278,7 @@ public class GASState<VS, ES, ST> implements IGASState<VS, ES, ST> {
          */
         for (Value v : tmp) {
 
-            gasProgram.init(this, v);
+            gasProgram.initVertex(ctx, this, v);
 
         }
 
@@ -272,7 +287,7 @@ public class GASState<VS, ES, ST> implements IGASState<VS, ES, ST> {
                 && sortFrontier, tmp.iterator());
 
     }
-
+    
     @Override
     public void traceState() {
 
@@ -392,4 +407,15 @@ public class GASState<VS, ES, ST> implements IGASState<VS, ES, ST> {
         return null;
     }
 
+    @Override
+    public int compareTo(final Value u, final Value v) {
+        
+        final int ret = valueComparator.compare(u, v);
+        
+//        log.error("ret=" + ret + ", u=" + u + ", v=" + v); // FIXME REMOVE
+        
+        return ret;
+        
+    }
+    
 }

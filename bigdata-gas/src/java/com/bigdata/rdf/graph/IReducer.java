@@ -37,7 +37,7 @@ public interface IReducer<VS,ES, ST, T> {
      *            The result from applying the procedure to a single index
      *            partition.
      */
-    public void visit(IGASState<VS, ES, ST> ctx, Value u);
+    public void visit(IGASState<VS, ES, ST> state, Value u);
 
     /**
      * Return the aggregated results as an implementation dependent object.

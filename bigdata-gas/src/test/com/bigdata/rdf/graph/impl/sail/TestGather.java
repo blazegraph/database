@@ -26,6 +26,7 @@ import org.openrdf.sail.SailConnection;
 
 import com.bigdata.rdf.graph.EdgesEnum;
 import com.bigdata.rdf.graph.Factory;
+import com.bigdata.rdf.graph.FrontierEnum;
 import com.bigdata.rdf.graph.IGASContext;
 import com.bigdata.rdf.graph.IGASEngine;
 import com.bigdata.rdf.graph.IGASScheduler;
@@ -71,6 +72,13 @@ public class TestGather extends AbstractSailGraphTestCase {
         }
         
         @Override
+        public FrontierEnum getInitialFrontierEnum() {
+
+            return FrontierEnum.SingleVertex;
+            
+        }
+        
+        @Override
         public EdgesEnum getGatherEdges() {
             return gatherEdges;
         }
@@ -112,7 +120,10 @@ public class TestGather extends AbstractSailGraphTestCase {
         }
 
         @Override
-        public void init(IGASState<Set<Statement>, Set<Statement>, Set<Statement>> ctx, Value u) {
+        public void initVertex(
+                IGASContext<Set<Statement>, Set<Statement>, Set<Statement>> ctx,
+                IGASState<Set<Statement>, Set<Statement>, Set<Statement>> state,
+                Value u) {
 
             // NOP
             
@@ -134,8 +145,10 @@ public class TestGather extends AbstractSailGraphTestCase {
          * Set UNION over the GATHERed edges.
          */
         @Override
-        public Set<Statement> sum(Set<Statement> left, Set<Statement> right) {
-            
+        public Set<Statement> sum(
+                final IGASState<Set<Statement>, Set<Statement>, Set<Statement>> state,
+                final Set<Statement> left, final Set<Statement> right) {
+
             /*
              * Note: This happens to preserve the visitation order. That is not
              * essential, but it is nice.
@@ -280,7 +293,7 @@ public class TestGather extends AbstractSailGraphTestCase {
                         .getGASState();
 
                 // Initialize the froniter.
-                gasState.init(startingVertex);
+                gasState.setFrontier(gasContext, startingVertex);
 
                 // Do one round.
                 gasContext.doRound(new GASStats());

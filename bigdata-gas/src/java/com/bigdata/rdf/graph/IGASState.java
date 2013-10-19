@@ -51,6 +51,8 @@ public interface IGASState<VS,ES, ST> {
     /**
      * {@link #reset()} the computation state and populate the initial frontier.
      * 
+     * @param ctx
+     *            The execution context.
      * @param v
      *            One or more vertices that will be included in the initial
      *            frontier.
@@ -58,7 +60,7 @@ public interface IGASState<VS,ES, ST> {
      * @throws IllegalArgumentException
      *             if no vertices are specified.
      */
-    void init(Value... v);
+    void setFrontier(IGASContext<VS, ES, ST> ctx, Value... v);
 
     /**
      * Discard computation state (the frontier, vertex state, and edge state)
@@ -227,5 +229,19 @@ public interface IGASState<VS,ES, ST> {
      *         TODO RDR : Link to an RDR wiki page as well.
      */
     Statement decodeStatement(Value v);
+ 
+    /**
+     * Return -1, o, or 1 if <code>u</code> is LT, EQ, or GT <code>v</code>. A
+     * number of GAS programs depend on the ability to place an order over the
+     * vertex identifiers, as does 2D partitioning. The ordering provided by
+     * this method MAY be arbitrary, but it MUST be total and stable across the
+     * life-cycle of the GAS program evaluation.
+     * 
+     * @param u
+     *            A vertex.
+     * @param v
+     *            Another vertex.
+     */
+    int compareTo(Value u, Value v);
     
 }

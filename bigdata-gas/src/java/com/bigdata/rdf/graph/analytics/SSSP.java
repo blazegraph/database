@@ -20,6 +20,7 @@ import org.openrdf.model.Statement;
 import org.openrdf.model.Value;
 
 import com.bigdata.rdf.graph.Factory;
+import com.bigdata.rdf.graph.FrontierEnum;
 import com.bigdata.rdf.graph.IGASContext;
 import com.bigdata.rdf.graph.IGASScheduler;
 import com.bigdata.rdf.graph.IGASState;
@@ -29,22 +30,24 @@ import cutthecrap.utils.striterators.IStriterator;
 
 /**
  * SSSP (Single Source, Shortest Path). This analytic computes the shortest path
- * to each vertex in the graph starting from the given vertex. Only connected
- * vertices are visited by this implementation (the frontier never leaves the
- * connected component in which the starting vertex is located).
+ * to each connected vertex in the graph starting from the given vertex. Only
+ * connected vertices are visited by this implementation (the frontier never
+ * leaves the connected component in which the starting vertex is located).
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * 
- *         TODO There is no reason to do a gather on the first round. Add
- *         isGather()? (parallel to isChanged() for scatter?)
- * 
- *         TODO Add reducer pattern for finding the maximum degree vertex.
  * 
  *         TODO Add parameter for directed versus undirected SSSP. When
  *         undirected, the gather and scatter are for AllEdges. Otherwise,
  *         gather on in-edges and scatter on out-edges. Also, we need to use a
  *         getOtherVertex(e) method to figure out the other edge when using
  *         undirected scatter/gather. Add unit test for undirected.
+ * 
+ *         FIXME New SSSP (push style scatter abstraction with new test case
+ *         based on graph example developed for this)
+ * 
+ *         TODO Add a reducer to report the actual minimum length paths. This is
+ *         similar to a BFS tree, but the path lengths are not integer values so
+ *         we need a different data structure to collect them.
  */
 public class SSSP extends BaseGASProgram<SSSP.VS, SSSP.ES, Integer/* dist */> {
 
@@ -76,8 +79,12 @@ public class SSSP extends BaseGASProgram<SSSP.VS, SSSP.ES, Integer/* dist */> {
          * The minimum observed distance (in hops) from the source to this
          * vertex and initially {@link Integer#MAX_VALUE}. When this value is
          * modified, the {@link #changed} flag is set as a side-effect.
+         * 
+         * FIXME This really needs to be a floating point value, probably
+         * double. We also need tests with non-integer weights and non- positive
+         * weights.
          */
-        private int dist = Integer.MAX_VALUE;
+        private Integer dist = Integer.MAX_VALUE;
 
         private boolean changed = false;
 
@@ -147,6 +154,13 @@ public class SSSP extends BaseGASProgram<SSSP.VS, SSSP.ES, Integer/* dist */> {
 
     }
 
+    @Override
+    public FrontierEnum getInitialFrontierEnum() {
+
+        return FrontierEnum.SingleVertex;
+        
+    }
+    
 //    @Override
 //    public Factory<ISPO, SSSP.ES> getEdgeStateFactory() {
 //
@@ -188,8 +202,8 @@ public class SSSP extends BaseGASProgram<SSSP.VS, SSSP.ES, Integer/* dist */> {
      * {@inheritDoc}
      */
     @Override
-    public void init(final IGASState<SSSP.VS, SSSP.ES, Integer> state,
-            final Value u) {
+    public void initVertex(final IGASContext<SSSP.VS, SSSP.ES, Integer> ctx,
+            final IGASState<SSSP.VS, SSSP.ES, Integer> state, final Value u) {
 
         final VS us = state.getState(u);
 
@@ -235,7 +249,8 @@ public class SSSP extends BaseGASProgram<SSSP.VS, SSSP.ES, Integer/* dist */> {
      * MIN
      */
     @Override
-    public Integer sum(final Integer left, final Integer right) {
+    public Integer sum(final IGASState<SSSP.VS, SSSP.ES, Integer> state,
+            final Integer left, final Integer right) {
 
         return Math.min(left, right);
 

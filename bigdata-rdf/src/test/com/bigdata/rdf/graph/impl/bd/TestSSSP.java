@@ -62,7 +62,7 @@ public class TestSSSP extends AbstractBigdataGraphTestCase {
             final IGASState<SSSP.VS, SSSP.ES, Integer> gasState = gasContext.getGASState();
             
             // Initialize the froniter.
-            gasState.init(p.getMike());
+            gasState.setFrontier(gasContext, p.getMike());
 
             // Converge.
             gasContext.call();
