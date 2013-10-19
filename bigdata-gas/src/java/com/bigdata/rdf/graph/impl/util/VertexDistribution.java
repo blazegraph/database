@@ -51,9 +51,15 @@ public class VertexDistribution {
     private static class VertexSample {
         /** The {@link Resource}. */
         public final Resource v;
-        /** The #of the {@link Resource} occurring as the target of an in-edge. */
+        /**
+         * The #of times this {@link Resource} occurs as the target of an
+         * in-edge.
+         */
         public int in;
-        /** The #of the {@link Resource} occurring as the source of an out-edge. */
+        /**
+         * The #of times this {@link Resource} occurs as the source of an
+         * out-edge.
+         */
         public int out;
 
         /**
@@ -73,6 +79,13 @@ public class VertexDistribution {
             this.out = out;
             // this.n = 0;
         }
+        
+        @Override
+        public String toString() {
+            return getClass().getName() + "{v=" + v + ",#in=" + in + ",#out="
+                    + out + "}";
+        }
+
     }
 
     /**
@@ -100,6 +113,16 @@ public class VertexDistribution {
         
     }
 
+//    /**
+//     * Add a sample of a vertex having some attribute value.
+//     * 
+//     * @param v
+//     *            The vertex.
+//     */
+//    public void addAttributeSample(final Resource v) {
+//
+//    }
+    
     /**
      * Add a sample of a vertex having some out-edge.
      * 
@@ -164,7 +187,9 @@ public class VertexDistribution {
      * 
      * @param edges
      *            Only vertice having the specified type(s) of edges will be
-     *            included in the distribution.
+     *            included in the distribution. If {@link EdgesEnum#NoEdges} is
+     *            specified, then vertices will not be filtered based on the #of
+     *            and type of edges.
      * @param normalize
      *            When <code>true</code> the vector will be normalized such that
      *            the elements in the vector are in <code>[0:1]</code> and sum
@@ -173,14 +198,17 @@ public class VertexDistribution {
      *            specified type(s).
      * 
      * @return The distribution vector over the samples.
+     * 
+     *         TODO There should also be an edge type filter (filter by link
+     *         type).
      */
     double[] getVector(final EdgesEnum edges, final boolean normalize) {
 
         if (edges == null)
             throw new IllegalArgumentException();
 
-        if (edges == EdgesEnum.NoEdges)
-            throw new IllegalArgumentException();
+//        if (edges == EdgesEnum.NoEdges)
+//            throw new IllegalArgumentException();
 
         final double[] a = new double[samples.size()];
 
@@ -199,6 +227,9 @@ public class VertexDistribution {
 
             final double d;
             switch (edges) {
+            case NoEdges:
+                d = 1;
+                break;
             case InEdges:
                 d = s.in;
                 break;
@@ -382,4 +413,9 @@ public class VertexDistribution {
 
     }
 
+    @Override
+    public String toString() {
+        return super.toString() + "{size=" + size() + "}";
+    }
+    
 }

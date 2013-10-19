@@ -333,117 +333,214 @@ public class BigdataGASEngine extends GASEngine {
             return keyOrder;
         }
 
-        @SuppressWarnings({ "unchecked", "rawtypes" })
+        /**
+         * Access path abstraction for a vertex for either its in-edges or its
+         * out-edges.
+         */
+        private class AP {
+
+            // ctor (given)
+            private final AbstractTripleStore kb;
+            private final boolean inEdges;
+            private final IGASContext<?, ?, ?> ctx;
+            private final IV u;
+            // ctor (computed)
+            private final IV linkTypeIV;
+            private final boolean posOptimization;
+            private final SPOKeyOrder keyOrder;
+            private final IIndex ndx;
+            private final byte[] fromKey;
+            private final byte[] toKey;
+
+            @SuppressWarnings("rawtypes")
+            public AP(final AbstractTripleStore kb, final boolean inEdges,
+                    final IGASContext<?, ?, ?> ctx, final IV u) {
+
+                this.kb = kb;
+                this.inEdges = inEdges;
+                this.ctx = ctx;
+                this.u = u;
+
+                linkTypeIV = (IV) ctx.getGASProgram().getLinkType();
+
+                final IKeyBuilder keyBuilder;
+                /*
+                 * Optimize case where P is a constant and O is known (2 bound).
+                 * 
+                 * P is a constant.
+                 * 
+                 * [u] gets bound on O.
+                 * 
+                 * We use the POS(C) index. The S values give us the out-edges
+                 * for that [u] and the specified link type.
+                 * 
+                 * FIXME POS OPTIMIZATION: write unit test for this option to
+                 * make sure that the right filter is imposed. write performance
+                 * test to verify expected benefit. Watch out for the in-edges
+                 * vs out-edges since only one is optimized.
+                 */
+                posOptimization = linkTypeIV != null && !inEdges;
+
+                if (posOptimization) {
+
+                    /*
+                     * POS(C)
+                     */
+                    keyOrder = kb.isQuads() ? SPOKeyOrder.POCS
+                            : SPOKeyOrder.POS;
+
+                    ndx = kb.getSPORelation().getIndex(keyOrder);
+
+                    keyBuilder = ndx.getIndexMetadata().getKeyBuilder();
+
+                    keyBuilder.reset();
+
+                    // Bind P as a constant.
+                    IVUtility.encode(keyBuilder, linkTypeIV);
+
+                    // Bind O for this key-range scan.
+                    IVUtility.encode(keyBuilder, u);
+
+                } else {
+
+                    /*
+                     * SPO(C) or OSP(C)
+                     */
+
+                    keyOrder = getKeyOrder(kb, inEdges);
+
+                    ndx = kb.getSPORelation().getIndex(keyOrder);
+
+                    keyBuilder = ndx.getIndexMetadata().getKeyBuilder();
+
+                    keyBuilder.reset();
+
+                    IVUtility.encode(keyBuilder, u);
+
+                }
+
+                fromKey = keyBuilder.getKey();
+
+                toKey = SuccessorUtil.successor(fromKey.clone());
+
+            }
+
+            /**
+             * Report the number of edges.
+             * 
+             * FIXME This is not optimized for the cases where the BTree range
+             * count would be exact. Part of the problem is that we need to
+             * tunnel the BTree API and discover whether or not the indicies
+             * support delete markers. However, the larger problem is that we
+             * can not apply the optional
+             * {@link IGASProgram#constrainFilter(IGASContext, IStriterator)}.
+             * Due to the API of that method (which optionally adds a filter to
+             * the striterator or wraps it), we do not know whether or not a
+             * constrain filter was specified and are unable to decide here
+             * whether or not we need to enumerate the edges in order to find
+             * only those which also satisify that filter.
+             */
+            public long getEdgeCount() {
+
+//                if (linkTypeIV != null && !posOptimization) {
+//
+//                    /*
+//                     * A link type constraint was specified, but we were not able to
+//                     * use the POS(C) index optimization. In this case we have to
+//                     * add a filter to impose that link type constraint.
+//                     */
+//                    
+//                }
+//
+//                return ndx.rangeCount(fromKey, toKey);
+
+                long n = 0L;
+                
+                final IStriterator sitr = getEdges();
+                
+                while(sitr.hasNext()) {
+                    
+                    sitr.next();
+                    
+                    n++;
+                    
+                }
+                
+                return n;
+                
+            }
+            
+            /**
+             * Return an iterator that will visit the edges.
+             */
+            public IStriterator getEdges() {
+                
+                @SuppressWarnings("unchecked")
+                final ITupleIterator<ISPO> titr = ndx.rangeIterator(fromKey, toKey,
+                        0/* capacity */, IRangeQuery.DEFAULT, null/* filter */);
+
+                final IStriterator sitr = new Striterator(titr);
+
+                sitr.addFilter(new Resolver() {
+                    private static final long serialVersionUID = 1L;
+                    @Override
+                    protected Object resolve(final Object e) {
+                        @SuppressWarnings("unchecked")
+                        final ITuple<ISPO> t = (ITuple<ISPO>) e;
+                        return t.getObject();
+                    }
+                });
+
+                if (linkTypeIV != null && !posOptimization) {
+                    /*
+                     * A link type constraint was specified, but we were not able to
+                     * use the POS(C) index optimization. In this case we have to
+                     * add a filter to impose that link type constraint.
+                     */
+                    sitr.addFilter(new Filter() {
+                        private static final long serialVersionUID = 1L;
+                        @Override
+                        public boolean isValid(final Object e) {
+                            return ((ISPO) e).p().equals(linkTypeIV);
+                        }
+                    });
+                }
+                
+                /*
+                 * Optionally wrap the program specified filter. This filter will be
+                 * pushed down onto the index. If the index is remote, then this is
+                 * much more efficient. (If the index is local, then simply stacking
+                 * striterators is just as efficient.)
+                 */
+                return ((IGASProgram) ctx.getGASProgram()).constrainFilter(ctx,
+                        sitr);
+
+            }
+            
+        } // class AP
+        
+        @SuppressWarnings({ "rawtypes" })
         private IStriterator getEdges(final AbstractTripleStore kb,
                 final boolean inEdges, final IGASContext<?, ?, ?> ctx,
                 final IV u) {
 
-            final SPOKeyOrder keyOrder;
-            final IIndex ndx;
-            final IKeyBuilder keyBuilder;
-            final IV linkTypeIV = (IV) ctx.getGASProgram().getLinkType();
-            /*
-             * Optimize case where P is a constant and O is known (2 bound).
-             * 
-             * P is a constant.
-             * 
-             * [u] gets bound on O.
-             * 
-             * We use the POS(C) index. The S values give us the out-edges for
-             * that [u] and the specified link type.
-             * 
-             * FIXME POS OPTIMIZATION: write unit test for this option to make
-             * sure that the right filter is imposed. write performance test to
-             * verify expected benefit. Watch out for the in-edges vs out-edges
-             * since only one is optimized.
-             */
-            final boolean posOptimization = linkTypeIV != null
-                    && !inEdges;
-
-            if (posOptimization) {
-            
-                /*
-                 * POS(C)
-                 */
-                keyOrder = kb.isQuads() ? SPOKeyOrder.POCS : SPOKeyOrder.POS;
-
-                ndx = kb.getSPORelation().getIndex(keyOrder);
-
-                keyBuilder = ndx.getIndexMetadata().getKeyBuilder();
-
-                keyBuilder.reset();
-
-                // Bind P as a constant.
-                IVUtility.encode(keyBuilder, linkTypeIV);
-
-                // Bind O for this key-range scan.
-                IVUtility.encode(keyBuilder, u);
-                
-            } else {
-                
-                /*
-                 * SPO(C) or OSP(C)
-                 */
-                
-                keyOrder = getKeyOrder(kb, inEdges);
-
-                ndx = kb.getSPORelation().getIndex(keyOrder);
-
-                keyBuilder = ndx.getIndexMetadata().getKeyBuilder();
-
-                keyBuilder.reset();
-
-                IVUtility.encode(keyBuilder, u);
-
-            }
-
-            final byte[] fromKey = keyBuilder.getKey();
-
-            final byte[] toKey = SuccessorUtil.successor(fromKey.clone());
-
-            final ITupleIterator<ISPO> titr = ndx.rangeIterator(fromKey, toKey,
-                    0/* capacity */, IRangeQuery.DEFAULT, null/* filter */);
-
-            final IStriterator sitr = new Striterator(titr);
-
-            sitr.addFilter(new Resolver() {
-                private static final long serialVersionUID = 1L;
-                @Override
-                protected Object resolve(final Object e) {
-                    final ITuple<ISPO> t = (ITuple<ISPO>) e;
-                    return t.getObject();
-                }
-            });
-
-            if (linkTypeIV != null && !posOptimization) {
-                /*
-                 * A link type constraint was specified, but we were not able to
-                 * use the POS(C) index optimization. In this case we have to
-                 * add a filter to impose that link type constraint.
-                 */
-                sitr.addFilter(new Filter() {
-                    private static final long serialVersionUID = 1L;
-                    @Override
-                    public boolean isValid(final Object e) {
-                        return ((ISPO) e).p().equals(linkTypeIV);
-                    }
-                });
-            }
-            
-            /*
-             * Optionally wrap the program specified filter. This filter will be
-             * pushed down onto the index. If the index is remote, then this is
-             * much more efficient. (If the index is local, then simply stacking
-             * striterators is just as efficient.)
-             */
-            return ((IGASProgram) ctx.getGASProgram()).constrainFilter(ctx,
-                    sitr);
+            return new AP(kb, inEdges, ctx, u).getEdges();
 
         }
 
-        @SuppressWarnings("unchecked")
-        private Iterator<ISPO> _getEdges(final IGASContext<?, ?, ?> p,
-                @SuppressWarnings("rawtypes") final IV u, final EdgesEnum edges) {
+        @SuppressWarnings({ "rawtypes" })
+        private long getEdgeCount(final AbstractTripleStore kb,
+                final boolean inEdges, final IGASContext<?, ?, ?> ctx,
+                final IV u) {
+
+            return new AP(kb, inEdges, ctx, u).getEdgeCount();
+            
+        }
+
+        @SuppressWarnings({ "unchecked", "rawtypes" })
+        @Override
+        public Iterator<Statement> getEdges(final IGASContext<?, ?, ?> ctx,
+                final Value u, final EdgesEnum edges) {
 
             final AbstractTripleStore kb = getKB();
             
@@ -451,12 +548,12 @@ public class BigdataGASEngine extends GASEngine {
             case NoEdges:
                 return EmptyIterator.DEFAULT;
             case InEdges:
-                return getEdges(kb, true/* inEdges */, p, u);
+                return getEdges(kb, true/* inEdges */, ctx, (IV) u);
             case OutEdges:
-                return getEdges(kb, false/* inEdges */, p, u);
+                return getEdges(kb, false/* inEdges */, ctx, (IV) u);
             case AllEdges: {
-                final IStriterator a = getEdges(kb, true/* inEdges */, p, u);
-                final IStriterator b = getEdges(kb, false/* outEdges */, p, u);
+                final IStriterator a = getEdges(kb, true/* inEdges */, ctx, (IV) u);
+                final IStriterator b = getEdges(kb, false/* outEdges */, ctx, (IV) u);
                 a.append(b);
                 return a;
             }
@@ -466,12 +563,30 @@ public class BigdataGASEngine extends GASEngine {
 
         }
 
-        @SuppressWarnings({ "unchecked", "rawtypes" })
         @Override
-        public Iterator<Statement> getEdges(final IGASContext<?, ?, ?> ctx,
-                final Value u, final EdgesEnum edges) {
+        @SuppressWarnings({ "rawtypes" })
+        public long getEdgeCount(final IGASContext<?, ?, ?> ctx, final Value u,
+                final EdgesEnum edges) {
 
-            return (Iterator) _getEdges(ctx, (IV) u, edges);
+            final AbstractTripleStore kb = getKB();
+
+            switch (edges) {
+            case NoEdges:
+                return 0L;
+            case InEdges:
+                return getEdgeCount(kb, true/* inEdges */, ctx, (IV) u);
+            case OutEdges:
+                return getEdgeCount(kb, false/* inEdges */, ctx, (IV) u);
+            case AllEdges: {
+                final long a = getEdgeCount(kb, true/* inEdges */, ctx, (IV) u);
+                final long b = getEdgeCount(kb, false/* outEdges */, ctx,
+                        (IV) u);
+                final long n = a + b;
+                return n;
+            }
+            default:
+                throw new UnsupportedOperationException(edges.name());
+            }
 
         }
 
@@ -490,7 +605,9 @@ public class BigdataGASEngine extends GASEngine {
 
                 if (!(spo.o().isResource())) {
 
-                    // Not an edge.
+                    // Attribute value (not an edge).
+//                    sample.addAttributeSample((Resource) spo.s());
+
                     continue;
                 }
 

@@ -65,7 +65,7 @@ public class TestBFS extends AbstractBigdataGraphTestCase {
                     .getGASState();
 
             // Initialize the froniter.
-            gasState.init(p.getMike());
+            gasState.setFrontier(gasContext, p.getMike());
 
             // Converge.
             gasContext.call();

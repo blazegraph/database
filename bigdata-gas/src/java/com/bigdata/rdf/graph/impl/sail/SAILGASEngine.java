@@ -95,6 +95,26 @@ public class SAILGASEngine extends GASEngine {
             // NOP
         }
 
+        @Override
+        public long getEdgeCount(final IGASContext<?, ?, ?> ctx, final Value u,
+                final EdgesEnum edges) {
+
+            long n = 0L;
+            
+            final Iterator<Statement> itr = getEdges(ctx, u, edges);
+
+            while (itr.hasNext()) {
+
+                itr.next();
+                
+                n++;
+
+            }
+
+            return n;
+
+        }
+
         @SuppressWarnings("unchecked")
         @Override
         public Iterator<Statement> getEdges(final IGASContext<?, ?, ?> p,

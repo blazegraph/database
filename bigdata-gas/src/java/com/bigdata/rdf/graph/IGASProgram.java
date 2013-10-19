@@ -32,10 +32,31 @@ import org.openrdf.model.Value;
  *            the generic type for the per-edge state, but that is not always
  *            true. The SUM type is scoped to the GATHER + SUM operation (NOT
  *            the computation).
- *            
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * 
+ *         TODO DESIGN: The broad problem with this approach is that it is
+ *         overly coupled with the Java object model. Instead it needs to expose
+ *         an API that is aimed at vectored (for GPU) execution with 2D
+ *         partitioning (for out-of-core, multi-node).
  */
 public interface IGASProgram<VS, ES, ST> extends IGASOptions<VS, ES, ST> {
+
+    /**
+     * One time initialization before the {@link IGASProgram} is executed.
+     * 
+     * @param ctx
+     *            The evaluation context.
+     */
+    void before(IGASContext<VS, ES, ST> ctx);
+
+    /**
+     * One time initialization after the {@link IGASProgram} is executed.
+     * 
+     * @param ctx
+     *            The evaluation context.
+     */
+    void after(IGASContext<VS, ES, ST> ctx);
 
     /**
      * Callback to initialize the state for each vertex in the initial frontier
@@ -44,9 +65,13 @@ public interface IGASProgram<VS, ES, ST> extends IGASOptions<VS, ES, ST> {
      * 
      * @param u
      *            The vertex.
+     * 
+     *            TODO We do not need both the {@link IGASContext} and the
+     *            {@link IGASState}. The latter is available from the former.
      */
-    void init(IGASState<VS, ES, ST> state, Value u);
-    
+    void initVertex(IGASContext<VS, ES, ST> ctx, IGASState<VS, ES, ST> state,
+            Value u);
+
     /**
      * GATHER is a map/reduce over the edges of the vertex. The SUM provides
      * pair-wise reduction over the edges visited by the GATHER.
@@ -94,8 +119,14 @@ public interface IGASProgram<VS, ES, ST> extends IGASOptions<VS, ES, ST> {
      *         TODO DESIGN: Rather than pair-wise reduction, why not use
      *         vectored reduction? That way we could use an array of primitives
      *         as well as objects.
+     * 
+     *         TODO DESIGN: This should be a reduced interface since we only
+     *         need access to the comparator semantics while the [state]
+     *         provides random access to vertex and edge state. The comparator
+     *         is necessary for MIN semantics for the {@link Value}
+     *         implementation of the backend. E.g., Value versus IV.
      */
-    ST sum(ST left, ST right);
+    ST sum(final IGASState<VS, ES, ST> state, ST left, ST right);
 
     /**
      * Apply the reduced aggregation computed by GATHER + SUM to the vertex.
@@ -155,7 +186,7 @@ public interface IGASProgram<VS, ES, ST> extends IGASOptions<VS, ES, ST> {
      * Return <code>true</code> iff the algorithm should continue. This is
      * invoked after every iteration, once the new frontier has been computed
      * and {@link IGASState#round()} has been advanced. An implementation may
-     * simple return <code>true</code>, in which case the algorithm will
+     * simply return <code>true</code>, in which case the algorithm will
      * continue IFF the current frontier is not empty.
      * <p>
      * Note: While this can be used to make custom decisions concerning the

@@ -16,8 +16,13 @@
 package com.bigdata.rdf.graph.impl.sail;
 
 import java.io.FileNotFoundException;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.LinkedHashSet;
+import java.util.Set;
 
 import org.openrdf.model.URI;
+import org.openrdf.model.Value;
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.sail.Sail;
 
@@ -66,7 +71,7 @@ public class AbstractSailGraphTestCase extends AbstractGraphTestCase {
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      */
-    protected class SmallGraphProblem {
+    static protected class SmallGraphProblem {
 
         /**
          * The data file.
@@ -74,19 +79,31 @@ public class AbstractSailGraphTestCase extends AbstractGraphTestCase {
         static private final String smallGraph1 = "bigdata-gas/src/test/com/bigdata/rdf/graph/data/smallGraph.ttl";
         static private final String smallGraph2 = "src/test/com/bigdata/rdf/graph/data/smallGraph.ttl";
         
-        private final URI rdfType, foafKnows, foafPerson, mike, bryan, martyn;
+        private final URI rdfType, foafKnows, foafPerson, mike, bryan, martyn, dc;
 
-        public SmallGraphProblem() throws Exception {
+        private final Set<Value> vertices;
+
+        private final Set<Value> linkTypes;
+        
+        public Set<Value> getVertices() {
+            return Collections.unmodifiableSet(vertices);
+        }
+        
+        public Set<Value> getLinkTypes() {
+            return Collections.unmodifiableSet(linkTypes);
+        }
+        
+        public SmallGraphProblem(final SailGraphFixture graphFixture) throws Exception {
 
             try {
                 // in eclipse with bigdata as the root dir.
-                getGraphFixture().loadGraph(smallGraph1);
+                graphFixture.loadGraph(smallGraph1);
             } catch (FileNotFoundException ex) {
                 // from the ant build file with bigdata-gas as the root dir.
-                getGraphFixture().loadGraph(smallGraph2);
+                graphFixture.loadGraph(smallGraph2);
             }
 
-            final Sail sail = getGraphFixture().getSail();
+            final Sail sail = graphFixture.getSail();
 
             rdfType = sail.getValueFactory().createURI(RDF.TYPE.stringValue());
 
@@ -104,6 +121,15 @@ public class AbstractSailGraphTestCase extends AbstractGraphTestCase {
 
             martyn = sail.getValueFactory().createURI(
                     "http://www.bigdata.com/Martyn");
+
+            dc = sail.getValueFactory().createURI(
+                    "http://www.bigdata.com/DC");
+
+            vertices = new LinkedHashSet<Value>(Arrays.asList(new Value[] {
+                    foafPerson, mike, bryan, martyn, dc }));
+
+            linkTypes = new LinkedHashSet<Value>(Arrays.asList(new Value[] {
+                    rdfType, foafKnows }));            
 
         }
 
@@ -131,6 +157,10 @@ public class AbstractSailGraphTestCase extends AbstractGraphTestCase {
             return martyn;
         }
 
+        public URI getDC() {
+            return dc;
+        }
+
     }
 
     /**
@@ -138,7 +168,111 @@ public class AbstractSailGraphTestCase extends AbstractGraphTestCase {
      */
     protected SmallGraphProblem setupSmallGraphProblem() throws Exception {
 
-        return new SmallGraphProblem();
+        return new SmallGraphProblem(getGraphFixture());
+
+    }
+
+    /**
+     * A small data set designed to demonstrate the push style scatter for SSSP.
+     * 
+     * <pre>
+     * Source, Target, Weight
+     * --------------------------------
+     * 1 2 1.00
+     * 1 3 1.00
+     * 2 4 0.50
+     * 3 4 1.00
+     * 3 5 1.00
+     * 4 5 0.25
+     * 
+     * Frontier @ t0 = {1}.   Vertices={1:0}
+     * Frontier @ t1 = {2,3}. Vertices={1:0, 2:1, 3:1}.
+     * Frontier @ t2 = {4,5}. Vertices={1:0, 2:1, 3:1, 4:1.5, 5:2}
+     * Frontier @ t3 = {5}.   Vertices={1:0, 2:1, 3:1, 4:1.5, 5:1.75}
+     * </pre>
+     * 
+     * @see <a href="../data/ssspGraph.ttl>ssspGraph.ttl</a>
+     * @see <a href="../data/ssspGraph.png>ssspGraph.png</a>
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+     *         Thompson</a>
+     */
+    protected static class SSSPGraphProblem {
+
+        /**
+         * The data file.
+         */
+        static private final String ssspGraph1 = "bigdata-gas/src/test/com/bigdata/rdf/graph/data/ssspGraph.ttl";
+        static private final String ssspGraph2 = "src/test/com/bigdata/rdf/graph/data/ssspGraph.ttl";
+        
+        public final URI link, v1, v2, v3, v4, v5;
+
+        private final Set<Value> vertices;
+        
+        private final Set<Value> linkTypes;
+        
+        public Set<Value> getVertices() {
+            return Collections.unmodifiableSet(vertices);
+        }
+        
+        public Set<Value> getLinkTypes() {
+            return Collections.unmodifiableSet(linkTypes);
+        }
+        
+        public SSSPGraphProblem(final SailGraphFixture graphFixture)
+                throws Exception {
+
+            try {
+                // in eclipse with bigdata as the root dir.
+                graphFixture.loadGraph(ssspGraph1);
+            } catch (FileNotFoundException ex) {
+                // from the ant build file with bigdata-gas as the root dir.
+                graphFixture.loadGraph(ssspGraph2);
+            }
+
+            final Sail sail = graphFixture.getSail();
+
+            link = sail.getValueFactory().createURI(
+                    "http://www.bigdata.com/ssspGraph/link");
+
+            v1 = sail.getValueFactory().createURI("http://www.bigdata.com/ssspGraph/1");
+            v2 = sail.getValueFactory().createURI("http://www.bigdata.com/ssspGraph/2");
+            v3 = sail.getValueFactory().createURI("http://www.bigdata.com/ssspGraph/3");
+            v4 = sail.getValueFactory().createURI("http://www.bigdata.com/ssspGraph/4");
+            v5 = sail.getValueFactory().createURI("http://www.bigdata.com/ssspGraph/5");
+
+            vertices = new LinkedHashSet<Value>(Arrays.asList(new Value[] {
+                    v1, v2, v3, v4, v5 }));
+
+            linkTypes = new LinkedHashSet<Value>(
+                    Arrays.asList(new Value[] { link }));
+
+        }
+        
+        public Value get_v1() {
+            return v1;
+        }
+        public Value get_v2() {
+            return v2;
+        }
+        public Value get_v3() {
+            return v3;
+        }
+        public Value get_v4() {
+            return v4;
+        }
+        public Value get_v5() {
+            return v5;
+        }
+
+    }
+
+    /**
+     * Load and setup the {@link SSSPGraphProblem}.
+     */
+    protected SSSPGraphProblem setupSSSPGraphProblem() throws Exception {
+
+        return new SSSPGraphProblem(getGraphFixture());
 
     }
 

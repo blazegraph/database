@@ -50,6 +50,11 @@ public interface IGASContext<VS, ES, ST> extends Callable<IGASStats> {
     IGASState<VS, ES, ST> getGASState();
     
     /**
+     * The graph access object.
+     */
+    IGraphAccessor getGraphAccessor();
+    
+    /**
      * Execute one iteration.
      * 
      * @param stats

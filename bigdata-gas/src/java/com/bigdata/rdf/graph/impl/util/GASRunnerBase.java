@@ -9,7 +9,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.log4j.Logger;
 import org.openrdf.model.Value;
 
-import com.bigdata.rdf.graph.EdgesEnum;
+import com.bigdata.rdf.graph.FrontierEnum;
 import com.bigdata.rdf.graph.IGASContext;
 import com.bigdata.rdf.graph.IGASEngine;
 import com.bigdata.rdf.graph.IGASProgram;
@@ -43,11 +43,6 @@ import com.bigdata.rdf.graph.impl.GASStats;
  *         vertices? For such algorithms, we just run them once per graph
  *         (unless the graph is dynamic).
  */
-//* @param <GE>
-//*            The generic type for the {@link IGASEngine}.
-//* @param <BE>
-//*            The generic type for the backend implementation.
-
 public abstract class GASRunnerBase<VS, ES, ST> implements
         Callable<IGASStats> {
 
@@ -59,24 +54,38 @@ public abstract class GASRunnerBase<VS, ES, ST> implements
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      */
     protected class OptionData {
+        static public final long DEFAULT_SEED = 217L;
+        static public final int DEFAULT_NRUNS = 1;
+        static public final int DEFAULT_NSAMPLES = 100;
+        static public final int DEFAULT_NTHREADS = 4; // TODO #of hardware threads?
         /**
          * The seed used for the random number generator (default {@value #seed}
          * ).
          */
-        public long seed = 217L;
+        public long seed = DEFAULT_SEED;
         /**
          * Random number generated used for sampling the starting vertices. Set
          * by #init().
          */
         public Random r = null;
         /**
-         * The #of random starting vertices to use.
+         * The #of runs per initial condition. For algorithms that use a single
+         * starting vertex (BFS, SSSP, etc.), there will be a total of
+         * <code>nruns * nsamples</code> runs. For algorithms that populate the
+         * initial frontier with all vertices (e.g., CC, PR), there will be a
+         * total of <code>nruns</code>.
          */
-        public int nsamples = 100;
+        public int nruns = DEFAULT_NRUNS;
+        /**
+         * The #of random starting vertices to use for algorithms that use
+         * a single starting vertex in the initial frontier and otherwise
+         * ignored.
+         */
+        public int nsamples = DEFAULT_NSAMPLES;
         /**
          * The #of threads to use for GATHER and SCATTER operators.
          */
-        public int nthreads = 4;
+        public int nthreads = DEFAULT_NTHREADS;
         /**
          * The analytic class to be executed.
          */
@@ -128,6 +137,7 @@ public abstract class GASRunnerBase<VS, ES, ST> implements
          *            The index into the arguments.
          * @param args
          *            The arguments.
+         *            
          * @return <code>true</code> iff any arguments were recognized.
          */
         public boolean handleArg(final AtomicInteger i, final String[] args) {
@@ -222,14 +232,26 @@ public abstract class GASRunnerBase<VS, ES, ST> implements
      *            <dl>
      *            <dt>-nthreads</dt>
      *            <dd>The #of threads which will be used for GATHER and SCATTER
-     *            operations.</dd>
+     *            operations (default {@value OptionData#DEFAULT_NTHREADS}).</dd>
+     *            <dt>-nruns</dt>
+     *            <dd>The #of times that the algorithm will be run. For
+     *            algorithms that are initialized with a single starting vertex
+     *            drawn from a random sample, total number of runs is
+     *            <code>nruns * nsamples</code>. For algorithms that are
+     *            initialize with either all vertices, there will be a total of
+     *            nruns runs. (default {@value OptionData#DEFAULT_NRUNS})</dd>
      *            <dt>-nsamples</dt>
-     *            <dd>The #of random sample starting vertices that will be
-     *            selected. The algorithm will be run ONCE for EACH sampled
-     *            vertex.</dd>
+     *            <dd>For algorithms that use a single starting vertex (such as
+     *            BFS, SSSP, etc.), this is the #of starting vertices that will
+     *            be randomly selected. The sampled vertices will have at least
+     *            one out-edge or in-edge as appropriate based on the
+     *            {@link IGASProgram}. For algorithm will be run ONCE for EACH
+     *            sampled vertex. This parameter is ignored for algorithms that
+     *            initialize the frontier with all vertices (PR, CC, etc).
+     *            (default {@value OptionData#DEFAULT_NSAMPLES})</dd>
      *            <dt>-seed</dt>
-     *            <dd>The seed for the random number generator (default is
-     *            <code>217L</code>).</dd>
+     *            <dd>The seed for the random number generator (default
+     *            {@value OptionData#DEFAULT_SEED}).</dd>
      *            <dt>-schedulerClass</dt>
      *            <dd>Override the default {@link IGASScheduler}. Class must
      *            implement {@link IGASSchedulerImpl}.</dd>
@@ -255,6 +277,13 @@ public abstract class GASRunnerBase<VS, ES, ST> implements
             if (arg.startsWith("-")) {
                 if (arg.equals("-seed")) {
                     opt.seed = Long.valueOf(args[i.incrementAndGet()]);
+                } else if (arg.equals("-nruns")) {
+                    final String s = args[i.incrementAndGet()];
+                    opt.nruns = Integer.valueOf(s);
+                    if (opt.nruns <= 0) {
+                        opt.usage(1/* status */,
+                                "-nruns must be positive, not: " + s);
+                    }
                 } else if (arg.equals("-nsamples")) {
                     final String s = args[i.incrementAndGet()];
                     opt.nsamples = Integer.valueOf(s);
@@ -413,66 +442,150 @@ public abstract class GASRunnerBase<VS, ES, ST> implements
                     graphAccessor, gasProgram);
 
             final IGASState<VS, ES, ST> gasState = gasContext.getGASState();
-            
-            final VertexDistribution dist = graphAccessor.getDistribution(opt.r);
-            
-            // Assume that a GATHER will be done for each starting vertex.
-            EdgesEnum edges = gasProgram.getGatherEdges();
 
-            if (edges == EdgesEnum.NoEdges) {
+            final FrontierEnum frontierEnum = gasProgram
+                    .getInitialFrontierEnum();
 
-                // If no GATHER is performed, then use the SCATTER edges.
-                edges = gasProgram.getScatterEdges();
+            /*
+             * TODO Should be customized if we do not want to use the default
+             * behavior (sample is drawn from distribution containing all
+             * vertices versus a subset of the vertices).
+             */
+            final VertexDistribution dist = frontierEnum
+                    .equals(FrontierEnum.SingleVertex) ? graphAccessor
+                    .getDistribution(opt.r) : null;
 
+            /*
+             * FIXME We need to introduce an abstraction that will allow us to
+             * indicate whether an analytic (a) runs one or more times with a
+             * pre-populated frontier that is a single vertex choosen from a
+             * distribution, (b) runs one or more times using a sample of
+             * vertices; or (c) runs one or more times using all vertices.
+             * 
+             * The requirment to use (a) a single vertex as the starting point;
+             * (b) a sample of vertices; or (c) all vertices arises from the
+             * nature of the specific IGASProgram. For both a single vertex and
+             * a sample of vertices, the initial value must come from a policy
+             * specified when the program is executed. For algorithms that
+             * normally operate on all vertices, it sometimes permissible to
+             * instead specify a sample of vertices. However, this may result in
+             * only the connected component(s) that span the sample being
+             * utilized by the computation.
+             * 
+             * The requirement to run once or multiple times arises from the
+             * desired to characterize the variance in the performance of the
+             * IGASProgram either as a function of the sampled vertex (or
+             * vertices) in the initial frontier and/or as a function of the
+             * runtime variation for a given initial frontier.
+             * 
+             * Thus, this could really be broken into two distinct parameters:
+             * #of trials per condition (to measure the variance in the
+             * runtime), and #of conditions (to measure the variance as a
+             * function of graph and the initial frontier).
+             * 
+             * The question of how we filter the initial vertices (in terms of
+             * ensuring that they have at least one out-edge or in-edge) is part
+             * of the same set of concerns around how to obtain a sample of
+             * vertices from the distribution.
+             */
+            final Value[] sampled;
+            {
+
+                switch (frontierEnum) {
+                case SingleVertex:
+
+                    sampled = dist.getWeightedSample(opt.nsamples,
+                            gasProgram.getSampleEdgesFilter());
+
+                    break;
+                    
+                case AllVertices:
+
+                    // All vertices will be used. Do not sample anything.
+                    sampled = null;
+                    break;
+                    
+                default:
+
+                    throw new AssertionError();
+                    
+                }
             }
-
-            final Value[] sampled = dist.getWeightedSample(opt.nsamples,
-                    edges);
 
             final IGASStats total = new GASStats();
 
-            // #of vertices that were not connected for that analytic.
+            /*
+             * The #of vertices that were not connected for that analytic across
+             * all trials.
+             */
             long nunconnected = 0;
             
-            for (int i = 0; i < sampled.length; i++) {
+            for (int run = 0; run < opt.nruns; run++) {
 
-                final Value startingVertex = sampled[i];
+                if (frontierEnum == FrontierEnum.AllVertices) {
+                    
+                    // Run analytic.
+                    final IGASStats stats = (IGASStats) gasContext.call();
 
-                gasState.init(startingVertex);
+                    total.add(stats);
 
-                final IGASStats stats = (IGASStats) gasContext.call();
+                    if (log.isInfoEnabled()) {
 
-                if (stats.getFrontierSize() == 1) {
+                        log.info("Run complete: stats(sample)=" + stats);
+                        
+                    }
+
+                } else {
+
                     /*
-                     * The starting vertex was not actually connected to any
-                     * other vertices by the traversal performed by the GAS
-                     * program.
+                     * The initial frontier is a single vertex. Choose it
+                     * from the sampled vertices.
                      */
-                    if (log.isInfoEnabled())
-                        log.info("Ignoring unconnected startingVertex: "
-                                + startingVertex + ", stats=" + stats);
-                    nunconnected++;
-                    continue;
-                }
+                    
+                    for (int i = 0; i < sampled.length; i++) {
+
+                        final Value startingVertex = sampled[i];
+
+                        gasState.setFrontier(gasContext, startingVertex);
+
+                        final IGASStats stats = (IGASStats) gasContext.call();
+
+                        if (stats.getFrontierSize() == 1) {
+                            /*
+                             * The starting vertex was not actually connected to any
+                             * other vertices by the traversal performed by the GAS
+                             * program.
+                             */
+                            if (log.isInfoEnabled())
+                                log.info("Ignoring unconnected startingVertex: "
+                                        + startingVertex + ", stats=" + stats);
+                            nunconnected++;
+                            continue;
+                        }
+
+                        total.add(stats);
+
+                        if (log.isInfoEnabled()) {
+                            log.info("Run complete: vertex[" + i + "] of "
+                                    + sampled.length + " : startingVertex="
+                                    + startingVertex + ", stats(sample)=" + stats);
+                        }
+
+                    } // next starting vertex in sample.
+
+                } // end single starting vertex run.
                 
-                total.add(stats);
-
-                if (log.isInfoEnabled()) {
-                    log.info("Run complete: vertex[" + i + "] of "
-                            + sampled.length + " : startingVertex="
-                            + startingVertex + ", stats(sample)=" + stats);
-                }
-
-            }
+            } // next run.
 
             // Total over all sampled vertices.
             final StringBuilder sb = new StringBuilder();
             sb.append("TOTAL");
             sb.append(": analytic=" + gasProgram.getClass().getSimpleName());
             sb.append(", nseed=" + opt.seed);
+            sb.append(", nruns=" + opt.nruns); // #runs (per sample if sampling)
             sb.append(", nsamples=" + opt.nsamples); // #desired samples
-            sb.append(", nsampled=" + sampled.length);// #actually sampled
-            sb.append(", distSize=" + dist.size());// #available for sampling.
+            sb.append(", nsampled=" + (sampled == null ? "N/A" : sampled.length));// #actually sampled
+            sb.append(", distSize=" + (dist==null?"N/A":dist.size()));// #available for sampling.
             sb.append(", nunconnected=" + nunconnected);// #unconnected vertices.
             sb.append(", nthreads=" + opt.nthreads);
             sb.append(", scheduler=" + ((GASState<VS, ES, ST>)gasState).getScheduler().getClass().getSimpleName());
