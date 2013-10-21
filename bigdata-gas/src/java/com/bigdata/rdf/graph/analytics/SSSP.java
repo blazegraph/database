@@ -19,6 +19,7 @@ import org.apache.log4j.Logger;
 import org.openrdf.model.Statement;
 import org.openrdf.model.Value;
 
+import com.bigdata.rdf.graph.EdgesEnum;
 import com.bigdata.rdf.graph.Factory;
 import com.bigdata.rdf.graph.FrontierEnum;
 import com.bigdata.rdf.graph.IGASContext;
@@ -86,6 +87,16 @@ public class SSSP extends BaseGASProgram<SSSP.VS, SSSP.ES, Integer/* dist */> {
          */
         private Integer dist = Integer.MAX_VALUE;
 
+        /**
+         * Note: This flag is cleared by apply() and then conditionally set
+         * iff the {@link #dist()} is replaced by the new value from the
+         * gather.  Thus, if the gather does not reduce the value, then the
+         * propagation of the algorithm is halted. However, this causes the
+         * algorithm to NOT scatter for round zero, which causes it to halt.
+         * I plan to fix the algorithm by doing the "push" style update in
+         * the scatter phase. That will completely remove the gather phase
+         * of the algorithm.
+         */
         private boolean changed = false;
 
 //        /**
@@ -167,20 +178,20 @@ public class SSSP extends BaseGASProgram<SSSP.VS, SSSP.ES, Integer/* dist */> {
 //        return null;
 //
 //    }
-//
-//    @Override
-//    public EdgesEnum getGatherEdges() {
-//
-//        return EdgesEnum.InEdges;
-//
-//    }
-//
-//    @Override
-//    public EdgesEnum getScatterEdges() {
-//
-//        return EdgesEnum.OutEdges;
-//
-//    }
+
+    @Override
+    public EdgesEnum getGatherEdges() {
+
+        return EdgesEnum.InEdges;
+
+    }
+
+    @Override
+    public EdgesEnum getScatterEdges() {
+
+        return EdgesEnum.OutEdges;
+
+    }
 
     /**
      * {@inheritDoc}
@@ -292,13 +303,21 @@ public class SSSP extends BaseGASProgram<SSSP.VS, SSSP.ES, Integer/* dist */> {
 
     }
 
-    @Override
-    public boolean isChanged(final IGASState<SSSP.VS, SSSP.ES, Integer> state,
-            final Value u) {
-
-        return state.getState(u).isChanged();
-
-    }
+    /*
+     * Note: Enabling this check causes SSSP to fail. The problem is that the
+     * changed flag is cleared when we enter apply(). Therefore, it gets cleared
+     * on the first round before we do the scatter and testing us.isChanged()
+     * here causes the scatter step to be skipped. This causes the propagation
+     * of the updates to stop.  This issue is also documented on the [isChanged]
+     * flag of the vertex state.
+     */
+//    @Override
+//    public boolean isChanged(final IGASState<SSSP.VS, SSSP.ES, Integer> state,
+//            final Value u) {
+//
+//        return state.getState(u).isChanged();
+//
+//    }
 
     /**
      * The remote vertex is scheduled if this vertex is changed.
@@ -310,7 +329,8 @@ public class SSSP extends BaseGASProgram<SSSP.VS, SSSP.ES, Integer/* dist */> {
      * {@inheritDoc}
      * 
      * FIXME OPTIMIZE: Test both variations on a variety of data sets and see
-     * which is better:
+     * which is better (actually, just replace with a push style Scatter of the
+     * updates):
      * 
      * <p>
      * Zhisong wrote: In the original GASengine, the scatter operator only need
@@ -324,7 +344,7 @@ public class SSSP extends BaseGASProgram<SSSP.VS, SSSP.ES, Integer/* dist */> {
      * depends on the fan-out of the scatter at time t versus the fan-in of the
      * gather at time t+1. The optimization might only benefit if a reasonable
      * fraction of the destination vertices wind up NOT being retriggered. I
-     * will try on these variations in the Java code as well. *
+     * will try on these variations in the Java code as well.
      * </p>
      */
     @Override
@@ -361,11 +381,11 @@ public class SSSP extends BaseGASProgram<SSSP.VS, SSSP.ES, Integer/* dist */> {
 
     }
 
-//    @Override
-//    public boolean nextRound(IGASContext ctx) {
-//
-//        return true;
-//        
-//    }
+    @Override
+    public boolean nextRound(final IGASContext<VS, ES, Integer> ctx) {
+
+        return true;
+        
+    }
 
 }

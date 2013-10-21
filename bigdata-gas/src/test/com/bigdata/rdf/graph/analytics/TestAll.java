@@ -55,7 +55,8 @@ public class TestAll extends TestCase {
 
         suite.addTestSuite(TestCC.class);
         
-        suite.addTestSuite(TestPR.class);
+        // FIXME Add unit test for Page Rank.
+//        suite.addTestSuite(TestPR.class);
         
         return suite;
         
