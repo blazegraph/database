@@ -59,7 +59,7 @@ import cutthecrap.utils.striterators.IStriterator;
  * <dd>iff the label has changed</dd>
  * </dl>
  * 
- * FIXME CC : Implement. Should push the updates through the scatter function.
+ * FIXME CC : Implement version that pushes updates through the scatter function.
  * Find an abstraction to support this pattern. It is used by both CC and SSSP.
  * (We can initially implement this as a Gather (over all edges) plus a
  * conditional Scatter (over all edges iff the vertex label has changed). We can
