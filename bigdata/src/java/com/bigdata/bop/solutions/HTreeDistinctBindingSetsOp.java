@@ -178,7 +178,7 @@ public class HTreeDistinctBindingSetsOp extends PipelineOp {
             this.state = state;
             
         }
-        
+        @Override
         public Void call() throws Exception {
 
             final BOpStats stats = context.getStats();
@@ -204,12 +204,12 @@ public class HTreeDistinctBindingSetsOp extends PipelineOp {
                 
             } finally {
 
-                if(context.isLastInvocation()) {
+                if (context.isLastInvocation()) {
 
                     state.release();
-                    
+
                 }
-                
+
                 sink.close();
 
             }
