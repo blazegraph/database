@@ -68,6 +68,7 @@ import com.bigdata.rdf.sparql.ast.service.ServiceCallCreateParams;
 import com.bigdata.rdf.sparql.ast.service.ServiceFactory;
 import com.bigdata.rdf.sparql.ast.service.ServiceNode;
 import com.bigdata.rdf.spo.DistinctMultiTermAdvancer;
+import com.bigdata.rdf.spo.DistinctTermAdvancer;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOKeyOrder;
@@ -483,7 +484,7 @@ public class SliceServiceFactory extends AbstractServiceFactory
     			
     		}
             
-            final long range = endIndex - startIndex + 1;
+            final long range = endIndex - startIndex;
             
     		if (log.isTraceEnabled()) {
     			log.trace("range: " + range);
@@ -538,7 +539,7 @@ public class SliceServiceFactory extends AbstractServiceFactory
     		 * Reading to the offset plus the limit (minus 1), or the end
     		 * index, whichever is smaller.
     		 */
-    		final long toIndex = Math.min(startIndex + offset + limit - 1,
+    		final long toIndex = Math.min(startIndex + offset + limit,
     									   endIndex);
     		
     		if (fromIndex > toIndex) {
@@ -549,7 +550,7 @@ public class SliceServiceFactory extends AbstractServiceFactory
     		
             final byte[] fromKey = ndx.keyAt(fromIndex);
             
-            final byte[] toKey = SuccessorUtil.successor(ndx.keyAt(toIndex));
+            final byte[] toKey = ndx.keyAt(toIndex);//SuccessorUtil.successor(ndx.keyAt(toIndex));
 
             final int arity = pred.arity();
             
@@ -567,13 +568,17 @@ public class SliceServiceFactory extends AbstractServiceFactory
 
     		/*
     		 * Use a multi-term advancer to skip the bound entries and just
-    		 * get to the variables. 
+    		 * get to the variables.
+    		 * 
+    		 * Not a good idea.  Needs to visit each tuple individually.
     		 */
-            final DistinctMultiTermAdvancer advancer = //null;
-                    new DistinctMultiTermAdvancer(
-                            arity, //arity - 3 or 4
-                            numBoundEntries // #boundEntries - anything not a var and not bound by incoming bindings
-                            );
+            final DistinctMultiTermAdvancer advancer = null;
+//                    new DistinctMultiTermAdvancer(
+//                            arity, //arity - 3 or 4
+//                            numBoundEntries // #boundEntries - anything not a var and not bound by incoming bindings
+//                            );
+//            final DistinctTermAdvancer advancer2 = 
+//            		  new DistinctTermAdvancer(arity);
 
             final ITupleIterator it = ndx.rangeIterator(fromKey, toKey,
                     0/* capacity */, IRangeQuery.KEYS | IRangeQuery.CURSOR, advancer);
