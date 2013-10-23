@@ -468,7 +468,7 @@ public class SliceServiceFactory extends AbstractServiceFactory
 	
 	    		final byte[] endKey = keyOrder.getToKey(KeyBuilder.newInstance(), pred); //SuccessorUtil.successor(startKey.clone());
 	    		
-	    		endIndex = indexOf(ndx, endKey);
+	    		endIndex = indexOf(ndx, endKey) - 1;
 	    		
 	            cache.put(pred, new CacheHit(startIndex, endIndex));
 	            
@@ -484,7 +484,7 @@ public class SliceServiceFactory extends AbstractServiceFactory
     			
     		}
             
-            final long range = endIndex - startIndex;
+            final long range = endIndex - startIndex + 1;
             
     		if (log.isTraceEnabled()) {
     			log.trace("range: " + range);
@@ -539,7 +539,7 @@ public class SliceServiceFactory extends AbstractServiceFactory
     		 * Reading to the offset plus the limit (minus 1), or the end
     		 * index, whichever is smaller.
     		 */
-    		final long toIndex = Math.min(startIndex + offset + limit,
+    		final long toIndex = Math.min(startIndex + offset + limit - 1,
     									   endIndex);
     		
     		if (fromIndex > toIndex) {
@@ -550,7 +550,7 @@ public class SliceServiceFactory extends AbstractServiceFactory
     		
             final byte[] fromKey = ndx.keyAt(fromIndex);
             
-            final byte[] toKey = ndx.keyAt(toIndex);//SuccessorUtil.successor(ndx.keyAt(toIndex));
+            final byte[] toKey = SuccessorUtil.successor(ndx.keyAt(toIndex));
 
             final int arity = pred.arity();
             
