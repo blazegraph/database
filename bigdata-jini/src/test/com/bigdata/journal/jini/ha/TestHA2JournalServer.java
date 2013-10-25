@@ -226,17 +226,23 @@ public class TestHA2JournalServer extends AbstractHA3JournalServerTestCase {
              */
             assertEquals(token1 + 1, token2);
 
-            // The leader should not have changed.
-            final HAGlue leader2 = quorum.getClient().getLeader(token2);
-
-            final UUID leaderId2 = leader2.getServiceId();
-
-            if (!leaderId1.equals(leaderId2)) {
-
-                fail("Expected leaderId=" + leaderId1 + ", but was "
-                        + leaderId2);
-
-            }
+            /*
+             * Note: The services will recast their votes. The pipeline order
+             * depends on whether the leader restarts more quickly than the
+             * latency required for the follower to notice that the leader is
+             * dead (this depends on the negotiated zookeeper session timeout).
+             */
+//            // The leader should not have changed.
+//            final HAGlue leader2 = quorum.getClient().getLeader(token2);
+//
+//            final UUID leaderId2 = leader2.getServiceId();
+//
+//            if (!leaderId1.equals(leaderId2)) {
+//
+//                fail("Expected leaderId=" + leaderId1 + ", but was "
+//                        + leaderId2);
+//
+//            }
             
             /*
              * Verify that the votes were recast for the then current
@@ -252,6 +258,8 @@ public class TestHA2JournalServer extends AbstractHA3JournalServerTestCase {
              */
             for (HAGlue service : new HAGlue[] { serverA, serverB }) {
 
+                awaitNSSAndHAReady(service);
+                
                 final RemoteRepository repo = getRemoteRepository(service);
 
                 // Should be empty.
@@ -323,17 +331,27 @@ public class TestHA2JournalServer extends AbstractHA3JournalServerTestCase {
              */
             assertEquals(token1 + 1, token2);
 
-            // The leader should have changed.
-            final HAGlue leader2 = quorum.getClient().getLeader(token2);
-
-            final UUID leaderId2 = leader2.getServiceId();
-
-            if (leaderId1.equals(leaderId2)) {
-
-                fail("Expected leaderId=" + leaderId1 + ", but was "
-                        + leaderId2);
-
-            }
+            /*
+             * Note: The services will recast their votes. The pipeline order
+             * depends on whether the leader restarts more quickly than the
+             * latency required for the follower to notice that the leader is
+             * dead (this depends on the negotiated zookeeper session timeout).
+             */
+//            // The leader should have changed.
+//            final HAGlue leader2 = quorum.getClient().getLeader(token2);
+//
+//            final UUID leaderId2 = leader2.getServiceId();
+//
+//            if (leaderId1.equals(leaderId2)) {
+//                /*
+//                 * This fail message is not useful.
+//                 * leaderId1.equals(leaderId2). it should report what the leader
+//                 * *should* have been, but reports two identical values instead.
+//                 */
+//                fail("Expected leaderId=" + leaderId1 + ", but was "
+//                        + leaderId2);
+//
+//            }
 
             /*
              * Verify that the votes were recast for the then current
@@ -348,6 +366,8 @@ public class TestHA2JournalServer extends AbstractHA3JournalServerTestCase {
              * both the leader and the follower.
              */
             for (HAGlue service : new HAGlue[] { serverA, serverB }) {
+                
+                awaitNSSAndHAReady(service);
 
                 final RemoteRepository repo = getRemoteRepository(service);
 

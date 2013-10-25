@@ -27,11 +27,13 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.quorum.zk;
 
+import java.util.Collections;
 import java.util.UUID;
 
 import com.bigdata.quorum.AbstractQuorum;
 import com.bigdata.quorum.Quorum;
 import com.bigdata.quorum.QuorumActor;
+import com.bigdata.quorum.QuorumClient;
 import com.bigdata.quorum.QuorumMember;
 
 /**
@@ -96,6 +98,145 @@ public class TestZkSingletonQuorumSemantics extends AbstractZkQuorumTestCase {
         
     }
 
+    /**
+     * Unit test for quorum member add followed by the termination of the quorum
+     * client. This checks for proper termination of the client, including the
+     * clear down of the quorum's internal state.
+     * 
+     * @throws InterruptedException
+     */
+    public void test_memberAdd_terminateClient() throws InterruptedException {
+        
+        final Quorum<?, ?> quorum = quorums[0];
+        final QuorumMember<?> client = clients[0];
+        final QuorumActor<?,?> actor = actors[0];
+        final UUID serviceId = client.getServiceId();
+        
+        // client is not a member.
+        assertFalse(client.isMember());
+        assertEquals(new UUID[] {}, quorum.getMembers());
+        
+        // instruct actor to add client as a member.
+        actor.memberAdd();
+
+        // client is a member.
+        assertTrue(client.isMember());
+        assertEquals(new UUID[] {serviceId}, quorum.getMembers());
+
+        /*
+         * Verify termination of the quorum for that client.
+         */
+        
+        assertEquals(client, quorum.getClient());
+
+        quorum.terminate();
+        
+        try {
+            quorum.getClient();
+        } catch (IllegalStateException ex) {
+            log.info("Ignoring expected exception: " + ex);
+        }
+
+        // State was cleared.
+        assertEquals(Quorum.NO_QUORUM, quorum.token());
+        assertEquals(Quorum.NO_QUORUM, quorum.lastValidToken());
+        assertEquals(new UUID[] {}, quorum.getMembers());
+        assertEquals(new UUID[] {}, quorum.getJoined());
+        assertEquals(new UUID[] {}, quorum.getPipeline());
+        assertEquals(Collections.emptyMap(), quorum.getVotes());
+        
+        try {
+            // Note: Quorum reference was cleared. Client throws exception.
+            assertFalse(client.isMember());
+        } catch (IllegalStateException ex) {
+            log.info("Ignoring expected exception: " + ex);
+        }
+
+        // Double-termination is safe.
+        quorum.terminate();
+
+    }
+    
+    /**
+     * Unit test for quorum member add followed by the termination of the quorum
+     * client. This checks for proper termination of the client, including the
+     * clear down of the quorum's internal state.
+     * 
+     * @throws InterruptedException
+     */
+    public void test_memberAdd_terminateClient_restartClient() throws InterruptedException {
+        
+        final Quorum<?, ?> quorum = quorums[0];
+        final QuorumMember<?> client = clients[0];
+        final QuorumActor<?,?> actor = actors[0];
+        final UUID serviceId = client.getServiceId();
+        
+        // client is not a member.
+        assertFalse(client.isMember());
+        assertEquals(new UUID[] {}, quorum.getMembers());
+        
+        // instruct actor to add client as a member.
+        actor.memberAdd();
+
+        // client is a member.
+        assertTrue(client.isMember());
+        assertEquals(new UUID[] {serviceId}, quorum.getMembers());
+
+        /*
+         * Verify termination of the quorum for that client.
+         */
+        
+        assertEquals(client, quorum.getClient());
+
+        quorum.terminate();
+        
+        try {
+            quorum.getClient();
+        } catch (IllegalStateException ex) {
+            log.info("Ignoring expected exception: " + ex);
+        }
+
+        // State was cleared.
+        assertEquals(Quorum.NO_QUORUM, quorum.token());
+        assertEquals(Quorum.NO_QUORUM, quorum.lastValidToken());
+        assertEquals(new UUID[] {}, quorum.getMembers());
+        assertEquals(new UUID[] {}, quorum.getJoined());
+        assertEquals(new UUID[] {}, quorum.getPipeline());
+        assertEquals(Collections.emptyMap(), quorum.getVotes());
+        
+        try {
+            // Note: Quorum reference was cleared. Client throws exception.
+            assertFalse(client.isMember());
+        } catch (IllegalStateException ex) {
+            log.info("Ignoring expected exception: " + ex);
+        }
+
+//        // Double-termination is safe.
+//        quorum.terminate();
+
+        // Restart the client on that quorum.
+        ((Quorum) quorum).start((QuorumClient) client);
+
+        /*
+         * Note: The client will automatically be added as a member (this is an
+         * implicit behavior of the quorum). However, the memberAdd() below is
+         * required to make this synchronous with respect to the current thread,
+         * otherwise it is a race whether we observe the client as a member or
+         * not.
+         */
+//        // client is not a member.
+//        assertFalse(client.isMember());
+//        assertEquals(new UUID[] {}, quorum.getMembers());
+        
+        // instruct actor to add client as a member.
+        actor.memberAdd();
+
+        // client is a member.
+        assertTrue(client.isMember());
+        assertEquals(new UUID[] {serviceId}, quorum.getMembers());
+
+    }
+    
 	/**
 	 * Unit test for write pipeline add/remove.
 	 * @throws InterruptedException 
@@ -339,6 +480,93 @@ public class TestZkSingletonQuorumSemantics extends AbstractZkQuorumTestCase {
         assertFalse(client.isPipelineMember());
         assertEquals(new UUID[]{},quorum.getPipeline());
         
+    }
+
+    /**
+     * Unit test verifying that we clear down the quorum's reflection of the
+     * distributed quorum state where we first have a quorum meet and then
+     * terminate the quorum client.
+     * 
+     * @throws InterruptedException
+     */
+    public void test_serviceJoin_terminateClient() throws InterruptedException {
+
+        final AbstractQuorum<?, ?> quorum = quorums[0];
+        final MockQuorumMember<?> client = clients[0];
+        final QuorumActor<?,?> actor = actors[0];
+        final UUID serviceId = client.getServiceId();
+
+        final long lastCommitTime = 0L;
+//        final long lastCommitTime2 = 2L;
+
+        // declare the service as a quorum member.
+        actor.memberAdd();
+        
+        assertTrue(client.isMember());
+        assertEquals(new UUID[]{serviceId},quorum.getMembers());
+        
+        // add to the pipeline.
+        actor.pipelineAdd();
+
+        assertTrue(client.isPipelineMember());
+        assertEquals(new UUID[]{serviceId},quorum.getPipeline());
+
+        // cast a vote for a lastCommitTime.
+        actor.castVote(lastCommitTime);
+
+        assertEquals(1,quorum.getVotes().size());
+        assertEquals(new UUID[] { serviceId }, quorum.getVotes().get(
+                lastCommitTime));
+
+        // verify the consensus was updated.
+        assertEquals(lastCommitTime, client.lastConsensusValue);
+
+        // wait for quorum meet.
+        final long token1 = quorum.awaitQuorum();
+        
+        // verify service was joined.
+        assertTrue(client.isJoinedMember(quorum.token()));
+        assertEquals(new UUID[] { serviceId }, quorum.getJoined());
+
+        // validate the token was assigned.
+        assertEquals(Quorum.NO_QUORUM + 1, quorum.lastValidToken());
+        assertEquals(Quorum.NO_QUORUM + 1, quorum.token());
+        assertTrue(quorum.isQuorumMet());
+
+        /*
+         * Terminate the quorum.  The state should be cleared down.
+         */
+        
+        // Verify termination of the quorum for that client.
+        assertEquals(client, quorum.getClient());
+
+        // terminate the quorum.
+        quorum.terminate();
+        
+        try {
+            quorum.getClient();
+        } catch (IllegalStateException ex) {
+            log.info("Ignoring expected exception: " + ex);
+        }
+
+        // State was cleared.
+        assertEquals(Quorum.NO_QUORUM, quorum.token());
+        assertEquals(Quorum.NO_QUORUM, quorum.lastValidToken());
+        assertEquals(new UUID[] {}, quorum.getMembers());
+        assertEquals(new UUID[] {}, quorum.getJoined());
+        assertEquals(new UUID[] {}, quorum.getPipeline());
+        assertEquals(Collections.emptyMap(), quorum.getVotes());
+        
+        try {
+            // Note: Quorum reference was cleared. Client throws exception.
+            assertFalse(client.isMember());
+        } catch (IllegalStateException ex) {
+            log.info("Ignoring expected exception: " + ex);
+        }
+        
+        // re-terminate() is safe.
+        quorum.terminate();
+
     }
 
 }

@@ -534,8 +534,7 @@ public class TestZLockImpl extends AbstractZooTestCase {
                  */
                 public Void call() throws Exception {
 
-                    final ZooKeeper zookeeper2 = getZooKeeperAccessorWithDistinctSession()
-                            .getZookeeper();
+                    final ZooKeeper zookeeper2 = getZooKeeperAccessorWithDistinctSession();
 
                     // obtain a lock object.
                     final ZLockImpl zlock = ZLockImpl.getLock(zookeeper2,

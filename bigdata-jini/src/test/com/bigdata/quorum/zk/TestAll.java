@@ -63,6 +63,9 @@ public class TestAll extends TestCase {
 
         final TestSuite suite = new TestSuite("zookeeper quorum integration");
 
+        // test for how to split a zpath into path components.
+        suite.addTestSuite(TestSplitZPath.class);
+        
         // test suite for deltas (added/removed) in (un)ordered sets.
         suite.addTestSuite(TestSetDifference.class);
 

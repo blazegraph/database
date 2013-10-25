@@ -100,6 +100,9 @@ import org.apache.zookeeper.ZooKeeper;
  * @see http://wiki.apache.org/hadoop/ZooKeeper/FAQ, which has a state
  *      transition diagram for the {@link ZooKeeper} client.
  * 
+ * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/718" >
+ *      HAJournalServer needs to handle ZK client connection loss </a>
+ * 
  *      FIXME Check all use of {@link SessionExpiredException}, of
  *      {@link ZooKeeper.States#CLOSED} or {@link ZooKeeper.States#isAlive()},
  *      and of {@link KeeperState#Expired}
@@ -263,7 +266,7 @@ public class ZooKeeperAccessor {
                     try {
     
                         log.warn("Creating new client");
-    
+
                         zookeeper = new ZooKeeper(hosts, sessionTimeout,
                                 new ZooAliveWatcher());
     
@@ -331,7 +334,7 @@ public class ZooKeeperAccessor {
             if (zookeeper != null) {
 
                 zookeeper.close();
-
+                // FIXME close must not clear the zk reference. only do this for session expired.
                 zookeeper = null;
 
             }
@@ -373,10 +376,11 @@ public class ZooKeeperAccessor {
     private class ZooAliveWatcher implements Watcher {
 
         private boolean connected = false;
-        
+        @Override
         public void process(final WatchedEvent e) {
-
-            if(!open) return;
+            System.err.println("event: "+e);
+            // FIXME Does not verify that event is for the current ZK client.
+            if(!open) return; // FIXME blocks view of events after a close().
 
             if (log.isInfoEnabled())
                 log.info(e.toString());
@@ -387,7 +391,7 @@ public class ZooKeeperAccessor {
             
                 if(!open) return;
                 
-                switch (e.getState()) {
+                switch (e.getState()) { // FIXME Review switch states.
                 
                 case Unknown:
                     // @todo what to do with these events?
@@ -428,7 +432,7 @@ public class ZooKeeperAccessor {
             }
 
             for (Watcher w : watchers) {
-
+                System.err.println("send event: "+e);
                 // send event to any registered watchers.
                 w.process(e);
 

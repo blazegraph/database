@@ -93,12 +93,14 @@ import com.bigdata.journal.IHABufferStrategy;
 import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.RootBlockUtility;
 import com.bigdata.journal.WORMStrategy;
-import com.bigdata.quorum.AbstractQuorum;
+import com.bigdata.journal.jini.ha.HAClient.HAConnection;
 import com.bigdata.quorum.Quorum;
 import com.bigdata.quorum.QuorumEvent;
 import com.bigdata.quorum.QuorumException;
 import com.bigdata.quorum.QuorumListener;
+import com.bigdata.quorum.zk.ZKQuorumClient;
 import com.bigdata.quorum.zk.ZKQuorumImpl;
+import com.bigdata.rdf.sail.CreateKBTask;
 import com.bigdata.rdf.sail.webapp.ConfigParams;
 import com.bigdata.rdf.sail.webapp.NanoSparqlServer;
 import com.bigdata.rwstore.RWStore;
@@ -110,7 +112,6 @@ import com.bigdata.util.StackInfoReport;
 import com.bigdata.util.concurrent.LatchedExecutor;
 import com.bigdata.util.concurrent.MonitoredFutureTask;
 import com.bigdata.util.config.NicUtil;
-import com.bigdata.zookeeper.ZooKeeperAccessor;
 import com.sun.jini.start.LifeCycle;
 
 /**
@@ -428,7 +429,10 @@ public class HAJournalServer extends AbstractServer {
         /**
          * The port at which the embedded {@link NanoSparqlServer} will respond
          * to HTTP requests (default {@value #DEFAULT_PORT}). This MAY be ZERO
-         * (0) to use a random open port.
+         * (0) to use a random open port. 
+         * 
+         * TODO We should be able to specify the interface, not just the port. Is
+         * there any way to do that with jetty?
          */
         String PORT = "port";
 
@@ -480,6 +484,11 @@ public class HAJournalServer extends AbstractServer {
      * @see ConfigurationOptions#LOGICAL_SERVICE_ID
      */
     private String logicalServiceId;
+    
+    /**
+     * The zpath for the znode that dominates the logical service.
+     */
+    private String logicalServiceZPathPrefix;
     
     /**
      * The zpath for the logical service.
@@ -605,14 +614,59 @@ public class HAJournalServer extends AbstractServer {
     
     }
 
+    /**
+     * Ensure key znodes exist.
+     * 
+     * @throws KeeperException
+     * @throws InterruptedException
+     */
+    private void setupZNodes() throws KeeperException, InterruptedException {
+
+        if (log.isInfoEnabled())
+            log.info("Ensuring key znodes exist.");
+
+        final ZookeeperClientConfig zkClientConfig = getHAClient()
+                .getZookeeperClientConfig();
+
+        final List<ACL> acl = zkClientConfig.acl;
+
+        final ZooKeeper zk = getHAClient().getConnection().getZookeeper();
+
+        /*
+         * Ensure key znodes exist.
+         */
+        try {
+            zk.create(zkClientConfig.zroot, new byte[] {/* data */}, acl,
+                    CreateMode.PERSISTENT);
+        } catch (NodeExistsException ex) {
+            // ignore.
+        }
+        try {
+            zk.create(logicalServiceZPathPrefix, new byte[] {/* data */}, acl,
+                    CreateMode.PERSISTENT);
+        } catch (NodeExistsException ex) {
+            // ignore.
+        }
+        try {
+            zk.create(logicalServiceZPath, new byte[] {/* data */}, acl,
+                    CreateMode.PERSISTENT);
+        } catch (NodeExistsException ex) {
+            // ignore.
+        }
+
+    }
+    
     @Override
     protected HAGlue newService(final Configuration config) throws Exception {
 
-        /*
-         * Verify discovery of at least one ServiceRegistrar.
-         */
-        getHAClient().getConnection().awaitServiceRegistrars(10/* timeout */,
-                TimeUnit.SECONDS);
+        if (log.isInfoEnabled())
+            log.info("Creating service impl...");
+
+//        /*
+//         * Verify discovery of at least one ServiceRegistrar.
+//         */
+//        getHAClient().getConnection().awaitServiceRegistrars(10/* timeout */,
+//                TimeUnit.SECONDS);
         
 //        {
 //            final long begin = System.currentTimeMillis();
@@ -683,9 +737,9 @@ public class HAJournalServer extends AbstractServer {
 
         {
 
-            final String logicalServiceZPathPrefix = zkClientConfig.zroot + "/"
+            logicalServiceZPathPrefix = zkClientConfig.zroot + "/"
                     + HAJournalServer.class.getName();
-            
+
             // zpath for the logical service.
             logicalServiceZPath = logicalServiceZPathPrefix + "/"
                     + logicalServiceId;
@@ -705,54 +759,51 @@ public class HAJournalServer extends AbstractServer {
             final Quorum<HAGlue, QuorumService<HAGlue>> quorum;
             {
 
-                final List<ACL> acl = zkClientConfig.acl;
-//                final String zoohosts = zkClientConfig.servers;
-//                final int sessionTimeout = zkClientConfig.sessionTimeout;
+//                final List<ACL> acl = zkClientConfig.acl;
+//
+//                final ZooKeeperAccessor zka = getHAClient().getConnection()
+//                        .getZookeeperAccessor();
+//
+//                if (!zka.awaitZookeeperConnected(10, TimeUnit.SECONDS)) {
+//
+//                    throw new RuntimeException("Could not connect to zk");
+//
+//                }
+//
+//                if (log.isInfoEnabled()) {
+//                    log.info("Connected to zookeeper");
+//                }
+//
+//                /*
+//                 * Ensure key znodes exist.
+//                 */
+//                try {
+//                    zka.getZookeeper()
+//                            .create(zkClientConfig.zroot,
+//                                    new byte[] {/* data */}, acl,
+//                                    CreateMode.PERSISTENT);
+//                } catch (NodeExistsException ex) {
+//                    // ignore.
+//                }
+//                try {
+//                    zka.getZookeeper()
+//                            .create(logicalServiceZPathPrefix,
+//                                    new byte[] {/* data */}, acl,
+//                                    CreateMode.PERSISTENT);
+//                } catch (NodeExistsException ex) {
+//                    // ignore.
+//                }
+//                try {
+//                    zka.getZookeeper()
+//                            .create(logicalServiceZPath,
+//                                    new byte[] {/* data */}, acl,
+//                                    CreateMode.PERSISTENT);
+//                } catch (NodeExistsException ex) {
+//                    // ignore.
+//                }
 
-
-                final ZooKeeperAccessor zka = getHAClient().getConnection()
-                        .getZookeeperAccessor();
-
-                if (!zka.awaitZookeeperConnected(10, TimeUnit.SECONDS)) {
-
-                    throw new RuntimeException("Could not connect to zk");
-
-                }
-
-                if (log.isInfoEnabled()) {
-                    log.info("Connected to zookeeper");
-                }
-
-                /*
-                 * Ensure key znodes exist.
-                 */
-                try {
-                    zka.getZookeeper()
-                            .create(zkClientConfig.zroot,
-                                    new byte[] {/* data */}, acl,
-                                    CreateMode.PERSISTENT);
-                } catch (NodeExistsException ex) {
-                    // ignore.
-                }
-                try {
-                    zka.getZookeeper()
-                            .create(logicalServiceZPathPrefix,
-                                    new byte[] {/* data */}, acl,
-                                    CreateMode.PERSISTENT);
-                } catch (NodeExistsException ex) {
-                    // ignore.
-                }
-                try {
-                    zka.getZookeeper()
-                            .create(logicalServiceZPath,
-                                    new byte[] {/* data */}, acl,
-                                    CreateMode.PERSISTENT);
-                } catch (NodeExistsException ex) {
-                    // ignore.
-                }
-
-                quorum = new ZKQuorumImpl<HAGlue, QuorumService<HAGlue>>(
-                        replicationFactor, zka, acl);
+                quorum = (Quorum) new ZKQuorumImpl<HAGlue, HAQuorumService<HAGlue, HAJournal>>(
+                        replicationFactor);// , zka, acl);
             }
 
             // The HAJournal.
@@ -767,6 +818,10 @@ public class HAJournalServer extends AbstractServer {
         // our external interface.
         haGlueService = journal.newHAGlue(serviceUUID);
 
+        // Setup the quorum client (aka quorum service).
+        quorumService = newQuorumService(logicalServiceZPath, serviceUUID,
+                haGlueService, journal);
+        
 //        // wrap the external interface, exposing administrative functions.
 //        final AdministrableHAGlueService administrableService = new AdministrableHAGlueService(
 //                this, haGlueService);
@@ -857,62 +912,42 @@ public class HAJournalServer extends AbstractServer {
     /**
      * {@inheritDoc}
      * <p>
-     * Overridden to handle initialization that must wait until the
-     * {@link ServiceItem} is registered.
+     * Note: called from {@link AbstractServer#run()}
      */
     @Override
-    protected void startUpHook() {
+    protected void startUpHook() { 
 
         if (log.isInfoEnabled())
             log.info("Starting server.");
 
-        // Setup listener that logs quorum events @ TRACE.
-        journal.getQuorum().addListener(new QuorumListener() {
-            @Override
-            public void notify(final QuorumEvent e) {
-                if (log.isTraceEnabled())
-                    log.trace(e);
-            }
-        });
+        // Start the NSS.
+        startNSS();
 
-        // Setup the quorum client (aka quorum service).
-        quorumService = newQuorumService(logicalServiceZPath, serviceUUID,
-                haGlueService, journal);
+//        // Setup listener that logs quorum events @ TRACE.
+//        journal.getQuorum().addListener(new QuorumListener() {
+//            @Override
+//            public void notify(final QuorumEvent e) {
+//                if (log.isTraceEnabled())
+//                    log.trace(e);
+//            }
+//        });
+
+//        // Setup the quorum client (aka quorum service).
+//        quorumService = newQuorumService(logicalServiceZPath, serviceUUID,
+//                haGlueService, journal);
 
         // Start the quorum.
         journal.getQuorum().start(quorumService);
 
-        // Enter a run state for the HAJournalServer.
-        quorumService.enterRunState(quorumService.new RestoreTask());
+//        // Enter a run state for the HAJournalServer.
+//        quorumService.enterRunState(quorumService.new RestoreTask());
         
-        /*
-         * The NSS will start on each service in the quorum. However,
-         * only the leader will create the default KB (if that option is
-         * configured).
-         */
-        try {
-
-            startNSS();
-
-        } catch (Exception e1) {
-
-            log.error("Could not start NanoSparqlServer: " + e1, e1);
-
-        }
-
     }
     
     /**
-     * {@inheritDoc}
-     * <p>
-     * Extended to tear down the {@link NanoSparqlServer}, the {@link Quorum},
-     * and the {@link HAJournal}.
+     * Shutdown the embedded NSS if it is running.
      */
-    @Override
-    protected void beforeShutdownHook(final boolean destroy) {
-
-        if (log.isInfoEnabled())
-            log.info("destroy=" + destroy);
+    private void stopNSS() {
 
         if (jettyServer != null) {
 
@@ -935,35 +970,50 @@ public class HAJournalServer extends AbstractServer {
 
         }
 
-        if (quorumService != null) {
+    }
+    
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Extended to tear down the {@link NanoSparqlServer}, the {@link Quorum},
+     * and the {@link HAJournal}.
+     */
+    @Override
+    protected void beforeShutdownHook(final boolean destroy) {
 
-            /*
-             * FIXME SHUTDOWN: What if we are already running a ShutdownTask? We
-             * should just submit a ShutdownTask here and let it work this out.
-             */
+        if (log.isInfoEnabled())
+            log.info("destroy=" + destroy);
 
-            /*
-             * Ensure that the HAQuorumService will not attempt to cure any
-             * serviceLeave or related actions.
-             * 
-             * TODO SHUTDOWN: If we properly enter a ShutdownTask run state then
-             * we would not have to do this since it will already be in the
-             * Shutdown runstate.
-             */
-            quorumService.runStateRef.set(RunStateEnum.Shutdown);
-
-            /*
-             * Terminate any running task.
-             */
-            final FutureTask<?> ft = quorumService.runStateFutureRef.get();
-
-            if (ft != null) {
-
-                ft.cancel(true/* mayInterruptIfRunning */);
-
-            }
-            
-        }
+        // Note: Moved to quorumService.terminate().
+//        if (quorumService != null) {
+//
+//            /*
+//             * FIXME SHUTDOWN: What if we are already running a ShutdownTask? We
+//             * should just submit a ShutdownTask here and let it work this out.
+//             */
+//
+//            /*
+//             * Ensure that the HAQuorumService will not attempt to cure any
+//             * serviceLeave or related actions.
+//             * 
+//             * TODO SHUTDOWN: If we properly enter a ShutdownTask run state then
+//             * we would not have to do this since it will already be in the
+//             * Shutdown runstate.
+//             */
+//            quorumService.runStateRef.set(RunStateEnum.Shutdown);
+//
+//            /*
+//             * Terminate any running task.
+//             */
+//            final FutureTask<?> ft = quorumService.runStateFutureRef.get();
+//
+//            if (ft != null) {
+//
+//                ft.cancel(true/* mayInterruptIfRunning */);
+//
+//            }
+//            
+//        }
 
         final HAJournal tjournal = journal;
 
@@ -1019,6 +1069,8 @@ public class HAJournalServer extends AbstractServer {
             
         }
         
+        stopNSS();
+
         if (tjournal != null) {
 
             if (destroy) {
@@ -1062,7 +1114,7 @@ public class HAJournalServer extends AbstractServer {
      */
     // Note: Exposed to HAJournal.enterErrorState()
     static /*private*/ class HAQuorumService<S extends HAGlue, L extends HAJournal>
-            extends QuorumServiceBase<S, L> {
+            extends QuorumServiceBase<S, L> implements ZKQuorumClient<S> {
 
         private final L journal;
         private final HAJournalServer server;
@@ -1295,6 +1347,120 @@ public class HAJournalServer extends AbstractServer {
         } // RunStateCallable
 
         /**
+         * Hooked to ensure that the key znodes exist before the quorum watcher
+         * starts.
+         * 
+         * @param quorum
+         *            The quorum.
+         */
+        @Override
+        public void start(final Quorum<?,?> quorum) {
+
+            if (log.isInfoEnabled())
+                log.info("", new StackInfoReport());
+
+            // Start the HAClient (River and Zookeeper).
+            server.getHAClient().connect();
+
+//            /*
+//             * Verify discovery of at least one ServiceRegistrar.
+//             */
+//            try {
+//                log.info("Awaiting service registrar discovery.");
+//                server.getHAClient()
+//                        .getConnection()
+//                        .awaitServiceRegistrars(10/* timeout */,
+//                                TimeUnit.SECONDS);
+//            } catch (TimeoutException e1) {
+//                throw new RuntimeException(e1);
+//            } catch (InterruptedException e1) {
+//                throw new RuntimeException(e1);
+//            }
+            
+            // Ensure key znodes exist.
+            try {
+                server.setupZNodes();
+            } catch (KeeperException e) {
+                throw new RuntimeException(e);
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+
+            // Start the quorum (relies on zookeeper).
+            super.start(quorum);
+
+            /*
+             * Setup listener that logs quorum events @ TRACE.
+             * 
+             * Note: Listeners are cleared by Quorum.terminate(), so we need to
+             * do this each time we do quorum.start(...).
+             */
+            journal.getQuorum().addListener(new QuorumListener() {
+                @Override
+                public void notify(final QuorumEvent e) {
+                    if (log.isTraceEnabled())
+                        log.trace(e);
+                }
+            });
+            
+            // Enter a run state for the HAJournalServer.
+            runStateRef.set(null); // clear reference.
+            enterRunState(new RestoreTask());
+
+        }
+        
+        /**
+         * {@inheritDoc}
+         * <p>
+         * Extended to tear down anything that we setup in
+         * {@link #start(Quorum)}.
+         */
+        @Override
+        public void terminate() {
+
+            if (log.isInfoEnabled())
+                log.info("", new StackInfoReport());
+           
+            {
+
+                /*
+                 * Ensure that the HAQuorumService will not attempt to cure any
+                 * serviceLeave or related actions. (This gets cleared if we go
+                 * through quorumService.start(...) again.)
+                 */
+                runStateRef.set(RunStateEnum.Shutdown);
+
+                /*
+                 * Terminate any running task.
+                 */
+                final FutureTask<?> ft = runStateFutureRef.get();
+
+                if (ft != null) {
+
+                    ft.cancel(true/* mayInterruptIfRunning */);
+
+                }
+
+            }
+                        
+            // Disconnect. Terminate River and Zookeeper processing.
+            server.getHAClient().disconnect(true/* immediateShutdown */);
+
+            /*
+             * Note: This can cause a deadlock on AbstractJournal's internal
+             * read/write lock if there is a concurrent 2-phase commit. It is
+             * better to leave this to the transitions among the
+             * RunStateCallable tasks (note that we interrupt the current task
+             * above).
+             */
+//            // Discard any pending writes.
+//            journal.doLocalAbort();
+            
+            super.terminate();
+
+        }
+        
+        /**
          * {@inheritDoc}
          * <p>
          * Overridden to report the negotiated zookeeper session timeout.
@@ -1305,14 +1471,14 @@ public class HAJournalServer extends AbstractServer {
         @Override
         protected long getRetrySendTimeoutNanos() {
             
-            final ZooKeeperAccessor zka = journal
-                    .getHAClient()
-                    .getConnection()
-                    .getZookeeperAccessor();
+//            final ZooKeeperAccessor zka = journal
+//                    .getHAClient()
+//                    .getConnection()
+//                    .getZookeeperAccessor();
 
+            final ZooKeeper zk = getZooKeeper();
             int negotiatedSessionTimeoutMillis;
 //            try {
-                final ZooKeeper zk = zka.getZookeeperNoBlock();
                 if (zk == null || !zk.getState().isAlive()) {
                     /*
                      * This service is not connected to zookeeper.
@@ -1758,7 +1924,13 @@ public class HAJournalServer extends AbstractServer {
          */
         @Override
         public void disconnected() {
-            
+            /*
+             * FIXME We are calling this when disconnected or expired. We might
+             * not need to force the service into an error state just because it
+             * notices that it is disconnected UNLESS that disconnect persists
+             * (but we might, since something in the ZKQuorumImpl did not work
+             * correctly for this event to get delivered).
+             */
             enterErrorState();
             
         }
@@ -1904,30 +2076,78 @@ public class HAJournalServer extends AbstractServer {
                     journal.clearQuorumToken(getQuorum().token());
 
                     /*
-                     * Do synchronous service leave.
+                     * Spin for up to the configured timeout (or the negotiated
+                     * timeout, whichever is less) before failing a zookeeper
+                     * session that is not connected (if not cured within a
+                     * timeout, then we treat this the same as if not alive).
                      * 
-                     * If a Zookeeper Exception is detected then try again.
-                     * 
-                     * Note: This code will BLOCK until the service has a client
-                     * connection to zookeeper. Therefore, we handle the set
-                     * quorum token before the service leave.
+                     * If we are (or become) connected with zookeeper before the 
+                     * timeout, then do serviceLeave() for this service.
                      */
-                    log.warn("Will attempt SERVICE LEAVE");
+                    // session timeout as configured.
+                    final int sessionTimeout1 = server.getHAClient().zooConfig.sessionTimeout;
+                    int sessionTimeout = sessionTimeout1;
+                    final long begin = System.nanoTime();
                     while (true) {
+                        final HAConnection cxn;
                         try {
-                            getActor().serviceLeave();
+                            cxn = server.getHAClient().getConnection();
+                        } catch (IllegalStateException ex) {
+                            log.error("Tearing down service: HAClient not connected.");
+                            restartHAQuorumService();
                             break;
-                        } catch (RuntimeException re) {
-                            if (InnerCause.isInnerCause(re,
-                                    KeeperException.class)) {
-                                // Do not retry in a tight loop.
-                                Thread.sleep(250/* ms */);
-                                // Retry.
-                                continue;
-                            }
-                            throw re;
                         }
+                        final ZooKeeper zk = cxn.getZookeeper();
+                        if (!zk.getState().isAlive()) {
+                            log.error("Tearing down service: ZK Session is expired");
+                            restartHAQuorumService();
+                        }
+                        // negotiated session timeout -or- ZERO (0).
+                        final int sessionTimeout2 = zk.getSessionTimeout();
+                        if (sessionTimeout2 > 0
+                                && sessionTimeout2 < sessionTimeout1) {
+                            // Reduce to negotiated timeout GT ZERO.
+                            sessionTimeout = sessionTimeout2;
+                        }
+                        if (zk.getState() == ZooKeeper.States.CONNECTED) {
+                            break;
+                        }
+                        final long elapsed = System.nanoTime() - begin;
+                        if (elapsed > TimeUnit.MILLISECONDS
+                                .toNanos(sessionTimeout)) {
+                            /*
+                             * TODO This forces the connection from CONNECTING
+                             * to CLOSED if we are in the Error state and unable
+                             * to connect to zookeeper. This might not be
+                             * strictly necessary.
+                             */
+                            log.error("Tearing down service: ZK Session remains disconnected for "
+                                    + TimeUnit.NANOSECONDS.toMillis(elapsed)
+                                    + "ms, effectiveTimeout=" + sessionTimeout);
+                            restartHAQuorumService();
+                            break;
+                        }
+                        // Sleep a bit, then check again.
+                        Thread.sleep(100/* ms */);
                     }
+                        
+                    log.warn("Will attempt SERVICE LEAVE");
+                    getActor().serviceLeave(); // Just once(!)
+//                    while (true) {
+//                        try {
+//                            getActor().serviceLeave();
+//                            break;
+//                        } catch (RuntimeException re) {
+//                            if (InnerCause.isInnerCause(re,
+//                                    KeeperException.class)) {
+//                                // Do not retry in a tight loop.
+//                                Thread.sleep(250/* ms */);
+//                                // Retry.
+//                                continue;
+//                            }
+//                            throw re;
+//                        }
+//                    }
 
                     /**
                      * Dispatch Events before entering SeekConsensus! Otherwise
@@ -1983,6 +2203,71 @@ public class HAJournalServer extends AbstractServer {
                 return null;
 
             } // doRun()
+
+            /**
+             * Restart the {@link HAQuorumService}. This gets invoked from the
+             * {@link ErrorTask} if it notices that the {@link ZooKeeper} client
+             * session has been expired or if the {@link ZooKeeper} client
+             * connection is disconnected and that disconencted state is not
+             * cured within a reasonable period of time.
+             * <p>
+             * The {@link HAQuorumService} is torn down, which includes closing
+             * the {@link HAClient}.
+             * <p>
+             * The {@link HAQuorumService} is then restarted. This includes
+             * obtaining a new {@link HAClient}, which means that we also have a
+             * new {@link ZooKeeper} client and a new sesssion.
+             */
+            private void restartHAQuorumService()  {
+                journal.getExecutorService().submit(new Runnable() {
+                    @Override
+                    public void run() {
+                        try {
+                            /*
+                             * Note: This will interrupt thread running the
+                             * ErrorTask, which is the thread that submitted
+                             * this Runnable. However, the Runnable itself is
+                             * not interrupted.
+                             */
+                            log.warn("HAQuorumService: TERMINATE");
+                            journal.getQuorum().terminate();
+                            /*
+                             * Force the clear of the token since disconnected
+                             * from zookeeper.
+                             */
+                            journal.clearQuorumToken(Quorum.NO_QUORUM);
+                        } catch (Throwable t) {
+                            log.error(t, t);
+                            // Re-enter the ErrorTask.
+                            enterErrorState();
+                        }
+                        try {
+                            log.warn("HAQuorumService: START");
+                            journal.getQuorum()
+                                    .start((QuorumService<HAGlue>) HAQuorumService.this);
+                        } catch (Throwable t) {
+                            log.error(t, t);
+                            // Re-enter the ErrorTask.
+                            enterErrorState();
+                        }
+                        /*
+                         * Done successfully. The HAQuorumService should have
+                         * been restarted.
+                         */
+                    }
+                });
+                // Sleep until interrupted.
+                try {
+                    Thread.sleep(Long.MAX_VALUE);
+                } catch (InterruptedException e) {
+                    /*
+                     * Note: We expect to be interrupted when the ErrorTask is
+                     * cancelled. We do not want code in the caller to resume so
+                     * throw out this exception.
+                     */
+                    throw new RuntimeException(e);
+                }
+            }
 
         } // class ErrorTask
         
@@ -2172,7 +2457,26 @@ public class HAJournalServer extends AbstractServer {
                  * a met quorum in order to take a snapshot.
                  */
                 {
-                
+
+                    if (isLeader(token)) {
+
+                        /*
+                         * Conditionally create the default KB instance.
+                         * 
+                         * Note: This task is *also* launched by the NSS life
+                         * cycle class (BigdataRDFServletContextListener).
+                         * However, that class only makes one attempt. If the
+                         * quorum is not running at the time the attempt is
+                         * made, it will fail with an
+                         * AsynchronousQuorumCloseException. By submitting this
+                         * task on the leader, we will make the attempt once the
+                         * quorum meets.
+                         */
+                        
+                        server.conditionalCreateDefaultKB();
+
+                    }
+
                     // Await the initial KB create commit point.
                     while (journal.getRootBlockView().getCommitCounter() < 1) {
 
@@ -3388,7 +3692,8 @@ public class HAJournalServer extends AbstractServer {
 
                     assert req == null; // Note: MUST be a live message!
 
-                    if (!isJoinedMember(msg.getQuorumToken())) {
+                    if (journal.getHAReady() == Quorum.NO_QUORUM
+                            || !isJoinedMember(msg.getQuorumToken())) {
 
                         /*
                          * If we are not joined, we can not do anything with a
@@ -4221,17 +4526,154 @@ public class HAJournalServer extends AbstractServer {
             if (ntimes > 1 && haLog.isInfoEnabled())
                 haLog.info("Journal quorumToken is set.");
         }
+
+        @Override
+        public ZooKeeper getZooKeeper() {
+            /*
+             * Note: This automatically connects if not connected. That allows
+             * us to disconnect in quorumService.terminate(). Note that we can
+             * not defer the connect() until quorumService.start() since the
+             * quorum itself requires access to ZooKeeper, which it obtains
+             * through this method. So the HAClient connection is made when the
+             * quorum first requests access to ZooKeeper if it did not already
+             * exist.
+             */
+            return server.getHAClient().connect().getZookeeper();
+        }
+
+        @Override
+        public List<ACL> getACL() {
+            return server.getHAClient().getZookeeperClientConfig().acl;
+        }
         
     } // class HAQuorumService
 
     /**
      * Setup and start the {@link NanoSparqlServer}.
      * <p>
+     * Note: The NSS will start on each service in the quorum. However, only the
+     * leader will create the default KB (if that option is configured).
+     * <p>
      * Note: We need to wait for a quorum meet since this will create the KB
      * instance if it does not exist and we can not write on the
      * {@link HAJournal} until we have a quorum meet.
      */
-    private void startNSS() throws Exception {
+    private void startNSS() {
+
+        try {
+
+            final String COMPONENT = NSSConfigurationOptions.COMPONENT;
+
+            final String namespace = (String) config.getEntry(COMPONENT,
+                    NSSConfigurationOptions.NAMESPACE, String.class,
+                    NSSConfigurationOptions.DEFAULT_NAMESPACE);
+
+            final Integer queryPoolThreadSize = (Integer) config.getEntry(
+                    COMPONENT, NSSConfigurationOptions.QUERY_THREAD_POOL_SIZE,
+                    Integer.TYPE,
+                    NSSConfigurationOptions.DEFAULT_QUERY_THREAD_POOL_SIZE);
+
+            final boolean create = (Boolean) config.getEntry(COMPONENT,
+                    NSSConfigurationOptions.CREATE, Boolean.TYPE,
+                    NSSConfigurationOptions.DEFAULT_CREATE);
+
+            final Integer port = (Integer) config.getEntry(COMPONENT,
+                    NSSConfigurationOptions.PORT, Integer.TYPE,
+                    NSSConfigurationOptions.DEFAULT_PORT);
+
+            final String servletContextListenerClass = (String) config
+                    .getEntry(
+                            COMPONENT,
+                            NSSConfigurationOptions.SERVLET_CONTEXT_LISTENER_CLASS,
+                            String.class,
+                            NSSConfigurationOptions.DEFAULT_SERVLET_CONTEXT_LISTENER_CLASS);
+
+            log.warn("Starting NSS: port=" + port);
+
+            final Map<String, String> initParams = new LinkedHashMap<String, String>();
+            {
+
+                initParams.put(ConfigParams.NAMESPACE, namespace);
+
+                initParams.put(ConfigParams.QUERY_THREAD_POOL_SIZE,
+                        queryPoolThreadSize.toString());
+
+                // Note: Create will be handled by the QuorumListener (above).
+                initParams.put(ConfigParams.CREATE, Boolean.toString(create));
+
+                initParams.put(ConfigParams.SERVLET_CONTEXT_LISTENER_CLASS,
+                        servletContextListenerClass);
+
+            }
+
+            if (jettyServer != null && jettyServer.isRunning()) {
+
+                throw new RuntimeException("Already running");
+
+            }
+
+            // Setup the embedded jetty server for NSS webapp.
+            jettyServer = NanoSparqlServer.newInstance(port, journal,
+                    initParams);
+
+            // Start the server.
+            jettyServer.start();
+
+            /*
+             * Report *an* effective URL of this service.
+             * 
+             * Note: This is an effective local URL (and only one of them, and
+             * even then only one for the first connector). It does not reflect
+             * any knowledge about the desired external deployment URL for the
+             * service end point.
+             */
+            final String serviceURL;
+            {
+
+                final int actualPort = jettyServer.getConnectors()[0]
+                        .getLocalPort();
+
+                String hostAddr = NicUtil.getIpAddress("default.nic",
+                        "default", true/* loopbackOk */);
+
+                if (hostAddr == null) {
+
+                    hostAddr = "localhost";
+
+                }
+
+                serviceURL = new URL("http", hostAddr, actualPort, ""/* file */)
+                        .toExternalForm();
+
+                final String msg = "logicalServiceZPath: "
+                        + logicalServiceZPath + "\n" + "serviceURL: "
+                        + serviceURL;
+
+                System.out.println(msg);
+                if (log.isInfoEnabled())
+                    log.info(msg);
+
+            }
+
+        } catch (Exception e1) {
+
+            // Log and ignore.
+            log.error("Could not start NanoSparqlServer: " + e1, e1);
+
+        }
+
+    }
+    
+    /**
+     * Conditionally create the default KB instance as identified by the
+     * {@link NSSConfigurationOptions}.
+     * 
+     * @throws ConfigurationException
+     * @throws ExecutionException
+     * @throws InterruptedException
+     */
+    private void conditionalCreateDefaultKB() throws ConfigurationException,
+            InterruptedException, ExecutionException {
 
         final String COMPONENT = NSSConfigurationOptions.COMPONENT;
 
@@ -4239,85 +4681,17 @@ public class HAJournalServer extends AbstractServer {
                 NSSConfigurationOptions.NAMESPACE, String.class,
                 NSSConfigurationOptions.DEFAULT_NAMESPACE);
 
-        final Integer queryPoolThreadSize = (Integer) config.getEntry(
-                COMPONENT, NSSConfigurationOptions.QUERY_THREAD_POOL_SIZE,
-                Integer.TYPE,
-                NSSConfigurationOptions.DEFAULT_QUERY_THREAD_POOL_SIZE);
-
         final boolean create = (Boolean) config.getEntry(COMPONENT,
                 NSSConfigurationOptions.CREATE, Boolean.TYPE,
                 NSSConfigurationOptions.DEFAULT_CREATE);
 
-        final Integer port = (Integer) config.getEntry(COMPONENT,
-                NSSConfigurationOptions.PORT, Integer.TYPE,
-                NSSConfigurationOptions.DEFAULT_PORT);
+        if (create) {
 
-        final String servletContextListenerClass = (String) config.getEntry(COMPONENT,
-                NSSConfigurationOptions.SERVLET_CONTEXT_LISTENER_CLASS, String.class,
-                NSSConfigurationOptions.DEFAULT_SERVLET_CONTEXT_LISTENER_CLASS);
+            final Future<Void> ft = journal.getExecutorService().submit(
+                    new CreateKBTask(journal, namespace));
 
-        log.warn("Starting NSS: port=" + port);
-
-        final Map<String, String> initParams = new LinkedHashMap<String, String>();
-        {
-
-            initParams.put(ConfigParams.NAMESPACE, namespace);
-
-            initParams.put(ConfigParams.QUERY_THREAD_POOL_SIZE,
-                    queryPoolThreadSize.toString());
-
-            // Note: Create will be handled by the QuorumListener (above).
-            initParams.put(ConfigParams.CREATE, Boolean.toString(create));
-
-            initParams.put(ConfigParams.SERVLET_CONTEXT_LISTENER_CLASS,
-                    servletContextListenerClass);
+            ft.get();
             
-        }
-        
-        if (jettyServer != null && jettyServer.isRunning()) {
-        
-            throw new RuntimeException("Already running");
-            
-        }
-
-        // Setup the embedded jetty server for NSS webapp.
-        jettyServer = NanoSparqlServer.newInstance(port, journal, initParams);
-
-        // Start the server.
-        jettyServer.start();
-
-        /*
-         * Report *an* effective URL of this service.
-         * 
-         * Note: This is an effective local URL (and only one of them, and even
-         * then only one for the first connector). It does not reflect any
-         * knowledge about the desired external deployment URL for the service
-         * end point.
-         */
-        final String serviceURL;
-        {
-
-            final int actualPort = jettyServer.getConnectors()[0].getLocalPort();
-
-            String hostAddr = NicUtil.getIpAddress("default.nic", "default",
-                    true/* loopbackOk */);
-
-            if (hostAddr == null) {
-
-                hostAddr = "localhost";
-
-            }
-
-            serviceURL = new URL("http", hostAddr, actualPort, ""/* file */)
-                    .toExternalForm();
-
-            final String msg = "logicalServiceZPath: " + logicalServiceZPath
-                    + "\n" + "serviceURL: " + serviceURL;
-            
-            System.out.println(msg);
-            if (log.isInfoEnabled())
-                log.info(msg);
-
         }
 
     }

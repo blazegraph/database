@@ -152,9 +152,9 @@ public class TestHA3JournalServerWithHALogs extends AbstractHA3BackupTestCase {
          * Note: This is (lastCommitCounter+1) since an empty HALog was created
          * for the next commit point.
          */
-        assertLogCount(getHALogDirA(), commitCounter1 + 1);
-        assertLogCount(getHALogDirB(), commitCounter1 + 1);
-        assertLogCount(getHALogDirC(), commitCounter1 + 1);
+        awaitLogCount(getHALogDirA(), commitCounter1 + 1);
+        awaitLogCount(getHALogDirB(), commitCounter1 + 1);
+        awaitLogCount(getHALogDirC(), commitCounter1 + 1);
 
         /*
          * Shutdown C.
@@ -209,9 +209,9 @@ public class TestHA3JournalServerWithHALogs extends AbstractHA3BackupTestCase {
         awaitCommitCounter(commitCounter2, new HAGlue[] { serverA, serverB });
 
         // Verify the expected #of HALogs on each service.
-        assertLogCount(getHALogDirA(), commitCounter2 + 1);
-        assertLogCount(getHALogDirB(), commitCounter2 + 1);
-        assertLogCount(getHALogDirC(), commitCounter2);
+        awaitLogCount(getHALogDirA(), commitCounter2 + 1);
+        awaitLogCount(getHALogDirB(), commitCounter2 + 1);
+        awaitLogCount(getHALogDirC(), commitCounter2);
 
         // Verify HALog file for next commit point on A is NOT empty.
         {
@@ -264,9 +264,9 @@ public class TestHA3JournalServerWithHALogs extends AbstractHA3BackupTestCase {
          * Note: Each service will have an empty HALog for the next commit
          * point.
          */
-        assertLogCount(getHALogDirA(), commitCounter2+1);
-        assertLogCount(getHALogDirB(), commitCounter2+1);
-        assertLogCount(getHALogDirC(), commitCounter2+1);
+        awaitLogCount(getHALogDirA(), commitCounter2+1);
+        awaitLogCount(getHALogDirB(), commitCounter2+1);
+        awaitLogCount(getHALogDirC(), commitCounter2+1);
 
     }
 

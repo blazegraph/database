@@ -59,7 +59,10 @@ import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.KeeperException.NoNodeException;
 import org.apache.zookeeper.KeeperException.NodeExistsException;
+import org.apache.zookeeper.WatchedEvent;
+import org.apache.zookeeper.Watcher;
 import org.apache.zookeeper.ZooKeeper;
+import org.apache.zookeeper.ZooKeeper.States;
 import org.apache.zookeeper.data.ACL;
 import org.apache.zookeeper.data.Stat;
 
@@ -74,13 +77,14 @@ import com.bigdata.quorum.QuorumEvent;
 import com.bigdata.quorum.QuorumListener;
 import com.bigdata.quorum.zk.QuorumTokenState;
 import com.bigdata.quorum.zk.ZKQuorum;
+import com.bigdata.quorum.zk.ZKQuorumClient;
 import com.bigdata.quorum.zk.ZKQuorumImpl;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.IService;
 import com.bigdata.service.IServiceShutdown;
 import com.bigdata.service.jini.JiniClient;
 import com.bigdata.service.jini.JiniClientConfig;
-import com.bigdata.zookeeper.ZooKeeperAccessor;
+import com.bigdata.util.StackInfoReport;
 import com.sun.jini.start.ServiceDescriptor;
 
 /**
@@ -187,7 +191,7 @@ public class HAClient {
     }
 
     /**
-     * {@inheritDoc}
+     * Terminate the connection if one exists.
      * <p>
      * Note: Immediate shutdown can cause odd exceptions to be logged. Normal
      * shutdown is recommended unless there is a reason to force immediate
@@ -215,17 +219,17 @@ public class HAClient {
 
         try {
 
-            final HAConnection fed = this.fed.get();
+            final HAConnection cxn = this.fed.get();
 
-            if (fed != null) {
+            if (cxn != null) {
 
                 if (immediateShutdown) {
 
-                    fed.shutdownNow();
+                    cxn.shutdownNow();
 
                 } else {
 
-                    fed.shutdown();
+                    cxn.shutdown();
 
                 }
 
@@ -241,25 +245,30 @@ public class HAClient {
 
     }
 
+    /**
+     * Return a valid connection. If the client is not connected, then it is
+     * connected. If the client is connected, the existing connection is
+     * returned.
+     */
     public HAConnection connect() {
 
         connectLock.lock();
 
         try {
 
-            HAConnection fed = this.fed.get();
+            HAConnection cxn = this.fed.get();
 
-            if (fed == null) {
+            if (cxn == null) {
 
-                fed = new HAConnection(jiniConfig, zooConfig);
+                cxn = new HAConnection(jiniConfig, zooConfig);
 
-                this.fed.set(fed);
+                this.fed.set(cxn);
 
-                fed.start(this);
+                cxn.start(this);
 
             }
 
-            return fed;
+            return cxn;
 
         } finally {
 
@@ -645,7 +654,7 @@ public class HAClient {
          */
         private final AtomicReference<HAClient> clientRef = new AtomicReference<HAClient>();
 
-        private ZooKeeperAccessor zka;
+        private ZooKeeper zk;
 
         private LookupDiscoveryManager lookupDiscoveryManager;
 
@@ -666,8 +675,8 @@ public class HAClient {
          * avoid contentions for a lock in
          * {@link #terminateDiscoveryProcesses()}.
          */
-        private final Map<String, Quorum<HAGlue, QuorumClient<HAGlue>>> quorums = Collections
-                .synchronizedMap(new LinkedHashMap<String, Quorum<HAGlue, QuorumClient<HAGlue>>>());
+        private final Map<String, Quorum<HAGlue, ZKQuorumClient<HAGlue>>> quorums = Collections
+                .synchronizedMap(new LinkedHashMap<String, Quorum<HAGlue, ZKQuorumClient<HAGlue>>>());
 
         private HAConnection(final JiniClientConfig jiniConfig,
                 final ZookeeperClientConfig zooConfig) {
@@ -743,14 +752,21 @@ public class HAClient {
         }
 
         /**
-         * Return an object that may be used to obtain a {@link ZooKeeper}
-         * client and that may be used to obtain the a new {@link ZooKeeper}
-         * client if the current session has been expired (an absorbing state
-         * for the {@link ZooKeeper} client).
+         * Return the {@link ZooKeeper} client connection.
+         * 
+         * @throws IllegalStateException
+         *             if the {@link HAClient} is not connected.
          */
-        public ZooKeeperAccessor getZookeeperAccessor() {
+        public ZooKeeper getZookeeper() {
 
-            return zka;
+            assertOpen();
+
+            final ZooKeeper zk = this.zk;
+
+            if (zk == null)
+                throw new IllegalStateException();
+
+            return zk;
 
         }
 
@@ -763,21 +779,13 @@ public class HAClient {
                 throw new IllegalStateException();
 
             if (log.isInfoEnabled())
-                log.info(jiniConfig.toString());
+                log.info(jiniConfig.toString(), new StackInfoReport());
 
             final String[] groups = jiniConfig.groups;
 
             final LookupLocator[] lookupLocators = jiniConfig.locators;
 
             try {
-
-                /*
-                 * Connect to a zookeeper service in the declare ensemble of
-                 * zookeeper servers.
-                 */
-
-                zka = new ZooKeeperAccessor(zooConfig.servers,
-                        zooConfig.sessionTimeout);
 
                 /*
                  * Note: This class will perform multicast discovery if
@@ -825,13 +833,75 @@ public class HAClient {
                         serviceDiscoveryManager,
                         this/* serviceDiscoveryListener */, cacheMissTimeout);
 
+                /*
+                 * Connect to a zookeeper service in the declare ensemble of
+                 * zookeeper servers.
+                 */
+                log.info("Creating ZooKeeper connection.");
+                
+                zk = new ZooKeeper(zooConfig.servers, zooConfig.sessionTimeout,
+                        new Watcher() {
+                            @Override
+                            public void process(final WatchedEvent event) {
+                                if (log.isInfoEnabled())
+                                    log.info(event);
+                            }
+                        });
+
+                /**
+                 * Wait until zookeeper is connected. Figure out how long that
+                 * took. If reverse DNS is not setup, then the following two
+                 * tickets will prevent the service from starting up in a timely
+                 * manner. We detect this with a delay of 4+ seconds before
+                 * zookeeper becomes connected. This issue does not appear in
+                 * zookeeper 3.3.4.
+                 * 
+                 * @see https://issues.apache.org/jira/browse/ZOOKEEPER-1652
+                 * @see https://issues.apache.org/jira/browse/ZOOKEEPER-1666
+                 */
+                {
+                    boolean reverseDSNError = false;
+                    final long begin = System.nanoTime();
+                    while (zk.getState().isAlive()) {
+                        if (zk.getState() == States.CONNECTED) {
+                            // connected.
+                            break;
+                        }
+                        final long elapsed = System.nanoTime() - begin;
+                        if (!reverseDSNError
+                                && TimeUnit.NANOSECONDS.toSeconds(elapsed) > 4) {
+                            reverseDSNError = true; // just one warning.
+                            log.error("Reverse DNS is not configured. The ZooKeeper client is taking too long to resolve server(s): "
+                                    + zooConfig.servers
+                                    + ", took="
+                                    + TimeUnit.NANOSECONDS.toMillis(elapsed)
+                                    + "ms");
+                        }
+                        if (TimeUnit.NANOSECONDS.toSeconds(elapsed) > 10) {
+                            // Fail if we can not reach zookeeper.
+                            throw new RuntimeException(
+                                    "Could not connect to zookeeper: state="
+                                            + zk.getState()
+                                            + ", config"
+                                            + zooConfig
+                                            + ", elapsed="
+                                            + TimeUnit.NANOSECONDS
+                                                    .toMillis(elapsed) + "ms");
+                        }
+                        // wait and then retry.
+                        Thread.sleep(100/* ms */);
+                    }
+                }
+
                 // And set the reference. The client is now "connected".
                 this.clientRef.set(client);
 
-            } catch (Exception ex) {
+                log.info("Done.");
+                
+            } catch (Throwable ex) {
 
                 log.fatal(
-                        "Problem initiating service discovery: "
+                        "Could not connect: "
                                 + ex.getMessage(), ex);
 
                 try {
@@ -921,6 +991,9 @@ public class HAClient {
 
             if (discoveryClient != null) {
 
+                if (log.isInfoEnabled())
+                    log.info("Terminating " + discoveryClient);
+                
                 discoveryClient.terminate();
 
                 discoveryClient = null;
@@ -933,6 +1006,9 @@ public class HAClient {
 
             if (serviceDiscoveryManager != null) {
 
+                if (log.isInfoEnabled())
+                    log.info("Terminating " + serviceDiscoveryManager);
+
                 serviceDiscoveryManager.terminate();
 
                 serviceDiscoveryManager = null;
@@ -941,6 +1017,9 @@ public class HAClient {
 
             if (lookupDiscoveryManager != null) {
 
+                if (log.isInfoEnabled())
+                    log.info("Terminating " + lookupDiscoveryManager);
+
                 lookupDiscoveryManager.terminate();
 
                 lookupDiscoveryManager = null;
@@ -948,7 +1027,7 @@ public class HAClient {
             }
 
             // Terminate any quorums opened by the HAConnection.
-            for (Quorum<HAGlue, QuorumClient<HAGlue>> quorum : quorums.values()) {
+            for (Quorum<HAGlue, ZKQuorumClient<HAGlue>> quorum : quorums.values()) {
 
                 quorum.terminate();
 
@@ -964,14 +1043,15 @@ public class HAClient {
              */
             log.warn("FORCING UNCURABLE ZOOKEEPER DISCONNECT");
 
-            if (zka != null) {
+            if (zk != null) {
 
                 try {
-                    zka.close();
+                    zk.close();
                 } catch (InterruptedException e) {
                     // propagate the interrupt.
                     Thread.currentThread().interrupt();
                 }
+                zk = null;
 
             }
             // try {
@@ -1098,7 +1178,7 @@ public class HAClient {
             final String logicalServiceZPathPrefix = zkClientConfig.zroot + "/"
                     + HAJournalServer.class.getName();
 
-            final String[] children = zka.getZookeeper()
+            final String[] children = getZookeeper()
                     .getChildren(logicalServiceZPathPrefix, false/* watch */)
                     .toArray(new String[0]);
 
@@ -1107,11 +1187,17 @@ public class HAClient {
         }
 
         /**
-         * Obtain an object that will reflect the state of the {@link Quorum}
-         * for the HA replication identified by the logical service identifier.
+         * This is a convenience method that provides access to a Quorum for
+         * some logical service corresponding to an HA replication cluster. The
+         * returned quorum object will monitor the and reflect the state of the
+         * identified quorum. A simple {@link QuorumClient} is started and will
+         * run for that quorum until any of: (a) the quorum terminated; (b) the
+         * {@link HAConnection} is closed; (c) it is noticed that the zookeeper
+         * session is expired.
          * <p>
          * Note: Each quorum that you start has asynchronous threads and MUST be
-         * terminated.
+         * terminated. Termination is automatically performed by
+         * {@link HAClient#disconnect(boolean)}.
          * 
          * @param logicalServiceId
          *            The logical service identifier.
@@ -1123,20 +1209,33 @@ public class HAClient {
          * @throws InterruptedException
          * @throws KeeperException
          */
-        public Quorum<HAGlue, QuorumClient<HAGlue>> getHAGlueQuorum(
+        public Quorum<HAGlue, ZKQuorumClient<HAGlue>> getHAGlueQuorum(
                 final String logicalServiceId) throws KeeperException,
                 InterruptedException {
 
             /*
-             * Fast path. Check for an existing instance.
+             * Fast path. Check for an existing instance. 
              */
-            Quorum<HAGlue, QuorumClient<HAGlue>> quorum;
+            Quorum<HAGlue, ZKQuorumClient<HAGlue>> quorum;
             synchronized (quorums) {
 
                 quorum = quorums.get(logicalServiceId);
 
                 if (quorum != null) {
 
+                    /*
+                     * Note: There is no guarantee that the client is running
+                     * for the returned quorum. If there is no such quorum, then
+                     * a client is created for that quorum. If a quorum is
+                     * found, then it is simply returned. The argument is that a
+                     * quorum will continue to run for a client unless the
+                     * HAClient is disconnected, the zookeeper session is
+                     * expired, or quorum.terminate() is explicitly invoked. The
+                     * former two cases can only be cured by a disconnect()
+                     * followed by a connect(). The latter has to be done
+                     * explicitly by the application, so they can deal with it
+                     * and start a new client if desired.
+                     */
                     return quorum;
 
                 }
@@ -1167,19 +1266,19 @@ public class HAClient {
              * Ensure key znodes exist.
              */
             try {
-                zka.getZookeeper().create(zkClientConfig.zroot,
+                getZookeeper().create(zkClientConfig.zroot,
                         new byte[] {/* data */}, acl, CreateMode.PERSISTENT);
             } catch (NodeExistsException ex) {
                 // ignore.
             }
             try {
-                zka.getZookeeper().create(logicalServiceZPathPrefix,
+                getZookeeper().create(logicalServiceZPathPrefix,
                         new byte[] {/* data */}, acl, CreateMode.PERSISTENT);
             } catch (NodeExistsException ex) {
                 // ignore.
             }
             try {
-                zka.getZookeeper().create(logicalServiceZPath,
+                getZookeeper().create(logicalServiceZPath,
                         new byte[] {/* data */}, acl, CreateMode.PERSISTENT);
             } catch (NodeExistsException ex) {
                 // ignore.
@@ -1195,7 +1294,7 @@ public class HAClient {
 
                     final Stat stat = new Stat();
 
-                    data = zka.getZookeeper().getData(quorumZPath,
+                    data = getZookeeper().getData(quorumZPath,
                             false/* watch */, stat);
 
                     final QuorumTokenState tokenState = (QuorumTokenState) SerializerUtil
@@ -1251,8 +1350,8 @@ public class HAClient {
 
                     quorums.put(
                             logicalServiceId,
-                            quorum = new ZKQuorumImpl<HAGlue, QuorumClient<HAGlue>>(
-                                    replicationFactor, zka, acl));
+                            quorum = new ZKQuorumImpl<HAGlue, ZKQuorumClient<HAGlue>>(
+                                    replicationFactor));//, zka, acl));
 
                     quorum.start(new MyQuorumClient(logicalServiceZPath));
 
@@ -1264,7 +1363,8 @@ public class HAClient {
 
         }
 
-        private class MyQuorumClient extends AbstractQuorumClient<HAGlue> {
+        private class MyQuorumClient extends AbstractQuorumClient<HAGlue>
+                implements ZKQuorumClient<HAGlue> {
 
             protected MyQuorumClient(final String logicalServiceZPath) {
 
@@ -1277,6 +1377,20 @@ public class HAClient {
 
                 return getHAGlueService(serviceId);
 
+            }
+
+            @Override
+            public ZooKeeper getZooKeeper() {
+
+                return HAConnection.this.getZookeeper();
+                
+            }
+
+            @Override
+            public List<ACL> getACL() {
+
+                return zooConfig.acl;
+                
             }
 
         }
@@ -1494,7 +1608,7 @@ public class HAClient {
 
     /**
      * Simple main just connects and then disconnects after a few seconds. It
-     * prints out all discovered {@link HAGlue} services before it shutsdown.
+     * prints out all discovered {@link HAGlue} services before it shuts down.
      * 
      * @param args
      * 
@@ -1539,7 +1653,7 @@ public class HAClient {
                 /*
                  * This shows up to lookup a known replication cluster.
                  */
-                final Quorum<HAGlue, QuorumClient<HAGlue>> quorum = ctx
+                final Quorum<HAGlue, ZKQuorumClient<HAGlue>> quorum = ctx
                         .getHAGlueQuorum(logicalServiceId);
 
                 // Setup listener that logs quorum events @ TRACE.

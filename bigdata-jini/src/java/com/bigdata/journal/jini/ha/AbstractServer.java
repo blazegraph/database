@@ -44,6 +44,8 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Condition;
@@ -53,11 +55,13 @@ import net.jini.admin.JoinAdmin;
 import net.jini.config.Configuration;
 import net.jini.config.ConfigurationException;
 import net.jini.config.ConfigurationProvider;
+import net.jini.core.discovery.LookupLocator;
 import net.jini.core.entry.Entry;
 import net.jini.core.lookup.ServiceID;
 import net.jini.core.lookup.ServiceRegistrar;
 import net.jini.discovery.DiscoveryEvent;
 import net.jini.discovery.DiscoveryListener;
+import net.jini.discovery.LookupDiscoveryManager;
 import net.jini.export.Exporter;
 import net.jini.jeri.BasicILFactory;
 import net.jini.jeri.BasicJeriExporter;
@@ -80,7 +84,6 @@ import com.bigdata.jini.lookup.entry.Hostname;
 import com.bigdata.jini.lookup.entry.ServiceUUID;
 import com.bigdata.jini.start.config.ZookeeperClientConfig;
 import com.bigdata.jini.util.JiniUtil;
-import com.bigdata.journal.jini.ha.HAClient.HAConnection;
 import com.bigdata.service.AbstractService;
 import com.bigdata.service.IService;
 import com.bigdata.service.IServiceShutdown;
@@ -260,8 +263,15 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
      * The {@link Configuration} read based on the args[] provided when the
      * server is started.
      */
-    protected Configuration config;
+    protected final Configuration config;
 
+    private final JiniClientConfig jiniClientConfig;
+
+    /**
+     * The as-configured entry attributes.
+     */
+    private final List<Entry> entries;
+    
     /**
      * A configured name for the service -or- a default value if no {@link Name}
      * was found in the {@link Configuration}.
@@ -579,7 +589,13 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
         
         runState = new AtomicReference<RunState>(RunState.Start);
         
-        // Show the copyright banner during startup.
+        /*
+         * Display the banner.
+         * 
+         * Note: This also installs the UncaughtExceptionHandler.
+         * 
+         * @see https://sourceforge.net/apps/trac/bigdata/ticket/601
+         */
         Banner.banner();
 
         if (lifeCycle == null)
@@ -589,24 +605,19 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
 
         setSecurityManager();
 
-        /*
-         * Display the banner.
-         * 
-         * Note: This also installs the UncaughtExceptionHandler.
-         * 
-         * @see https://sourceforge.net/apps/trac/bigdata/ticket/601
-         */
-        Banner.banner();
-//        Thread.setDefaultUncaughtExceptionHandler(
-//                new Thread.UncaughtExceptionHandler() {
-//                    public void uncaughtException(Thread t, Throwable e) {
-//                        log.warn("Uncaught exception in thread", e);
-//                    }
-//                });
-
         // Note the process id (best guess).
         this.pid = PIDUtil.getPID();
         
+        /*
+         * The runtime shutdown hook appears to be a robust way to handle ^C by
+         * providing a clean service termination.
+         * 
+         * Note: This is setup before we start any async threads, including
+         * service discovery.
+         */
+        Runtime.getRuntime().addShutdownHook(
+                new ShutdownThread(false/* destroy */, this));
+
         /*
          * Read jini configuration & service properties 
          */
@@ -614,8 +625,10 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
         List<Entry> entries = null;
         
         final String COMPONENT = getClass().getName();
-        final JiniClientConfig jiniClientConfig;
         try {
+
+            // Create client.
+            haClient = new HAClient(args);
 
             config = ConfigurationProvider.getInstance(args);
             
@@ -855,6 +868,9 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
                 
             }
 
+            // Save a reference to the as-configured Entry[] attributes.
+            this.entries = entries;
+
             /*
              * Extract how the service will provision itself from the
              * Configuration.
@@ -867,7 +883,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
                     Exporter.class, // type (of the return object)
                     /*
                      * The default exporter is a BasicJeriExporter using a
-                     * TcpServerEnpoint.
+                     * TcpServerEndpoint.
                      */
                     new BasicJeriExporter(TcpServerEndpoint.getInstance(0),
                             new BasicILFactory())
@@ -879,196 +895,106 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
             throw new AssertionError();// keeps compiler happy.
         }
         
-        /*
-         * The runtime shutdown hook appears to be a robust way to handle ^C by
-         * providing a clean service termination.
-         * 
-         * Note: This is setup before we start any async threads, including
-         * service discovery.
-         */
-        Runtime.getRuntime().addShutdownHook(
-                new ShutdownThread(false/* destroy */, this));
-
-        final HAConnection ctx;
-        try {
-
-            // Create client.
-            haClient = new HAClient(args);
-
-            // Connect.
-            ctx = haClient.connect();
-            
-//            /*
-//             * Note: This class will perform multicast discovery if ALL_GROUPS
-//             * is specified and otherwise requires you to specify one or more
-//             * unicast locators (URIs of hosts running discovery services). As
-//             * an alternative, you can use LookupDiscovery, which always does
-//             * multicast discovery.
-//             */
-//            lookupDiscoveryManager = new LookupDiscoveryManager(
-//                    jiniClientConfig.groups, jiniClientConfig.locators,
-//                    this /* DiscoveryListener */, config);
+//         Note: Moved HAClient.connect() into quorumService.start().
+//        final HAConnection ctx;
+//        try {
 //
-//            /*
-//             * Setup a helper class that will be notified as services join or
-//             * leave the various registrars to which the data server is
-//             * listening.
-//             */
-//            try {
+//            // Create client.
+//            haClient = new HAClient(args);
 //
-//                serviceDiscoveryManager = new ServiceDiscoveryManager(
-//                        lookupDiscoveryManager, new LeaseRenewalManager(),
-//                        config);
+//            // Connect.
+//            ctx = haClient.connect();
+//            
+////            /*
+////             * Note: This class will perform multicast discovery if ALL_GROUPS
+////             * is specified and otherwise requires you to specify one or more
+////             * unicast locators (URIs of hosts running discovery services). As
+////             * an alternative, you can use LookupDiscovery, which always does
+////             * multicast discovery.
+////             */
+////            lookupDiscoveryManager = new LookupDiscoveryManager(
+////                    jiniClientConfig.groups, jiniClientConfig.locators,
+////                    this /* DiscoveryListener */, config);
+////
+////            /*
+////             * Setup a helper class that will be notified as services join or
+////             * leave the various registrars to which the data server is
+////             * listening.
+////             */
+////            try {
+////
+////                serviceDiscoveryManager = new ServiceDiscoveryManager(
+////                        lookupDiscoveryManager, new LeaseRenewalManager(),
+////                        config);
+////
+////            } catch (IOException ex) {
+////
+////                throw new RuntimeException(
+////                        "Could not initiate service discovery manager", ex);
+////
+////            }
+////
+////        } catch (IOException ex) {
+////
+////            fatal("Could not setup discovery", ex);
+////            throw new AssertionError();// keep the compiler happy.
+////
+//        } catch (ConfigurationException ex) {
 //
-//            } catch (IOException ex) {
+//            fatal("Configuration error: " + ex, ex);
 //
-//                throw new RuntimeException(
-//                        "Could not initiate service discovery manager", ex);
-//
-//            }
-//
-//        } catch (IOException ex) {
-//
-//            fatal("Could not setup discovery", ex);
 //            throw new AssertionError();// keep the compiler happy.
 //
-        } catch (ConfigurationException ex) {
+//        } catch(Throwable ex) {
+//            
+//            fatal("Could not connect: " + ex, ex);
+//
+//            throw new AssertionError();// keep the compiler happy.
+//
+//        }
 
-            fatal("Configuration error: " + ex, ex);
+        // Note: Moved newService() call into AbstractServer.run().
+//        /*
+//         * Create the service object.
+//         */
+//        try {
+//            
+//            /*
+//             * Note: By creating the service object here rather than outside of
+//             * the constructor we potentially create problems for subclasses of
+//             * AbstractServer since their own constructor will not have been
+//             * executed yet.
+//             * 
+//             * Some of those problems are worked around using a JiniClient to
+//             * handle all aspects of service discovery (how this service locates
+//             * the other services in the federation).
+//             * 
+//             * Note: If you explicitly assign values to those clients when the
+//             * fields are declared, e.g., [timestampServiceClient=null] then the
+//             * ctor will overwrite the values set by [newService] since it is
+//             * running before those initializations are performed. This is
+//             * really crufty, may be JVM dependent, and needs to be refactored
+//             * to avoid this subclass ctor init problem.
+//             */
+//
+//            if (log.isInfoEnabled())
+//                log.info("Creating service impl...");
+//
+//            // init.
+//            impl = newService(config);
+//            
+//            if (log.isInfoEnabled())
+//                log.info("Service impl is " + impl);
+//            
+//        } catch(Exception ex) {
+//        
+//            fatal("Could not start service: "+this, ex);
+//            throw new AssertionError();// keeps compiler happy.
+//        }
 
-            throw new AssertionError();// keep the compiler happy.
-
-        } catch(Throwable ex) {
-            
-            fatal("Could not connect: " + ex, ex);
-
-            throw new AssertionError();// keep the compiler happy.
-
-        }
-
-        /*
-         * Create the service object.
-         */
-        try {
-            
-            /*
-             * Note: By creating the service object here rather than outside of
-             * the constructor we potentially create problems for subclasses of
-             * AbstractServer since their own constructor will not have been
-             * executed yet.
-             * 
-             * Some of those problems are worked around using a JiniClient to
-             * handle all aspects of service discovery (how this service locates
-             * the other services in the federation).
-             * 
-             * Note: If you explicitly assign values to those clients when the
-             * fields are declared, e.g., [timestampServiceClient=null] then the
-             * ctor will overwrite the values set by [newService] since it is
-             * running before those initializations are performed. This is
-             * really crufty, may be JVM dependent, and needs to be refactored
-             * to avoid this subclass ctor init problem.
-             */
-
-            if (log.isInfoEnabled())
-                log.info("Creating service impl...");
-
-            // init.
-            impl = newService(config);
-            
-            if (log.isInfoEnabled())
-                log.info("Service impl is " + impl);
-            
-        } catch(Exception ex) {
+//        // Export the service proxy.
+//        exportProxy(haClient, impl);
         
-            fatal("Could not start service: "+this, ex);
-            throw new AssertionError();// keeps compiler happy.
-        }
-
-        /*
-         * Export a proxy object for this service instance.
-         * 
-         * Note: This must be done before we start the join manager since the
-         * join manager will register the proxy.
-         */
-        try {
-
-            proxy = exporter.export(impl);
-            
-            if (log.isInfoEnabled())
-                log.info("Proxy is " + proxy + "(" + proxy.getClass() + ")");
-
-        } catch (ExportException ex) {
-
-            fatal("Export error: "+this, ex);
-            throw new AssertionError();// keeps compiler happy.
-        }
-        
-        /*
-         * Start the join manager. 
-         */
-        try {
-
-            assert proxy != null : "No proxy?";
-            
-            final Entry[] attributes = entries.toArray(new Entry[0]);
-            
-            if (this.serviceID != null) {
-
-                /*
-                 * We read the serviceID from local storage (either the
-                 * serviceIDFile and/or the Configuration).
-                 */
-                
-                joinManager = new JoinManager(proxy, // service proxy
-                        attributes, // attr sets
-                        serviceID, // ServiceID
-                        ctx.getDiscoveryManagement(), // DiscoveryManager
-                        new LeaseRenewalManager(), //
-                        config);
-                
-            } else {
-                
-                /*
-                 * We are requesting a serviceID from the registrar.
-                 */
-                
-                joinManager = new JoinManager(proxy, // service proxy
-                        attributes, // attr sets
-                        this, // ServiceIDListener
-                        ctx.getDiscoveryManagement(), // DiscoveryManager
-                        new LeaseRenewalManager(), //
-                        config);
-            
-            }
-
-        } catch (Exception ex) {
-
-            fatal("JoinManager: " + this, ex);
-            throw new AssertionError();// keeps compiler happy.
-        }
-
-        /*
-         * Note: This is synchronized in case set via listener by the
-         * JoinManager, which would be rather fast action on its part.
-         */
-        synchronized (this) {
-
-            if (this.serviceID != null) {
-
-                /*
-                 * Notify the service that it's service UUID has been set.
-                 * 
-                 * @todo Several things currently depend on this notification.
-                 * In effect, it is being used as a proxy for the service
-                 * registration event.
-                 */
-
-                notifyServiceUUID(serviceID);
-
-            }
-
-        }
-
     }
 
     /**
@@ -1076,6 +1002,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
      * in the representation may be <code>null</code> depending on the server
      * state.
      */
+    @Override
     public String toString() {
         
         // note: MAY be null.
@@ -1201,8 +1128,200 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
     }
 
     /**
-     * Unexports the {@link #proxy} - this is a NOP if the proxy is
-     * <code>null</code>.
+     * Attempt to start lookup discovery.
+     * <p>
+     * Note: The returned service will perform multicast discovery if ALL_GROUPS
+     * is specified and otherwise requires you to specify one or more unicast
+     * locators (URIs of hosts running discovery services).
+     * 
+     * @see JiniClientConfig
+     * @see JiniClientConfig#Options
+     * 
+     * @throws ConfigurationException
+     * @throws IOException
+     */
+    private void startLookupDiscoveryManager(final Configuration config)
+            throws ConfigurationException, IOException {
+
+        if (lookupDiscoveryManager == null) {
+            
+            log.info("Starting lookup discovery.");
+            
+            final String[] groups = jiniClientConfig.groups;
+
+            final LookupLocator[] lookupLocators = jiniClientConfig.locators;
+
+            this.lookupDiscoveryManager = new LookupDiscoveryManager(groups,
+                    lookupLocators, null /* DiscoveryListener */, config);
+        
+        }
+        
+    }
+    private volatile LookupDiscoveryManager lookupDiscoveryManager = null;
+
+    /**
+     * Await discovery of at least one {@link ServiceRegistrar}.
+     * 
+     * @param timeout
+     *            The timeout.
+     * @param unit
+     *            The units for that timeout.
+     * 
+     * @throws IllegalArgumentException
+     *             if minCount is non-positive.
+     */
+    protected ServiceRegistrar[] awaitServiceRegistrars(final long timeout,
+            final TimeUnit unit) throws TimeoutException,
+            InterruptedException {
+
+        if (lookupDiscoveryManager == null)
+            throw new IllegalStateException();
+        
+        final long begin = System.nanoTime();
+        final long nanos = unit.toNanos(timeout);
+        long remaining = nanos;
+
+        ServiceRegistrar[] registrars = null;
+
+        while ((registrars == null || registrars.length == 0)
+                && remaining > 0) {
+
+            registrars = lookupDiscoveryManager.getRegistrars();
+
+            Thread.sleep(100/* ms */);
+
+            final long elapsed = System.nanoTime() - begin;
+
+            remaining = nanos - elapsed;
+
+        }
+
+        if (registrars == null || registrars.length == 0) {
+
+            throw new RuntimeException(
+                    "Could not discover ServiceRegistrar(s)");
+
+        }
+
+        if (log.isInfoEnabled()) {
+
+            log.info("Found " + registrars.length + " service registrars");
+
+        }
+
+        return registrars;
+
+    }
+
+    /**
+     * Export a proxy object for this service instance.
+     * 
+     * @throws IOException
+     * @throws ConfigurationException
+     */
+    synchronized private void exportProxy(final Remote impl)
+            throws ConfigurationException, IOException {
+
+        /*
+         * Export a proxy object for this service instance.
+         * 
+         * Note: This must be done before we start the join manager since the
+         * join manager will register the proxy.
+         */
+        try {
+
+            proxy = exporter.export(impl);
+            
+            if (log.isInfoEnabled())
+                log.info("EXPORTED PROXY: Proxy is " + proxy + "("
+                        + proxy.getClass() + ")");
+
+        } catch (ExportException ex) {
+
+            fatal("Export error: " + this, ex);
+            throw new AssertionError();// keeps compiler happy.
+        }
+
+        /*
+         * Start the join manager. 
+         */
+        try {
+
+            assert proxy != null : "No proxy?";
+
+            // The as-configured Entry[] attributes.
+            final Entry[] attributes = entries.toArray(new Entry[0]);
+
+            if (this.serviceID != null) {
+
+                /*
+                 * We read the serviceID from local storage (either the
+                 * serviceIDFile and/or the Configuration).
+                 */
+                
+                joinManager = new JoinManager(proxy, // service proxy
+                        attributes, // attr sets
+                        serviceID, // ServiceID
+                        lookupDiscoveryManager, // DiscoveryManager
+                        new LeaseRenewalManager(), //
+                        config);
+                
+            } else {
+                
+                /*
+                 * We are requesting a serviceID from the registrar.
+                 */
+                
+                joinManager = new JoinManager(proxy, // service proxy
+                        attributes, // attr sets
+                        this, // ServiceIDListener
+                        lookupDiscoveryManager, // DiscoveryManager
+                        new LeaseRenewalManager(), //
+                        config);
+            
+            }
+
+        } catch (Exception ex) {
+
+            fatal("JoinManager: " + this, ex);
+            throw new AssertionError();// keeps compiler happy.
+        }
+
+        /*
+         * Note: This is synchronized in case set via listener by the
+         * JoinManager, which would be rather fast action on its part.
+         */
+        synchronized (this) {
+
+            if (this.serviceID != null) {
+
+                /*
+                 * Notify the service that it's service UUID has been set.
+                 * 
+                 * @todo Several things currently depend on this notification.
+                 * In effect, it is being used as a proxy for the service
+                 * registration event.
+                 */
+
+                notifyServiceUUID(serviceID);
+
+            }
+
+        }
+
+    }
+    
+    /**
+     * Unexports the {@link #proxy}, halt the {@link JoinManager}, and halt the
+     * {@link LookupDiscoveryManager}. This is safe to invoke whether or not the
+     * proxy is exported.
+     * <p>
+     * Note: You can not re-export the proxy. The {@link Exporter} does not
+     * support this for a given instance. Also, once un-exported, if you create
+     * a new {@link Exporter} and then re-export the proxy, the new proxy will
+     * be a distinct instance. Most clients expect the life cycle of the proxy
+     * to be the life cycle of the service that is being exposed by the proxy.
+     * Unexporting and re-exporting will confuse such clients.
      * 
      * @param force
      *            When true, the object is unexported even if there are pending
@@ -1212,34 +1331,51 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
      * 
      * @see Exporter#unexport(boolean)
      */
-    synchronized protected boolean unexport(boolean force) {
+    synchronized private boolean unexport(final boolean force) {
 
-        if (log.isInfoEnabled())
-            log.info("force=" + force + ", proxy=" + proxy);
+        boolean unexported = false;
 
-        try {
-            
-            if (proxy != null) {
+        if (proxy != null) {
 
+            log.warn("UNEXPORT PROXY: force=" + force + ", proxy=" + proxy);
+
+            try {
                 if (exporter.unexport(force)) {
 
-                    return true;
+                    unexported = true;
 
                 } else {
 
-                    log.warn("Proxy was not unexported? : "+this);
+                    log.warn("Proxy was not unexported? : " + this);
 
                 }
+            } finally {
+
+                proxy = null;
 
             }
 
-            return false;
+        }
 
-        } finally {
+        if (joinManager != null) {
 
-            proxy = null;
+            try {
+
+                joinManager.terminate();
+
+            } catch (Throwable ex) {
+
+                log.error("Could not terminate the join manager: " + this, ex);
+
+            } finally {
+
+                joinManager = null;
+
+            }
 
         }
+
+        return unexported;
 
     }
 
@@ -1489,7 +1625,10 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
      *            the service is also destroyed.
      */
     final protected void shutdownNow(final boolean destroy) {
-
+        
+//        if (log.isTraceEnabled())
+//            HAJournalTest.dumpThreads();
+        
         // Atomically change RunState.
         if (!runState.compareAndSet(RunState.Start, RunState.ShuttingDown)
                 && !runState.compareAndSet(RunState.Running,
@@ -1515,9 +1654,6 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
              * service is no longer visible in the service browser.
              */
             try {
-
-                if (log.isInfoEnabled())
-                    log.info("Unexporting the service proxy.");
 
                 unexport(true/* force */);
 
@@ -1749,24 +1885,6 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
     }
     
     /**
-     * Return <code>true</code> iff the {@link RunState} is
-     * {@link RunState#Start} -or- {@link RunState#Running}.
-     * 
-     * @return <code>true</code> if the service is starting or running and
-     *         otherwise <code>false</code>.
-     */
-    public boolean isRunning() {
-
-        switch (runState.get()) {
-        case Running:
-        case Start:
-            return true;
-        }
-        return false;
-        
-    }
-
-    /**
      * Terminates service management threads.
      * <p>
      * Subclasses which start additional service management threads SHOULD
@@ -1779,25 +1897,27 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
         if (log.isInfoEnabled())
             log.info("Terminating service management threads.");
 
-        if (joinManager != null) {
-            
+        if (haClient.isConnected())
+            haClient.disconnect(false/* immediateShutdown */);
+
+        if (lookupDiscoveryManager != null) {
+
             try {
 
-                joinManager.terminate();
+                lookupDiscoveryManager.terminate();
 
             } catch (Throwable ex) {
 
-                log.error("Could not terminate the join manager: " + this, ex);
+                log.error("Could not terminate the lookup discovery manager: "
+                        + this, ex);
 
             } finally {
-                
-                joinManager = null;
+
+                lookupDiscoveryManager = null;
 
             }
 
         }
-        
-        haClient.disconnect(false/*immediateShutdown*/);
 
 //        if (serviceDiscoveryManager != null) {
 //
@@ -1840,6 +1960,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
     /**
      * Run the server (this should be invoked from <code>main</code>.
      */
+    @Override
     public void run() {
 
         if (log.isInfoEnabled())
@@ -1860,26 +1981,47 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
             
             // ignore.
             log.warn("Could not set thread name: " + ex);
-            
+
         }
 
-        boolean started = false;
         try {
+
+            /*
+             * Note: We run our own LookupDiscoveryManager in order to avoid
+             * forcing an unexport of the service proxy when the HAClient is
+             * terminated.
+             */
+            startLookupDiscoveryManager(config);
+            
+            // Create the service object.
+            impl = newService(config);
+
+            // Export the service.
+            exportProxy(impl);
+            
+            // Start the service.
             startUpHook();
-            started = true;
-        } finally {
-            if (!started)
-                shutdownNow(false/*destroy*/);
+            
+        } catch (Throwable t) {
+
+            fatal("Startup failure", t);
+
+            throw new AssertionError();
+            
         }
 
         if (runState.compareAndSet(RunState.Start, RunState.Running)) {
 
             {
+
                 final String msg = "Service is running: class="
                         + getClass().getName() + ", name=" + getServiceName();
+
                 System.out.println(msg);
+
                 if (log.isInfoEnabled())
                     log.info(msg);
+
             }
 
             /*
@@ -1905,7 +2047,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
             }
 
         }
-
+        
         System.out.println("Service is down: class=" + getClass().getName()
                 + ", name=" + getServiceName());
 
@@ -1947,6 +2089,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
             
         }
 
+        @Override
         public void run() {
 
             // format log message.
@@ -1957,7 +2100,10 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
 
             try {
 
-                // Wait long enough for the RMI request to end.
+                /*
+                 * Wait long enough for the RMI request to end (in case the
+                 * service is shutdown in response to an RMI).
+                 */
                 Thread.sleep(250/* ms */);
 
             } catch (InterruptedException e) {

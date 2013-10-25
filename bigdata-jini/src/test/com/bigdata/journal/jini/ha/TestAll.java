@@ -85,11 +85,11 @@ public class TestAll extends TestCase {
         suite.addTestSuite(TestHALogIndex.class);
         suite.addTestSuite(TestSnapshotIndex.class);
         
+        // Test suite for direct IBufferStrategy data xfer tests.
+        suite.addTestSuite(TestRawTransfers.class);
+
         // Basic tests for a single HAJournalServer (quorum does not meet)
         suite.addTestSuite(TestHAJournalServer.class);
-
-        // Verify ability to override the HAJournal implementation class.
-        suite.addTestSuite(TestHAJournalServerOverride.class);
 
         // HA2 test suite (k=3, but only 2 services are running).
         suite.addTestSuite(TestHA2JournalServer.class);
@@ -113,8 +113,8 @@ public class TestAll extends TestCase {
         // Test suite for utility to compute and compare HALog digests.
         suite.addTestSuite(TestHA3DumpLogs.class);
 
-        // Test suite for direct IBufferStrategy data xfer tests.
-        suite.addTestSuite(TestRawTransfers.class);
+        // Verify ability to override the HAJournal implementation class.
+        suite.addTestSuite(TestHAJournalServerOverride.class); 
 
         // Test suite of longer running stress tests for an HA3 cluster.
         suite.addTestSuite(StressTestHA3JournalServer.class);

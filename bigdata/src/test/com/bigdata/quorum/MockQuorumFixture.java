@@ -742,15 +742,22 @@ public class MockQuorumFixture {
             // Save UUID -> QuorumMember mapping on the fixture.
             fixture.known.put(client.getServiceId(), client);
         }
-
+        
+        @Override
         public void terminate() {
-            final MockQuorumWatcher watcher = (MockQuorumWatcher) getWatcher();
+            MockQuorumWatcher watcher = null;
+            try {
+                watcher = (MockQuorumWatcher) getWatcher();
+            } catch(IllegalStateException ex) {
+                // Already terminated.
+            }
             super.terminate();
             // Stop the service accepting events for the watcher.
             watcherService.shutdownNow();
             
-            // remove our watcher as a listener for the fixture's inner quorum.   
-            fixture.removeWatcher(watcher);
+            // remove our watcher as a listener for the fixture's inner quorum.
+            if (watcher != null)
+                fixture.removeWatcher(watcher);
         }
 
         /**

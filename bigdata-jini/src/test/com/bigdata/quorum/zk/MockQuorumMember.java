@@ -6,7 +6,6 @@ import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.rmi.Remote;
 import java.util.UUID;
-import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -17,7 +16,6 @@ import com.bigdata.ha.msg.IHALogRequest;
 import com.bigdata.ha.msg.IHALogRootBlocksRequest;
 import com.bigdata.ha.msg.IHALogRootBlocksResponse;
 import com.bigdata.ha.msg.IHARebuildRequest;
-import com.bigdata.ha.msg.IHARootBlockResponse;
 import com.bigdata.ha.msg.IHASendStoreResponse;
 import com.bigdata.ha.msg.IHASyncRequest;
 import com.bigdata.ha.msg.IHAWriteMessage;
@@ -40,7 +38,8 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-abstract class MockQuorumMember<S extends Remote> extends AbstractQuorumMember<S> {
+abstract class MockQuorumMember<S extends Remote> extends
+        AbstractQuorumMember<S> implements ZKQuorumClient<S> {
 
     /**
      * The local implementation of the {@link Remote} interface.
@@ -95,6 +94,7 @@ abstract class MockQuorumMember<S extends Remote> extends AbstractQuorumMember<S
         }
     }
     
+    @Override
     public ExecutorService getExecutor() {
         return executorService;
     }
@@ -104,6 +104,7 @@ abstract class MockQuorumMember<S extends Remote> extends AbstractQuorumMember<S
      */
     abstract S newService();
     
+    @Override
     public S getService() {
         return service;
     }
@@ -112,6 +113,7 @@ abstract class MockQuorumMember<S extends Remote> extends AbstractQuorumMember<S
      * Can not resolve services (this functionality is not required for the
      * unit tests in the <code>com.bigdata.quorum</code> package.
      */
+    @Override
     public S getService(UUID serviceId) {
         return registrar.get(serviceId);
     }
@@ -140,6 +142,7 @@ abstract class MockQuorumMember<S extends Remote> extends AbstractQuorumMember<S
      * Overridden to save the current downstream service {@link UUID} on
      * {@link #downStreamId}
      */
+    @Override
     public void pipelineChange(final UUID oldDownStreamId,
             final UUID newDownStreamId) {
         super.pipelineChange(oldDownStreamId, newDownStreamId);
@@ -151,6 +154,7 @@ abstract class MockQuorumMember<S extends Remote> extends AbstractQuorumMember<S
      * 
      * Overridden to clear the {@link #downStreamId}.
      */
+    @Override
     public void pipelineRemove() {
         super.pipelineRemove();
         this.downStreamId = null;
@@ -186,8 +190,10 @@ abstract class MockQuorumMember<S extends Remote> extends AbstractQuorumMember<S
          *       operation. The real implemention should be a little more
          *       sophisticated.
          */
+        @Override
         public Future<Void> moveToEndOfPipeline() throws IOException {
             final FutureTask<Void> ft = new FutureTask<Void>(new Runnable() {
+                @Override
                 public void run() {
 
                     // note the current vote (if any).

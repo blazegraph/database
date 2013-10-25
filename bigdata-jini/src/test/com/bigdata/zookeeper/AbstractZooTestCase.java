@@ -298,16 +298,22 @@ public abstract class AbstractZooTestCase extends TestCase3 {
     }
 
     /**
-     * Return a new {@link ZooKeeperAccessor} instance connects to the same
+     * Return a new {@link ZooKeeper} instance connects to the same
      * zookeeper ensemble but which uses distinct {@link ZooKeeper} session.
      * 
      * @throws InterruptedException
+     * @throws IOException 
      */
-    protected ZooKeeperAccessor getZooKeeperAccessorWithDistinctSession()
-            throws InterruptedException {
+    protected ZooKeeper getZooKeeperAccessorWithDistinctSession()
+            throws InterruptedException, IOException {
 
-        return new ZooKeeperAccessor(zookeeperAccessor.hosts,
-                zookeeperAccessor.sessionTimeout);
+        return new ZooKeeper(zookeeperAccessor.hosts,
+                zookeeperAccessor.sessionTimeout, new Watcher(){
+                    @Override
+                    public void process(WatchedEvent event) {
+                        if(log.isInfoEnabled())
+                            log.info(event);
+                    }});
         
 //        final ZooKeeper zookeeper2 = new ZooKeeper(zookeeperAccessor.hosts,
 //                zookeeperAccessor.sessionTimeout, new Watcher() {

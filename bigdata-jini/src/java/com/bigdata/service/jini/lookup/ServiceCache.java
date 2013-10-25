@@ -171,7 +171,16 @@ public class ServiceCache implements ServiceDiscoveryListener {
         if (log.isInfoEnabled())
             log.info("" + e + ", class=" + item);
 
-        if (service instanceof IService) {
+        /**
+         * Note: This code path could block on the RMI to verify that the
+         * service remains alive. It was disabled to support the
+         * HAJournalService, which now unexports the proxy for the service in
+         * order to address a zk session expire.
+         * 
+         * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/718" >
+         *      HAJournalServer needs to handle ZK client connection loss </a>
+         */
+        if (false && service instanceof IService) {
             
             try {
             

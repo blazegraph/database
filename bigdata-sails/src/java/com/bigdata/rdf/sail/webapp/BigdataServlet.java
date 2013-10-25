@@ -37,12 +37,10 @@ import javax.servlet.http.HttpServletResponse;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.HAStatusEnum;
-import com.bigdata.ha.QuorumService;
+import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.IIndexManager;
-import com.bigdata.journal.Journal;
-import com.bigdata.quorum.Quorum;
+import com.bigdata.quorum.AbstractQuorum;
 import com.bigdata.rdf.sail.webapp.client.IMimeTypes;
 
 /**
@@ -116,24 +114,44 @@ abstract public class BigdataServlet extends HttpServlet implements IMimeTypes {
 	    
 	}
 
-    /**
-     * Return the {@link Quorum} -or- <code>null</code> if the
-     * {@link IIndexManager} is not participating in an HA {@link Quorum}.
-     */
-    protected Quorum<HAGlue, QuorumService<HAGlue>> getQuorum() {
+//    /**
+//     * Return the {@link Quorum} -or- <code>null</code> if the
+//     * {@link IIndexManager} is not participating in an HA {@link Quorum}.
+//     */
+//    protected Quorum<HAGlue, QuorumService<HAGlue>> getQuorum() {
+//
+//        final IIndexManager indexManager = getIndexManager();
+//
+//        if (indexManager instanceof Journal) {
+//
+//            return ((Journal) indexManager).getQuorum();
+//
+//        }
+//
+//        return null;
+//	    
+//	}
 
+    /**
+     * Return the {@link HAStatusEnum} -or- <code>null</code> if the
+     * {@link IIndexManager} is not an {@link AbstractQuorum} or is not HA
+     * enabled.
+     */
+    protected HAStatusEnum getHAStatus() {
+        
         final IIndexManager indexManager = getIndexManager();
 
-        if (indexManager instanceof Journal) {
+        if (indexManager instanceof AbstractJournal) {
 
-            return ((Journal) indexManager).getQuorum();
+            // Note: Invocation against local object (NOT RMI).
+            return ((AbstractJournal) indexManager).getHAStatus();
 
         }
 
         return null;
-	    
-	}
-	
+        
+    }
+    
     /**
      * If the node is not writable, then commit a response and return
      * <code>false</code>. Otherwise return <code>true</code>.
@@ -148,44 +166,16 @@ abstract public class BigdataServlet extends HttpServlet implements IMimeTypes {
     protected boolean isWritable(final HttpServletRequest req,
             final HttpServletResponse resp) throws IOException {
         
-        final Quorum<HAGlue, QuorumService<HAGlue>> quorum = getQuorum();
-
-        if (quorum == null) {
-         
+        final HAStatusEnum haStatus = getHAStatus();
+        if (haStatus == null) {
             // No quorum.
             return true;
-            
         }
-
-        /*
-         * Note: This is a summary of what we need to look at to proxy a
-         * request.
-         * 
-         * Note: We need to proxy PUT, POST, DELETE requests to the quorum
-         * leader.
-         * 
-         * Note: If an NSS service is NOT joined with a met quorum, but there is
-         * a met quorum, then we should just proxy the request to the met
-         * quorum. This includes both reads and writes.
-         */
-        
-//        req.getMethod();
-//        final Enumeration<String> names = req.getHeaderNames();
-//        while(names.hasMoreElements()) {
-//            req.getHeaders(names.nextElement());
-//        }
-//        req.getInputStream();
-
-        // Note: Response also has status code plus everything above.
-        
-        // Note: Invocation against local HAGlue object (NOT RMI).
-        final HAStatusEnum haStatus = getQuorum().getClient().getService()
-                .getHAStatus();
-
         switch (haStatus) {
         case Leader:
             return true;
         default:
+            log.warn(haStatus.name());
             buildResponse(resp, HTTP_METHOD_NOT_ALLOWED, MIME_TEXT_PLAIN,
                     haStatus.name());
             // Not writable.  Response has been committed.
@@ -195,38 +185,31 @@ abstract public class BigdataServlet extends HttpServlet implements IMimeTypes {
 	}
 	
     /**
-     * If the node is not writable, then commit a response and return
+     * If the node is not readable, then commit a response and return
      * <code>false</code>. Otherwise return <code>true</code>.
      * 
      * @param req
      * @param resp
      * 
-     * @return <code>true</code> iff the node is writable.
+     * @return <code>true</code> iff the node is readable.
      * 
      * @throws IOException
      */
     protected boolean isReadable(final HttpServletRequest req,
             final HttpServletResponse resp) throws IOException {
 
-        final Quorum<HAGlue, QuorumService<HAGlue>> quorum = getQuorum();
-
-        if (quorum == null) {
-         
+        final HAStatusEnum haStatus = getHAStatus();
+        if (haStatus == null) {
             // No quorum.
             return true;
-
         }
-
-        // Note: Invocation against local HAGlue object (NOT RMI).
-        final HAStatusEnum haStatus = getQuorum().getClient().getService()
-                .getHAStatus();
-
         switch (haStatus) {
         case Leader:
         case Follower:
             return true;
         default:
             // Not ready.
+            log.warn(haStatus.name());
             buildResponse(resp, HTTP_METHOD_NOT_ALLOWED, MIME_TEXT_PLAIN,
                     haStatus.name());
             // Response has been committed.

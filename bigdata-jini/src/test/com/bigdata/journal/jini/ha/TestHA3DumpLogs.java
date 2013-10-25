@@ -30,6 +30,7 @@ import java.util.Iterator;
 import java.util.UUID;
 
 import com.bigdata.ha.HAGlue;
+import com.bigdata.ha.HAStatusEnum;
 
 public class TestHA3DumpLogs extends AbstractHA3JournalServerTestCase {
 
@@ -94,15 +95,17 @@ public class TestHA3DumpLogs extends AbstractHA3JournalServerTestCase {
 
     public void testSimpleDumpLogs() throws Exception {
         // only start 2 services to ensure logs are maintained
-    	startA();
-    	startB();
-    	
-    	awaitMetQuorum();
-    	
+        final HAGlue serverA = startA();
+        final HAGlue serverB = startB();
+
+        awaitMetQuorum();
+        awaitHAStatus(serverA, HAStatusEnum.Leader);
+        awaitHAStatus(serverB, HAStatusEnum.Follower);
         final UUID leaderId = quorum.getLeaderId();
         final HAGlue leader = quorum.getClient().getService(leaderId);
         awaitNSSAndHAReady(leader);
-
+        awaitCommitCounter(1L, new HAGlue[] { serverA, serverB });
+        
         // Run through a few transactions to generate some log files
         simpleTransaction();       
         simpleTransaction();        
@@ -113,6 +116,7 @@ public class TestHA3DumpLogs extends AbstractHA3JournalServerTestCase {
         
         // now start third
         startC();
+        awaitHAStatus(serverB, HAStatusEnum.Follower);
         
         awaitFullyMetQuorum();
         
@@ -128,20 +132,21 @@ public class TestHA3DumpLogs extends AbstractHA3JournalServerTestCase {
     
     public void testBatchDumpLogs() throws Exception {
         // only start 2 services to ensure logs are maintained
-    	startA();
-    	startB();
-    	
-    	awaitMetQuorum();
+        final HAGlue serverA = startA();
+        final HAGlue serverB = startB();
+
+        awaitMetQuorum();
     	
         final UUID leaderId = quorum.getLeaderId();
         final HAGlue leader = quorum.getClient().getService(leaderId);
         awaitNSSAndHAReady(leader);
+        awaitCommitCounter(1L, new HAGlue[] { serverA, serverB });
 
         // Run through a few transactions to generate some log files
-    	// Ensure that services use multiple batches
-    	for (int t = 0; t < 200; t++) {
-    		simpleTransaction();       
-    	}
+        // Ensure that services use multiple batches
+        for (int t = 0; t < 200; t++) {
+            simpleTransaction();
+        }
         
         log.warn("After 200 met quorum transactions");
         

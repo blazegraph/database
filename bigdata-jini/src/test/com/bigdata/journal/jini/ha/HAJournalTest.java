@@ -197,18 +197,18 @@ public class HAJournalTest extends HAJournal {
          */
         public Future<Void> bounceZookeeperConnection() throws IOException;
 
-        /**
-         * This method may be issued to force the service to close
-         * its zookeeper connection. This is a drastic action which will
-         * cause all <i>ephemeral</i> tokens for that service to be retracted
-         * from zookeeper.
-         * <p>
-         * Note: This method is intended primarily as an aid in writing various
-         * HA unit tests.
-         * 
-         * @see http://wiki.apache.org/hadoop/ZooKeeper/FAQ#A4
-         */
-        public Future<Void> dropZookeeperConnection() throws IOException;
+//        /**
+//         * This method may be issued to force the service to close
+//         * its zookeeper connection. This is a drastic action which will
+//         * cause all <i>ephemeral</i> tokens for that service to be retracted
+//         * from zookeeper.
+//         * <p>
+//         * Note: This method is intended primarily as an aid in writing various
+//         * HA unit tests.
+//         * 
+//         * @see http://wiki.apache.org/hadoop/ZooKeeper/FAQ#A4
+//         */
+//        public Future<Void> dropZookeeperConnection() throws IOException;
 
 //        /**
 //         * This method may be issued to force the service to reopen
@@ -612,32 +612,51 @@ public class HAJournalTest extends HAJournal {
             @SuppressWarnings("rawtypes")
             public void run() {
 
-                if (getQuorum() instanceof ZKQuorumImpl) {
+                // Note: Local method call on AbstractJournal.
+                final UUID serviceId = getServiceId();
 
-                    // Note: Local method call on AbstractJournal.
-                    final UUID serviceId = getServiceId();
+                try {
 
-                    try {
+                    haLog.warn("BOUNCING ZOOKEEPER CONNECTION: " + serviceId);
 
-                        haLog.warn("BOUNCING ZOOKEEPER CONNECTION: "
-                                + serviceId);
+                    // Close the current connection (if any).
+                    ((ZKQuorumImpl) getQuorum()).getZookeeper().close();
 
-                        // Close the current connection (if any).
-                        ((ZKQuorumImpl) getQuorum()).getZookeeper().close();
+                    // // Obtain a new connection.
+                    // ((ZKQuorumImpl) getQuorum()).getZookeeper();
+                    //
+                    // haLog.warn("RECONNECTED TO ZOOKEEPER: " + serviceId);
 
-                        // Obtain a new connection.
-                        ((ZKQuorumImpl) getQuorum()).getZookeeper();
+                    /*
+                     * Note: The HAJournalServer will not notice the zookeeper
+                     * session expire unless it attempts to actually use
+                     * zookeeper. Further, it will not try to use zookeeper
+                     * unless there is a local change in the quorum state (i.e.,
+                     * this service does a service leave).
+                     * 
+                     * We enter into the ErrorTask in order to force the service
+                     * to recognize that the zookeeper session is expired.
+                     */
+                    
+                    @SuppressWarnings("unchecked")
+                    final HAQuorumService<HAGlue, HAJournal> service = (HAQuorumService<HAGlue, HAJournal>) getQuorum()
+                            .getClient();
 
-                        haLog.warn("RECONNECTED TO ZOOKEEPER: " + serviceId);
+                    if (service != null) {
 
-                    } catch (InterruptedException e) {
+                        haLog.warn("ENTERING ERROR STATE: " + serviceId);
 
-                        // Propagate the interrupt.
-                        Thread.currentThread().interrupt();
+                        service.enterErrorState();
 
                     }
 
+                } catch (InterruptedException e) {
+
+                    // Propagate the interrupt.
+                    Thread.currentThread().interrupt();
+
                 }
+
             }
 
         }
@@ -1062,46 +1081,46 @@ public class HAJournalTest extends HAJournal {
         
         }
 
-		@Override
-		public Future<Void> dropZookeeperConnection() throws IOException {
-
-            final FutureTask<Void> ft = new FutureTaskMon<Void>(
-                    new CloseZookeeperConnectionTask(), null/* result */);
-
-            ft.run();
-
-            return super.getProxy(ft);
-
-        }
-
-        private class CloseZookeeperConnectionTask implements Runnable {
-
-            @SuppressWarnings("rawtypes")
-            public void run() {
-
-                if (getQuorum() instanceof ZKQuorumImpl) {
-
-                    // Note: Local method call on AbstractJournal.
-                    final UUID serviceId = getServiceId();
-
-                    try {
-
-                        haLog.warn("DISCONNECTING FROM ZOOKEEPER: " + serviceId);
-
-                        // Close existing connection.
-                        ((ZKQuorumImpl) getQuorum()).getZookeeper().close();
-
-                    } catch (InterruptedException e) {
-
-                        // Propagate the interrupt.
-                        Thread.currentThread().interrupt();
-
-                    }
-
-                }
-            }
-
-        }
+//		@Override
+//		public Future<Void> dropZookeeperConnection() throws IOException {
+//
+//            final FutureTask<Void> ft = new FutureTaskMon<Void>(
+//                    new CloseZookeeperConnectionTask(), null/* result */);
+//
+//            ft.run();
+//
+//            return super.getProxy(ft);
+//
+//        }
+//
+//        private class CloseZookeeperConnectionTask implements Runnable {
+//
+//            @SuppressWarnings("rawtypes")
+//            public void run() {
+//
+//                if (getQuorum() instanceof ZKQuorumImpl) {
+//
+//                    // Note: Local method call on AbstractJournal.
+//                    final UUID serviceId = getServiceId();
+//
+//                    try {
+//
+//                        haLog.warn("DISCONNECTING FROM ZOOKEEPER: " + serviceId);
+//
+//                        // Close existing connection.
+//                        ((ZKQuorumImpl) getQuorum()).getZookeeper().close();
+//
+//                    } catch (InterruptedException e) {
+//
+//                        // Propagate the interrupt.
+//                        Thread.currentThread().interrupt();
+//
+//                    }
+//
+//                }
+//            }
+//
+//        }
 
 //		@Override
 //		public Future<Void> reopenZookeeperConnection() throws IOException {

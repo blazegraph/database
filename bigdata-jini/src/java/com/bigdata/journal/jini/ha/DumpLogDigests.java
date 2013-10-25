@@ -49,12 +49,11 @@ import com.bigdata.btree.BytesUtil;
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.IndexManagerCallable;
 import com.bigdata.ha.halog.IHALogReader;
-import com.bigdata.journal.ITransactionService;
 import com.bigdata.journal.jini.ha.HAClient.HAConnection;
 import com.bigdata.journal.jini.ha.HALogIndex.IHALogRecord;
 import com.bigdata.journal.jini.ha.SnapshotIndex.ISnapshotRecord;
 import com.bigdata.quorum.Quorum;
-import com.bigdata.quorum.QuorumClient;
+import com.bigdata.quorum.zk.ZKQuorumClient;
 
 import cutthecrap.utils.striterators.EmptyIterator;
 
@@ -643,28 +642,30 @@ public class DumpLogDigests {
 		return tmp;
     }
  
+    private List<HAGlue> services(final String serviceRoot) throws IOException,
+            ExecutionException, KeeperException, InterruptedException {
 
-	private List<HAGlue> services(final String serviceRoot) throws IOException,
-			ExecutionException, KeeperException, InterruptedException {
-		
-		
-		final List<HAGlue> ret = new ArrayList<HAGlue>();
-		
-		final HAConnection cnxn = client.connect();
-		
-		final Quorum<HAGlue, QuorumClient<HAGlue>> quorum = cnxn.getHAGlueQuorum(serviceRoot);
-		final UUID[] uuids = quorum.getJoined();
-		
-		final HAGlue[] haglues = cnxn.getHAGlueService(uuids);
-		
-		for (HAGlue haglue : haglues) {
-			ret.add(haglue);
-		}
-		
-		client.disconnect(true/*immediate shutdown*/);
-		
-		return ret;
+        final List<HAGlue> ret = new ArrayList<HAGlue>();
 
-	}
-   
+        final HAConnection cnxn = client.connect();
+
+        final Quorum<HAGlue, ZKQuorumClient<HAGlue>> quorum = cnxn
+                .getHAGlueQuorum(serviceRoot);
+
+        final UUID[] uuids = quorum.getJoined();
+
+        final HAGlue[] haglues = cnxn.getHAGlueService(uuids);
+
+        for (HAGlue haglue : haglues) {
+
+            ret.add(haglue);
+
+        }
+
+        client.disconnect(true/* immediate shutdown */);
+
+        return ret;
+
+    }
+
 }

@@ -33,6 +33,8 @@ import java.util.concurrent.TimeoutException;
 
 import net.jini.config.Configuration;
 
+import org.apache.zookeeper.ZooKeeper;
+
 import com.bigdata.ha.HACommitGlue;
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.HAStatusEnum;
@@ -40,10 +42,8 @@ import com.bigdata.ha.msg.IHA2PhaseCommitMessage;
 import com.bigdata.ha.msg.IHA2PhasePrepareMessage;
 import com.bigdata.ha.msg.IHANotifyReleaseTimeRequest;
 import com.bigdata.journal.AbstractTask;
-import com.bigdata.journal.jini.ha.HAJournalServer.RunStateEnum;
 import com.bigdata.journal.jini.ha.HAJournalTest.HAGlueTest;
 import com.bigdata.journal.jini.ha.HAJournalTest.SpuriousTestException;
-import com.bigdata.quorum.AsynchronousQuorumCloseException;
 import com.bigdata.quorum.zk.ZKQuorumImpl;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
 import com.bigdata.util.ClocksNotSynchronizedException;
@@ -493,10 +493,13 @@ public class TestHAJournalServerOverride extends AbstractHA3JournalServerTestCas
      * might have a consensus around the new commit point.)
      * 
      * TODO Consider leader failure scenarios in this test suite, not just
-     * scenarios where B fails. Probably we should also cover failures of C (the
-     * 2nd follower). We should also cover scenariors where the quorum is barely
-     * met and a single failure causes a rejected commit (local decision) or
-     * 2-phase abort (joined services in joint agreement).
+     * scenarios where B fails. We MUST also cover failures of C (the 2nd
+     * follower). We should also cover scenariors where the quorum is barely met
+     * and a single failure causes a rejected commit (local decision) or 2-phase
+     * abort (joined services in joint agreement).
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/760" >
+     *      Review commit2Phase semantics when a follower fails </a>
      */
     public void testStartABC_commit2Phase_B_fails()
             throws Exception {
@@ -518,60 +521,91 @@ public class TestHAJournalServerOverride extends AbstractHA3JournalServerTestCas
                         new Class[] { IHA2PhaseCommitMessage.class },
                         0/* nwait */, 1/* nfail */);
 
-        // Simple transaction.
-        simpleTransaction();
-        
-//        try {
-//            // Simple transaction.
-//            simpleTransaction();
-//            fail("Expecting failed transaction");
-//        } catch(HttpException ex) {
-//        if (!ex.getMessage().contains(
-//                SpuriousTestException.class.getName())) {
-//            /*
-//             * Wrong inner cause.
-//             * 
-//             * Note: The stack trace of the local exception does not include
-//             * the remote stack trace. The cause is formatted into the HTTP
-//             * response body.
-//             */
-//            fail("Expecting " + ClocksNotSynchronizedException.class, t);
-//        }
-//        }
-        
-        // Verify quorum is unchanged.
-        assertEquals(token, quorum.token());
-        
-        // Should be two commit points on {A,C].
-        awaitCommitCounter(2L, startup.serverA, startup.serverC);
-        
-        /*
-         * B should go into an ERROR state and then into SeekConsensus and from
-         * there to RESYNC and finally back to RunMet. We can not reliably
-         * observe the intervening states. So what we really need to do is watch
-         * for B to move to the end of the pipeline and catch up to the same
-         * commit point.
+        /**
+         * FIXME We need to resolve the correct behavior when B fails the commit
+         * after having prepared. Two code paths are outlined below. The
+         * implementation currently does an abort2Phase() when the
+         * commit2Phase() observe an error for B. That causes the commit point
+         * to NOT advance.
+         * 
+         * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/760" >
+         * Review commit2Phase semantics when a follower fails </a>
          */
+        
+        if(true) {
 
-        /*
-         * The pipeline should be reordered. B will do a service leave, then
-         * enter seek consensus, and then re-enter the pipeline.
-         */
-        awaitPipeline(new HAGlue[] { startup.serverA, startup.serverC,
-                startup.serverB });
+            // Simple transaction.
+            simpleTransaction();
 
-        /*
-         * There should be two commit points on {A,C,B} (note that this assert
-         * does not pay attention to the pipeline order).
-         */
-        awaitCommitCounter(2L, startup.serverA, startup.serverC,
-                startup.serverB);
+            // Verify quorum is unchanged.
+            assertEquals(token, quorum.token());
 
-        // B should be a follower again.
-        awaitHAStatus(startup.serverB, HAStatusEnum.Follower);
+            // Should be two commit points on {A,C].
+            awaitCommitCounter(2L, startup.serverA, startup.serverC);
 
-        // quorum token is unchanged.
-        assertEquals(token, quorum.token());
+            /*
+             * B should go into an ERROR state and then into SeekConsensus and
+             * from there to RESYNC and finally back to RunMet. We can not
+             * reliably observe the intervening states. So what we really need
+             * to do is watch for B to move to the end of the pipeline and catch
+             * up to the same commit point.
+             */
+
+            /*
+             * The pipeline should be reordered. B will do a service leave, then
+             * enter seek consensus, and then re-enter the pipeline.
+             */
+            awaitPipeline(new HAGlue[] { startup.serverA, startup.serverC,
+                    startup.serverB });
+
+            /*
+             * There should be two commit points on {A,C,B} (note that this
+             * assert does not pay attention to the pipeline order).
+             */
+            awaitCommitCounter(2L, startup.serverA, startup.serverC,
+                    startup.serverB);
+
+            // B should be a follower again.
+            awaitHAStatus(startup.serverB, HAStatusEnum.Follower);
+
+            // quorum token is unchanged.
+            assertEquals(token, quorum.token());
+
+        } else {
+            
+            try {
+
+                // Simple transaction.
+                simpleTransaction();
+                
+                fail("Expecting failed transaction");
+                
+            } catch (Exception t) {
+                
+                if (!t.getMessage().contains(
+                        SpuriousTestException.class.getName())) {
+                    /*
+                     * Wrong inner cause.
+                     * 
+                     * Note: The stack trace of the local exception does not
+                     * include the remote stack trace. The cause is formatted
+                     * into the HTTP response body.
+                     */
+                    fail("Expecting " + SpuriousTestException.class, t);
+                }
+                
+            }
+
+            // Verify quorum is unchanged.
+            assertEquals(token, quorum.token());
+
+            // Should be ONE commit point on {A,B, C].
+            awaitCommitCounter(1L, startup.serverA, startup.serverB,
+                    startup.serverC);
+
+            fail("finish test under these assumptions");
+            
+        }
 
     }
     
@@ -590,7 +624,7 @@ public class TestHAJournalServerOverride extends AbstractHA3JournalServerTestCas
      *      HAJournalServer needs to handle ZK client connection loss </a>
      */
     public void testStartAB_BounceFollower() throws Exception {
-    	doBounceFollower();
+        doBounceFollower();
     }
     
     public void _testStressStartAB_BounceFollower() throws Exception {
@@ -691,6 +725,8 @@ public class TestHAJournalServerOverride extends AbstractHA3JournalServerTestCas
              */
             for (HAGlue service : new HAGlue[] { serverA, serverB }) {
 
+                awaitNSSAndHAReady(service);
+
                 final RemoteRepository repo = getRemoteRepository(service);
 
                 // Should be empty.
@@ -748,9 +784,7 @@ public class TestHAJournalServerOverride extends AbstractHA3JournalServerTestCas
             
             final HAGlue leader = quorum.getClient().getLeader(token1);
 
-//            final UUID leaderId1 = leader.getServiceId();
-            
-            ((HAGlueTest)leader).bounceZookeeperConnection().get();
+            ((HAGlueTest) leader).bounceZookeeperConnection().get();
 
             // Wait for the quorum to break and then meet again.
             final long token2 = awaitNextQuorumMeet(token1);
@@ -774,7 +808,7 @@ public class TestHAJournalServerOverride extends AbstractHA3JournalServerTestCas
             
             // Verify leader self-reports in new role.
             awaitHAStatus(leader2, HAStatusEnum.Leader);
-            
+
             /*
              * Verify we can read on the KB on both nodes.
              * 
@@ -783,6 +817,8 @@ public class TestHAJournalServerOverride extends AbstractHA3JournalServerTestCas
              */
             for (HAGlue service : new HAGlue[] { serverA, serverB }) {
 
+                awaitNSSAndHAReady(service);
+                
                 final RemoteRepository repo = getRemoteRepository(service);
 
                 // Should be empty.
@@ -892,140 +928,6 @@ public class TestHAJournalServerOverride extends AbstractHA3JournalServerTestCas
 //        
 //    }
 
-    public void testStartAB_StopStartZookeeper() throws Exception {
-        
-    	doStartAB_StopStartZookeeper();
-    }
-    
-    public void testStartAB_StopStartZookeeperA() throws Exception {
-        
-    	doStartAB_StopStartZookeeper();
-    }
-    
-    public void testStartAB_StopStartZookeeperB() throws Exception {
-        
-    	doStartAB_StopStartZookeeper();
-    }
-    
-    public void testStartAB_StopStartZookeeperC() throws Exception {
-        
-    	doStartAB_StopStartZookeeper();
-    }
-    
-    public void testStartAB_StopStartZookeeperD() throws Exception {
-        
-    	doStartAB_StopStartZookeeper();
-    }
-    
-    public void testStartAB_StopStartZookeeperE() throws Exception {
-        
-    	doStartAB_StopStartZookeeper();
-    }
-    
-    public void testStartAB_StopStartZookeeperF() throws Exception {
-        
-    	doStartAB_StopStartZookeeper();
-    }
-    
-    public void testStartAB_StopStartZookeeperG() throws Exception {
-        
-    	doStartAB_StopStartZookeeper();
-    }
-    
-    public void doStartAB_StopStartZookeeper() throws Exception {
-        
-        final HAGlue serverA = startA();
-        final HAGlue serverB = startB();
-
-        final long token1 = quorum.awaitQuorum(awaitQuorumTimeout,
-                TimeUnit.MILLISECONDS);
-        awaitNSSAndHAReady(serverA);
-        awaitNSSAndHAReady(serverB);
-        awaitCommitCounter(1L, serverA, serverB); // wait for the initial KB create.
-        
-        /*
-         * Shutdown zookeeper.
-         */
-        final int negotiatedSessionTimeout = ((ZKQuorumImpl) quorum)
-                .getZookeeper().getSessionTimeout();
-        ((HAGlueTest)serverA).log("WILL SHUTDOWN ZOOKEEPER");
-        stopZookeeper();
-        assertZookeeperNotRunning();
-        
-        /*
-         * Make sure that the clients know that they are disconnected (otherwise
-         * this can take up to the zk session timeout).
-         */
-//        ((HAGlueTest)serverA).dropZookeeperConnection();
-//        ((HAGlueTest)serverB).dropZookeeperConnection();
-
-        /*
-         * Sleep until the session timeout would have expired. This should cause
-         * the zk clients to notice that they are disconnected and trigger the
-         * error state transition.
-         */
-        Thread.sleep(negotiatedSessionTimeout + 2000/* ms */);
-        /*
-         * FIXME Restore this block of code once AbstractQuorum.getClient() no
-         * longer contents for a lock to provide access to the client reference
-         * (right now these operations can contend that lock and block during
-         * doServiceLeave() in the ErrorTask).
-         */
-//        /*
-//         * The services should be NotReady (their haReadyToken and haStatus
-//         * should all have been cleared).
-//         */
-//        awaitHAStatus(serverA, HAStatusEnum.NotReady);
-//        awaitHAStatus(serverB, HAStatusEnum.NotReady);
-//        if (log.isInfoEnabled()) {
-//            log.info("A:: " + serverA.getExtendedRunState());
-//            log.info("B:: " + serverB.getExtendedRunState());
-//        }
-//
-//        /*
-//         * The services should be in the Error state. They can not leave that
-//         * state until we restart zookeeper, at which point they can finish
-//         * their actor.doServiceLeave().
-//         */
-//        awaitRunStateEnum(RunStateEnum.Error, serverA);
-//        awaitRunStateEnum(RunStateEnum.Error, serverB);
-
-        log.warn("Start Zookeeper, met: " + quorum.isQuorumMet());
-        ((HAGlueTest)serverA).log("WILL START ZOOKEEPER");
-        ((HAGlueTest)serverB).log("WILL START ZOOKEEPER");
-        startZookeeper();
-        assertZookeeperRunning();
-        
-//        final Future<Boolean> res2 = serverA.submit(
-//                new InvariantTask.ServiceDoesntJoin(getServiceAId()), true);
-//
-//        // The task should note service join and return
-//        assertTrue(res2.get(30, TimeUnit.SECONDS));
-        
-        final long token2 =  awaitNextQuorumMeet(token1);
-        
-        log.warn("Met: " + quorum.isQuorumMet() + ", token: " + token2);
-
-//		assertTrue(token2 != token1);
-		
-    }
-    
-    public void _testStressStartAB_StopStartZookeeper() throws AsynchronousQuorumCloseException, InterruptedException, TimeoutException {
-       	for (int test = 0; test < 20; test++) {
-            log.warn("Starting run: " + test);
-            try {
-            	doStartAB_StopStartZookeeper();
-            } catch (Throwable t) {
-                fail("Run " + test, t);
-            } finally {
-            	Thread.sleep(3000); // wait for local state to settle?
-                destroyAll();
-            }
-    	}
-       	
-    	Thread.sleep(3000); // wait for local state to settle?
-    }
-
     /**
      * Verify ability to stop and restart the zookeeper process under test
      * control.
@@ -1047,6 +949,522 @@ public class TestHAJournalServerOverride extends AbstractHA3JournalServerTestCas
         }
     }
 
+    /**
+     * Verify that the {@link HAJournalServer} dies if we attempt to start it
+     * and the zookeeper server process is not running.
+     * 
+     * @throws Exception
+     */
+    public void test_stopZookeeper_startA_fails()
+            throws Exception {
+        
+        stopZookeeper();
+        
+        try {
+            startA();
+        } catch (Throwable t) {
+            if (!InnerCause.isInnerCause(t, ServiceStartException.class)) {
+                fail("Expecting " + ServiceStartException.class, t);
+            }
+        }
+        
+    }
+    
+    /**
+     * Zookeeper is not required except when there are quorum state changes.
+     * Futher, the services will not notice that zookeeper is dead and will
+     * continue to process transactions successfully while zookeeper is dead.
+     * <p>
+     * Note: because this test stops and starts the zookeeper server process,
+     * the {@link ZooKeeper} client objects REMAIN VALID. They will not observe
+     * any state changes while the zookeeper server process is shutdown, but
+     * they will re-connect when the zookeeper server process comes back up and
+     * will be usable again once they reconnect.
+     * 
+     * TODO We should be doing NSS status requests in these zk server stop /
+     * start tests to verify that we do not have any deadlocks or errors on the
+     * /status page.
+     */
+    public void testAB_stopZookeeper_commit_startZookeeper_commit()
+            throws Exception {
+        
+        final HAGlue serverA = startA();
+        final HAGlue serverB = startB();
+
+        final long token1 = quorum.awaitQuorum(awaitQuorumTimeout,
+                TimeUnit.MILLISECONDS);
+        assertEquals(0L, token1);
+        
+        awaitNSSAndHAReady(serverA);
+        awaitNSSAndHAReady(serverB);
+        awaitCommitCounter(1L, serverA, serverB); // wait for the initial KB create.
+        
+        // verify that we know which service is the leader.
+        awaitHAStatus(serverA, HAStatusEnum.Leader); // must be the leader.
+        awaitHAStatus(serverB, HAStatusEnum.Follower); // must be a follower.
+        
+        /*
+         * Note: Once we stop the zookeeper service, the test harness is not
+         * able to observe zookeeper change events until after zookeeper has
+         * been restarted. However, the ZooKeeper client connection should
+         * remain valid after zookeeper restarts.
+         */
+        ((HAGlueTest)serverA).log("MARK");
+        ((HAGlueTest)serverB).log("MARK");
+        stopZookeeper();
+        // transaction should succeed.
+        simpleTransaction_noQuorumCheck(serverA);
+
+        // restart zookeeper.
+        ((HAGlueTest)serverA).log("MARK");
+        ((HAGlueTest)serverB).log("MARK");
+        startZookeeper();
+        simpleTransaction_noQuorumCheck(serverA);
+
+        /*
+         * The quorum has remained met. No events are propagated while zookeeper
+         * is shutdown. Further, zookeepers only sense of "time" is its own
+         * ticks. If the ensemble is entirely shutdown, then "time" does not
+         * advance for zookeeper.
+         * 
+         * Since the zookeeper server has been restarted, the ZkQuorumImpl for
+         * the test harness (and the HAJournalServers) will now notice quorum
+         * state changes again.
+         */
+        final long token2 = quorum.awaitQuorum(awaitQuorumTimeout,
+                TimeUnit.MILLISECONDS);
+        assertEquals(token1, token2);
+
+        // transaction should succeed.
+        simpleTransaction();
+
+        /*
+         * Now verify that C starts, resyncs, and that the quorum fully meets.
+         * These behaviors depend on zookeeper.
+         */
+        final HAGlue serverC = startC();
+
+        final long token3 = awaitFullyMetQuorum();
+        assertEquals(token1, token3);
+
+        // A is still the leader.  B and C are followers.
+        awaitHAStatus(serverA, HAStatusEnum.Leader);
+        awaitHAStatus(serverB, HAStatusEnum.Follower);
+        awaitHAStatus(serverC, HAStatusEnum.Follower);
+        
+        // transaction should succeed.
+        simpleTransaction();
+
+    }
+    
+    /**
+     * Test variant where we force a service into an error state when zookeeper
+     * is shutdown. This will cause all commits to fail since the service can
+     * not update the quorum state and the other services can not notice that
+     * the service is not part of the quorum. Eventually the leader will be in
+     * an error state, and maybe the other services as well. Once we restart
+     * zookeeper, the quorum should meet again and then fully meet.
+     */
+    public void testABC_stopZookeeper_failC_startZookeeper_quorumMeetsAgain()
+            throws Exception {
+        
+        final HAGlue serverA = startA();
+        final HAGlue serverB = startB();
+        final HAGlue serverC = startC();
+
+        final long token1 = quorum.awaitQuorum(awaitQuorumTimeout,
+                TimeUnit.MILLISECONDS);
+        assertEquals(0L, token1);
+        
+        // wait for the initial KB create.
+        awaitNSSAndHAReady(serverA);
+        awaitNSSAndHAReady(serverB);
+        awaitNSSAndHAReady(serverC);
+        awaitCommitCounter(1L, serverA, serverB, serverC);
+        
+        // verify that we know which service is the leader.
+        awaitHAStatus(serverA, HAStatusEnum.Leader); // must be the leader.
+        awaitHAStatus(serverB, HAStatusEnum.Follower); // must be a follower.
+        awaitHAStatus(serverC, HAStatusEnum.Follower); // must be a follower.
+        
+        /*
+         * Note: Once we stop the zookeeper service, the test harness is not
+         * able to observe zookeeper change events until after zookeeper has
+         * been restarted. However, the ZooKeeper client connection should
+         * remain valid after zookeeper restarts.
+         */
+        ((HAGlueTest)serverA).log("MARK");
+        ((HAGlueTest)serverB).log("MARK");
+        ((HAGlueTest)serverC).log("MARK");
+        stopZookeeper();
+        
+        // transaction should succeed.
+        simpleTransaction_noQuorumCheck(serverA);
+        awaitCommitCounter(2L, serverA, serverB, serverC);
+
+        /*
+         * Force C into an Error state.
+         * 
+         * Note: C will remain in the met quorum because it is unable to act on
+         * the quorum. 
+         */
+        ((HAGlueTest) serverC).enterErrorState();
+        awaitHAStatus(serverA, HAStatusEnum.Leader);
+        awaitHAStatus(serverB, HAStatusEnum.Follower);
+        awaitHAStatus(serverC, HAStatusEnum.NotReady);
+
+        /*
+         * Transaction will NOT fail. C will just drop the replicated writes. C
+         * will vote NO on the prepare (actually, it fails on the GATHER). C
+         * will not participate in the commit.  But A and B will both go through
+         * the commit.
+         */
+        ((HAGlueTest)serverA).log("MARK");
+        ((HAGlueTest)serverB).log("MARK");
+        ((HAGlueTest)serverC).log("MARK");
+        simpleTransaction_noQuorumCheck(serverA);
+        awaitCommitCounter(3L, serverA, serverB);
+        awaitCommitCounter(2L, serverC); // C did NOT commit.
+
+        // restart zookeeper.
+        ((HAGlueTest)serverA).log("MARK");
+        ((HAGlueTest)serverB).log("MARK");
+        ((HAGlueTest)serverC).log("MARK");
+        startZookeeper();
+        
+        /*
+         * C was in the Error state while zookeeper was dead. The quorum state
+         * does not update until zookeeper is restarted. Once we restart
+         * zookeeper, it should eventually go into Resync and then join and be
+         * at the same commit point.
+         */
+        
+        // wait until C becomes a follower again.
+        awaitHAStatus(20, TimeUnit.SECONDS, serverC, HAStatusEnum.Follower);
+
+        // quorum should become fully met on the original token.
+        final long token2 = awaitFullyMetQuorum();
+        assertEquals(token1, token2);
+        awaitHAStatus(serverA, HAStatusEnum.Leader);
+        awaitHAStatus(serverB, HAStatusEnum.Follower);
+        awaitHAStatus(serverC, HAStatusEnum.Follower);
+        awaitCommitCounter(3L, serverA, serverB, serverC);
+
+    }
+    
+    /**
+     * Variant test where B is forced into the error state after we have
+     * shutdown zookeeper. C should continue to replicate the data to C and A+C
+     * should be able to go through commits.
+     */
+    public void testABC_stopZookeeper_failB_startZookeeper_quorumMeetsAgain()
+            throws Exception {
+        
+        final HAGlue serverA = startA();
+        final HAGlue serverB = startB();
+        final HAGlue serverC = startC();
+
+        final long token1 = quorum.awaitQuorum(awaitQuorumTimeout,
+                TimeUnit.MILLISECONDS);
+        assertEquals(0L, token1);
+        
+        // wait for the initial KB create.
+        awaitNSSAndHAReady(serverA);
+        awaitNSSAndHAReady(serverB);
+        awaitNSSAndHAReady(serverC);
+        awaitCommitCounter(1L, serverA, serverB, serverC);
+        awaitPipeline(new HAGlue[] { serverA, serverB, serverC });
+        
+        // verify that we know which service is the leader.
+        awaitHAStatus(serverA, HAStatusEnum.Leader); // must be the leader.
+        awaitHAStatus(serverB, HAStatusEnum.Follower); // must be a follower.
+        awaitHAStatus(serverC, HAStatusEnum.Follower); // must be a follower.
+        
+        /*
+         * Note: Once we stop the zookeeper service, the test harness is not
+         * able to observe zookeeper change events until after zookeeper has
+         * been restarted. However, the ZooKeeper client connection should
+         * remain valid after zookeeper restarts.
+         */
+        ((HAGlueTest)serverA).log("MARK");
+        ((HAGlueTest)serverB).log("MARK");
+        ((HAGlueTest)serverC).log("MARK");
+        stopZookeeper();
+        
+        // transaction should succeed.
+        simpleTransaction_noQuorumCheck(serverA);
+        awaitCommitCounter(2L, serverA, serverB, serverC);
+
+        /*
+         * Force B into an Error state.
+         * 
+         * Note: B will remain in the met quorum because it is unable to act on
+         * the quorum. 
+         */
+        ((HAGlueTest) serverB).enterErrorState();
+        awaitHAStatus(serverA, HAStatusEnum.Leader);
+        awaitHAStatus(serverB, HAStatusEnum.NotReady);
+        awaitHAStatus(serverC, HAStatusEnum.Follower);
+        
+        /*
+         * Transaction will NOT fail. B will just drop the replicated writes. B
+         * will vote NO on the prepare (actually, it fails on the GATHER). B
+         * will not participate in the commit.  But A and C will both go through
+         * the commit.
+         */
+        ((HAGlueTest)serverA).log("MARK");
+        ((HAGlueTest)serverB).log("MARK");
+        ((HAGlueTest)serverC).log("MARK");
+        simpleTransaction_noQuorumCheck(serverA);
+        awaitCommitCounter(3L, serverA, serverC);
+        awaitCommitCounter(2L, serverB); // B did NOT commit.
+
+        // restart zookeeper.
+        ((HAGlueTest)serverA).log("MARK");
+        ((HAGlueTest)serverB).log("MARK");
+        ((HAGlueTest)serverC).log("MARK");
+        startZookeeper();
+        
+        /*
+         * B was in the Error state while zookeeper was dead. The quorum state
+         * does not update until zookeeper is restarted. Once we restart
+         * zookeeper, it should eventually go into Resync and then join and be
+         * at the same commit point.
+         * 
+         * Note: B will be moved to the end of the pipeline when this happens.
+         */
+        
+        // wait until B becomes a follower again.
+        awaitHAStatus(20, TimeUnit.SECONDS, serverB, HAStatusEnum.Follower);
+
+        // pipeline is changed.
+        awaitPipeline(new HAGlue[] { serverA, serverC, serverB });
+
+        // quorum should become fully met on the original token.
+        final long token2 = awaitFullyMetQuorum();
+        assertEquals(token1, token2);
+        awaitHAStatus(serverA, HAStatusEnum.Leader);
+        awaitHAStatus(serverB, HAStatusEnum.Follower);
+        awaitHAStatus(serverC, HAStatusEnum.Follower);
+        awaitCommitCounter(3L, serverA, serverB, serverC);
+
+    }
+    
+    /**
+     * Variant where we start A+B+C, stop zookeeper, then force A into an error
+     * state. The quorum will not accept writes (leader is in an error state),
+     * but B and C will still accept queries. When we restart zookeeper, a new
+     * quorum will form around (A,B,C). The new leader (which could be any
+     * service) will accept new transactions. There could be a race here between
+     * a fully met quorum and new transactions, but eventually all services will
+     * be joined with the met quorum and at the same commit point.
+     * 
+     * FIXME This test fails.  Figure out why.
+     */
+    public void testABC_stopZookeeper_failA_startZookeeper_quorumMeetsAgainOnNewToken()
+            throws Exception {
+        
+        final HAGlue serverA = startA();
+        final HAGlue serverB = startB();
+        final HAGlue serverC = startC();
+
+        final long token1 = quorum.awaitQuorum(awaitQuorumTimeout,
+                TimeUnit.MILLISECONDS);
+        assertEquals(0L, token1);
+        
+        // wait for the initial KB create.
+        awaitNSSAndHAReady(serverA);
+        awaitNSSAndHAReady(serverB);
+        awaitNSSAndHAReady(serverC);
+        awaitCommitCounter(1L, serverA, serverB, serverC);
+        awaitPipeline(new HAGlue[] { serverA, serverB, serverC });
+        
+        // verify that we know which service is the leader.
+        awaitHAStatus(serverA, HAStatusEnum.Leader); // must be the leader.
+        awaitHAStatus(serverB, HAStatusEnum.Follower); // must be a follower.
+        awaitHAStatus(serverC, HAStatusEnum.Follower); // must be a follower.
+        
+        /*
+         * Note: Once we stop the zookeeper service, the test harness is not
+         * able to observe zookeeper change events until after zookeeper has
+         * been restarted. However, the ZooKeeper client connection should
+         * remain valid after zookeeper restarts.
+         */
+        ((HAGlueTest)serverA).log("MARK");
+        ((HAGlueTest)serverB).log("MARK");
+        ((HAGlueTest)serverC).log("MARK");
+        stopZookeeper();
+        
+        // transaction should succeed.
+        simpleTransaction_noQuorumCheck(serverA);
+        awaitCommitCounter(2L, serverA, serverB, serverC);
+
+        /*
+         * Force A into an Error state.
+         * 
+         * Note: A will remain in the met quorum because it is unable to act on
+         * the quorum. However, it will no longer be a "Leader". The other
+         * services will remain "Followers" since zookeeper is not running and
+         * watcher events are not being triggered.
+         */
+        ((HAGlueTest) serverA).enterErrorState();
+        awaitHAStatus(serverA, HAStatusEnum.NotReady);
+        awaitHAStatus(serverB, HAStatusEnum.Follower);
+        awaitHAStatus(serverC, HAStatusEnum.Follower);
+        
+        /*
+         * Transaction will fail.
+         */
+        ((HAGlueTest)serverA).log("MARK");
+        ((HAGlueTest)serverB).log("MARK");
+        ((HAGlueTest)serverC).log("MARK");
+        try {
+            simpleTransaction_noQuorumCheck(serverA);
+            fail("Expecting transaction to fail");
+        } catch (Exception ex) {
+            log.warn("Ignoring expected exception: " + ex, ex);
+        }
+        
+        /*
+         * Can query B/C. 
+         */
+        for (HAGlue service : new HAGlue[] { serverB, serverC }) {
+
+            final RemoteRepository repo = getRemoteRepository(service);
+
+            assertEquals(
+                    1L,
+                    countResults(repo.prepareTupleQuery(
+                            "SELECT (count(*) as ?count) {?a ?b ?c}")
+                            .evaluate()));
+            
+        }
+        
+        // restart zookeeper.
+        ((HAGlueTest)serverA).log("MARK");
+        ((HAGlueTest)serverB).log("MARK");
+        ((HAGlueTest)serverC).log("MARK");
+        startZookeeper();
+        
+        /*
+         * A was in the Error state while zookeeper was dead. The quorum state
+         * does not update until zookeeper is restarted. Once we restart
+         * zookeeper, it should eventually go into Resync and then join and be
+         * at the same commit point.
+         * 
+         * Note: Since A was the leader, the quorum will break and then reform.
+         * The services could be in any order in the new quorum.
+         */
+
+        // wait for the next quorum meet.
+        awaitNextQuorumMeet(token1);
+
+        // wait until the quorum is fully met.
+        final long token2 = awaitFullyMetQuorum(6);
+        assertEquals(token1 + 1, token2);
+
+        // Still 2 commit points.
+        awaitCommitCounter(2L, serverA, serverB, serverC);
+
+        // New transactions now succeed.
+        simpleTransaction();
+
+        awaitCommitCounter(3L, serverA, serverB, serverC);
+
+    }
+    
+    /**
+     * Variant test where we start A+B, stop zookeeper, then force B into an
+     * error state. B will refuse to commit, which will cause A to fail the
+     * transaction. This should push A into an error state. When we restart
+     * zookeeper the quorum should break and then reform (in some arbitrary)
+     * order. Services should be at the last recorded commit point. New
+     * transactions should be accepted.  FIXME Test fails. Figure out why.
+     */
+    public void testAB_stopZookeeper_failB_startZookeeper_quorumBreaksThenMeets()
+            throws Exception {
+        
+        final HAGlue serverA = startA();
+        final HAGlue serverB = startB();
+
+        final long token1 = quorum.awaitQuorum(awaitQuorumTimeout,
+                TimeUnit.MILLISECONDS);
+        assertEquals(0L, token1);
+        
+        // wait for the initial KB create.
+        awaitNSSAndHAReady(serverA);
+        awaitNSSAndHAReady(serverB);
+        awaitCommitCounter(1L, serverA, serverB);
+        awaitPipeline(new HAGlue[] { serverA, serverB });
+
+        // verify that we know which service is the leader.
+        awaitHAStatus(serverA, HAStatusEnum.Leader); // must be the leader.
+        awaitHAStatus(serverB, HAStatusEnum.Follower); // must be a follower.
+        
+        /*
+         * Note: Once we stop the zookeeper service, the test harness is not
+         * able to observe zookeeper change events until after zookeeper has
+         * been restarted. However, the ZooKeeper client connection should
+         * remain valid after zookeeper restarts.
+         */
+        ((HAGlueTest)serverA).log("MARK");
+        ((HAGlueTest)serverB).log("MARK");
+        stopZookeeper();
+        
+        // transaction should succeed.
+        simpleTransaction_noQuorumCheck(serverA);
+        awaitCommitCounter(2L, serverA, serverB);
+
+        /*
+         * Force B into an Error state.
+         * 
+         * Note: B will remain in the met quorum because it is unable to act on
+         * the quorum. 
+         */
+        ((HAGlueTest) serverB).enterErrorState();
+        awaitHAStatus(serverA, HAStatusEnum.Leader);
+        awaitHAStatus(serverB, HAStatusEnum.NotReady);
+        
+        /*
+         * Transaction will fail
+         */
+        ((HAGlueTest)serverA).log("MARK");
+        ((HAGlueTest)serverB).log("MARK");
+        try {
+            simpleTransaction_noQuorumCheck(serverA);
+            fail("expecting transaction to fail");
+        } catch (Exception ex) {
+            log.warn("Ignoring expected exception: " + ex, ex);
+        }
+        awaitCommitCounter(2L, serverA, serverB); // commit counter unchanged
+        awaitHAStatus(serverA, HAStatusEnum.Leader);
+        awaitHAStatus(serverB, HAStatusEnum.NotReady);
+
+        // restart zookeeper.
+        ((HAGlueTest)serverA).log("MARK");
+        ((HAGlueTest)serverB).log("MARK");
+        startZookeeper();
+        
+        /*
+         * Quorum should break and then meet again on a new token. We do not
+         * know which server will wind up as the leader. It could be either one.
+         */
+
+        awaitNextQuorumMeet(token1);
+        
+        // still at the same commit point.
+        awaitCommitCounter(2L, serverA, serverB);
+//        awaitNSSAndHAReady(serverA);
+//        awaitNSSAndHAReady(serverB);
+
+        // transactions are now accepted.
+        simpleTransaction();
+
+        // commit counter advances.
+        awaitCommitCounter(3L, serverA, serverB);
+
+    }
+    
     /**
      * Attempt to start a service. Once it is running, request a thread dump and
      * then issue a sure kill - both of these operations are done using a SIGNAL
