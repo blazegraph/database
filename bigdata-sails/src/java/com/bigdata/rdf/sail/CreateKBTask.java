@@ -66,6 +66,7 @@ public class CreateKBTask implements Callable<Void> {
 
     }
 
+    @Override
     public Void call() throws Exception {
 
         try {
@@ -76,7 +77,13 @@ public class CreateKBTask implements Callable<Void> {
 
             if (InnerCause.isInnerCause(t, AsynchronousQuorumCloseException.class)) {
 
-                // The quorum is closed, so we stopped trying.
+                /*
+                 * The quorum is closed, so we stopped trying.
+                 * 
+                 * Note: This can also happen if the quorum has not been started
+                 * yet. The HAJournalServer explicitly invokes the CreateKBTask
+                 * when entering "RunMet" in order to handle this case.
+                 */
                 log.warn(t);
 
             } else {
@@ -94,8 +101,9 @@ public class CreateKBTask implements Callable<Void> {
     }
 
     /**
-     * TODO This process is not robust if the leader is elected and becomes
-     * HAReady and then fails over before the KB is created.
+     * Note: This process is not robust if the leader is elected and becomes
+     * HAReady and then fails over before the KB is created. The task should be
+     * re-submitted by the new leader once that leader is elected.
      */
     private void doRun() {
     

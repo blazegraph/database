@@ -31,6 +31,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
@@ -48,7 +49,6 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -301,7 +301,9 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
      * Note: This is volatile to allow visibility without holding the
      * {@link #lock}. The field is only modified in {@link #start(QuorumClient)}
      * and {@link #terminate()}, and those methods use the {@link #lock} to
-     * impose an appropriate ordering over events.
+     * impose an appropriate ordering over events. The quorum is running iff
+     * there is a client for which it is delivering events. When <code>null</code>,
+     * the quorum is not running.
      * 
      * @see #start(QuorumClient)
      */
@@ -582,71 +584,72 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
              */
             interruptAll();
             if (client == null) {
-                // No client is attached.
+                // No client?  Not running.
                 return;
             }
             if (log.isDebugEnabled())
                 log.debug("client=" + client);
-            if (client instanceof QuorumMember<?>) {
-                /*
-                 * Update the distributed quorum state by removing our client
-                 * from the set of member services. This will also cause a
-                 * service leave, pipeline leave, and any vote to be withdrawn.
-                 * 
-                 * We have observed Condition spins during terminate() that
-                 * result in HAJournalServer hangs. This runs another Thread
-                 * that will interrupt this Thread if the quorum member is
-                 * unable to complete the memberRemove() within a timeout.
-                 * 
-                 * Note: Since we are holding the lock in the current thread, we
-                 * MUST execute memberRemove() in this thread (it requires the
-                 * lock). Therefore, I have used a 2nd thread that will
-                 * interrupt this thread if it does not succeed in a polite
-                 * removal from the quorum within a timeout.
-                 */
-                {
-                    final long MEMBER_REMOVE_TIMEOUT = 5000;// ms.
-                    final AtomicBoolean didRemove = new AtomicBoolean(false);
-                    final Thread self = Thread.currentThread();
-                    final Thread t = new Thread() {
-                        public void run() {
-                            try {
-                                Thread.sleep(MEMBER_REMOVE_TIMEOUT);
-                            } catch (InterruptedException e) {
-                                // Expected. Ignored.
-                                return;
-                            }
-                            if (!didRemove.get()) {
-                                log.error("Timeout awaiting quorum member remove.");
-                                self.interrupt();
-                            }
-                        }
-                    };
-                    t.setDaemon(true);
-                    t.start();
-                    try {
-                        // Attempt memberRemove() (interruptably).
-                        actor.memberRemoveInterruptable();
-                        didRemove.set(true); // Success.
-                    } catch (InterruptedException e) {
-                        // Propagate the interrupt.
-                        Thread.currentThread().interrupt();
-                    } finally {
-                        t.interrupt(); // Stop execution of [t].
+//            if (client instanceof QuorumMember<?>) {
+//                /*
+//                 * Update the distributed quorum state by removing our client
+//                 * from the set of member services. This will also cause a
+//                 * service leave, pipeline leave, and any vote to be withdrawn.
+//                 * 
+//                 * We have observed Condition spins during terminate() that
+//                 * result in HAJournalServer hangs. This runs another Thread
+//                 * that will interrupt this Thread if the quorum member is
+//                 * unable to complete the memberRemove() within a timeout.
+//                 * 
+//                 * Note: Since we are holding the lock in the current thread, we
+//                 * MUST execute memberRemove() in this thread (it requires the
+//                 * lock). Therefore, I have used a 2nd thread that will
+//                 * interrupt this thread if it does not succeed in a polite
+//                 * removal from the quorum within a timeout.
+//                 */
+//                {
+//                    final long MEMBER_REMOVE_TIMEOUT = 5000;// ms.
+//                    final AtomicBoolean didRemove = new AtomicBoolean(false);
+//                    final Thread self = Thread.currentThread();
+//                    final Thread t = new Thread() {
+//                        public void run() {
+//                            try {
+//                                Thread.sleep(MEMBER_REMOVE_TIMEOUT);
+//                            } catch (InterruptedException e) {
+//                                // Expected. Ignored.
+//                                return;
+//                            }
+//                            if (!didRemove.get()) {
+//                                log.error("Timeout awaiting quorum member remove.");
+//                                self.interrupt();
+//                            }
+//                        }
+//                    };
+//                    t.setDaemon(true);
+//                    t.start();
+//                    try {
+//                        // Attempt memberRemove() (interruptably).
+//                        actor.memberRemoveInterruptable();
+//                        didRemove.set(true); // Success.
+//                    } catch (InterruptedException e) {
+//                        // Propagate the interrupt.
+//                        Thread.currentThread().interrupt();
+//                    } finally {
+//                        t.interrupt(); // Stop execution of [t].
+//                    }
+//                }
+//            }
+
+            if (watcher != null) {
+                try {
+                    watcher.terminate();
+                } catch (Throwable t) {
+                    if (InnerCause.isInnerCause(t, InterruptedException.class)) {
+                        interrupted = true;
+                    } else {
+                        launderThrowable(t);
                     }
                 }
             }
-
-            /*
-             * Let the service know that it is no longer running w/ the quorum.
-             */
-            try {
-                client.terminate();
-            } catch (Throwable t) {
-                launderThrowable(t);
-            }
-            if (watcher != null)
-                watcher.terminate();
             if (watcherActionService != null) {
                 watcherActionService.shutdown();
                 try {
@@ -664,10 +667,15 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
                     interrupted = true;
                 } finally {
                     /*
-                     * Cancel any tasks which did terminate in a timely manner.
+                     * Cancel any tasks which did not terminate in a timely manner.
                      */
-                    watcherActionService.shutdownNow();
+                    final List<Runnable> notrun = watcherActionService.shutdownNow();
                     watcherActionService = null;
+                    for (Runnable r : notrun) {
+                        if (r instanceof Future) {
+                            ((Future<?>) r).cancel(true/* mayInterruptIfRunning */);
+                        }
+                    }
                 }
             }
             if (actorActionService != null) {
@@ -684,10 +692,15 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
                     interrupted = true;
                 } finally {
                     /*
-                     * Cancel any tasks which did terminate in a timely manner.
+                     * Cancel any tasks which did not terminate in a timely manner.
                      */
-                    actorActionService.shutdownNow();
+                    final List<Runnable> notrun = actorActionService.shutdownNow();
                     actorActionService = null;
+                    for (Runnable r : notrun) {
+                        if (r instanceof Future) {
+                            ((Future<?>) r).cancel(true/* mayInterruptIfRunning */);
+                        }
+                    }
                 }
             }
             if (!sendSynchronous) {
@@ -700,12 +713,41 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
                     // Will be propagated below.
                     interrupted = true;
                 } finally {
+                    /*
+                     * Cancel any tasks which did terminate in a timely manner.
+                     */
+                    final List<Runnable> notrun = eventService.shutdownNow();
                     eventService = null;
+                    for (Runnable r : notrun) {
+                        if (r instanceof Future) {
+                            ((Future<?>) r).cancel(true/* mayInterruptIfRunning */);
+                        }
+                    }
                 }
             }
             /*
-             * Signal all conditions so anyone blocked will wake up.
+             * Let the service know that it is no longer running w/ the quorum.
              */
+            try {
+                client.terminate();
+            } catch (Throwable t) {
+                if (InnerCause.isInnerCause(t, InterruptedException.class)) {
+                    interrupted = true;
+                } else {
+                    launderThrowable(t);
+                }
+            }
+            /*
+             * Clear all internal state variables that mirror the distributed
+             * quorum state and then signal all conditions so anyone blocked
+             * will wake up.
+             */
+            listeners.clear(); // discard listeners.
+            token = lastValidToken = NO_QUORUM;
+            members.clear();
+            votes.clear();
+            joined.clear();
+            pipeline.clear();
             quorumChange.signalAll();
             membersChange.signalAll();
             pipelineChange.signalAll();
@@ -713,8 +755,6 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
             joinedChange.signalAll();
             // discard reference to the client.
             this.client = null;
-            // discard listeners.
-            listeners.clear();
         } finally {
             lock.unlock();
         }
@@ -819,6 +859,19 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
         } finally {
             lock.unlock();
         }
+    }
+
+//    @Override
+    protected C getClientNoLock() {
+//        lock.lock();
+//        try {
+            final C client = this.client;
+            if (client == null)
+                throw new IllegalStateException();
+            return client;
+//        } finally {
+//            lock.unlock();
+//        }
     }
 
     @Override

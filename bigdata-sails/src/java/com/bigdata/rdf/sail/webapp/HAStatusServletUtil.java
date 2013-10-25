@@ -39,6 +39,7 @@ import javax.servlet.http.HttpServletResponse;
 
 import org.apache.log4j.Logger;
 import org.apache.zookeeper.KeeperException;
+import org.apache.zookeeper.ZooKeeper;
 
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.HAStatusEnum;
@@ -58,6 +59,7 @@ import com.bigdata.journal.jini.ha.SnapshotIndex.ISnapshotRecord;
 import com.bigdata.journal.jini.ha.SnapshotManager;
 import com.bigdata.quorum.AsynchronousQuorumCloseException;
 import com.bigdata.quorum.Quorum;
+import com.bigdata.quorum.zk.ZKQuorumClient;
 import com.bigdata.quorum.zk.ZKQuorumImpl;
 import com.bigdata.zookeeper.DumpZookeeper;
 
@@ -120,7 +122,7 @@ public class HAStatusServletUtil {
 
         final HAJournal journal = (HAJournal) indexManager;
 
-        final ZKQuorumImpl<HAGlue, QuorumService<HAGlue>> quorum = (ZKQuorumImpl<HAGlue, QuorumService<HAGlue>>) journal
+        final ZKQuorumImpl<HAGlue, ZKQuorumClient<HAGlue>> quorum = (ZKQuorumImpl) journal
                 .getQuorum();
 
         // The current token.
@@ -135,49 +137,81 @@ public class HAStatusServletUtil {
         
         final int njoined = quorum.getJoined().length;
 
-        // Note: This is the *local* HAGlueService.
-        final QuorumService<HAGlue> quorumService = quorum.getClient();
+        /*
+         * Note: This is the *local* HAGlueService.
+         * 
+         * This page must be robust to some new failure modes. The ZooKeeper
+         * client can now be associated with an expired session, River discovery
+         * can now be disabled, and the HAQuorumService might not be available
+         * from quorum.getClient(). All of those things can happen if there is a
+         * zookeeper session expiration that forces us to terminate the
+         * HAQuorumService. This condition will be cured automatically (unless
+         * the service is being shutdown), but only limited status information
+         * can be provided while the HAQuorumService is not running.
+         */
+        final QuorumService<HAGlue> quorumService;
+        {
+            QuorumService<HAGlue> t;
+            try {
+                t = (QuorumService) quorum.getClient();
+            } catch (IllegalStateException ex) {
+                // Note: Not available (quorum.start() not called)./
+                t = null;
+            }
+            quorumService = t;
+        }
 
         final boolean digests = req.getParameter(StatusServlet.DIGESTS) != null;
         
         current.node("h1", "High Availability");
 
-        // The quorum state.
         {
 
             final XMLBuilder.Node p = current.node("p");
 
-            p.text("The quorum is " + (quorum.isQuorumMet() ? "" : "not")
-                    + " met.").node("br").close();
+            // The quorum state
+            if (quorumService == null) {
 
-            p.text("" + njoined + " out of " + quorum.replicationFactor()
-                    + " services are joined.").node("br").close();
-
-            p.text("quorumToken=" + quorumToken + ", lastValidToken="
-                    + lastValidToken).node("br").close();
-
-            p.text("logicalServiceZPath=" + quorumService.getLogicalServiceZPath())
-                    .node("br").close();
-
-            // Note: This is the *local* value of getHAStatus().
-            // Note: The HAReady token reflects whether or not the service is
-            // joined.
-            p.text("HAStatus: " + quorumService.getService().getHAStatus()
-                    + ", HAReadyToken=" + haReadyToken).node("br").close();
-
-            /*
-             * Report on the Service.
-             */
-            {
-                p.text("Service: serviceId=" + quorumService.getServiceId())
-                        .node("br").close();
-                p.text("Service: pid=" + quorumService.getPID()).node("br")
+                p.text("The local quorum service is not running.").node("br")
                         .close();
-                p.text("Service: path=" + quorumService.getServiceDir())
-                        .node("br").close();
+
+            } else {
+                    
+                p.text("The quorum is " + (quorum.isQuorumMet() ? "" : "not")
+                        + " met.").node("br").close();
+
+                p.text("" + njoined + " out of " + quorum.replicationFactor()
+                        + " services are joined.").node("br").close();
+
+                p.text("quorumToken=" + quorumToken + ", lastValidToken="
+                        + lastValidToken).node("br").close();
+
+                p.text("logicalServiceZPath="
+                        + quorumService.getLogicalServiceZPath()).node("br")
+                        .close();
+
+                // Note: This is the *local* value of getHAStatus().
+                // Note: The HAReady token reflects whether or not the service
+                // is
+                // joined.
+                p.text("HAStatus: " + quorumService.getService().getHAStatus()
+                        + ", HAReadyToken=" + haReadyToken).node("br").close();
+
+                /*
+                 * Report on the Service.
+                 */
+                {
+                    p.text("Service: serviceId=" + quorumService.getServiceId())
+                            .node("br").close();
+                    p.text("Service: pid=" + quorumService.getPID()).node("br")
+                            .close();
+                    p.text("Service: path=" + quorumService.getServiceDir())
+                            .node("br").close();
+
+                }
 
             }
-            
+
             /*
              * Report on the HA backup status (snapshot and restore policy).
              * 
@@ -502,7 +536,7 @@ public class HAStatusServletUtil {
          * same commit point as the leader, or already running, but it is not so
          * safe that you should be able to use a GET to demand a REBUILD).
          */
-        {
+        if (quorumService != null) {
             
             final String val = req.getParameter(HAStatusServletUtil.REBUILD);
 
@@ -527,145 +561,172 @@ public class HAStatusServletUtil {
          * Display the NSS port, host, and leader/follower/not-joined
          * status for each service in the quorum.
          */
-        current.node("h2", "Quorum Services");
-        {
-            final XMLBuilder.Node p = current.node("p");
+        if (quorumService != null) {
+
+            current.node("h2", "Quorum Services");
             
-            final UUID[] joined = quorum.getJoined();
+            {
+                
+                final XMLBuilder.Node p = current.node("p");
 
-            final UUID[] pipeline = quorum.getPipeline();
+                final UUID[] joined = quorum.getJoined();
 
-            // In pipeline order.
-            for (UUID serviceId : pipeline) {
+                final UUID[] pipeline = quorum.getPipeline();
 
-                final HAGlue remoteService;
-                try {
+                // In pipeline order.
+                for (UUID serviceId : pipeline) {
 
-                    remoteService = quorumService.getService(serviceId);
+                    final HAGlue remoteService;
+                    try {
 
-                } catch (RuntimeException ex) {
+                        remoteService = quorumService.getService(serviceId);
+
+                    } catch (RuntimeException ex) {
+
+                        /*
+                         * Ignore. Might not be an HAGlue instance.
+                         */
+
+                        if (log.isInfoEnabled())
+                            log.info(ex, ex);
+
+                        continue;
+
+                    }
 
                     /*
-                     * Ignore. Might not be an HAGlue instance.
+                     * Do all RMIs to the remote service in a try/catch. This
+                     * allows us to catch problems with communications to the
+                     * remote service and continue to paint the page.
                      */
-                    
-                    if (log.isInfoEnabled())
-                        log.info(ex, ex);
-                    
-                    continue;
+                    final String hostname;
+                    final int nssPort;
+                    final InetSocketAddress writePipelineAddr;
+                    final String extendedRunState;
+                    try {
 
+                        hostname = remoteService.getHostname();
+
+                        /*
+                         * TODO When there are multiple ethernet interfaces, is
+                         * not necessarily reporting the interface(s) that the
+                         * port is exposed to.
+                         */
+                        nssPort = remoteService.getNSSPort();
+
+                        // address where the downstream service will listen.
+                        writePipelineAddr = remoteService
+                                .getWritePipelineAddr();
+
+                        // The AbstractServer and HAQuorumService run states.
+                        extendedRunState = remoteService.getExtendedRunState();
+
+                    } catch (IOException ex) {
+
+                        /*
+                         * Note error and continue with the next service.
+                         */
+
+                        p.text("Unable to reach service: " + remoteService)
+                                .close();
+
+                        log.error(ex, ex);
+
+                        continue;
+
+                    }
+
+                    final boolean isLeader = serviceId.equals(quorum
+                            .getLeaderId());
+
+                    final boolean isFollower = indexOf(serviceId, joined) > 0;
+
+                    final boolean isSelf = serviceId.equals(quorumService
+                            .getServiceId());
+
+                    final int pipelineIndex = indexOf(serviceId, pipeline);
+
+                    final String nssUrl = "http://" + hostname + ":" + nssPort;
+
+                    // hyper link to NSS service.
+                    p.node("a").attr("href", nssUrl).text(nssUrl).close();
+
+                    // plus the other metadata.
+                    p.text(" : "//
+                            + (isLeader ? "leader" : (isFollower ? "follower"
+                                    : " is not joined"))//
+                            + ", pipelineOrder="
+                            + (pipelineIndex == -1 ? "N/A" : pipelineIndex)//
+                            + ", writePipelineAddr=" + writePipelineAddr//
+                            + ", service=" + (isSelf ? "self" : "other")//
+                            + ", extendedRunState=" + extendedRunState//
+                    ).node("br").close();
                 }
 
-                /*
-                 * Do all RMIs to the remote service in a try/catch. This allows
-                 * us to catch problems with communications to the remote
-                 * service and continue to paint the page.
-                 */
-                final String hostname;
-                final int nssPort;
-                final InetSocketAddress writePipelineAddr;
-                final String extendedRunState;
-                try {
-                    
-                    hostname = remoteService.getHostname();
-
-                    /*
-                     * TODO When there are multiple ethernet interfaces, is not
-                     * necessarily reporting the interface(s) that the port is
-                     * exposed to.
-                     */
-                    nssPort = remoteService.getNSSPort();
-
-                    // address where the downstream service will listen.
-                    writePipelineAddr = remoteService.getWritePipelineAddr();
-
-                    // The AbstractServer and HAQuorumService run states.
-                    extendedRunState = remoteService.getExtendedRunState();
-
-                } catch (IOException ex) {
-
-                    /*
-                     * Note error and continue with the next service.
-                     */
- 
-                    p.text("Unable to reach service: " + remoteService).close();
-
-                    log.error(ex, ex);
-                    
-                    continue;
-                    
-                }
-
-                final boolean isLeader = serviceId.equals(quorum
-                        .getLeaderId());
-
-                final boolean isFollower = indexOf(serviceId, joined) > 0;
-
-                final boolean isSelf = serviceId.equals(quorumService
-                        .getServiceId());
-
-                final int pipelineIndex = indexOf(serviceId, pipeline);
-                
-                final String nssUrl = "http://" + hostname + ":" + nssPort;
-                
-                // hyper link to NSS service.
-                p.node("a").attr("href", nssUrl).text(nssUrl).close();
-
-                // plus the other metadata.
-                p.text(" : "//
-                        + (isLeader ? "leader" : (isFollower ? "follower"
-                                : " is not joined"))//
-                        + ", pipelineOrder="
-                        + (pipelineIndex == -1 ? "N/A" : pipelineIndex)//
-                        + ", writePipelineAddr=" + writePipelineAddr//
-                        + ", service=" + (isSelf ? "self" : "other")//
-                        + ", extendedRunState=" + extendedRunState//
-                ).node("br").close();
-            }
-
-            p.close();
-            
-        }
-
-        // DumpZookeeper
-        {
-            
-            current.node("h2", "Zookeeper");
-
-            // final XMLBuilder.Node section = current.node("pre");
-            // flush writer before writing on PrintStream.
-            current.getBuilder().getWriter().flush();
-
-            // dump onto the response.
-            final PrintWriter out = new PrintWriter(
-                    resp.getOutputStream(), true/* autoFlush */);
-
-            out.print("<pre>\n");
-
-            try {
-
-                final DumpZookeeper dump = new DumpZookeeper(
-                        quorum.getZookeeper());
-
-                dump.dump(out, true/* showDatatrue */,
-                        quorumService.getLogicalServiceZPath()/* zpath */,
-                        0/* depth */);
-
-            } catch (InterruptedException e) {
-
-                e.printStackTrace(out);
-
-            } catch (KeeperException e) {
-
-                e.printStackTrace(out);
+                p.close();
 
             }
 
-            // close section.
-            out.print("\n</pre>");
+            // DumpZookeeper
+            {
 
-            // flush PrintWriter before resuming writes on Writer.
-            out.flush();
+                current.node("h2", "Zookeeper");
+
+                ZooKeeper zk;
+                try {
+                    zk = quorum.getZookeeper();
+                } catch (InterruptedException e1) {
+                    // Continue, but ignore zookeeper.
+                    zk = null;
+                }
+
+                if (zk == null || !zk.getState().isAlive()) {
+
+                    final XMLBuilder.Node p = current.node("p");
+
+                    p.text("ZooKeeper is not available.").close();
+
+                } else {
+
+                    // final XMLBuilder.Node section = current.node("pre");
+                    // flush writer before writing on PrintStream.
+                    current.getBuilder().getWriter().flush();
+
+                    // dump onto the response.
+                    final PrintWriter out = new PrintWriter(
+                            resp.getOutputStream(), true/* autoFlush */);
+
+                    out.print("<pre>\n");
+
+                    try {
+
+                        final DumpZookeeper dump = new DumpZookeeper(zk);
+
+                        dump.dump(
+                                out,
+                                true/* showDatatrue */,
+                                quorumService.getLogicalServiceZPath()/* zpath */,
+                                0/* depth */);
+
+                    } catch (InterruptedException e) {
+
+                        e.printStackTrace(out);
+
+                    } catch (KeeperException e) {
+
+                        e.printStackTrace(out);
+
+                    }
+
+                    // close section.
+                    out.print("\n</pre>");
+
+                    // flush PrintWriter before resuming writes on Writer.
+                    out.flush();
+
+                }
+
+            }
 
         }
 

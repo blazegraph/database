@@ -48,14 +48,6 @@ import org.apache.log4j.Logger;
 public class TestAll extends TestCase {
 
     private final static Logger log = Logger.getLogger(TestAll.class);
-    
-    /**
-     * FIXME This is used to avoid a CI deadlock that needs to be tracked down.
-     * 
-     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/530">
-     *      Journal HA </a>
-     */
-    final private static boolean s_includeQuorum = true;
 
     /**
      * 
@@ -74,42 +66,38 @@ public class TestAll extends TestCase {
      * Returns a test that will run each of the implementation specific test
      * suites in turn.
      */
-    public static Test suite()
-    {
+    public static Test suite() {
 
         final TestSuite suite = new TestSuite("quorum");
 
-        if (s_includeQuorum) {
-	        /*
-	         * Test the fixture used to test the quorums (the fixture builds on the
-	         * same base class).
-	         */
-	        suite.addTestSuite(TestMockQuorumFixture.class);
-	
-	        /*
-	         * Test the quorum semantics for a singleton quorum. This unit test
-	         * allows us to verify that each quorum state change is translated into
-	         * the appropriate methods against the public API of the quorum client
-	         * or quorum member.
-	         */
-	        suite.addTestSuite(TestSingletonQuorumSemantics.class);
-	
-	        /*
-	         * Test the quorum semantics for a highly available quorum of 3
-	         * nodes. The main points to test here are the particulars of events not
-	         * observable with a singleton quorum, including a service join which
-	         * does not trigger a quorum meet, a service leave which does not
-	         * trigger a quorum break, a leader leave, etc.
-	         */
-	        suite.addTestSuite(TestHA3QuorumSemantics.class);
-	
-            /*
-             * Run the test HA3 suite a bunch of times.
-             */
-            suite.addTest(StressTestHA3.suite());
+        /*
+         * Test the fixture used to test the quorums (the fixture builds on the
+         * same base class).
+         */
+        suite.addTestSuite(TestMockQuorumFixture.class);
 
-        }
-        
+        /*
+         * Test the quorum semantics for a singleton quorum. This unit test
+         * allows us to verify that each quorum state change is translated into
+         * the appropriate methods against the public API of the quorum client
+         * or quorum member.
+         */
+        suite.addTestSuite(TestSingletonQuorumSemantics.class);
+
+        /*
+         * Test the quorum semantics for a highly available quorum of 3 nodes.
+         * The main points to test here are the particulars of events not
+         * observable with a singleton quorum, including a service join which
+         * does not trigger a quorum meet, a service leave which does not
+         * trigger a quorum break, a leader leave, etc.
+         */
+        suite.addTestSuite(TestHA3QuorumSemantics.class);
+
+        /*
+         * Run the test HA3 suite a bunch of times.
+         */
+        suite.addTest(StressTestHA3.suite());
+
         return suite;
         
     }
