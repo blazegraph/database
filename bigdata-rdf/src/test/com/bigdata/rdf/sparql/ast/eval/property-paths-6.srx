@@ -1,0 +1,477 @@
+<?xml version="1.0"?>
+<sparql
+    xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+    xmlns:xs="http://www.w3.org/2001/XMLSchema#"
+    xmlns="http://www.w3.org/2005/sparql-results#" >
+  <head>
+    <variable name="A"/>
+  </head>
+  <results>
+
+    <result>
+      <binding name="A">
+        <uri>os:1</uri>
+      </binding>
+      <binding name="val">
+        <literal>z</literal>
+      </binding>
+      <binding name="type1">
+        <uri>os:ClassB</uri>
+      </binding>
+      <binding name="type2">
+        <uri>os:ClassA</uri>
+      </binding>
+    </result>
+    <result>
+      <binding name="A">
+        <uri>os:1</uri>
+      </binding>
+      <binding name="val">
+        <literal>z</literal>
+      </binding>
+      <binding name="type1">
+        <uri>os:ClassC</uri>
+      </binding>
+      <binding name="type2">
+        <uri>os:ClassA</uri>
+      </binding>
+    </result>
+    <result>
+      <binding name="A">
+        <uri>os:1</uri>
+      </binding>
+      <binding name="val">
+        <literal>z</literal>
+      </binding>
+      <binding name="type1">
+        <uri>os:ClassD</uri>
+      </binding>
+      <binding name="type2">
+        <uri>os:ClassB</uri>
+      </binding>
+    </result>
+     <result>
+      <binding name="A">
+        <uri>os:1</uri>
+      </binding>
+      <binding name="val">
+        <literal>z</literal>
+      </binding>
+      <binding name="type1">
+        <uri>os:ClassE</uri>
+      </binding>
+      <binding name="type2">
+        <uri>os:ClassC</uri>
+      </binding>
+    </result>
+    <result>
+      <binding name="A">
+        <uri>os:1</uri>
+      </binding>
+      <binding name="val">
+        <literal>z</literal>
+      </binding>
+      <binding name="type1">
+        <uri>os:ClassD</uri>
+      </binding>
+      <binding name="type2">
+        <uri>os:ClassA</uri>
+      </binding>
+    </result>
+    <result>
+      <binding name="A">
+        <uri>os:1</uri>
+      </binding>
+      <binding name="val">
+        <literal>z</literal>
+      </binding>
+      <binding name="type1">
+        <uri>os:ClassE</uri>
+      </binding>
+      <binding name="type2">
+        <uri>os:ClassA</uri>
+      </binding>
+    </result>
+    <result>
+      <binding name="A">
+        <uri>os:1</uri>
+      </binding>
+      <binding name="val">
+        <literal>z</literal>
+      </binding>
+      <binding name="type1">
+        <uri>os:ClassA</uri>
+      </binding>
+      <binding name="type2">
+        <uri>os:ClassA</uri>
+      </binding>
+    </result>
+    <result>
+      <binding name="A">
+        <uri>os:1</uri>
+      </binding>
+      <binding name="val">
+        <literal>z</literal>
+      </binding>
+      <binding name="type1">
+        <uri>os:ClassB</uri>
+      </binding>
+      <binding name="type2">
+        <uri>os:ClassB</uri>
+      </binding>
+    </result>
+    <result>
+      <binding name="A">
+        <uri>os:1</uri>
+      </binding>
+      <binding name="val">
+        <literal>z</literal>
+      </binding>
+      <binding name="type1">
+        <uri>os:ClassC</uri>
+      </binding>
+      <binding name="type2">
+        <uri>os:ClassC</uri>
+      </binding>
+    </result>
+    <result>
+      <binding name="A">
+        <uri>os:1</uri>
+      </binding>
+      <binding name="val">
+        <literal>z</literal>
+      </binding>
+      <binding name="type1">
+        <uri>os:ClassD</uri>
+      </binding>
+      <binding name="type2">
+        <uri>os:ClassD</uri>
+      </binding>
+    </result>
+    <result>
+      <binding name="A">
+        <uri>os:1</uri>
+      </binding>
+      <binding name="val">
+        <literal>z</literal>
+      </binding>
+      <binding name="type1">
+        <uri>os:ClassE</uri>
+      </binding>
+      <binding name="type2">
+        <uri>os:ClassE</uri>
+      </binding>
+    </result>
+
+    <result>
+      <binding name="A">
+        <uri>os:0</uri>
+      </binding>
+      <binding name="val">
+        <literal>x</literal>
+      </binding>
+      <binding name="type1">
+        <uri>os:ClassB</uri>
+      </binding>
+      <binding name="type2">
+        <uri>os:ClassA</uri>
+      </binding>
+    </result>
+    <result>
+      <binding name="A">
+        <uri>os:0</uri>
+      </binding>
+      <binding name="val">
+        <literal>x</literal>
+      </binding>
+      <binding name="type1">
+        <uri>os:ClassC</uri>
+      </binding>
+      <binding name="type2">
+        <uri>os:ClassA</uri>
+      </binding>
+    </result>
+    <result>
+      <binding name="A">
+        <uri>os:0</uri>
+      </binding>
+      <binding name="val">
+        <literal>x</literal>
+      </binding>
+      <binding name="type1">
+        <uri>os:ClassD</uri>
+      </binding>
+      <binding name="type2">
+        <uri>os:ClassB</uri>
+      </binding>
+    </result>
+     <result>
+      <binding name="A">
+        <uri>os:0</uri>
+      </binding>
+      <binding name="val">
+        <literal>x</literal>
+      </binding>
+      <binding name="type1">
+        <uri>os:ClassE</uri>
+      </binding>
+      <binding name="type2">
+        <uri>os:ClassC</uri>
+      </binding>
+    </result>
+    <result>
+      <binding name="A">
+        <uri>os:0</uri>
+      </binding>
+      <binding name="val">
+        <literal>x</literal>
+      </binding>
+      <binding name="type1">
+        <uri>os:ClassD</uri>
+      </binding>
+      <binding name="type2">
+        <uri>os:ClassA</uri>
+      </binding>
+    </result>
+    <result>
+      <binding name="A">
+        <uri>os:0</uri>
+      </binding>
+      <binding name="val">
+        <literal>x</literal>
+      </binding>
+      <binding name="type1">
+        <uri>os:ClassE</uri>
+      </binding>
+      <binding name="type2">
+        <uri>os:ClassA</uri>
+      </binding>
+    </result>
+    <result>
+      <binding name="A">
+        <uri>os:0</uri>
+      </binding>
+      <binding name="val">
+        <literal>x</literal>
+      </binding>
+      <binding name="type1">
+        <uri>os:ClassA</uri>
+      </binding>
+      <binding name="type2">
+        <uri>os:ClassA</uri>
+      </binding>
+    </result>
+    <result>
+      <binding name="A">
+        <uri>os:0</uri>
+      </binding>
+      <binding name="val">
+        <literal>x</literal>
+      </binding>
+      <binding name="type1">
+        <uri>os:ClassB</uri>
+      </binding>
+      <binding name="type2">
+        <uri>os:ClassB</uri>
+      </binding>
+    </result>
+    <result>
+      <binding name="A">
+        <uri>os:0</uri>
+      </binding>
+      <binding name="val">
+        <literal>x</literal>
+      </binding>
+      <binding name="type1">
+        <uri>os:ClassC</uri>
+      </binding>
+      <binding name="type2">
+        <uri>os:ClassC</uri>
+      </binding>
+    </result>
+    <result>
+      <binding name="A">
+        <uri>os:0</uri>
+      </binding>
+      <binding name="val">
+        <literal>x</literal>
+      </binding>
+      <binding name="type1">
+        <uri>os:ClassD</uri>
+      </binding>
+      <binding name="type2">
+        <uri>os:ClassD</uri>
+      </binding>
+    </result>
+    <result>
+      <binding name="A">
+        <uri>os:0</uri>
+      </binding>
+      <binding name="val">
+        <literal>x</literal>
+      </binding>
+      <binding name="type1">
+        <uri>os:ClassE</uri>
+      </binding>
+      <binding name="type2">
+        <uri>os:ClassE</uri>
+      </binding>
+    </result>
+
+    <result>
+      <binding name="A">
+        <uri>os:0</uri>
+      </binding>
+      <binding name="val">
+        <literal>y</literal>
+      </binding>
+      <binding name="type1">
+        <uri>os:ClassB</uri>
+      </binding>
+      <binding name="type2">
+        <uri>os:ClassA</uri>
+      </binding>
+    </result>
+    <result>
+      <binding name="A">
+        <uri>os:0</uri>
+      </binding>
+      <binding name="val">
+        <literal>y</literal>
+      </binding>
+      <binding name="type1">
+        <uri>os:ClassC</uri>
+      </binding>
+      <binding name="type2">
+        <uri>os:ClassA</uri>
+      </binding>
+    </result>
+    <result>
+      <binding name="A">
+        <uri>os:0</uri>
+      </binding>
+      <binding name="val">
+        <literal>y</literal>
+      </binding>
+      <binding name="type1">
+        <uri>os:ClassD</uri>
+      </binding>
+      <binding name="type2">
+        <uri>os:ClassB</uri>
+      </binding>
+    </result>
+     <result>
+      <binding name="A">
+        <uri>os:0</uri>
+      </binding>
+      <binding name="val">
+        <literal>y</literal>
+      </binding>
+      <binding name="type1">
+        <uri>os:ClassE</uri>
+      </binding>
+      <binding name="type2">
+        <uri>os:ClassC</uri>
+      </binding>
+    </result>
+    <result>
+      <binding name="A">
+        <uri>os:0</uri>
+      </binding>
+      <binding name="val">
+        <literal>y</literal>
+      </binding>
+      <binding name="type1">
+        <uri>os:ClassD</uri>
+      </binding>
+      <binding name="type2">
+        <uri>os:ClassA</uri>
+      </binding>
+    </result>
+    <result>
+      <binding name="A">
+        <uri>os:0</uri>
+      </binding>
+      <binding name="val">
+        <literal>y</literal>
+      </binding>
+      <binding name="type1">
+        <uri>os:ClassE</uri>
+      </binding>
+      <binding name="type2">
+        <uri>os:ClassA</uri>
+      </binding>
+    </result>
+    <result>
+      <binding name="A">
+        <uri>os:0</uri>
+      </binding>
+      <binding name="val">
+        <literal>y</literal>
+      </binding>
+      <binding name="type1">
+        <uri>os:ClassA</uri>
+      </binding>
+      <binding name="type2">
+        <uri>os:ClassA</uri>
+      </binding>
+    </result>
+    <result>
+      <binding name="A">
+        <uri>os:0</uri>
+      </binding>
+      <binding name="val">
+        <literal>y</literal>
+      </binding>
+      <binding name="type1">
+        <uri>os:ClassB</uri>
+      </binding>
+      <binding name="type2">
+        <uri>os:ClassB</uri>
+      </binding>
+    </result>
+    <result>
+      <binding name="A">
+        <uri>os:0</uri>
+      </binding>
+      <binding name="val">
+        <literal>y</literal>
+      </binding>
+      <binding name="type1">
+        <uri>os:ClassC</uri>
+      </binding>
+      <binding name="type2">
+        <uri>os:ClassC</uri>
+      </binding>
+    </result>
+    <result>
+      <binding name="A">
+        <uri>os:0</uri>
+      </binding>
+      <binding name="val">
+        <literal>y</literal>
+      </binding>
+      <binding name="type1">
+        <uri>os:ClassD</uri>
+      </binding>
+      <binding name="type2">
+        <uri>os:ClassD</uri>
+      </binding>
+    </result>
+    <result>
+      <binding name="A">
+        <uri>os:0</uri>
+      </binding>
+      <binding name="val">
+        <literal>y</literal>
+      </binding>
+      <binding name="type1">
+        <uri>os:ClassE</uri>
+      </binding>
+      <binding name="type2">
+        <uri>os:ClassE</uri>
+      </binding>
+    </result>
+    
+  </results>
+</sparql>

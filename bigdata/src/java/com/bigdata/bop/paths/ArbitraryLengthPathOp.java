@@ -27,10 +27,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.bop.paths;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Callable;
@@ -265,9 +267,10 @@ public class ArbitraryLengthPathOp extends PipelineOp {
                 	while (sitr.hasNext()) {
                 		
 	                    final IBindingSet[] chunk = sitr.next();
-	                    
-	                    for (IBindingSet bs : chunk)
-	                    	processChunk(new IBindingSet[] { bs });
+                    	processChunk(chunk);
+
+//                    	for (IBindingSet bs : chunk)
+//	                    	processChunk(new IBindingSet[] { bs });
 						
                 	}
                 	
@@ -320,12 +323,51 @@ public class ArbitraryLengthPathOp extends PipelineOp {
             	log.debug("gearing: " + gearing);
             }
             
+            final boolean noInput = chunkIn == null || chunkIn.length == 0 ||
+            		(chunkIn.length == 1 && chunkIn[0].isEmpty());
+            
+            final IVariable<?> joinVar = gearing.inVar != null ? 
+            		gearing.inVar : 
+            			(gearing.outVar != null ? gearing.outVar : null);
+            
+            if (log.isDebugEnabled()) {
+            	log.debug("join var: " + joinVar);
+            }
+            
+            /*
+             * Fix cardinality problem here
+             */
+            final Map<IConstant<?>, List<IBindingSet>> chunkInBySolutionKey = 
+            		noInput ? null : 
+            		new LinkedHashMap<IConstant<?>, List<IBindingSet>>();
+
+            if (!noInput) {
+
+            	for (IBindingSet parentSolutionIn : chunkIn) {
+		            	
+	            	final IConstant<?> key = joinVar != null ? parentSolutionIn.get(joinVar) : null; //newSolutionKey(gearing, parentSolutionIn);
+	            	
+	                if (log.isDebugEnabled()) {
+	                	log.debug("adding parent solution for joining: " + parentSolutionIn);
+	                	log.debug("join key: " + key);
+	                }
+	                
+	            	if (!chunkInBySolutionKey.containsKey(key)) {
+	            		chunkInBySolutionKey.put(key, new ArrayList<IBindingSet>());
+	            	}
+	            	
+	            	chunkInBySolutionKey.get(key).add(parentSolutionIn);
+	            	
+	            }
+	            
+            }
+            
             for (IBindingSet parentSolutionIn : chunkIn) {
             
 	            if (log.isDebugEnabled())
 	            	log.debug("parent solution in: " + parentSolutionIn);
         
-                IBindingSet childSolutionIn = parentSolutionIn.clone();
+                final IBindingSet childSolutionIn = parentSolutionIn.clone();
                 
                 /*
                  * The seed is either a constant on the input side of
@@ -405,6 +447,9 @@ public class ArbitraryLengthPathOp extends PipelineOp {
 
                 try {
             	
+                	/*
+                	 * TODO replace with code that does the PipelineJoins manually
+                	 */
                     runningSubquery = queryEngine.eval(subquery,
                             nextRoundInput.toArray(new IBindingSet[nextRoundInput.size()]));
 
@@ -550,102 +595,321 @@ public class ArbitraryLengthPathOp extends PipelineOp {
                 }
 					
             } // fixed point for loop
-                
-            /*
-             * Do some final filtering and then send the solutions
-             * down the pipeline.
-             */
-            final Iterator<Map.Entry<SolutionKey, IBindingSet>> it = 
-            		solutionsOut.entrySet().iterator();
             
-            while (it.hasNext()) {
-
-            	final Map.Entry<SolutionKey, IBindingSet> entry = it.next();
-            	
-            	final IBindingSet bs = entry.getValue();
-            	
-            	if (log.isDebugEnabled()) {
-            		log.debug("considering possible solution: " + bs);
-            	}
-            	
-            	if (gearing.outConst != null) {
-            		
+            /*
+    		 * Handle the case where there is a constant on the output side of 
+    		 * the subquery.  Make sure the solution's transitive output 
+    		 * variable matches. Filter out solutions where tVarOut != outConst.
+             */
+        	if (gearing.outConst != null) {
+        		
+	            final Iterator<Map.Entry<SolutionKey, IBindingSet>> it = 
+	            		solutionsOut.entrySet().iterator();
+	            
+	            while (it.hasNext()) {
+	            	
+	            	final IBindingSet bs = it.next().getValue();
+	            	
             		/*
-            		 * Handle the case where there is a constant on the
-            		 * output side of the subquery.  Make sure the
-            		 * solution's transitive output variable matches.
             		 */
         			if (!bs.get(gearing.tVarOut).equals(gearing.outConst)) {
                 		
 	                	if (log.isDebugEnabled()) {
 	                		log.debug("transitive output does not match output const, dropping");
+	                		log.debug(bs.get(gearing.tVarOut));
+	                		log.debug(gearing.outConst);
 	                	}
 	                	
         				it.remove();
         				
+        			}
+	
+            	}
+
+            }
+        	
+        	if (lowerBound == 0 && (gearing.inVar != null && gearing.outVar != null)) {
+        	
+        		final Map<SolutionKey, IBindingSet> zlps = new LinkedHashMap<SolutionKey, IBindingSet>();
+        		
+        		for (IBindingSet bs : solutionsOut.values()) {
+        			
+        			// is this right??
+        			if (bs.isBound(gearing.outVar)) {
+        				
         				continue;
         				
         			}
+        			
+        			{ // left to right
+	        		
+        				final IBindingSet zlp = bs.clone();
+	        			
+	        			zlp.set(gearing.tVarOut, zlp.get(gearing.inVar));
+	        			
+	        			final SolutionKey key = newSolutionKey(gearing, zlp);
+	        			
+	        			if (!solutionsOut.containsKey(key)) {
+	        				
+	        				zlps.put(key, zlp);
+	        				
+	        			}
+	        			
+        			}
+        			
+        			{ // right to left
+    	        		
+        				final IBindingSet zlp = bs.clone();
+	        			
+	        			zlp.set(gearing.inVar, zlp.get(gearing.tVarOut));
+	        			
+	        			final SolutionKey key = newSolutionKey(gearing, zlp);
+	        			
+	        			if (!solutionsOut.containsKey(key)) {
+	        				
+	        				zlps.put(key, zlp);
+	        				
+	        			}
+	        			
+        			}
+        			
+        		}
+        		
+        		solutionsOut.putAll(zlps);
+        		
+        	}
+            
+        	/*
+        	 * We can special case when there was no input (and
+        	 * thus no join is required).
+        	 */
+            if (noInput) {
 
-            	} else { // outVar != null
-            		
-                	/*
-                	 * Handle the case where the gearing.outVar was bound 
-                	 * coming in.  Again, make sure it matches the
-                	 * transitive output variable.
-                	 */
-            		if (bs.isBound(gearing.outVar)) {
+            	for (IBindingSet bs : solutionsOut.values()) {
+
+            		/*
+            		 * Set the binding for the outVar if necessary.
+            		 */
+            		if (gearing.outVar != null) {
             			
-            			if (!bs.get(gearing.tVarOut).equals(bs.get(gearing.outVar))) {
-            				
-    	                	if (log.isDebugEnabled()) {
-    	                		log.debug("transitive output does not match incoming binding for output var, dropping");
-    	                	}
-    	                	
-            				it.remove();
-            				
-            				continue;
-            				
-            			}
-            			
-            		} else {
-            			
-            			/*
-            			 * Handle the normal case - when we simply
-            			 * need to copy the transitive output over to
-            			 * the real output.
-            			 */
             			bs.set(gearing.outVar, bs.get(gearing.tVarOut));
             			
             		}
             		
+                	/*
+                	 * Clear the intermediate variables before sending the output
+                	 * down the pipeline.
+                	 */
+	            	bs.clear(gearing.tVarIn);
+	            	bs.clear(gearing.tVarOut);
+            		
             	}
             	
-            	if (log.isDebugEnabled()) {
-            		log.debug("solution accepted");
-            	}
+                final IBindingSet[] chunkOut =  
+	        		solutionsOut.values().toArray(
+	        				new IBindingSet[solutionsOut.size()]);
+        
+		        if (log.isDebugEnabled()) {
+		        	log.debug("final output to sink:\n" + Arrays.toString(chunkOut).replace("}, ", "},\n"));
+		        }
+		        
+		        // copy accepted binding sets to the default sink.
+		        context.getSink().add(chunkOut);
             	
-            	/*
-            	 * Should we drop the intermediate variables now?
-            	 */
-            	bs.clear(gearing.tVarIn);
-            	bs.clear(gearing.tVarOut);
-            	
+            } else {
+            
+	            final ArrayList<IBindingSet> finalOutput = new ArrayList<IBindingSet>();
+	            
+	            final Iterator<Map.Entry<SolutionKey, IBindingSet>> it = 
+	            		solutionsOut.entrySet().iterator();
+	            
+	            while (it.hasNext()) {
+	
+	            	final Map.Entry<SolutionKey, IBindingSet> entry = it.next();
+	            	
+	            	final IBindingSet bs = entry.getValue();
+	            	
+	            	if (log.isDebugEnabled()) {
+	            		log.debug("considering possible solution: " + bs);
+	            	}
+	            	
+	            	final IConstant<?> key = joinVar != null ? bs.get(joinVar) : null;
+	            	
+	            	if (key != null && chunkInBySolutionKey.containsKey(key)) {
+	            		
+		            	final List<IBindingSet> parentSolutionsIn = chunkInBySolutionKey.get(key);
+		            	
+		                if (log.isDebugEnabled()) {
+		                	log.debug("join key: " + key);
+		                	log.debug("parent solutions to join: " + parentSolutionsIn);
+		                }
+	                
+	                	for (IBindingSet parentSolutionIn : parentSolutionsIn) {
+	                
+			            	if (gearing.outConst != null) {
+			            		
+		        				/*
+		        				 * No need to clone, since we are not modifying the
+		        				 * incoming parent solution in this case. The ALP
+		        				 * is simply acting as a filter.
+		        				 */
+		        				finalOutput.add(parentSolutionIn);
+		        				
+			            	} else { // outVar != null
+			            		
+			                	/*
+			                	 * Handle the case where the gearing.outVar was bound 
+			                	 * coming in.  Again, make sure it matches the
+			                	 * transitive output variable.
+			                	 */
+			            		if (parentSolutionIn.isBound(gearing.outVar)) {
+			            			
+			            			// do this later now
+			            			
+			            			if (!bs.get(gearing.tVarOut).equals(parentSolutionIn.get(gearing.outVar))) {
+			            				
+			    	                	if (log.isDebugEnabled()) {
+			    	                		log.debug("transitive output does not match incoming binding for output var, dropping");
+			    	                	}
+			    	                	
+			            				continue;
+			            				
+			            			} else {
+				        				
+				        				/*
+				        				 * No need to clone, since we are not modifying the
+				        				 * incoming parent solution in this case. The ALP
+				        				 * is simply acting as a filter.
+				        				 */
+				        				finalOutput.add(parentSolutionIn);
+				        				
+				        			}
+			            			
+			            		} else {
+			            			
+			            			/*
+			            			 * Handle the normal case - when we simply
+			            			 * need to copy the transitive output over to
+			            			 * the real output.
+			            			 */
+		//	            			bs.set(gearing.outVar, bs.get(gearing.tVarOut));
+			            			
+			            			/*
+			            			 * Clone, modify, and accept.
+			            			 */
+		            				final IBindingSet join = parentSolutionIn.clone();
+		            				
+		            				join.set(gearing.outVar, bs.get(gearing.tVarOut));
+		            				
+		            				finalOutput.add(join);
+			            			
+			            		}
+			            		
+			            	}
+			            	
+			            	if (log.isDebugEnabled()) {
+			            		log.debug("solution accepted");
+			            	}
+			            	
+		                }
+	                	
+	                } 
+
+	            	/*
+	            	 * Always do the null solutions if there are any.
+	            	 */
+	            	if (chunkInBySolutionKey.containsKey(null)) {
+	            		
+		                /*
+		                 * Join the null solutions.  These solutions represent 
+		                 * a cross product (no shared variables with the ALP node).
+		                 */
+			        	final List<IBindingSet> nullSolutions = chunkInBySolutionKey.get(null);
+			        	
+			            if (log.isDebugEnabled()) {
+			            	log.debug("null solutions to join: " + nullSolutions);
+			            }
+			            
+		            	for (IBindingSet nullSolution : nullSolutions) {
+		            
+		            		final IBindingSet solution;
+		            		
+	//			            		if ((gearing.inVar != null && !nullSolution.isBound(gearing.inVar)) ||
+	//			            				(gearing.outVar != null && !nullSolution.isBound(gearing.outVar))) {
+		            		if (gearing.inVar != null || gearing.outVar != null) {
+		            		
+		            			solution = nullSolution.clone();
+		            		
+		            		} else {
+		            			
+		            			solution = nullSolution;
+		            			
+		            		}
+		            		
+		            		if (gearing.inVar != null) {
+		            			
+		            			if (solution.isBound(gearing.inVar)) {
+		            				
+		            				/*
+		            				 * This should never happen.
+		            				 */
+		            				throw new RuntimeException();
+		            				
+		            			} else {
+		            				
+		            				solution.set(gearing.inVar, bs.get(gearing.inVar));
+		            				
+		            			}
+		            			
+		            		}
+		            		
+		            		if (gearing.outVar != null) {
+		            			
+		            			if (solution.isBound(gearing.outVar)) {
+		            				
+		            				/*
+		            				 * This should never happen.
+		            				 */
+		            				throw new RuntimeException();
+	//		            				if (!bs.get(gearing.tVarOut).equals(solution.get(gearing.outVar))) {
+	//		            					
+	//		            					// discard this solution;
+	//		            					continue;
+	//		            					
+	//		            				}
+		            				
+		            			} else {
+		            				
+		            				solution.set(gearing.outVar, bs.get(gearing.tVarOut));
+		            				
+		            			}
+		            			
+		            		}
+		            		
+		            		finalOutput.add(solution);
+		            		
+			            	if (log.isDebugEnabled()) {
+			            		log.debug("solution accepted");
+			            	}
+			            	
+		                }
+		            	
+	            	}
+		            	
+	            }
+	            
+	            final IBindingSet[] chunkOut = finalOutput.toArray(new IBindingSet[finalOutput.size()]); 
+	//            		solutionsOut.values().toArray(
+	//            				new IBindingSet[solutionsOut.size()]);
+	            
+	            if (log.isDebugEnabled()) {
+	            	log.debug("final output to sink:\n" + Arrays.toString(chunkOut).replace("}, ", "},\n"));
+	            }
+	            
+	            // copy accepted binding sets to the default sink.
+	            context.getSink().add(chunkOut);
+
             }
-            
-            final IBindingSet[] chunkOut = 
-            		solutionsOut.values().toArray(
-            				new IBindingSet[solutionsOut.size()]);
-            
-            if (log.isDebugEnabled()) {
-            	log.debug("final output to sink:\n" + Arrays.toString(chunkOut));
-            }
-            
-            // copy accepted binding sets to the default sink.
-            context.getSink().add(chunkOut);
-                
-            // done.
-//          return runningSubquery;
                 
         } // processChunk method
 
