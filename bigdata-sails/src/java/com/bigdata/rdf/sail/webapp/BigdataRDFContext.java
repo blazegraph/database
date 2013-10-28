@@ -1093,7 +1093,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
             } finally {
                 endNanos = System.nanoTime();
                 m_queries.remove(queryId);
-                m_queries2.remove(queryId2);
+                if (queryId2 != null) m_queries2.remove(queryId2);
 //                if (os != null) {
 //                    try {
 //                        os.close();
