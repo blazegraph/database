@@ -326,6 +326,17 @@ public class ArbitraryLengthPathOp extends PipelineOp {
             final boolean noInput = chunkIn == null || chunkIn.length == 0 ||
             		(chunkIn.length == 1 && chunkIn[0].isEmpty());
             
+            /*
+             * We need to keep a collection of parent solutions to join
+             * against the output from the fixed point operation.
+             */
+            final Map<IConstant<?>, List<IBindingSet>> parentSolutionsToJoin = 
+            		noInput ? null : new LinkedHashMap<IConstant<?>, List<IBindingSet>>();
+
+            /*
+             * The join var is what we use to join the parent solutions to the
+             * output from the fixed point operation.
+             */
             final IVariable<?> joinVar = gearing.inVar != null ? 
             		gearing.inVar : 
             			(gearing.outVar != null ? gearing.outVar : null);
@@ -334,29 +345,22 @@ public class ArbitraryLengthPathOp extends PipelineOp {
             	log.debug("join var: " + joinVar);
             }
             
-            /*
-             * Fix cardinality problem here
-             */
-            final Map<IConstant<?>, List<IBindingSet>> chunkInBySolutionKey = 
-            		noInput ? null : 
-            		new LinkedHashMap<IConstant<?>, List<IBindingSet>>();
-
             if (!noInput) {
 
             	for (IBindingSet parentSolutionIn : chunkIn) {
 		            	
-	            	final IConstant<?> key = joinVar != null ? parentSolutionIn.get(joinVar) : null; //newSolutionKey(gearing, parentSolutionIn);
+	            	final IConstant<?> key = joinVar != null ? parentSolutionIn.get(joinVar) : null;
 	            	
 	                if (log.isDebugEnabled()) {
 	                	log.debug("adding parent solution for joining: " + parentSolutionIn);
 	                	log.debug("join key: " + key);
 	                }
 	                
-	            	if (!chunkInBySolutionKey.containsKey(key)) {
-	            		chunkInBySolutionKey.put(key, new ArrayList<IBindingSet>());
+	            	if (!parentSolutionsToJoin.containsKey(key)) {
+	            		parentSolutionsToJoin.put(key, new ArrayList<IBindingSet>());
 	            	}
 	            	
-	            	chunkInBySolutionKey.get(key).add(parentSolutionIn);
+	            	parentSolutionsToJoin.get(key).add(parentSolutionIn);
 	            	
 	            }
 	            
@@ -628,13 +632,21 @@ public class ArbitraryLengthPathOp extends PipelineOp {
 
             }
         	
+        	/*
+        	 * Add the necessary zero-length path solutions for the case where
+        	 * there are variables on both side of the operator.
+        	 */
         	if (lowerBound == 0 && (gearing.inVar != null && gearing.outVar != null)) {
         	
-        		final Map<SolutionKey, IBindingSet> zlps = new LinkedHashMap<SolutionKey, IBindingSet>();
+        		final Map<SolutionKey, IBindingSet> zlps = 
+        				new LinkedHashMap<SolutionKey, IBindingSet>();
         		
         		for (IBindingSet bs : solutionsOut.values()) {
         			
-        			// is this right??
+        			/*
+        			 * Do not handle the case where the out var is bound by
+        			 * the incoming solutions.
+        			 */
         			if (bs.isBound(gearing.outVar)) {
         				
         				continue;
@@ -735,9 +747,10 @@ public class ArbitraryLengthPathOp extends PipelineOp {
 	            	
 	            	final IConstant<?> key = joinVar != null ? bs.get(joinVar) : null;
 	            	
-	            	if (key != null && chunkInBySolutionKey.containsKey(key)) {
+	            	if (key != null && parentSolutionsToJoin.containsKey(key)) {
 	            		
-		            	final List<IBindingSet> parentSolutionsIn = chunkInBySolutionKey.get(key);
+		            	final List<IBindingSet> parentSolutionsIn = 
+		            			parentSolutionsToJoin.get(key);
 		            	
 		                if (log.isDebugEnabled()) {
 		                	log.debug("join key: " + key);
@@ -818,13 +831,13 @@ public class ArbitraryLengthPathOp extends PipelineOp {
 	            	/*
 	            	 * Always do the null solutions if there are any.
 	            	 */
-	            	if (chunkInBySolutionKey.containsKey(null)) {
+	            	if (parentSolutionsToJoin.containsKey(null)) {
 	            		
 		                /*
 		                 * Join the null solutions.  These solutions represent 
 		                 * a cross product (no shared variables with the ALP node).
 		                 */
-			        	final List<IBindingSet> nullSolutions = chunkInBySolutionKey.get(null);
+			        	final List<IBindingSet> nullSolutions = parentSolutionsToJoin.get(null);
 			        	
 			            if (log.isDebugEnabled()) {
 			            	log.debug("null solutions to join: " + nullSolutions);
