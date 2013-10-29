@@ -126,11 +126,11 @@ public class HALogReader implements IHALogReader {
 						ex);
 			}
 			if (magic != HALogWriter.MAGIC)
-				throw new RuntimeException("Bad journal magic: expected="
+				throw new RuntimeException("Bad HALog magic: expected="
 						+ HALogWriter.MAGIC + ", actual=" + magic);
 			version = m_raf.readInt();
 			if (version != HALogWriter.VERSION1)
-				throw new RuntimeException("Bad journal version: expected="
+				throw new RuntimeException("Bad HALog version: expected="
 						+ HALogWriter.VERSION1 + ", actual=" + version);
 
 			final RootBlockUtility tmp = new RootBlockUtility(reopener, file,
