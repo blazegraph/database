@@ -37,6 +37,7 @@ import java.util.Arrays;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.ha.msg.IHAMessage;
 import com.bigdata.ha.msg.IHAWriteMessage;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.FileChannelUtility;
@@ -50,16 +51,12 @@ import com.bigdata.util.ChecksumUtility;
 
 /**
  * Given an HALog file can be used to replay the file and can provide a readable
- * dump of the content.
- * 
- * When replaying, the current position is compared to the EOF to determine
- * whether more data can be read.
- * 
- * The called should call hasMoreBuffers() and if so read the next associated
- * buffer and process with the returned IHAMessage.
- * 
- * If hasMoreBuffers() is false, then the committing rootBlock should be used to
- * commit the replayed transaction.
+ * dump of the content. When replaying, the current position is compared to the
+ * EOF to determine whether more data can be read. The called should call
+ * {@link IHALogReader#hasMoreBuffers()} and if so read the next associated
+ * buffer and process with the returned {@link IHAMessage}. If
+ * {@link IHALogReader#hasMoreBuffers()} is false, then the committing
+ * {@link IRootBlockView} should be used to commit the replayed transaction.
  * 
  * @author Martyn Cutcher
  */
@@ -121,17 +118,19 @@ public class HALogReader implements IHALogReader {
 				 */
 				magic = m_raf.readInt();
 			} catch (IOException ex) {
-				throw new RuntimeException(
-						"Can not read magic. Is file locked by another process?",
-						ex);
+                throw new RuntimeException(
+                        "Can not read magic. Is file locked by another process? file="
+                                + file, ex);
 			}
-			if (magic != HALogWriter.MAGIC)
-				throw new RuntimeException("Bad HALog magic: expected="
-						+ HALogWriter.MAGIC + ", actual=" + magic);
+            if (magic != HALogWriter.MAGIC)
+                throw new RuntimeException("Bad HALog magic: file=" + file
+                        + ", expected=" + HALogWriter.MAGIC + ", actual="
+                        + magic);
 			version = m_raf.readInt();
 			if (version != HALogWriter.VERSION1)
-				throw new RuntimeException("Bad HALog version: expected="
-						+ HALogWriter.VERSION1 + ", actual=" + version);
+                throw new RuntimeException("Bad HALog version: file=" + file
+                        + ", expected=" + HALogWriter.VERSION1 + ", actual="
+                        + version);
 
 			final RootBlockUtility tmp = new RootBlockUtility(reopener, file,
 					true/* validateChecksum */, false/* alternateRootBlock */,
@@ -151,8 +150,9 @@ public class HALogReader implements IHALogReader {
 				 * Counters are inconsistent with either an empty log file or a
 				 * single transaction scope.
 				 */
-				throw new IllegalStateException("Incompatible rootblocks: cc0="
-						+ cc0 + ", cc1=" + cc1);
+                throw new IllegalStateException(
+                        "Incompatible rootblocks: file=" + file + ", cc0="
+                                + cc0 + ", cc1=" + cc1);
 			}
 
 			m_channel.position(HALogWriter.headerSize0);
