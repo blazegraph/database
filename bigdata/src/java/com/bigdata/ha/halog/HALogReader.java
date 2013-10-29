@@ -48,6 +48,7 @@ import com.bigdata.journal.RootBlockUtility;
 import com.bigdata.journal.StoreTypeEnum;
 import com.bigdata.util.ChecksumError;
 import com.bigdata.util.ChecksumUtility;
+import com.bigdata.util.InnerCause;
 
 /**
  * Given an HALog file can be used to replay the file and can provide a readable
@@ -403,8 +404,7 @@ public class HALogReader implements IHALogReader {
 	 * @throws IOException
 	 * @throws InterruptedException
 	 */
-	public static void main(final String[] args) throws IOException,
-			InterruptedException {
+    public static void main(final String[] args) throws InterruptedException {
 
 		final IBufferAccess buf = DirectBufferPool.INSTANCE.acquire();
 
@@ -442,8 +442,7 @@ public class HALogReader implements IHALogReader {
 
 	}
 
-	private static void doDirectory(final File dir, final IBufferAccess buf)
-			throws IOException {
+    private static void doDirectory(final File dir, final IBufferAccess buf) {
 
 		final File[] files = dir.listFiles(new FilenameFilter() {
 
@@ -489,47 +488,75 @@ public class HALogReader implements IHALogReader {
 
 	}
 
-	private static void doFile(final File file, final IBufferAccess buf)
-			throws IOException {
+	private static void doFile(final File file, final IBufferAccess buf) {
 
-		final HALogReader r = new HALogReader(file);
+	    try {
+            
+	        doFile2(file,buf);
+            
+        } catch (Throwable e) {
+            
+            if(InnerCause.isInnerCause(e, InterruptedException.class)) {
+            
+                // Propagate interrupt.
+                Thread.currentThread().interrupt();
+                
+            }
 
-		try {
+            final String msg = "ERROR: Could not read file: file=" + file
+                    + ", cause=" + e;
+            
+            System.err.println(msg);
+            
+            log.error(msg, e);
+            
+        }
+	    
+    }
 
-			final IRootBlockView openingRootBlock = r.getOpeningRootBlock();
+    private static void doFile2(final File file, final IBufferAccess buf)
+            throws IOException {
+        
+        final HALogReader r = new HALogReader(file);
 
-			final IRootBlockView closingRootBlock = r.getClosingRootBlock();
+        try {
 
-			final boolean isWORM = openingRootBlock.getStoreType() == StoreTypeEnum.WORM;
+            final IRootBlockView openingRootBlock = r.getOpeningRootBlock();
 
-			if (openingRootBlock.getCommitCounter() == closingRootBlock
-					.getCommitCounter()) {
+            final IRootBlockView closingRootBlock = r.getClosingRootBlock();
 
-				System.err.println("EMPTY LOG: " + file);
+            final boolean isWORM = openingRootBlock.getStoreType() == StoreTypeEnum.WORM;
 
-			}
+            System.out.println("----------begin----------");
+            System.out.println("file=" + file);
+            System.out.println("openingRootBlock=" + openingRootBlock);
+            System.out.println("closingRootBlock=" + closingRootBlock);
 
-			System.out.println("----------begin----------");
-			System.out.println("file=" + file);
-			System.out.println("openingRootBlock=" + openingRootBlock);
-			System.out.println("closingRootBlock=" + closingRootBlock);
+            if (openingRootBlock.getCommitCounter() == closingRootBlock
+                    .getCommitCounter()) {
 
-			while (r.hasMoreBuffers()) {
+                System.err
+                        .println("WARN : LOGICALLY EMPTY LOG (closing root block == opening root block): file="
+                                + file);
 
-				// don't pass buffer in if WORM, just validate the messages
-				final IHAWriteMessage msg = r.processNextBuffer(isWORM ? null
-						: buf.buffer());
+            }
+            
+            while (r.hasMoreBuffers()) {
 
-				System.out.println(msg.toString());
+                // don't pass buffer in if WORM, just validate the messages
+                final IHAWriteMessage msg = r.processNextBuffer(isWORM ? null
+                        : buf.buffer());
 
-			}
-			System.out.println("-----------end-----------");
+                System.out.println(msg.toString());
 
-		} finally {
+            }
+            System.out.println("-----------end-----------");
 
-			r.close();
+        } finally {
 
-		}
+            r.close();
+
+        }
 
 	}
 
