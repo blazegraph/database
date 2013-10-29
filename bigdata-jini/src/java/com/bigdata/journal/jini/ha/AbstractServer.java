@@ -1897,9 +1897,13 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
         if (log.isInfoEnabled())
             log.info("Terminating service management threads.");
 
-        if (haClient != null && haClient.isConnected()) { // Note: null reference is possible if ctor fails.
+        // Note: null reference is possible if ctor fails.
+        if (haClient != null && haClient.isConnected()) {
+        
             haClient.disconnect(false/* immediateShutdown */);
+            
         }
+        
         if (lookupDiscoveryManager != null) {
 
             try {
