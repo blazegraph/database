@@ -406,6 +406,17 @@ public class HALogReader implements IHALogReader {
 	 */
     public static void main(final String[] args) throws InterruptedException {
 
+        /*
+         * Sort into lexical order to force visitation in lexical order.
+         * 
+         * Note: This should work under any OS. Files will be either directory
+         * names (3 digits) or filenames (21 digits plus the file extension).
+         * Thus the comparison centers numerically on the digits that encode
+         * either part of a commit counter (subdirectory) or an entire commit
+         * counter (HALog file).
+         */
+        Arrays.sort(args);
+        
 		final IBufferAccess buf = DirectBufferPool.INSTANCE.acquire();
 
 		try {
