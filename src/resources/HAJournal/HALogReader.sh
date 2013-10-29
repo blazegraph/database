@@ -11,4 +11,4 @@ java ${JAVA_OPTS} \
 	-cp ${CLASSPATH} \
     -Djava.security.policy=${POLICY_FILE}\
     com.bigdata.ha.halog.HALogReader \
-    *
+    $*
