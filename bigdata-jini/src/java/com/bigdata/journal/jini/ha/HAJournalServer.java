@@ -42,6 +42,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
 
@@ -1270,7 +1271,7 @@ public class HAJournalServer extends AbstractServer {
                          */
                         if (runState == RunStateEnum.Error) {
                             haLog.warn("Detected error from ErrorTask, so clear runStateRef to allow re-entry");
-                        	runStateRef.set(null);
+                            runStateRef.set(null);
                         }
 
                         enterErrorState();
@@ -1287,11 +1288,14 @@ public class HAJournalServer extends AbstractServer {
 
                 } finally {
 
-                	/*
-                	 * Has a future been set? NOTE: THIS DOES NOT WAIT ON THE FUTURE ITSELF,
-                	 * it just displays the reference for the Future.
-                	 */
-                    haLog.warn(runState + ": exit, runStateFuture=" + runStateFutureRef.get());
+                    /*
+                     * Has a future been set? NOTE: THIS DOES NOT WAIT ON THE
+                     * FUTURE ITSELF, it just displays the reference for the
+                     * Future.
+                     */
+
+                    haLog.warn(runState + ": exit, runStateFuture="
+                            + runStateFutureRef.get());
 
                     /*
                      * Note: Do NOT clear the run state since it could have been
@@ -1345,10 +1349,11 @@ public class HAJournalServer extends AbstractServer {
             }
             
         } // RunStateCallable
-
+        
         /**
          * Hooked to ensure that the key znodes exist before the quorum watcher
-         * starts.
+         * starts and to enter {@link RunStateEnum#Restore} to get the service
+         * moving again.
          * 
          * @param quorum
          *            The quorum.
@@ -1359,55 +1364,75 @@ public class HAJournalServer extends AbstractServer {
             if (log.isInfoEnabled())
                 log.info("", new StackInfoReport());
 
-            // Start the HAClient (River and Zookeeper).
-            server.getHAClient().connect();
+            if (!quorumStartStopGuard
+                    .compareAndSet(false/* expect */, true/* update */)) {
 
-//            /*
-//             * Verify discovery of at least one ServiceRegistrar.
-//             */
-//            try {
-//                log.info("Awaiting service registrar discovery.");
-//                server.getHAClient()
-//                        .getConnection()
-//                        .awaitServiceRegistrars(10/* timeout */,
-//                                TimeUnit.SECONDS);
-//            } catch (TimeoutException e1) {
-//                throw new RuntimeException(e1);
-//            } catch (InterruptedException e1) {
-//                throw new RuntimeException(e1);
-//            }
-            
-            // Ensure key znodes exist.
-            try {
-                server.setupZNodes();
-            } catch (KeeperException e) {
-                throw new RuntimeException(e);
-            } catch (InterruptedException e) {
-                throw new RuntimeException(e);
+                throw new IllegalStateException();
+                
             }
 
-            // Start the quorum (relies on zookeeper).
-            super.start(quorum);
+            try {
 
-            /*
-             * Setup listener that logs quorum events @ TRACE.
-             * 
-             * Note: Listeners are cleared by Quorum.terminate(), so we need to
-             * do this each time we do quorum.start(...).
-             */
-            journal.getQuorum().addListener(new QuorumListener() {
-                @Override
-                public void notify(final QuorumEvent e) {
-                    if (log.isTraceEnabled())
-                        log.trace(e);
+                // Start the HAClient (River and Zookeeper).
+                server.getHAClient().connect();
+
+                // /*
+                // * Verify discovery of at least one ServiceRegistrar.
+                // */
+                // try {
+                // log.info("Awaiting service registrar discovery.");
+                // server.getHAClient()
+                // .getConnection()
+                // .awaitServiceRegistrars(10/* timeout */,
+                // TimeUnit.SECONDS);
+                // } catch (TimeoutException e1) {
+                // throw new RuntimeException(e1);
+                // } catch (InterruptedException e1) {
+                // throw new RuntimeException(e1);
+                // }
+
+                // Ensure key znodes exist.
+                try {
+                    server.setupZNodes();
+                } catch (KeeperException e) {
+                    throw new RuntimeException(e);
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
                 }
-            });
+
+                // Start the quorum (relies on zookeeper).
+                super.start(quorum);
+
+                /*
+                 * Setup listener that logs quorum events @ TRACE.
+                 * 
+                 * Note: Listeners are cleared by Quorum.terminate(), so we need
+                 * to do this each time we do quorum.start(...).
+                 */
+                journal.getQuorum().addListener(new QuorumListener() {
+                    @Override
+                    public void notify(final QuorumEvent e) {
+                        if (log.isTraceEnabled())
+                            log.trace(e);
+                    }
+                });
+
+            } finally {
+
+                // disable guard.
+                quorumStartStopGuard.set(false);
+                
+            }
+
+            // clear reference so we can enter a run state.
+            runStateRef.set(null);
             
             // Enter a run state for the HAJournalServer.
-            runStateRef.set(null); // clear reference.
             enterRunState(new RestoreTask());
 
         }
+        
+        private final AtomicBoolean quorumStartStopGuard = new AtomicBoolean(false);
         
         /**
          * {@inheritDoc}
@@ -1420,8 +1445,11 @@ public class HAJournalServer extends AbstractServer {
 
             if (log.isInfoEnabled())
                 log.info("", new StackInfoReport());
-           
-            {
+
+            // Unconditionally set guard. terminate() overrides anything.
+            quorumStartStopGuard.set(true);
+
+            try {
 
                 /*
                  * Ensure that the HAQuorumService will not attempt to cure any
@@ -1441,22 +1469,27 @@ public class HAJournalServer extends AbstractServer {
 
                 }
 
-            }
-                        
-            // Disconnect. Terminate River and Zookeeper processing.
-            server.getHAClient().disconnect(true/* immediateShutdown */);
+                // Disconnect. Terminate River and Zookeeper processing.
+                server.getHAClient().disconnect(true/* immediateShutdown */);
 
-            /*
-             * Note: This can cause a deadlock on AbstractJournal's internal
-             * read/write lock if there is a concurrent 2-phase commit. It is
-             * better to leave this to the transitions among the
-             * RunStateCallable tasks (note that we interrupt the current task
-             * above).
-             */
-//            // Discard any pending writes.
-//            journal.doLocalAbort();
-            
-            super.terminate();
+                /*
+                 * Note: This can cause a deadlock on AbstractJournal's internal
+                 * read/write lock if there is a concurrent 2-phase commit. It
+                 * is better to leave this to the transitions among the
+                 * RunStateCallable tasks (note that we interrupt the current
+                 * task above).
+                 */
+                // // Discard any pending writes.
+                // journal.doLocalAbort();
+
+                super.terminate();
+
+            } finally {
+                
+                // disable guard.
+                quorumStartStopGuard.set(false);
+                
+            }
 
         }
         
@@ -1568,14 +1601,49 @@ public class HAJournalServer extends AbstractServer {
          * will not re-enter the current active state). Thus, the caller MAY
          * observe an {@link InterruptedException} in their thread, but only if
          * they are being run out of {@link RunStateCallable}.
+         * <p>
+         * Note: This is written defensively.  It will not throw out anything.
          */
         @Override
         public void enterErrorState() {
 
-            log.warn(new StackInfoReport("Will enter error state"));
+            try {
 
-            enterRunState(new ErrorTask());
+                log.warn(new StackInfoReport("Will enter error state"));
 
+                enterRunState(new ErrorTask());
+                
+            } catch (Throwable t) {
+
+                /*
+                 * Problem attempting to enter the error state.
+                 * 
+                 * Note: If the HAQuorumService is not running, then an
+                 * IllegalStateException is thrown out. This is logged and not
+                 * rethrown. If the HAQuorumService is not running, then there
+                 * is nothing that needs to be torn down by entering the Error
+                 * state. When (if) the HAQuorumService is re-started, it will
+                 * come back up from close to scratch.
+                 */
+                try {
+
+                    log.error(t, t);
+
+                    if (InnerCause.isInnerCause(t, InterruptedException.class)) {
+
+                        // propagate interrupt.
+                        Thread.currentThread().interrupt();
+
+                    }
+
+                } finally {
+
+                    // ignore
+
+                }
+
+            }
+            
         }
         
         /**
@@ -1651,6 +1719,17 @@ public class HAJournalServer extends AbstractServer {
             if (runStateTask == null)
                 throw new IllegalArgumentException();
 
+            if (quorumStartStopGuard.get()) {
+
+                /*
+                 * We can not change the run state while we are in either
+                 * quorumService.start() or quorumService.terminate().
+                 */
+                
+                throw new IllegalStateException();
+
+            }
+            
             synchronized (runStateRef) {
 
                 if (runStateTask.runState
@@ -1919,18 +1998,12 @@ public class HAJournalServer extends AbstractServer {
         /**
          * {@inheritDoc}
          * <p>
-         * Force the service to enter the {@link ErrorTask} when if it becomes
-         * disconnected from the quorum.
+         * Force the service to enter the {@link ErrorTask} when if the
+         * zookeeper session is expired.
          */
         @Override
         public void disconnected() {
-            /*
-             * FIXME We are calling this when disconnected or expired. We might
-             * not need to force the service into an error state just because it
-             * notices that it is disconnected UNLESS that disconnect persists
-             * (but we might, since something in the ZKQuorumImpl did not work
-             * correctly for this event to get delivered).
-             */
+
             enterErrorState();
             
         }
@@ -3738,33 +3811,16 @@ public class HAJournalServer extends AbstractServer {
                          * write cache block sequence.
                          */
                         log.error(t, t);
-                        try {
-                            enterErrorState();
-                        } catch (RuntimeException e) {
-                            if (InnerCause.isInnerCause(e,
-                                    InterruptedException.class)) {
-                                /*
-                                 * Propagate the interrupt.
-                                 * 
-                                 * Note: This probably does not occur in this
-                                 * context since we are not running in the
-                                 * Thread for any doRun() method.
-                                 */
-                                Thread.currentThread().interrupt();
-                            } else {
-                                // log and ignore.
-                                log.error(e, e);
-                            }
-                        }
+                        enterErrorState();
                         /*
                          * Note: DO NOT rethrow the exception. This service will
                          * leave the met quorum. If we rethrow the exception,
-                         * the the update operation that that generated the live
-                         * replicated write will be failed with the rethrown
-                         * exception as the root cause. However, we want the
-                         * update operation to complete successfully as long as
-                         * we can retain an met quorum (and the same leader) for
-                         * the duration of the update operation.
+                         * then the update operation that that generated the
+                         * live replicated write will be failed with the
+                         * rethrown exception as the root cause. However, we
+                         * want the update operation to complete successfully as
+                         * long as we can retain an met quorum (and the same
+                         * leader) for the duration of the update operation.
                          */
 //                        // rethrow exception.
 //                        throw new RuntimeException(t);
@@ -4294,28 +4350,13 @@ public class HAJournalServer extends AbstractServer {
          * starting point for that log file.
          */
         @Override
-        public void logRootBlock(final boolean isJoinedService,
+        public void logRootBlock(//final boolean isJoinedService,
                 final IRootBlockView rootBlock) throws IOException {
 
             logLock.lock();
 
             try {
-
-                if (!isJoinedService) {//FIXME logRootBlock()
-
-                    /*
-                     * NOTE: Unless we are joined with the met quorum we will be
-                     * in RESYCNC (at best). RESYNC will put down the closing
-                     * root block on the HALog when it is done receiving the
-                     * HALog from the leader. Therefore, there is no condition
-                     * under which a service that is not participating in the
-                     * 2-phase commit should lay down the closing root block on
-                     * the HALog here.
-                     */
-                    return;
-                    
-                }
-
+                
                 // Close off the old log file with the root block.
                 journal.getHALogNexus().closeHALog(rootBlock);
 

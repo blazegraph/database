@@ -218,7 +218,7 @@ public class TestDumpJournal extends ProxyTestCase<Journal> {
         final String PREFIX = "testIndex#";
         final int NUM_INDICES = 4;
 
-        final Journal src = getStore(getProperties());
+        Journal src = getStore(getProperties());
 
         try {
 
@@ -262,6 +262,10 @@ public class TestDumpJournal extends ProxyTestCase<Journal> {
             src.commit();
 
             new DumpJournal(src)
+                    .dumpJournal(false/* dumpHistory */, true/* dumpPages */,
+                            false/* dumpIndices */, false/* showTuples */);
+            
+            new DumpJournal(src)
                     .dumpJournal(true/* dumpHistory */, true/* dumpPages */,
                             true/* dumpIndices */, false/* showTuples */);
 
@@ -269,6 +273,85 @@ public class TestDumpJournal extends ProxyTestCase<Journal> {
             new DumpJournal(src)
                     .dumpJournal(true/* dumpHistory */, false/* dumpPages */,
                             true/* dumpIndices */, false/* showTuples */);
+
+            /*
+             * Now write some more data, going through a series of commit
+             * points. This let's us check access to historical commit points.
+             */
+            for (int j = 0; j < 10; j++) {
+                
+                for (int i = 0; i < NUM_INDICES; i++) {
+
+                    // register an index
+                    final String name = PREFIX + i;
+
+                    // lookup the index.
+                    final BTree ndx = src.getIndex(name);
+
+                    // #of tuples to write.
+                    final int ntuples = r.nextInt(1000);
+
+                    // generate random data.
+                    final KV[] a = AbstractBTreeTestCase
+                            .getRandomKeyValues(ntuples);
+
+                    // write tuples (in random order)
+                    for (KV kv : a) {
+
+                        ndx.insert(kv.key, kv.val);
+
+                        if (r.nextInt(100) < 10) {
+
+                            // randomly increment the counter (10% of the time).
+                            ndx.getCounter().incrementAndGet();
+
+                        }
+
+                    }
+
+                }
+
+                src.commit();
+
+                new DumpJournal(src)
+                        .dumpJournal(false/* dumpHistory */,
+                                true/* dumpPages */, false/* dumpIndices */,
+                                false/* showTuples */);
+
+                new DumpJournal(src)
+                        .dumpJournal(true/* dumpHistory */,
+                                true/* dumpPages */, true/* dumpIndices */,
+                                false/* showTuples */);
+
+                // test again w/o dumpPages
+                new DumpJournal(src)
+                        .dumpJournal(true/* dumpHistory */,
+                                false/* dumpPages */, true/* dumpIndices */,
+                                false/* showTuples */);
+            }
+
+            if (src.isStable()) {
+
+                src = reopenStore(src);
+
+                new DumpJournal(src)
+                        .dumpJournal(false/* dumpHistory */,
+                                true/* dumpPages */, false/* dumpIndices */,
+                                false/* showTuples */);
+
+                new DumpJournal(src)
+                        .dumpJournal(true/* dumpHistory */,
+                                true/* dumpPages */, true/* dumpIndices */,
+                                false/* showTuples */);
+
+                // test again w/o dumpPages
+                new DumpJournal(src)
+                        .dumpJournal(true/* dumpHistory */,
+                                false/* dumpPages */, true/* dumpIndices */,
+                                false/* showTuples */);
+
+            }
+            
             
         } finally {
 

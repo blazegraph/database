@@ -144,6 +144,7 @@ import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.IDataRecord;
 import com.bigdata.io.IDataRecordAccess;
 import com.bigdata.io.SerializerUtil;
+import com.bigdata.io.writecache.WriteCacheService;
 import com.bigdata.journal.Name2Addr.Entry;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.JournalMetadata;
@@ -164,6 +165,7 @@ import com.bigdata.resources.ResourceManager;
 import com.bigdata.rwstore.IAllocationManager;
 import com.bigdata.rwstore.IHistoryManager;
 import com.bigdata.rwstore.IRWStrategy;
+import com.bigdata.rwstore.RWStore;
 import com.bigdata.rwstore.sector.MemStrategy;
 import com.bigdata.rwstore.sector.MemoryManager;
 import com.bigdata.service.AbstractHATransactionService;
@@ -2765,23 +2767,25 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 			 */
 			_bufferStrategy.abort();
 
-			/*
-			 * Discard hard references to any indices. The Name2Addr reference
-			 * will also be discarded below. This should be sufficient to ensure
-			 * that any index requested by the methods on the AbstractJournal
-			 * will be re-read from disk using the commit record which we
-			 * re-load below. This is necessary in order to discard any
-			 * checkpoints that may have been written on indices since the last
-			 * commit.
-			 * 
-			 * FIXME Verify this is not required. Historical index references
-			 * should not be discarded on abort as they remain valid. Discarding
-			 * them admits the possibility of a non-canonicalizing cache for the
-			 * historical indices since an existing historical index reference
-			 * will continue to be held but a new copy of the index will be
-			 * loaded on the next request if we clear the cache here.
-			 */
+            /*
+             * The Name2Addr reference will be discarded below. This should be
+             * sufficient to ensure that any index requested by the methods on
+             * the AbstractJournal will be re-read from disk using the commit
+             * record which we re-load below. This is necessary in order to
+             * discard any checkpoints that may have been written on indices
+             * since the last commit (dirty indices that have not been
+             * checkpointed to the disk are discarded when we discard
+             * Name2Addr).
+             * 
+             * Note: Historical index references should NOT be discarded on
+             * abort as they remain valid. Discarding them admits the
+             * possibility of a non-canonicalizing cache for the historical
+             * indices since an existing historical index reference will
+             * continue to be held but a new copy of the index will be loaded on
+             * the next request if we clear the cache here.
+             */
 			// historicalIndexCache.clear();
+			
 			// discard the commit record and re-read from the store.
 			_commitRecord = _getCommitRecord();
 
@@ -3030,6 +3034,637 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
 	}
 
+    /**
+     * Class to which we attach all of the little pieces of state during
+     * {@link AbstractJournal#commitNow(long)}.
+     * <p>
+     * The non-final fields in this class are laid directly below the method
+     * which set those fields. The methods in the class are laid out in the
+     * top-to-bottom order in which they are executed by commitNow().
+     */
+    static private class CommitState {
+        
+        /**
+         * The timestamp at which the commit began.
+         */
+        private final long beginNanos;
+
+        /**
+         * The backing store. 
+         */
+        private final AbstractJournal store;
+
+        /**
+         * The backing {@link IBufferStrategy} for the {@link #store}.
+         */
+        private final IBufferStrategy _bufferStrategy;
+        
+        /**
+         * The quorum iff HA and <code>null</code> otherwise.
+         */
+        private final Quorum<HAGlue, QuorumService<HAGlue>> quorum;
+
+        /**
+         * Local HA service implementation (non-Remote) and <code>null</code> if
+         * not in an HA mode..
+         */
+        private final QuorumService<HAGlue> quorumService;
+        
+        /**
+         * The commit time either of a transaction or of an unisolated commit.
+         * Note that when mixing isolated and unisolated commits you MUST use
+         * the same {@link ITimestampService} for both purposes.
+         */
+        private final long commitTime;
+        
+        /**
+         * The current root block on the journal as of the start of the commit
+         * protocol.
+         */
+        private final IRootBlockView old;
+
+        /**
+         * The quorum token associated with this commit point.
+         */
+        private final long commitToken;
+        
+        /** The #of bytes on the journal as of the previous commit point. */
+        private final long byteCountBefore;
+        
+        /**
+         * The commit counter that will be assigned to the new commit point.
+         */
+        private final long newCommitCounter;
+        
+        /**
+         * 
+         * @param store
+         *            The backing store.
+         * @param commitTime
+         *            The commit time either of a transaction or of an
+         *            unisolated commit. Note that when mixing isolated and
+         *            unisolated commits you MUST use the same
+         *            {@link ITimestampService} for both purposes.
+         */
+        public CommitState(final AbstractJournal store, final long commitTime) {
+
+            if (store == null)
+                throw new IllegalArgumentException();
+            
+            this.beginNanos = System.nanoTime();
+
+            this.store = store;
+
+            this.commitTime = commitTime;
+
+            this._bufferStrategy = store._bufferStrategy;
+            
+            // Note: null if not HA.
+            this.quorum = store.quorum;
+
+            /*
+             * Local HA service implementation (non-Remote).
+             * 
+             * Note: getClient() throws IllegalStateException if quorum exists
+             * and is not not running.
+             */
+            this.quorumService = quorum == null ? null : quorum.getClient();
+
+            this.old = store._rootBlock;
+
+            // #of bytes on the journal as of the previous commit point.
+            this.byteCountBefore = store._rootBlock.getNextOffset();
+
+            this.newCommitCounter = old.getCommitCounter() + 1;
+
+            this.commitToken = store.quorumToken;
+            
+            store.assertCommitTimeAdvances(commitTime);
+            
+        }
+
+        /**
+         * Notify {@link ICommitter}s to flush out application data. This sets
+         * the {@link #rootAddrs} for the {@link ICommitRecord}.
+         * 
+         * @return <code>true</code> if the store is dirty and the commit should
+         *         proceed and <code>false</code> otherwise.
+         */
+        private boolean notifyCommitters() {
+
+            /*
+             * First, run each of the committers accumulating the updated root
+             * addresses in an array. In general, these are btrees and they may
+             * have dirty nodes or leaves that needs to be evicted onto the
+             * store. The first time through, any newly created btrees will have
+             * dirty empty roots (the btree code does not optimize away an empty
+             * root at this time). However, subsequent commits without
+             * intervening data written on the store should not cause any
+             * committers to update their root address.
+             * 
+             * Note: This also checkpoints the deferred free block list.
+             */
+            rootAddrs = store.notifyCommitters(commitTime);
+
+            /*
+             * See if anything has been written on the store since the last
+             * commit.
+             */
+            if (!_bufferStrategy.requiresCommit(store._rootBlock)) {
+
+                /*
+                 * Will not do commit.
+                 * 
+                 * Note: No data was written onto the store so the commit can
+                 * not achieve any useful purpose.
+                 */
+
+                return false;
+                
+            }
+            
+            /*
+             * Explicitly call the RootBlockCommitter
+             * 
+             * Note: This logs the current root block and set the address of
+             * that root block in the as a root address in the commitRecord.
+             * This is of potential use solely in disaster recovery scenarios
+             * where your root blocks are toast, but good root blocks can be
+             * found elsewhere in the file. Once you find a root block, you can
+             * get the commitRecordIndex and then find earlier root blocks using
+             * that root addr. Or you can just scan the file looking for valid
+             * root blocks and then use the most recent one that you can find.
+             */
+            rootAddrs[PREV_ROOTBLOCK] = store.m_rootBlockCommitter
+                    .handleCommit(commitTime);
+
+            // Will do commit.
+            return true;
+
+        }
+
+        /**
+         * The new root addresses for the {@link ICommitRecord}.
+         * 
+         * @see #notifyCommitters()
+         */
+        private long[] rootAddrs;
+        
+        /**
+         * Write out the {@link ICommitRecord}, noting the
+         * {@link #commitRecordAddr}, add the {@link ICommitRecord} to the
+         * {@link CommitRecordIndex}. Finally, checkpoint the
+         * {@link CommitRecordIndex} setting the {@link #commitRecordIndexAddr}.
+         * <p>
+         * Note: This is also responsible for recycling the deferred frees for
+         * {@link IHistoryManager} backends.
+         */
+        private void writeCommitRecord() {
+
+            /*
+             * Before flushing the commitRecordIndex we need to check for
+             * deferred frees that will prune the index.
+             * 
+             * This is responsible for recycling the deferred frees (RWS).
+             * 
+             * Do this BEFORE adding the new commit record since that commit
+             * record will otherwise be immediately removed if no history is
+             * retained.
+             */
+            if (_bufferStrategy instanceof IHistoryManager) {
+
+                ((IHistoryManager) _bufferStrategy)
+                        .checkDeferredFrees(store);
+
+            }
+
+            final ICommitRecord commitRecord = new CommitRecord(commitTime,
+                    newCommitCounter, rootAddrs);
+
+            this.commitRecordAddr = store.write(ByteBuffer
+                    .wrap(CommitRecordSerializer.INSTANCE
+                            .serialize(commitRecord)));
+
+            /*
+             * Add the commit record to an index so that we can recover
+             * historical states efficiently.
+             */
+            store._commitRecordIndex.add(commitRecordAddr, commitRecord);
+            
+            /*
+             * Flush the commit record index to the store and stash the address
+             * of its metadata record in the root block.
+             * 
+             * Note: The address of the root of the CommitRecordIndex itself
+             * needs to go right into the root block. We are unable to place it
+             * into the commit record since we need to serialize the commit
+             * record, get its address, and add the entry to the
+             * CommitRecordIndex before we can flush the CommitRecordIndex to
+             * the store.
+             */
+            commitRecordIndexAddr = store._commitRecordIndex
+                    .writeCheckpoint();
+
+        }
+        
+        /**
+         * The address of the {@link ICommitRecord}.
+         * 
+         * @see #writeCommitRecord()
+         */
+        private long commitRecordAddr;
+        
+        /**
+         * The address of the {@link CommitRecordIndex} once it has been
+         * checkpointed against the backing store.
+         * <p>
+         * Note: The address of the root of the {@link CommitRecordIndex} needs
+         * to go right into the {@link IRootBlockView}. We are unable to place
+         * it into the {@link ICommitRecord} since we need to serialize the
+         * {@link ICommitRecord}, get its address, and add the entry to the
+         * {@link CommitRecordIndex} before we can flush the
+         * {@link CommitRecordIndex} to the store.
+         * 
+         * @see #writeCommitRecord()
+         */
+        private long commitRecordIndexAddr;
+        
+        /**
+         * Call commit on {@link IBufferStrategy} prior to creating the new
+         * {@link IRootBlockView}. This will flush the {@link WriteCacheService}
+         * . For HA, that ensures that the write set has been replicated to the
+         * followers.
+         * <p>
+         * Note: required for {@link RWStore} since the metaBits allocations are
+         * not made until commit, leading to invalid addresses for recent store
+         * allocations.
+         * <p>
+         * Note: After this, we do not write anything on the backing store other
+         * than the root block. The rest of this code is dedicated to creating a
+         * properly formed root block. For a non-HA deployment, we just lay down
+         * the root block. For an HA deployment, we do a 2-phase commit.
+         * <p>
+         * Note: In HA, the followers lay down the replicated writes
+         * synchronously. Thus, they are guaranteed to be on local storage by
+         * the time the leader finishes WriteCacheService.flush(). This does not
+         * create much latency because the WriteCacheService drains the
+         * dirtyList in a seperate thread.
+         */
+        private void flushWriteSet() {
+
+            _bufferStrategy.commit();
+
+        }
+
+        /**
+         * Create the new root block.
+         */
+        private void newRootBlock() {
+
+            /*
+             * The next offset at which user data would be written. Calculated,
+             * after commit!
+             */
+            final long nextOffset = _bufferStrategy.getNextOffset();
+
+            final long blockSequence;
+            if (_bufferStrategy instanceof IHABufferStrategy) {
+
+                // always available for HA.
+                blockSequence = ((IHABufferStrategy) _bufferStrategy)
+                        .getBlockSequence();
+
+            } else {
+
+                blockSequence = old.getBlockSequence();
+
+            }
+
+            /*
+             * Update the firstCommitTime the first time a transaction commits
+             * and the lastCommitTime each time a transaction commits (these are
+             * commit timestamps of isolated or unisolated transactions).
+             */
+
+            final long firstCommitTime = (old.getFirstCommitTime() == 0L ? commitTime
+                    : old.getFirstCommitTime());
+
+            final long priorCommitTime = old.getLastCommitTime();
+
+            if (priorCommitTime != 0L) {
+
+                /*
+                 * This is a local sanity check to make sure that the commit
+                 * timestamps are strictly increasing. An error will be reported
+                 * if the commit time for the current (un)isolated transaction
+                 * is not strictly greater than the last commit time on the
+                 * store as read back from the current root block.
+                 */
+
+                assertPriorCommitTimeAdvances(commitTime, priorCommitTime);
+
+            }
+
+            final long lastCommitTime = commitTime;
+            final long metaStartAddr = _bufferStrategy.getMetaStartAddr();
+            final long metaBitsAddr = _bufferStrategy.getMetaBitsAddr();
+
+            // Create the new root block.
+            newRootBlock = new RootBlockView(!old.isRootBlock0(),
+                    old.getOffsetBits(), nextOffset, firstCommitTime,
+                    lastCommitTime, newCommitCounter, commitRecordAddr,
+                    commitRecordIndexAddr,
+                    old.getUUID(), //
+                    blockSequence,
+                    commitToken,//
+                    metaStartAddr, metaBitsAddr, old.getStoreType(),
+                    old.getCreateTime(), old.getCloseTime(), old.getVersion(),
+                    store.checker);
+
+        }
+
+        /**
+         * The new {@link IRootBlockView}.
+         * 
+         * @see #newRootBlock()
+         */
+        private IRootBlockView newRootBlock;
+        
+
+        /**
+         * Run the GATHER consensus protocol (iff HA).
+         */
+        private void gatherPhase() {
+
+            /*
+             * If not HA, do not do GATHER.
+             */
+
+            if (!(_bufferStrategy instanceof IHABufferStrategy))
+                return;
+
+            if (quorum == null)
+                return;
+
+            if (!quorum.isHighlyAvailable())
+                return;
+
+            /**
+             * CRITICAL SECTION. We need obtain a distributed consensus for the
+             * services joined with the met quorum concerning the earliest
+             * commit point that is pinned by the combination of the active
+             * transactions and the minReleaseAge on the TXS. New transaction
+             * starts during this critical section will block (on the leader or
+             * the folllower) unless they are guaranteed to be allowable, e.g.,
+             * based on the current minReleaseAge, the new tx would read from
+             * the most recent commit point, the new tx would ready from a
+             * commit point that is already pinned by an active transaction on
+             * that node, etc.
+             * 
+             * Note: Lock makes this section MUTEX with awaitServiceJoin().
+             * 
+             * @see <a href=
+             *      "https://docs.google.com/document/d/14FO2yJFv_7uc5N0tvYboU-H6XbLEFpvu-G8RhAzvxrk/edit?pli=1#"
+             *      > HA TXS Design Document </a>
+             * 
+             * @see <a
+             *      href="https://sourceforge.net/apps/trac/bigdata/ticket/623"
+             *      > HA TXS / TXS Bottleneck </a>
+             */
+
+            store._gatherLock.lock();
+
+            try {
+
+                // Atomic decision point for GATHER re joined services.
+                gatherJoinedAndNonJoinedServices = new JoinedAndNonJoinedServices(
+                        quorum);
+
+                // Run the GATHER protocol.
+                consensusReleaseTime = ((AbstractHATransactionService) store
+                        .getLocalTransactionManager().getTransactionService())
+                        .updateReleaseTimeConsensus(newCommitCounter,
+                                commitTime, gatherJoinedAndNonJoinedServices
+                                        .getJoinedServiceIds(), store
+                                        .getHAReleaseTimeConsensusTimeout(),
+                                TimeUnit.MILLISECONDS);
+
+            } catch (Exception ex) {
+
+                log.error(ex, ex);
+
+                // Wrap and rethrow.
+                throw new RuntimeException(ex);
+
+            } finally {
+
+                store._gatherLock.unlock();
+
+            }
+
+        }
+
+        /**
+         * Set by {@link #gatherPhase()} IFF HA.
+         */
+        private IJoinedAndNonJoinedServices gatherJoinedAndNonJoinedServices = null;
+        /**
+         * Set by {@link #gatherPhase()} IFF HA.
+         */
+        private IHANotifyReleaseTimeResponse consensusReleaseTime = null;
+
+        /**
+         * Simple (non-HA) commit.
+         */
+        private void commitSimple() {
+            
+            /*
+             * Force application data to stable storage _before_
+             * we update the root blocks. This option guarantees
+             * that the application data is stable on the disk
+             * before the atomic commit. Some operating systems
+             * and/or file systems may otherwise choose an
+             * ordered write with the consequence that the root
+             * blocks are laid down on the disk before the
+             * application data and a hard failure could result
+             * in the loss of application data addressed by the
+             * new root blocks (data loss on restart).
+             * 
+             * Note: We do not force the file metadata to disk.
+             * If that is done, it will be done by a force()
+             * after we write the root block on the disk.
+             */
+            if (store.doubleSync) {
+
+                _bufferStrategy.force(false/* metadata */);
+
+            }
+
+            // write the root block on to the backing store.
+            _bufferStrategy.writeRootBlock(newRootBlock, store.forceOnCommit);
+
+            if (_bufferStrategy instanceof IRWStrategy) {
+
+                /*
+                 * Now the root blocks are down we can commit any transient
+                 * state.
+                 */
+
+                ((IRWStrategy) _bufferStrategy).postCommit();
+
+            }
+            
+            // set the new root block.
+            store._rootBlock = newRootBlock;
+
+            // reload the commit record from the new root block.
+            store._commitRecord = store._getCommitRecord();
+
+            if (txLog.isInfoEnabled())
+                txLog.info("COMMIT: commitTime=" + commitTime);
+
+        }
+
+        /**
+         * HA mode commit (2-phase commit).
+         * <p>
+         * Note: We need to make an atomic decision here regarding whether a
+         * service is joined with the met quorum or not. This information will
+         * be propagated through the HA 2-phase prepare message so services will
+         * know how they must intepret the 2-phase prepare(), commit(), and
+         * abort() requests. The atomic decision is necessary in order to
+         * enforce a consistent role on a services that is resynchronizing and
+         * which might vote to join the quorum and enter the quorum
+         * asynchronously with respect to this decision point.
+         * 
+         * TODO If necessary, we could also explicitly provide the zk version
+         * metadata for the znode that is the parent of the joined services.
+         * However, we would need an expanded interface to get that metadata
+         * from zookeeper out of the Quorum.
+         */
+        private void commitHA() {
+
+            try {
+
+                if(!prepare2Phase()) {
+                    
+                    // PREPARE rejected.  
+                    throw new QuorumException("PREPARE rejected: nyes="
+                            + prepareResponse.getYesCount() + ", replicationFactor="
+                            + prepareResponse.replicationFactor());
+
+                }
+
+                commitRequest = new CommitRequest(prepareRequest,
+                        prepareResponse);
+
+                quorumService.commit2Phase(commitRequest);
+
+            } catch (Throwable e) {
+
+                try {
+                    /*
+                     * Something went wrong. Any services that were in the
+                     * pipeline could have a dirty write set. Services that
+                     * voted NO will have already discarded their dirty write
+                     * set. We issue an abort2Phase() to tell the other services
+                     * to discard the dirty write set as well.
+                     * 
+                     * TODO We only need to issue the 2-phase abort against
+                     * those services that (a) were joined with the met quorum;
+                     * and (b) voted YES in response to the PREPARE message (any
+                     * service that voted NO already discarded its dirty write
+                     * set).
+                     * 
+                     * TODO The service should only do the 2-phase abort if the
+                     * commitToken and commitCounter are valid. If the quorum
+                     * breaks, then the services will move into the Error state
+                     * and will do a local abort as part of that transition.
+                     */
+                    quorumService.abort2Phase(commitToken);
+                } catch (Throwable t) {
+                    log.warn(t, t);
+                }
+
+                if (commitRequest != null) {
+                    /*
+                     * The quorum voted to commit, but something went wrong.
+                     * 
+                     * This forces the leader to fail over. The quorum can then
+                     * meet up again around a new consensus.
+                     * 
+                     * Note: It is possible that a new consensus can not be
+                     * formed. The 2-phase commit protocol does not handle some
+                     * cases of compound failure. For example, consider the case
+                     * where the HA cluster is running with bare majority of
+                     * services. All services that are active vote YES, but one
+                     * of those services fails before processing the COMMIT
+                     * message. The quorum will not meet again unless a new
+                     * consensus can be formed from the services that remain up
+                     * and the services that were not running. The services that
+                     * were not running will be at an earlier commit point so
+                     * they can not form a consensus with the services that
+                     * remain up. Further, there can not be a majority among the
+                     * services that were not running (except in the edge case
+                     * where the failed commit was the first commit since the
+                     * last commit on one of the services that was down at the
+                     * start of that failed commit). Situations of this type
+                     * require operator intervention. E.g., explicitly rollback
+                     * the database or copy HALog files from one machine to
+                     * another such that it will apply those HALog files on
+                     * restart and form a consensus with the other services.
+                     */
+                    quorumService.enterErrorState();
+                }
+                
+                // Re-throw the root cause exception.
+                throw new RuntimeException(e);
+
+            }
+
+        }
+        // Fields set by the method above.
+        private CommitRequest commitRequest;
+        
+        /**
+         * Return <code>true</code> iff the 2-phase PREPARE votes to COMMIT.
+         * 
+         * @throws IOException
+         * @throws TimeoutException
+         * @throws InterruptedException
+         */
+        private boolean prepare2Phase() throws InterruptedException,
+                TimeoutException, IOException {
+ 
+            // Atomic decision point for joined vs non-joined services.
+            prepareJoinedAndNonJoinedServices = new JoinedAndNonJoinedServices(
+                    quorum);
+
+            prepareRequest = new PrepareRequest(//
+                    consensusReleaseTime,//
+                    gatherJoinedAndNonJoinedServices,//
+                    prepareJoinedAndNonJoinedServices,//
+                    newRootBlock,//
+                    quorumService.getPrepareTimeout(), // timeout
+                    TimeUnit.MILLISECONDS//
+            );
+
+            // issue prepare request.
+            prepareResponse = quorumService.prepare2Phase(prepareRequest);
+
+            if (haLog.isInfoEnabled())
+                haLog.info(prepareResponse.toString());
+            
+            return prepareResponse.willCommit();
+            
+        }
+        // Fields set by the method above.
+        private IJoinedAndNonJoinedServices prepareJoinedAndNonJoinedServices;
+        private PrepareRequest prepareRequest;
+        private PrepareResponse prepareResponse;
+        
+    } // class CommitState.
+    
 	/**
 	 * An atomic commit is performed by directing each registered
 	 * {@link ICommitter} to flush its state onto the store using
@@ -3066,195 +3701,45 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
             
 			assertOpen();
 
-			final long beginNanos = System.nanoTime();
+            if (log.isInfoEnabled())
+                log.info("commitTime=" + commitTime);
 
-			// #of bytes on the journal as of the previous commit point.
-			final long byteCountBefore = _rootBlock.getNextOffset();
-
-			if (log.isInfoEnabled())
-				log.info("commitTime=" + commitTime);
-
-			assertCommitTimeAdvances(commitTime);
-
-            final IRootBlockView old = _rootBlock;
-
-            final long newCommitCounter = old.getCommitCounter() + 1;
-            
-			/*
-			 * First, run each of the committers accumulating the updated root
-			 * addresses in an array. In general, these are btrees and they may
-			 * have dirty nodes or leaves that needs to be evicted onto the
-			 * store. The first time through, any newly created btrees will have
-			 * dirty empty roots (the btree code does not optimize away an empty
-			 * root at this time). However, subsequent commits without
-			 * intervening data written on the store should not cause any
-			 * committers to update their root address.
-             * 
-             * Note: This also checkpoints the deferred free block list.
-			 */
-			final long[] rootAddrs = notifyCommitters(commitTime);
-
-			/*
-			 * See if anything has been written on the store since the last
-			 * commit.
-			 */
-			if (!_bufferStrategy.requiresCommit(_rootBlock)) {
-
-				/*
-				 * No data was written onto the store so the commit can not
-				 * achieve any useful purpose.
-				 */
-
-				if (log.isInfoEnabled())
-					log.info("Nothing to commit");
-
-				return 0L;
-			}
-			
-            /*
-             * Explicitly call the RootBlockCommitter
-             */
-            rootAddrs[PREV_ROOTBLOCK] = this.m_rootBlockCommitter
-                    .handleCommit(commitTime);
-
-            // Local HA service implementation (non-Remote).
-            final QuorumService<HAGlue> quorumService = quorum == null ? null
-                    : quorum.getClient();
-
-            final IJoinedAndNonJoinedServices gatherJoinedAndNonJoinedServices;
-            final IHANotifyReleaseTimeResponse consensusReleaseTime;
-            if ((_bufferStrategy instanceof IHABufferStrategy)
-                    && quorum != null && quorum.isHighlyAvailable()) {
-
-                /**
-                 * CRITICAL SECTION. We need obtain a distributed consensus for
-                 * the services joined with the met quorum concerning the
-                 * earliest commit point that is pinned by the combination of
-                 * the active transactions and the minReleaseAge on the TXS. New
-                 * transaction starts during this critical section will block
-                 * (on the leader or the folllower) unless they are guaranteed
-                 * to be allowable, e.g., based on the current minReleaseAge,
-                 * the new tx would read from the most recent commit point, the
-                 * new tx would ready from a commit point that is already pinned
-                 * by an active transaction on that node, etc.
-                 * 
-                 * Note: Lock makes this section MUTEX with awaitServiceJoin().
-                 * 
-                 * @see <a href=
-                 *      "https://docs.google.com/document/d/14FO2yJFv_7uc5N0tvYboU-H6XbLEFpvu-G8RhAzvxrk/edit?pli=1#"
-                 *      > HA TXS Design Document </a>
-                 * 
-                 * @see <a
-                 *      href="https://sourceforge.net/apps/trac/bigdata/ticket/623"
-                 *      > HA TXS / TXS Bottleneck </a>
-                 */
-
-                _gatherLock.lock();
-                
-                try {
-                
-                    // Atomic decision point for GATHER re joined services.
-                    gatherJoinedAndNonJoinedServices = new JoinedAndNonJoinedServices(
-                            quorum);
-                    
-                    // Run the GATHER protocol.
-                    consensusReleaseTime = ((AbstractHATransactionService) getLocalTransactionManager()
-                            .getTransactionService())
-                            .updateReleaseTimeConsensus(newCommitCounter,
-                                    commitTime,
-                                    gatherJoinedAndNonJoinedServices.getJoinedServiceIds(),
-                                    getHAReleaseTimeConsensusTimeout(),
-                                    TimeUnit.MILLISECONDS);
-
-                } catch (Exception ex) {
-
-                    log.error(ex, ex);
-                    
-                    // Wrap and rethrow.
-                    throw new RuntimeException(ex);
-                    
-                } finally {
-
-                    _gatherLock.unlock();
-                    
-                }
-                
-            } else {
-                
-                /*
-                 * Not HA. Did not do GATHER.
-                 */
-                
-                gatherJoinedAndNonJoinedServices = null;
-                consensusReleaseTime = null;
-                
-            } // if (HA) do GATHER
+            final CommitState cs = new CommitState(this, commitTime);
 
             /*
-             * Before flushing the commitRecordIndex we need to check for
-             * deferred frees that will prune the index.
-             * 
-             * This is responsible for recycling the deferred frees (RWS).
-             * 
-             * Do this BEFORE adding the new commit record since that commit
-             * record will otherwise be immediately removed if no history is
-             * retained.
+             * Flush application data, decide whether or not the store is dirty,
+             * and return immediately if it is not dirty.
              */
-            if (_bufferStrategy instanceof IHistoryManager) {
+            if (!cs.notifyCommitters()) {
 
-                ((IHistoryManager) _bufferStrategy).checkDeferredFrees(this);
+                if (log.isInfoEnabled())
+                    log.info("Nothing to commit");
+
+                return 0L;
 
             }
 
-            /*
-             * Write the commit record onto the store.
-             * 
-             * @todo Modify to log the current root block and set the address of
-             * that root block in the commitRecord. This will be of use solely
-             * in disaster recovery scenarios where your root blocks are toast,
-             * but good root blocks can be found elsewhere in the file.
-             */
-
-            final ICommitRecord commitRecord = new CommitRecord(commitTime,
-                    newCommitCounter, rootAddrs);
-
-            final long commitRecordAddr = write(ByteBuffer
-                    .wrap(CommitRecordSerializer.INSTANCE
-                            .serialize(commitRecord)));
+            // Do GATHER (iff HA).
+            cs.gatherPhase();
 
             /*
-             * Add the commit record to an index so that we can recover
-             * historical states efficiently.
+             * Flush deferred frees (iff RWS), write the commit record onto the
+             * store, and write the commit record index onto the store.
              */
-			_commitRecordIndex.add(commitRecordAddr, commitRecord);
-			
-            /*
-             * Flush the commit record index to the store and stash the address
-             * of its metadata record in the root block.
-             * 
-             * Note: The address of the root of the CommitRecordIndex itself
-             * needs to go right into the root block. We are unable to place it
-             * into the commit record since we need to serialize the commit
-             * record, get its address, and add the entry to the
-             * CommitRecordIndex before we can flush the CommitRecordIndex to
-             * the store.
-             */
-            final long commitRecordIndexAddr = _commitRecordIndex
-                    .writeCheckpoint();
+            cs.writeCommitRecord();
 
-            final long commitToken = quorumToken;
             if (quorum != null) {
                 /*
                  * Verify that the last negotiated quorum is still valid.
                  */
-                quorum.assertLeader(commitToken);
+                quorum.assertLeader(cs.commitToken);
             }
 
             /*
              * Conditionally obtain a lock that will protect the
              * commit()/postCommit() protocol.
              */
-            final long nextOffset;
+//            final long nextOffset;
             final Lock commitLock;
             if (_bufferStrategy instanceof IRWStrategy) {
                 commitLock = ((IRWStrategy) _bufferStrategy).getCommitLock();
@@ -3266,271 +3751,48 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                 commitLock.lock();
             }
             try {
-                /*
-                 * Call commit on buffer strategy prior to retrieving root block,
-                 * required for RWStore since the metaBits allocations are not made
-                 * until commit, leading to invalid addresses for recent store
-                 * allocations.
-                 * 
-                 * Note: This will flush the write cache. For HA, that ensures that
-                 * the write set has been replicated to the followers.
-                 * 
-                 * Note: After this, we do not write anything on the backing store
-                 * other than the root block. The rest of this code is dedicated to
-                 * creating a properly formed root block. For a non-HA deployment,
-                 * we just lay down the root block. For an HA deployment, we do a
-                 * 2-phase commit.
-                 * 
-                 * Note: In HA, the followers lay down the replicated writes
-                 * synchronously. Thus, they are guaranteed to be on local storage
-                 * by the time the leader finishes WriteCacheService.flush(). This
-                 * does not create much latency because the WriteCacheService drains
-                 * the dirtyList in a seperate thread.
-                 */
-                _bufferStrategy.commit();
+
+                // Flush writes to the backing store / followers.
+                cs.flushWriteSet();
                 
-                /*
-                 * The next offset at which user data would be written.
-                 * Calculated, after commit!
-                 */
-                nextOffset = _bufferStrategy.getNextOffset();
-    
-                final long blockSequence;
-                
-                if (_bufferStrategy instanceof IHABufferStrategy) {
-    
-                    // always available for HA.
-                    blockSequence = ((IHABufferStrategy) _bufferStrategy)
-                            .getBlockSequence();
-                    
-                } else {
-                    
-                    blockSequence = old.getBlockSequence();
-                    
-                }
-    
-                /*
-    			 * Prepare the new root block.
-    			 */
-    			final IRootBlockView newRootBlock;
-    			{
-    
-    				/*
-    				 * Update the firstCommitTime the first time a transaction
-    				 * commits and the lastCommitTime each time a transaction
-    				 * commits (these are commit timestamps of isolated or
-    				 * unisolated transactions).
-    				 */
-    
-                    final long firstCommitTime = (old.getFirstCommitTime() == 0L ? commitTime
-                            : old.getFirstCommitTime());
-    
-                    final long priorCommitTime = old.getLastCommitTime();
-    
-    				if (priorCommitTime != 0L) {
-    
-    					/*
-    					 * This is a local sanity check to make sure that the commit
-    					 * timestamps are strictly increasing. An error will be
-    					 * reported if the commit time for the current (un)isolated
-    					 * transaction is not strictly greater than the last commit
-    					 * time on the store as read back from the current root
-    					 * block.
-    					 */
-    
-                        assertPriorCommitTimeAdvances(commitTime, priorCommitTime);
-    
-    				}
-    
-    				final long lastCommitTime = commitTime;
-    				final long metaStartAddr = _bufferStrategy.getMetaStartAddr();
-    				final long metaBitsAddr = _bufferStrategy.getMetaBitsAddr();
-    
-    				// Create the new root block.
-                    newRootBlock = new RootBlockView(!old.isRootBlock0(), old
-                            .getOffsetBits(), nextOffset, firstCommitTime,
-                            lastCommitTime, newCommitCounter, commitRecordAddr,
-                            commitRecordIndexAddr, old.getUUID(), //
-                            blockSequence, commitToken,//
-                            metaStartAddr, metaBitsAddr, old.getStoreType(),
-                            old.getCreateTime(), old.getCloseTime(), 
-                            old.getVersion(), checker);
-    
-    			}
-    
+                // Prepare the new root block.
+                cs.newRootBlock();
+
                 if (quorum == null) {
                     
-                    /*
-                     * Non-HA mode.
-                     */
-    
-                    /*
-                     * Force application data to stable storage _before_
-                     * we update the root blocks. This option guarantees
-                     * that the application data is stable on the disk
-                     * before the atomic commit. Some operating systems
-                     * and/or file systems may otherwise choose an
-                     * ordered write with the consequence that the root
-                     * blocks are laid down on the disk before the
-                     * application data and a hard failure could result
-                     * in the loss of application data addressed by the
-                     * new root blocks (data loss on restart).
-                     * 
-                     * Note: We do not force the file metadata to disk.
-                     * If that is done, it will be done by a force()
-                     * after we write the root block on the disk.
-                     */
-                    if (doubleSync) {
-    
-                        _bufferStrategy.force(false/* metadata */);
-    
-                    }
-    
-                    // write the root block on to the backing store.
-                    _bufferStrategy.writeRootBlock(newRootBlock, forceOnCommit);
-    
-                    if (_bufferStrategy instanceof IRWStrategy) {
-    
-                        /*
-                         * Now the root blocks are down we can commit any transient
-                         * state.
-                         */
-    
-                        ((IRWStrategy) _bufferStrategy).postCommit();
-    
-                    }
-        			
-                    // set the new root block.
-                    _rootBlock = newRootBlock;
-    
-                    // reload the commit record from the new root block.
-                    _commitRecord = _getCommitRecord();
-    
-                    if (txLog.isInfoEnabled())
-                        txLog.info("COMMIT: commitTime=" + commitTime);
+                    // Non-HA mode.
+                    cs.commitSimple();
     
                 } else {
-                    
-                    /*
-                     * HA mode.
-                     * 
-                     * Note: We need to make an atomic decision here regarding
-                     * whether a service is joined with the met quorum or not. This
-                     * information will be propagated through the HA 2-phase prepare
-                     * message so services will know how they must intepret the
-                     * 2-phase prepare(), commit(), and abort() requests. The atomic
-                     * decision is necessary in order to enforce a consistent role
-                     * on a services that is resynchronizing and which might vote to
-                     * join the quorum and enter the quorum asynchronously with
-                     * respect to this decision point.
-                     * 
-                     * TODO If necessary, we could also explicitly provide the zk
-                     * version metadata for the znode that is the parent of the
-                     * joined services. However, we would need an expanded interface
-                     * to get that metadata from zookeeper out of the Quorum..
-                     */
-                    
-                    boolean didVoteYes = false;
-                    try {
-    
-                        // Atomic decision point for joined vs non-joined services.
-                        final IJoinedAndNonJoinedServices prepareJoinedAndNonJoinedServices = new JoinedAndNonJoinedServices(
-                                quorum);
-    
-                        final PrepareRequest req = new PrepareRequest(//
-                                consensusReleaseTime,//
-                                gatherJoinedAndNonJoinedServices,//
-                                prepareJoinedAndNonJoinedServices,//
-                                newRootBlock,//
-                                quorumService.getPrepareTimeout(), // timeout
-                                TimeUnit.MILLISECONDS//
-                                );
-    
-                        // issue prepare request.
-                        final PrepareResponse resp = quorumService
-                                .prepare2Phase(req);
-    
-                        if (haLog.isInfoEnabled())
-                            haLog.info(resp.toString());
-    
-                        if (resp.willCommit()) {
-    
-                            didVoteYes = true;
-    
-                            quorumService
-                                    .commit2Phase(new CommitRequest(req, resp));
-    
-                        } else {
-    
-                            /*
-                             * TODO We only need to issue the 2-phase abort
-                             * against those services that (a) were joined with
-                             * the met quorum; and (b) voted YES in response to
-                             * the PREPARE message.
-                             */
-                            try {
-                                quorumService.abort2Phase(commitToken);
-                            } finally {
-                                throw new RuntimeException(
-                                        "PREPARE rejected: nyes="
-                                                + resp.getYesCount()
-                                                + ", replicationFactor="
-                                                + resp.replicationFactor());
-                            }
-    
-                        }
-    
-                    } catch (Throwable e) {
-                        if (didVoteYes) {
-                            /*
-                             * The quorum voted to commit, but something went wrong.
-                             * 
-                             * FIXME RESYNC : At this point the quorum is probably
-                             * inconsistent in terms of their root blocks. Rather
-                             * than attempting to send an abort() message to the
-                             * quorum, we probably should force the leader to yield
-                             * its role at which point the quorum will attempt to
-                             * elect a new master and resynchronize.
-                             */
-                            if (quorumService != null) {
-                                try {
-                                    quorumService.abort2Phase(commitToken);
-                                } catch (Throwable t) {
-                                    log.warn(t, t);
-                                }
-                            }
-                        } else {
-                            /*
-                             * This exception was thrown during the abort handling
-                             * logic. Note that we already attempting an 2-phase
-                             * abort since the quorum did not vote "yes".
-                             * 
-                             * TODO We should probably force a quorum break since
-                             * there is clearly something wrong with the lines of
-                             * communication among the nodes.
-                             */
-                        }
-                        throw new RuntimeException(e);
-                    }
-    
+
+                    // HA mode commit (2-phase commit).
+                    cs.commitHA();
+                        
                 } // else HA mode
 
             } finally {
-                if(commitLock != null) {
+
+                if (commitLock != null) {
                     /*
                      * Release the [commitLock] iff one was taken above.
                      */
                     commitLock.unlock();
                 }
+
             }
 
-			final long elapsedNanos = System.nanoTime() - beginNanos;
+			final long elapsedNanos = System.nanoTime() - cs.beginNanos;
 
 			if (BigdataStatics.debug || log.isInfoEnabled()) {
-				final String msg = "commit: commitTime=" + commitTime + ", latency="
-						+ TimeUnit.NANOSECONDS.toMillis(elapsedNanos) + ", nextOffset=" + nextOffset + ", byteCount="
-						+ (nextOffset - byteCountBefore);
-				if (BigdataStatics.debug)
+                final String msg = "commit: commitTime="
+                        + cs.commitTime
+                        + ", latency="
+                        + TimeUnit.NANOSECONDS.toMillis(elapsedNanos)
+                        + ", nextOffset="
+                        + cs.newRootBlock.getNextOffset()
+                        + ", byteCount="
+                        + (cs.newRootBlock.getNextOffset() - cs.byteCountBefore);
+                if (BigdataStatics.debug)
 					System.err.println(msg);
 				else if (log.isInfoEnabled())
 					log.info(msg);
@@ -3539,7 +3801,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 				}
 			}
 
-			return commitTime;
+			return cs.commitTime;
 
 		} finally {
 
@@ -3621,8 +3883,8 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
      *             if the <i>commitTime</i> is LTE the value reported by
      *             {@link IRootBlockView#getLastCommitTime()}.
      */
-    protected void assertPriorCommitTimeAdvances(final long currentCommitTime,
-            final long priorCommitTime) {
+    static protected void assertPriorCommitTimeAdvances(
+            final long currentCommitTime, final long priorCommitTime) {
 
         if (currentCommitTime <= priorCommitTime) {
 
@@ -6576,6 +6838,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
             // Clear vote (assume NO unless proven otherwise).
             vote.set(false);
 
+            // Note: Can throw IllegalStateException (if not running).
 			final QuorumService<HAGlue> quorumService = quorum.getClient();
 
 			// Note: as decided by the leader!
@@ -6592,7 +6855,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                  * A NOP task if this service is not joined with the met quorum.
                  */
 
-                ft = new FutureTaskMon<Boolean>(new VoteNoTask());
+                ft = new FutureTaskMon<Boolean>(new VoteNoTask(quorumService));
 
             } else {
 
@@ -6603,8 +6866,8 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                  * Note: This code path is only when [isJoined := true].
                  */
 
-                ft = new FutureTaskMon<Boolean>(new Prepare2PhaseTask(//isJoined,
-                        isLeader, prepareMessage));
+                ft = new FutureTaskMon<Boolean>(new Prepare2PhaseTask(isLeader,
+                        prepareMessage));
 
             }
 
@@ -6655,10 +6918,15 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
          */
         protected class VoteNoTask implements Callable<Boolean>{
 
-            public VoteNoTask() {
+            private final QuorumService<HAGlue> localService;
+
+            public VoteNoTask(final QuorumService<HAGlue> localService) {
+            
+                this.localService = localService;
                 
             }
             
+            @Override
             public Boolean call() throws Exception {
 
                 // Vote NO.
@@ -6676,7 +6944,11 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                      * leave.
                      */
                     
-                    quorum.getClient().enterErrorState();
+                    if (localService != null) {
+
+                        localService.enterErrorState();
+                        
+                    }
 
                 }
 
@@ -6704,18 +6976,26 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
          */
         private class Prepare2PhaseTask implements Callable<Boolean> {
 
-//            private final boolean isJoined;
             private final boolean isLeader;
             private final IHA2PhasePrepareMessage prepareMessage;
 
-            public Prepare2PhaseTask(//final boolean isJoined,
-                    final boolean isLeader,
+            public Prepare2PhaseTask(//
+                    final boolean isLeader,//
                     final IHA2PhasePrepareMessage prepareMessage) {
 
                 if (prepareMessage == null)
                     throw new IllegalArgumentException();
 
-//                this.isJoined = isJoined;
+                if (!prepareMessage.isJoinedService()) {
+
+                    /*
+                     * Only services that are joined as of the atomic decision
+                     * point in commitNow() are sent a PREPARE message.
+                     */
+
+                    throw new AssertionError();
+                    
+                }
                 
                 this.isLeader = isLeader;
 
@@ -6726,232 +7006,30 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
             /**
              * Note: This code path is only when [isJoined := true].
              */
+            @Override
             public Boolean call() throws Exception {
 
+                QuorumService<HAGlue> localService = null;
+
                 try {
-                    
+
                     /*
-                     * Get and clear the [gatherFuture]. A service which was
-                     * joined at the atomic decision point for the GATHER will
-                     * have a non-null Future here. A service which is newly
-                     * joined and which joined *after* the GATHER will have a
-                     * [null] Future here. If the service participated in the
-                     * gather, then we will use this Future to decide if it
-                     * should vote NO. If the service joined *after* the GATHER,
-                     * then the Future will be [null] and we will ignore it.
-                     * 
-                     * Note: This is checked below.
+                     * Note: Throws IllegalStateException if quorum has been
+                     * terminated. We can't PREPARE if the quorum is terminated.
                      */
-                    final Future<IHANotifyReleaseTimeResponse> oldFuture = gatherFuture
-                            .getAndSet(null/* newValue */);
+                    localService = quorum.getClient();
 
-                    if (haLog.isInfoEnabled())
-                        haLog.info("gatherFuture=" + oldFuture);
-                        
-                    final IRootBlockView rootBlock = prepareMessage.getRootBlock();
-    
-                    if (haLog.isInfoEnabled())
-                        haLog.info("preparedRequest=" + rootBlock + ", isLeader: " + isLeader);
-    
-                    if (rootBlock == null)
-                        throw new IllegalStateException();
-
-                    // Validate new root block against current root block.
-                    validateNewRootBlock(/* isJoined, */isLeader,
-                            AbstractJournal.this._rootBlock, rootBlock);
-
-                    if (haLog.isInfoEnabled())
-                        haLog.info("validated=" + rootBlock);
-    
-                    /*
-                     * Verify that the local release time is consisent with the
-                     * GATHER.
-                     */
-                    final IHANotifyReleaseTimeResponse consensusReleaseTime = prepareMessage
-                            .getConsensusReleaseTime();
-                    
-                    {
-
-                        if (oldFuture != null) {
-
-                            /*
-                             * If we ran the GATHER task, then we must await the
-                             * outcome of the GATHER on this service before we
-                             * can verify that the local consensus release time
-                             * is consistent with the GATHER.
-                             * 
-                             * Note: If the oldFuture is null, then the service
-                             * just joined and was explicitly handed the
-                             * consensus release time and hence should be
-                             * consistent here anyway.
-                             */
-                            
-                            oldFuture.get();
-                            
-                        }
-
-                        final long localReleaseTime = getLocalTransactionManager()
-                                .getTransactionService().getReleaseTime();
-    
-                        // Note: Per the GatherTask (in Journal.java).
-                        final long expectedReleaseTime = Math.max(0L,
-                                consensusReleaseTime.getCommitTime() - 1);
-
-                        if (localReleaseTime != expectedReleaseTime) {
-
-                            throw new AssertionError(
-                                    "Local service does not agree with consensusReleaseTime: localReleaseTime="
-                                            + localReleaseTime
-                                            + ", expectedReleaseTime="
-                                            + expectedReleaseTime
-                                            + ", consensusReleaseTime="
-                                            + consensusReleaseTime
-                                            + ", serviceId=" + getServiceId());
-
-                        }
-    
-                    }
-    
-                    /*
-                     * if(follower) {...}
-                     */
-                    if (/*isJoined &&*/ !isLeader) {
-    
-                        /**
-                         * This is a follower.
-                         * 
-                         * Validate the release time consensus protocol was
-                         * completed successfully on the follower.
-                         * 
-                         * @see <a
-                         *      href="https://sourceforge.net/apps/trac/bigdata/ticket/673"
-                         *      > Native thread leak in HAJournalServer process </a>
-                         */
-    
-                        if (!prepareMessage.isGatherService()) {
-    
-                            /*
-                             * This service did not participate in the GATHER.
-                             * Instead, it joined after the GATHER but before
-                             * the PREPARE.
-                             */
-
-                            // [gatherFuture] should have been [null].
-                            assert oldFuture == null;
-                            
-                            vote.set(true);
-    
-                            // Done.
-                            return vote.get();
-                            
-                        }
-
-                        /**
-                         * Note: We need to block here (on oldFuture.get()) in
-                         * case the follower has not finished applying the
-                         * updated release time.
-                         */
-                        try {
-
-                            // Note: [oldFuture] MUST be non-null!
-                            final IHANotifyReleaseTimeResponse tmp = oldFuture.get();
-                            
-                            if ((tmp.getCommitCounter() != consensusReleaseTime
-                                    .getCommitCounter())
-                                    || (tmp.getCommitTime() != consensusReleaseTime
-                                            .getCommitTime())) {
-                            
-                                throw new AssertionError(
-                                        "GatherTask reports different consensus: GatherTask="
-                                                + tmp
-                                                + ", consensusReleaseTime="
-                                                + consensusReleaseTime);
-                            }
-
-                            /*
-                             * Gather was successful - fall through.
-                             */
-                            
-                        } catch (InterruptedException e) {
-                            /*
-                             * Note: Future isDone(). Caller should not block.
-                             */
-                            throw new AssertionError();
-                        } catch (CancellationException e) {
-                            /*
-                             * Gather cancelled on the follower (e.g.,
-                             * immediately above).
-                             */
-                            haLog.error("Gather cancelled on follower: serviceId="
-                                    + getServiceId() + " : " + e, e);
-                            return vote.get();
-                        } catch (ExecutionException e) {
-                            // Gather failed on the follower.
-                            haLog.error("Gather failed on follower: serviceId="
-                                    + getServiceId() + " : " + e, e);
-                            return vote.get();
-                        }
-    
-                    }
-                    
-                    /*
-                     * Call to ensure strategy does everything required for itself
-                     * before final root block commit. At a minimum it must flush
-                     * its write cache to the backing file (issue the writes).
-                     */
-                    // _bufferStrategy.commit(); // lifted to before we
-                    // retrieve
-                    // RootBlock in commitNow
-                    /*
-                     * Force application data to stable storage _before_ we update
-                     * the root blocks. This option guarantees that the application
-                     * data is stable on the disk before the atomic commit. Some
-                     * operating systems and/or file systems may otherwise choose an
-                     * ordered write with the consequence that the root blocks are
-                     * laid down on the disk before the application data and a hard
-                     * failure could result in the loss of application data
-                     * addressed by the new root blocks (data loss on restart).
-                     * 
-                     * Note: We do not force the file metadata to disk. If that is
-                     * done, it will be done by a force() after we write the root
-                     * block on the disk.
-                     */
-                    if (doubleSync) {
-    
-                        _bufferStrategy.force(false/* metadata */);
-    
-                    }
-    
-                    if (prepareMessage.voteNo()) {
-
-                        /*
-                         * Hook allows the test suite to force a NO vote.
-                         */
-                        
-                        throw new RuntimeException("Force NO vote");
-
-                    }
-
-                    // Vote YES.
-                    vote.set(true);
-                    
-                    return vote.get();
+                    return innerCall();
 
                 } finally {
 
+                    if (haLog.isInfoEnabled())
+                        haLog.info("VOTE=" + vote.get());
+
                     if (!vote.get()) {
-//                        /*
-//                         * Throw away our local write set.
-//                         */
-//                        // doLocalAbort(); // enterErrorState will do this
-//                        
-//                        /*
-//                         * Exit the service
-//                         */
-//                        // quorum.getActor().serviceLeave(); // enterErrorState will do this
-//
+
                         /**
-                         * Since the service refuses the commit, we want it to
+                         * Since the service refuses to PREPARE we want it to
                          * enter an error state and then figure out whether it
                          * needs to resynchronize with the quorum.
                          * <p>
@@ -6965,13 +7043,229 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                          *      SeekConsensus and is not participating in
                          *      commits</a>
                          */
-                        quorum.getClient().enterErrorState();
+                        if (localService != null) {
+                            
+                            localService.enterErrorState();
+                            
+                        }
+                        
                     }
 
                 }
 
             }
 
+            private Boolean innerCall() throws Exception {
+                
+                /*
+                 * Get and clear the [gatherFuture]. A service which was
+                 * joined at the atomic decision point for the GATHER will
+                 * have a non-null Future here. A service which is newly
+                 * joined and which joined *after* the GATHER will have a
+                 * [null] Future here. If the service participated in the
+                 * gather, then we will use this Future to decide if it
+                 * should vote NO. If the service joined *after* the GATHER,
+                 * then the Future will be [null] and we will ignore it.
+                 * 
+                 * Note: This is checked below.
+                 */
+                final Future<IHANotifyReleaseTimeResponse> oldFuture = gatherFuture
+                        .getAndSet(null/* newValue */);
+
+                if (haLog.isInfoEnabled())
+                    haLog.info("gatherFuture=" + oldFuture);
+                    
+                final IRootBlockView rootBlock = prepareMessage.getRootBlock();
+
+                if (haLog.isInfoEnabled())
+                    haLog.info("preparedRequest=" + rootBlock + ", isLeader: " + isLeader);
+
+                if (rootBlock == null)
+                    throw new IllegalStateException();
+
+                // Validate new root block against current root block.
+                validateNewRootBlock(/* isJoined, */isLeader,
+                        AbstractJournal.this._rootBlock, rootBlock);
+
+                if (haLog.isInfoEnabled())
+                    haLog.info("validated=" + rootBlock);
+
+                /*
+                 * Verify that the local release time is consisent with the
+                 * GATHER.
+                 */
+                final IHANotifyReleaseTimeResponse consensusReleaseTime = prepareMessage
+                        .getConsensusReleaseTime();
+                
+                {
+
+                    if (oldFuture != null) {
+
+                        /*
+                         * If we ran the GATHER task, then we must await the
+                         * outcome of the GATHER on this service before we
+                         * can verify that the local consensus release time
+                         * is consistent with the GATHER.
+                         * 
+                         * Note: If the oldFuture is null, then the service
+                         * just joined and was explicitly handed the
+                         * consensus release time and hence should be
+                         * consistent here anyway.
+                         */
+                        
+                        oldFuture.get();
+                        
+                    }
+
+                    final long localReleaseTime = getLocalTransactionManager()
+                            .getTransactionService().getReleaseTime();
+
+                    // Note: Per the GatherTask (in Journal.java).
+                    final long expectedReleaseTime = Math.max(0L,
+                            consensusReleaseTime.getCommitTime() - 1);
+
+                    if (localReleaseTime != expectedReleaseTime) {
+
+                        throw new AssertionError(
+                                "Local service does not agree with consensusReleaseTime: localReleaseTime="
+                                        + localReleaseTime
+                                        + ", expectedReleaseTime="
+                                        + expectedReleaseTime
+                                        + ", consensusReleaseTime="
+                                        + consensusReleaseTime
+                                        + ", serviceId=" + getServiceId());
+
+                    }
+
+                }
+
+                /*
+                 * if(follower) {...}
+                 */
+                if (/*isJoined &&*/ !isLeader) {
+
+                    /**
+                     * This is a follower.
+                     * 
+                     * Validate the release time consensus protocol was
+                     * completed successfully on the follower.
+                     * 
+                     * @see <a
+                     *      href="https://sourceforge.net/apps/trac/bigdata/ticket/673"
+                     *      > Native thread leak in HAJournalServer process </a>
+                     */
+
+                    if (!prepareMessage.isGatherService()) {
+
+                        /*
+                         * This service did not participate in the GATHER.
+                         * Instead, it joined after the GATHER but before
+                         * the PREPARE.
+                         */
+
+                        // [gatherFuture] should have been [null].
+                        assert oldFuture == null;
+                        
+                        vote.set(true);
+
+                        // Done.
+                        return vote.get();
+                        
+                    }
+
+                    /**
+                     * Note: We need to block here (on oldFuture.get()) in
+                     * case the follower has not finished applying the
+                     * updated release time.
+                     */
+                    try {
+
+                        // Note: [oldFuture] MUST be non-null!
+                        final IHANotifyReleaseTimeResponse tmp = oldFuture.get();
+                        
+                        if ((tmp.getCommitCounter() != consensusReleaseTime
+                                .getCommitCounter())
+                                || (tmp.getCommitTime() != consensusReleaseTime
+                                        .getCommitTime())) {
+                        
+                            throw new AssertionError(
+                                    "GatherTask reports different consensus: GatherTask="
+                                            + tmp
+                                            + ", consensusReleaseTime="
+                                            + consensusReleaseTime);
+                        }
+
+                        /*
+                         * Gather was successful - fall through.
+                         */
+                        
+                    } catch (InterruptedException e) {
+                        /*
+                         * Note: Future isDone(). Caller should not block.
+                         */
+                        throw new AssertionError();
+                    } catch (CancellationException e) {
+                        /*
+                         * Gather cancelled on the follower (e.g.,
+                         * immediately above).
+                         */
+                        haLog.error("Gather cancelled on follower: serviceId="
+                                + getServiceId() + " : " + e, e);
+                        return vote.get();
+                    } catch (ExecutionException e) {
+                        // Gather failed on the follower.
+                        haLog.error("Gather failed on follower: serviceId="
+                                + getServiceId() + " : " + e, e);
+                        return vote.get();
+                    }
+
+                }
+                
+                /*
+                 * Call to ensure strategy does everything required for itself
+                 * before final root block commit. At a minimum it must flush
+                 * its write cache to the backing file (issue the writes).
+                 */
+                // _bufferStrategy.commit(); // lifted to before we
+                // retrieve
+                // RootBlock in commitNow
+                /*
+                 * Force application data to stable storage _before_ we update
+                 * the root blocks. This option guarantees that the application
+                 * data is stable on the disk before the atomic commit. Some
+                 * operating systems and/or file systems may otherwise choose an
+                 * ordered write with the consequence that the root blocks are
+                 * laid down on the disk before the application data and a hard
+                 * failure could result in the loss of application data
+                 * addressed by the new root blocks (data loss on restart).
+                 * 
+                 * Note: We do not force the file metadata to disk. If that is
+                 * done, it will be done by a force() after we write the root
+                 * block on the disk.
+                 */
+                if (doubleSync) {
+
+                    _bufferStrategy.force(false/* metadata */);
+
+                }
+
+                if (prepareMessage.voteNo()) {
+
+                    /*
+                     * Hook allows the test suite to force a NO vote.
+                     */
+                    
+                    throw new RuntimeException("Force NO vote");
+
+                }
+
+                // Vote YES.
+                vote.set(true);
+
+                return vote.get();
+
+            }
+            
         }
 
         /**
@@ -7065,28 +7359,34 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
             // Verify HA ready for that token.
             assertHAReady(prepareToken);
 
-            if (!isLeader) {// && isJoined) {
+            // Note: Throws IllegalStateException if quorum not running.
+            final QuorumService<HAGlue> localService = quorum.getClient();
+
+            if (isLeader) {
+                
+                /*
+                 * Verify still the leader.
+                 */
+                if (!localService.isLeader(prepareToken))
+                    throw new IllegalStateException("Not leader.");
+
+                final HAStatusEnum st = getHAStatus();
+
+                if (!HAStatusEnum.Leader.equals(st)) {
+
+                    throw new IllegalStateException("HAStatusEnum: expected="
+                            + HAStatusEnum.Leader + ", actual=" + st);
+
+                }
+                
+            } else {
 
                 /*
                  * Verify still a follower.
                  */
-                final QuorumService<HAGlue> localService = quorum.getClient();
-                
-                if (localService == null)
-                    throw new IllegalStateException("Quorum terminated.");
-                
-                if(!localService.isFollower(prepareToken))
+                if (!localService.isFollower(prepareToken))
                     throw new IllegalStateException("Not follower.");
 
-                final long tmp = getHAReady();
-                
-                if (prepareToken != tmp) {
-                
-                    throw new IllegalStateException("HAReadyToken: expected="
-                            + prepareToken + ", actual=" + tmp);
-                    
-                }
-                
                 final HAStatusEnum st = getHAStatus();
 
                 if (!HAStatusEnum.Follower.equals(st)) {
@@ -7095,6 +7395,15 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                             + HAStatusEnum.Follower + ", actual=" + st);
 
                 }
+
+            }
+            
+            final long tmp = getHAReady();
+
+            if (prepareToken != tmp) {
+
+                throw new IllegalStateException("HAReadyToken: expected="
+                        + prepareToken + ", actual=" + tmp);
 
             }
             
@@ -7136,129 +7445,24 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                 
             }
 
+            @Override
             public void run() {
+
+                QuorumService<HAGlue> localService = null;
 
                 _fieldReadWriteLock.writeLock().lock();
 
                 try {
 
-                    final IHA2PhasePrepareMessage prepareMessage = prepareRequest
-                            .get();
-
-                    if (prepareMessage == null)
-                        throw new IllegalStateException();
-
-                    // Note: Could throw ChecksumError.
-                    final IRootBlockView rootBlock = prepareMessage == null ? null
-                            : prepareMessage.getRootBlock();
-
-                    final long commitTime = commitMessage.getCommitTime();
-
-                    if (rootBlock == null)
-                        throw new IllegalStateException();
-
-                    if (haLog.isInfoEnabled())
-                        haLog.info("commitTime="
-                                + commitTime
-                                + ", commitCounter="
-                                + prepareMessage.getRootBlock()
-                                        .getCommitCounter() + ", vote=" + vote);
-
-                    if (rootBlock.getLastCommitTime() != commitTime) {
-                        /*
-                         * The commit time does not agree with the root
-                         * block from the prepare message.
-                         */
-                        throw new IllegalStateException();
-                    }
-
-                    if (!vote.get()) {
-                        
-                        /*
-                         * This service voted NO. It will not participate in
-                         * the commit.
-                         */
-
-                    	haLog.warn("IGNORING COMMIT2PHASE, joined: " + prepareMessage.isJoinedService());
-
-                        return;
+                    /*
+                     * Note: Throws IllegalStateException if quorum has been
+                     * terminated. We can't go through the 2-phase commit if the
+                     * quorum is terminated.
+                     */
+                    localService = quorum.getClient();
                     
-                    }
+                    doInnerRun(localService);
                     
-                    // verify that the qourum has not changed.
-                    quorum.assertQuorum(rootBlock.getQuorumToken());
-
-                    final QuorumService<HAGlue> localService = quorum
-                            .getClient();
-
-                    if (prepareMessage.isJoinedService()) {
-
-                        /*
-                         * Only the services that are joined go through the
-                         * commit protocol.
-                         */
-                        if (localService == null) {
-                            /*
-                             * The quorum has been terminated. We can't go
-                             * through the 2-phase commit.
-                             */
-                            throw new IllegalStateException();
-                        }
-                        AbstractJournal.this.doLocalCommit(localService,
-                                rootBlock);
-
-                    } else { // if(isJoinedService)
-                    	haLog.warn("IGNORING COMMIT2PHASE - not joined");
-                    }
-
-                    try {
-
-                        /*
-                         * Write the root block on the HA log file, closing
-                         * out that file.
-                         */
-                        
-                        localService.logRootBlock(
-                                prepareMessage.isJoinedService(), rootBlock);
-
-                    } catch (IOException e) {
-                        /*
-                         * We have already committed.
-                         * 
-                         * This HA log file will be unusable if we have to
-                         * replay the write set to resynchronize some other
-                         * service. However, it is still possible to obtain
-                         * the HA log file from some other service in the
-                         * qourum. If all else fails, the hypothetical
-                         * service can be rebuilt from scratch.
-                         */
-                        haLog.error("UNABLE TO SEAL HA LOG FILE WITH ROOT BLOCK: "
-                                + getServiceId()
-                                + ", rootBlock="
-                                + rootBlock);
-                    }
-
-                    if (commitMessage.didAllServicesPrepare()) {
-
-                        /*
-                         * The HALog files are conditionally purged (depending
-                         * on the IRestorePolicy) on each node any time the
-                         * quorum is fully met and goes through a commit point.
-                         * The current HALog always remains open.
-                         * 
-                         * Note: This decision needs to be made in awareness of
-                         * whether all services voted to PREPARE. Otherwise we
-                         * can hit a problem where some service did not vote to
-                         * prepare, but the other services did, and we wind up
-                         * purging the HALogs even though one of the services
-                         * did not go through the commit2Phase(). This issue is
-                         * fixed by the didAllServicesPrepare() flag.
-                         */
-
-                        localService.purgeHALogs(rootBlock.getQuorumToken());
-                        
-                    }
-
                 } catch (Throwable t) {
 
                     try {
@@ -7273,19 +7477,15 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
                     }
 
-                    try {
+                    if (localService != null) {
 
-                        quorum.getActor().serviceLeave();
-
-                    } catch (Throwable t2) {
-
-                        log.error(t2, t2);
-
+                        localService.enterErrorState();
+                        
                     }
 
                     // always rethrow the root cause exception.
                     throw new RuntimeException(t);
-                    
+
                 } finally {
 
                     // Discard the prepare request.
@@ -7300,7 +7500,98 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
             }
 
-        }
+            private void doInnerRun(final QuorumService<HAGlue> localService)
+                    throws Exception {
+                
+                final IHA2PhasePrepareMessage prepareMessage = prepareRequest
+                        .get();
+
+                if (prepareMessage == null)
+                    throw new IllegalStateException();
+
+                if (!prepareMessage.isJoinedService()) {
+                    /*
+                     * Only services that are joined as of the atomic decision
+                     * point should receive a PREPARE or COMMIT message.
+                     */
+                    throw new AssertionError();
+                }
+
+                // Note: Could throw ChecksumError.
+                final IRootBlockView rootBlock = prepareMessage == null ? null
+                        : prepareMessage.getRootBlock();
+
+                final long commitTime = commitMessage.getCommitTime();
+
+                if (rootBlock == null)
+                    throw new IllegalStateException();
+
+                if (haLog.isInfoEnabled())
+                    haLog.info("commitTime="
+                            + commitTime
+                            + ", commitCounter="
+                            + prepareMessage.getRootBlock()
+                                    .getCommitCounter() + ", vote=" + vote);
+
+                if (rootBlock.getLastCommitTime() != commitTime) {
+                    /*
+                     * The commit time does not agree with the root
+                     * block from the prepare message.
+                     */
+                    throw new IllegalStateException();
+                }
+
+                if (!vote.get()) {
+
+                    /*
+                     * This service voted NO. It will not participate in the
+                     * commit.
+                     */
+
+                    haLog.warn("IGNORING COMMIT2PHASE");
+
+                    return;
+
+                }
+                
+                // verify that the qourum has not changed.
+                quorum.assertQuorum(rootBlock.getQuorumToken());
+
+                /*
+                 * Write the root block on the local journal.
+                 */
+                AbstractJournal.this.doLocalCommit(localService, rootBlock);
+
+                /*
+                 * Write the root block on the HALog file, closing out that
+                 * file.
+                 */
+                localService.logRootBlock(rootBlock);
+
+                if (commitMessage.didAllServicesPrepare()) {
+
+                    /*
+                     * The HALog files are conditionally purged (depending
+                     * on the IRestorePolicy) on each node any time the
+                     * quorum is fully met and goes through a commit point.
+                     * The current HALog always remains open.
+                     * 
+                     * Note: This decision needs to be made in awareness of
+                     * whether all services voted to PREPARE. Otherwise we
+                     * can hit a problem where some service did not vote to
+                     * prepare, but the other services did, and we wind up
+                     * purging the HALogs even though one of the services
+                     * did not go through the commit2Phase(). This issue is
+                     * fixed by the didAllServicesPrepare() flag.
+                     */
+
+                    localService.purgeHALogs(rootBlock.getQuorumToken());
+                    
+                }
+            
+            } // doInnerRun()
+            
+        } // Commit2PhaseTask
 
         @Override
         public Future<Void> abort2Phase(final IHA2PhaseAbortMessage abortMessage) {
