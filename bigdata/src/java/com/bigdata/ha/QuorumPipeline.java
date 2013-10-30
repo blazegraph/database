@@ -160,19 +160,21 @@ public interface QuorumPipeline<S extends HAPipelineGlue> {
      * onto the {@link HALogWriter}.
      * <p>
      * Note: This method is ONLY invoked as part of the 2-phase commit protocol.
-     * Therefore, it ONLY applies to the live HALog file. A service is
+     * Therefore, this method ONLY applies to the live HALog file. A service is
      * atomically either joined with the met quorum at a 2-phase commit point or
-     * not joined. This information is passed through from the 2-phase prepare
-     * in the <i>isJoinedService</i> argument. 
+     * not joined. The PREPARE and COMMIT messages are ONLY generated for
+     * services that were joined with the met quorum as of that atomic decision
+     * point in the commit protocol. Therefore, this method is never called for
+     * a service that was not joined as of that atomic decision point.
      * 
-     * @param isJoinedService
-     *            <code>true</code> iff the service was joined with the met
-     *            quorum at the atomic decision point in the 2-phase commit
-     *            protocol.
      * @param rootBlock
      *            The root block for the commit point that was just achieved.
      */
-    void logRootBlock(final boolean isJoinedService,
+//    * @param isJoinedService
+//    *            <code>true</code> iff the service was joined with the met
+//    *            quorum at the atomic decision point in the 2-phase commit
+//    *            protocol.
+    void logRootBlock(//final boolean isJoinedService,
             final IRootBlockView rootBlock) throws IOException;
 
     /**

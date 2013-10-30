@@ -661,7 +661,8 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
 //            @SuppressWarnings("unchecked")
 //            final Future<Void>[] remoteFutures = new Future[joinedServiceIds.length];
 //            final boolean[] remoteDone = new boolean[joinedServiceIds.length];
-            
+
+            // Local future for RMI requesting GATHER on each follower.
             final List<Future<Void>> futures = new LinkedList<Future<Void>>();
 
             try {
@@ -866,14 +867,49 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
                  */
 
                 for (Future<Void> f : futures) {
-                
-                    f.cancel(true/* mayInterruptIfRunning */);
-                
+
+                    /*
+                     * Await the Future with a short timeout for the task that
+                     * did the RMI to each follow to participate in the GATHER
+                     * protocol. Ensure that these Futures are cancelled if they
+                     * are not already done, but prefer not to attempt to cancel
+                     * the Future if it would be finished if we waited for a few
+                     * milliseconds.
+                     */
+                    boolean done = false;
                     try {
+                        f.get(10, TimeUnit.MILLISECONDS);
+                        done = true;
+                    } catch (Exception ex) {
+                        // IGNORE
+                    } finally {
+                        if (!done) {
+                            // cancel local future.
+                            f.cancel(true/* mayInterruptIfRunning */);
+                        }
+                    }
+                    
+                    /*
+                     * Future is done. Either cancelled, error, or successfully
+                     * completed per the code block immediately above.
+                     */
+                    try {
+                        // check outcome of future.
                         f.get();
                     } catch (CancellationException e) {
-                        // Probably blocked on the RMI.
-                        log.error(e, e);
+                        /*
+                         * There is a race between the code path returning from
+                         * the RMI (to request the caller to participate in the
+                         * gather procotol) and the code path in which the
+                         * leader awakens from the broken barrier (above). We
+                         * have explicitly cancelled the future for that RMI and
+                         * then checked the Future. If the leader wakes up
+                         * before the RMI returns, then the Future will be
+                         * cancelled rather than done. This case is a race, not an
+                         * error.
+                         */
+                        if (log.isInfoEnabled())
+                            log.info(e);// , e);
                     } catch (ExecutionException e) {
                         // Probably error on the RMI.
                         log.error(e, e);
