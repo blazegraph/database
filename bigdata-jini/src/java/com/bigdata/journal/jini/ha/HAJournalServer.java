@@ -441,11 +441,6 @@ public class HAJournalServer extends AbstractServer {
         
     }
 
-//    /**
-//     * Caching discovery client for the {@link HAGlue} services.
-//     */
-//    private HAJournalDiscoveryClient discoveryClient;
-
     /**
      * The journal.
      */
@@ -457,10 +452,6 @@ public class HAJournalServer extends AbstractServer {
      * @see ConfigurationOptions#ONLINE_DISASTER_RECOVERY
      */
     private boolean onelineDisasterRecovery;
-    
-//    private ZookeeperClientConfig zkClientConfig;
-    
-//    private ZooKeeperAccessor zka;
     
     /**
      * An executor used to handle events that were received in the zk watcher
@@ -560,15 +551,6 @@ public class HAJournalServer extends AbstractServer {
          */
         Operator;
     }
-    
-//    /**
-//     * Caching discovery client for the {@link HAGlue} services.
-//     */
-//    public HAJournalDiscoveryClient getDiscoveryClient() {
-//
-//        return discoveryClient;
-//        
-//    }
 
     public HAJournalServer(final String[] args, final LifeCycle lifeCycle) {
 
@@ -602,14 +584,6 @@ public class HAJournalServer extends AbstractServer {
 
     @Override
     protected void terminate() {
-
-//        if (discoveryClient != null) {
-//        
-//            discoveryClient.terminate();
-//            
-//            discoveryClient = null;
-//            
-//        }
 
         super.terminate();
     
@@ -663,49 +637,6 @@ public class HAJournalServer extends AbstractServer {
         if (log.isInfoEnabled())
             log.info("Creating service impl...");
 
-//        /*
-//         * Verify discovery of at least one ServiceRegistrar.
-//         */
-//        getHAClient().getConnection().awaitServiceRegistrars(10/* timeout */,
-//                TimeUnit.SECONDS);
-        
-//        {
-//            final long begin = System.currentTimeMillis();
-//
-//            ServiceRegistrar[] registrars = null;
-//
-//            long elapsed = 0;
-//
-//            while ((registrars == null || registrars.length == 0)
-//                    && elapsed < TimeUnit.SECONDS.toMillis(10)) {
-//
-//                registrars = getHAClient().getConnection()
-//                        .getDiscoveryManagement().getRegistrars();
-//
-//                Thread.sleep(100/* ms */);
-//
-//                elapsed = System.currentTimeMillis() - begin;
-//
-//            }
-//
-//            if (registrars == null || registrars.length == 0) {
-//
-//                throw new RuntimeException(
-//                        "Could not discover ServiceRegistrar(s)");
-//
-//            }
-//
-//            if (log.isInfoEnabled()) {
-//                log.info("Found " + registrars.length + " service registrars");
-//            }
-//
-//        }
-
-//        // Setup discovery for HAGlue clients.
-//        discoveryClient = new HAJournalDiscoveryClient(
-//                getServiceDiscoveryManager(),
-//                null/* serviceDiscoveryListener */, cacheMissTimeout);
-
         // Jini/River ServiceID.
         final ServiceID serviceID = getServiceID();
 
@@ -727,7 +658,6 @@ public class HAJournalServer extends AbstractServer {
          * Setup the Quorum / HAJournal.
          */
 
-//        zkClientConfig = new ZookeeperClientConfig(config);
         final ZookeeperClientConfig zkClientConfig = getHAClient()
                 .getZookeeperClientConfig();
 
@@ -757,55 +687,8 @@ public class HAJournalServer extends AbstractServer {
             /*
              * Zookeeper quorum.
              */
-            final Quorum<HAGlue, QuorumService<HAGlue>> quorum;
-            {
-
-//                final List<ACL> acl = zkClientConfig.acl;
-//
-//                final ZooKeeperAccessor zka = getHAClient().getConnection()
-//                        .getZookeeperAccessor();
-//
-//                if (!zka.awaitZookeeperConnected(10, TimeUnit.SECONDS)) {
-//
-//                    throw new RuntimeException("Could not connect to zk");
-//
-//                }
-//
-//                if (log.isInfoEnabled()) {
-//                    log.info("Connected to zookeeper");
-//                }
-//
-//                /*
-//                 * Ensure key znodes exist.
-//                 */
-//                try {
-//                    zka.getZookeeper()
-//                            .create(zkClientConfig.zroot,
-//                                    new byte[] {/* data */}, acl,
-//                                    CreateMode.PERSISTENT);
-//                } catch (NodeExistsException ex) {
-//                    // ignore.
-//                }
-//                try {
-//                    zka.getZookeeper()
-//                            .create(logicalServiceZPathPrefix,
-//                                    new byte[] {/* data */}, acl,
-//                                    CreateMode.PERSISTENT);
-//                } catch (NodeExistsException ex) {
-//                    // ignore.
-//                }
-//                try {
-//                    zka.getZookeeper()
-//                            .create(logicalServiceZPath,
-//                                    new byte[] {/* data */}, acl,
-//                                    CreateMode.PERSISTENT);
-//                } catch (NodeExistsException ex) {
-//                    // ignore.
-//                }
-
-                quorum = (Quorum) new ZKQuorumImpl<HAGlue, HAQuorumService<HAGlue, HAJournal>>(
-                        replicationFactor);// , zka, acl);
-            }
+            final Quorum<HAGlue, QuorumService<HAGlue>> quorum = (Quorum) new ZKQuorumImpl<HAGlue, HAQuorumService<HAGlue, HAJournal>>(
+                    replicationFactor);
 
             // The HAJournal.
             this.journal = newHAJournal(this, config, quorum);
@@ -822,19 +705,15 @@ public class HAJournalServer extends AbstractServer {
         // Setup the quorum client (aka quorum service).
         quorumService = newQuorumService(logicalServiceZPath, serviceUUID,
                 haGlueService, journal);
-        
-//        // wrap the external interface, exposing administrative functions.
-//        final AdministrableHAGlueService administrableService = new AdministrableHAGlueService(
-//                this, haGlueService);
-//
-//        // return that wrapped interface.
-//        return administrableService;
 
         /*
-         * Return that object. This will get proxied. If we wrap it with a
-         * delegation pattern here, then RMI methods on a subclass of
-         * HAGlueService will not be visible on the exported proxy.
+         * Return our external interface object. This object will get proxied.
+         * 
+         * Note: If we wrap that object with a delegation pattern, then RMI
+         * methods on a subclass of HAGlueService will not be visible on the
+         * exported proxy.
          */
+
         return haGlueService;
 
     }
@@ -924,25 +803,9 @@ public class HAJournalServer extends AbstractServer {
         // Start the NSS.
         startNSS();
 
-//        // Setup listener that logs quorum events @ TRACE.
-//        journal.getQuorum().addListener(new QuorumListener() {
-//            @Override
-//            public void notify(final QuorumEvent e) {
-//                if (log.isTraceEnabled())
-//                    log.trace(e);
-//            }
-//        });
-
-//        // Setup the quorum client (aka quorum service).
-//        quorumService = newQuorumService(logicalServiceZPath, serviceUUID,
-//                haGlueService, journal);
-
         // Start the quorum.
         journal.getQuorum().start(quorumService);
 
-//        // Enter a run state for the HAJournalServer.
-//        quorumService.enterRunState(quorumService.new RestoreTask());
-        
     }
     
     /**
@@ -985,37 +848,6 @@ public class HAJournalServer extends AbstractServer {
         if (log.isInfoEnabled())
             log.info("destroy=" + destroy);
 
-        // Note: Moved to quorumService.terminate().
-//        if (quorumService != null) {
-//
-//            /*
-//             * FIXME SHUTDOWN: What if we are already running a ShutdownTask? We
-//             * should just submit a ShutdownTask here and let it work this out.
-//             */
-//
-//            /*
-//             * Ensure that the HAQuorumService will not attempt to cure any
-//             * serviceLeave or related actions.
-//             * 
-//             * TODO SHUTDOWN: If we properly enter a ShutdownTask run state then
-//             * we would not have to do this since it will already be in the
-//             * Shutdown runstate.
-//             */
-//            quorumService.runStateRef.set(RunStateEnum.Shutdown);
-//
-//            /*
-//             * Terminate any running task.
-//             */
-//            final FutureTask<?> ft = quorumService.runStateFutureRef.get();
-//
-//            if (ft != null) {
-//
-//                ft.cancel(true/* mayInterruptIfRunning */);
-//
-//            }
-//            
-//        }
-
         final HAJournal tjournal = journal;
 
         final Quorum<HAGlue, QuorumService<HAGlue>> quorum = tjournal == null ? null
@@ -1042,26 +874,7 @@ public class HAJournalServer extends AbstractServer {
                  * that method.]
                  */
                 quorum.terminate();
-
-                // Note: handled by HAClient.disconnect().
-                // TODO Should we do that disconnect here?
-//                /*
-//                 * Close our zookeeper connection, invalidating all ephemeral
-//                 * znodes for this service.
-//                 * 
-//                 * Note: This provides a decisive mechanism for removing this
-//                 * service from the joined services, the pipeline, withdrawing
-//                 * its vote, and removing it as a quorum member.
-//                 */
-//                if (haLog.isInfoEnabled())
-//                    haLog.warn("FORCING UNCURABLE ZOOKEEPER DISCONNECT");
-//                
-//                if (zka != null) {
-//
-//                    zka.close();
-//                    
-//                }
-
+                
             } catch (Throwable t) {
 
                 log.error(t, t);
@@ -1215,6 +1028,7 @@ public class HAJournalServer extends AbstractServer {
                 
             }
             
+            @Override
             final public T call() throws Exception {
 
                 /*
@@ -1504,11 +1318,6 @@ public class HAJournalServer extends AbstractServer {
         @Override
         protected long getRetrySendTimeoutNanos() {
             
-//            final ZooKeeperAccessor zka = journal
-//                    .getHAClient()
-//                    .getConnection()
-//                    .getZookeeperAccessor();
-
             final ZooKeeper zk = getZooKeeper();
             int negotiatedSessionTimeoutMillis;
 //            try {
@@ -2206,21 +2015,6 @@ public class HAJournalServer extends AbstractServer {
                         
                     log.warn("Will attempt SERVICE LEAVE");
                     getActor().serviceLeave(); // Just once(!)
-//                    while (true) {
-//                        try {
-//                            getActor().serviceLeave();
-//                            break;
-//                        } catch (RuntimeException re) {
-//                            if (InnerCause.isInnerCause(re,
-//                                    KeeperException.class)) {
-//                                // Do not retry in a tight loop.
-//                                Thread.sleep(250/* ms */);
-//                                // Retry.
-//                                continue;
-//                            }
-//                            throw re;
-//                        }
-//                    }
 
                     /**
                      * Dispatch Events before entering SeekConsensus! Otherwise
@@ -2743,10 +2537,6 @@ public class HAJournalServer extends AbstractServer {
 
                     while (r.hasMoreBuffers()) {
 
-//                        // IHABufferStrategy
-//                        final IHABufferStrategy strategy = journal
-//                                .getBufferStrategy();
-
                         // get message and fill write cache buffer (unless
                         // WORM).
                         final IHAWriteMessage msg = r.processNextBuffer(buf
@@ -2815,6 +2605,7 @@ public class HAJournalServer extends AbstractServer {
 
             }
 
+            @Override
             protected Void doRun() throws Exception {
 
                 /*
@@ -3004,6 +2795,7 @@ public class HAJournalServer extends AbstractServer {
              * 
              * @throws Exception
              */
+            @Override
             protected Void doRun() throws Exception {
 
 //                // Wait for the token to be set, root blocks to be valid.
@@ -4106,6 +3898,7 @@ public class HAJournalServer extends AbstractServer {
 
             txs.runWithBarrierLock(new Runnable() {
 
+                @Override
                 public void run() {
 
                     // Verify that the quorum is valid.
@@ -4765,168 +4558,8 @@ public class HAJournalServer extends AbstractServer {
         // Wait for the HAJournalServer to terminate.
         server.run();
         
-//        try {
-//            final Server tmp = server.jettyServer;
-//            if (tmp != null) {
-//                // Wait for the jetty server to terminate.
-//                tmp.join();
-//            }
-//        } catch (InterruptedException e) {
-//            log.warn(e);
-//        }
-
         System.exit(0);
 
     }
-    
-//    /**
-//     * Adds jini administration interfaces to the basic {@link HAGlue} interface
-//     * exposed by the {@link HAJournal}.
-//     * 
-//     * @see HAJournal.HAGlueService
-//     * 
-//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
-//     *         Thompson</a>
-//     */
-//    public static class AdministrableHAGlueService extends HAGlueDelegate
-//            implements RemoteAdministrable, RemoteDestroyAdmin {
-//
-//        final protected HAJournalServer server;
-//
-//        public AdministrableHAGlueService(final HAJournalServer server,
-//                final HAGlue service) {
-//
-//            super(service);
-//
-//            this.server = server;
-//            
-//        }
-//        
-////        /**
-////         * Returns an object that implements whatever administration interfaces
-////         * are appropriate for the particular service.
-////         * 
-////         * @return an object that implements whatever administration interfaces
-////         *         are appropriate for the particular service.
-////         */
-////        public Object getAdmin() throws RemoteException {
-////
-////            if (log.isInfoEnabled())
-////                log.info("serviceID=" + server.getServiceID());
-////
-////            return server.proxy;
-////            
-////        }
-//        
-////        /**
-////         * Sets up the {@link MDC} logging context. You should do this on every
-////         * client facing point of entry and then call
-////         * {@link #clearLoggingContext()} in a <code>finally</code> clause. You
-////         * can extend this method to add additional context.
-////         * <p>
-////         * This implementation adds the following parameters to the {@link MDC}.
-////         * <dl>
-////         * <dt>serviceName</dt>
-////         * <dd>The serviceName is typically a configuration property for the
-////         * service. This datum can be injected into log messages using
-////         * <em>%X{serviceName}</em> in your log4j pattern layout.</dd>
-////         * <dt>serviceUUID</dt>
-////         * <dd>The serviceUUID is, in general, assigned asynchronously by the
-////         * service registrar. Once the serviceUUID becomes available it will be
-////         * added to the {@link MDC}. This datum can be injected into log
-////         * messages using <em>%X{serviceUUID}</em> in your log4j pattern layout.
-////         * </dd>
-////         * <dt>hostname</dt>
-////         * <dd>The hostname statically determined. This datum can be injected
-////         * into log messages using <em>%X{hostname}</em> in your log4j pattern
-////         * layout.</dd>
-////         * <dt>clientname
-////         * <dt>
-////         * <dd>The hostname or IP address of the client making the request.</dd>
-////         * </dl>
-////         * Note: {@link InetAddress#getHostName()} is used. This method makes a
-////         * one-time best effort attempt to resolve the host name from the
-////         * {@link InetAddress}.
-////         */
-////        private void setupLoggingContext() {
-////
-////            try {
-////
-////                // Note: This _is_ a local method call.
-////                final ServiceID serviceUUID = server.getServiceID();
-////
-////                // Will be null until assigned by the service registrar.
-////
-////                if (serviceUUID != null) {
-////
-////                    MDC.put("serviceUUID", serviceUUID);
-////
-////                }
-////
-////                MDC.put("serviceName", server.getServiceName());
-////
-////                MDC.put("hostname", server.getHostName());
-////
-////                try {
-////
-////                    final InetAddress clientAddr = ((ClientHost) ServerContext
-////                            .getServerContextElement(ClientHost.class))
-////                            .getClientHost();
-////
-////                    MDC.put("clientname", clientAddr.getHostName());
-////
-////                } catch (ServerNotActiveException e) {
-////
-////                    /*
-////                     * This exception gets thrown if the client has made a
-////                     * direct (vs RMI) call so we just ignore it.
-////                     */
-////
-////                }
-////
-////            } catch (Throwable t) {
-////
-////                /*
-////                 * Ignore.
-////                 */
-////
-////            }
-////
-////        }
-////
-////        /**
-////         * Clear the logging context.
-////         */
-////        protected void clearLoggingContext() {
-////            
-////            MDC.remove("serviceName");
-////
-////            MDC.remove("serviceUUID");
-////
-////            MDC.remove("hostname");
-////            
-////            MDC.remove("clientname");
-////
-////        }
-//
-////        /**
-////         * Extends the base behavior to return a {@link Name} of the service
-////         * from the {@link Configuration}. If no name was specified in the
-////         * {@link Configuration} then the value returned by the base class is
-////         * returned instead.
-////         */
-////        @Override
-////        public String getServiceName() {
-////
-////            String s = server.getServiceName();
-////
-////            if (s == null)
-////                s = super.getServiceName();
-////
-////            return s;
-////
-////        }
-//
-//    }
 
 }

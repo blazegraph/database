@@ -260,6 +260,11 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
     private JoinManager joinManager;
 
     /**
+     * Used to suppor the {@link #joinManager}.
+     */
+    private volatile LookupDiscoveryManager lookupDiscoveryManager = null;
+
+    /**
      * The {@link Configuration} read based on the args[] provided when the
      * server is started.
      */
@@ -399,24 +404,6 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
         
     }
 
-//    /**
-//     * An object used to manage jini service registrar discovery.
-//     */
-//    public LookupDiscoveryManager getDiscoveryManagement() {
-//        
-//        return lookupDiscoveryManager;
-//        
-//    }
-//
-//    /**
-//     * An object used to lookup services using the discovered service registars.
-//     */
-//    public ServiceDiscoveryManager getServiceDiscoveryManager() {
-//        
-//        return serviceDiscoveryManager;
-//        
-//    }
-
     /**
      * The {@link HAClient}.
      */
@@ -445,6 +432,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
     /**
      * Signals anyone waiting on {@link #discoveryEvent}.
      */
+    @Override
     public void discarded(final DiscoveryEvent e) {
 
         try {
@@ -472,6 +460,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
     /**
      * Signals anyone waiting on {@link #discoveryEvent}.
      */
+    @Override
     public void discovered(final DiscoveryEvent e) {
 
         try {
@@ -895,106 +884,6 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
             throw new AssertionError();// keeps compiler happy.
         }
         
-//         Note: Moved HAClient.connect() into quorumService.start().
-//        final HAConnection ctx;
-//        try {
-//
-//            // Create client.
-//            haClient = new HAClient(args);
-//
-//            // Connect.
-//            ctx = haClient.connect();
-//            
-////            /*
-////             * Note: This class will perform multicast discovery if ALL_GROUPS
-////             * is specified and otherwise requires you to specify one or more
-////             * unicast locators (URIs of hosts running discovery services). As
-////             * an alternative, you can use LookupDiscovery, which always does
-////             * multicast discovery.
-////             */
-////            lookupDiscoveryManager = new LookupDiscoveryManager(
-////                    jiniClientConfig.groups, jiniClientConfig.locators,
-////                    this /* DiscoveryListener */, config);
-////
-////            /*
-////             * Setup a helper class that will be notified as services join or
-////             * leave the various registrars to which the data server is
-////             * listening.
-////             */
-////            try {
-////
-////                serviceDiscoveryManager = new ServiceDiscoveryManager(
-////                        lookupDiscoveryManager, new LeaseRenewalManager(),
-////                        config);
-////
-////            } catch (IOException ex) {
-////
-////                throw new RuntimeException(
-////                        "Could not initiate service discovery manager", ex);
-////
-////            }
-////
-////        } catch (IOException ex) {
-////
-////            fatal("Could not setup discovery", ex);
-////            throw new AssertionError();// keep the compiler happy.
-////
-//        } catch (ConfigurationException ex) {
-//
-//            fatal("Configuration error: " + ex, ex);
-//
-//            throw new AssertionError();// keep the compiler happy.
-//
-//        } catch(Throwable ex) {
-//            
-//            fatal("Could not connect: " + ex, ex);
-//
-//            throw new AssertionError();// keep the compiler happy.
-//
-//        }
-
-        // Note: Moved newService() call into AbstractServer.run().
-//        /*
-//         * Create the service object.
-//         */
-//        try {
-//            
-//            /*
-//             * Note: By creating the service object here rather than outside of
-//             * the constructor we potentially create problems for subclasses of
-//             * AbstractServer since their own constructor will not have been
-//             * executed yet.
-//             * 
-//             * Some of those problems are worked around using a JiniClient to
-//             * handle all aspects of service discovery (how this service locates
-//             * the other services in the federation).
-//             * 
-//             * Note: If you explicitly assign values to those clients when the
-//             * fields are declared, e.g., [timestampServiceClient=null] then the
-//             * ctor will overwrite the values set by [newService] since it is
-//             * running before those initializations are performed. This is
-//             * really crufty, may be JVM dependent, and needs to be refactored
-//             * to avoid this subclass ctor init problem.
-//             */
-//
-//            if (log.isInfoEnabled())
-//                log.info("Creating service impl...");
-//
-//            // init.
-//            impl = newService(config);
-//            
-//            if (log.isInfoEnabled())
-//                log.info("Service impl is " + impl);
-//            
-//        } catch(Exception ex) {
-//        
-//            fatal("Could not start service: "+this, ex);
-//            throw new AssertionError();// keeps compiler happy.
-//        }
-
-//        // Export the service proxy.
-//        exportProxy(haClient, impl);
-        
     }
 
     /**
@@ -1157,7 +1046,6 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
         }
         
     }
-    private volatile LookupDiscoveryManager lookupDiscoveryManager = null;
 
     /**
      * Await discovery of at least one {@link ServiceRegistrar}.
@@ -1420,6 +1308,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
      * @param serviceID
      *            The assigned {@link ServiceID}.
      */
+    @Override
     synchronized public void serviceIDNotify(final ServiceID serviceID) {
 
         if (serviceID == null)
@@ -1550,6 +1439,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
      * Note: This is only invoked if the automatic lease renewal by the lease
      * manager is denied by the service registrar.
      */
+    @Override
     public void notify(final LeaseRenewalEvent event) {
         
         log.warn("Lease could not be renewed: " + this + " : " + event);
@@ -1922,42 +1812,6 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
             }
 
         }
-
-//        if (serviceDiscoveryManager != null) {
-//
-//            serviceDiscoveryManager.terminate();
-//
-//            serviceDiscoveryManager = null;
-//
-//        }
-//
-//        if (lookupDiscoveryManager != null) {
-//
-//            lookupDiscoveryManager.terminate();
-//
-//            lookupDiscoveryManager = null;
-//
-//        }
-        
-//        if (client != null) {
-//
-//            if(client.isConnected()) {
-//
-//                /*
-//                 * Note: This will close the zookeeper client and that will
-//                 * cause the ephemeral znode for the service to be removed.
-//                 */
-//
-////                if (log.isInfoEnabled())
-////                    log.info("Disconnecting from federation");
-//                
-//                client.disconnect(true/* immediateShutdown */);
-//                
-//            }
-//
-//            client = null;
-//            
-//        }
         
     }
     
@@ -2181,7 +2035,8 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
         
         return new FileFilter() {
 
-            public boolean accept(File pathname) {
+            @Override
+            public boolean accept(final File pathname) {
 
                 return false;
                 

@@ -69,6 +69,7 @@ import com.bigdata.ha.msg.HADigestRequest;
 import com.bigdata.ha.msg.HALogDigestRequest;
 import com.bigdata.ha.msg.HARootBlockRequest;
 import com.bigdata.ha.msg.HASnapshotDigestRequest;
+import com.bigdata.ha.msg.IHARootBlockRequest;
 import com.bigdata.io.TestCase3;
 import com.bigdata.jini.start.process.ProcessHelper;
 import com.bigdata.journal.DumpJournal;
@@ -1001,34 +1002,34 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
         
     }
 
-    /**
-     * Assert that the remote server is at the specified commit point.
-     * <p>
-     * This method DOES NOT WAIT. It will fail unless the service is already at
-     * the specified commit point.
-     * 
-     * @param expected
-     *            The expected commit point.
-     * @param haGlue
-     *            The remote server interface(s).
-     * 
-     * @throws IOException
-     * 
-     * @deprecated by {@link #awaitCommitCounter(long, HAGlue...)}.
-     */
-    @Deprecated
-    protected void assertCommitCounter(final long expected, final HAGlue... haGlue)
-            throws IOException {
-
-        for (HAGlue server : haGlue) {
-            assertEquals(
-                    expected,
-                    server.getRootBlock(
-                            new HARootBlockRequest(null/* storeUUID */))
-                            .getRootBlock().getCommitCounter());
-        }
-
-    }
+//    /**
+//     * Assert that the remote server is at the specified commit point.
+//     * <p>
+//     * This method DOES NOT WAIT. It will fail unless the service is already at
+//     * the specified commit point.
+//     * 
+//     * @param expected
+//     *            The expected commit point.
+//     * @param haGlue
+//     *            The remote server interface(s).
+//     * 
+//     * @throws IOException
+//     * 
+//     * @deprecated by {@link #awaitCommitCounter(long, HAGlue...)}.
+//     */
+//    @Deprecated
+//    protected void assertCommitCounter(final long expected, final HAGlue... haGlue)
+//            throws IOException {
+//
+//        for (HAGlue server : haGlue) {
+//            assertEquals(
+//                    expected,
+//                    server.getRootBlock(
+//                            new HARootBlockRequest(null/* storeUUID */))
+//                            .getRootBlock().getCommitCounter());
+//        }
+//
+//    }
 
     /**
      * Await a commit point on one or more services, but only a short while as
@@ -1054,16 +1055,22 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
     protected void awaitCommitCounter(final long expected,
             final HAGlue... services) throws IOException {
 
+        /*
+         * Note: This explicitly uses a blocking form of the request in order to
+         * ensure that we do not observe a root block that has been written on a
+         * given service but where that service is not fully done with its share
+         * of the commit protocol.
+         */
+        final IHARootBlockRequest req = new HARootBlockRequest(
+                null/* storeUUID */, false/* isNonBlocking */);
+
         for (HAGlue service : services) {
             final HAGlue haGlue = service;
             assertCondition(new Runnable() {
                 public void run() {
                     try {
-                        assertEquals(
-                                expected,
-                                haGlue.getRootBlock(
-                                        new HARootBlockRequest(null/* storeUUID */))
-                                        .getRootBlock().getCommitCounter());
+                        assertEquals(expected, haGlue.getRootBlock(req)
+                                .getRootBlock().getCommitCounter());
                     } catch (IOException e) {
                         throw new RuntimeException(e);
                     }
