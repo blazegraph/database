@@ -32,11 +32,33 @@ public class HARootBlockRequest implements IHARootBlockRequest,
     private static final long serialVersionUID = 1L;
 
     private final UUID storeUUID;
+    private final boolean isNonBlocking;
 
+    /**
+     * Create a non-blocking request (this is the historical behavior).
+     * 
+     * @param storeUUID
+     *            The store UUID (optional).
+     */
     public HARootBlockRequest(final UUID storeUUID) {
+
+        this(storeUUID, true/* isNonBlocking */);
+
+    }
+ 
+    /**
+     * 
+     * @param storeUUID
+     *            The store UUID (optional).
+     * @param isNonBlocking
+     *            <code>true</code> iff the request should be non-blocking.
+     */
+    public HARootBlockRequest(final UUID storeUUID,final boolean isNonBlocking) {
 
         // Note: Optional.
         this.storeUUID = storeUUID;
+        
+        this.isNonBlocking = isNonBlocking;
 
     }
 
@@ -47,4 +69,11 @@ public class HARootBlockRequest implements IHARootBlockRequest,
 
     }
 
+    @Override
+    public boolean isNonBlocking() {
+
+        return isNonBlocking;
+        
+    }
+    
 }

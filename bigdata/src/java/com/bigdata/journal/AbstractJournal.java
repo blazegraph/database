@@ -7842,8 +7842,33 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                 
             }
 
-            return new HARootBlockResponse(
-                    AbstractJournal.this.getRootBlockView());
+            if (msg.isNonBlocking()) {
+
+                // Non-blocking code path.
+                
+                return new HARootBlockResponse(
+                        AbstractJournal.this.getRootBlockView());
+
+            } else {
+
+                // Blocking code path.
+                
+                final ReadLock lock = _fieldReadWriteLock.readLock();
+
+                lock.lock();
+
+                try {
+                    
+                    return new HARootBlockResponse(
+                            AbstractJournal.this.getRootBlockView());
+
+                } finally {
+                
+                    lock.unlock();
+                    
+                }
+                
+            }
 
         }
 
