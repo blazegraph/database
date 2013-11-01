@@ -96,6 +96,7 @@ import com.bigdata.counters.AbstractStatisticsCollector;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
 import com.bigdata.ha.CommitRequest;
+import com.bigdata.ha.CommitResponse;
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.HAStatusEnum;
 import com.bigdata.ha.HATXSGlue;
@@ -3527,6 +3528,26 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
         /**
          * HA mode commit (2-phase commit).
+         */
+        private void commitHA() {
+
+            try {
+                
+                prepare2Phase();
+                
+                commit2Phase();
+                
+            } catch (Exception e) {
+
+                // launder throwable.
+                throw new RuntimeException(e);
+                
+            }
+            
+        }
+        
+        /**
+         * PREPARE
          * <p>
          * Note: We need to make an atomic decision here regarding whether a
          * service is joined with the met quorum or not. This information will
@@ -3541,12 +3562,37 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
          * metadata for the znode that is the parent of the joined services.
          * However, we would need an expanded interface to get that metadata
          * from zookeeper out of the Quorum.
+         * 
+         * @throws IOException
+         * @throws TimeoutException
+         * @throws InterruptedException
          */
-        private void commitHA() {
-
+        private void prepare2Phase() throws InterruptedException,
+                TimeoutException, IOException {
+ 
+            boolean didPrepare = false;
             try {
 
-                if(!prepare2Phase()) {
+                // Atomic decision point for joined vs non-joined services.
+                prepareJoinedAndNonJoinedServices = new JoinedAndNonJoinedServices(
+                        quorum);
+
+                prepareRequest = new PrepareRequest(//
+                        consensusReleaseTime,//
+                        gatherJoinedAndNonJoinedServices,//
+                        prepareJoinedAndNonJoinedServices,//
+                        newRootBlock,//
+                        quorumService.getPrepareTimeout(), // timeout
+                        TimeUnit.MILLISECONDS//
+                );
+
+                // issue prepare request.
+                prepareResponse = quorumService.prepare2Phase(prepareRequest);
+
+                if (haLog.isInfoEnabled())
+                    haLog.info(prepareResponse.toString());
+                
+                if (!prepareResponse.willCommit()) {
                     
                     // PREPARE rejected.  
                     throw new QuorumException("PREPARE rejected: nyes="
@@ -3554,15 +3600,12 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                             + prepareResponse.replicationFactor());
 
                 }
+                didPrepare = true;
 
-                commitRequest = new CommitRequest(prepareRequest,
-                        prepareResponse);
+            } finally {
 
-                quorumService.commit2Phase(commitRequest);
+                if (!didPrepare) {
 
-            } catch (Throwable e) {
-
-                try {
                     /*
                      * Something went wrong. Any services that were in the
                      * pipeline could have a dirty write set. Services that
@@ -3581,12 +3624,73 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                      * breaks, then the services will move into the Error state
                      * and will do a local abort as part of that transition.
                      */
-                    quorumService.abort2Phase(commitToken);
-                } catch (Throwable t) {
-                    log.warn(t, t);
+                    
+                    try {
+                        quorumService.abort2Phase(commitToken);
+                    } catch (Throwable t) {
+                        log.warn(t, t);
+                    }
+
                 }
 
-                if (commitRequest != null) {
+            }
+            
+        }
+        // Fields set by the method above.
+        private IJoinedAndNonJoinedServices prepareJoinedAndNonJoinedServices;
+        private PrepareRequest prepareRequest;
+        private PrepareResponse prepareResponse;
+        
+        /**
+         * COMMIT.
+         * 
+         * Pre-condition: PREPARE was successful on a majority of the services.
+         */
+        private void commit2Phase() throws Exception {
+            
+            boolean didCommit = false;
+            try {
+
+                /*
+                 * Prepare was successful. COMMIT message has been formed. We
+                 * will now commit.
+                 * 
+                 * Note: The overall commit will fail unless we can prove that a
+                 * majority of the services successfully committed.
+                 */
+                
+                commitRequest = new CommitRequest(prepareRequest,
+                        prepareResponse);
+
+                commitResponse = quorumService.commit2Phase(commitRequest);
+
+                if (!store.quorum.isQuorum(commitResponse.getNOk())) {
+
+                    /*
+                     * Fail the commit.
+                     * 
+                     * Note: An insufficient number of services were able to
+                     * COMMIT successfully.
+                     * 
+                     * Note: It is possible that a commit could be failed here
+                     * when the commit is in fact stable on a majority of
+                     * services. For example, with k=3 and 2 services running if
+                     * both of them correctly update their root blocks but we
+                     * lose network connectivity to the follower before the RMI
+                     * returns, then we will fail the commit.
+                     */
+                    
+                    // Note: Guaranteed to not return normally!
+                    commitResponse.throwCauses();
+
+                }
+
+                didCommit = true;
+
+            } finally {
+
+                if (!didCommit) {
+
                     /*
                      * The quorum voted to commit, but something went wrong.
                      * 
@@ -3614,54 +3718,17 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                      * another such that it will apply those HALog files on
                      * restart and form a consensus with the other services.
                      */
+
                     quorumService.enterErrorState();
+
                 }
-                
-                // Re-throw the root cause exception.
-                throw new RuntimeException(e);
 
             }
 
         }
         // Fields set by the method above.
         private CommitRequest commitRequest;
-        
-        /**
-         * Return <code>true</code> iff the 2-phase PREPARE votes to COMMIT.
-         * 
-         * @throws IOException
-         * @throws TimeoutException
-         * @throws InterruptedException
-         */
-        private boolean prepare2Phase() throws InterruptedException,
-                TimeoutException, IOException {
- 
-            // Atomic decision point for joined vs non-joined services.
-            prepareJoinedAndNonJoinedServices = new JoinedAndNonJoinedServices(
-                    quorum);
-
-            prepareRequest = new PrepareRequest(//
-                    consensusReleaseTime,//
-                    gatherJoinedAndNonJoinedServices,//
-                    prepareJoinedAndNonJoinedServices,//
-                    newRootBlock,//
-                    quorumService.getPrepareTimeout(), // timeout
-                    TimeUnit.MILLISECONDS//
-            );
-
-            // issue prepare request.
-            prepareResponse = quorumService.prepare2Phase(prepareRequest);
-
-            if (haLog.isInfoEnabled())
-                haLog.info(prepareResponse.toString());
-            
-            return prepareResponse.willCommit();
-            
-        }
-        // Fields set by the method above.
-        private IJoinedAndNonJoinedServices prepareJoinedAndNonJoinedServices;
-        private PrepareRequest prepareRequest;
-        private PrepareResponse prepareResponse;
+        private CommitResponse commitResponse;
         
     } // class CommitState.
     

@@ -28,10 +28,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.ha;
 
 import java.io.IOException;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
-import com.bigdata.journal.IRootBlockView;
 import com.bigdata.quorum.Quorum;
 
 /**
@@ -64,12 +62,13 @@ public interface QuorumCommit<S extends HACommitGlue> { //extends QuorumService<
     /**
      * Used by the leader to send a message to each joined service in the quorum
      * telling it to commit using the root block from the corresponding
-     * {@link #prepare2Phase(IRootBlockView, long, TimeUnit) prepare} message.
-     * The commit MAY NOT go forward unless both the current quorum token and
-     * the lastCommitTime on this message agree with the quorum token and
+     * {@link #prepare2Phase(PrepareRequest) prepare} message. The commit MAY
+     * NOT go forward unless both the current quorum token and the
+     * lastCommitTime on this message agree with the quorum token and
      * lastCommitTime in the root block from the last "prepare" message.
      */
-    void commit2Phase(CommitRequest req) throws IOException, InterruptedException;
+    CommitResponse commit2Phase(CommitRequest req) throws IOException,
+            InterruptedException;
 
     /**
      * Used by the leader to send a message to each service joined with the
@@ -80,6 +79,6 @@ public interface QuorumCommit<S extends HACommitGlue> { //extends QuorumService<
      * @param token
      *            The quorum token.
      */
-    void abort2Phase(final long token) throws IOException, InterruptedException;
+    void abort2Phase(long token) throws IOException, InterruptedException;
 
 }

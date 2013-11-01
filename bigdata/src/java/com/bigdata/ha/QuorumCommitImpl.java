@@ -386,8 +386,8 @@ public class QuorumCommitImpl<S extends HACommitGlue> extends
     }
 
     @Override
-    public void commit2Phase(final CommitRequest commitRequest) throws IOException,
-            InterruptedException {
+    public CommitResponse commit2Phase(final CommitRequest commitRequest)
+            throws IOException, InterruptedException {
 
         if (log.isInfoEnabled())
             log.info("req=" + commitRequest);
@@ -428,18 +428,32 @@ public class QuorumCommitImpl<S extends HACommitGlue> extends
         final boolean didAllServicesPrepare = prepareResponse.getYesCount() == prepareResponse
                 .replicationFactor();
         
-        final List<Future<Void>> localFutures = new LinkedList<Future<Void>>();
-        
+        /*
+         * Note: These entries are in service join order. The first entry is
+         * always the leader. If a services did not vote YES for the PREPARE
+         * then it will have a null entry in this list.
+         */
+        final ArrayList<Future<Void>> localFutures = new ArrayList<Future<Void>>(
+                joinedServiceIds.length);
+
+        final ArrayList<Throwable> causes = new ArrayList<Throwable>();
+
         try {
 
+            for (int i = 0; i < joinedServiceIds.length; i++) {
+
+                // Pre-size to ensure sufficient room for set(i,foo).
+                localFutures.add(null);
+                causes.add(null);
+
+            }
+            
             member.assertLeader(token);
 
             final IHA2PhaseCommitMessage msgJoinedService = new HA2PhaseCommitMessage(
                     true/* isJoinedService */, commitTime, didAllServicesPrepare);
 
             for (int i = 1; i < joinedServiceIds.length; i++) {
-
-                final UUID serviceId = joinedServiceIds[i];
 
                 if (!prepareResponse.getVote(i)) {
 
@@ -448,6 +462,8 @@ public class QuorumCommitImpl<S extends HACommitGlue> extends
                     
                 }
                 
+                final UUID serviceId = joinedServiceIds[i];
+
                 /*
                  * Submit task on local executor. The task will do an RMI to the
                  * remote service.
@@ -457,7 +473,7 @@ public class QuorumCommitImpl<S extends HACommitGlue> extends
                                 msgJoinedService));
 
                 // add to list of futures we will check.
-                localFutures.add(rf);
+                localFutures.set(i, rf);
 
             }
 
@@ -471,37 +487,38 @@ public class QuorumCommitImpl<S extends HACommitGlue> extends
 
                 final Future<Void> f = leader.commit2Phase(msgJoinedService);
 
-                localFutures.add(f);
+                localFutures.set(0/* leader */, f);
 
             }
 
             /*
              * Check the futures for the other services in the quorum.
              */
-            final List<Throwable> causes = new LinkedList<Throwable>();
-            for (Future<Void> ft : localFutures) {
+            for (int i = 0; i < joinedServiceIds.length; i++) {
+                final Future<Void> ft = localFutures.get(i);
+                if (ft == null)
+                    continue;
                 try {
                     ft.get(); // FIXME Timeout to await followers in commit2Phase().
 //                } catch (TimeoutException ex) {
 //                    // Timeout on this Future.
 //                    log.error(ex, ex);
-//                    causes.add(ex);
-//                    done = false;
+//                    causes.set(i, ex);
                 } catch (CancellationException ex) {
                     // Future was cancelled.
                     log.error(ex, ex);
-                    causes.add(ex);
+                    causes.set(i, ex);
                 } catch (ExecutionException ex) {
                     log.error(ex, ex);
-                    causes.add(ex);
+                    causes.set(i, ex);
                 } catch (RuntimeException ex) {
                     /*
-                     * Note: ClientFuture.get() can throw a RuntimeException
-                     * if there is a problem with the RMI call. In this case
-                     * we do not know whether the Future is done.
+                     * Note: ClientFuture.get() can throw a RuntimeException if
+                     * there is a problem with the RMI call. In this case we do
+                     * not know whether the Future is done.
                      */
                     log.error(ex, ex);
-                    causes.add(ex);
+                    causes.set(i, ex);
                 } finally {
                     // Note: cancelling a *local* Future wrapping an RMI.
                     ft.cancel(true/* mayInterruptIfRunning */);
@@ -511,13 +528,7 @@ public class QuorumCommitImpl<S extends HACommitGlue> extends
             /*
              * If there were any errors, then throw an exception listing them.
              */
-            if (!causes.isEmpty()) {
-                // Throw exception back to the leader.
-                if (causes.size() == 1)
-                    throw new RuntimeException(causes.get(0));
-                throw new RuntimeException("remote errors: nfailures="
-                        + causes.size(), new ExecutionExceptions(causes));
-            }
+            return new CommitResponse(commitRequest, causes);
 
         } finally {
 
