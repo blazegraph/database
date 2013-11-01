@@ -8001,15 +8001,17 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
             
             final UUID leaderId = req.getLeaderId();
 
+            // Note: Will throw exception if our HAQuorumService is not running.
             final HAGlue leader = getQuorum().getClient().getService(leaderId);
 
             if (leader == null)
                 throw new RuntimeException(
                         "Could not discover the quorum leader.");
 
+            // Get our serviceId.
             final UUID serviceId = getServiceId();
 
-            if(serviceId == null)
+            if (serviceId == null)
                 throw new AssertionError();
             
             final Callable<IHANotifyReleaseTimeResponse> task = ((AbstractHATransactionService) AbstractJournal.this

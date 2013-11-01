@@ -1689,11 +1689,29 @@ public class HAJournalServer extends AbstractServer {
         }
         
         /**
-         * Resolve an {@link HAGlue} object from its Service UUID.
+         * {@inheritDoc}
+         * <p>
+         * This implementation resolves an {@link HAGlue} object from its
+         * Service UUID using the <strong>pre-existing</strong> connection for
+         * the {@link HAClient} and the cached service discovery lookup for that
+         * connection. If the {@link HAClient} is not connected, then an
+         * {@link IllegalStateException} will be thrown.
+         * 
+         * @param serviceId
+         *            The {@link UUID} of the service to be resolved.
+         * 
+         * @return The proxy for the service having the specified {@link UUID}
+         *         and never <code>null</code>.
+         * 
+         * @throws IllegalStateException
+         *             if the {@link HAClient} is not connected.
+         * @throws QuorumException
+         *             if no service can be discovered for that {@link UUID}.
          */
         @Override
         public S getService(final UUID serviceId) {
             
+            // Throws IllegalStateException if not connected (HAClient).
             final HAGlueServicesClient discoveryClient = server
                     .getHAClient().getConnection().getHAGlueServicesClient();
 
