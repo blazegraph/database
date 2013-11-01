@@ -494,7 +494,7 @@ public class TestHAJournalServerOverride extends AbstractHA3JournalServerTestCas
      * 
      * TODO Consider leader failure scenarios in this test suite, not just
      * scenarios where B fails. We MUST also cover failures of C (the 2nd
-     * follower). We should also cover scenariors where the quorum is barely met
+     * follower). We should also cover scenarios where the quorum is barely met
      * and a single failure causes a rejected commit (local decision) or 2-phase
      * abort (joined services in joint agreement).
      * 
@@ -515,7 +515,17 @@ public class TestHAJournalServerOverride extends AbstractHA3JournalServerTestCas
         awaitCommitCounter(1L, startup.serverA, startup.serverB,
                 startup.serverC);
 
-        // Setup B to fail the "COMMIT" message.
+        /*
+         * Setup B to fail the "COMMIT" message (specifically, it will throw
+         * back an exception rather than executing the commit.
+         * 
+         * FIXME We need to cause B to actually fail the commit such that it
+         * enters the ERROR state. This is only causing the RMI to be rejected
+         * so B is not being failed out of the pipeline. Thus, B will remain
+         * joined with the met quorum (but at the wrong commit point) until we
+         * send down another replicated write. At that point B will notice that
+         * it is out of whack and enter the ERROR state.
+         */
         ((HAGlueTest) startup.serverB)
                 .failNext("commit2Phase",
                         new Class[] { IHA2PhaseCommitMessage.class },
@@ -543,13 +553,24 @@ public class TestHAJournalServerOverride extends AbstractHA3JournalServerTestCas
             // Should be two commit points on {A,C].
             awaitCommitCounter(2L, startup.serverA, startup.serverC);
 
+            // Just one commit point on B.
+            awaitCommitCounter(1L, startup.serverB);
+
+            // B is still a follower.
+            awaitHAStatus(startup.serverB, HAStatusEnum.Follower);
+            
             /*
              * B should go into an ERROR state and then into SeekConsensus and
              * from there to RESYNC and finally back to RunMet. We can not
              * reliably observe the intervening states. So what we really need
              * to do is watch for B to move to the end of the pipeline and catch
              * up to the same commit point.
+             * 
+             * FIXME This is forcing B into an error state to simulate what
+             * would happen if B had encountered an error during the 2-phase
+             * commit above.
              */
+            ((HAGlueTest)startup.serverB).enterErrorState();
 
             /*
              * The pipeline should be reordered. B will do a service leave, then
@@ -558,6 +579,8 @@ public class TestHAJournalServerOverride extends AbstractHA3JournalServerTestCas
             awaitPipeline(new HAGlue[] { startup.serverA, startup.serverC,
                     startup.serverB });
 
+            awaitFullyMetQuorum();
+            
             /*
              * There should be two commit points on {A,C,B} (note that this
              * assert does not pay attention to the pipeline order).

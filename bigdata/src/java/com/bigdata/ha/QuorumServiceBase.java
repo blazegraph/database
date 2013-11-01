@@ -314,10 +314,10 @@ abstract public class QuorumServiceBase<S extends HAGlue, L extends AbstractJour
     }
 
     @Override
-    public void commit2Phase(final CommitRequest req) throws IOException,
+    public CommitResponse commit2Phase(final CommitRequest req) throws IOException,
             InterruptedException {
 
-        commitImpl.commit2Phase(req);
+        return commitImpl.commit2Phase(req);
 
     }
 
