@@ -48,6 +48,7 @@ import com.bigdata.ha.halog.IHALogReader;
 import com.bigdata.ha.msg.HARemoteRebuildRequest;
 import com.bigdata.ha.msg.HASnapshotRequest;
 import com.bigdata.ha.msg.IHARemoteRebuildRequest;
+import com.bigdata.journal.CommitCounterUtility;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.RootBlockView;
@@ -326,8 +327,9 @@ public class HAStatusServletUtil {
                     int nfiles = 0;
                     long nbytes = 0L;
                     final Iterator<IHALogRecord> itr = nexus.getHALogs();
+                    IHALogRecord r = null;
                     while (itr.hasNext()) {
-                        final IHALogRecord r = itr.next();
+                        r = itr.next();
                         nbytes += r.sizeOnDisk();
                         nfiles++;
                     }
@@ -339,13 +341,25 @@ public class HAStatusServletUtil {
                         nbytes += currentFile.length();
                         nfiles++;
                     }
-                    final String compressorKey = journal.getProperties().getProperty(
-                            com.bigdata.journal.Options.HALOG_COMPRESSOR,
-                            com.bigdata.journal.Options.DEFAULT_HALOG_COMPRESSOR);
-                    p.text("HALogDir: nfiles=" + nfiles + ", nbytes=" + nbytes
-                            + ", path=" + nexus.getHALogDir()
-                            + ", compressorKey=" + compressorKey).node("br")
-                            .close();
+                    final String compressorKey = journal
+                            .getProperties()
+                            .getProperty(
+                                    com.bigdata.journal.Options.HALOG_COMPRESSOR,
+                                    com.bigdata.journal.Options.DEFAULT_HALOG_COMPRESSOR);
+                    p.text("HALogDir: nfiles="
+                            + nfiles
+                            + ", nbytes="
+                            + nbytes
+                            + ", path="
+                            + nexus.getHALogDir()
+                            + ", compressorKey="
+                            + compressorKey
+                            + ", lastHALogClosed="
+                            + (r == null ? "N/A" : CommitCounterUtility
+                                    .getCommitCounterStr(r.getCommitCounter()))
+                            + ", liveLog="
+                            + (currentFile == null ? "N/A" : currentFile
+                                    .getName())).node("br").close();
                 }
                 if (digests) {
                     /*

@@ -102,6 +102,7 @@ import com.bigdata.service.proxy.ClientFuture;
 import com.bigdata.service.proxy.RemoteFuture;
 import com.bigdata.service.proxy.RemoteFutureImpl;
 import com.bigdata.service.proxy.ThickFuture;
+import com.bigdata.util.StackInfoReport;
 
 /**
  * A {@link Journal} that that participates in a write replication pipeline. The
@@ -846,7 +847,44 @@ public class HAJournal extends Journal {
             final Lock logLock = getHALogNexus().getLogLock();
             logLock.lock();
             try {
-            
+
+                /*
+                 * Verify that this service is the quorum leader.
+                 */
+                final long token = getQuorum().token();
+                
+                // Method is only allowed on the quorum leader.
+                getQuorumService().assertLeader(token);
+
+                if (!getHALogNexus().isHALogOpen()) {
+
+                    /**
+                     * The live HALog should always exist on the leader.
+                     * However, the leader is defined by the zookeeper state and
+                     * it is possible that the leader has not yet gone through
+                     * the code path to create the HALog. Thus, for safety, we
+                     * ensure that the live HALog exists here.
+                     * 
+                     * Note: we are holding the logLock.
+                     * 
+                     * Note: This only causes the HALog to be created on the
+                     * quorum leader. HAJournalServer.discardWriteSet() handles
+                     * this for both the leader and the joined followers.
+                     * 
+                     * @see <a
+                     *      href="https://sourceforge.net/apps/trac/bigdata/ticket/764"
+                     *      > RESYNC fails (HA) </a>
+                     */
+
+                    if (haLog.isInfoEnabled())
+                        log.info(
+                                "Live HALog does not exist on the quorum leader",
+                                new StackInfoReport());
+
+                    getHALogNexus().conditionalCreateHALog();
+
+                }
+                
                 // The commit counter of the desired closing root block.
                 final long commitCounter = msg.getCommitCounter();
 

@@ -550,7 +550,7 @@ public class TestHAJournalServerOverride extends AbstractHA3JournalServerTestCas
             // Verify quorum is unchanged.
             assertEquals(token, quorum.token());
 
-            // Should be two commit points on {A,C].
+            // Should be two commit points on {A,C}.
             awaitCommitCounter(2L, startup.serverA, startup.serverC);
 
             // Just one commit point on B.
@@ -632,6 +632,76 @@ public class TestHAJournalServerOverride extends AbstractHA3JournalServerTestCas
 
     }
     
+    /**
+     * Unit test for failure to RESYNC having a root cause that the live HALog
+     * file did not exist on the quorum leader after an abort2Phase() call.
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/764" >
+     *      RESYNC fails (HA) </a>
+     */
+    public void testStartABC_abort2Phase_restartC() throws Exception {
+        
+        final ABC x = new ABC(true/*sequential*/);
+        
+        final long token = awaitFullyMetQuorum();
+        
+        // Now run several transactions
+        final int NTX = 5;
+        for (int i = 0; i < NTX; i++)
+            simpleTransaction();
+
+        // wait until the commit point is registered on all services.
+        awaitCommitCounter(NTX + 1L, new HAGlue[] { x.serverA, x.serverB,
+                x.serverC });
+        
+        /*
+         * The same number of HALog files should exist on all services.
+         * 
+         * Note: the restore policy is setup such that we are purging the HALog
+         * files at each commit of a fully met quorum.
+         */
+        awaitLogCount(getHALogDirA(), 1L);
+        awaitLogCount(getHALogDirB(), 1L);
+        awaitLogCount(getHALogDirC(), 1L);
+        
+        // shutdown C.
+        shutdownC();
+        
+        // wait for C to be gone from zookeeper.
+        awaitPipeline(new HAGlue[] { x.serverA, x.serverB });
+        awaitMembers(new HAGlue[] { x.serverA, x.serverB });
+        awaitJoined(new HAGlue[] { x.serverA, x.serverB });
+        
+        /*
+         * Run a transaction that forces a 2-phase abort.
+         * 
+         * Note: Historically, this would cause the live HALog on the leader to
+         * be disabled (aka deleted) without causing that live HALog file to be
+         * recreated.  This is ticket #764.
+         */
+        ((HAGlueTest) x.serverA).simpleTransaction_abort();
+        
+        /*
+         * Restart C.
+         * 
+         * Note: C will go into RESYNC. Since all services are at the same
+         * commit point, C will attempt to replicate the live HALog from the
+         * leader. Once it obtains that HALog, it should figure out that it has
+         * the live HALog and attempt to transition atomically to a joined
+         * service.
+         */
+        /*final HAGlue serverC =*/ startC();
+        
+        // wait until the quorum fully meets again (on the same token).
+        assertEquals(token, awaitFullyMetQuorum());
+
+        // Verify expected HALog files.
+        awaitLogCount(getHALogDirA(), 1L);
+        awaitLogCount(getHALogDirB(), 1L);
+        awaitLogCount(getHALogDirC(), 1L);
+
+    }
+
     /**
      * 2 services start, quorum meets then we bounce the zookeeper connection
      * for the follower and verify that the quorum meets again.

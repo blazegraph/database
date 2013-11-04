@@ -1382,17 +1382,30 @@ public class HAJournalServer extends AbstractServer {
 				journal.getHALogNexus().lastLiveHAWriteMessage = null;
 
 				if (journal.getHALogNexus().isHALogOpen()) {
-					/*
-					 * Note: Closing the HALog is necessary for us to be able to
-					 * re-enter SeekConsensus without violating a pre-condition
-					 * for that run state.
-					 */
+                    /**
+                     * Note: Closing the HALog is necessary for us to be able to
+                     * re-enter SeekConsensus without violating a pre-condition
+                     * for that run state.
+                     * 
+                     * @see <a
+                     *      href="https://sourceforge.net/apps/trac/bigdata/ticket/764"
+                     *      > RESYNC fails (HA) </a>
+                     */
 					try {
 						journal.getHALogNexus().disableHALog();
 					} catch (IOException e) {
 						log.error(e, e);
 					}
-				}
+                    final long token = getQuorum().token();
+                    if (isJoinedMember(token)) {
+                        try {
+                            journal.getHALogNexus().createHALog(
+                                    journal.getRootBlockView());
+                        } catch (IOException e) {
+                            throw new RuntimeException(e);
+                        }
+                    }
+                }
 			} finally {
 				logLock.unlock();
 			}
@@ -1767,6 +1780,7 @@ public class HAJournalServer extends AbstractServer {
             public QuorumMeetTask(final long token, final UUID leaderId) {
                 this.token = token;
             }
+            @Override
             public Void call() throws Exception {
                 journal.setQuorumToken(token);
                 if (isJoinedMember(token)) {
@@ -2834,9 +2848,6 @@ public class HAJournalServer extends AbstractServer {
 
                 journal.doLocalAbort();
 
-                // Sets up expectations (maybe just for the test suite?)
-                conditionalCreateHALog();
-                
                 /*
                  * We will do a local commit with each HALog (aka write set)
                  * that is replicated. This let's us catch up incrementally with
@@ -3393,49 +3404,6 @@ public class HAJournalServer extends AbstractServer {
             
         }
 
-        /**
-         * Conditionally create the HALog.
-         * <p>
-         * Refactored out of {@link #pipelineSetup()} since
-         * {@link #discardWriteSet()} now removes the current HALog. Therefore,
-         * the {@link ResyncTask} needs to call
-         * {@link #conditionalCreateHALog()} <em>after</em> it calls
-         * {@link AbstractJournal#doLocalAbort()}.
-         * 
-         * @throws FileNotFoundException
-         * @throws IOException
-         */
-        private void conditionalCreateHALog() throws FileNotFoundException,
-                IOException {
-
-            logLock.lock();
-
-            try {
-
-                if (!journal.getHALogNexus().isHALogOpen()) {
-
-                    /*
-                     * Open the HALogWriter for our current root blocks.
-                     * 
-                     * Note: We always use the current root block when receiving
-                     * an HALog file, even for historical writes. This is
-                     * because the historical log writes occur when we ask the
-                     * leader to send us a prior commit point in RESYNC.
-                     */
-
-                    journal.getHALogNexus().createHALog(
-                            journal.getRootBlockView());
-
-                }
-
-            } finally {
-
-                logLock.unlock();
-                
-            }
-
-        }
-        
         @Override
         protected void handleReplicatedWrite(final IHASyncRequest req,
                 final IHAWriteMessage msg, final ByteBuffer data)
@@ -3472,7 +3440,7 @@ public class HAJournalServer extends AbstractServer {
             logLock.lock();
             try {
 
-                conditionalCreateHALog();
+                journal.getHALogNexus().conditionalCreateHALog();
 
                 if (haLog.isDebugEnabled())
                     haLog.debug("msg=" + msg + ", buf=" + data);
@@ -4078,7 +4046,7 @@ public class HAJournalServer extends AbstractServer {
 
             try {
 
-                conditionalCreateHALog();
+                journal.getHALogNexus().conditionalCreateHALog();
                 
                 /*
                  * Throws IllegalStateException if the message is not

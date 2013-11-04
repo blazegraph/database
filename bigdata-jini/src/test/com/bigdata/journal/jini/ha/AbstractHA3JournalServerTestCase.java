@@ -606,16 +606,26 @@ public class AbstractHA3JournalServerTestCase extends
         }, 5, TimeUnit.SECONDS);
         
     }
-    
+
+    /**
+     * Start A then B then C. As each service starts, this method waits for that
+     * service to appear in the pipeline in the proper position.
+     * 
+     * @return The ordered array of services <code>[A, B, C]</code>
+     */
     protected HAGlue[] startSequenceABC() throws Exception {
-    	startA();
-    	awaitPipeline(new HAGlue[] {serverA});
-    	startB();
-    	awaitPipeline(new HAGlue[] {serverA, serverB});
-    	startC();
-    	awaitPipeline(new HAGlue[] {serverA, serverB, serverC});
-    	
-    	return new HAGlue[] {serverA, serverB, serverC};
+
+        startA();
+        awaitPipeline(new HAGlue[] { serverA });
+        
+        startB();
+        awaitPipeline(new HAGlue[] { serverA, serverB });
+        
+        startC();
+        awaitPipeline(new HAGlue[] { serverA, serverB, serverC });
+
+        return new HAGlue[] { serverA, serverB, serverC };
+        
     }
     
     /*

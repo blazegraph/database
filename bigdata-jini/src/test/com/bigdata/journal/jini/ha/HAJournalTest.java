@@ -85,11 +85,16 @@ import com.bigdata.ha.msg.IHAWriteSetStateRequest;
 import com.bigdata.ha.msg.IHAWriteSetStateResponse;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.IRootBlockView;
+import com.bigdata.journal.ITx;
 import com.bigdata.journal.jini.ha.HAJournalServer.HAQuorumService;
 import com.bigdata.journal.jini.ha.HAJournalServer.RunStateEnum;
 import com.bigdata.quorum.AsynchronousQuorumCloseException;
 import com.bigdata.quorum.Quorum;
 import com.bigdata.quorum.zk.ZKQuorumImpl;
+import com.bigdata.rdf.sail.BigdataSail;
+import com.bigdata.rdf.sail.BigdataSailRepository;
+import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
+import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.service.jini.RemoteDestroyAdmin;
 
 /**
@@ -286,6 +291,12 @@ public class HAJournalTest extends HAJournal {
          * Report the internal run state of the {@link HAJournalServer}.
          */
         public RunStateEnum getRunStateEnum() throws IOException;
+        
+        /**
+         * Run a simple update transaction on the quorum leader, but abort()
+         * rather than committing the transaction.
+         */
+        public void simpleTransaction_abort() throws IOException, Exception;
         
     }
 
@@ -1167,6 +1178,65 @@ public class HAJournalTest extends HAJournal {
 
         // @Override
 
+        @Override
+        public void simpleTransaction_abort() throws IOException, Exception {
+        
+            final Quorum<HAGlue, QuorumService<HAGlue>> quorum = getQuorum();
+            
+            // Note: Throws IllegalStateException if quorum is not running.
+            final QuorumService<HAGlue> quorumService = quorum.getClient();
+
+            final long token = quorum.token();
+
+            // This service must be the quorum leader.
+            quorumService.assertLeader(token);
+
+            // The default namespace.
+            final String namespace = BigdataSail.Options.DEFAULT_NAMESPACE;
+            
+            // resolve the default namespace.
+            final AbstractTripleStore tripleStore = (AbstractTripleStore) getIndexManager()
+                    .getResourceLocator().locate(namespace, ITx.UNISOLATED);
+
+            if (tripleStore == null) {
+
+                throw new RuntimeException("Not found: namespace=" + namespace);
+
+            }
+
+            // Wrap with SAIL.
+            final BigdataSail sail = new BigdataSail(tripleStore);
+
+            final BigdataSailRepository repo = new BigdataSailRepository(sail);
+
+            repo.initialize();
+
+            final BigdataSailRepositoryConnection conn = (BigdataSailRepositoryConnection) repo
+                    .getUnisolatedConnection();
+
+            try {
+
+//                conn.setAutoCommit(false);
+//
+//                final ValueFactory f = sail.getValueFactory();
+//
+//                conn.add(f.createStatement(
+//                        f.createURI("http://www.bigdata.com"), RDF.TYPE,
+//                        RDFS.RESOURCE), null/* contexts */);
+//
+//                conn.flush();
+                
+                // Fall through.
+                
+            } finally {
+
+                // Force abort.
+                conn.rollback();
+
+            }
+
+        }
+        
     } // class HAGlueTestImpl
 
     private static class MyPrepareMessage implements IHA2PhasePrepareMessage {

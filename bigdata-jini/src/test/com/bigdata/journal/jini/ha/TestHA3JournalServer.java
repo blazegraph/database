@@ -82,7 +82,6 @@ import com.bigdata.util.NV;
  */
 public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
 
-
     /**
      * {@inheritDoc}
      * <p>
@@ -557,6 +556,181 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
 
     }
     
+    /**
+     * Unit test for a situation in which A B and C start. A quorum mets and the
+     * third service resyncs with the met quorum. The quorum then fully meets.
+     * Once the fully met quorum is stable, C is then restarted. This test
+     * exercises a code path that handles the case where C is current, but is
+     * forced into RESYNC in case there are writes in progress on the leader.
+     * <p>
+     * Note: In this version of the test, the HALog files are purged at each
+     * commit of the fully met quorum. Another version of this test exists in
+     * which the HALog files are NOT purged at each commit of a fully met
+     * quorum.
+     */
+    public void testStartABC_restartC() throws Exception {
+        
+        final ABC x = new ABC(true/*sequential*/);
+        
+        final long token = awaitFullyMetQuorum();
+        
+        // Now run several transactions
+        final int NTX = 5;
+        for (int i = 0; i < NTX; i++)
+            simpleTransaction();
+
+        // wait until the commit point is registered on all services.
+        awaitCommitCounter(NTX + 1L, new HAGlue[] { x.serverA, x.serverB,
+                x.serverC });
+        
+        /*
+         * The same number of HALog files should exist on all services.
+         * 
+         * Note: the restore policy is setup such that we are purging the HALog
+         * files at each commit of a fully met quorum.
+         */
+        awaitLogCount(getHALogDirA(), 1L);
+        awaitLogCount(getHALogDirB(), 1L);
+        awaitLogCount(getHALogDirC(), 1L);
+        
+        // shutdown C.
+        shutdownC();
+        
+        // wait for C to be gone from zookeeper.
+        awaitPipeline(new HAGlue[] { x.serverA, x.serverB });
+        awaitMembers(new HAGlue[] { x.serverA, x.serverB });
+        awaitJoined(new HAGlue[] { x.serverA, x.serverB });
+        
+        // restart C.
+        /*final HAGlue serverC =*/ startC();
+        
+        // wait until the quorum fully meets again (on the same token).
+        assertEquals(token, awaitFullyMetQuorum());
+
+        // Verify expected HALog files.
+        awaitLogCount(getHALogDirA(), 1L);
+        awaitLogCount(getHALogDirB(), 1L);
+        awaitLogCount(getHALogDirC(), 1L);
+        
+    }
+
+    /**
+     * Unit test for a situation in which A B and C start. A quorum mets and the
+     * third service resyncs with the met quorum. The quorum then fully meets.
+     * Once the fully met quorum is stable, B is then restarted. The pipeline is
+     * reorganized when B is shutdown but the quorum does not break. This test
+     * exercises a code path that handles the case where B is current, but is
+     * forced into RESYNC in case there are writes in progress on the leader.
+     * <p>
+     * Note: In this version of the test, the HALog files are NOT purged at each
+     * commit of the fully met quorum.
+     */
+    public void testStartABC_restartB() throws Exception {
+        
+        final ABC x = new ABC(true/*sequential*/);
+        
+        final long token = awaitFullyMetQuorum();
+        
+        // Now run several transactions
+        final int NTX = 5;
+        for (int i = 0; i < NTX; i++)
+            simpleTransaction();
+
+        // wait until the commit point is registered on all services.
+        awaitCommitCounter(NTX + 1L, new HAGlue[] { x.serverA, x.serverB,
+                x.serverC });
+        
+        /*
+         * The same number of HALog files should exist on all services.
+         * 
+         * Note: the restore policy is setup such that we are purging the HALog
+         * files at each commit of a fully met quorum.
+         */
+        awaitLogCount(getHALogDirA(), 1L);
+        awaitLogCount(getHALogDirB(), 1L);
+        awaitLogCount(getHALogDirC(), 1L);
+        
+        // shutdown B.
+        shutdownB();
+        
+        // wait for B to be gone from zookeeper.
+        awaitPipeline(new HAGlue[] { x.serverA, x.serverC });
+        awaitMembers(new HAGlue[] { x.serverA, x.serverC });
+        awaitJoined(new HAGlue[] { x.serverA, x.serverC });
+        
+        // restart B.
+        /*final HAGlue serverB =*/ startB();
+        
+        // wait until the quorum fully meets again (on the same token).
+        assertEquals(token, awaitFullyMetQuorum());
+
+        // Verify expected HALog files.
+        awaitLogCount(getHALogDirA(), 1L);
+        awaitLogCount(getHALogDirB(), 1L);
+        awaitLogCount(getHALogDirC(), 1L);
+        
+    }
+
+    /**
+     * Unit test for a situation in which A B and C start. A quorum mets and the
+     * third service resyncs with the met quorum. The quorum then fully meets.
+     * Once the fully met quorum is stable, A is then restarted. The pipeline is
+     * reorganized when A is shutdown and a new leader is elected. This test
+     * exercises a code path that handles the case where A is current, but is
+     * forced into RESYNC in case there are writes in progress on the leader.
+     * <p>
+     * Note: In this version of the test, the HALog files are NOT purged at each
+     * commit of the fully met quorum.
+     */
+    public void testStartABC_restartA() throws Exception {
+        
+        final ABC x = new ABC(true/*sequential*/);
+        
+        final long token = awaitFullyMetQuorum();
+        
+        // Now run several transactions
+        final int NTX = 5;
+        for (int i = 0; i < NTX; i++)
+            simpleTransaction();
+
+        // wait until the commit point is registered on all services.
+        awaitCommitCounter(NTX + 1L, new HAGlue[] { x.serverA, x.serverB,
+                x.serverC });
+        
+        /*
+         * The same number of HALog files should exist on all services.
+         * 
+         * Note: the restore policy is setup such that we are purging the HALog
+         * files at each commit of a fully met quorum.
+         */
+        awaitLogCount(getHALogDirA(), 1L);
+        awaitLogCount(getHALogDirB(), 1L);
+        awaitLogCount(getHALogDirC(), 1L);
+        
+        // shutdown A.
+        shutdownA();
+        
+        // wait for A to be gone from zookeeper.
+//        awaitPipeline(new HAGlue[] { x.serverA, x.serverC });
+//        awaitMembers(new HAGlue[] { x.serverA, x.serverC });
+//        awaitJoined(new HAGlue[] { x.serverA, x.serverC });
+        
+        // since the leader failed over, the quorum meets on a new token.
+        final long token2 = awaitNextQuorumMeet(token);
+        
+        // restart A.
+        /*final HAGlue serverA =*/ startA();
+
+        // wait until the quorum fully meets again (on the same token).
+        assertEquals(token2, awaitFullyMetQuorum());
+
+        // Verify expected HALog files.
+        awaitLogCount(getHALogDirA(), 1L);
+        awaitLogCount(getHALogDirB(), 1L);
+        awaitLogCount(getHALogDirC(), 1L);
+        
+    }
+
     /**
      * Unit test of the ability to go through a simultaneous restart of all
      * services once those services are no longer at commit point 0. Two
@@ -2404,7 +2578,6 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
         awaitLogCount(logsC, 1);
         
     }
-    
     
     /**
      * Tests shutdown of met quorum, but leader first forces re-organisation concurrent 

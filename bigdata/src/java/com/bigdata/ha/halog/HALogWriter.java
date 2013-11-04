@@ -37,6 +37,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.ha.msg.HAWriteMessage;
 import com.bigdata.ha.msg.IHAWriteMessage;
 import com.bigdata.io.FileChannelUtility;
 import com.bigdata.io.IReopenChannel;
@@ -51,10 +52,10 @@ import com.bigdata.util.StackInfoReport;
 
 /**
  * Wrapper class to handle process log creation and output for HA.
- * 
- * The process log stores the HAWriteMessages and buffers to support reading and
- * reprocessing as part of the HA synchronization protocol.
- * 
+ * <p>
+ * The process log stores the {@link HAWriteMessage} and buffers to support
+ * reading and reprocessing as part of the HA synchronization protocol.
+ * <p>
  * The writer encapsulates not only the writing of individual messages but also
  * the closing and creation of new files.
  * 
@@ -128,26 +129,31 @@ public class HALogWriter implements IHALogWriter {
 	/** current write point on the channel. */
 	private long m_position = headerSize0;
 
-	/**
-	 * Return the commit counter that is expected for the writes that will be
-	 * logged (the same commit counter that is on the opening root block).
-	 */
+	@Override
 	public long getCommitCounter() {
 
-		assertOpen();
-
-		return m_rootBlock.getCommitCounter();
+        final Lock lock = m_stateLock.readLock();
+        lock.lock();
+        try {
+            assertOpen();
+            return m_rootBlock.getCommitCounter();
+        } finally {
+            lock.unlock();
+        }
 
 	}
 
-	/**
-	 * Return the sequence number that is expected for the next write.
-	 */
+    @Override
 	public long getSequence() {
 
-		assertOpen();
-
-		return m_nextSequence;
+        final Lock lock = m_stateLock.readLock();
+        lock.lock();
+        try {
+            assertOpen();
+            return m_nextSequence;
+        } finally {
+            lock.unlock();
+        }
 
 	}
 
@@ -162,9 +168,16 @@ public class HALogWriter implements IHALogWriter {
 
 	}
 	
+    @Override
 	public boolean isHALogOpen() {
-	  
-	    return m_state != null && !m_state.isCommitted();
+        
+        final Lock lock = m_stateLock.readLock();
+        lock.lock();
+        try {
+            return m_state != null && !m_state.isCommitted();
+        } finally {
+            lock.unlock();
+        }
 	    
 	}
 
@@ -179,7 +192,6 @@ public class HALogWriter implements IHALogWriter {
 		} finally {
 			lock.unlock();
 		}
-
 	}
 
     /**
@@ -225,6 +237,7 @@ public class HALogWriter implements IHALogWriter {
 
 	}
 
+    @Override
 	public String toString() {
 
 		final IRootBlockView tmp = m_rootBlock;
@@ -375,6 +388,7 @@ public class HALogWriter implements IHALogWriter {
      *            The final root block for the write set.
      * @throws IOException
      */
+    @Override
 	public void closeHALog(final IRootBlockView rootBlock)
 			throws FileNotFoundException, IOException {
 
@@ -472,6 +486,7 @@ public class HALogWriter implements IHALogWriter {
      * @throws IOException
      *             if we can not write on the log.
 	 */
+    @Override
 	public void writeOnHALog(final IHAWriteMessage msg, final ByteBuffer data)
 			throws IOException, IllegalStateException {
 

@@ -33,7 +33,6 @@ import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -1054,6 +1053,43 @@ public class HALogNexus implements IHALogWriter {
         
     }
 
+    /**
+     * Conditionally create the HALog.
+     * 
+     * @throws FileNotFoundException
+     * @throws IOException
+     */
+    public void conditionalCreateHALog() throws FileNotFoundException,
+            IOException {
+
+        logLock.lock();
+
+        try {
+
+            if (!isHALogOpen()) {
+
+                /*
+                 * Open the HALogWriter for our current root blocks.
+                 * 
+                 * Note: We always use the current root block when receiving an
+                 * HALog file, even for historical writes. This is because the
+                 * historical log writes occur when we ask the leader to send us
+                 * a prior commit point in RESYNC.
+                 */
+
+                createHALog(journal.getRootBlockView());
+
+            }
+
+        } finally {
+
+            logLock.unlock();
+
+        }
+
+    }
+    
+    @Override
     public boolean isHALogOpen() {
         
         logLock.lock();
@@ -1070,6 +1106,7 @@ public class HALogNexus implements IHALogWriter {
 
     }
 
+    @Override
     public void closeHALog(final IRootBlockView rootBlock)
             throws IOException {
 
@@ -1116,6 +1153,7 @@ public class HALogNexus implements IHALogWriter {
 
     }
 
+    @Override
     public void disableHALog() throws IOException {
 
         logLock.lock();
@@ -1132,6 +1170,7 @@ public class HALogNexus implements IHALogWriter {
 
    }
 
+    @Override
     public void writeOnHALog(final IHAWriteMessage msg, final ByteBuffer data)
             throws IOException, IllegalStateException {
 
