@@ -35,7 +35,7 @@ import com.bigdata.ha.HACommitGlue;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
-public interface IHA2PhaseCommitMessage extends IHAMessage {
+public interface IHA2PhaseCommitMessage extends IHA2PhaseCommitProtocolMessage {
 
     /**
      * <code>true</code> iff the service was recognized as being joined with the
@@ -60,5 +60,23 @@ public interface IHA2PhaseCommitMessage extends IHAMessage {
      * the commit will still be performed).
      */
     boolean didAllServicesPrepare();
-    
+
+    /**
+     * When <code>true</code> the COMMIT message will fail within the
+     * commit2Phase implementation. An exception will be thrown immeditely
+     * before the new root block is written onto the journal.
+     * <p>
+     * Note: This is for unit tests only.
+     */
+    boolean failCommit_beforeWritingRootBlockOnJournal();
+
+    /**
+     * When <code>true</code> the COMMIT message will fail within the
+     * commit2Phase implementation. An exception will be thrown immeditely
+     * before the closing root block is written onto the HALog file.
+     * <p>
+     * Note: This is for unit tests only.
+     */
+    boolean failCommit_beforeClosingHALog();
+
 }

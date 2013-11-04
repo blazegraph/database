@@ -36,7 +36,7 @@ import com.bigdata.journal.IRootBlockView;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
-public interface IHA2PhasePrepareMessage extends IHAMessage {
+public interface IHA2PhasePrepareMessage extends IHA2PhaseCommitProtocolMessage {
 
     /**
      * The consensus release time from the GATHER.
@@ -91,6 +91,8 @@ public interface IHA2PhasePrepareMessage extends IHAMessage {
     
     /**
      * When <code>true</code>, always vote note.
+     * <p>
+     * Note: This is for unit tests only.
      */
     boolean voteNo();
     
