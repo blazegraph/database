@@ -464,6 +464,33 @@ public class TestHA3JournalServerWithHALogs extends AbstractHA3BackupTestCase {
      *      Review commit2Phase semantics when a follower fails </a>
      * 
      * @see TestHAJournalServerOverride#testStartABC_commit2Phase_B_failCommit_beforeWritingRootBlockOnJournal_HALogsPurgedAtCommit()
+     * 
+     *      TODO There should probably be different tests to examine how the HA
+     *      cluster handles the case where we have fewer than the required
+     *      number of services that correctly perform the commit. We should be
+     *      able to write tests that actually cause the HA cluster meet on the
+     *      previous commit point (majority fail to commit), the new commit
+     *      point (majority commit), or on NO commit point (bare majority with
+     *      3rd service at an earlier commit point, 2 services vote YES and one
+     *      fails before writing the root block on the journal - this last case
+     *      should cause generate an alert, even if only because the HA cluster
+     *      is unable to form a quorum).
+     * 
+     *      TODO Write test where commit2Phase() fails after writing the root
+     *      block on the journal but before writing the root block on the HALog.
+     *      Use this to explore what can happen when the live HALog file is not
+     *      properly closed. The journal will be at a commit point in advance of
+     *      the most recent HALog file. It needs to either reach to the quorum
+     *      and recover the root block (and any subsequent commits) from the
+     *      leader. Note that it could cure the missing HALog root block locally
+     *      as well, but better to find a common pattern.
+     * 
+     *      TODO Develop annotations on the commit2Phase protocol diagram that
+     *      show the different tests that we have to examine the failure modes.
+     * 
+     *      TODO Explore GATHER failure modes.
+     * 
+     *      TODO Test failover reads.
      */
     public void testStartABC_commit2Phase_B_failCommit_beforeWritingRootBlockOnJournal_HALogsNotPurgedAtCommit()
             throws Exception {
