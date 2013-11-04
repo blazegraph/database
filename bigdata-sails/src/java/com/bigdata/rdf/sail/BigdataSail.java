@@ -625,7 +625,7 @@ public class BigdataSail extends SailBase implements Sail {
      * 
      * @see Options
      */
-    public BigdataSail(Properties properties) {
+    public BigdataSail(final Properties properties) {
         
         this(createLTS(properties));
 

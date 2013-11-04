@@ -68,20 +68,7 @@ public class CommitCounterUtility {
          * the file name and then partitioning it into groups of THREE (3)
          * digits.
          */
-        final String basename;
-        {
-
-            final StringBuilder sb = new StringBuilder();
-
-            final Formatter f = new Formatter(sb);
-
-            f.format("%021d", commitCounter);
-            f.flush();
-            f.close();
-
-            basename = sb.toString();
-
-        }
+        final String basename = getCommitCounterStr(commitCounter);
 
         /*
          * Now figure out the recursive directory name.
@@ -102,6 +89,32 @@ public class CommitCounterUtility {
 
         return file;
         
+    }
+
+    /**
+     * Format the commit counter with leading zeros such that it will be
+     * lexically ordered in the file system.
+     * 
+     * @param commitCounter
+     *            The commit counter.
+     *            
+     * @return The basename of the file consisting of the foramtted commit
+     *         counter with the appropriate leading zeros.
+     */
+    public static String getCommitCounterStr(final long commitCounter) {
+
+        final StringBuilder sb = new StringBuilder(21);
+
+        final Formatter f = new Formatter(sb);
+
+        f.format("%021d", commitCounter);
+        f.flush();
+        f.close();
+
+        final String basename = sb.toString();
+
+        return basename;
+
     }
 
     /**

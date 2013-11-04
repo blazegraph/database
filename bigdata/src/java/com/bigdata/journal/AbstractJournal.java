@@ -2835,10 +2835,26 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                  * last live HA message).
                  */
 
-                final QuorumService<HAGlue> localService = quorum.getClient();
-
-                localService.discardWriteSet();
+                QuorumService<HAGlue> localService = null;
+                try {
                 
+                    localService = quorum.getClient();
+                    
+                } catch (IllegalStateException ex) {
+                    
+                    /*
+                     * Note: Thrown if the QuorumService is not running.
+                     */
+                    
+                    // ignore.
+                }
+
+                if (localService != null) {
+
+                    localService.discardWriteSet();
+
+                }
+
             }
             
 			if (log.isInfoEnabled())
@@ -3854,11 +3870,11 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                 final String msg = "commit: commitTime="
                         + cs.commitTime
                         + ", latency="
-                        + TimeUnit.NANOSECONDS.toMillis(elapsedNanos)
-                        + ", nextOffset="
-                        + cs.newRootBlock.getNextOffset()
-                        + ", byteCount="
-                        + (cs.newRootBlock.getNextOffset() - cs.byteCountBefore);
+                        + TimeUnit.NANOSECONDS.toMillis(elapsedNanos);
+//                        + ", nextOffset="
+//                        + cs.newRootBlock.getNextOffset()
+//                        + ", byteCount="
+//                        + (cs.newRootBlock.getNextOffset() - cs.byteCountBefore);
                 if (BigdataStatics.debug)
 					System.err.println(msg);
 				else if (log.isInfoEnabled())
@@ -7694,6 +7710,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                 this.abortMessage = abortMessage;
             }
 
+            @Override
             public void run() {
 
                 try {
@@ -7731,7 +7748,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                     
                     // ALWAYS go through the local abort.
                     doLocalAbort();
-                    
+
                 }
 
             }
@@ -7750,6 +7767,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
          * @todo Since these are rare events it may not be worthwhile to setup a
          *       separate low-level socket service to send/receive the data.
          */
+        @Override
         public Future<IHAReadResponse> readFromDisk(
                 final IHAReadRequest msg) {
 
@@ -7762,7 +7780,8 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
             final FutureTask<IHAReadResponse> ft = new FutureTask<IHAReadResponse>(
                     new Callable<IHAReadResponse>() {
-				
+                        
+                @Override
 			    public IHAReadResponse call() throws Exception {
 
 		            if (haLog.isInfoEnabled())
