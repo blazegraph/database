@@ -24,14 +24,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.ha.msg;
 
 /**
- * Message indicating that a 2-phase abort should be performed.
+ * Message for one of the 2-phase commit protocol operations.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
-public interface IHA2PhaseAbortMessage extends IHA2PhaseCommitProtocolMessage {
+public interface IHA2PhaseCommitProtocolMessage extends IHAMessage {
 
-    /**
-     * The token for the quorum for which this request was made.
-     */
-    long getQuorumToken();
 }

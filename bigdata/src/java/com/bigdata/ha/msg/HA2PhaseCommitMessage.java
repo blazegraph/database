@@ -66,5 +66,15 @@ public class HA2PhaseCommitMessage implements IHA2PhaseCommitMessage,
                 + didAllServicesPrepare + "}";
 
     }
+
+    @Override
+    public boolean failCommit_beforeWritingRootBlockOnJournal() {
+        return false;
+    }
+
+    @Override
+    public boolean failCommit_beforeClosingHALog() {
+        return false;
+    }
     
 }

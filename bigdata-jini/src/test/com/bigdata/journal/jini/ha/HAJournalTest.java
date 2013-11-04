@@ -265,6 +265,16 @@ public class HAJournalTest extends HAJournal {
         public void voteNo() throws IOException;
 
         /**
+         * @see IHA2PhaseCommitMessage#failCommit_beforeWritingRootBlockOnJournal()
+         */
+        public void failCommit_beforeWritingRootBlockOnJournal() throws IOException;
+
+        /**
+         * @see IHA2PhaseCommitMessage#failCommit_beforeClosingHALog()
+         */
+        public void failCommit_beforeClosingHALog() throws IOException;
+        
+        /**
          * Set the next value to be reported by {@link BasicHA#nextTimestamp()}.
          * <p>
          * Note: Only a few specific methods call against
@@ -278,7 +288,7 @@ public class HAJournalTest extends HAJournal {
          *            by {@link BasicHA#nextTimestamp()}, after which the
          *            behavior will revert to the default.
          * 
-         *            TODO Add a "clearNextTimestamp() method.
+         *            TODO Add a "clearNextTimestamp()" method.
          */
         public void setNextTimestamp(long nextTimestamp) throws IOException;
         
@@ -424,8 +434,28 @@ public class HAJournalTest extends HAJournal {
         /**
          * Flag used to force the service to vote "NO" on the next two-phase
          * commit.
+         * 
+         * @see IHA2PhasePrepareMessage#voteNo()
          */
         private final AtomicBoolean voteNo = new AtomicBoolean(false);
+
+        /**
+         * Flag used to force the service to fail rather than laying down the
+         * new root block in the COMMIT message.
+         * 
+         * @see IHA2PhaseCommitMessage#failCommit_beforeWritingRootBlockOnJournal()
+         */
+        private final AtomicBoolean failCommit_beforeWritingRootBlockOnJournal = new AtomicBoolean(
+                false);
+
+        /**
+         * Flag used to force the service to fail rather than laying down the
+         * new root block in the COMMIT message.
+         * 
+         * @see IHA2PhaseCommitMessage#failCommit_beforeClosingHALog()
+         */
+        private final AtomicBoolean failCommit_beforeClosingHALog = new AtomicBoolean(
+                false);
 
         private final AtomicLong nextTimestamp = new AtomicLong(-1L);
         
@@ -487,7 +517,23 @@ public class HAJournalTest extends HAJournal {
 
         @Override
         public void voteNo() throws IOException {
+
             voteNo.set(true);
+            
+        }
+        
+        @Override
+        public void failCommit_beforeWritingRootBlockOnJournal() throws IOException {
+
+            failCommit_beforeWritingRootBlockOnJournal.set(true);
+            
+        }
+        
+        @Override
+        public void failCommit_beforeClosingHALog() throws IOException {
+
+            failCommit_beforeClosingHALog.set(true);
+            
         }
         
         @Override
@@ -915,7 +961,16 @@ public class HAJournalTest extends HAJournal {
 
             if (voteNo.compareAndSet(true/* expect */, false/* update */)) {
 
-                return super.prepare2Phase(new MyPrepareMessage(prepareMessage));
+                return super
+                        .prepare2Phase(new MyPrepareMessage(prepareMessage) {
+                            
+                            private static final long serialVersionUID = 1L;
+
+                            @Override
+                            public boolean voteNo() {
+                                return true;
+                            }
+                        });
 
             } else {
                 
@@ -926,12 +981,41 @@ public class HAJournalTest extends HAJournal {
         }
 
         @Override
-        public Future<Void> commit2Phase(IHA2PhaseCommitMessage commitMessage) {
+        public Future<Void> commit2Phase(final IHA2PhaseCommitMessage commitMessage) {
 
             checkMethod("commit2Phase",
                     new Class[] { IHA2PhaseCommitMessage.class });
 
-            return super.commit2Phase(commitMessage);
+            if (failCommit_beforeWritingRootBlockOnJournal.compareAndSet(
+                    true/* expect */, false/* update */)) {
+
+                return super.commit2Phase(new MyCommitMessage(commitMessage) {
+                
+                    private static final long serialVersionUID = 1L;
+
+                    @Override
+                    public boolean failCommit_beforeWritingRootBlockOnJournal() {
+                        return true;
+                    }
+                });
+            } else if (failCommit_beforeClosingHALog.compareAndSet(
+                    true/* expect */, false/* update */)) {
+
+                return super.commit2Phase(new MyCommitMessage(commitMessage) {
+
+                    private static final long serialVersionUID = 1L;
+
+                    @Override
+                    public boolean failCommit_beforeClosingHALog() {
+                        return true;
+                    }
+                });
+
+            } else {
+                
+                return super.commit2Phase(commitMessage);
+                
+            }
 
         }
 
@@ -950,7 +1034,8 @@ public class HAJournalTest extends HAJournal {
          */
 
         @Override
-        public Future<IHAReadResponse> readFromDisk(IHAReadRequest readMessage) {
+        public Future<IHAReadResponse> readFromDisk(
+                final IHAReadRequest readMessage) {
 
             checkMethod("readFromDisk", new Class[] { IHAReadResponse.class });
 
@@ -979,8 +1064,8 @@ public class HAJournalTest extends HAJournal {
         }
 
         @Override
-        public Future<Void> receiveAndReplicate(IHASyncRequest req,
-                IHAWriteMessage msg) throws IOException {
+        public Future<Void> receiveAndReplicate(final IHASyncRequest req,
+                final IHAWriteMessage msg) throws IOException {
 
             checkMethod("receiveAndReplicate", new Class[] {
                     IHASyncRequest.class, IHAWriteMessage.class });
@@ -1157,7 +1242,7 @@ public class HAJournalTest extends HAJournal {
 //
 //                    try {
 //
-//                        // FIXME: hould already be closed, can we check this?
+//                        // Should already be closed, can we check this?
 //
 //                        // Obtain a new connection.
 //                        ((ZKQuorumImpl) getQuorum()).getZookeeper();
@@ -1239,6 +1324,11 @@ public class HAJournalTest extends HAJournal {
         
     } // class HAGlueTestImpl
 
+    /**
+     * Delegation pattern allows us to override select methods easily.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     */
     private static class MyPrepareMessage implements IHA2PhasePrepareMessage {
         
         /**
@@ -1288,13 +1378,57 @@ public class HAJournalTest extends HAJournal {
         }
 
         /**
-         * Force the PREPARE to vote NO.
+         * {@inheritDoc}
+         * <p>
+         * Overridden to force the PREPARE to vote NO.
          */
         @Override
         public boolean voteNo() {
-            return true;
+            return delegate.voteNo();
         }
         
+    }
+
+    /**
+     * Delegation pattern allows us to override select methods easily.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     */
+    private static class MyCommitMessage implements IHA2PhaseCommitMessage {
+
+        private static final long serialVersionUID = 1L;
+
+        private final IHA2PhaseCommitMessage delegate;
+
+        public MyCommitMessage(final IHA2PhaseCommitMessage msg) {
+            this.delegate = msg;
+        }
+
+        @Override
+        public boolean isJoinedService() {
+            return delegate.isJoinedService();
+        }
+
+        @Override
+        public long getCommitTime() {
+            return delegate.getCommitTime();
+        }
+
+        @Override
+        public boolean didAllServicesPrepare() {
+            return delegate.didAllServicesPrepare();
+        }
+
+        @Override
+        public boolean failCommit_beforeWritingRootBlockOnJournal() {
+            return delegate.failCommit_beforeWritingRootBlockOnJournal();
+        }
+
+        @Override
+        public boolean failCommit_beforeClosingHALog() {
+            return delegate.failCommit_beforeClosingHALog();
+        }
+
     }
     
 } // class HAJournalTest

@@ -24,14 +24,28 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.ha.msg;
 
 /**
- * Message indicating that a 2-phase abort should be performed.
+ * Instances of this class are used when one of the
+ * {@link IHA2PhaseCommitProtocolMessage}s is configured to force a runtime
+ * exception during the 2-phase commit protocol.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
-public interface IHA2PhaseAbortMessage extends IHA2PhaseCommitProtocolMessage {
+public class Mock2PhaseCommitProtocolException extends RuntimeException {
 
-    /**
-     * The token for the quorum for which this request was made.
-     */
-    long getQuorumToken();
+    private static final long serialVersionUID = 1L;
+
+    public Mock2PhaseCommitProtocolException() {
+        super();
+    }
+
+    public Mock2PhaseCommitProtocolException(final String msg) {
+        super(msg);
+    }
+
+    public Mock2PhaseCommitProtocolException(final RuntimeException cause) {
+
+        super(cause);
+
+    }
+
 }

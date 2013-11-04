@@ -140,6 +140,7 @@ import com.bigdata.ha.msg.IHASyncRequest;
 import com.bigdata.ha.msg.IHAWriteMessage;
 import com.bigdata.ha.msg.IHAWriteSetStateRequest;
 import com.bigdata.ha.msg.IHAWriteSetStateResponse;
+import com.bigdata.ha.msg.Mock2PhaseCommitProtocolException;
 import com.bigdata.htree.HTree;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.IDataRecord;
@@ -7040,16 +7041,6 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
             }
 
         } // class VoteNoTask
-
-//        /**
-//         * Method must be extended by subclass to coordinate the rejected
-//         * commit.
-//         */
-//        protected void doRejectedCommit() {
-//
-//           doLocalAbort(); 
-//            
-//        }
         
         /**
          * Task prepares for a 2-phase commit (syncs to the disk) and votes YES
@@ -7337,8 +7328,8 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                     /*
                      * Hook allows the test suite to force a NO vote.
                      */
-                    
-                    throw new RuntimeException("Force NO vote");
+
+                    throw new Mock2PhaseCommitProtocolException("Force NO vote");
 
                 }
 
@@ -7640,10 +7631,22 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                 // verify that the qourum has not changed.
                 quorum.assertQuorum(rootBlock.getQuorumToken());
 
+                if (commitMessage.failCommit_beforeWritingRootBlockOnJournal()) {
+
+                    throw new Mock2PhaseCommitProtocolException();
+
+                }
+                
                 /*
                  * Write the root block on the local journal.
                  */
                 AbstractJournal.this.doLocalCommit(localService, rootBlock);
+
+                if (commitMessage.failCommit_beforeClosingHALog()) {
+
+                    throw new Mock2PhaseCommitProtocolException();
+
+                }
 
                 /*
                  * Write the root block on the HALog file, closing out that

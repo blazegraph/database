@@ -30,10 +30,14 @@ import java.io.File;
 
 import net.jini.config.Configuration;
 
+import com.bigdata.ha.HACommitGlue;
 import com.bigdata.ha.HAGlue;
+import com.bigdata.ha.HAStatusEnum;
 import com.bigdata.ha.halog.HALogReader;
 import com.bigdata.ha.halog.IHALogReader;
+import com.bigdata.ha.msg.IHA2PhasePrepareMessage;
 import com.bigdata.journal.CommitCounterUtility;
+import com.bigdata.journal.jini.ha.HAJournalTest.HAGlueTest;
 
 /**
  * Test suite when we are using the {@link DefaultSnapshotPolicy} and
@@ -441,6 +445,100 @@ public class TestHA3JournalServerWithHALogs extends AbstractHA3BackupTestCase {
         awaitLogCount(getHALogDirB(), NTX + 2L);
         awaitLogCount(getHALogDirC(), NTX + 2L);
         
+    }
+
+    /**
+     * Three services are started in [A,B,C] order. B is setup for
+     * {@link HACommitGlue#prepare2Phase(IHA2PhasePrepareMessage)} to throw an
+     * exception inside of the commit2Phase() method rather than at the external
+     * RMI interface.
+     * <p>
+     * A simple transaction is performed. We verify that the transaction
+     * completes successfully, that the quorum token is unchanged, and that
+     * [A,C] both participated in the commit. We also verify that B is moved to
+     * the end of the pipeline (by doing a serviceLeave and then re-entering the
+     * pipeline) and that it resyncs with the met quorum and finally re-joins
+     * with the met quorum. The quorum should not break across this test.
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/760" >
+     *      Review commit2Phase semantics when a follower fails </a>
+     * 
+     * @see TestHAJournalServerOverride#testStartABC_commit2Phase_B_failCommit_beforeWritingRootBlockOnJournal_HALogsPurgedAtCommit()
+     */
+    public void testStartABC_commit2Phase_B_failCommit_beforeWritingRootBlockOnJournal_HALogsNotPurgedAtCommit()
+            throws Exception {
+
+        // Enforce the join order.
+        final ABC startup = new ABC(true /*sequential*/);
+
+        //HAJournalTest.dumpThreads();
+        
+        final long token = awaitFullyMetQuorum();
+
+        // Should be one commit point.
+        awaitCommitCounter(1L, startup.serverA, startup.serverB,
+                startup.serverC);
+
+        /*
+         * Setup B to fail the "COMMIT" message (specifically, it will throw
+         * back an exception rather than executing the commit.
+         */
+        ((HAGlueTest) startup.serverB)
+                .failCommit_beforeWritingRootBlockOnJournal();
+
+        /*
+         * Simple transaction.
+         * 
+         * Note: B will fail the commit without laying down the root block and
+         * will transition into the ERROR state. From there, it will move to
+         * SeekConsensus and then RESYNC. While in RESYNC it will pick up the
+         * missing HALog and commit point. Finally, it will transition into
+         * RunMet.
+         */
+        simpleTransaction();
+
+        // Verify quorum is unchanged.
+        assertEquals(token, quorum.token());
+
+        // Should be two commit points on {A,C}.
+        awaitCommitCounter(2L, startup.serverA, startup.serverC);
+
+        /*
+         * Just one commit point on B
+         * 
+         * TODO This is a data race. It is only transiently true.
+         */
+        awaitCommitCounter(1L, startup.serverB);
+
+        /*
+         * B is NotReady
+         * 
+         * TODO This is a data race. It is only transiently true.
+         */
+        awaitHAStatus(startup.serverB, HAStatusEnum.NotReady);
+
+        /*
+         * The pipeline should be reordered. B will do a service leave, then
+         * enter seek consensus, and then re-enter the pipeline.
+         */
+        awaitPipeline(new HAGlue[] { startup.serverA, startup.serverC,
+                startup.serverB });
+
+        awaitFullyMetQuorum();
+
+        /*
+         * There should be two commit points on {A,C,B} (note that this assert
+         * does not pay attention to the pipeline order).
+         */
+        awaitCommitCounter(2L, startup.serverA, startup.serverC,
+                startup.serverB);
+
+        // B should be a follower again.
+        awaitHAStatus(startup.serverB, HAStatusEnum.Follower);
+
+        // quorum token is unchanged.
+        assertEquals(token, quorum.token());
+
     }
 
 }

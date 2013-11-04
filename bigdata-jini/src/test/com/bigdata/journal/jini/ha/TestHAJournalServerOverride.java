@@ -38,10 +38,10 @@ import org.apache.zookeeper.ZooKeeper;
 import com.bigdata.ha.HACommitGlue;
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.HAStatusEnum;
-import com.bigdata.ha.msg.IHA2PhaseCommitMessage;
 import com.bigdata.ha.msg.IHA2PhasePrepareMessage;
 import com.bigdata.ha.msg.IHANotifyReleaseTimeRequest;
 import com.bigdata.journal.AbstractTask;
+import com.bigdata.journal.jini.ha.HAJournalServer.RunStateEnum;
 import com.bigdata.journal.jini.ha.HAJournalTest.HAGlueTest;
 import com.bigdata.journal.jini.ha.HAJournalTest.SpuriousTestException;
 import com.bigdata.quorum.zk.ZKQuorumImpl;
@@ -174,13 +174,36 @@ public class TestHAJournalServerOverride extends AbstractHA3JournalServerTestCas
      * When we add concurrent unisolated writers, the user level transaction
      * abort will just discard the buffered writes for a specific
      * {@link AbstractTask}.
-     * 
-     * @throws Exception
      */
     public void testStartABC_userLevelAbortDoesNotCauseQuorumBreak()
             throws Exception {
 
-        fail("write test");
+        final ABC x = new ABC(true/*sequential*/);
+        
+        final long token = awaitFullyMetQuorum();
+        
+        // Now run several transactions
+        final int NTX = 5;
+        for (int i = 0; i < NTX; i++)
+            simpleTransaction();
+
+        // wait until the commit point is registered on all services.
+        awaitCommitCounter(NTX + 1L, new HAGlue[] { x.serverA, x.serverB,
+                x.serverC });
+
+        // Verify order.
+        awaitPipeline(new HAGlue[] { x.serverA, x.serverB, x.serverC });
+        awaitJoined(new HAGlue[] { x.serverA, x.serverB, x.serverC });
+        
+        // Run a transaction that forces a 2-phase abort.
+        ((HAGlueTest) x.serverA).simpleTransaction_abort();
+        
+        // Reverify order.
+        awaitPipeline(new HAGlue[] { x.serverA, x.serverB, x.serverC });
+        awaitJoined(new HAGlue[] { x.serverA, x.serverB, x.serverC });
+        
+        // Verify no failover of the leader.
+        assertEquals(token, awaitFullyMetQuorum());
 
     }
 
@@ -375,13 +398,14 @@ public class TestHAJournalServerOverride extends AbstractHA3JournalServerTestCas
     
     /**
      * Three services are started in [A,B,C] order. B is setup for
-     * {@link HACommitGlue#prepare2Phase(IHA2PhasePrepareMessage)} to vote "NO".
-     * A simple transaction is performed. We verify that the transaction
-     * completes successfully, that the quorum token is unchanged, and that
-     * [A,C] both participated in the commit. We also verify that B is moved to
-     * the end of the pipeline (by doing a serviceLeave and then re-entering the
-     * pipeline) and that it resyncs with the met quorum and finally re-joins
-     * with the met quorum. The quorum should not break across this test.
+     * {@link HACommitGlue#prepare2Phase(IHA2PhasePrepareMessage)} to throw an
+     * exception. A simple transaction is performed. We verify that the
+     * transaction completes successfully, that the quorum token is unchanged,
+     * and that [A,C] both participated in the commit. We also verify that B is
+     * moved to the end of the pipeline (by doing a serviceLeave and then
+     * re-entering the pipeline) and that it resyncs with the met quorum and
+     * finally re-joins with the met quorum. The quorum should not break across
+     * this test.
      */
     public void testStartABC_prepare2Phase_B_throws_exception()
             throws Exception {
@@ -472,36 +496,36 @@ public class TestHAJournalServerOverride extends AbstractHA3JournalServerTestCas
     /**
      * Three services are started in [A,B,C] order. B is setup for
      * {@link HACommitGlue#prepare2Phase(IHA2PhasePrepareMessage)} to throw an
-     * exeption. A simple transaction is performed. We verify that the
-     * transaction completes successfully, that the quorum token is unchanged,
-     * and that [A,C] both participated in the commit. We also verify that B is
-     * moved to the end of the pipeline (by doing a serviceLeave and then
-     * re-entering the pipeline) and that it resyncs with the met quorum and
-     * finally re-joins with the met quorum. The quorum should not break across
-     * this test.
-     * 
-     * FIXME Variant where the commit2Phase fails. Note: The COMMIT message is
-     * design to do as little work as possible. In practice, this requires an
-     * RMI to the followers, each follower must not encounter an error when it
-     * validates the COMMIT message, and each follower must put down its new
-     * root block (from the prepare message) and then sync the disk. Finally,
-     * the RMI response must be returned.
+     * exception inside of the commit2Phase() method rather than at the external
+     * RMI interface.
      * <p>
-     * Under what conditions can a COMMIT message fail where we can still
-     * recover? Single node failure? Leader failure? (QuorumCommitImpl currently
-     * fails the commit if there is a single failure, even though the quourm
-     * might have a consensus around the new commit point.)
+     * A simple transaction is performed. We verify that the transaction
+     * completes successfully, that the quorum token is unchanged, and that
+     * [A,C] both participated in the commit. We also verify that B is moved to
+     * the end of the pipeline (by doing a serviceLeave and then re-entering the
+     * pipeline). For this test, B DOES NOT resync and join. This is because A
+     * and C go through their commit2Phase() methods for a fully met quorum.
+     * Because we have explicitly disabled the {@link DefaultRestorePolicy},
+     * this allows them to purge their HALogs. This means that B can not resync
+     * with the met quorum. As a consequence, B transitions to the
+     * {@link RunStateEnum#Operator} state and remains
+     * {@link HAStatusEnum#NotReady}.
+     * <p>
+     * The quorum should not break across this test.
      * 
-     * TODO Consider leader failure scenarios in this test suite, not just
-     * scenarios where B fails. We MUST also cover failures of C (the 2nd
-     * follower). We should also cover scenarios where the quorum is barely met
-     * and a single failure causes a rejected commit (local decision) or 2-phase
-     * abort (joined services in joint agreement).
+     * TODO Consider leader failure scenarios in this test suite (commit2Phase()
+     * fails on the leader), not just scenarios where B fails. We MUST also
+     * cover failures of C (the 2nd follower). We should also cover scenarios
+     * where the quorum is barely met and a single failure causes a rejected
+     * commit (local decision) or 2-phase abort (joined services in joint
+     * agreement).
      * 
      * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/760" >
      *      Review commit2Phase semantics when a follower fails </a>
+     * 
+     * @see TestHA3JournalServerWithHALogs#testStartABC_commit2Phase_B_failCommit_beforeWritingRootBlockOnJournal_HALogsNotPurgedAtCommit()
      */
-    public void testStartABC_commit2Phase_B_fails()
+    public void testStartABC_commit2Phase_B_failCommit_beforeWritingRootBlockOnJournal_HALogsPurgedAtCommit()
             throws Exception {
 
         // Enforce the join order.
@@ -518,120 +542,69 @@ public class TestHAJournalServerOverride extends AbstractHA3JournalServerTestCas
         /*
          * Setup B to fail the "COMMIT" message (specifically, it will throw
          * back an exception rather than executing the commit.
-         * 
-         * FIXME We need to cause B to actually fail the commit such that it
-         * enters the ERROR state. This is only causing the RMI to be rejected
-         * so B is not being failed out of the pipeline. Thus, B will remain
-         * joined with the met quorum (but at the wrong commit point) until we
-         * send down another replicated write. At that point B will notice that
-         * it is out of whack and enter the ERROR state.
          */
         ((HAGlueTest) startup.serverB)
-                .failNext("commit2Phase",
-                        new Class[] { IHA2PhaseCommitMessage.class },
-                        0/* nwait */, 1/* nfail */);
+                .failCommit_beforeWritingRootBlockOnJournal();
 
-        /**
-         * FIXME We need to resolve the correct behavior when B fails the commit
-         * after having prepared. Two code paths are outlined below. The
-         * implementation currently does an abort2Phase() when the
-         * commit2Phase() observe an error for B. That causes the commit point
-         * to NOT advance.
+        /*
+         * Simple transaction.
          * 
-         * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/760" >
-         * Review commit2Phase semantics when a follower fails </a>
+         * Note: B will fail the commit without laying down the root block and
+         * will transition into the ERROR state. From there, it will move to
+         * SeekConsensus and then RESYNC. While in RESYNC it will pick up the
+         * missing HALog and commit point. Finally, it will transition into
+         * RunMet.
          */
-        
-        if(true) {
+        simpleTransaction();
 
-            // Simple transaction.
-            simpleTransaction();
+        // Verify quorum is unchanged.
+        assertEquals(token, quorum.token());
 
-            // Verify quorum is unchanged.
-            assertEquals(token, quorum.token());
+        // Should be two commit points on {A,C}.
+        awaitCommitCounter(2L, startup.serverA, startup.serverC);
 
-            // Should be two commit points on {A,C}.
-            awaitCommitCounter(2L, startup.serverA, startup.serverC);
+        /*
+         * Just one commit point on B
+         * 
+         * TODO This is a data race. It is only transiently true.
+         */
+        awaitCommitCounter(1L, startup.serverB);
 
-            // Just one commit point on B.
-            awaitCommitCounter(1L, startup.serverB);
+        /*
+         * B is NotReady
+         * 
+         * TODO This is a data race. It is only transiently true.
+         */
+        awaitHAStatus(startup.serverB, HAStatusEnum.NotReady);
 
-            // B is still a follower.
-            awaitHAStatus(startup.serverB, HAStatusEnum.Follower);
-            
-            /*
-             * B should go into an ERROR state and then into SeekConsensus and
-             * from there to RESYNC and finally back to RunMet. We can not
-             * reliably observe the intervening states. So what we really need
-             * to do is watch for B to move to the end of the pipeline and catch
-             * up to the same commit point.
-             * 
-             * FIXME This is forcing B into an error state to simulate what
-             * would happen if B had encountered an error during the 2-phase
-             * commit above.
-             */
-            ((HAGlueTest)startup.serverB).enterErrorState();
+        /*
+         * The pipeline should be reordered. B will do a service leave, then
+         * enter seek consensus, and then re-enter the pipeline.
+         */
+        awaitPipeline(new HAGlue[] { startup.serverA, startup.serverC,
+                startup.serverB });
 
-            /*
-             * The pipeline should be reordered. B will do a service leave, then
-             * enter seek consensus, and then re-enter the pipeline.
-             */
-            awaitPipeline(new HAGlue[] { startup.serverA, startup.serverC,
-                    startup.serverB });
+        /*
+         * IF you allow the purge of the HALog files on a fully met commit AND a
+         * service fails in commit2Phase() for a fully met quorum THEN the other
+         * services will have purged their HALog files and the service that
+         * failed in commit2Phase() will be unable to resync and join the met
+         * quorum.
+         */
+        awaitRunStateEnum(RunStateEnum.Operator, startup.serverB);
+        awaitHAStatus(startup.serverB, HAStatusEnum.NotReady);
 
-            awaitFullyMetQuorum();
-            
-            /*
-             * There should be two commit points on {A,C,B} (note that this
-             * assert does not pay attention to the pipeline order).
-             */
-            awaitCommitCounter(2L, startup.serverA, startup.serverC,
-                    startup.serverB);
+        // There should be two commit points on {A,C}.
+        awaitCommitCounter(2L, startup.serverA, startup.serverC);
 
-            // B should be a follower again.
-            awaitHAStatus(startup.serverB, HAStatusEnum.Follower);
+        // Just one commit point on B.
+        awaitCommitCounter(1L, startup.serverB);
 
-            // quorum token is unchanged.
-            assertEquals(token, quorum.token());
-
-        } else {
-            
-            try {
-
-                // Simple transaction.
-                simpleTransaction();
-                
-                fail("Expecting failed transaction");
-                
-            } catch (Exception t) {
-                
-                if (!t.getMessage().contains(
-                        SpuriousTestException.class.getName())) {
-                    /*
-                     * Wrong inner cause.
-                     * 
-                     * Note: The stack trace of the local exception does not
-                     * include the remote stack trace. The cause is formatted
-                     * into the HTTP response body.
-                     */
-                    fail("Expecting " + SpuriousTestException.class, t);
-                }
-                
-            }
-
-            // Verify quorum is unchanged.
-            assertEquals(token, quorum.token());
-
-            // Should be ONE commit point on {A,B, C].
-            awaitCommitCounter(1L, startup.serverA, startup.serverB,
-                    startup.serverC);
-
-            fail("finish test under these assumptions");
-            
-        }
+        // quorum token is unchanged.
+        assertEquals(token, quorum.token());
 
     }
-    
+
     /**
      * Unit test for failure to RESYNC having a root cause that the live HALog
      * file did not exist on the quorum leader after an abort2Phase() call.
