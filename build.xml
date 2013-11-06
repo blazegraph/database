@@ -381,7 +381,7 @@ public class BuildInfo {
 	<target name="javadoc" depends="prepare" if="javadoc">
 		<mkdir dir="${build.dir}/docs/api" />
 		<javadoc destdir="${build.dir}/docs/api" defaultexcludes="yes"
-			      author="true" version="true" use="true"
+			      author="true" version="true" use="true" verbose="no"
 			    overview="${bigdata.dir}/overview.html"
 			 windowtitle="bigdata&#174; v${build.ver}"
 			classpathref="build.classpath"
