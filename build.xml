@@ -387,6 +387,7 @@ public class BuildInfo {
 			classpathref="build.classpath"
 			>
 			<arg value="-J-Xmx1000m" />
+         <arg value="-quiet" />
 			<packageset dir="${bigdata.dir}/bigdata/src/java" />
 			<packageset dir="${bigdata.dir}/bigdata/src/samples" />
 			<packageset dir="${bigdata.dir}/bigdata-jini/src/java" />
