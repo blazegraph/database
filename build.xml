@@ -1992,8 +1992,8 @@ ${postInstallMessage}</echo>
       <mkdir dir="${test.results.dir}" />
 
     	<!-- Clear out the old HA test suite logs. -->
-      <property name="HAtest.dir" location="benchmark/CI-HAJournal-1" />
-      <delete dir="${HAtest.dir}" quiet="true" />
+      <property name="HATest.dir" location="benchmark/CI-HAJournal-1" />
+      <delete dir="${HATest.dir}" quiet="true" />
       <mkdir dir="${HATest.dir}" />
 
       <condition property="testClass" value="${testName}">
@@ -2187,7 +2187,7 @@ ${postInstallMessage}</echo>
       <tar destfile="${test.results.dir}/report.tgz" basedir="${test.results.dir}/report" compression="gzip"/>
 
       <!-- Archive the HA test suite output logs. -->
-      <tar destfile="${test.results.dir}/HAtest-report.tgz" basedir="${HAtest.dir}" compression="gzip"/>
+      <tar destfile="${test.results.dir}/HAtest-report.tgz" basedir="${HATest.dir}" compression="gzip"/>
 
     </target>
 
