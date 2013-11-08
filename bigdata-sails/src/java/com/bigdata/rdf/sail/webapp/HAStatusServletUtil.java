@@ -62,6 +62,7 @@ import com.bigdata.quorum.AsynchronousQuorumCloseException;
 import com.bigdata.quorum.Quorum;
 import com.bigdata.quorum.zk.ZKQuorumClient;
 import com.bigdata.quorum.zk.ZKQuorumImpl;
+import com.bigdata.rdf.sail.webapp.StatusServlet.DigestEnum;
 import com.bigdata.zookeeper.DumpZookeeper;
 
 /**
@@ -162,7 +163,19 @@ public class HAStatusServletUtil {
             quorumService = t;
         }
 
-        final boolean digests = req.getParameter(StatusServlet.DIGESTS) != null;
+        final DigestEnum digestEnum;
+        {
+            final String str = req.getParameter(StatusServlet.DIGESTS);
+            if (str == null) {
+                digestEnum = null;
+            } else {
+                if (str.trim().isEmpty()) {
+                    digestEnum = StatusServlet.DEFAULT_DIGESTS;
+                } else {
+                    digestEnum = DigestEnum.valueOf(str.trim());
+                }
+            }
+        }
         
         current.node("h1", "High Availability");
 
@@ -270,7 +283,8 @@ public class HAStatusServletUtil {
                 final File file = journal.getFile();
                 if (file != null) {
                     String digestStr = null;
-                    if (digests) {
+                    if (digestEnum != null
+                            && (digestEnum == DigestEnum.All || digestEnum == DigestEnum.Journal)) {
                         try {
                             final MessageDigest digest = MessageDigest
                                     .getInstance("MD5");
@@ -361,7 +375,8 @@ public class HAStatusServletUtil {
                             + (currentFile == null ? "N/A" : currentFile
                                     .getName())).node("br").close();
                 }
-                if (digests) {
+                if (digestEnum != null
+                        && (digestEnum == DigestEnum.All || digestEnum == DigestEnum.HALogs)) {
                     /*
                      * List each historical HALog file together with its digest.
                      * 
@@ -379,7 +394,7 @@ public class HAStatusServletUtil {
                         final IHALogReader r = nexus.getHALogWriter()
                                 .getReader(closingCommitCounter);
                         try {
-                            if (digests && !r.isEmpty()) {
+                            if (!r.isEmpty()) {
                                 try {
                                     final MessageDigest digest = MessageDigest
                                             .getInstance("MD5");
@@ -462,7 +477,8 @@ public class HAStatusServletUtil {
 //                        final File file = journal.getSnapshotManager()
 //                                .getSnapshotFile(rb.getCommitCounter());
                         String digestStr = null;
-                        if (digests) {
+                        if (digestEnum != null
+                                && (digestEnum == DigestEnum.All || digestEnum == DigestEnum.Snapshots)) {
                             try {
                                 final MessageDigest digest = MessageDigest
                                         .getInstance("MD5");

@@ -175,8 +175,18 @@ public class StatusServlet extends BigdataRDFServlet {
      * on the journal are only valid if there are no concurrent writes on the
      * journal and the journal has been through either a commit or an abort
      * protocol.
+     * <p>
+     * The value is a {@link DigestEnum} and defaults to
+     * {@link DigestEnum#Journal} when {@link #DIGESTS} is specified without an
+     * explicit {@link DigestEnum} value.
      */
     static final String DIGESTS = "digests";
+    
+    static final DigestEnum DEFAULT_DIGESTS = DigestEnum.Journal;
+
+    static enum DigestEnum {
+        None, Journal, HALogs, Snapshots, All;
+    }
 
     /**
      * Special HA status request designed for clients that poll to determine the
