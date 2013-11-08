@@ -532,6 +532,20 @@ public class HALogNexus implements IHALogWriter {
 
         haLogIndex.add(new HALogRecord(closingRootBlock, sizeOnDisk));
 
+        final long nentries = haLogIndex.getEntryCount();
+
+        if (nentries % 1000 == 0) {
+
+            /*
+             * Provide an indication that the server is doing work during
+             * startup. If there are a lot of HALog files, then we can spend
+             * quite a bit of time in this procedure.
+             */
+
+            haLog.warn("Indexed " + nentries + " HALog files");
+
+        }
+        
     }
 
     /**
