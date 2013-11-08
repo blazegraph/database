@@ -236,7 +236,7 @@ public class HALogNexus implements IHALogWriter {
         }
 
         // Set up the HA log writer.
-        haLogWriter = new HALogWriter(haLogDir);
+        haLogWriter = new HALogWriter(haLogDir, journal.isDoubleSync());
 
         haLogIndex = HALogIndex.createTransient();
 

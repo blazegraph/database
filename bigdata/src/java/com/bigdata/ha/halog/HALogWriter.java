@@ -110,6 +110,21 @@ public class HALogWriter implements IHALogWriter {
 	/** HA log directory. */
 	private final File m_haLogDir;
 
+    /**
+     * When <code>true</code>, the HALog is flushed to the disk before the
+     * closing root block is written and then once again after the closing root
+     * block is written. When <code>false</code>, the HALog is flushed only
+     * once, after the closing root block is written.
+     * 
+     * @see <a
+     *      href="http://sourceforge.net/apps/trac/bigdata/ticket/738#comment:13"
+     *      >Longevity and stress test protocol for HA QA </a>
+     * 
+     * @see <a href="http://sourceforge.net/apps/trac/bigdata/ticket/679">
+     *      HAJournalServer can not restart due to logically empty log file </a>
+     */
+	private final boolean doubleSync;
+	
 	/**
 	 * The root block of the leader at the start of the current write set.
 	 */
@@ -250,9 +265,41 @@ public class HALogWriter implements IHALogWriter {
 
 	}
 
-	public HALogWriter(final File logDir) {
+    /**
+     * 
+     * @param logDir
+     *            The directory in which the HALog files reside.
+     * @param doubleSync
+     *            When <code>true</code>, the HALog is flushed to the disk
+     *            before the closing root block is written and then once again
+     *            after the closing root block is written. When
+     *            <code>false</code>, the HALog is flushed only once, after the
+     *            closing root block is written.
+     * 
+     * @see <a
+     *      href="http://sourceforge.net/apps/trac/bigdata/ticket/738#comment:13"
+     *      >Longevity and stress test protocol for HA QA </a>
+     * 
+     * @see <a href="http://sourceforge.net/apps/trac/bigdata/ticket/679">
+     *      HAJournalServer can not restart due to logically empty log file </a>
+     */
+	public HALogWriter(final File logDir, final boolean doubleSync) {
 
 		m_haLogDir = logDir;
+		
+		this.doubleSync = doubleSync;
+
+	}
+
+	/**
+	 * 
+	 * @param logDir
+	 * 
+	 * @deprecated This is ony used by the test suite.
+	 */
+    HALogWriter(final File logDir) {
+
+        this(logDir, true/* doubleSync */);
 
 	}
 
@@ -430,7 +477,26 @@ public class HALogWriter implements IHALogWriter {
 
 			}
 
-			flush(); // current streamed data
+            if (doubleSync) {
+                /**
+                 * Flush the HALog records to the disk.
+                 * 
+                 * Note: This is intended to avoid the possibility that the
+                 * writes might be reordered such that closing root block was
+                 * written to the disk before the HALog records were flushed to
+                 * the disk. However, better durability guarantees are provided
+                 * by battery backup on the disk controller and similar such
+                 * nicities. If such techniques are used, you can disable the
+                 * doubleSync option and still have a guarantee that writes on
+                 * the HALog are durable and respect the applications ordering
+                 * of write requests (in terms of restart safe visibility).
+                 * 
+                 * @see <a
+                 *      href="http://sourceforge.net/apps/trac/bigdata/ticket/738#comment:13"
+                 *      >Longevity and stress test protocol for HA QA </a>
+                 */
+                flush();
+            }
 
 			/*
 			 * The closing root block is written into which ever slot
@@ -442,8 +508,14 @@ public class HALogWriter implements IHALogWriter {
 			 */
 			writeRootBlock(rootBlock.isRootBlock0(), rootBlock);
 
-			// // The closing root block is always in slot 1.
-			// writeRootBlock(false/* isRootBlock0 */, rootBlock);
+            /**
+             * Flush the backing channel.
+             * 
+             * @see <a
+             *      href="http://sourceforge.net/apps/trac/bigdata/ticket/738#comment:13"
+             *      >Longevity and stress test protocol for HA QA </a>
+             */
+            flush();
 
 			m_state.committed();
 
