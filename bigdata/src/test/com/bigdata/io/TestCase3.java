@@ -66,7 +66,7 @@ public class TestCase3 extends TestCase2 {
     /**
      * @param name
      */
-    public TestCase3(String name) {
+    public TestCase3(final String name) {
         super(name);
      
     }
@@ -78,6 +78,7 @@ public class TestCase3 extends TestCase2 {
 
     }
 
+    @Override
     protected void tearDown() throws Exception {
 
         super.tearDown();
