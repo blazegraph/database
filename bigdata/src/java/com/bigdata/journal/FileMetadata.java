@@ -990,13 +990,13 @@ public class FileMetadata {
 				 */
 				magic = raf.readInt();
 			} catch (IOException ex) {
-				throw new RuntimeException("Can not read magic. Is file locked by another process?", ex);
+				throw new RuntimeException("Can not read magic. Is file locked by another process? file="+file, ex);
 			}
 			if (magic != MAGIC)
-				throw new RuntimeException("Bad journal magic: expected=" + MAGIC + ", actual=" + magic);
+				throw new RuntimeException("Bad journal magic: file="+file+", expected=" + MAGIC + ", actual=" + magic);
 			version = raf.readInt();
 			if (version != VERSION1)
-				throw new RuntimeException("Bad journal version: expected=" + VERSION1 + ", actual=" + version);
+				throw new RuntimeException("Bad journal version: file="+file+", expected=" + VERSION1 + ", actual=" + version);
 
 			/*
 			 * Check root blocks (magic, timestamps), choose root block, read
@@ -1081,7 +1081,7 @@ public class FileMetadata {
 
 			if (closeTime != 0L && !readOnly) {
 
-				throw new RuntimeException("Journal is closed for writes: closedTime=" + closeTime);
+				throw new RuntimeException("Journal is closed for writes: file="+file+", closedTime=" + closeTime);
 
 			}
 
