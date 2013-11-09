@@ -9,6 +9,7 @@ import com.bigdata.rdf.graph.IGraphAccessor;
 import com.bigdata.rdf.graph.impl.bd.BigdataGASEngine.BigdataGraphAccessor;
 import com.bigdata.rdf.graph.util.AbstractGraphFixture;
 import com.bigdata.rdf.sail.BigdataSail;
+import com.bigdata.rdf.store.AbstractTripleStore;
 
 public class BigdataGraphFixture extends AbstractGraphFixture {
 
@@ -17,12 +18,21 @@ public class BigdataGraphFixture extends AbstractGraphFixture {
     public BigdataGraphFixture(final Properties properties)
             throws SailException {
 
-        sail = new BigdataSail();
+        sail = new BigdataSail(properties);
 
         sail.initialize();
 
     }
-    
+
+    public BigdataGraphFixture(final AbstractTripleStore kb)
+            throws SailException {
+
+        sail = new BigdataSail(kb);
+
+        sail.initialize();
+
+    }
+
     @Override
     public BigdataSail getSail() {
 
