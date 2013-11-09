@@ -369,8 +369,8 @@ public class TestConcurrentKBCreate extends ProxyBigdataSailTestCase {
                 errorCount.incrementAndGet();
 
                 log.error(t);
-                
-                throw new RuntimeException(t);
+                // Added delegate to trace to see which proxy version of this test fails in CI.
+                throw new RuntimeException("delegate="+getOurDelegate()+", t=" + t, t);
                 
             } finally {
                 
