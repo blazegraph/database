@@ -51,7 +51,7 @@ public class AbstractResourceManagerBootstrapTestCase extends TestCase2 {
     /**
      * @param arg0
      */
-    public AbstractResourceManagerBootstrapTestCase(String arg0) {
+    public AbstractResourceManagerBootstrapTestCase(final String arg0) {
         super(arg0);
     }
 
@@ -85,7 +85,8 @@ public class AbstractResourceManagerBootstrapTestCase extends TestCase2 {
     /**
      * Sets up the per-test data directory.
      */
-    public void setUp() throws Exception {
+    @Override
+    protected void setUp() throws Exception {
 
         super.setUp();
         
@@ -104,6 +105,64 @@ public class AbstractResourceManagerBootstrapTestCase extends TestCase2 {
 
         segmentsDir = new File(dataDir,"segments");
         
+    }
+
+    @Override
+    protected void tearDown() throws Exception {
+        
+        super.tearDown();
+
+        if (dataDir != null) {
+
+            recursiveDelete(dataDir);
+            
+        }
+        
+        dataDir = null;
+        journalsDir = null;
+        segmentsDir = null;
+        tmpDir = null;
+        
+    }
+    
+
+    /**
+     * Recursively removes any files and subdirectories and then removes the
+     * file (or directory) itself.
+     * 
+     * @param f
+     *            A file or directory.
+     */
+    private void recursiveDelete(final File f) {
+
+        if (f.isDirectory()) {
+
+            final File[] children = f.listFiles();
+
+            if (children == null) {
+
+                // No such file or directory exists.
+                return;
+                
+            }
+            
+            for (int i = 0; i < children.length; i++) {
+
+                recursiveDelete(children[i]);
+
+            }
+
+        }
+
+        if (log.isInfoEnabled())
+            log.info("Removing: " + f);
+
+        if (f.exists() && !f.delete()) {
+
+            log.warn("Could not remove: " + f);
+
+        }
+
     }
 
 }

@@ -138,7 +138,8 @@ public class AbstractResourceManagerTestCase extends
     /**
      * Setup test fixtures.
      */
-    public void setUp() throws Exception {
+    @Override
+    protected void setUp() throws Exception {
         
         super.setUp();
 
@@ -209,7 +210,8 @@ public class AbstractResourceManagerTestCase extends
         
     }
 
-    public void tearDown() throws Exception {
+    @Override
+    protected void tearDown() throws Exception {
 
         if(executorService != null)
             executorService.shutdownNow();
@@ -232,6 +234,8 @@ public class AbstractResourceManagerTestCase extends
         if (txService != null) {
             txService.destroy();
         }
+        
+        super.tearDown();
         
     }
 
@@ -663,7 +667,7 @@ public class AbstractResourceManagerTestCase extends
      * @throws ExecutionException 
      * @throws InterruptedException 
      */
-    protected void registerIndex(String name) throws InterruptedException, ExecutionException {
+    protected void registerIndex(final String name) throws InterruptedException, ExecutionException {
         
         final IndexMetadata indexMetadata = new IndexMetadata(name, UUID.randomUUID());
         {
@@ -699,7 +703,7 @@ public class AbstractResourceManagerTestCase extends
      * @param expected
      * @param actual
      */
-    protected void assertSameResources(IRawStore[] expected, Set<UUID> actual) {
+    protected void assertSameResources(final IRawStore[] expected, final Set<UUID> actual) {
         
         if(log.isInfoEnabled()) {
             
