@@ -1715,6 +1715,7 @@ ${postInstallMessage}</echo>
       <delete file="${bigdata-test.lib}/jsk-platform.jar" quiet="true" />
       <delete file="${bigdata-test.lib}/jsk-lib.jar" quiet="true" />
       <delete file="${bigdata-test.lib}/start.jar" quiet="true" />
+      <delete file="${bigdata-test.lib}/reggie.jar" quiet="true" />
       <delete file="${bigdata-test.lib}/bigdata.jar" quiet="true" />
 
       <copy file="${dist.lib}/log4j.jar"
@@ -1724,6 +1725,8 @@ ${postInstallMessage}</echo>
       <copy file="${dist.lib}/jsk-lib.jar"
             todir="${bigdata-test.lib}" />
       <copy file="${dist.lib}/start.jar"
+            todir="${bigdata-test.lib}" />
+      <copy file="${dist.lib}/reggie.jar"
             todir="${bigdata-test.lib}" />
       <copy file="${dist.lib}/bigdata.jar"
             todir="${bigdata-test.lib}" />
