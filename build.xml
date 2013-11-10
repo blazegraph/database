@@ -1693,7 +1693,7 @@ ${postInstallMessage}</echo>
       <jar destfile="${bigdata-test.lib}/lookupstarter.jar" index="false">
         <manifest>
           <attribute name="Manifest-Version" value="1.0" />
-          <attribute name="Class-Path" value="log4j.jar jsk-platform.jar jsk-lib.jar start.jar bigdata.jar" />
+          <attribute name="Class-Path" value="log4j.jar jsk-platform.jar jsk-lib.jar start.jar reggie.jar bigdata.jar" />
           <attribute name="Main-Class" value="com.bigdata.service.jini.util.LookupStarter" />
         </manifest>
 
