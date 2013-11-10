@@ -377,6 +377,15 @@ public class BigdataSail extends SailBase implements Sail {
         public static final String DESCRIBE_STATEMENT_LIMIT = BigdataSail.class
                 .getPackage().getName() + ".describeIterationStatementLimit";
 
+        /**
+         * The name of the default value used for the
+         * {@link Journal.Options#FILE} property by the
+         * {@link BigdataSail#BigdataSail()} convenience constructor.
+         * 
+         * @see BigdataSail#BigdataSail()
+         */
+        public static final String DEFAULT_FILE = "bigdata" + JNL;
+
     }
 
     /**
@@ -557,9 +566,9 @@ public class BigdataSail extends SailBase implements Sail {
      */
     private static Properties getDefaultProperties() {
         
-        Properties properties = new Properties();
+        final Properties properties = new Properties();
         
-        properties.setProperty(Options.FILE, "bigdata" + Options.JNL);
+        properties.setProperty(Options.FILE, Options.DEFAULT_FILE);
         
         return properties;
         

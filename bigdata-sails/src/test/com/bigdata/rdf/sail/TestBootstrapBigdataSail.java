@@ -29,6 +29,7 @@ package com.bigdata.rdf.sail;
 import info.aduna.iteration.CloseableIteration;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.Properties;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
@@ -76,7 +77,7 @@ public class TestBootstrapBigdataSail extends TestCase2 {
     /**
      * @param arg0
      */
-    public TestBootstrapBigdataSail(String arg0) {
+    public TestBootstrapBigdataSail(final String arg0) {
         super(arg0);
     }
 
@@ -84,13 +85,32 @@ public class TestBootstrapBigdataSail extends TestCase2 {
      * Test create and shutdown of the default store.
      * 
      * @throws SailException
+     * @throws IOException 
      */
-    public void test_ctor_1() throws SailException {
+    public void test_ctor_1() throws SailException, IOException {
 
+        final File file = new File(BigdataSail.Options.DEFAULT_FILE);
+
+        /*
+         * If the default file exists, then delete it before creating the SAIL.
+         */
+        if (file.exists()) {
+
+            if (!file.delete()) {
+
+                throw new IOException("Unable to remove default file:" + file);
+
+            }
+
+        }
+        
         final BigdataSail sail = new BigdataSail();
         
         try {
 
+            if (!file.exists())
+                fail("Expected file does not exist: " + file);
+            
             sail.initialize();
 
             sail.shutDown();
@@ -111,15 +131,15 @@ public class TestBootstrapBigdataSail extends TestCase2 {
     public void test_ctor_2() throws SailException {
 
         final File file = new File(getName() + Options.JNL);
-        
-        if(file.exists()) {
-            
-            if(!file.delete()) {
-                
+
+        if (file.exists()) {
+
+            if (!file.delete()) {
+
                 fail("Could not delete file before test: " + file);
 
             }
-            
+
         }
         
         final Properties properties = new Properties();
