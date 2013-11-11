@@ -2360,19 +2360,25 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
     }
 
     /**
-     * Similar to multitransaction but rather than a number of updates following a load it is simply a number of loads
-     * followed by queries on the folowers that are checkd for consistency.
+     * Similar to multitransaction but rather than a number of updates following
+     * a load it is simply a number of loads followed by queries on the folowers
+     * that are checkd for consistency.
      */
     public void testABCMultiLoadFollowerReads() throws Exception {
-    	doABCMultiLoadFollowerReads2(50/*nTransactions*/, false/*largeLoad*/);
+
+        doABCMultiLoadFollowerReads2(50/* nTransactions */, false/* largeLoad */);
+        
     }
-    
+
     /**
-     * Similar to multitransaction but rather than a number of updates following a load it is simply a number of loads
-     * followed by queries on the folowers that are checkd for consistency.
+     * Similar to multitransaction but rather than a number of updates following
+     * a load it is simply a number of loads followed by queries on the folowers
+     * that are checkd for consistency.
      */
     public void testABCMultiLoadFollowerReadsLargeLoad() throws Exception {
-    	doABCMultiLoadFollowerReads2(20/*nTransactions*/, true/*largeLoad*/);
+        
+        doABCMultiLoadFollowerReads2(20/* nTransactions */, true/* largeLoad */);
+        
     }
     
     /**
@@ -2386,7 +2392,7 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
     protected void doABCMultiLoadFollowerReads2(final int nTransactions,
             final boolean largeLoad) throws Exception {
 
-        try {
+//        try {
 
             // Start all services.
             final ABC services = new ABC(true/* sequential */);
@@ -2515,11 +2521,11 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
             // Finally cehck for binary compatibility
 			assertDigestsEquals(new HAGlue[] { services.serverA, services.serverB, services.serverC });
 
-        } finally {
-		
-            destroyAll();
-            
-		}
+//        } finally {
+//		
+//            destroyAll();
+//            
+//		}
 	    	
     }
     

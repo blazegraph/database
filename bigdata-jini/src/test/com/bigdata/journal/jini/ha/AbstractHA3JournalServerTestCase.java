@@ -468,8 +468,11 @@ public class AbstractHA3JournalServerTestCase extends
             } else if (leader.equals(serverC)) {
                 leaderServiceDir = getServiceDirC();
                 leaderListener = serviceListenerC;
-            } else {
-                throw new IllegalStateException();
+            } else {// log warning and fall through.
+                throw new IllegalStateException(
+                        "Leader is none of A, B, or C: leader=" + leader
+                                + ", A=" + serverA + ", B=" + serverB + ", C="
+                                + serverC);
             }
         } else {
             leader = null;
@@ -531,6 +534,7 @@ public class AbstractHA3JournalServerTestCase extends
         final UUID[] services = getServices(members);
 
         assertCondition(new Runnable() {
+            @Override
             public void run() {
                 try {
                     assertEquals(services, quorum.getPipeline());
@@ -570,6 +574,7 @@ public class AbstractHA3JournalServerTestCase extends
         final UUID[] services = getServices(members);
         
         assertCondition(new Runnable() {
+            @Override
             public void run() {
                 try {
                     assertEquals(services, quorum.getJoined());
@@ -594,6 +599,7 @@ public class AbstractHA3JournalServerTestCase extends
         final UUID[] services = getServices(members);
         
         assertCondition(new Runnable() {
+            @Override
             public void run() {
                 try {
                     assertEquals(services, quorum.getMembers());
@@ -855,15 +861,16 @@ public class AbstractHA3JournalServerTestCase extends
     }
     
     private void tidyServiceDirectory(final File serviceDir) {
-    	if (serviceDir == null || !serviceDir.exists())
-    		return;
-    	
+        if (serviceDir == null || !serviceDir.exists())
+            return;
+
         for (File file : serviceDir.listFiles()) {
-        	final String name = file.getName();
-        	
-        	if (name.endsWith(".jnl") || name.equals("snapshot") || name.equals("HALog")) {
-        		recursiveDelete(file);
-        	} 
+            final String name = file.getName();
+
+            if (name.endsWith(".jnl") || name.equals("snapshot")
+                    || name.equals("HALog")) {
+                recursiveDelete(file);
+            }
         }
     }
     
@@ -928,48 +935,50 @@ public class AbstractHA3JournalServerTestCase extends
     }
     
     protected void destroyA() {
-    	safeDestroy(serverA, getServiceDirA(), serviceListenerA);
-    	serverA = null;
-    	serviceListenerA = null;
+        safeDestroy(serverA, getServiceDirA(), serviceListenerA);
+        serverA = null;
+        serviceListenerA = null;
     }
 
     protected void destroyB() {
-    	safeDestroy(serverB, getServiceDirB(), serviceListenerB);
-    	serverB = null;
-    	serviceListenerB = null;
+        safeDestroy(serverB, getServiceDirB(), serviceListenerB);
+        serverB = null;
+        serviceListenerB = null;
     }
 
     protected void destroyC() {
-    	safeDestroy(serverC, getServiceDirC(), serviceListenerC);
-    	serverC = null;
-    	serviceListenerC = null;
+        safeDestroy(serverC, getServiceDirC(), serviceListenerC);
+        serverC = null;
+        serviceListenerC = null;
     }
 
     protected void shutdownA() throws IOException {
-    	safeShutdown(serverA, getServiceDirA(), serviceListenerA, true);
-    	
-    	serverA = null;
-    	serviceListenerA = null;
+        safeShutdown(serverA, getServiceDirA(), serviceListenerA, true);
+
+        serverA = null;
+        serviceListenerA = null;
     }
-    
+
     protected void shutdownB() throws IOException {
-    	safeShutdown(serverB, getServiceDirB(), serviceListenerB, true);
-    	
-    	serverB = null;
-    	serviceListenerB = null;
+        safeShutdown(serverB, getServiceDirB(), serviceListenerB, true);
+
+        serverB = null;
+        serviceListenerB = null;
     }
-    
+
     protected void shutdownC() throws IOException {
-    	safeShutdown(serverC, getServiceDirC(), serviceListenerC, true);
-    	
-    	serverC = null;
-    	serviceListenerC = null;
+        safeShutdown(serverC, getServiceDirC(), serviceListenerC, true);
+
+        serverC = null;
+        serviceListenerC = null;
     }
-    
+
     protected void kill(final HAGlue service) throws IOException {
+
         final int pid = ((HAGlueTest) service).getPID();
-    	
+
         trySignal(SignalEnum.KILL, pid);
+
     }
 
     /**
@@ -977,19 +986,20 @@ public class AbstractHA3JournalServerTestCase extends
      * necessarily something we should rely on
      */
     protected void shutdown(final HAGlue service) throws IOException {
-    	if (service == null) {
-    		throw new IllegalArgumentException();
-    	}
-    	
-    	if (service.equals(serverA)) {
-    		shutdownA();
-    	} else if (service.equals(serverB)) {
-    		shutdownB();
-    	} else if (service.equals(serverC)) {
-    		shutdownC();
-    	} else {
-    		throw new IllegalArgumentException("Unable to match service: " + service + " possible problem with equals() on Proxy");
-    	}
+        if (service == null) {
+            throw new IllegalArgumentException();
+        }
+
+        if (service.equals(serverA)) {
+            shutdownA();
+        } else if (service.equals(serverB)) {
+            shutdownB();
+        } else if (service.equals(serverC)) {
+            shutdownC();
+        } else {
+            throw new IllegalArgumentException("Unable to match service: "
+                    + service + " possible problem with equals() on Proxy");
+        }
     }
     
     protected void shutdownLeader() throws AsynchronousQuorumCloseException,
@@ -1028,6 +1038,7 @@ public class AbstractHA3JournalServerTestCase extends
             
         }
         
+        @Override
         public Void call() {
             
             safeShutdown(haGlue, serviceDir, serviceListener, now);
@@ -1133,6 +1144,7 @@ public class AbstractHA3JournalServerTestCase extends
             final File serviceDir, final ServiceListener serviceListener) {
 
         assertCondition(new Runnable() {
+            @Override
             public void run() {
                 try {
                     haGlue.getRunState();
@@ -1145,6 +1157,7 @@ public class AbstractHA3JournalServerTestCase extends
         });
 
         assertCondition(new Runnable() {
+            @Override
             public void run() {
 
                 // try to discover the service item.
@@ -1164,6 +1177,7 @@ public class AbstractHA3JournalServerTestCase extends
         try {
 
             assertCondition(new Runnable() {
+                @Override
                 public void run() {
                     // Wait for the process death.
                     assertTrue(serviceListener.isDead());
@@ -1517,6 +1531,7 @@ public class AbstractHA3JournalServerTestCase extends
 
         }
 
+        @Override
         public HAGlue call() throws Exception {
 
             if (restart) {
@@ -1542,6 +1557,7 @@ public class AbstractHA3JournalServerTestCase extends
 
         }
 
+        @Override
         public HAGlue call() throws Exception {
 
             if (restart) {
@@ -1567,6 +1583,7 @@ public class AbstractHA3JournalServerTestCase extends
 
         }
 
+        @Override
         public HAGlue call() throws Exception {
 
             if (restart) {
@@ -1621,15 +1638,15 @@ public class AbstractHA3JournalServerTestCase extends
     }
     
     protected UUID getServiceAId() {
-    	return serverAId;
+        return serverAId;
     }
-    
+
     protected UUID getServiceBId() {
-    	return serverBId;
+        return serverBId;
     }
-    
+
     protected UUID getServiceCId() {
-    	return serverCId;
+        return serverCId;
     }
 
     private HAGlue startServer(final String name,
