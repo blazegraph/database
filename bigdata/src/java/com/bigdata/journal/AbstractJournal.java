@@ -3868,8 +3868,8 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 			final long elapsedNanos = System.nanoTime() - cs.beginNanos;
 
 			if (BigdataStatics.debug || log.isInfoEnabled()) {
-                final String msg = "commit: commitTime="
-                        + cs.commitTime
+                final String msg = "commit: commitTime=" + cs.commitTime
+                        + ", commitCounter=" + cs.newCommitCounter
                         + ", latency="
                         + TimeUnit.NANOSECONDS.toMillis(elapsedNanos);
 //                        + ", nextOffset="
