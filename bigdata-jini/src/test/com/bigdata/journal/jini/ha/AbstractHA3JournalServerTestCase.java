@@ -1786,7 +1786,7 @@ public class AbstractHA3JournalServerTestCase extends
                     }
 
                 }
-            });
+            }, 10, TimeUnit.SECONDS);
 
             
             return haGlue;
