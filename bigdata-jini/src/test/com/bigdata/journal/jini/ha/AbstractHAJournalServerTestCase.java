@@ -155,7 +155,7 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
     
     @Override
     protected void setUp() throws Exception {
-
+        super.setUp(); if(log.isInfoEnabled()) log.info("---- TEST START "+getName() + "----");
         executorService = Executors
                 .newCachedThreadPool(new DaemonThreadFactory(getName()));
 
@@ -209,7 +209,7 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
             oldProcessHelperLevel = null;
             
         }
-        
+        if(log.isInfoEnabled()) log.info("---- TEST END "+getName() + "----");        
     }
 
     /**
