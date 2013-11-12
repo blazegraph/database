@@ -1195,10 +1195,11 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
     protected void awaitLogCount(final File logDir, final long count) {
 
         assertCondition(new Runnable() {
+            @Override
             public void run() {
                 assertLogCount(logDir, count);
             }
-        }, 5000, TimeUnit.MILLISECONDS);
+        }, 10000, TimeUnit.MILLISECONDS);
 
     }
 
