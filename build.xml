@@ -333,7 +333,7 @@ public class BuildInfo {
 	<!-- Deploy the JAR to the maven repository. -->
    <target name="maven-deploy" depends="jar" 
    	   description="Deploy the jar to the maven repository.">
-     	<exec command="mvn">
+     	<exec command="${MAVEN_HOME}/bin/mvn">
     		<arg value="clean"/>
     		<arg value="deploy"/>
      	</exec>
