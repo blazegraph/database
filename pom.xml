@@ -39,7 +39,11 @@ available) then you need to publish the updated dependencies to the maven
 repository.  There are commands in comment blocks in this POM that will
 deploy those dependencies.  Be sure to update the version numbers in the
 commands first!
-        
+
+See https://sourceforge.net/apps/mediawiki/bigdata/index.php?title=ReleaseGuide
+for information on publishing maven releases and snapshots for bigdata and its
+dependencies.
+
 -->
 <project xmlns="http://maven.apache.org/POM/4.0.0" 
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -316,7 +320,7 @@ mvn deploy:deploy-file \
    -Dversion=5.1.5 \
    -Dpackaging=jar \
    -DrepositoryId=bigdata.releases \
-   -Durl=scpexe://shell.speakeasy.net/home/t/thompsonbry/systap.com/maven/releases/ \
+   -Durl=scpexe://www.systap.com/srv/www/htdocs/systap.com/maven/releases/ \
    -Dfile=bigdata/lib/unimi/fastutil-5.1.5.jar
                -->
            <groupId>it.unimi</groupId>
@@ -332,7 +336,7 @@ mvn deploy:deploy-file \
    -Dversion=4.8 \
    -Dpackaging=jar \
    -DrepositoryId=bigdata.releases \
-   -Durl=scpexe://shell.speakeasy.net/home/t/thompsonbry/systap.com/maven/releases/ \
+   -Durl=scpexe://www.systap.com/srv/www/htdocs/systap.com/maven/releases/ \
    -Dfile=bigdata/lib/icu/icu4j-charset-4.8.jar
                -->
            <groupId>com.ibm.icu</groupId>
@@ -355,7 +359,7 @@ mvn deploy:deploy-file \
    -Dversion=1.0.1 \
    -Dpackaging=jar \
    -DrepositoryId=bigdata.releases \
-   -Durl=scpexe://shell.speakeasy.net/home/t/thompsonbry/systap.com/maven/releases/ \
+   -Durl=scpexe://www.systap.com/srv/www/htdocs/systap.com/maven/releases/ \
    -Dfile=bigdata/lib/bigdata-ganglia-1.0.1.jar
         -->
            <groupId>com.bigdata</groupId>
@@ -370,7 +374,7 @@ mvn deploy:deploy-file \
    -Dversion=1.0.6-020610 \
    -Dpackaging=jar \
    -DrepositoryId=bigdata.releases \
-   -Durl=scpexe://shell.speakeasy.net/home/t/thompsonbry/systap.com/maven/releases/ \
+   -Durl=scpexe://www.systap.com/srv/www/htdocs/systap.com/maven/releases/ \
    -Dfile=bigdata/lib/dsi-utils-1.0.6-020610.jar
         -->
        <dependency>
@@ -386,7 +390,7 @@ mvn deploy:deploy-file \
    -Dversion=1.0.6-020610 \
    -Dpackaging=jar \
    -DrepositoryId=bigdata.releases \
-   -Durl=scpexe://shell.speakeasy.net/home/t/thompsonbry/systap.com/maven/releases/ \
+   -Durl=scpexe://www.systap.com/srv/www/htdocs/systap.com/maven/releases/ \
    -Dfile=bigdata/lib/lgpl-utils-1.0.6-020610.jar
            -->
            <groupId>com.bigdata</groupId>
