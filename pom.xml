@@ -154,12 +154,12 @@ commands first!
         <repository>
             <id>bigdata.releases</id>
             <name>bigdata(R) releases</name>
-            <url>scpexe://shell.speakeasy.net/home/t/thompsonbry/systap.com/maven/releases</url>
+            <url>scpexe://www.systap.com/srv/www/htdocs/systap.com/maven/releases</url>
         </repository>
         <snapshotRepository>
             <id>bigdata.snapshots</id>
             <name>bigdata(R) snapshots</name>
-            <url>scpexe://shell.speakeasy.net/home/t/thompsonbry/systap.com/maven/snapshots</url>
+            <url>scpexe://www.systap.com/srv/www/htdocs/systap.com/maven/snapshots</url>
             <uniqueVersion>true</uniqueVersion>
         </snapshotRepository>
     </distributionManagement>
