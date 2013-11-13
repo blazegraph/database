@@ -73,7 +73,7 @@ public class TestCase3 extends TestCase2 {
 
     @Override
     protected void setUp() throws Exception {
-        
+        super.setUp();
         r = new Random();
 
     }
