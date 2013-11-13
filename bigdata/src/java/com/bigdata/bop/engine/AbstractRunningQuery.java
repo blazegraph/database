@@ -349,7 +349,7 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
      * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/772">
      *      Query timeout only checked at operator start/stop. </a>
      */
-    final protected void checkDeadline() {
+    final public void checkDeadline() {
 
         try {
         
