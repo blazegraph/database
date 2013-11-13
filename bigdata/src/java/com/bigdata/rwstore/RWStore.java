@@ -1451,7 +1451,9 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
                 for (int i = 0; i < m_metaBitsSize; i++) {
                     m_metaBits[i] = strBuf.readInt();
                 }
-                m_metaTransientBits = (int[]) m_metaBits.clone();
+                // m_metaTransientBits = (int[]) m_metaBits.clone();
+                
+                syncMetaTransients();
         
                 final int numFixed = m_allocSizes.length;
     
@@ -1477,6 +1479,20 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
                 log.info("restored from RootBlock: " + m_nextAllocation 
                         + ", " + m_metaBitsAddr);
         }
+    }
+    
+    /**
+     * Uses System.arraycopy rather than clone() to duplicate the
+     * metaBits to the metaTransientBits, which will be faster.
+     */
+    private void syncMetaTransients() {
+    	if (m_metaTransientBits == null) {
+    		m_metaTransientBits = (int[]) m_metaBits.clone();
+    	} else {
+    		assert m_metaTransientBits.length == m_metaBits.length;
+    		
+    		System.arraycopy(m_metaBits, 0, m_metaTransientBits, 0, m_metaTransientBits.length);
+    	}
     }
 
 //  /*
@@ -2842,6 +2858,11 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
                 isolatedWrites = isolatedWrites || fa.reset(m_writeCacheService, m_committedNextAllocation);
             }
             
+            /**
+             * Now clone the transient metabits for protection if this service becomes leader
+             */
+            syncMetaTransients();
+                       
             if (!isolatedWrites) {
                 /**
                  * Now we should be able to unwind any unused allocators and unused
@@ -3114,7 +3135,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
             // to provide control
             // writeFileSpec();
 
-            m_metaTransientBits = (int[]) m_metaBits.clone();
+            syncMetaTransients();
             
             // Must be called from AbstractJournal commitNow after writeRootBlock
             // postCommit();
@@ -3500,6 +3521,9 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
                     (b * cDefaultMetaBitsSize) + 1, cDefaultMetaBitsSize-1);
             
             if (ret != -1) {
+            	// The assumption is that this bit is also NOT set in m_metaBits
+            	assert !tstBit(m_metaBits, ret);
+            	
                 return ret;
             }
         }
