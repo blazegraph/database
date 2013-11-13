@@ -85,9 +85,13 @@ public interface IRunningQuery extends IHaltable<Void>, IQueryContext {
     /**
      * The client coordinate the evaluation of this query (aka the query
      * controller). For a standalone database, this will be the
-     * {@link QueryEngine}. For scale-out, this will be the RMI proxy for the
-     * {@link QueryEngine} instance to which the query was submitted for
-     * evaluation by the application.
+     * {@link QueryEngine}.
+     * <p>
+     * For scale-out, this will be the RMI proxy for the {@link QueryEngine}
+     * instance to which the query was submitted for evaluation by the
+     * application. The proxy is primarily for light weight RMI messages used to
+     * coordinate the distributed query evaluation. Ideally, all large objects
+     * will be transfered among the nodes of the cluster using NIO buffers.
      */
     IQueryClient getQueryController();
     
