@@ -36,7 +36,6 @@ import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
-import org.openrdf.model.impl.URIImpl;
 import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFHandlerException;
 import org.openrdf.rio.RDFParser;
@@ -414,6 +413,7 @@ public class DeleteServlet extends BigdataRDFServlet {
             }
         }
 
+        @Override
         public void handleStatement(final Statement stmt)
                 throws RDFHandlerException {
 

@@ -546,6 +546,7 @@ public class InsertServlet extends BigdataRDFServlet {
             }
         }
 
+        @Override
         public void handleStatement(final Statement stmt)
                 throws RDFHandlerException {
 

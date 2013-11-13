@@ -355,7 +355,7 @@ public class UpdateServlet extends BigdataRDFServlet {
 
         if (ServletFileUpload.isMultipartContent(req)) {
     		
-    		doUpdateWithBody(req, resp);
+            doUpdateWithBody(req, resp);
     		
         } else {
 

@@ -658,17 +658,19 @@ public class QueryServlet extends BigdataRDFServlet {
      * linked data GET by turning it into a SPARQL DESCRIBE query.
      * @throws IOException 
      */
-	private String getQueryString(final HttpServletRequest req) throws IOException {
-		if (RESTServlet.hasMimeType(req, MIME_SPARQL_QUERY)) {
-			// return the body of the POST, see trac 711
-			return readFully( req.getReader() );
-		}
-		return req.getParameter(ATTR_QUERY) != null ? req
+    static private String getQueryString(final HttpServletRequest req)
+            throws IOException {
+        if (RESTServlet.hasMimeType(req, MIME_SPARQL_QUERY)) {
+            // return the body of the POST, see trac 711
+            return readFully(req.getReader());
+        }
+        return req.getParameter(ATTR_QUERY) != null ? req
                 .getParameter(ATTR_QUERY) : (String) req
                 .getAttribute(ATTR_QUERY);
-	}
-	
-	private String getUpdateString(final HttpServletRequest req) throws IOException {
+    }
+
+    static private String getUpdateString(final HttpServletRequest req)
+            throws IOException {
 		if (RESTServlet.hasMimeType(req, MIME_SPARQL_UPDATE)) {
 			// return the body of the POST, see trac 711
 			return readFully( req.getReader() );
@@ -676,9 +678,10 @@ public class QueryServlet extends BigdataRDFServlet {
 		return req.getParameter(ATTR_UPDATE);
 	}
 	
-	static String readFully(Reader reader) throws IOException {
-		char[] arr = new char[8*1024]; // 8K at a time
-		StringBuffer buf = new StringBuffer();
+	// Note: Referenced by the test suite. Should be moved to utility class.
+	static String readFully(final Reader reader) throws IOException {
+	    final char[] arr = new char[8*1024]; // 8K at a time
+		final StringBuffer buf = new StringBuffer();
 		int numChars;
 
 		while ((numChars = reader.read(arr, 0, arr.length)) > 0) {
