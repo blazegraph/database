@@ -905,9 +905,9 @@ public class BOpContext<E> extends BOpContextBase {
      * with a binding in the source {@link IBindingSet}.
      * 
      * @param left
-     *            The left binding set.
+     *            The left binding set (target).
      * @param right
-     *            The right binding set.
+     *            The right binding set (source).
      * @param constraints
      *            An array of constraints (optional). When given, destination
      *            {@link IBindingSet} will be validated <em>after</em> mutation.
@@ -918,7 +918,8 @@ public class BOpContext<E> extends BOpContextBase {
      * 
      * @return The solution with the combined bindings and <code>null</code> if
      *         the bindings were not consistent, if a constraint was violated,
-     *         etc.
+     *         etc. Note that either <code>left</code> or <code>right</code> MAY
+     *         be returned if the other solution set is empty (optimization).
      */
     @SuppressWarnings({ "rawtypes", "unchecked" })
     static public IBindingSet bind(//
