@@ -606,8 +606,7 @@ class RunState {
         if (innerState.allDone.get())
             throw new IllegalStateException(ERR_QUERY_HALTED);
 
-        if (innerState.deadline.get() < System.currentTimeMillis())
-            throw new QueryTimeoutException(ERR_DEADLINE);
+        checkDeadline();
 
         if (!innerState.started.compareAndSet(false/* expect */, true/* update */))
             throw new IllegalStateException(ERR_QUERY_STARTED);
@@ -704,11 +703,9 @@ class RunState {
 
         if (innerState.allDone.get())
             throw new IllegalStateException(ERR_QUERY_HALTED);
-//                    + "  bopId="+msg.bopId+" : msg="+msg);
 
-        if (innerState.deadline.get() < System.currentTimeMillis())
-            throw new QueryTimeoutException(ERR_DEADLINE);
-
+        checkDeadline();
+        
         innerState.stepCount.incrementAndGet();
 
         final boolean firstTime = _startOp(msg);
@@ -777,6 +774,19 @@ class RunState {
     } // RunStateEnum
 
     /**
+     * Check the query to see whether its deadline has expired.
+     * 
+     * @throws QueryTimeoutException
+     *             if the query deadline has expired.
+     */
+    protected void checkDeadline() throws QueryTimeoutException {
+
+        if (innerState.deadline.get() < System.currentTimeMillis())
+            throw new QueryTimeoutException(ERR_DEADLINE);
+
+    }
+    
+    /**
      * Update the {@link RunState} to reflect the post-condition of the
      * evaluation of an operator against one or more {@link IChunkMessage}s,
      * adjusting the #of messages available for consumption by the operator
@@ -809,8 +819,7 @@ class RunState {
         if (innerState.allDone.get())
             throw new IllegalStateException(ERR_QUERY_HALTED);
 
-        if (innerState.deadline.get() < System.currentTimeMillis())
-            throw new QueryTimeoutException(ERR_DEADLINE);
+        checkDeadline();
 
         innerState.stepCount.incrementAndGet();
 

@@ -340,24 +340,56 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
         
     }
 
+    /**
+     * If the query deadline has expired, then halt the query.
+     * 
+     * @throws QueryTimeoutException
+     *             if the query deadline has expired.
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/772">
+     *      Query timeout only checked at operator start/stop. </a>
+     */
+    final protected void checkDeadline() {
+
+        try {
+        
+            runState.checkDeadline();
+            
+        } catch (QueryTimeoutException ex) {
+
+            halt(ex);
+
+            /*
+             * Note: The exception is not rethrown when the query halts for a
+             * deadline. See startOp() and haltOp() for the standard behavior.
+             */
+
+        }
+        
+    }
+    
+    @Override
     final public long getDeadline() {
 
         return runState.getDeadline();
         
     }
 
+    @Override
     final public long getStartTime() {
         
         return startTime.get();
         
     }
 
+    @Override
     final public long getDoneTime() {
         
         return doneTime.get();
         
     }
 
+    @Override
     final public long getElapsed() {
         
         long mark = doneTime.get();
@@ -379,37 +411,28 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
         
     }
 
+    @Override
     public QueryEngine getQueryEngine() {
 
         return queryEngine;
 
     }
 
-    /**
-     * The client executing this query (aka the query controller).
-     * <p>
-     * Note: The proxy is primarily for light weight RMI messages used to
-     * coordinate the distributed query evaluation. Ideally, all large objects
-     * will be transfered among the nodes of the cluster using NIO buffers.
-     */
+    @Override
     final public IQueryClient getQueryController() {
 
         return clientProxy;
 
     }
 
-    /**
-     * The unique identifier for this query.
-     */
+    @Override
     final public UUID getQueryId() {
 
         return queryId;
 
     }
 
-    /**
-     * Return the operator tree for this query.
-     */
+    @Override
     final public PipelineOp getQuery() {
 
         return query;
@@ -425,6 +448,7 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
 
     }
 
+    @Override
     final public Map<Integer/* bopId */, BOpStats> getStats() {
 
         return Collections.unmodifiableMap(statsMap);
@@ -744,6 +768,11 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
 
             halt(ex);
 
+            /*
+             * Note: The exception is not rethrown when the query halts for a
+             * deadline.
+             */
+            
         } finally {
 
             lock.unlock();
@@ -830,6 +859,11 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
 
             halt(t);
             
+            /*
+             * Note: The exception is not rethrown when the query halts for a
+             * deadline.
+             */
+
         } finally {
 
             lock.unlock();
@@ -1149,6 +1183,7 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
      */
     abstract protected void consumeChunk();
     
+    @Override
     final public ICloseableIterator<IBindingSet[]> iterator() {
 
         if (!controller)
@@ -1161,6 +1196,7 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
 
     }
 
+    @Override
     final public void halt(final Void v) {
 
         lock.lock();
@@ -1181,6 +1217,7 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
 
     }
 
+    @Override
     final public <T extends Throwable> T halt(final T t) {
 
         if (t == null)
@@ -1223,6 +1260,7 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
      * consume them.</li>
      * </ul>
      */
+    @Override
     final public boolean cancel(final boolean mayInterruptIfRunning) {
         /*
          * Set if we notice an interrupt during clean up of the query and then
@@ -1397,43 +1435,50 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
 
     }
 
+    @Override
     final public Void get() throws InterruptedException, ExecutionException {
 
         return future.get();
 
     }
 
-    final public Void get(long arg0, TimeUnit arg1)
+    @Override
+    final public Void get(final long arg0, final TimeUnit arg1)
             throws InterruptedException, ExecutionException, TimeoutException {
 
         return future.get(arg0, arg1);
 
     }
 
+    @Override
     final public boolean isCancelled() {
 
         return future.isCancelled();
 
     }
 
+    @Override
     final public boolean isDone() {
 
         return future.isDone();
 
     }
 
+    @Override
     final public Throwable getCause() {
 
         return future.getCause();
 
     }
 
+    @Override
     public IBigdataFederation<?> getFederation() {
 
         return queryEngine.getFederation();
 
     }
 
+    @Override
     public IIndexManager getLocalIndexManager() {
 
         return queryEngine.getIndexManager();
@@ -1526,6 +1571,7 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
      * buffered on the native heap) rather than as a limit to the among of
      * native memory the operator may use while it is running.
      */
+    @Override
     public IMemoryManager getMemoryManager() {
         IMemoryManager memoryManager = this.memoryManager.get();
         if (memoryManager == null) {
@@ -1545,6 +1591,7 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
 
     private final AtomicReference<IMemoryManager> memoryManager = new AtomicReference<IMemoryManager>();
     
+    @Override
     final public IQueryAttributes getAttributes() {
         
         return queryAttributes;
@@ -1618,6 +1665,7 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
         }
     }
     
+    @Override
     public String toString() {
         final StringBuilder sb = new StringBuilder(getClass().getName());
         sb.append("{queryId=" + queryId);
