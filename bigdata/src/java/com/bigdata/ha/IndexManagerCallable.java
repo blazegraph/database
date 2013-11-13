@@ -2,7 +2,6 @@ package com.bigdata.ha;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.ha.HAGlue.IIndexManagerCallable;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.jini.ha.HAJournal;
 
