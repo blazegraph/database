@@ -100,6 +100,7 @@ import com.bigdata.ha.CommitResponse;
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.HAStatusEnum;
 import com.bigdata.ha.HATXSGlue;
+import com.bigdata.ha.IIndexManagerCallable;
 import com.bigdata.ha.IJoinedAndNonJoinedServices;
 import com.bigdata.ha.JoinedAndNonJoinedServices;
 import com.bigdata.ha.PrepareRequest;
@@ -3106,8 +3107,8 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
          */
         private final long commitToken;
         
-        /** The #of bytes on the journal as of the previous commit point. */
-        private final long byteCountBefore;
+//        /** The #of bytes on the journal as of the previous commit point. */
+//        private final long byteCountBefore;
         
         /**
          * The commit counter that will be assigned to the new commit point.
@@ -3150,8 +3151,8 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
             this.old = store._rootBlock;
 
-            // #of bytes on the journal as of the previous commit point.
-            this.byteCountBefore = store._rootBlock.getNextOffset();
+//            // #of bytes on the journal as of the previous commit point.
+//            this.byteCountBefore = store._rootBlock.getNextOffset();
 
             this.newCommitCounter = old.getCommitCounter() + 1;
 
@@ -5857,12 +5858,14 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                 
                 /*
                  * We also need to discard any active read/write tx since there
-                 * is no longer a quorum and a read/write tx was running on the
+                 * is no longer a quorum. This will hit both read-only
+                 * transactions running on any service (not necessarily the
+                 * leader) and read/write transactions if this service was the
                  * old leader.
                  * 
-                 * We do not need to discard read-only tx since the committed
-                 * state should remain valid even when a quorum is lost.
-                 * However, it would be a bit odd to leave read-only
+                 * Note: We do not need to discard read-only tx since the
+                 * committed state should remain valid even when a quorum is
+                 * lost. However, it would be a bit odd to leave read-only
                  * transactions running if you could not start a new read-only
                  * because the quorum is not met.
                  */
@@ -5874,7 +5877,17 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                  * 
                  * FIXME HA : Abort the unisolated connection? (esp for group
                  * commit and the NSS level SPARQL and REST API unisolated
-                 * operations).
+                 * operations). Maybe we can wrap the execute of the UpdateTask
+                 * and the execution of the REST Mutation API methods in a
+                 * well-known ThreadGuard and then do interruptAll() to force
+                 * the cancelation of any running task? We could also wrap any
+                 * IIndexManagerCallable in HAGlue.submit() with a FutureTask
+                 * implementation that uses the appropriate ThreadGuard to
+                 * ensure that any unisolated tasks are cancelled (that is
+                 * actually overkill since it would not differentiate TX based
+                 * operations from unisolated operations - we could also use
+                 * that ThreadGuard in AbstractTask). Add unit tests for both
+                 * UPDATE and other REST mutation methods.
                  * 
                  * @see <a
                  *      href="https://sourceforge.net/apps/trac/bigdata/ticket/753"

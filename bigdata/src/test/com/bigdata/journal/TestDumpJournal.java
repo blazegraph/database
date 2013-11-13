@@ -29,15 +29,23 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.journal;
 
 import java.io.IOException;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.FutureTask;
+import java.util.concurrent.TimeUnit;
 
 import com.bigdata.btree.AbstractBTreeTestCase;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.HTreeIndexMetadata;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.keys.KV;
+import com.bigdata.concurrent.FutureTaskMon;
 import com.bigdata.htree.HTree;
+import com.bigdata.rwstore.IRWStrategy;
+import com.bigdata.util.concurrent.LatchedExecutor;
 
 /**
  * Test suite for {@link DumpJournal}.
@@ -66,8 +74,10 @@ public class TestDumpJournal extends ProxyTestCase<Journal> {
     /**
      * @param name
      */
-    public TestDumpJournal(String name) {
+    public TestDumpJournal(final String name) {
+
         super(name);
+        
     }
 
     /**
@@ -361,4 +371,254 @@ public class TestDumpJournal extends ProxyTestCase<Journal> {
 
     }
 
+    /**
+     * Unit test for {@link DumpJournal} with concurrent updates against the
+     * backing store. This is intended primarily to detect failures to protect
+     * against the recycling model associated with the {@link IRWStrategy}.
+     * 
+     * @throws Exception 
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/762">
+     *      DumpJournal does not protect against concurrent updates (NSS) </a>
+     */
+    public void test_dumpJournal_concurrent_updates() throws Exception {
+        
+        final String PREFIX = "testIndex#";
+        final int NUM_INDICES = 4;
+
+        Journal src = getStore(getProperties());
+
+        try {
+
+            for (int i = 0; i < NUM_INDICES; i++) {
+
+                // register an index
+                final String name = PREFIX + i;
+
+                src.registerIndex(new IndexMetadata(name, UUID.randomUUID()));
+                {
+
+                    // lookup the index.
+                    final BTree ndx = src.getIndex(name);
+
+                    // #of tuples to write.
+                    final int ntuples = r.nextInt(1000);
+
+                    // generate random data.
+                    final KV[] a = AbstractBTreeTestCase
+                            .getRandomKeyValues(ntuples);
+
+                    // write tuples (in random order)
+                    for (KV kv : a) {
+
+                        ndx.insert(kv.key, kv.val);
+
+                        if (r.nextInt(100) < 10) {
+
+                            // randomly increment the counter (10% of the time).
+                            ndx.getCounter().incrementAndGet();
+
+                        }
+
+                    }
+
+                }
+
+            }
+
+            // commit the journal (!)
+            src.commit();
+
+            /**
+             * Task to run various DumpJournal requests.
+             */
+            final class DumpTask implements Callable<Void> {
+
+                private final Journal src;
+                
+                public DumpTask(final Journal src) {
+                
+                    this.src = src;
+                    
+                }
+                @Override
+                public Void call() throws Exception {
+                    
+                    new DumpJournal(src)
+                            .dumpJournal(false/* dumpHistory */,
+                                    true/* dumpPages */,
+                                    false/* dumpIndices */, false/* showTuples */);
+
+                    new DumpJournal(src)
+                            .dumpJournal(true/* dumpHistory */,
+                                    true/* dumpPages */, true/* dumpIndices */,
+                                    false/* showTuples */);
+
+                    // test again w/o dumpPages
+                    new DumpJournal(src)
+                            .dumpJournal(true/* dumpHistory */,
+                                    false/* dumpPages */,
+                                    true/* dumpIndices */, false/* showTuples */);
+                    
+                    return (Void) null;
+                    
+                }
+            
+            }
+            
+            final class UpdateTask implements Callable<Void> {
+                
+                private final Journal src;
+                
+                public UpdateTask(final Journal src) {
+                
+                    this.src = src;
+                    
+                }
+                @Override
+                public Void call() throws Exception {
+                    
+                    /*
+                     * Now write some more data, going through a series of commit
+                     * points. This let's us check access to historical commit points.
+                     */
+                    for (int j = 0; j < 10; j++) {
+                        
+                        for (int i = 0; i < NUM_INDICES; i++) {
+
+                            // register an index
+                            final String name = PREFIX + i;
+
+                            // lookup the index.
+                            final BTree ndx = src.getIndex(name);
+
+                            // #of tuples to write.
+                            final int ntuples = r.nextInt(1000);
+
+                            // generate random data.
+                            final KV[] a = AbstractBTreeTestCase
+                                    .getRandomKeyValues(ntuples);
+
+                            // write tuples (in random order)
+                            for (KV kv : a) {
+
+                                ndx.insert(kv.key, kv.val);
+
+                                if (r.nextInt(100) < 10) {
+
+                                    // randomly increment the counter (10% of the time).
+                                    ndx.getCounter().incrementAndGet();
+
+                                }
+
+                            }
+
+                        }
+
+                        log.info("Will commit");
+                        src.commit();
+                        log.info("Did commit");
+
+                    }
+                
+                    return (Void) null;
+                }
+            }
+
+            final List<FutureTask<Void>> tasks1 = new LinkedList<FutureTask<Void>>();
+            final List<FutureTask<Void>> tasks2 = new LinkedList<FutureTask<Void>>();
+            final List<FutureTask<Void>> tasksAll = new LinkedList<FutureTask<Void>>();
+
+            // Setup executor that limits parallelism.
+            final LatchedExecutor executor1 = new LatchedExecutor(
+                    src.getExecutorService(), 1/* nparallel */);
+
+            // Setup executor that limits parallelism.
+            final LatchedExecutor executor2 = new LatchedExecutor(
+                    src.getExecutorService(), 1/* nparallel */);
+
+            try {
+
+                // Tasks to run.
+                tasks1.add(new FutureTaskMon<Void>(new DumpTask(src)));
+                tasks1.add(new FutureTaskMon<Void>(new DumpTask(src)));
+                tasks1.add(new FutureTaskMon<Void>(new DumpTask(src)));
+
+                tasks2.add(new FutureTaskMon<Void>(new UpdateTask(src)));
+                tasks2.add(new FutureTaskMon<Void>(new UpdateTask(src)));
+                tasks2.add(new FutureTaskMon<Void>(new UpdateTask(src)));
+
+                // Schedule the tasks.
+                for (FutureTask<Void> ft : tasks1) 
+                    executor1.execute(ft);
+                for (FutureTask<Void> ft : tasks2) 
+                    executor2.execute(ft);
+
+                log.info("Blocking for futures");
+
+                // Wait for tasks.
+                tasksAll.addAll(tasks1);
+                tasksAll.addAll(tasks2);
+                int ndone = 0;
+                for (FutureTask<Void> ft : tasksAll) {
+
+                    /*
+                     * Check Future.
+                     * 
+                     * Note: sanity check for test termination w/ timeout.
+                     */
+
+                    try {
+                        ft.get(2, TimeUnit.MINUTES);
+                    } catch (ExecutionException ex) {
+                        log.error("ndone=" + ndone, ex);
+                        throw ex;
+                    }
+
+                    log.info("ndone=" + ndone);
+                    ndone++;
+                }
+
+            } finally {
+
+                // Ensure tasks are terminated.
+                for (FutureTask<Void> ft : tasksAll) {
+                 
+                    ft.cancel(true/*mayInterruptIfRunning*/);
+                    
+                }
+                
+            }
+            
+            if (src.isStable()) {
+
+                src = reopenStore(src);
+
+                // Try running the DumpTask again.
+                new DumpTask(src).call();
+
+            }
+            
+        } finally {
+
+            src.destroy();
+
+        }
+
+    }
+    /** Stress test to look for different failure modes. */
+    public void _testStress_dumpJournal_concurrent_updates() throws Exception {
+        final int LIMIT = 20;
+        for (int i = 0; i < LIMIT; i++) {
+            if (i > 1)
+                setUp();
+            try {
+                test_dumpJournal_concurrent_updates();
+            } catch (Exception ex) {
+                log.fatal("FAILURE: i=" + i + ", cause=" + ex);
+            }
+            if (i + 1 < LIMIT)
+                tearDown();
+        }
+    }
 }

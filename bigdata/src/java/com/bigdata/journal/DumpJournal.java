@@ -381,6 +381,18 @@ public class DumpJournal {
             final boolean dumpHistory, final boolean dumpPages,
             final boolean dumpIndices, final boolean showTuples) {
 
+//        Note: This does not fix the issue.
+//        /**
+//         * Start a transaction. This will bracket all index access and protect
+//         * the data on the journal from concurrent recycling.
+//         * 
+//         * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/762">
+//         *      DumpJournal does not protect against concurrent updates (NSS)
+//         *      </a>
+//         */
+//        final long tx = journal.newTx(ITx.READ_COMMITTED);
+//        try {
+//        
         final FileMetadata fmd = journal.getFileMetadata();
 
         if (fmd != null) {
@@ -600,6 +612,9 @@ public class DumpJournal {
                     dumpPages, dumpIndices, showTuples);
 
         }
+//        } finally {
+//            journal.abort(tx);
+//        }
 
     }
 
@@ -614,7 +629,7 @@ public class DumpJournal {
 
     }
     
-    public void dumpGlobalRowStore(final PrintWriter out) {
+    private void dumpGlobalRowStore(final PrintWriter out) {
         
         final SparseRowStore grs = journal.getGlobalRowStore(journal
                 .getLastCommitTime());
@@ -826,7 +841,7 @@ public class DumpJournal {
      * 
      * @return
      */
-    public String dumpRawRecord(final long addr) {
+    private String dumpRawRecord(final long addr) {
 
         if (journal.getBufferStrategy() instanceof IRWStrategy) {
             /**
@@ -984,6 +999,7 @@ public class DumpJournal {
                     }
                 }
                 case Stream:
+                    @SuppressWarnings("unused")
                     final Stream stream = (Stream) ndx;
                     /*
                      * Note: We can't do anything here with a Stream, but we do
@@ -1001,43 +1017,6 @@ public class DumpJournal {
 
         // Could not decode.
         return null;
-
-    }
-
-    /**
-     * Return the data in the buffer.
-     */
-    public static byte[] getBytes(ByteBuffer buf) {
-
-        if (buf.hasArray() && buf.arrayOffset() == 0 && buf.position() == 0
-                && buf.limit() == buf.capacity()) {
-
-            /*
-             * Return the backing array.
-             */
-
-            return buf.array();
-
-        }
-
-        /*
-         * Copy the expected data into a byte[] using a read-only view on the
-         * buffer so that we do not mess with its position, mark, or limit.
-         */
-        final byte[] a;
-        {
-
-            buf = buf.asReadOnlyBuffer();
-
-            final int len = buf.remaining();
-
-            a = new byte[len];
-
-            buf.get(a);
-
-        }
-
-        return a;
 
     }
 
