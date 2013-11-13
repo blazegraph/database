@@ -177,6 +177,7 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
      * Human readable representation of the {@link IHashJoinUtility} metadata
      * (but not the solutions themselves).
      */
+    @Override
     public String toString() {
 
         final StringBuilder sb = new StringBuilder();
@@ -336,22 +337,27 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
 
     }
     
+    @Override
     public JoinTypeEnum getJoinType() {
         return joinType;
     }
     
+    @Override
     public IVariable<?> getAskVar() {
         return askVar;
     }
     
+    @Override
     public IVariable<?>[] getJoinVars() {
         return joinVars;
     }
     
+    @Override
     public IVariable<?>[] getSelectVars() {
         return selectVars;
     }
     
+    @Override
     public IConstraint[] getConstraints() {
         return constraints;
     }
