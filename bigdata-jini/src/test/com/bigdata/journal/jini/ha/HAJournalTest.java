@@ -1148,19 +1148,6 @@ public class HAJournalTest extends HAJournal {
 		}
 
         @Override
-        public <T> Future<T> submit(final IIndexManagerCallable<T> callable,
-                final boolean asyncFuture) throws IOException {
-
-            callable.setIndexManager(getIndexManager());
-
-            final Future<T> ft = getIndexManager().getExecutorService().submit(
-                    callable);
-
-            return getProxy(ft, asyncFuture);
-
-        }
-
-        @Override
         public RunStateEnum getRunStateEnum() {
             
             @SuppressWarnings("unchecked")
