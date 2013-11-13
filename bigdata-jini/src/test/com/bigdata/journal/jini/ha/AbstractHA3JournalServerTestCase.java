@@ -458,21 +458,35 @@ public class AbstractHA3JournalServerTestCase extends
         if (quorum.isQuorumMet()) {
             final long token = quorum.awaitQuorum(awaitQuorumTimeout,
                     TimeUnit.MILLISECONDS);
-            leader = quorum.getClient().getLeader(token);
-            if (leader.equals(serverA)) {
+            /*
+             * Note: It is possible to resolve a proxy for a service that
+             * has been recently shutdown or destroyed.  This is effectively
+             * a data race.
+             */
+            final HAGlue t = quorum.getClient().getLeader(token);
+            if (t.equals(serverA)) {
+                leader = t;
                 leaderServiceDir = getServiceDirA();
                 leaderListener = serviceListenerA;
-            } else if (leader.equals(serverB)) {
+            } else if (t.equals(serverB)) {
+                leader = t;
                 leaderServiceDir = getServiceDirB();
                 leaderListener = serviceListenerB;
-            } else if (leader.equals(serverC)) {
+            } else if (t.equals(serverC)) {
+                leader = t;
                 leaderServiceDir = getServiceDirC();
                 leaderListener = serviceListenerC;
-            } else {// log warning and fall through.
+            } else {
+                if (serverA == null && serverB == null && serverC == null) {
+                    /*
+                     * There are no services running and nothing to shutdown. We
+                     * probably resolved a stale proxy to the leader above.
+                     */
+                    return;
+                }
                 throw new IllegalStateException(
-                        "Leader is none of A, B, or C: leader=" + leader
-                                + ", A=" + serverA + ", B=" + serverB + ", C="
-                                + serverC);
+                        "Leader is none of A, B, or C: leader=" + t + ", A="
+                                + serverA + ", B=" + serverB + ", C=" + serverC);
             }
         } else {
             leader = null;
