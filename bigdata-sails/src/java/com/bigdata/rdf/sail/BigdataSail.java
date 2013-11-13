@@ -1756,9 +1756,6 @@ public class BigdataSail extends SailBase implements Sail {
          * This method currently will expose a mutable connection to any
          * registered {@link CustomServiceFactory}.
          * 
-         * @param conn
-         *            The connection.
-         * 
          * @return The connection.
          * 
          * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/754">
