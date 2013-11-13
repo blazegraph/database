@@ -133,16 +133,16 @@ public class BigdataLoader {
     /**
      * Load a data file into a SAIL via the Sesame Repository API.
      * 
-     * @param sail
-     *            the SAIL
+     * @param repo
+     *            the repository.
      * @param data
      *            path to the data (assumes ntriples)
      * 
      * @todo This is not an efficient API for loading the data.  use the 
      * 		 {@link DataLoader} instead.
      */
-    private static final void loadData(BigdataSailRepository repo, String data) 
-            throws Exception {
+    private static final void loadData(final BigdataSailRepository repo,
+            final String data) throws Exception {
         
         RepositoryConnection cxn = null;
         try {
