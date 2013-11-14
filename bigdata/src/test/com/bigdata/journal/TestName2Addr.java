@@ -122,7 +122,8 @@ public class TestName2Addr extends ProxyTestCase<Journal> {
 
         assertTrue(BytesUtil.compareBytes(a, b) == 0);
 
-        log.error("name=" + name + ", key=" + BytesUtil.toString(a));
+        if (log.isInfoEnabled())
+            log.info("name=" + name + ", key=" + BytesUtil.toString(a));
 
     }
     
@@ -335,9 +336,10 @@ public class TestName2Addr extends ProxyTestCase<Journal> {
     private static Set<String> getIndexNames(final Journal jnl,
             final String prefix, final long timestamp) {
 
-        log.error("prefix=" + prefix + ", timestamp="
-                + TimestampUtility.toString(timestamp));
-        
+        if (log.isInfoEnabled())
+            log.info("prefix=" + prefix + ", timestamp="
+                    + TimestampUtility.toString(timestamp));
+
         final Set<String> names = new LinkedHashSet<String>();
 
         final Iterator<String> itr = jnl.indexNameScan(prefix, timestamp);
