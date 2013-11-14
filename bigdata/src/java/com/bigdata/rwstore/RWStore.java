@@ -1486,11 +1486,9 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
      * metaBits to the metaTransientBits, which will be faster.
      */
     private void syncMetaTransients() {
-    	if (m_metaTransientBits == null) {
+    	if (m_metaTransientBits == null ||  m_metaTransientBits.length != m_metaBits.length) {
     		m_metaTransientBits = (int[]) m_metaBits.clone();
     	} else {
-    		assert m_metaTransientBits.length == m_metaBits.length;
-    		
     		System.arraycopy(m_metaBits, 0, m_metaTransientBits, 0, m_metaTransientBits.length);
     	}
     }
