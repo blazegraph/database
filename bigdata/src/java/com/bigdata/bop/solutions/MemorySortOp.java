@@ -123,6 +123,7 @@ public class MemorySortOp extends SortOp {
         
 	}
     
+    @Override
     public FutureTask<Void> eval(final BOpContext<IBindingSet> context) {
 
         return new FutureTask<Void>(new SortTask(this, context));
@@ -200,6 +201,7 @@ public class MemorySortOp extends SortOp {
             
         }
 
+        @Override
         public Void call() throws Exception {
 
             final ICloseableIterator<IBindingSet[]> itr = context
