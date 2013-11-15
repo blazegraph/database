@@ -16,8 +16,13 @@ import com.bigdata.service.IService;
 public interface IQueryPeer extends Remote {
 
     /**
-     * The {@link UUID} of the service within which the {@link IQueryPeer} is
+     * The {@link UUID} of the service in which this {@link QueryEngine} is
      * running.
+     * 
+     * @return The {@link UUID} of the service in which this {@link QueryEngine}
+     *         is running -or- a unique and distinct UUID if the
+     *         {@link QueryEngine} is not running against an
+     *         IBigdataFederation.
      * 
      * @see IService#getServiceUUID()
      */
