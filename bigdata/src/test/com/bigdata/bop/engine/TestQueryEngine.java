@@ -90,8 +90,6 @@ import cutthecrap.utils.striterators.ICloseableIterator;
  * @version $Id$
  * 
  * @see TestFederatedQueryEngine
- * 
- * @todo write a unit and stress tests for deadlines.
  */
 public class TestQueryEngine extends AbstractQueryEngineTestCase {
 
@@ -104,7 +102,7 @@ public class TestQueryEngine extends AbstractQueryEngineTestCase {
     /**
      * @param name
      */
-    public TestQueryEngine(String name) {
+    public TestQueryEngine(final String name) {
         super(name);
     }
 
@@ -121,9 +119,10 @@ public class TestQueryEngine extends AbstractQueryEngineTestCase {
     }
 
     static private final String namespace = "ns";
-    Journal jnl;
-    QueryEngine queryEngine;
-    
+    private Journal jnl;
+    private QueryEngine queryEngine;
+
+    @Override
     public void setUp() throws Exception {
         
         jnl = new Journal(getProperties());
@@ -161,6 +160,7 @@ public class TestQueryEngine extends AbstractQueryEngineTestCase {
 
     }
 
+    @Override
     public void tearDown() throws Exception {
 
         if (queryEngine != null) {
