@@ -27,6 +27,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.optimizers;
 
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.LinkedList;
 
 import org.apache.log4j.Logger;
@@ -53,10 +55,12 @@ public class ASTOptimizerList extends LinkedList<IASTOptimizer> implements
      */
     private static final long serialVersionUID = 1L;
 
-    public ASTOptimizerList() {
-        
+    public ASTOptimizerList(Collection<IASTOptimizer> c) {
+    	super(c);
     }
-
+    public ASTOptimizerList(IASTOptimizer ... optimizers) {
+    	this(Arrays.asList(optimizers));
+    }
     public boolean add(final IASTOptimizer opt) {
         
         if(opt == null)
@@ -95,7 +99,7 @@ public class ASTOptimizerList extends LinkedList<IASTOptimizer> implements
 
             if (log.isDebugEnabled())
                 log.debug("Rewritten AST:\n" + queryNode);
-            
+      
         }
 
         return queryNode;

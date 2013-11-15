@@ -87,42 +87,58 @@ public class ASTRangeCountOptimizer extends AbstractJoinGroupOptimizer
     		
     		if (sp.getProperty(Annotations.ESTIMATED_CARDINALITY) == null) {
     			
-                final IV<?, ?> s = getIV(sp.s(), exogenousBindings);
-                final IV<?, ?> p = getIV(sp.p(), exogenousBindings);
-                final IV<?, ?> o = getIV(sp.o(), exogenousBindings);
-                final IV<?, ?> c = getIV(sp.c(), exogenousBindings);
-                
-                final RangeNode rangeNode = sp.getRange();
-                final RangeBOp range = rangeNode != null ? rangeNode.getRangeBOp() : null;
-    			
-                final IAccessPath<?> ap = db.getAccessPath(s, p, o, c, range);
-                
-                final long cardinality = ap.rangeCount(false/* exact */);
-
-                // Annotate with the fast range count.
-    			sp.setProperty(Annotations.ESTIMATED_CARDINALITY, cardinality);
-    			
-                /*
-                 * Annotate with the index which would be used if we did not run
-                 * access path "as-bound". This is the index that will be used
-                 * if we wind up doing a hash join for this predicate.
-                 * 
-                 * TODO It would make sense to lift this annotation into a
-                 * different AST optimizer so it is always present. An
-                 * optimization for index locality for as-bound evaluation
-                 * depends on the presence of this annotation.
-                 * 
-                 * @see https://sourceforge.net/apps/trac/bigdata/ticket/150"
-                 * (Choosing the index for testing fully bound access paths
-                 * based on index locality)
-                 */
-                sp.setProperty(Annotations.ORIGINAL_INDEX, ap.getKeyOrder());
+                estimateCardinality(sp, db, exogenousBindings);
 
     		}
     		
     	}
     	
     }
+
+    /**
+     * For testing purposes we can override this method.
+     * @param sp
+     * @param db
+     * @param exogenousBindings
+     */
+	protected void estimateCardinality(StatementPatternNode sp, final AbstractTripleStore db,
+			final IBindingSet exogenousBindings) {
+		final IV<?, ?> s = getIV(sp.s(), exogenousBindings);
+		final IV<?, ?> p = getIV(sp.p(), exogenousBindings);
+		final IV<?, ?> o = getIV(sp.o(), exogenousBindings);
+		final IV<?, ?> c = getIV(sp.c(), exogenousBindings);
+		
+		estimateCardinalities(sp, s, p, o, c, db);
+	}
+
+	protected void estimateCardinalities(StatementPatternNode sp, final IV<?, ?> s, final IV<?, ?> p,
+			final IV<?, ?> o, final IV<?, ?> c, final AbstractTripleStore db) {
+		final RangeNode rangeNode = sp.getRange();
+		final RangeBOp range = rangeNode != null ? rangeNode.getRangeBOp() : null;
+		
+		final IAccessPath<?> ap = db.getAccessPath(s, p, o, c, range);
+		
+		final long cardinality = ap.rangeCount(false/* exact */);
+
+		// Annotate with the fast range count.
+		sp.setProperty(Annotations.ESTIMATED_CARDINALITY, cardinality);
+		
+		/*
+		 * Annotate with the index which would be used if we did not run
+		 * access path "as-bound". This is the index that will be used
+		 * if we wind up doing a hash join for this predicate.
+		 * 
+		 * TODO It would make sense to lift this annotation into a
+		 * different AST optimizer so it is always present. An
+		 * optimization for index locality for as-bound evaluation
+		 * depends on the presence of this annotation.
+		 * 
+		 * @see https://sourceforge.net/apps/trac/bigdata/ticket/150"
+		 * (Choosing the index for testing fully bound access paths
+		 * based on index locality)
+		 */
+		sp.setProperty(Annotations.ORIGINAL_INDEX, ap.getKeyOrder());
+	}
 
     /**
      * Helper method grabs the IV out of the TermNode, doing the appropriate

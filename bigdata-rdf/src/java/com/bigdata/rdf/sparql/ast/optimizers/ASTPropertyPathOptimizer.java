@@ -335,7 +335,12 @@ public class ASTPropertyPathOptimizer extends AbstractJoinGroupOptimizer
         return v;
     }
     
-    private VarNode anonVar(final String anon) {
+    /**
+     * Override during testing to give predictable results
+     * @param anon
+     * @return
+     */
+    protected VarNode anonVar(final String anon) {
         VarNode v = new VarNode(anon+UUID.randomUUID().toString());
         v.setAnonymous(true);
         return v;

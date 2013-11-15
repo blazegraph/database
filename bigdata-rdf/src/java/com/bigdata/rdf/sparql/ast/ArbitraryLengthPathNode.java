@@ -28,7 +28,7 @@ public class ArbitraryLengthPathNode
      */
     private static final long serialVersionUID = 1L;
 
-    interface Annotations extends GroupNodeBase.Annotations {
+    public interface Annotations extends GroupNodeBase.Annotations {
 
     	/**
     	 * The left term - can be a variable or a constant.
@@ -202,7 +202,18 @@ public class ArbitraryLengthPathNode
         sb.append(s).append(getClass().getSimpleName());
         sb.append("(left=").append(left()).append(", right=").append(right()).append(") {");
         sb.append(subgroup().toString(indent+1));
-        sb.append("\n").append(s).append("}");
+        sb.append("\n").append(s);
+
+        final Long rangeCount = (Long) getProperty(AST2BOpBase.Annotations.ESTIMATED_CARDINALITY);
+
+        if (rangeCount != null) {
+            sb.append(indent(indent + 1));
+            sb.append(AST2BOpBase.Annotations.ESTIMATED_CARDINALITY);
+            sb.append("=");
+            sb.append(rangeCount.toString());
+            sb.append("\n");
+        }
+        sb.append("}");
         
         return sb.toString();
 

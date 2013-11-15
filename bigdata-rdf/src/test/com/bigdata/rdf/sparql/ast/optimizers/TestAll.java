@@ -138,6 +138,10 @@ public class TestAll extends TestCase {
 
         // Test suite for resolving mock IVs.
         suite.addTestSuite(TestASTBatchResolveTermsOptimizer.class);
+        
+        suite.addTestSuite(TestASTFlattenJoinGroupsOptimizer.class);
+        
+        suite.addTestSuite(TestALPPinTrac773.class);
 
         return suite;
 
