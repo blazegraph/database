@@ -50,6 +50,7 @@ import com.bigdata.relation.accesspath.ThickAsynchronousIterator;
  */
 public class TestQueryEngine_GroupByOp extends TestCase2 {
 
+    @Override
     public Properties getProperties() {
 
         final Properties p = new Properties(super.getProperties());
@@ -61,9 +62,10 @@ public class TestQueryEngine_GroupByOp extends TestCase2 {
         
     }
 
-    Journal jnl;
-    QueryEngine queryEngine;
+    private Journal jnl;
+    private QueryEngine queryEngine;
     
+    @Override
     public void setUp() throws Exception {
         
         jnl = new Journal(getProperties());
@@ -74,6 +76,7 @@ public class TestQueryEngine_GroupByOp extends TestCase2 {
 
     }
     
+    @Override
     public void tearDown() throws Exception {
 
         if (queryEngine != null) {

@@ -87,9 +87,10 @@ public class TestQueryEngine_Slice extends TestCase2 {
         
     }
 
-    Journal jnl;
-    QueryEngine queryEngine;
-    
+    private Journal jnl;
+    private QueryEngine queryEngine;
+
+    @Override
     public void setUp() throws Exception {
         
         jnl = new Journal(getProperties());
@@ -100,6 +101,7 @@ public class TestQueryEngine_Slice extends TestCase2 {
 
     }
     
+    @Override
     public void tearDown() throws Exception {
 
         if (queryEngine != null) {
