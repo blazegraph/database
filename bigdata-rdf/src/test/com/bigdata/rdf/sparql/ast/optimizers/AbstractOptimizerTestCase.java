@@ -339,7 +339,7 @@ public abstract class AbstractOptimizerTestCase extends AbstractASTEvaluationTes
 				}
 				for (;i<more.length;i++) {
 					if (more[i] instanceof Integer) {
-			            rslt.setProperty(Annotations.ESTIMATED_CARDINALITY, Long.valueOf((int)more[i]));
+			            rslt.setProperty(Annotations.ESTIMATED_CARDINALITY, Long.valueOf((Integer)more[i]));
 					} else {
 						HelperFlag flag = (HelperFlag)more[i];
 						flag.apply(rslt);
