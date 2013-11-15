@@ -84,6 +84,7 @@ public class AbstractASTEvaluationTestCase extends AbstractQueryEngineTestCase {
 
     protected String baseURI = null;
 
+    @Override
     protected void setUp() throws Exception {
         
         super.setUp();
@@ -100,6 +101,7 @@ public class AbstractASTEvaluationTestCase extends AbstractQueryEngineTestCase {
         
     }
     
+    @Override
     protected void tearDown() throws Exception {
         
         if (store != null) {
@@ -118,6 +120,7 @@ public class AbstractASTEvaluationTestCase extends AbstractQueryEngineTestCase {
         
     }
 
+    @Override
     public Properties getProperties() {
 
         // Note: clone to avoid modifying!!!
