@@ -314,6 +314,7 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
      * available and no task is currently running, then drain the work queue and
      * submit a task to consume that work.
      */
+    @Override
     protected void consumeChunk() {
         lock.lock();
         try {
@@ -722,6 +723,7 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
 
         }
 
+        @Override
         public void run() {
 
             try {
@@ -791,6 +793,7 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
             
         }
         
+        @Override
         public void run() {
 
             final QueryEngine queryEngine = getQueryEngine();
@@ -1015,6 +1018,7 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
         /**
          * A human readable representation of the {@link ChunkTask}'s state.
          */
+        @Override
         public String toString() {
             return "ChunkTask" + //
                     "{query=" + getQueryId() + //
@@ -1269,6 +1273,7 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
         /**
          * Evaluate the {@link IChunkMessage}.
          */
+        @Override
         public Void call() throws Exception {
             if (log.isDebugEnabled())
                 log.debug("Running chunk: " + this);
@@ -1355,6 +1360,7 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
 
         }
 
+        @Override
         public void add(final E e) {
             super.add(e);
             if (SolutionsLog.solutionsLog.isInfoEnabled()) {
@@ -1609,7 +1615,8 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
             chunkSize = 0;
             smallChunks = null;
         }
-        
+
+        @Override
         synchronized // Note: possible side-effect on internal buffer.
         public long flush() {
             if (open)
@@ -1618,46 +1625,55 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
 //          return sink.flush();
       }
 
+        @Override
         public void abort(final Throwable cause) {
             open = false;
             q.halt(cause);
 //            sink.abort(cause);
         }
 
+        @Override
         public void close() {
 //            sink.close();
             open = false;
         }
 
+        @Override
         public Future getFuture() {
 //            return sink.getFuture();
             return null;
         }
 
+        @Override
         public boolean isEmpty() {
             return true;
 //            return sink.isEmpty();
         }
 
+        @Override
         public boolean isOpen() {
             return open && !q.isDone();
 //            return sink.isOpen();
         }
 
+        @Override
         public IAsynchronousIterator<IBindingSet[]> iterator() {
             throw new UnsupportedOperationException();
 //            return sink.iterator();
         }
 
+        @Override
         public void reset() {
 //            sink.reset();
         }
 
+        @Override
         public void setFuture(Future future) {
             throw new UnsupportedOperationException();
 //            sink.setFuture(future);
         }
 
+        @Override
         public int size() {
             return 0;
 //            return sink.size();
@@ -1702,6 +1718,7 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
 
         }
 
+        @Override
         public void run() {
 			try {
 				if (q.isController()) {
