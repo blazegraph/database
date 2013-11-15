@@ -8,7 +8,6 @@ import java.util.Map;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IVariable;
 import com.bigdata.rdf.internal.constraints.InBOp;
-import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.service.ServiceNode;
 
 /**
@@ -179,20 +178,7 @@ public class JoinGroupNode extends GraphPatternGroup<IGroupMemberNode> {
 	 */
 	public List<StatementPatternNode> getStatementPatterns() {
 		
-		final List<StatementPatternNode> spNodes = 
-			new LinkedList<StatementPatternNode>();
-		
-		for (IQueryNode node : this) {
-			
-			if (node instanceof StatementPatternNode) {
-				
-				spNodes.add((StatementPatternNode) node);
-				
-			}
-			
-		}
-		
-		return spNodes;
+		return getChildren(StatementPatternNode.class); 
 		
 	}
 
@@ -248,20 +234,7 @@ public class JoinGroupNode extends GraphPatternGroup<IGroupMemberNode> {
 	 */
 	public List<ServiceNode> getServiceNodes() {
 		
-		final List<ServiceNode> serviceNodes = 
-			new LinkedList<ServiceNode>();
-		
-		for (IQueryNode node : this) {
-			
-			if (node instanceof ServiceNode) {
-				
-				serviceNodes.add((ServiceNode) node);
-				
-			}
-			
-		}
-		
-		return serviceNodes;
+		return getChildren(ServiceNode.class); 
 		
 	}
 
@@ -270,20 +243,7 @@ public class JoinGroupNode extends GraphPatternGroup<IGroupMemberNode> {
 	 */
 	public List<NamedSubqueryInclude> getNamedSubqueryIncludes() {
 		
-		final List<NamedSubqueryInclude> namedSubqueryIncludes = 
-			new LinkedList<NamedSubqueryInclude>();
-		
-		for (IQueryNode node : this) {
-			
-			if (node instanceof NamedSubqueryInclude) {
-				
-				namedSubqueryIncludes.add((NamedSubqueryInclude) node);
-				
-			}
-			
-		}
-		
-		return namedSubqueryIncludes;
+		return getChildren(NamedSubqueryInclude.class); 
 		
 	}
 
@@ -319,21 +279,8 @@ public class JoinGroupNode extends GraphPatternGroup<IGroupMemberNode> {
      * evaluated left-to-right in the order given in the original query.
      */
     public List<AssignmentNode> getAssignments(){
-        
-        final List<AssignmentNode> assignments = new LinkedList<AssignmentNode>();
-        
-        for (IQueryNode node : this) {
-            
-            if (node instanceof AssignmentNode) {
-                
-                assignments.add((AssignmentNode) node);
-                
-            }
-            
-        }
-        
-        return assignments;
-        
+		
+		return getChildren(AssignmentNode.class); 
     }
 
 	/**
@@ -341,19 +288,7 @@ public class JoinGroupNode extends GraphPatternGroup<IGroupMemberNode> {
 	 */
 	public List<FilterNode> getAllFiltersInGroup() {
 		
-		final List<FilterNode> filters = new LinkedList<FilterNode>();
-		
-		for (IQueryNode node : this) {
-			
-			if (node instanceof FilterNode) {
-				
-				filters.add((FilterNode) node);
-				
-			}
-			
-		}
-		
-		return filters;
+		return getChildren(FilterNode.class); 
 		
     }
 

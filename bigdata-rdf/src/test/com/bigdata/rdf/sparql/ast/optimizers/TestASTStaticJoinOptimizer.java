@@ -32,225 +32,36 @@ import org.openrdf.model.impl.URIImpl;
 import org.openrdf.model.vocabulary.RDF;
 
 import com.bigdata.bop.IBindingSet;
-import com.bigdata.bop.ModifiableBOpBase;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.sparql.ast.ASTBase;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
-import com.bigdata.rdf.sparql.ast.AbstractASTEvaluationTestCase;
 import com.bigdata.rdf.sparql.ast.AssignmentNode;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
-import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
-import com.bigdata.rdf.sparql.ast.GroupMemberNodeBase;
-import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.IQueryNode;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueryInclude;
 import com.bigdata.rdf.sparql.ast.NamedSubqueryRoot;
 import com.bigdata.rdf.sparql.ast.ProjectionNode;
-import com.bigdata.rdf.sparql.ast.QueryBase;
 import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryType;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
-import com.bigdata.rdf.sparql.ast.TermNode;
-import com.bigdata.rdf.sparql.ast.UnionNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.service.ServiceNode;
 import com.bigdata.rdf.store.BDS;
-import com.bigdata.rdf.sparql.ast.PropertyPathUnionNode;
+import static com.bigdata.rdf.sparql.ast.optimizers.AbstractOptimizerTestCase.HelperFlag.*;
 /**
  * Test suite for {@link ASTStaticJoinOptimizer}.
  */
-public class TestASTStaticJoinOptimizer extends AbstractASTEvaluationTestCase {
+public class TestASTStaticJoinOptimizer extends AbstractOptimizerTestCase
+{
 
-	public interface Annotations extends
-			com.bigdata.rdf.sparql.ast.GraphPatternGroup.Annotations,
-			com.bigdata.rdf.sparql.ast.eval.AST2BOpBase.Annotations {
+
+	@Override
+	protected ASTStaticJoinOptimizer newOptimizer() {
+		return new ASTStaticJoinOptimizer();
 	}
-
-	enum HelperFlag {
-		OPTIONAL {
-			@Override
-			public void apply(ASTBase sp) {
-				((ModifiableBOpBase) sp)
-						.setProperty(Annotations.OPTIONAL, true);
-			}
-		},
-		DISTINCT {
-			@Override
-			public void apply(ASTBase rslt) {
-				((QueryBase) rslt).getProjection().setDistinct(true);
-			}
-		};
-
-		/**
-		 * 
-		 * @param target
-		 * @throws ClassCastException
-		 *             If there is a mismatch between the flag and its usage.
-		 */
-		abstract public void apply(ASTBase target);
-	};
-
-	/**
-	 * The purpose of this class is to make the tests look like the old
-	 * comments. The first example
-	 * {@link TestASTStaticJoinOptimizer#test_simpleOptional01A()} is based on
-	 * the comments of
-	 * {@link TestASTStaticJoinOptimizer#test_simpleOptional01()} and
-	 * demonstrates that the comment is out of date.
-	 * 
-	 * NB: Given this goal, several Java naming conventions are ignored. e.g.
-	 * methods whose names are ALLCAPS or the same as ClassNames
-	 * 
-	 * Also, note that the intent is that this class be used in
-	 * anonymous subclasses with a single invocation of the {@link #test()} method,
-	 * and the two fields {@link #given} and {@link #expected} initialized
-	 * in the subclasses constructor (i.e. inside a second pair of braces).
-	 * 
-	 * All of the protected members are wrappers around constructors,
-	 * to allow the initialization of these two fields, to have a style
-	 * much more like Prolog than Java.
-	 * 
-	 * @author jeremycarroll
-	 * 
-	 */
-	@SuppressWarnings("rawtypes")
-	public abstract class Helper {
-		protected QueryRoot given, expected;
-		protected final String w = "w", x = "x", y = "y", z = "z";
-		protected final IV a = iv("a"), b = iv("b"), c = iv("c"), d = iv("d"),
-				e = iv("e"), f = iv("f"), g = iv("g"), h = iv("h");
-
-		protected final HelperFlag OPTIONAL = HelperFlag.OPTIONAL;
-		protected final HelperFlag DISTINCT = HelperFlag.DISTINCT;
-
-		private IV iv(String id) {
-			return makeIV(new URIImpl("http://example/" + id));
-		}
-
-		protected QueryRoot select(VarNode[] varNodes,
-				NamedSubqueryRoot namedSubQuery, JoinGroupNode where,
-				HelperFlag... flags) {
-			QueryRoot rslt = select(varNodes, where, flags);
-			rslt.getNamedSubqueriesNotNull().add(namedSubQuery);
-			return rslt;
-		}
-
-		protected QueryRoot select(VarNode[] varNodes, JoinGroupNode where,
-				HelperFlag... flags) {
-
-			QueryRoot select = new QueryRoot(QueryType.SELECT);
-			final ProjectionNode projection = new ProjectionNode();
-			for (VarNode varNode : varNodes)
-				projection.addProjectionVar(varNode);
-
-			select.setProjection(projection);
-			select.setWhereClause(where);
-			for (HelperFlag flag : flags)
-				flag.apply(select);
-			return select;
-		}
-
-		protected QueryRoot select(VarNode varNode,
-				NamedSubqueryRoot namedSubQuery, JoinGroupNode where,
-				HelperFlag... flags) {
-			return select(new VarNode[] { varNode }, namedSubQuery, where,
-					flags);
-		}
-
-		protected QueryRoot select(VarNode varNode, JoinGroupNode where,
-				HelperFlag... flags) {
-			return select(new VarNode[] { varNode }, where, flags);
-		}
-
-		protected NamedSubqueryRoot namedSubQuery(String name, VarNode varNode,
-				JoinGroupNode where) {
-			final NamedSubqueryRoot namedSubquery = new NamedSubqueryRoot(
-					QueryType.SELECT, name);
-			final ProjectionNode projection = new ProjectionNode();
-			namedSubquery.setProjection(projection);
-			projection.addProjectionExpression(new AssignmentNode(varNode,
-					new VarNode(varNode)));
-
-			namedSubquery.setWhereClause(where);
-			return namedSubquery;
-		}
-
-		protected GroupMemberNodeBase namedSubQueryInclude(String name) {
-			return new NamedSubqueryInclude(name);
-		}
-
-		protected VarNode[] varNodes(String... names) {
-			VarNode rslt[] = new VarNode[names.length];
-			for (int i = 0; i < names.length; i++)
-				rslt[i] = varNode(names[i]);
-			return rslt;
-		}
-
-		protected VarNode varNode(String varName) {
-			return new VarNode(varName);
-		}
-
-		protected TermNode constantNode(IV iv) {
-			return new ConstantNode(iv);
-		}
-
-		protected StatementPatternNode statementPatternNode(TermNode s,
-				TermNode p, TermNode o, long cardinality, HelperFlag... flags) {
-			StatementPatternNode rslt = newStatementPatternNode(s, p, o,
-					cardinality);
-			for (HelperFlag flag : flags) {
-				flag.apply(rslt);
-			}
-			return rslt;
-		}
-
-		@SuppressWarnings("unchecked")
-		private <E extends IGroupMemberNode, T extends GraphPatternGroup<E>> T initGraphPatternGroup(
-				T rslt, Object... statements) {
-			for (Object mem : statements) {
-				if (mem instanceof IGroupMemberNode) {
-					rslt.addChild((E) mem);
-				} else {
-					((HelperFlag) mem).apply(rslt);
-				}
-			}
-			return rslt;
-		}
-
-		protected JoinGroupNode joinGroupNode(Object... statements) {
-			return initGraphPatternGroup(new JoinGroupNode(), statements);
-		}
-
-		protected PropertyPathUnionNode propertyPathUnionNode(
-				Object... statements) {
-			return initGraphPatternGroup(new PropertyPathUnionNode(),
-					statements);
-		}
-
-		protected UnionNode unionNode(Object... statements) {
-			return initGraphPatternGroup(new UnionNode(), statements);
-
-		}
-
-		protected JoinGroupNode where(GroupMemberNodeBase... statements) {
-			return joinGroupNode((Object[]) statements);
-		}
-
-		public void test() {
-			final IASTOptimizer rewriter = new ASTStaticJoinOptimizer();
-
-			final AST2BOpContext context = new AST2BOpContext(new ASTContainer(
-					given), store);
-
-			final IQueryNode actual = rewriter.optimize(context, given,
-					new IBindingSet[] {});
-
-			assertSameAST(expected, actual);
-		}
-	}
+	
     public void test_simpleOptional01A() {
     	new Helper() {{
     		given = select( varNode(x), 
@@ -281,6 +92,7 @@ public class TestASTStaticJoinOptimizer extends AbstractASTEvaluationTestCase {
      * 
      */
     public TestASTStaticJoinOptimizer() {
+    	super();
     }
 
     /**
@@ -1911,13 +1723,6 @@ public class TestASTStaticJoinOptimizer extends AbstractASTEvaluationTestCase {
 
     }
     
-    private StatementPatternNode newStatementPatternNode(
-            final TermNode s, final TermNode p, final TermNode o, 
-            final long cardinality) {
-        
-        return newStatementPatternNode(s, p, o, cardinality, false);
-        
-    }
         
     /*
      * 
@@ -2225,23 +2030,6 @@ where {
 
     }
     
-    private StatementPatternNode newStatementPatternNode(
-            final TermNode s, final TermNode p, final TermNode o, 
-            final long cardinality, final boolean optional) {
-        
-        final StatementPatternNode sp = new StatementPatternNode(s, p, o);
-        
-        sp.setProperty(Annotations.ESTIMATED_CARDINALITY, cardinality);
-        
-        if (optional) {
-            
-            sp.setOptional(true);
-            
-        }
-        
-        return sp;
-        
-    }
     
     private StatementPatternNode runFirst(final StatementPatternNode sp) {
     	sp.setProperty(QueryHints.RUN_FIRST, true);
