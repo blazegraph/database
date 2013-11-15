@@ -59,6 +59,7 @@ public interface IRunningQuery extends IHaltable<Void>, IQueryContext {
 	/**
 	 * The unique identifier for this query.
 	 */
+	@Override
 	UUID getQueryId();
 	
     /**
