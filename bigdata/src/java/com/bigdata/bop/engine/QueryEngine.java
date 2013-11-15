@@ -27,10 +27,13 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.bop.engine;
 
+import java.lang.ref.WeakReference;
 import java.lang.reflect.Constructor;
 import java.rmi.RemoteException;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.BlockingQueue;
@@ -42,6 +45,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.PriorityBlockingQueue;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
@@ -255,10 +259,14 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
      * Return a {@link CounterSet} which reports various statistics for the
      * {@link QueryEngine}.
      */
+    @Override
     public CounterSet getCounters() {
 
         final CounterSet root = new CounterSet();
 
+        // Note: This counter is not otherwise tracked.
+        counters.deadlineQueueSize.set(deadlineQueue.size());
+        
         // global counters.
         root.attach(counters.getCounters());
 
@@ -402,15 +410,7 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
 //     */
 //    private final ForkJoinPool fjpool;
 
-    /**
-     * The {@link UUID} of the service in which this {@link QueryEngine} is
-     * running.
-     * 
-     * @return The {@link UUID} of the service in which this {@link QueryEngine}
-     *         is running -or- a unique and distinct UUID if the
-     *         {@link QueryEngine} is not running against an
-     *         {@link IBigdataFederation}.
-     */
+    @Override
     public UUID getServiceUUID() {
 
         return ((IRawStore) localIndexManager).getUUID();
@@ -589,6 +589,208 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
 //            );
 
     /**
+     * A queue arranged in order of increasing deadline times. Only queries with
+     * an explicit deadline are added to this priority queue. The head of the
+     * queue contains the query whose deadline will expire soonest. A thread can
+     * thus poll the head of the queue to determine whether the deadline would
+     * have passed. Such queries can be removed from the queue and their
+     * {@link AbstractRunningQuery#checkDeadline()} method invoked to force
+     * their timely termination.
+     * <p>
+     * {@link AbstractRunningQuery#startOp(IStartOpMessage)} and
+     * {@link AbstractRunningQuery#haltOp(IHaltOpMessage)} check to see if the
+     * deadline for a query has expired. However, those methods are only invoked
+     * when a query plan operator starts and halts. In cases where the query is
+     * compute bound within a single operator (e.g., ORDER BY or an unconstraint
+     * cross-product JOIN), the query will not be checked for termination. This
+     * priority queue is used to ensure that the query deadline is tested even
+     * though it may be in a compute bound operator.
+     * <p>
+     * If the deadline has expired, {@link IRunningQuery#cancel(boolean)} will
+     * be invoked. In order for a compute bound operator to terminate in a
+     * timely fashion, it MUST periodically test {@link Thread#isInterrupted()}.
+     * <p>
+     * Note: The deadline of a query may be set at most once. Thus, a query
+     * which is entered into the {@link #deadlineQueue} may not have its
+     * deadline modified. This means that we do not have to search the priority
+     * queue for an existing reference to the query. It also means that we are
+     * able to store an object that wraps the query with a {@link WeakReference}
+     * and thus can avoid pinning the query on the heap until its deadline
+     * expires. That means that we do not need to remove an entries from the
+     * deadline queue each time a query terminates, but we do need to
+     * periodically trim the queue to ensure that queries with distant deadlines
+     * do not hang around in the queue for long periods of time after their
+     * deadline has expired. This can be done by scanning the queue and removing
+     * all entries whose {@link WeakReference} has been cleared.
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/772">
+     *      Query timeout only checked at operator start/stop. </a>
+     */
+    final private PriorityBlockingQueue<QueryDeadline> deadlineQueue = new PriorityBlockingQueue<QueryDeadline>();
+
+    /**
+     * Queries with a deadline that lies significantly in the future can lie
+     * around in the priority queue until that deadline is reached if there are
+     * other queries in front of them that are not terminated and whose deadline
+     * has not be reached. Therefore, periodically, we need to scan the queue
+     * and clear out entries for terminated queries. This is done any time the
+     * size of the queue is at least this many elements when we examine the
+     * queue in {@link #checkDeadlines()}.
+     */
+    final static private int DEADLINE_QUEUE_SCAN_SIZE = 200;
+    
+    /**
+     * The maximum granularity before we will check the deadline priority queue
+     * for queries that need to be terminated because their deadline has
+     * expired.
+     */
+    final static private long DEADLINE_CHECK_MILLIS = 100;
+    
+    /**
+     * Add the query to the deadline priority queue
+     * 
+     * @exception IllegalArgumentException
+     *                if the query deadline has not been set.
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/772">
+     *      Query timeout only checked at operator start/stop. </a>
+     */
+    void addQueryToDeadlineQueue(final AbstractRunningQuery query) {
+
+        final long deadline = query.getDeadline();
+
+        if (deadline == Long.MAX_VALUE) {
+            /*
+             * Do not allow queries with an unbounded deadline into the priority
+             * queue.
+             */
+            throw new IllegalArgumentException();
+        }
+
+        deadlineQueue.add(new QueryDeadline(deadline, query));
+
+    }
+
+    /**
+     * Scan the priority queue of queries with a specified deadline, halting any
+     * queries whose deadline has expired.
+     */
+    static private void checkDeadlines(final long now,
+            final PriorityBlockingQueue<QueryDeadline> deadlineQueue) {
+        
+        /*
+         * While the queue is thread safe, we want at most one thread at a time
+         * to be inspecting the queue for queries whose deadlines have expired.
+         */
+        synchronized (deadlineQueue) {
+
+            /*
+             * Check the head of the deadline queue for any queries whose
+             * deadline has expired.
+             */
+            checkHeadOfDeadlineQueue(now, deadlineQueue);
+
+            if (deadlineQueue.size() > DEADLINE_QUEUE_SCAN_SIZE) {
+
+                /*
+                 * Scan the deadline queue, removing entries for expired
+                 * queries.
+                 */
+                scanDeadlineQueue(now, deadlineQueue);
+
+            }
+
+        }
+        
+    }
+
+    /**
+     * Check the head of the deadline queue for any queries whose deadline has
+     * expired.
+     */
+    static private void checkHeadOfDeadlineQueue(final long now,
+            final PriorityBlockingQueue<QueryDeadline> deadlineQueue) {
+        
+        QueryDeadline x;
+
+        // remove the element at the head of the queue.
+        while ((x = deadlineQueue.poll()) != null) {
+
+            // test for query done or deadline expired.
+            if (x.checkDeadline(now) == null) {
+
+                /*
+                 * This query is known to be done. It was removed from the
+                 * priority queue above. We need to check the next element in
+                 * the priority order to see whether it is also done.
+                 */
+
+                continue;
+
+            }
+
+            if (x.deadline > now) {
+
+                /*
+                 * This query has not yet reached its deadline. That means that
+                 * no other query in the deadline queue has reached its
+                 * deadline. Therefore we are done for now.
+                 */
+
+                // Put the query back on the deadline queue.
+                deadlineQueue.add(x);
+
+                break;
+
+            }
+
+        }
+
+    }
+    
+    /**
+     * Queries with a deadline that lies significantly in the future can lie
+     * around in the priority queue until that deadline is reached if there are
+     * other queries in front of them that are not terminated and whose deadline
+     * has not be reached. Therefore, periodically, we need to scan the queue
+     * and clear out entries for terminated queries.
+     */
+    static private void scanDeadlineQueue(final long now,
+            final PriorityBlockingQueue<QueryDeadline> deadlineQueue) {
+
+        final List<QueryDeadline> c = new ArrayList<QueryDeadline>(
+                DEADLINE_QUEUE_SCAN_SIZE);
+
+        // drain up to that many elements.
+        deadlineQueue.drainTo(c, DEADLINE_QUEUE_SCAN_SIZE);
+
+        int ndropped = 0, nrunning = 0;
+        
+        for (QueryDeadline x : c) {
+
+            if (x.checkDeadline(now) != null) {
+
+                // return this query to the deadline queue.
+                deadlineQueue.add(x);
+
+                nrunning++;
+
+            } else {
+                
+                ndropped++;
+                
+            }
+
+        }
+        
+        if (log.isInfoEnabled())
+            log.info("Scan: threadhold=" + DEADLINE_QUEUE_SCAN_SIZE
+                    + ", ndropped=" + ndropped + ", nrunning=" + nrunning
+                    + ", deadlineQueueSize=" + deadlineQueue.size());
+
+    }
+    
+    /**
      * 
      * @param localIndexManager
      *            The <em>local</em> index manager.
@@ -616,7 +818,7 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
     public void init() {
 
         final FutureTask<Void> ft = new FutureTaskMon<Void>(new QueryEngineTask(
-                priorityQueue), (Void) null);
+                priorityQueue, deadlineQueue), (Void) null);
 
         if (engineFuture.compareAndSet(null/* expect */, ft)) {
         
@@ -711,15 +913,23 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
      */
     static private class QueryEngineTask implements Runnable {
         
-        final private BlockingQueue<AbstractRunningQuery> queue;
+        final private BlockingQueue<AbstractRunningQuery> priorityQueue;
+        final private PriorityBlockingQueue<QueryDeadline> deadlineQueue;
 
-        public QueryEngineTask(final BlockingQueue<AbstractRunningQuery> queue) {
+        public QueryEngineTask(
+                final BlockingQueue<AbstractRunningQuery> priorityQueue,
+                final PriorityBlockingQueue<QueryDeadline> deadlineQueue) {
 
-            if (queue == null)
+            if (priorityQueue == null)
                 throw new IllegalArgumentException();
+
+            if (deadlineQueue == null)
+                throw new IllegalArgumentException();
+
+            this.priorityQueue = priorityQueue;
             
-            this.queue = queue;
-            
+            this.deadlineQueue = deadlineQueue;
+
         }
         
         @Override
@@ -727,10 +937,30 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
             if(log.isInfoEnabled())
                 log.info("Running: " + this);
             try {
+                long mark = System.currentTimeMillis();
+                long remaining = DEADLINE_CHECK_MILLIS;
                 while (true) {
                     try {
-                        final AbstractRunningQuery q = queue.take();
-                        if (!q.isDone())
+                        final AbstractRunningQuery q = priorityQueue.poll(
+                                remaining, TimeUnit.MILLISECONDS);
+                        final long now = System.currentTimeMillis();
+                        if ((remaining = now - mark) < 0) {
+                            /*
+                             * Check for queries whose deadline is expired.
+                             * 
+                             * Note: We only do this every DEADLINE_CHECK_MILLIS
+                             * and then reset [mark] and [remaining].
+                             * 
+                             * Note: In queue.pool(), we only wait only up to
+                             * the [remaining] time before the next check in
+                             * queue.poll().
+                             */
+                            checkDeadlines(now, deadlineQueue);
+                            mark = now;
+                            remaining = DEADLINE_CHECK_MILLIS;
+                        }
+                        // Consume chunk already on queue for this query.
+                        if (q != null && !q.isDone())
                             q.consumeChunk();
                     } catch (InterruptedException e) {
                         /*
@@ -865,6 +1095,10 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
             cm.shutdown();
         }
         
+        // clear the queues
+        priorityQueue.clear();
+        deadlineQueue.clear();
+
         // clear references.
         engineFuture.set(null);
         engineService.set(null);
@@ -920,6 +1154,10 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
             q.cancel(true/*mayInterruptIfRunning*/);
             
         }
+        
+        // clear the queues
+        priorityQueue.clear();
+        deadlineQueue.clear();
 
         // clear references.
         engineFuture.set(null);
@@ -932,6 +1170,7 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
      * IQueryPeer
      */
     
+    @Override
     @Deprecated // see IQueryClient
     public void declareQuery(final IQueryDecl queryDecl) throws RemoteException {
         
@@ -939,6 +1178,7 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
         
     }
     
+    @Override
     public void bufferReady(final IChunkMessage<IBindingSet> msg) {
 
         throw new UnsupportedOperationException();
@@ -950,6 +1190,7 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
      * <p>
      * The default implementation is a NOP.
      */
+    @Override
     public void cancelQuery(final UUID queryId, final Throwable cause) {
         // NOP
     }
@@ -957,7 +1198,7 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
     /*
      * IQueryClient
      */
-
+    @Override
     public PipelineOp getQuery(final UUID queryId) {
         
         final AbstractRunningQuery q = getRunningQuery(queryId);
@@ -969,6 +1210,7 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
         
     }
 
+    @Override
     public void startOp(final IStartOpMessage msg) throws RemoteException {
         
         final AbstractRunningQuery q = getRunningQuery(msg.getQueryId());
@@ -981,6 +1223,7 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
 
     }
 
+    @Override
     public void haltOp(final IHaltOpMessage msg) throws RemoteException {
         
         final AbstractRunningQuery q = getRunningQuery(msg.getQueryId());
@@ -1827,9 +2070,9 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
 //
 //    }
 //
-//    // TODO Must deliver events in another thread!
-//    // TODO Must drop and drop any errors.
-//    // TODO Optimize with CopyOnWriteArray
+//    // Must deliver events in another thread!
+//    // Must drop and drop any errors.
+//    // Optimize with CopyOnWriteArray
 //    // Note: Security hole if we allow notification for queries w/o queryId.
 //  protected void fireQueryEndedEvent(final IRunningQuery query) {
 //      

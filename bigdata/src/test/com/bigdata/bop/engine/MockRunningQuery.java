@@ -83,27 +83,33 @@ public class MockRunningQuery implements IRunningQuery {
 
     }
 
+    @Override
     public IBigdataFederation<?> getFederation() {
         return fed;
     }
 
+    @Override
     public IIndexManager getLocalIndexManager() {
         return indexManager;
     }
 
+    @Override
 	public void halt(Void v) {
         log.warn("Mock object does not implement halt(Void)");
 	}
 
+    @Override
 	public <T extends Throwable> T halt(T cause) {
         log.warn("Mock object does not implement halt(Throwable)");
         return cause;
 	}
 
+    @Override
     public QueryEngine getQueryEngine() {
         throw new UnsupportedOperationException();
     }
 
+    @Override
 	public Map<Integer, BOp> getBOpIndex() {
 		return null;
 	}
@@ -112,85 +118,108 @@ public class MockRunningQuery implements IRunningQuery {
 //		throw new UnsupportedOperationException();
 //	}
 	
+    @Override
 	public Map<Integer, BOpStats> getStats() {
 		return null;
 	}
 
+    @Override
 	public long getDeadline() {
 		// TODO Auto-generated method stub
 		return 0;
 	}
 
+    @Override
 	public long getDoneTime() {
 		// TODO Auto-generated method stub
 		return 0;
 	}
 
+    @Override
 	public long getElapsed() {
 		// TODO Auto-generated method stub
 		return 0;
 	}
 
+    @Override
 	public long getStartTime() {
 		// TODO Auto-generated method stub
 		return 0;
 	}
 
-	public Throwable getCause() {
-		// TODO Auto-generated method stub
-		return null;
-	}
+    @Override
+    public Throwable getCause() {
+        // TODO Auto-generated method stub
+        return null;
+    }
 
+    @Override
+    public Throwable getAsThrownCause() {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
+    @Override
 	public BOp getQuery() {
 		// TODO Auto-generated method stub
 		return null;
 	}
 
+    @Override
 	public UUID getQueryId() {
 		return queryContext.getQueryId();
 	}
 
+    @Override
     public IAsynchronousIterator<IBindingSet[]> iterator() {
         // TODO Auto-generated method stub
         return null;
     }
 
+    @Override
     public boolean cancel(boolean mayInterruptIfRunning) {
         // TODO Auto-generated method stub
         return false;
     }
 
+    @Override
     public Void get() throws InterruptedException, ExecutionException {
         // TODO Auto-generated method stub
         return null;
     }
 
+    @Override
     public Void get(long timeout, TimeUnit unit) throws InterruptedException,
             ExecutionException, TimeoutException {
         // TODO Auto-generated method stub
         return null;
     }
 
+    @Override
     public boolean isCancelled() {
         // TODO Auto-generated method stub
         return false;
     }
 
+    @Override
     public boolean isDone() {
         // TODO Auto-generated method stub
         return false;
     }
 
+    @Override
     public IQueryClient getQueryController() {
         throw new UnsupportedOperationException();
     }
 
+    @Override
     public IMemoryManager getMemoryManager() {
         
         return queryContext.getMemoryManager();
         
     }
 
+    @Override
     public IQueryAttributes getAttributes() {
 
         return queryContext.getAttributes();

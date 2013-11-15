@@ -55,9 +55,10 @@ public class BindingSetComparator<E> implements Comparator<IBindingSet> {
         
     }
     
+    @Override
     public int compare(final IBindingSet bs1, final IBindingSet bs2) {
 
-        if ((n++ % 5000) == 1) {
+        if ((n++ % 1000) == 1) {
             /*
              * Check for interrupts, but not too often.
              */

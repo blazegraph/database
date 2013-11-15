@@ -328,6 +328,8 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
             
             runState.setDeadline(deadline);
             
+            queryEngine.addQueryToDeadlineQueue(this);
+            
         } catch (QueryTimeoutException e) {
 
             /*
@@ -349,10 +351,20 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
      * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/772">
      *      Query timeout only checked at operator start/stop. </a>
      */
-    final public void checkDeadline() {
+    final protected void checkDeadline() {
+
+        if (isDone()) {
+
+            // already terminated.
+            return;
+            
+        }
 
         try {
         
+//            if (log.isTraceEnabled())
+//                log.trace("Checking " + deadline);
+
             runState.checkDeadline();
             
         } catch (QueryTimeoutException ex) {
@@ -367,7 +379,7 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
         }
         
     }
-    
+
     @Override
     final public long getDeadline() {
 
@@ -1468,6 +1480,13 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
     final public Throwable getCause() {
 
         return future.getCause();
+
+    }
+
+    @Override
+    final public Throwable getAsThrownCause() {
+
+        return future.getAsThrownCause();
 
     }
 

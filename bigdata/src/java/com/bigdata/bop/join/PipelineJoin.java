@@ -55,6 +55,8 @@ import com.bigdata.bop.IShardwisePipelineOp;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
+import com.bigdata.bop.engine.AbstractRunningQuery;
+import com.bigdata.bop.engine.QueryTimeoutException;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.concurrent.FutureTaskMon;
@@ -260,6 +262,7 @@ public class PipelineJoin<E> extends PipelineOp implements
 	 * @see Annotations#PREDICATE
 	 */
 	@SuppressWarnings("unchecked")
+	@Override
 	public IPredicate<E> getPredicate() {
 
 		return (IPredicate<E>) getRequiredProperty(Annotations.PREDICATE);
@@ -316,6 +319,7 @@ public class PipelineJoin<E> extends PipelineOp implements
 
 	}
 
+	@Override
 	public FutureTask<Void> eval(final BOpContext<IBindingSet> context) {
 
 		return new FutureTaskMon<Void>(new JoinTask<E>(this, context));
@@ -530,6 +534,7 @@ public class PipelineJoin<E> extends PipelineOp implements
 
 		}
 
+		@Override
 		public String toString() {
 
 			return getClass().getName() + "{ joinOp=" + joinOp + "}";
@@ -541,6 +546,7 @@ public class PipelineJoin<E> extends PipelineOp implements
 		 * 
 		 * @return <code>null</code>.
 		 */
+		@Override
 		public Void call() throws Exception {
 
 			// final long begin = System.currentTimeMillis();
@@ -728,6 +734,31 @@ public class PipelineJoin<E> extends PipelineOp implements
 
 		}
 
+        /**
+         * {@inheritDoc}
+         * <p>
+         * Note: The {@link JoinTask} extends {@link Haltable}. We want to treat
+         * the {@link QueryTimeoutException} as a normal termination cause for a
+         * {@link JoinTask}. The {@link Haltable} for the
+         * {@link AbstractRunningQuery} will have its root cause set to the
+         * {@link QueryTimeoutException} and from there the exception will get
+         * eventually converted back into the appropriate openrdf exception. We
+         * do things differently here because the {@link JoinTask} termination
+         * is not the same as the {@link AbstractRunningQuery} termination.
+         * {@link JoinTask} is the only place right now where we extend haltable
+         * and the only place where we have to make this specific override.
+         * 
+         * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/772">
+         *      Query timeout only checked at operator start/stop. </a>
+         */
+		@Override
+	    protected boolean isNormalTerminationCause(final Throwable cause) {
+
+		    return super.isNormalTerminationCause(cause)
+                    || super.isDeadlineTerminationCause(cause);
+		    
+		}
+		
 		/**
 		 * Cancel sink {@link JoinTask}(s).
 		 */
@@ -892,6 +923,7 @@ public class PipelineJoin<E> extends PipelineOp implements
 			 *             true for query on the lastJoin) and that
 			 *             {@link IBlockingBuffer} has been closed.
 			 */
+			@Override
 			public Void call() throws Exception {
 
 				try {
@@ -928,8 +960,9 @@ public class PipelineJoin<E> extends PipelineOp implements
 					halt(t);
 					if (getCause() != null) {
 						// abnormal termination.
-						log.error("Halting join (abnormal termination): t="+t+" : cause="+getCause());
-						throw new RuntimeException("Halting join: " + t, t);
+//						log.error("Halting join (abnormal termination): t="+t+" : cause="+getCause());
+//						throw new RuntimeException("Halting join: " + t, t);
+					    throw new RuntimeException(t);
 					}
 					// normal termination - ignore exception.
 					if (log.isDebugEnabled())
@@ -1392,6 +1425,7 @@ public class PipelineJoin<E> extends PipelineOp implements
 			 * 
 			 * @return if the as bound predicate is equals().
 			 */
+			@Override
 			public boolean equals(final Object o) {
 
 				if (this == o)
@@ -1458,6 +1492,7 @@ public class PipelineJoin<E> extends PipelineOp implements
 
 			}
 
+		    @Override
 			public String toString() {
 
 				return JoinTask.this.getClass().getSimpleName() + "{ joinOp="
@@ -1481,6 +1516,7 @@ public class PipelineJoin<E> extends PipelineOp implements
 			 *             true for query on the lastJoin) and that
 			 *             {@link IBlockingBuffer} has been closed.
 			 */
+		    @Override
 			public Void call() throws Exception {
 
 				halted();
@@ -1717,7 +1753,11 @@ public class PipelineJoin<E> extends PipelineOp implements
 
                             }
 
-                            bindex++;
+                            if (bindex++ % 50 == 0) {
+                                // Periodically check for an interrupt.
+                                if (Thread.currentThread().isInterrupted())
+                                    throw new InterruptedException();
+                            }
 
                         }
 
@@ -2029,6 +2069,7 @@ public class PipelineJoin<E> extends PipelineOp implements
 			 * 
 			 * @return
 			 */
+		    @Override
 			public int compareTo(final AccessPathTask o) {
 
 				/*
@@ -2140,6 +2181,7 @@ public class PipelineJoin<E> extends PipelineOp implements
 			 *             true for query on the lastJoin) and that
 			 *             {@link IBlockingBuffer} has been closed.
 			 */
+		    @Override
 			public Void call() throws Exception {
 
 				try {

@@ -99,12 +99,22 @@ public class QueryEngineCounters implements ICounterSetAccess {
      */
     protected final CAT operatorHaltCount = new CAT();
 
+    /**
+     * The size of the deadline queue.
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/772">
+     *      Query timeout only checked at operator start/stop. </a>
+     */
+    protected final CAT deadlineQueueSize = new CAT();
+
+    @Override
     public CounterSet getCounters() {
 
         final CounterSet root = new CounterSet();
 
         // #of queries started on this server.
         root.addCounter("queryStartCount", new Instrument<Long>() {
+            @Override
             public void sample() {
                 setValue(queryStartCount.get());
             }
@@ -112,6 +122,7 @@ public class QueryEngineCounters implements ICounterSetAccess {
 
         // #of queries retired on this server.
         root.addCounter("queryDoneCount", new Instrument<Long>() {
+            @Override
             public void sample() {
                 setValue(queryDoneCount.get());
             }
@@ -119,6 +130,7 @@ public class QueryEngineCounters implements ICounterSetAccess {
 
         // #of queries with abnormal termination on this server.
         root.addCounter("queryErrorCount", new Instrument<Long>() {
+            @Override
             public void sample() {
                 setValue(queryErrorCount.get());
             }
@@ -126,6 +138,7 @@ public class QueryEngineCounters implements ICounterSetAccess {
 
         // average #of operator tasks evaluated per query
         root.addCounter("operatorTasksPerQuery", new Instrument<Double>() {
+            @Override
             public void sample() {
                 final long opCount = operatorHaltCount.get();
                 final long n = queryDoneCount.get();
@@ -136,6 +149,7 @@ public class QueryEngineCounters implements ICounterSetAccess {
 
         // #of queries retired per second on this server.
         root.addCounter("queriesPerSecond", new Instrument<Double>() {
+            @Override
             public void sample() {
                 final long ms = elapsedMillis.get();
                 final long n = queryDoneCount.get();
@@ -154,6 +168,7 @@ public class QueryEngineCounters implements ICounterSetAccess {
 
         // #of blocked work queues.
         root.addCounter("blockedWorkQueueCount", new Instrument<Long>() {
+            @Override
             public void sample() {
                 setValue(blockedWorkQueueCount.get());
             }
@@ -161,6 +176,7 @@ public class QueryEngineCounters implements ICounterSetAccess {
 
         // #of times that a work queue has blocked.
         root.addCounter("blockedWorkQueueRunningTotal", new Instrument<Long>() {
+            @Override
             public void sample() {
                 setValue(blockedWorkQueueRunningTotal.get());
             }
@@ -168,6 +184,7 @@ public class QueryEngineCounters implements ICounterSetAccess {
 
         // #of concurrently executing operator tasks.
         root.addCounter("operatorActiveCount", new Instrument<Long>() {
+            @Override
             public void sample() {
                 setValue(operatorActiveCount.get());
             }
@@ -175,6 +192,7 @@ public class QueryEngineCounters implements ICounterSetAccess {
 
         // #of operator evaluation tasks which have started.
         root.addCounter("operatorStartCount", new Instrument<Long>() {
+            @Override
             public void sample() {
                 setValue(operatorStartCount.get());
             }
@@ -182,8 +200,17 @@ public class QueryEngineCounters implements ICounterSetAccess {
 
         // #of operator evaluation tasks which have ended.
         root.addCounter("operatorHaltCount", new Instrument<Long>() {
+            @Override
             public void sample() {
                 setValue(operatorHaltCount.get());
+            }
+        });
+
+        // The size of the deadlineQueue.
+        root.addCounter("deadlineQueueSize", new Instrument<Long>() {
+            @Override
+            public void sample() {
+                setValue(deadlineQueueSize.get());
             }
         });
 

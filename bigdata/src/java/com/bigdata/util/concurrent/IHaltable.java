@@ -43,4 +43,11 @@ public interface IHaltable<V> extends Future<V> {
 	 */
 	Throwable getCause();
 
+    /**
+     * Return the first {@link Throwable cause} regardless of whether it is
+     * indicative of normal termination and <code>null</code> iff no cause has
+     * been set.
+     */
+    Throwable getAsThrownCause();
+
 }

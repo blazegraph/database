@@ -44,6 +44,7 @@ import java.util.concurrent.locks.ReentrantLock;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
+import com.bigdata.bop.engine.QueryTimeoutException;
 import com.bigdata.relation.accesspath.BufferClosedException;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
@@ -105,6 +106,15 @@ public class Haltable<V> implements IHaltable<V> {
     private volatile boolean error = false;
 
     /**
+     * Flag is set <code>true</code> if the process was halted by a
+     * {@link Throwable} indicating a deadline expiration.
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/772">
+     *      Query timeout only checked at operator start/stop. </a>
+     */
+    private volatile boolean deadline = false;
+    
+    /**
      * Set to <code>true</code> iff the process should halt.
      */
     private volatile boolean halt = false;
@@ -114,10 +124,18 @@ public class Haltable<V> implements IHaltable<V> {
      * cancelled}.
      */
     private volatile boolean cancelled = false;
+
+    /**
+     * Designated constructor.
+     */
+    public Haltable() {
+        
+    }
     
     /**
      * Halt (normal termination).
      */
+    @Override
     final public void halt(final V v) {
         lock.lock();
         try {
@@ -146,6 +164,7 @@ public class Haltable<V> implements IHaltable<V> {
      * 
      * @return The argument.
      */
+    @Override
     final public <T extends Throwable> T halt(final T cause) {
         final boolean didHalt;
         lock.lock();
@@ -159,6 +178,7 @@ public class Haltable<V> implements IHaltable<V> {
                         : new IllegalArgumentException());
                 // note if abnormal termination (firstCause only)
                 error = !isNormalTerminationCause(firstCause);
+                deadline = isDeadlineTerminationCause(firstCause);
                 try {
                     // signal *all* listeners.
                     halted.signalAll();
@@ -213,6 +233,7 @@ public class Haltable<V> implements IHaltable<V> {
 
     }
 
+    @Override
     final public boolean cancel(final boolean mayInterruptIfRunning) {
         lock.lock();
         try {
@@ -236,6 +257,7 @@ public class Haltable<V> implements IHaltable<V> {
         }
     }
 
+    @Override
     final public V get() throws InterruptedException, ExecutionException {
         lock.lock();
         try {
@@ -255,6 +277,7 @@ public class Haltable<V> implements IHaltable<V> {
         }
     }
 
+    @Override
     final public V get(final long timeout, final TimeUnit unit)
             throws InterruptedException, ExecutionException, TimeoutException {
         final long begin = System.nanoTime();
@@ -285,6 +308,7 @@ public class Haltable<V> implements IHaltable<V> {
     /**
      * Return <code>true</code> if the process is done.
      */
+    @Override
     final public boolean isDone() {
 
         return halt;
@@ -307,6 +331,7 @@ public class Haltable<V> implements IHaltable<V> {
 
     }
 
+    @Override
     public boolean isCancelled() {
 
         // Note: lock required for atomic visibility for [halt AND cancelled].
@@ -319,6 +344,7 @@ public class Haltable<V> implements IHaltable<V> {
 
     }
 
+    @Override
 	final public Throwable getCause() {
 
 		lock.lock();
@@ -340,11 +366,7 @@ public class Haltable<V> implements IHaltable<V> {
 
     }
 
-    /**
-     * Return the first {@link Throwable cause} regardless of whether it is
-     * indicative of normal termination and <code>null</code> iff no cause has
-     * been set.
-     */
+    @Override
     final public Throwable getAsThrownCause() {
 
         return firstCause;
@@ -386,10 +408,27 @@ public class Haltable<V> implements IHaltable<V> {
 	 * @see #getCause()
 	 */
     protected boolean isNormalTerminationCause(final Throwable cause) {
-    	if(isTerminationByInterrupt(cause))
-    		return true;
+        if (isTerminationByInterrupt(cause))
+            return true;
         if (InnerCause.isInnerCause(cause, RejectedExecutionException.class))
             return true;
+        return false;
+    }
+
+    /**
+     * Note: There is a special exemption for {@link QueryTimeoutException}.
+     * This can not be interpreted as "normal" termination since we want the
+     * exception to be thrown out and then turned into the corresponding openrdf
+     * exception. However, we do not want to log a full stack trace for this
+     * since it is, in fact, an exception termination mode for a query.
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/772">
+     *      Query timeout only checked at operator start/stop. </a>
+     */
+    protected boolean isDeadlineTerminationCause(final Throwable cause) {
+        if (InnerCause.isInnerCause(cause, QueryTimeoutException.class)) {
+            return true;
+        }
         return false;
     }
 
@@ -403,6 +442,12 @@ public class Haltable<V> implements IHaltable<V> {
             return true;
         if (InnerCause.isInnerCause(cause, BufferClosedException.class))
             return true;
+        /*
+         * Note: We can not treat this as normal termination or the query will
+         * fail to report out the openrdf QueryInterruptedException.
+         */
+//        if (InnerCause.isInnerCause(cause, QueryTimeoutException.class))
+//            return true;
 
         return false;
         
@@ -415,12 +460,17 @@ public class Haltable<V> implements IHaltable<V> {
      * an error (as opposed to something which originated as an interrupt) it is
      * logged @ ERROR.
      */
-    protected void logCause(final boolean isFirstCause, final Throwable cause) {
-        if (isFirstCause && error) {
-            log.error(this + " : isFirstCause=" + isFirstCause + " : "
-                    + cause, cause);
+    private void logCause(final boolean isFirstCause, final Throwable cause) {
+        if (isFirstCause) {
+            if (deadline) {
+                log.warn(this + " : isFirstCause=" + isFirstCause + " : "
+                        + cause, cause);
+            } else if (error) {
+                log.error(this + " : isFirstCause=" + isFirstCause + " : "
+                        + cause, cause);
+            }
         } else if (log.isEnabledFor(Level.WARN)) {
-            if (error) {
+            if (!deadline && error) {
                 log.warn(this + " : isFirstCause=" + isFirstCause + " : "
                         + cause, cause);
             } 
