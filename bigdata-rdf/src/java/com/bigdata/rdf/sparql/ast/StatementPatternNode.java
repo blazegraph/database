@@ -23,6 +23,7 @@ import com.bigdata.rdf.sparql.ast.optimizers.StaticOptimizer;
 import com.bigdata.rdf.spo.DistinctTermAdvancer;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPOAccessPath;
+import com.bigdata.rdf.store.ITripleStore;
 import com.bigdata.relation.rule.eval.ISolution;
 import com.bigdata.striterator.IKeyOrder;
 
@@ -635,7 +636,7 @@ public class StatementPatternNode extends
 	 * @see com.bigdata.rdf.sparql.ast.IReorderableNode#isReorderable()
 	 */
 	@Override
-	public boolean isReorderable() {
+	public boolean isReorderable(ITripleStore db) {
 		
 		return !isOptional();
 		
@@ -645,7 +646,7 @@ public class StatementPatternNode extends
 	 * @see com.bigdata.rdf.sparql.ast.IReorderableNode#getEstimatedCardinality()
 	 */
 	@Override
-	public long getEstimatedCardinality(StaticOptimizer opt) {
+	public long getEstimatedCardinality(StaticOptimizer opt, ITripleStore db) {
         
 		return getProperty(AST2BOpBase.Annotations.ESTIMATED_CARDINALITY, -1l);
         

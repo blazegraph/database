@@ -11,6 +11,7 @@ import com.bigdata.bop.NV;
 import com.bigdata.rdf.sparql.ast.PathNode.PathMod;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpBase;
 import com.bigdata.rdf.sparql.ast.optimizers.StaticOptimizer;
+import com.bigdata.rdf.store.ITripleStore;
 
 /**
  * A special kind of AST node that represents the SPARQL 1.1 arbitrary length
@@ -220,19 +221,20 @@ public class ArbitraryLengthPathNode
 	}
 
 //	@Override
-	public boolean isReorderable() {
+	public boolean isReorderable(ITripleStore db) {
 
-		final long estCard = getEstimatedCardinality(null);
+		final long estCard = getEstimatedCardinality(null, db);
 		
 		return estCard >= 0 && estCard < Long.MAX_VALUE;
 		
 	}
 
 //	@Override
-	public long getEstimatedCardinality(StaticOptimizer opt) {
+	public long getEstimatedCardinality(StaticOptimizer opt, ITripleStore db) {
 		
 		final JoinGroupNode group = subgroup();
-
+		
+		long zeroMatchAdjustment = 0;
 		/*
 		 * if lowerBound() is zero, and both ?s and ?o are
 		 * variables then we (notionally) match
@@ -244,10 +246,20 @@ public class ArbitraryLengthPathNode
 		 * Despite this not being implemented, the optimizer does better
 		 * knowing this correctly.
 		 */
-		if (lowerBound() == 0 && left() instanceof VarNode && right() instanceof VarNode) {
-			return Long.MAX_VALUE;	
+		if (lowerBound() == 0 ) {
+			int fixedCount = (left() instanceof VarNode ? 1 : 0) + (right() instanceof VarNode ? 1 : 0);
+			switch (fixedCount) {
+			case 0:
+				zeroMatchAdjustment = left().getValue().equals(right().getValue())?1:0;
+				break;
+			case 1:
+				zeroMatchAdjustment = 1;
+				break;
+			case 2:
+				zeroMatchAdjustment = db.getURICount() + db.getBNodeCount(); // this is too big when we are looking in a reduced dataset
+				break;
+			}
 		}
-		
 		
 		/*
 		 * Only deal with singleton paths for now.
@@ -261,8 +273,11 @@ public class ArbitraryLengthPathNode
 			final long estCard = node.getProperty(
 					AST2BOpBase.Annotations.ESTIMATED_CARDINALITY, 
 					Long.MAX_VALUE); 
+
+
+
 			
-			return estCard;
+			return estCard + zeroMatchAdjustment;
 			
 		}
 		
