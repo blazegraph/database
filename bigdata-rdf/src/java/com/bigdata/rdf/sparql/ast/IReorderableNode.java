@@ -29,6 +29,7 @@ package com.bigdata.rdf.sparql.ast;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.rdf.sparql.ast.optimizers.StaticOptimizer;
+import com.bigdata.rdf.store.ITripleStore;
 
 /**
  * Interface for things which can be re-ordered by the static join
@@ -43,7 +44,7 @@ public interface IReorderableNode extends IGroupMemberNode, IBindingProducerNode
 	 * by examining the type - individual instances of a particular type
 	 * may or may not be reorderable.
 	 */
-	boolean isReorderable();
+	boolean isReorderable(ITripleStore db);
 	
 	/**
 	 * Return the estimated cardinality - either the range count of a 
@@ -51,6 +52,6 @@ public interface IReorderableNode extends IGroupMemberNode, IBindingProducerNode
 	 * group.
 	 * @param opt This optimizer can be used to help work out the estimate
 	 */
-	long getEstimatedCardinality(StaticOptimizer opt);
+	long getEstimatedCardinality(StaticOptimizer opt, ITripleStore db);
 	
 }

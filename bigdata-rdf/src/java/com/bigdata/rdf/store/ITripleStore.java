@@ -73,7 +73,7 @@ import com.bigdata.striterator.IChunkedOrderedIterator;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-interface ITripleStore {
+public interface ITripleStore {
 
     /**
      * The #of named graphs.

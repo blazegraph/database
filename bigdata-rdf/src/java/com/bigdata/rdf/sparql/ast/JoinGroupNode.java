@@ -9,6 +9,7 @@ import com.bigdata.bop.BOp;
 import com.bigdata.bop.IVariable;
 import com.bigdata.rdf.internal.constraints.InBOp;
 import com.bigdata.rdf.sparql.ast.service.ServiceNode;
+import com.bigdata.rdf.store.ITripleStore;
 
 /**
  * An optional or non-optional collection of query nodes that run together in
@@ -348,12 +349,12 @@ public class JoinGroupNode extends GraphPatternGroup<IGroupMemberNode> {
         
     }
 
-    public List<IReorderableNode> getReorderableChildren() {
+    public List<IReorderableNode> getReorderableChildren(ITripleStore db) {
     	final List<IReorderableNode> nodes = getChildren(IReorderableNode.class);
     	final Iterator<IReorderableNode> it = nodes.iterator();
     	while (it.hasNext()) {
     		final IReorderableNode node = it.next();
-    		if (!node.isReorderable()) {
+    		if (!node.isReorderable(db)) {
     			it.remove();
     		}
     	}   	

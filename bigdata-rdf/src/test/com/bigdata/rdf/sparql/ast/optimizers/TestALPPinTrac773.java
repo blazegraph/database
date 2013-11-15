@@ -48,6 +48,9 @@ public class TestALPPinTrac773 extends AbstractOptimizerTestCase {
 
 	private class NotNestedHelper extends Helper {
 		public NotNestedHelper(HelperFlag zero_or_one_to_one_or_more, String sym) {
+			this(zero_or_one_to_one_or_more, sym, true);
+		}
+		public NotNestedHelper(HelperFlag zero_or_one_to_one_or_more, String sym, boolean switchOrdering) {
 			String pattern = "c" + sym;
 
     		given = select( varNode(z), 
@@ -63,23 +66,35 @@ public class TestALPPinTrac773 extends AbstractOptimizerTestCase {
     		// we have to evaluate this one earlier in order to get the anonymous variable numbering
     		// lined up. Really we should compare the result with expected wise to
     		// the unimportance of the name of anonymous variables.
-    		ArbitraryLengthPathNode alpp = arbitartyLengthPropertyPath(varNode(x), varNode(z), zero_or_one_to_one_or_more,
-					joinGroupNode( 
-							statementPatternNode(leftVar(), constantNode(c),  rightVar(), 3135)
-							) );
-    		expected = select( varNode(z), 
+    		ArbitraryLengthPathNode alpp1;
+    		ArbitraryLengthPathNode alpp2;
+    		if (switchOrdering) {
+    			alpp2 = alpp2(zero_or_one_to_one_or_more);
+    			alpp1 = alpp1(zero_or_one_to_one_or_more);
+    		} else {
+    			alpp1 = alpp1(zero_or_one_to_one_or_more);
+    			alpp2 = alpp2(zero_or_one_to_one_or_more);
+
+    		}
+    		
+			expected = select( varNode(z), 
     				where (
-    						arbitartyLengthPropertyPath(varNode(x), constantNode(b), zero_or_one_to_one_or_more,
-    										joinGroupNode( 
-    												statementPatternNode(leftVar(), constantNode(c),  rightVar(), 26)
-    												) ),
-    					    alpp,
+    						alpp1,
+    					    alpp2,
     			    		statementPatternNode(varNode(z), constantNode(a),  varNode(w), 2054),
     						statementPatternNode(varNode(y), constantNode(c),  varNode(x), 15431)
     				) );
     		varCount = 0;
     		
     	}
+		ArbitraryLengthPathNode alpp1(HelperFlag zero_or_one_to_one_or_more) {
+			return arbitartyLengthPropertyPath(varNode(x), constantNode(b), zero_or_one_to_one_or_more,
+							joinGroupNode( statementPatternNode(leftVar(), constantNode(c),  rightVar(), 26) ) );
+		}
+		ArbitraryLengthPathNode alpp2(HelperFlag zero_or_one_to_one_or_more) {
+			return arbitartyLengthPropertyPath(varNode(x), varNode(z), zero_or_one_to_one_or_more,
+					joinGroupNode( statementPatternNode(leftVar(), constantNode(c),  rightVar(), 3135) ) );
+		}
 	}
 	private class NestedHelper extends Helper {
 		
@@ -173,7 +188,7 @@ public class TestALPPinTrac773 extends AbstractOptimizerTestCase {
 	}
 	public void testNestedPartway() {
 
-    	new Helper(){{
+    	new NestedHelper(ZERO_OR_MORE,"*"){{
 
     		given = select( varNode(z), 
     				where (
@@ -195,26 +210,12 @@ public class TestALPPinTrac773 extends AbstractOptimizerTestCase {
     			    		statementPatternNode(varNode(z), constantNode(a),  varNode(w), 2054)
     				) );
     		
-    		varCount = 0;
-    		expected = select( varNode(z), 
-    				where (
-    						arbitartyLengthPropertyPath(varNode(x), constantNode(b), ZERO_OR_MORE,
-    										joinGroupNode( 
-    												statementPatternNode(leftVar(), constantNode(c),  rightVar(), 26)
-    												) ),
-    						statementPatternNode(varNode(y), constantNode(c),  varNode(x), 15431),
-    						arbitartyLengthPropertyPath(varNode(x), varNode(z), ZERO_OR_MORE,
-    										joinGroupNode( 
-    												statementPatternNode(leftVar(), constantNode(c),  rightVar(), 3135)
-    												) ),
-    			    		statementPatternNode(varNode(z), constantNode(a),  varNode(w), 2054)
-    				) );
     		
     	}}.test();
 	}
 	public void testNotNestedPartway() {
 
-    	new Helper(){{
+		new NotNestedHelper(ZERO_OR_MORE,"*", false){{
 
     		given = select( varNode(z), 
     				where (
@@ -233,66 +234,14 @@ public class TestALPPinTrac773 extends AbstractOptimizerTestCase {
     			    		statementPatternNode(varNode(z), constantNode(a),  varNode(w), 2054)
     				) );
     		
-    		varCount = 0;
-    		expected = select( varNode(z), 
-    				where (
-    						arbitartyLengthPropertyPath(varNode(x), constantNode(b), ZERO_OR_MORE,
-    										joinGroupNode( 
-    												statementPatternNode(leftVar(), constantNode(c),  rightVar(), 26)
-    												) ),
-    						statementPatternNode(varNode(y), constantNode(c),  varNode(x), 15431),
-    						arbitartyLengthPropertyPath(varNode(x), varNode(z), ZERO_OR_MORE,
-    										joinGroupNode( 
-    												statementPatternNode(leftVar(), constantNode(c),  rightVar(), 3135)
-    												) ),
-    			    		statementPatternNode(varNode(z), constantNode(a),  varNode(w), 2054)
-    				) );
-    		
     	}}.test();
 	}
 	public void testNestedStar() {
 
-    	new NestedHelper(ZERO_OR_MORE,"*"){{
-    		// currently not correctly optimized.
-    		// TODO: this expected result is incorrect.
-    		
-    		expected = select( varNode(z), 
-    				where (
-    						arbitartyLengthPropertyPath(varNode(x), constantNode(b), ZERO_OR_MORE,
-    										joinGroupNode( 
-    												statementPatternNode(leftVar(), constantNode(c),  rightVar(), 26)
-    												) ),
-    						statementPatternNode(varNode(y), constantNode(c),  varNode(x), 15431),
-    						arbitartyLengthPropertyPath(varNode(x), varNode(z), ZERO_OR_MORE,
-    										joinGroupNode( 
-    												statementPatternNode(leftVar(), constantNode(c),  rightVar(), 3135)
-    												) ),
-    			    		statementPatternNode(varNode(z), constantNode(a),  varNode(w), 2054)
-    				) );
-    		
-    	}}.test();
+    	new NestedHelper(ZERO_OR_MORE,"*").test();
 	}
 	public void testNotNestedStar() {
-    	new NotNestedHelper(ZERO_OR_MORE,"*"){{
-    		// currently not correctly optimized.
-    		// TODO: this expected result is incorrect.
-
-    		ArbitraryLengthPathNode alpp = arbitartyLengthPropertyPath(varNode(x), varNode(z), ZERO_OR_MORE,
-					joinGroupNode( 
-							statementPatternNode(leftVar(), constantNode(c),  rightVar(), 3135)
-							) );
-    		expected = select( varNode(z), 
-    				where (
-    						arbitartyLengthPropertyPath(varNode(x), constantNode(b), ZERO_OR_MORE,
-    										joinGroupNode( 
-    												statementPatternNode(leftVar(), constantNode(c),  rightVar(), 26)
-    												) ),
-    						statementPatternNode(varNode(y), constantNode(c),  varNode(x), 15431),
-    			    		statementPatternNode(varNode(z), constantNode(a),  varNode(w), 2054),
-    			    		alpp
-    				) );
-    		
-    	}}.test();
+    	new NotNestedHelper(ZERO_OR_MORE,"*").test();
 	}
 	public void testNestedPlus() {
 
@@ -304,47 +253,10 @@ public class TestALPPinTrac773 extends AbstractOptimizerTestCase {
 	}
 	public void testNestedQuestionMark() {
 
-    	new NestedHelper(ZERO_OR_ONE,"?"){{
-    		// currently not correctly optimized.
-    		// TODO: this expected result is incorrect.
-    		
-    		expected = select( varNode(z), 
-    				where (
-    						arbitartyLengthPropertyPath(varNode(x), constantNode(b), ZERO_OR_ONE,
-    										joinGroupNode( 
-    												statementPatternNode(leftVar(), constantNode(c),  rightVar(), 26)
-    												) ),
-    						statementPatternNode(varNode(y), constantNode(c),  varNode(x), 15431),
-    						arbitartyLengthPropertyPath(varNode(x), varNode(z), ZERO_OR_ONE,
-    										joinGroupNode( 
-    												statementPatternNode(leftVar(), constantNode(c),  rightVar(), 3135)
-    												) ),
-    			    		statementPatternNode(varNode(z), constantNode(a),  varNode(w), 2054)
-    				) );
-    		
-    	}}.test();
+    	new NestedHelper(ZERO_OR_ONE,"?").test();
 	}
 	public void testNotNestedQuestionMark() {
 
-    	new NotNestedHelper(ZERO_OR_ONE,"?"){{
-    		// currently not correctly optimized.
-    		// TODO: this expected result is incorrect.
-
-    		ArbitraryLengthPathNode alpp = arbitartyLengthPropertyPath(varNode(x), varNode(z), ZERO_OR_ONE,
-					joinGroupNode( 
-							statementPatternNode(leftVar(), constantNode(c),  rightVar(), 3135)
-							) );
-    		expected = select( varNode(z), 
-    				where (
-    						arbitartyLengthPropertyPath(varNode(x), constantNode(b), ZERO_OR_ONE,
-    										joinGroupNode( 
-    												statementPatternNode(leftVar(), constantNode(c),  rightVar(), 26)
-    												) ),
-    						statementPatternNode(varNode(y), constantNode(c),  varNode(x), 15431),
-    			    		statementPatternNode(varNode(z), constantNode(a),  varNode(w), 2054),
-    			    		alpp
-    				) );
-    		
-    	}}.test();
+    	new NotNestedHelper(ZERO_OR_ONE,"?").test();
 	}
 }

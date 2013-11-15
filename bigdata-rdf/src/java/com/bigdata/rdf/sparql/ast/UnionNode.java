@@ -6,6 +6,7 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.rdf.sparql.ast.optimizers.StaticOptimizer;
+import com.bigdata.rdf.store.ITripleStore;
 
 /**
  * A special kind of group {@link IGroupNode} that represents the sparql union
@@ -92,22 +93,22 @@ public class UnionNode extends GraphPatternGroup<JoinGroupNode>  implements IReo
     
 
 	@Override
- 	public long getEstimatedCardinality(StaticOptimizer optimizer) {
+ 	public long getEstimatedCardinality(StaticOptimizer optimizer, ITripleStore db) {
  		long cardinality = 0;
  		for (JoinGroupNode child : this) {
- 			StaticOptimizer opt = new StaticOptimizer(optimizer, child.getReorderableChildren());
+ 			StaticOptimizer opt = new StaticOptimizer(optimizer, child.getReorderableChildren(db));
  			cardinality += opt.getCardinality();
  		}
  		return cardinality;
  	}
 
 	@Override
-	public boolean isReorderable() {
+	public boolean isReorderable(ITripleStore db) {
 		for (JoinGroupNode child : this) {
 			for (IGroupMemberNode grandchild : child) {
 				if (! (grandchild instanceof IReorderableNode))
 					return false;
-				if (! ((IReorderableNode)grandchild).isReorderable())
+				if (! ((IReorderableNode)grandchild).isReorderable(db))
 					return false;
 			}
 		}

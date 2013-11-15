@@ -39,6 +39,7 @@ import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IVariable;
 import com.bigdata.rdf.sparql.ast.eval.IEvaluationContext;
 import com.bigdata.rdf.sparql.ast.ssets.ISolutionSetManager;
+import com.bigdata.rdf.store.ITripleStore;
 
 /**
  * Base class for static analysis.
@@ -470,6 +471,10 @@ public class StaticAnalysisBase {
 
         return set;
 
+    }
+    
+    public ITripleStore getDB() {
+    	return evaluationContext.getAbstractTripleStore();
     }
 
 }
