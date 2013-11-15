@@ -46,6 +46,7 @@ import org.apache.log4j.Logger;
 
 import cern.colt.Arrays;
 
+import com.bigdata.bop.engine.QueryTimeoutException;
 import com.bigdata.rdf.store.BigdataSolutionResolverator;
 import com.bigdata.rdf.store.BigdataStatementIteratorImpl;
 import com.bigdata.relation.rule.IQueryOptions;
@@ -1462,10 +1463,32 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
 
                 } catch (ExecutionException e) {
 
-					if (InnerCause.isInnerCause(e,
-							ClosedByInterruptException.class)||
-						InnerCause.isInnerCause(e,
-									InterruptedException.class)) {
+                    if(InnerCause.isInnerCause(e,
+                                    QueryTimeoutException.class)) {
+
+                        /**
+                         * Closed by query deadline expiration.
+                         * 
+                         * @see <a
+                         *      href="https://sourceforge.net/apps/trac/bigdata/ticket/772">
+                         *      Query timeout only checked at operator
+                         *      start/stop. </a>
+                         */
+                        if (log.isInfoEnabled())
+                            log.info(e.getMessage());
+
+                        // itr will not deliver any more elements.
+                        _close();
+                        
+                        // need to rethrow to convert to openrdf query interrupted exception.
+                        throw new RuntimeException(e);
+                        
+                    }
+
+                    if (InnerCause.isInnerCause(e,
+                            ClosedByInterruptException.class)||
+                        InnerCause.isInnerCause(e,
+                                    InterruptedException.class)) {
 
 						/*
 						 * Note: ClosedByInterruptException indicates that the

@@ -45,7 +45,7 @@ public class TestAll extends TestCase {
     /**
      * @param arg0
      */
-    public TestAll(String arg0) {
+    public TestAll(final String arg0) {
      
         super(arg0);
         
@@ -95,7 +95,10 @@ public class TestAll extends TestCase {
         
         // test suite for the RunState class.
         suite.addTestSuite(TestRunState.class);
-        
+
+        // test suite for query deadline ordering semantics.
+        suite.addTestSuite(TestQueryDeadlineOrder.class);
+
         // test suite for query evaluation (basic JOINs).
         suite.addTestSuite(TestQueryEngine.class);
 
@@ -117,7 +120,7 @@ public class TestAll extends TestCase {
         suite.addTestSuite(TestQueryEngine_DistinctOp.class);
 
         // stress test for GROUP_BY.
-    	suite.addTestSuite(TestQueryEngine_GroupByOp.class);
+        suite.addTestSuite(TestQueryEngine_GroupByOp.class);
 
         return suite;
         
