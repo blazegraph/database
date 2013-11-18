@@ -452,6 +452,11 @@ public class HALogNexus implements IHALogWriter {
             is.readFully(b0);
             is.readFully(b1);
 
+        } catch(IOException ex) {
+
+            // Wrap exception with the file name.
+            throw new IOException(ex.getMessage() + ", file=" + file, ex);
+            
         } finally {
 
             is.close();
