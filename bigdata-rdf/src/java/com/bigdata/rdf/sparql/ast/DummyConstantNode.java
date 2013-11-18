@@ -45,7 +45,7 @@ public class DummyConstantNode extends ConstantNode {
 	}
 	
     /**
-     * Required deep copy constructor.
+     * Constructor required for {@link com.bigdata.bop.BOpUtility#deepCopy(FilterNode)}.
      */
     public DummyConstantNode(DummyConstantNode op) {
         super(op);

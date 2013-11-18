@@ -63,7 +63,7 @@ public class IsBoundBOp extends XSDBooleanIVValueExpression {
     }
 
     /**
-     * Required deep copy constructor.
+     * Constructor required for {@link com.bigdata.bop.BOpUtility#deepCopy(FilterNode)}.
      */
     public IsBoundBOp(final IsBoundBOp op) {
         super(op);

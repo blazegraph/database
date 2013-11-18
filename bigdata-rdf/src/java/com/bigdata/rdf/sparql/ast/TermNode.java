@@ -25,7 +25,7 @@ public abstract class TermNode extends ValueExpressionNode {
 	private static final long serialVersionUID = 2050144811725774174L;
 
     /**
-     * Required deep copy constructor.
+     * Constructor required for {@link com.bigdata.bop.BOpUtility#deepCopy(FilterNode)}.
      */
     public TermNode(TermNode op) {
         super(op);

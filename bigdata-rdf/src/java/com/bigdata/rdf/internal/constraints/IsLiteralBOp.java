@@ -62,7 +62,7 @@ public class IsLiteralBOp extends XSDBooleanIVValueExpression {
     }
 
     /**
-     * Required deep copy constructor.
+     * Constructor required for {@link com.bigdata.bop.BOpUtility#deepCopy(FilterNode)}.
      */
     public IsLiteralBOp(final IsLiteralBOp op) {
         super(op);

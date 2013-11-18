@@ -94,7 +94,7 @@ public class MemoryGroupByOp extends GroupByOp {
     }
     
     /**
-     * Required deep copy constructor.
+     * Constructor required for {@link com.bigdata.bop.BOpUtility#deepCopy(FilterNode)}.
      */
     public MemoryGroupByOp(final MemoryGroupByOp op) {
         super(op);

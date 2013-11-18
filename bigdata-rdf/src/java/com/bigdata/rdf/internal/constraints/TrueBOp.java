@@ -57,7 +57,7 @@ public class TrueBOp extends XSDBooleanIVValueExpression {
     }
 
     /**
-     * Required deep copy constructor.
+     * Constructor required for {@link com.bigdata.bop.BOpUtility#deepCopy(FilterNode)}.
      */
     public TrueBOp(final TrueBOp op) {
         super(op);

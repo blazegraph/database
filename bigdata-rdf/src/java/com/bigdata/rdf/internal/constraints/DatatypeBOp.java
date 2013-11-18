@@ -76,7 +76,7 @@ public class DatatypeBOp extends IVValueExpression<IV>
     }
 
     /**
-     * Required deep copy constructor.
+     * Constructor required for {@link com.bigdata.bop.BOpUtility#deepCopy(FilterNode)}.
      */
     public DatatypeBOp(final DatatypeBOp op) {
         super(op);

@@ -213,7 +213,7 @@ public class TestSPORelation extends AbstractTripleStoreTestCase {
         }
 
         /**
-         * Required deep copy constructor.
+         * Constructor required for {@link com.bigdata.bop.BOpUtility#deepCopy(FilterNode)}.
          */
         public P(final P op) {
             super(op);

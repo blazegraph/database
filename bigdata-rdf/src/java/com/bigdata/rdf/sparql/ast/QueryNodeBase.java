@@ -27,7 +27,7 @@ public abstract class QueryNodeBase extends ASTBase implements
     }
 
     /**
-     * Required deep copy constructor.
+     * Constructor required for {@link com.bigdata.bop.BOpUtility#deepCopy(FilterNode)}.
      */
     public QueryNodeBase(final QueryNodeBase op) {
 

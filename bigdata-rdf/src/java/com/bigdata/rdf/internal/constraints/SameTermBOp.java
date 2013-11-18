@@ -106,7 +106,7 @@ public class SameTermBOp extends XSDBooleanIVValueExpression
     }
 
     /**
-     * Required deep copy constructor.
+     * Constructor required for {@link com.bigdata.bop.BOpUtility#deepCopy(FilterNode)}.
      */
     public SameTermBOp(final SameTermBOp op) {
         super(op);

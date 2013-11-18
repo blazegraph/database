@@ -104,7 +104,7 @@ public class DigestBOp extends IVValueExpression<IV> implements INeedsMaterializ
     }
 
     /**
-     * Required deep copy constructor.
+     * Constructor required for {@link com.bigdata.bop.BOpUtility#deepCopy(FilterNode)}.
      *
      * @param op
      */

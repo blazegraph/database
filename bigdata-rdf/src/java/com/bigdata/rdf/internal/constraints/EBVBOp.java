@@ -72,7 +72,7 @@ public class EBVBOp extends XSDBooleanIVValueExpression
     }
 
     /**
-     * Required deep copy constructor.
+     * Constructor required for {@link com.bigdata.bop.BOpUtility#deepCopy(FilterNode)}.
      */
     public EBVBOp(final EBVBOp op) {
         super(op);

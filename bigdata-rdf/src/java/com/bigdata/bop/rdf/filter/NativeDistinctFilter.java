@@ -126,7 +126,7 @@ public class NativeDistinctFilter extends BOpFilterBase {
     }
     
     /**
-     * Required deep copy constructor.
+     * Constructor required for {@link com.bigdata.bop.BOpUtility#deepCopy(FilterNode)}.
      */
     public NativeDistinctFilter(final NativeDistinctFilter op) {
         super(op);

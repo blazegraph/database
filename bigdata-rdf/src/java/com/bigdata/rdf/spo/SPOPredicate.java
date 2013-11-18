@@ -77,7 +77,7 @@ public class SPOPredicate extends Predicate<ISPO> {
     }
 
     /**
-     * Required deep copy constructor.
+     * Constructor required for {@link com.bigdata.bop.BOpUtility#deepCopy(FilterNode)}.
      */
     public SPOPredicate(final SPOPredicate op) {
         super(op);

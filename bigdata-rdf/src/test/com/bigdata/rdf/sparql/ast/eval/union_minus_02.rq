@@ -1,0 +1,10 @@
+PREFIX :       <http://example/>
+
+SELECT  ?s
+WHERE {
+   { 
+     BIND ( :bob as ?s )
+   } UNION {
+   }
+   FILTER (!BOUND(?s) || ?s != :bob)
+}

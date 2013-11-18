@@ -141,7 +141,7 @@ public class RegexBOp extends XSDBooleanIVValueExpression
     }
 
     /**
-     * Required deep copy constructor.
+     * Constructor required for {@link com.bigdata.bop.BOpUtility#deepCopy(FilterNode)}.
      */
     public RegexBOp(final RegexBOp op) {
         super(op);

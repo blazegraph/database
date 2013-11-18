@@ -88,7 +88,7 @@ public class SPARQLConstraint<X extends XSDBooleanIV> extends
     }
 
     /**
-     * Required deep copy constructor.
+     * Constructor required for {@link com.bigdata.bop.BOpUtility#deepCopy(FilterNode)}.
      */
     public SPARQLConstraint(final SPARQLConstraint op) {
         super(op);

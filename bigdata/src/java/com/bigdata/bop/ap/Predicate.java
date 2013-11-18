@@ -79,7 +79,7 @@ public class Predicate<E> extends AbstractAccessPathOp<E> implements
     }
 
     /**
-     * Required deep copy constructor.
+     * Constructor required for {@link com.bigdata.bop.BOpUtility#deepCopy(FilterNode)}.
      */
     public Predicate(final Predicate<E> op) {
         super(op);

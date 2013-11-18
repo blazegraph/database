@@ -70,7 +70,7 @@ public class LangBOp extends IVValueExpression<IV>
     }
 
     /**
-     * Required deep copy constructor.
+     * Constructor required for {@link com.bigdata.bop.BOpUtility#deepCopy(FilterNode)}.
      */
     public LangBOp(final LangBOp op) {
         super(op);

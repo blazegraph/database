@@ -75,7 +75,7 @@ public class IfBOp extends IVValueExpression<IV> implements IPassesMaterializati
     }
 
     /**
-     * Required deep copy constructor.
+     * Constructor required for {@link com.bigdata.bop.BOpUtility#deepCopy(FilterNode)}.
      */
     public IfBOp(final IfBOp op) {
         super(op);

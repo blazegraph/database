@@ -63,7 +63,7 @@ public class IsBNodeBOp extends XSDBooleanIVValueExpression {
     }
 
     /**
-     * Required deep copy constructor.
+     * Constructor required for {@link com.bigdata.bop.BOpUtility#deepCopy(FilterNode)}.
      */
     public IsBNodeBOp(final IsBNodeBOp op) {
         super(op);

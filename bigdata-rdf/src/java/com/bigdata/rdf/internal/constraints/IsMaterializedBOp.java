@@ -94,7 +94,7 @@ public class IsMaterializedBOp extends XSDBooleanIVValueExpression {
     }
 
     /**
-     * Required deep copy constructor.
+     * Constructor required for {@link com.bigdata.bop.BOpUtility#deepCopy(FilterNode)}.
      */
     public IsMaterializedBOp(final IsMaterializedBOp op) {
         super(op);

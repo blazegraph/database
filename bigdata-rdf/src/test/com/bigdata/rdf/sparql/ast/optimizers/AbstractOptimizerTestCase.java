@@ -23,27 +23,35 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.rdf.sparql.ast.optimizers;
 
+import java.util.HashMap;
+import java.util.Map;
+
 import org.openrdf.model.impl.URIImpl;
 import org.openrdf.query.algebra.StatementPattern.Scope;
 
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.ModifiableBOpBase;
-import com.bigdata.bop.NV;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.constraints.IsBoundBOp;
 import com.bigdata.rdf.sparql.ast.ASTBase;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.AbstractASTEvaluationTestCase;
 import com.bigdata.rdf.sparql.ast.ArbitraryLengthPathNode;
 import com.bigdata.rdf.sparql.ast.AssignmentNode;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
+import com.bigdata.rdf.sparql.ast.FilterNode;
+import com.bigdata.rdf.sparql.ast.FunctionNode;
+import com.bigdata.rdf.sparql.ast.FunctionRegistry;
 import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
 import com.bigdata.rdf.sparql.ast.GroupMemberNodeBase;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.IQueryNode;
+import com.bigdata.rdf.sparql.ast.IValueExpressionNode;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueryInclude;
 import com.bigdata.rdf.sparql.ast.NamedSubqueryRoot;
 import com.bigdata.rdf.sparql.ast.PathNode;
+import com.bigdata.rdf.sparql.ast.ValueExpressionNode;
 import com.bigdata.rdf.sparql.ast.PathNode.*;
 import com.bigdata.rdf.sparql.ast.ProjectionNode;
 import com.bigdata.rdf.sparql.ast.PropertyPathNode;
@@ -62,7 +70,8 @@ public abstract class AbstractOptimizerTestCase extends AbstractASTEvaluationTes
 	public interface Annotations extends
 			com.bigdata.rdf.sparql.ast.GraphPatternGroup.Annotations,
 			com.bigdata.rdf.sparql.ast.ArbitraryLengthPathNode.Annotations,
-			com.bigdata.rdf.sparql.ast.eval.AST2BOpBase.Annotations {
+			com.bigdata.rdf.sparql.ast.eval.AST2BOpBase.Annotations
+			{
 	}
 
 	enum HelperFlag {
@@ -362,6 +371,7 @@ public abstract class AbstractOptimizerTestCase extends AbstractASTEvaluationTes
 			return rslt;
 		}
 
+
 		protected JoinGroupNode joinGroupNode(TermNode context,Object... statements) {
 			JoinGroupNode rslt = joinGroupNode(statements);
 			rslt.setContext(context);
@@ -395,6 +405,26 @@ public abstract class AbstractOptimizerTestCase extends AbstractASTEvaluationTes
 					new IBindingSet[] {});
 
 			assertSameAST(expected, actual);
+		}
+
+		protected FunctionNode bound(VarNode varNode) {
+            FunctionNode rslt = new FunctionNode(FunctionRegistry.BOUND,
+            		null,
+                    new ValueExpressionNode[] {
+                     varNode
+                    } );
+			rslt.setValueExpression(new IsBoundBOp(varNode.getValueExpression()));
+			return rslt;
+		}
+		protected FunctionNode knownUnbound(VarNode varNode) {
+            final VarNode vv = varNode("-unbound-var-"+varNode.getValueExpression().getName()+"-0");
+			FunctionNode rslt = new FunctionNode(FunctionRegistry.BOUND, null, vv);
+			rslt.setValueExpression(new IsBoundBOp(vv.getValueExpression()));
+			return rslt;
+		}
+
+		protected FilterNode filter(IValueExpressionNode f) {
+			return new FilterNode(f);
 		}
 	}
 

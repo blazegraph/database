@@ -48,7 +48,7 @@ public class DatasetNode extends QueryNodeBase {
     }
 	
     /**
-     * Required deep copy constructor.
+     * Constructor required for {@link com.bigdata.bop.BOpUtility#deepCopy(FilterNode)}.
      */
     public DatasetNode(final DatasetNode op) {
 

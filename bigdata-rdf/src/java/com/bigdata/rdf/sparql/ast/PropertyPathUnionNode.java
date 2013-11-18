@@ -16,7 +16,7 @@ public class PropertyPathUnionNode extends UnionNode {
     private static final long serialVersionUID = 1L;
 
     /**
-     * Required deep copy constructor.
+     * Constructor required for {@link com.bigdata.bop.BOpUtility#deepCopy(FilterNode)}.
      */
     public PropertyPathUnionNode(PropertyPathUnionNode op) {
 

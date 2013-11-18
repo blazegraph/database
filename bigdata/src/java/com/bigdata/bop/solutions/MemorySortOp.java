@@ -74,7 +74,7 @@ public class MemorySortOp extends SortOp {
     private static final long serialVersionUID = 1L;
 
     /**
-     * Required deep copy constructor.
+     * Constructor required for {@link com.bigdata.bop.BOpUtility#deepCopy(FilterNode)}.
      */
     public MemorySortOp(final MemorySortOp op) {
         super(op);

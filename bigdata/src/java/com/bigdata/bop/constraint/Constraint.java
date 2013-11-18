@@ -77,7 +77,7 @@ public class Constraint<X> extends BOpBase implements
     }
 
     /**
-     * Required deep copy constructor.
+     * Constructor required for {@link com.bigdata.bop.BOpUtility#deepCopy(FilterNode)}.
      */
     public Constraint(final Constraint<X> op) {
         super(op);

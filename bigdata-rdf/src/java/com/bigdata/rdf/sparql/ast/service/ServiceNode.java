@@ -121,7 +121,7 @@ public class ServiceNode extends GroupMemberNodeBase<IGroupMemberNode>
     }
 
     /**
-     * Required deep copy constructor.
+     * Constructor required for {@link com.bigdata.bop.BOpUtility#deepCopy(FilterNode)}.
      */
     public ServiceNode(final ServiceNode op) {
 
