@@ -72,7 +72,7 @@ public class HTreeDistinctBindingSetsOp extends PipelineOp {
 	}
 
     /**
-     * Required deep copy constructor.
+     * Constructor required for {@link com.bigdata.bop.BOpUtility#deepCopy(FilterNode)}.
      */
     public HTreeDistinctBindingSetsOp(final HTreeDistinctBindingSetsOp op) {
         super(op);

@@ -83,7 +83,7 @@ final public class Constant<E> extends ImmutableBOp implements IConstant<E> {
 //    }
 
     /**
-     * Required deep copy constructor.
+     * Constructor required for {@link com.bigdata.bop.BOpUtility#deepCopy(FilterNode)}.
      * 
      * @param op
      */

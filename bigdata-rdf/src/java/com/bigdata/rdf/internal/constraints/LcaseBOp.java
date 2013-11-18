@@ -75,7 +75,7 @@ public class LcaseBOp extends IVValueExpression<IV> implements INeedsMaterializa
     }
 
     /**
-     * Required deep copy constructor.
+     * Constructor required for {@link com.bigdata.bop.BOpUtility#deepCopy(FilterNode)}.
      * 
      * @param op
      */

@@ -53,7 +53,7 @@ public class RejectAnythingSameAsItself extends BOpBase
     }
 
     /**
-     * Required deep copy constructor.
+     * Constructor required for {@link com.bigdata.bop.BOpUtility#deepCopy(FilterNode)}.
      */
     public RejectAnythingSameAsItself(final RejectAnythingSameAsItself op) {
         super(op);

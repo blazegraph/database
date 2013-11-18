@@ -81,7 +81,7 @@ public abstract class XSDBooleanIVValueExpression extends
     }
 
     /**
-     * Required deep copy constructor.
+     * Constructor required for {@link com.bigdata.bop.BOpUtility#deepCopy(FilterNode)}.
      */
     public XSDBooleanIVValueExpression(final XSDBooleanIVValueExpression op) {
         

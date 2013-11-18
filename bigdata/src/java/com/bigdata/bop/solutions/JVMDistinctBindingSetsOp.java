@@ -74,7 +74,7 @@ public class JVMDistinctBindingSetsOp extends PipelineOp {
     }
 
     /**
-     * Required deep copy constructor.
+     * Constructor required for {@link com.bigdata.bop.BOpUtility#deepCopy(FilterNode)}.
      */
     public JVMDistinctBindingSetsOp(final JVMDistinctBindingSetsOp op) {
         super(op);

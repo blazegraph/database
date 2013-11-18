@@ -79,7 +79,7 @@ public class XsdStrBOp extends IVValueExpression<IV>
     }
 
     /**
-     * Required deep copy constructor.
+     * Constructor required for {@link com.bigdata.bop.BOpUtility#deepCopy(FilterNode)}.
      */
     public XsdStrBOp(final XsdStrBOp op) {
         super(op);

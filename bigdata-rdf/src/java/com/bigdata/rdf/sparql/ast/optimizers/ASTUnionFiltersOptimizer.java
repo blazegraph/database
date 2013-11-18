@@ -31,6 +31,7 @@ import java.util.Collection;
 import java.util.LinkedList;
 
 import com.bigdata.bop.BOp;
+import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.rdf.sparql.ast.FilterNode;
 import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
@@ -166,7 +167,7 @@ public class ASTUnionFiltersOptimizer implements IASTOptimizer {
             		
             		for (FilterNode filter : filters) {
             			
-                		child.addChild(new FilterNode(filter));
+                		child.addChild(BOpUtility.deepCopy(filter));
                 		
             		}
             		

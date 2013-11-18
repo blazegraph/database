@@ -66,7 +66,7 @@ public class SparqlTypeErrorBOp extends XSDBooleanIVValueExpression {
     }
 
     /**
-     * Required deep copy constructor.
+     * Constructor required for {@link com.bigdata.bop.BOpUtility#deepCopy(FilterNode)}.
      */
     public SparqlTypeErrorBOp(final SparqlTypeErrorBOp op) {
         super(op);

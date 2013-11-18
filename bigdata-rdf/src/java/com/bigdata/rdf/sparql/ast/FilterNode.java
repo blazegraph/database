@@ -20,7 +20,7 @@ public class FilterNode extends GroupMemberValueExpressionNodeBase implements
     private static final long serialVersionUID = 1L;
 
     /**
-     * Required deep copy constructor.
+     * Constructor required for {@link com.bigdata.bop.BOpUtility#deepCopy(FilterNode)}.
      */
     public FilterNode(final FilterNode op) {
 

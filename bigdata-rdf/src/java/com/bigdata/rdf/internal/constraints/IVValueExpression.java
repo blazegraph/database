@@ -171,7 +171,7 @@ public abstract class IVValueExpression<T extends IV> extends BOpBase
     }
 
     /**
-     * Required deep copy constructor.
+     * Constructor required for {@link com.bigdata.bop.BOpUtility#deepCopy(FilterNode)}.
      */
     public IVValueExpression(final IVValueExpression<T> op) {
         super(op);

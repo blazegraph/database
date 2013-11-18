@@ -16,7 +16,7 @@ public class Bind<E> extends ImmutableBOp implements IValueExpression<E>, IBind<
 	private static final long serialVersionUID = 1L;
 
 	/**
-	 * Required deep copy constructor.
+	 * Constructor required for {@link com.bigdata.bop.BOpUtility#deepCopy(FilterNode)}.
 	 */
 	public Bind(Bind<E> op) {
 		super(op);

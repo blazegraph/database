@@ -56,7 +56,7 @@ abstract public class SubqueryFunctionNodeBase extends FunctionNode implements
     }
 
     /**
-     * Required deep copy constructor.
+     * Constructor required for {@link com.bigdata.bop.BOpUtility#deepCopy(FilterNode)}.
      */
     public SubqueryFunctionNodeBase(final SubqueryFunctionNodeBase op) {
         super(op);

@@ -55,7 +55,7 @@ public class OldBackupPathNode extends ASTBase {
 	private static final long serialVersionUID = -4396141823074067307L;
 
 	/**
-     * Required deep copy constructor.
+     * Constructor required for {@link com.bigdata.bop.BOpUtility#deepCopy(FilterNode)}.
      */
     public OldBackupPathNode(OldBackupPathNode op) {
         super(op);
@@ -84,7 +84,7 @@ public class OldBackupPathNode extends ASTBase {
 		private static final long serialVersionUID = 1L;
 		
 		/**
-	     * Required deep copy constructor.
+	     * Constructor required for {@link com.bigdata.bop.BOpUtility#deepCopy(FilterNode)}.
 	     */
 	    public Path(OldBackupPathNode op) {
 	        super(op);
@@ -115,7 +115,7 @@ public class OldBackupPathNode extends ASTBase {
 		private static final long serialVersionUID = 1L;
 
 		/**
-	     * Required deep copy constructor.
+	     * Constructor required for {@link com.bigdata.bop.BOpUtility#deepCopy(FilterNode)}.
 	     */
 	    public PathAlternative(OldBackupPathNode op) {
 	        super(op);
@@ -145,7 +145,7 @@ public class OldBackupPathNode extends ASTBase {
 		private static final long serialVersionUID = 1L;
 
 		/**
-	     * Required deep copy constructor.
+	     * Constructor required for {@link com.bigdata.bop.BOpUtility#deepCopy(FilterNode)}.
 	     */
 	    public PathSequence(OldBackupPathNode op) {
 	        super(op);
@@ -181,7 +181,7 @@ public class OldBackupPathNode extends ASTBase {
 	    }
 
 		/**
-	     * Required deep copy constructor.
+	     * Constructor required for {@link com.bigdata.bop.BOpUtility#deepCopy(FilterNode)}.
 	     */
 	    public PathEltOrInverse(OldBackupPathNode op) {
 	        super(op);
@@ -226,7 +226,7 @@ public class OldBackupPathNode extends ASTBase {
 	    }
 	    
 		/**
-	     * Required deep copy constructor.
+	     * Constructor required for {@link com.bigdata.bop.BOpUtility#deepCopy(FilterNode)}.
 	     */
 	    public PathElt(OldBackupPathNode op) {
 	        super(op);
@@ -265,7 +265,7 @@ public class OldBackupPathNode extends ASTBase {
 		private static final long serialVersionUID = 1L;
 
 		/**
-	     * Required deep copy constructor.
+	     * Constructor required for {@link com.bigdata.bop.BOpUtility#deepCopy(FilterNode)}.
 	     */
 	    public PathPrimary(OldBackupPathNode op) {
 	        super(op);
@@ -323,7 +323,7 @@ public class OldBackupPathNode extends ASTBase {
 		private static final long serialVersionUID = 1L;
 
 		/**
-	     * Required deep copy constructor.
+	     * Constructor required for {@link com.bigdata.bop.BOpUtility#deepCopy(FilterNode)}.
 	     */
 	    public PathNegatedPropertySet(OldBackupPathNode op) {
 	        super(op);
@@ -356,7 +356,7 @@ public class OldBackupPathNode extends ASTBase {
 	    }
 
 		/**
-	     * Required deep copy constructor.
+	     * Constructor required for {@link com.bigdata.bop.BOpUtility#deepCopy(FilterNode)}.
 	     */
 	    public PathOneInPropertySet(OldBackupPathNode op) {
 	        super(op);

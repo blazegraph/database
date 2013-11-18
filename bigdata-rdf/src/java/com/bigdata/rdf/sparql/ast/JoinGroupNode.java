@@ -34,7 +34,7 @@ public class JoinGroupNode extends GraphPatternGroup<IGroupMemberNode> {
     }
     
     /**
-     * Required deep copy constructor.
+     * Constructor required for {@link com.bigdata.bop.BOpUtility#deepCopy(FilterNode)}.
      */
     public JoinGroupNode(final JoinGroupNode op) {
 

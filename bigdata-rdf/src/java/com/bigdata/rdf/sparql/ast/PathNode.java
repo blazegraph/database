@@ -64,7 +64,7 @@ public class PathNode extends ASTBase {
 	private static final long serialVersionUID = -4396141823074067307L;
 
 	/**
-     * Required deep copy constructor.
+     * Constructor required for {@link com.bigdata.bop.BOpUtility#deepCopy(FilterNode)}.
      */
     public PathNode(PathNode op) {
         super(op);
@@ -99,7 +99,7 @@ public class PathNode extends ASTBase {
 		private static final long serialVersionUID = 1L;
 
 		/**
-	     * Required deep copy constructor.
+	     * Constructor required for {@link com.bigdata.bop.BOpUtility#deepCopy(FilterNode)}.
 	     */
 	    public PathAlternative(PathAlternative op) {
 	        super(op);
@@ -132,7 +132,7 @@ public class PathNode extends ASTBase {
 		private static final long serialVersionUID = 1L;
 
 		/**
-	     * Required deep copy constructor.
+	     * Constructor required for {@link com.bigdata.bop.BOpUtility#deepCopy(FilterNode)}.
 	     */
 	    public PathSequence(PathSequence op) {
 	        super(op);
@@ -179,7 +179,7 @@ public class PathNode extends ASTBase {
 	    }
 	    
 		/**
-	     * Required deep copy constructor.
+	     * Constructor required for {@link com.bigdata.bop.BOpUtility#deepCopy(FilterNode)}.
 	     */
 	    public PathElt(PathElt op) {
 	        super(op);
@@ -296,7 +296,7 @@ public class PathNode extends ASTBase {
 		private static final long serialVersionUID = 1L;
 
 		/**
-	     * Required deep copy constructor.
+	     * Constructor required for {@link com.bigdata.bop.BOpUtility#deepCopy(FilterNode)}.
 	     */
 	    public PathNegatedPropertySet(PathNegatedPropertySet op) {
 	        super(op);
@@ -329,7 +329,7 @@ public class PathNode extends ASTBase {
 	    }
 
 		/**
-	     * Required deep copy constructor.
+	     * Constructor required for {@link com.bigdata.bop.BOpUtility#deepCopy(FilterNode)}.
 	     */
 	    public PathOneInPropertySet(PathOneInPropertySet op) {
 	        super(op);

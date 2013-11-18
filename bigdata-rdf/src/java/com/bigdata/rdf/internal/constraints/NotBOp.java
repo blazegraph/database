@@ -69,7 +69,7 @@ public class NotBOp extends XSDBooleanIVValueExpression {
     }
 
     /**
-     * Required deep copy constructor.
+     * Constructor required for {@link com.bigdata.bop.BOpUtility#deepCopy(FilterNode)}.
      */
     public NotBOp(final NotBOp op) {
         super(op);

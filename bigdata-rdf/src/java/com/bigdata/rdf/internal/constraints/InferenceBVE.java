@@ -35,7 +35,7 @@ public class InferenceBVE extends BOpBase implements BooleanValueExpression {
     }
 
     /**
-     * Required deep copy constructor.
+     * Constructor required for {@link com.bigdata.bop.BOpUtility#deepCopy(FilterNode)}.
      */
     public InferenceBVE(final InferenceBVE op) {
         super(op);

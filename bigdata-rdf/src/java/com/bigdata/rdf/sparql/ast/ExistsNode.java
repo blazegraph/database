@@ -59,7 +59,7 @@ public class ExistsNode extends SubqueryFunctionNodeBase {
     }
 
     /**
-     * Required deep copy constructor.
+     * Constructor required for {@link com.bigdata.bop.BOpUtility#deepCopy(FilterNode)}.
      */
     public ExistsNode(ExistsNode op) {
         super(op);

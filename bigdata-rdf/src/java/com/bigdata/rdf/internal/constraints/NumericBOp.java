@@ -100,7 +100,7 @@ public class NumericBOp extends IVValueExpression<IV>  {
     }
 
     /**
-     * Required deep copy constructor.
+     * Constructor required for {@link com.bigdata.bop.BOpUtility#deepCopy(FilterNode)}.
      *
      * @param op
      */

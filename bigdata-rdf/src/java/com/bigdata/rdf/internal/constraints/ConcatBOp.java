@@ -56,7 +56,7 @@ public class ConcatBOp extends IVValueExpression<IV> implements INeedsMaterializ
     }
 
     /**
-     * Required deep copy constructor.
+     * Constructor required for {@link com.bigdata.bop.BOpUtility#deepCopy(FilterNode)}.
      */
     public ConcatBOp(final ConcatBOp op) {
         super(op);

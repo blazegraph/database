@@ -69,7 +69,7 @@ public class ArbitraryLengthPathNode
     }
 	
     /**
-     * Required deep copy constructor.
+     * Constructor required for {@link com.bigdata.bop.BOpUtility#deepCopy(FilterNode)}.
      */
     public ArbitraryLengthPathNode(ArbitraryLengthPathNode op) {
 

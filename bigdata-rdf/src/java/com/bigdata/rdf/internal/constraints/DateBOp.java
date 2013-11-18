@@ -111,7 +111,7 @@ public class DateBOp extends IVValueExpression<IV> implements INeedsMaterializat
     }
 
     /**
-     * Required deep copy constructor.
+     * Constructor required for {@link com.bigdata.bop.BOpUtility#deepCopy(FilterNode)}.
      *
      * @param op
      */

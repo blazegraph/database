@@ -34,7 +34,7 @@ public class ConditionalBind<E extends IV> extends ImmutableBOp implements
     protected transient Boolean projection;
 
     /**
-     * Required deep copy constructor.
+     * Constructor required for {@link com.bigdata.bop.BOpUtility#deepCopy(FilterNode)}.
      */
     public ConditionalBind(ConditionalBind<E> op) {
         super(op);

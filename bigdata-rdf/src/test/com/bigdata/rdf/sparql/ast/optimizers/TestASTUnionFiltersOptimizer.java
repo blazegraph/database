@@ -54,7 +54,7 @@ import com.bigdata.rdf.sparql.ast.VarNode;
  * @version $Id: TestASTEmptyGroupOptimizer.java 5302 2011-10-07 14:28:03Z
  *          thompsonbry $
  */
-public class TestASTUnionFiltersOptimizer extends AbstractASTEvaluationTestCase {
+public class TestASTUnionFiltersOptimizer extends AbstractOptimizerTestCase {
 
     /**
      * 
@@ -261,5 +261,36 @@ public class TestASTUnionFiltersOptimizer extends AbstractASTEvaluationTestCase 
         assertSameAST(expected, actual);
 
     }
+
+	@Override
+	IASTOptimizer newOptimizer() {
+		return new ASTOptimizerList(new ASTUnionFiltersOptimizer(), new ASTBottomUpOptimizer());
+	}
+	
+	public void test_ticket767_case2() {
+		new Helper(){{
+			given = select( varNode(w), 
+					where ( joinGroupNode(
+							    unionNode(
+									joinGroupNode(
+											statementPatternNode(constantNode(a),constantNode(b),varNode(w))
+											),
+											joinGroupNode()
+									),
+							    filter(bound(varNode(w)))
+							) ) );
+			
+			expected = select( varNode(w), 
+					where (joinGroupNode(
+							unionNode(
+								joinGroupNode(
+											statementPatternNode(constantNode(a),constantNode(b),varNode(w)),
+											filter(bound(varNode(w)))),
+								joinGroupNode(filter(knownUnbound(varNode(w)))) 
+								)
+							) ) );
+			
+		}}.test();
+	}
 
 }

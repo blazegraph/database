@@ -63,7 +63,7 @@ public class EQ extends BOpBase implements BooleanValueExpression {
     }
 
     /**
-     * Required deep copy constructor.
+     * Constructor required for {@link com.bigdata.bop.BOpUtility#deepCopy(FilterNode)}.
      */
     public EQ(final EQ op) {
         super(op);

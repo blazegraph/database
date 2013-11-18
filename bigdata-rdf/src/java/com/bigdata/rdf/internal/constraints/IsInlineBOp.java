@@ -82,7 +82,7 @@ public class IsInlineBOp extends XSDBooleanIVValueExpression {
     }
 
     /**
-     * Required deep copy constructor.
+     * Constructor required for {@link com.bigdata.bop.BOpUtility#deepCopy(FilterNode)}.
      */
     public IsInlineBOp(final IsInlineBOp op) {
         super(op);

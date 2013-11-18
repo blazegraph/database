@@ -105,7 +105,7 @@ public class FuncBOp extends IVValueExpression<IV> implements
     private transient volatile Function funct;
 
     /**
-     * Required deep copy constructor.
+     * Constructor required for {@link com.bigdata.bop.BOpUtility#deepCopy(FilterNode)}.
      */
     public FuncBOp(final FuncBOp op) {
         super(op);

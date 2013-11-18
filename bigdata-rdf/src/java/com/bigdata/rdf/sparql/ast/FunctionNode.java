@@ -76,7 +76,7 @@ public class FunctionNode extends ValueExpressionNode {
 	}
 	
     /**
-     * Required deep copy constructor.
+     * Constructor required for {@link com.bigdata.bop.BOpUtility#deepCopy(FilterNode)}.
      */
     public FunctionNode(final FunctionNode op) {
 

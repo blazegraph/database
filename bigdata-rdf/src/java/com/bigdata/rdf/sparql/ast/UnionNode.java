@@ -24,7 +24,7 @@ public class UnionNode extends GraphPatternGroup<JoinGroupNode>  implements IReo
     private static final transient Logger log = Logger.getLogger(UnionNode.class);
 	
     /**
-     * Required deep copy constructor.
+     * Constructor required for {@link com.bigdata.bop.BOpUtility#deepCopy(FilterNode)}.
      */
     public UnionNode(UnionNode op) {
 
