@@ -27,6 +27,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.journal.jini.ha;
 
 import java.io.File;
+import java.io.FileOutputStream;
+import java.io.OutputStream;
+import java.nio.ByteBuffer;
 
 import net.jini.config.Configuration;
 
@@ -37,7 +40,9 @@ import com.bigdata.ha.halog.HALogReader;
 import com.bigdata.ha.halog.IHALogReader;
 import com.bigdata.ha.msg.IHA2PhasePrepareMessage;
 import com.bigdata.journal.CommitCounterUtility;
+import com.bigdata.journal.FileMetadata;
 import com.bigdata.journal.jini.ha.HAJournalTest.HAGlueTest;
+import com.bigdata.util.InnerCause;
 
 /**
  * Test suite when we are using the {@link DefaultSnapshotPolicy} and
@@ -104,7 +109,7 @@ public class TestHA3JournalServerWithHALogs extends AbstractHA3BackupTestCase {
      *      HAJournalServer can not restart due to logically empty log files
      *      </a>
      */
-    public void test_startABC_emptyLogFileDeletedOnRestartC() throws Exception {
+    public void test_startABC_logicallyEmptyLogFileDeletedOnRestartC() throws Exception {
 
         final ABC abc = new ABC(true/* sequential */);
 
@@ -271,6 +276,620 @@ public class TestHA3JournalServerWithHALogs extends AbstractHA3BackupTestCase {
         awaitLogCount(getHALogDirA(), commitCounter2+1);
         awaitLogCount(getHALogDirB(), commitCounter2+1);
         awaitLogCount(getHALogDirC(), commitCounter2+1);
+
+    }
+    
+    /**
+     * This is a unit test for the ability to silently remove a physically empty
+     * HALog file. Three services are started in sequence (A,B,C). A series of
+     * small commits are applied to the quorum. (C) is then shutdown. A
+     * logically empty HALog file should exist on each service for the next
+     * commit point. We now overwrite that file with a physically empty HALog
+     * file (zero length). We then do one more update. C is then restarted. We
+     * verify that C restarts and that the logically empty HALog file has been
+     * replaced by an HALog file that has the same digest as the HALog file for
+     * that commit point on (A,B).
+     * <p>
+     * Note: We can not reliably observe that the physically HALog file was
+     * removed during startup. However, this is not critical. What is critical
+     * is that the physically empty HALog file (a) does not prevent (C) from
+     * starting; (b) is replaced by the correct HALog data from the quorum
+     * leader; and (c) that (C) resynchronizes with the met quorum and joins
+     * causing a fully met quorum.
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/679" >
+     *      HAJournalServer can not restart due to logically empty log files
+     *      </a>
+     * @see <a href="http://sourceforge.net/apps/trac/bigdata/ticket/775" >
+     *      HAJournal start() </a>
+     */
+    public void test_startABC_physicallyEmptyLogFileDeletedOnRestartC() throws Exception {
+
+        final ABC abc = new ABC(true/* sequential */);
+
+        final HAGlue serverA = abc.serverA, serverB = abc.serverB;
+        HAGlue serverC = abc.serverC;
+
+        // Verify quorum is FULLY met.
+        awaitFullyMetQuorum();
+
+        // await the KB create commit point to become visible on each service.
+        awaitCommitCounter(1L, new HAGlue[] { serverA, serverB, serverC });
+
+        // Verify binary equality of ALL journals.
+        assertDigestsEquals(new HAGlue[] { serverA, serverB, serverC });
+
+        // Verify binary equality of ALL HALog files.
+        assertHALogDigestsEquals(1L/* firstCommitCounter */,
+                1/* lastCommitCounter */, new HAGlue[] { serverA, serverB,
+                        serverC });
+
+        /*
+         * Do a series of small commits.
+         */
+
+        final int NSMALL = 5;
+        
+        for (int i = 1/* createKB */; i <= NSMALL; i++) {
+
+            simpleTransaction();
+            
+        }
+
+        final long commitCounter1 = 1 + NSMALL; // AKA (6)
+
+        // await the commit points to become visible.
+        awaitCommitCounter(commitCounter1,
+                new HAGlue[] { serverA, serverB, serverC });
+
+        // Verify binary equality of ALL journals.
+        assertDigestsEquals(new HAGlue[] { serverA, serverB, serverC });
+
+        // Verify binary equality of ALL HALog files.
+        assertHALogDigestsEquals(1L/* firstCommitCounter */, commitCounter1,
+                new HAGlue[] { serverA, serverB, serverC });
+
+        /*
+         * Verify the expected #of HALogs on each service.
+         * 
+         * Note: This is (lastCommitCounter+1) since an empty HALog was created
+         * for the next commit point.
+         */
+        awaitLogCount(getHALogDirA(), commitCounter1 + 1);
+        awaitLogCount(getHALogDirB(), commitCounter1 + 1);
+        awaitLogCount(getHALogDirC(), commitCounter1 + 1);
+
+        /*
+         * Shutdown C.
+         * 
+         * Note: This might cause the empty HALog file on (C) to be deleted.
+         * That is Ok, since we will copy the desired empty HALOg from (A) to
+         * (C), thus enforcing the desired test condition.
+         */
+        shutdownC();
+        
+        /*
+         * Verify that there is an empty HALog file on (A) for the next
+         * commit point.
+         */
+        
+        // The next commit point.
+        final long commitCounter2 = commitCounter1 + 1; // AKA (7)
+        
+        // The HALog for that next commit point.
+        final File fileA = CommitCounterUtility.getCommitCounterFile(
+                getHALogDirA(), commitCounter2, IHALogReader.HA_LOG_EXT);
+        
+        // Verify HALog file for next commit point on A is logically empty.
+        {
+            assertTrue(fileA.exists());
+            final IHALogReader r = new HALogReader(fileA);
+            assertTrue(r.isEmpty());
+            assertFalse(r.isLive());
+            r.close();
+            assertTrue(fileA.exists());
+        }
+
+        // The name of that HALog file on (C).
+        final File fileC = CommitCounterUtility.getCommitCounterFile(
+                getHALogDirC(), commitCounter2, IHALogReader.HA_LOG_EXT);
+
+//        // Copy that empty HALog file to (C).
+//        copyFile(fileA, fileC, false/* append */);
+        
+        // delete the logically empty file (if it exists).
+        if (fileC.exists() && !fileC.delete())
+            fail("Could not delete: fileC=" + fileC);
+
+        // create the physically empty file.
+        if (!fileC.createNewFile())
+            fail("Could not create: fileC=" + fileC);
+
+        /*
+         * Do another transaction. This will cause the HALog file for that
+         * commit point to be non-empty on A.
+         */
+        simpleTransaction();
+        
+        /*
+         * Await the commit points to become visible.
+         * 
+         * Note: This is (lastCommitCounter+1) since an empty HALog was created
+         * for the next commit point.
+         */
+        awaitCommitCounter(commitCounter2, new HAGlue[] { serverA, serverB });
+
+        // Verify the expected #of HALogs on each service.
+        awaitLogCount(getHALogDirA(), commitCounter2 + 1);
+        awaitLogCount(getHALogDirB(), commitCounter2 + 1);
+        awaitLogCount(getHALogDirC(), commitCounter2);
+
+        // Verify HALog file for next commit point on A is NOT empty.
+        {
+            assertTrue(fileA.exists());
+            final IHALogReader r = new HALogReader(fileA);
+            assertFalse(r.isEmpty());
+            assertFalse(r.isLive());
+            r.close();
+            assertTrue(fileA.exists());
+        }
+
+        // Verify HALog file for next commit point on C is phsyically empty.
+        {
+            assertTrue(fileC.exists());
+            assertEquals(0L, fileC.length());
+        }
+
+        /*
+         * Restart (C). It should start without complaint. The logically empty
+         * HALog file should be replaced by the corresponding file from (A) by
+         * the time the quorum fully meets. At this point all services will have
+         * the same digests for all HALog files.
+         */
+
+        // Restart C.
+        serverC = startC();
+        
+        // Wait until the quorum is fully met.
+        awaitFullyMetQuorum();
+        
+        // await the commit points to become visible.
+        awaitCommitCounter(commitCounter2,
+                new HAGlue[] { serverA, serverB, serverC });
+
+        // Verify binary equality of ALL journals.
+        assertDigestsEquals(new HAGlue[] { serverA, serverB, serverC });
+        
+        // Verify binary equality of ALL HALog files.
+        assertHALogDigestsEquals(1L/* firstCommitCounter */,
+                commitCounter2 /* lastCommitCounter */, new HAGlue[] { serverA,
+                        serverB, serverC });
+
+        /*
+         * Verify the expected #of HALogs on each service.
+         * 
+         * Note: Each service will have an empty HALog for the next commit
+         * point.
+         */
+        awaitLogCount(getHALogDirA(), commitCounter2+1);
+        awaitLogCount(getHALogDirB(), commitCounter2+1);
+        awaitLogCount(getHALogDirC(), commitCounter2+1);
+
+    }
+    
+    /**
+     * This is a variant test for the ability to silently remove a corrupt HALog
+     * file on restart when it is the HALog file for the first write set not yet
+     * committed on the journal. Three services are started in sequence (A,B,C).
+     * A series of small commits are applied to the quorum. (C) is then
+     * shutdown. A logically empty HALog file should exist on each service for
+     * the next commit point. However, since this might have been removed on C
+     * when it was shutdown, we copy the logically empty HALog file from (A) to
+     * (C). We then overwrite the root blocks of that logically empty HALog file
+     * with junk. We then do one more update. C is then restarted. We verify
+     * that C restarts and that the corrupt HALog file has been replaced
+     * by an HALog file that has the same digest as the HALog file for that
+     * commit point on (A,B).
+     * <p>
+     * Note: We can not reliably observe that the logically HALog file was
+     * removed during startup. However, this is not critical. What is critical
+     * is that the logically empty HALog file (a) does not prevent (C) from
+     * starting; (b) is replaced by the correct HALog data from the quorum
+     * leader; and (c) that (C) resynchronizes with the met quorum and joins
+     * causing a fully met quorum.
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/679" >
+     *      HAJournalServer can not restart due to logically empty log files
+     *      </a>
+     */
+    public void test_startABC_corruptLogFileDeletedOnRestartC() throws Exception {
+
+        final ABC abc = new ABC(true/* sequential */);
+
+        final HAGlue serverA = abc.serverA, serverB = abc.serverB;
+        HAGlue serverC = abc.serverC;
+
+        // Verify quorum is FULLY met.
+        awaitFullyMetQuorum();
+
+        // await the KB create commit point to become visible on each service.
+        awaitCommitCounter(1L, new HAGlue[] { serverA, serverB, serverC });
+
+        // Verify binary equality of ALL journals.
+        assertDigestsEquals(new HAGlue[] { serverA, serverB, serverC });
+
+        // Verify binary equality of ALL HALog files.
+        assertHALogDigestsEquals(1L/* firstCommitCounter */,
+                1/* lastCommitCounter */, new HAGlue[] { serverA, serverB,
+                        serverC });
+
+        /*
+         * Do a series of small commits.
+         */
+
+        final int NSMALL = 5;
+        
+        for (int i = 1/* createKB */; i <= NSMALL; i++) {
+
+            simpleTransaction();
+            
+        }
+
+        final long commitCounter1 = 1 + NSMALL; // AKA (6)
+
+        // await the commit points to become visible.
+        awaitCommitCounter(commitCounter1,
+                new HAGlue[] { serverA, serverB, serverC });
+
+        // Verify binary equality of ALL journals.
+        assertDigestsEquals(new HAGlue[] { serverA, serverB, serverC });
+
+        // Verify binary equality of ALL HALog files.
+        assertHALogDigestsEquals(1L/* firstCommitCounter */, commitCounter1,
+                new HAGlue[] { serverA, serverB, serverC });
+
+        /*
+         * Verify the expected #of HALogs on each service.
+         * 
+         * Note: This is (lastCommitCounter+1) since an empty HALog was created
+         * for the next commit point.
+         */
+        awaitLogCount(getHALogDirA(), commitCounter1 + 1);
+        awaitLogCount(getHALogDirB(), commitCounter1 + 1);
+        awaitLogCount(getHALogDirC(), commitCounter1 + 1);
+
+        /*
+         * Shutdown C.
+         * 
+         * Note: This might cause the empty HALog file on (C) to be deleted.
+         * That is Ok, since we will copy the desired empty HALOg from (A) to
+         * (C), thus enforcing the desired test condition.
+         */
+        shutdownC();
+        
+        /*
+         * Verify that there is an empty HALog file on (A) for the next
+         * commit point.
+         */
+        
+        // The next commit point.
+        final long commitCounter2 = commitCounter1 + 1; // AKA (7)
+        
+        // The HALog for that next commit point.
+        final File fileA = CommitCounterUtility.getCommitCounterFile(
+                getHALogDirA(), commitCounter2, IHALogReader.HA_LOG_EXT);
+        
+        // Verify HALog file for next commit point on A is logically empty.
+        {
+            assertTrue(fileA.exists());
+            final IHALogReader r = new HALogReader(fileA);
+            assertTrue(r.isEmpty());
+            assertFalse(r.isLive());
+            r.close();
+            assertTrue(fileA.exists());
+        }
+
+        // The name of that HALog file on (C).
+        final File fileC = CommitCounterUtility.getCommitCounterFile(
+                getHALogDirC(), commitCounter2, IHALogReader.HA_LOG_EXT);
+
+        // Copy that empty HALog file to (C).
+        copyFile(fileA, fileC, false/* append */);
+        /*
+         * Overwrite the root blocks of the HALog on (C).
+         */
+        {
+            final OutputStream os = new FileOutputStream(fileC);
+            try {
+                final ByteBuffer buf = getRandomData(FileMetadata.headerSize0);
+                final byte[] b = getBytes(buf);
+                os.write(b);
+                os.flush();
+            } finally {
+                os.close();
+            }
+        }
+
+        /*
+         * Do another transaction. This will cause the HALog file for that
+         * commit point to be non-empty on A.
+         */
+        simpleTransaction();
+        
+        /*
+         * Await the commit points to become visible.
+         * 
+         * Note: This is (lastCommitCounter+1) since an empty HALog was created
+         * for the next commit point.
+         */
+        awaitCommitCounter(commitCounter2, new HAGlue[] { serverA, serverB });
+
+        // Verify the expected #of HALogs on each service.
+        awaitLogCount(getHALogDirA(), commitCounter2 + 1);
+        awaitLogCount(getHALogDirB(), commitCounter2 + 1);
+        awaitLogCount(getHALogDirC(), commitCounter2);
+
+        // Verify HALog file for next commit point on A is NOT empty.
+        {
+            assertTrue(fileA.exists());
+            final IHALogReader r = new HALogReader(fileA);
+            assertFalse(r.isEmpty());
+            assertFalse(r.isLive());
+            r.close();
+            assertTrue(fileA.exists());
+        }
+
+        // Verify HALog file for next commit point on C is corrupt.
+        {
+            boolean ok = false;
+            try {
+                new HALogReader(fileC);
+                ok = true;
+            } catch(Throwable t) {
+                // Note: Could be IOException, ChecksumError, or
+                // RuntimeException.
+            }
+            if (ok)
+                fail("HALog is not corrupt: " + fileC);
+        }
+
+        /*
+         * Restart (C). It should start without complaint. The logically empty
+         * HALog file should be replaced by the corresponding file from (A) by
+         * the time the quorum fully meets. At this point all services will have
+         * the same digests for all HALog files.
+         */
+
+        // Restart C.
+        serverC = startC();
+        
+        // Wait until the quorum is fully met.
+        awaitFullyMetQuorum();
+        
+        // await the commit points to become visible.
+        awaitCommitCounter(commitCounter2,
+                new HAGlue[] { serverA, serverB, serverC });
+
+        // Verify binary equality of ALL journals.
+        assertDigestsEquals(new HAGlue[] { serverA, serverB, serverC });
+        
+        // Verify binary equality of ALL HALog files.
+        assertHALogDigestsEquals(1L/* firstCommitCounter */,
+                commitCounter2 /* lastCommitCounter */, new HAGlue[] { serverA,
+                        serverB, serverC });
+
+        /*
+         * Verify the expected #of HALogs on each service.
+         * 
+         * Note: Each service will have an empty HALog for the next commit
+         * point.
+         */
+        awaitLogCount(getHALogDirA(), commitCounter2+1);
+        awaitLogCount(getHALogDirB(), commitCounter2+1);
+        awaitLogCount(getHALogDirC(), commitCounter2+1);
+
+    }
+    
+    /**
+     * This is a unit test for the ability to correctly NOT remove a logically
+     * empty HALog file when that HALog file is for the last commit point on the
+     * Journal. Three services are started in sequence (A,B,C). A series of
+     * small commits are applied to the quorum. (C) is then shutdown. A
+     * logically empty HALog file should exist on each service for the next
+     * commit point. We remove the HALog for the next commit point from (C) if
+     * it exists. We then remove the HALog for the last durable commit point on
+     * (C) and replace it with a physically empty HALog file. We then do one
+     * more update. C is then restarted. We verify that C DOES NOT restart and
+     * that the physically empty HALog file for the last durable commit point on
+     * C has not been removed or updated.
+     * 
+     * TODO This is the staring place for adding the capability to automatically
+     * replicate bad or missing historical HALog files from the quorum leader.
+     * The tests exists now to ensure that the logic to remove a bad HALog on
+     * startup will refuse to remove an HALog corresponding to the most recent
+     * commit point on the Journal.
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/679" >
+     *      HAJournalServer can not restart due to logically empty log files
+     *      </a>
+     * @see <a href="http://sourceforge.net/apps/trac/bigdata/ticket/775" >
+     *      HAJournal start() </a>
+     */
+    public void test_startABC_missingHALogFileForLastCommitBlocksRestartC() throws Exception {
+
+        final ABC abc = new ABC(true/* sequential */);
+
+        final HAGlue serverA = abc.serverA, serverB = abc.serverB;
+        HAGlue serverC = abc.serverC;
+
+        // Verify quorum is FULLY met.
+        awaitFullyMetQuorum();
+
+        // await the KB create commit point to become visible on each service.
+        awaitCommitCounter(1L, new HAGlue[] { serverA, serverB, serverC });
+
+        // Verify binary equality of ALL journals.
+        assertDigestsEquals(new HAGlue[] { serverA, serverB, serverC });
+
+        // Verify binary equality of ALL HALog files.
+        assertHALogDigestsEquals(1L/* firstCommitCounter */,
+                1/* lastCommitCounter */, new HAGlue[] { serverA, serverB,
+                        serverC });
+
+        /*
+         * Do a series of small commits.
+         */
+
+        final int NSMALL = 5;
+        
+        for (int i = 1/* createKB */; i <= NSMALL; i++) {
+
+            simpleTransaction();
+            
+        }
+
+        final long commitCounter1 = 1 + NSMALL; // AKA (6)
+
+        // await the commit points to become visible.
+        awaitCommitCounter(commitCounter1,
+                new HAGlue[] { serverA, serverB, serverC });
+
+        // Verify binary equality of ALL journals.
+        assertDigestsEquals(new HAGlue[] { serverA, serverB, serverC });
+
+        // Verify binary equality of ALL HALog files.
+        assertHALogDigestsEquals(1L/* firstCommitCounter */, commitCounter1,
+                new HAGlue[] { serverA, serverB, serverC });
+
+        /*
+         * Verify the expected #of HALogs on each service.
+         * 
+         * Note: This is (lastCommitCounter+1) since an empty HALog was created
+         * for the next commit point.
+         */
+        awaitLogCount(getHALogDirA(), commitCounter1 + 1);
+        awaitLogCount(getHALogDirB(), commitCounter1 + 1);
+        awaitLogCount(getHALogDirC(), commitCounter1 + 1);
+
+        /*
+         * Shutdown C.
+         * 
+         * Note: This might cause the empty HALog file on (C) to be deleted.
+         * That is Ok, since we will copy the desired empty HALOg from (A) to
+         * (C), thus enforcing the desired test condition.
+         */
+        shutdownC();
+        
+        /*
+         * Verify that there is an empty HALog file on (A) for the next
+         * commit point.
+         */
+        
+        // The next commit point.
+        final long commitCounter2 = commitCounter1 + 1; // AKA (7)
+        
+        // The HALog for that next commit point.
+        final File fileA = CommitCounterUtility.getCommitCounterFile(
+                getHALogDirA(), commitCounter2, IHALogReader.HA_LOG_EXT);
+        
+        // Verify HALog file for next commit point on A is logically empty.
+        {
+            assertTrue(fileA.exists());
+            final IHALogReader r = new HALogReader(fileA);
+            assertTrue(r.isEmpty());
+            assertFalse(r.isLive());
+            r.close();
+            assertTrue(fileA.exists());
+        }
+
+        // The name of that HALog file on (C).
+        final File fileC = CommitCounterUtility.getCommitCounterFile(
+                getHALogDirC(), commitCounter2, IHALogReader.HA_LOG_EXT);
+
+//        // Copy that empty HALog file to (C).
+//        copyFile(fileA, fileC, false/* append */);
+        if (fileC.exists())
+            if (!fileC.delete())
+                fail("Could not remove HALog for open write set: " + fileC);
+
+        // The HALog file on (C) for the last durable commit point on (C).
+        final File fileCLastCommit = CommitCounterUtility.getCommitCounterFile(
+                getHALogDirC(), commitCounter1, IHALogReader.HA_LOG_EXT);
+
+        if (!fileCLastCommit.exists())
+            fail("HALog for last commit not found: " + fileCLastCommit);
+
+        if (!fileCLastCommit.delete())
+            fail("Could not remove HALog for last commit: " + fileCLastCommit);
+
+        /*
+         * Do another transaction. This will cause the HALog file for that
+         * commit point to be non-empty on A.
+         */
+        simpleTransaction();
+        
+        /*
+         * Await the commit points to become visible.
+         * 
+         * Note: This is (lastCommitCounter+1) since an empty HALog was created
+         * for the next commit point.
+         */
+        awaitCommitCounter(commitCounter2, new HAGlue[] { serverA, serverB });
+
+        // Verify the expected #of HALogs on each service.
+        awaitLogCount(getHALogDirA(), commitCounter2 + 1);
+        awaitLogCount(getHALogDirB(), commitCounter2 + 1);
+        awaitLogCount(getHALogDirC(), commitCounter1 - 1);
+
+        // Verify HALog file for next commit point on A is NOT empty.
+        {
+            assertTrue(fileA.exists());
+            final IHALogReader r = new HALogReader(fileA);
+            assertFalse(r.isEmpty());
+            assertFalse(r.isLive());
+            r.close();
+            assertTrue(fileA.exists());
+        }
+
+        // Verify HALog files for last and next commit point on C are missing.
+        {
+            assertFalse(fileC.exists());
+            assertFalse(fileCLastCommit.exists());
+        }
+
+        /*
+         * Restart (C).
+         * 
+         * Note: This restart should fail. The number of HALog files on (C)
+         * should be unchanged.
+         */
+
+        // Restart C.
+        {
+            boolean ok = false;
+            try {
+                serverC = startC();
+                ok = true;
+            } catch (Throwable t) {
+                if (InnerCause.isInnerCause(t, InterruptedException.class))
+                    // test interrupted? propagate interrupt.
+                    throw new RuntimeException(t);
+                // log message. refused start is expected.
+                log.warn("C refused to start: " + t, t);
+            }
+            if (ok)
+                fail("C should not have restarted.");
+        }
+        
+        /*
+         * Verify the expected #of HALogs on each service.
+         * 
+         * Note: Each service will have an empty HALog for the next commit
+         * point.
+         */
+        awaitLogCount(getHALogDirA(), commitCounter2 + 1);
+        awaitLogCount(getHALogDirB(), commitCounter2 + 1);
+        awaitLogCount(getHALogDirC(), commitCounter1 - 1);
 
     }
     

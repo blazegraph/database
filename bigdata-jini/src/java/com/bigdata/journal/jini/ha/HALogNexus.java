@@ -70,7 +70,7 @@ import com.bigdata.util.InnerCause;
  */
 public class HALogNexus implements IHALogWriter {
 
-    private static final Logger log = Logger.getLogger(SnapshotManager.class);
+    private static final Logger log = Logger.getLogger(HALogNexus.class);
 
     /**
      * Logger for HA events.
@@ -249,35 +249,123 @@ public class HALogNexus implements IHALogWriter {
          * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/679" >
          *      HAJournalServer can not restart due to logically empty log files
          *      </a>
+         * @see <a href="http://sourceforge.net/apps/trac/bigdata/ticket/775" >
+         *      HAJournal start() </a>
          */
         {
 
             /*
-             * Used to detect a logically empty HALog (iff it is the last one in
-             * commit order).
+             * Data structure used to detect a bad HALog and identify whether or
+             * not it is the last one in commit order.
              */
             final HALogScanState tmp = new HALogScanState();
             
             // Scan the HALog directory, populating the in-memory index.
             populateIndexRecursive(haLogDir, IHALogReader.HALOG_FILTER, tmp);
 
-            if (tmp.emptyHALogFile != null) {
+            final long commitCounterOnJournal = journal.getRootBlockView().getCommitCounter();
 
-                /*
-                 * The last HALog file is logically empty. It WAS NOT added to
-                 * the in-memory index. We try to remove it now.
+            if (tmp.firstBadHALogFile != null) {
+
+                /**
+                 * The only the last HALog file is bad (physically empty,
+                 * logically empty, bad MAGIC, etc), then it WAS NOT added to
+                 * the in-memory index.
+                 * 
+                 * We try to remove it now and then start up normally. While we
+                 * are short one HALog file, we can obtain it during
+                 * resynchronization from the other nodes in the cluster.
                  * 
                  * Note: It is not critical that we succeed in removing this
                  * HALog file so long as it does not interfere with the correct
                  * startup of the HAJournalServer.
                  */
-                final File f = tmp.emptyHALogFile;
+                final File f = tmp.firstBadHALogFile;
 
-                if (!f.delete()) {
+                /*
+                 * Parse out the closing commit counter for that HALog. This is
+                 * the commit counter that would be assigned to the root block
+                 * if this transaction had been applied to the Journal.
+                 */
+                final long closingCommitCounter = CommitCounterUtility
+                        .parseCommitCounterFile(f.getName(),
+                                IHALogReader.HA_LOG_EXT);
 
-                    log.warn("Could not remove empty HALog: " + f);
+                if (commitCounterOnJournal + 1 == closingCommitCounter) {
+                    
+                    /*
+                     * This HALog file was for the next commit point to be
+                     * recorded on the Journal. We can safely delete it and
+                     * continue the normal startup.
+                     */
+
+                    if (haLog.isInfoEnabled())
+                        haLog.info("Removing bad/empty HALog file: commitCounterOnJournal="
+                                + commitCounterOnJournal);
+
+                    if (!f.delete()) {
+
+                        log.warn("Could not remove empty HALog: " + f);
+
+                    }
+
+                } else {
+
+                    /*
+                     * This HALog file is bad. The service can not start until
+                     * it has been replaced.
+                     * 
+                     * FIXME Automate the replacement of the bad/missing HALog
+                     * file from the quorum leader.
+                     */
+                    throw new HALogException(tmp.firstBadHALogFile,
+                            tmp.firstCause);
 
                 }
+
+            }
+
+            // Get the most recent HALog record from the index.
+            final IHALogRecord r = haLogIndex.getNewestEntry();
+
+            if (r != null) {
+
+                /**
+                 * Note: The logic above makes sure that we have each HALog in
+                 * sequence from some unspecified starting point, but it does
+                 * not verify that the last HALog file corresponds to the last
+                 * durable commit point on the Journal, does not verify the
+                 * number of local HALog files against some target (e.g., as
+                 * specified by the restore policy), and does not verify that
+                 * there are no HALog files for commit points beyond the last
+                 * commit point on the journal (which could happen if someone
+                 * did a point in time restore of the journal from a snapshot
+                 * and failed to remove the HALog files after that point in
+                 * time).
+                 * 
+                 * TODO This should be refactored when we address #775.
+                 */
+
+                if (r.getCommitCounter() < commitCounterOnJournal) {
+                    /*
+                     * Reject start if we are missing the HALog for the most
+                     * recent commit point on the journal.
+                     */
+                    throw new RuntimeException(
+                            "Missing HALog(s) for committed state on journal: journal@="
+                                    + commitCounterOnJournal + ", lastHALog@"
+                                    + r.getCommitCounter());
+                }
+
+                /*
+                 * Note: If there are HALog files for commit points beyond the
+                 * most recent commit point on the journal, then those HALog
+                 * files will be applied to roll forward the journal. This is
+                 * done by HAJournalServer in its RESTORE state. Thus is
+                 * necessary to remove any HALog files beyond the desired commit
+                 * point before restarting the service when rolling back to a
+                 * specific point in time.
+                 */
 
             }
             
@@ -309,13 +397,19 @@ public class HALogNexus implements IHALogWriter {
      */
     private static class HALogScanState {
         /**
-         * Flag is set the first time an empty HALog file is identified.
+         * Flag is set the first time bad HALog file is identified.
          * <p>
-         * Note: We scan the HALog files in commit counter order. If the last
-         * file is (logically) empty, then we will silently remove it. However,
-         * if any other HALog file is logically empty, then this is an error.
+         * Note: We scan the HALog files in commit counter order. If only the
+         * last file in the scan is bad, then we will silently remove it - the
+         * HALog will be replaced when this service attempts to .
+         * However, if there is more than one bad HALog file, then this is an
+         * error.
          */
-        File emptyHALogFile = null;
+        File firstBadHALogFile = null;
+        /**
+         * The exception when we first encountered a bad HALog file.
+         */
+        Throwable firstCause = null;
     }
     
     /**
@@ -328,11 +422,11 @@ public class HALogNexus implements IHALogWriter {
      * side-effect using the {@link HALogScanState} and will NOT be added to the
      * index. The caller SHOULD then remove the logically empty HALog file
      * 
-     * TODO If an HALog is discovered to have bad checksums or otherwise corrupt
-     * root blocks and there is a met quorum, then we should re-replicate that
-     * HALog from the quourm leader.
+     * FIXME If an HALog is discovered to have bad checksums or otherwise
+     * corrupt root blocks and there is a met quorum, then we should
+     * re-replicate that HALog from the quourm leader.
      * 
-     * TODO For HALog files other than the last HALog file (in commit counter
+     * FIXME For HALog files other than the last HALog file (in commit counter
      * sequence) if there are any missing HALog files in the sequence, if any if
      * the files in the sequence other than the last HALog file is logically
      * empty, or if any of those HALog files has a bad root bloxks) then we
@@ -342,6 +436,27 @@ public class HALogNexus implements IHALogWriter {
      * we allow the service to start, then it will have limited rollback
      * capability. All of this could be checked in an index scan once we have
      * identified all of the HALog files in the file system.
+     * 
+     * TODO This could be rewritten to generate the filenames by running the
+     * commit counter from the first discovered HALog file's commit counter up
+     * through the current commit point on the journal. Alternatively, we could
+     * just start with the current commit point on the journal and the substract
+     * one and move backward until we find the first HALog file that is not
+     * locally available. We could then cross check this with the
+     * {@link IRestorePolicy} and decide whether we needed to back fill either
+     * HALog files or snapshots on this service in order to satisify the
+     * {@link IRestorePolicy}. This has the advantage that we start with the
+     * most recent HALog file first, so we can immediately diagnose any problems
+     * with the last commit point on restart. It removes the recursive logic and
+     * makes it easier to write code that decides whether or not a given HALog
+     * file being bad poses a problem and what kind of a problem and how to
+     * resolve that problem. There will be more GC associated with the
+     * generation of the file names from the commit counters, but we could get
+     * rid of that GC overhead entirely by supplying a reusable
+     * {@link StringBuilder}.
+     * 
+     * @see <a href="http://sourceforge.net/apps/trac/bigdata/ticket/775" >
+     *      HAJournal start() </a>
      */
     private void populateIndexRecursive(final File f,
             final FileFilter fileFilter, final HALogScanState state)
@@ -370,7 +485,7 @@ public class HALogNexus implements IHALogWriter {
 
         } else {
 
-            if (state.emptyHALogFile != null) {
+            if (state.firstBadHALogFile != null) {
 
                 /*
                  * We already have an empty HALog file. If there are any more
@@ -380,8 +495,9 @@ public class HALogNexus implements IHALogWriter {
                  * order).
                  */
 
-                throw new LogicallyEmptyHALogException(state.emptyHALogFile);
-                
+                throw new HALogException(state.firstBadHALogFile,
+                        state.firstCause);
+
             }
             
             try {
@@ -389,16 +505,22 @@ public class HALogNexus implements IHALogWriter {
                 // Attempt to add to the index.
                 addHALog(f);
 
-            } catch (LogicallyEmptyHALogException ex) {
+            } catch (Throwable t) {
+                
+                if (InnerCause.isInnerCause(t, InterruptedException.class)) {
+                    // propagate interrupt.
+                    throw new RuntimeException(t);
+                }
                 
                 // Should be null since we checked this above.
-                assert state.emptyHALogFile == null;
+                assert state.firstBadHALogFile == null;
 
                 /*
                  * The first empty HALog file. There is at most one allowed and
                  * it must be the last HALog file in commit counter order.
                  */
-                state.emptyHALogFile = f;
+                state.firstBadHALogFile = f;
+                state.firstCause = t;
                 
             }
 
@@ -430,6 +552,13 @@ public class HALogNexus implements IHALogWriter {
         
         final byte[] b0 = new byte[RootBlockView.SIZEOF_ROOT_BLOCK];
         final byte[] b1 = new byte[RootBlockView.SIZEOF_ROOT_BLOCK];
+
+        if (file.length() == 0L) {
+            /*
+             * The file is physically empty (zero length).
+             */
+            throw new EmptyHALogException(file);
+        }
         
         final DataInputStream is = new DataInputStream(
                 new FileInputStream(file));
@@ -455,8 +584,8 @@ public class HALogNexus implements IHALogWriter {
         } catch(IOException ex) {
 
             // Wrap exception with the file name.
-            throw new IOException(ex.getMessage() + ", file=" + file, ex);
-            
+            throw new HALogException(file, ex);
+
         } finally {
 
             is.close();
@@ -489,18 +618,16 @@ public class HALogNexus implements IHALogWriter {
      * @throws ChecksumError
      *             if there is a checksum problem with the root blocks.
      * 
-     *             TODO If the root blocks are the same then this is an empty
-     *             HALog. Right now that is an error. [We might want to simply
-     *             remove any such HALog file.]
-     *             <p>
-     *             Likewise, it is an error if any HALog has bad root blocks
-     *             (checksum or other errors).
-     * 
      *             TODO A similar problem exists if any of the HALog files GTE
      *             the earliest snapshot are missing, have bad root blocks, etc.
      *             We will not be able to restore the commit point associated
      *             with that HALog file unless it also happens to correspond to
-     *             a snapshot.
+     *             a snapshot. Such bad/missing HALog files should be
+     *             re-replicated from the quorum leader. This process should be
+     *             automated.
+     * 
+     * @see <a href="http://sourceforge.net/apps/trac/bigdata/ticket/775" >
+     *      HAJournal start() </a>
      */
     private void addHALog(final File file) throws IOException,
             LogicallyEmptyHALogException {
@@ -554,22 +681,60 @@ public class HALogNexus implements IHALogWriter {
     }
 
     /**
+     * Base class for exceptions when we are unable to read an HALog file.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     */
+    private static class HALogException extends IOException {
+        
+        private static final long serialVersionUID = 1L;
+
+        public HALogException(final File file) {
+
+            super(file.getAbsolutePath());
+            
+        }
+
+        public HALogException(final File file,final Throwable cause) {
+
+            super(file.getAbsolutePath(), cause);
+            
+        }
+        
+    }
+    
+    /**
      * Exception raise when an HALog file is logically empty (the opening and
      * closing root blocks are identicial).
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
      *         Thompson</a>
      */
-    private static class LogicallyEmptyHALogException extends IOException {
+    private static class LogicallyEmptyHALogException extends HALogException {
 
-        /**
-         * 
-         */
         private static final long serialVersionUID = 1L;
         
         public LogicallyEmptyHALogException(final File file) {
 
-            super(file.getAbsolutePath());
+            super(file);
+            
+        }
+        
+    }
+
+    /**
+     * Exception raise when an HALog file is physically empty (zero length).
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+     *         Thompson</a>
+     */
+    private static class EmptyHALogException extends HALogException {
+
+        private static final long serialVersionUID = 1L;
+        
+        public EmptyHALogException(final File file) {
+
+            super(file);
             
         }
         

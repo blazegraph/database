@@ -32,8 +32,6 @@ import junit.framework.TestCase;
 import junit.framework.TestSuite;
 
 import com.bigdata.journal.Journal;
-import com.bigdata.journal.WORMStrategy;
-import com.bigdata.rwstore.RWStore;
 
 /**
  * Test suite for highly available configurations of the standalone
@@ -60,21 +58,6 @@ public class TestAll extends TestCase {
     /**
      * Returns a test that will run each of the implementation specific test
      * suites in turn.
-     * 
-     * FIXME (*) Test {@link WORMStrategy} and {@link RWStore} (through an override?)
-     * 
-     * FIXME The NSS should transparently proxy mutation requests to the quorum
-     * leader (and to a global leader if offsite is supported, or maybe that is
-     * handled at a layer above). The tests need to be modified (A) to NOT only
-     * write on the leader; and (B) to verify that we can send a write request
-     * to ANY service that is joined with the met quorum. (And verify for POST,
-     * DELETE, and PUT since those are all different method.)
-     * <p>
-     * Note: We could have services that are not joined with the met quorum
-     * simply forward read requests to services that ARE joined with the met
-     * quorum. That way they can begin "accepting" reads and writes immediately.
-     * This could also be done one level down, using failover reads to reach a
-     * service joined with the met quorum.
      */
     public static Test suite()
     {
