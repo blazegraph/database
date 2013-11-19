@@ -53,6 +53,11 @@ import com.bigdata.service.IBigdataFederation;
  *      FIXME Rolling back r7319 which broke UNION processing. 
  */
 public class AST2BOpContext implements IdFactory, IEvaluationContext {
+	
+	/**
+	 * This field is public non-final so that we can change its value during testing.
+	 */
+	public static boolean DEFAULT_NATIVE_HASH_JOINS = true; // QueryHints.DEFAULT_NATIVE_HASH_JOINS;
 
     /**
      * The {@link ASTContainer}
@@ -148,7 +153,7 @@ public class AST2BOpContext implements IdFactory, IEvaluationContext {
      * 
      * @see QueryHints#NATIVE_HASH_JOINS
      */
-    public boolean nativeHashJoins = QueryHints.DEFAULT_NATIVE_HASH_JOINS;
+    public boolean nativeHashJoins = DEFAULT_NATIVE_HASH_JOINS;
     
     /**
      * When <code>true</code>, a merge-join pattern will be recognized if it
