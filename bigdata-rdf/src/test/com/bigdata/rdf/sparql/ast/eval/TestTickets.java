@@ -27,6 +27,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.eval;
 
+import com.bigdata.BigdataStatics;
+
 /**
  * Test suite for tickets at <href a="http://sourceforge.net/apps/trac/bigdata">
  * trac </a>.
@@ -178,6 +180,11 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
 
     }
     public void test_ticket_748() throws Exception {
+    	// Concerning omitting the test with hash joins, see Trac776 and 
+    	// com.bigdata.rdf.internal.encoder.AbstractBindingSetEncoderTestCase.test_solutionWithOneMockIV()
+  
+    	if(AST2BOpContext.DEFAULT_NATIVE_HASH_JOINS && !BigdataStatics.runKnownBadTests)
+            return;
 
         new TestHelper("ticket748-subselect",// testURI,
                 "ticket748-subselect.rq",// queryFileURL
@@ -190,6 +197,9 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
 
     public void test_ticket_748a() throws Exception {
 
+    	if(AST2BOpContext.DEFAULT_NATIVE_HASH_JOINS && !BigdataStatics.runKnownBadTests)
+            return;
+
         new TestHelper("ticket748A-subselect",// testURI,
                 "ticket748A-subselect.rq",// queryFileURL
                 "ticket748-subselect.ttl",// dataFileURL
@@ -200,6 +210,9 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
 
     public void test_ticket_two_subselects_748() throws Exception {
 
+    	if(AST2BOpContext.DEFAULT_NATIVE_HASH_JOINS && !BigdataStatics.runKnownBadTests)
+            return;
+    	
         new TestHelper("ticket748-two-subselects",// testURI,
                 "ticket748-two-subselects.rq",// queryFileURL
                 "ticket748-two-subselects.ttl",// dataFileURL
@@ -211,6 +224,9 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
 
     public void test_ticket_two_subselects_748a() throws Exception {
 
+    	if(AST2BOpContext.DEFAULT_NATIVE_HASH_JOINS && !BigdataStatics.runKnownBadTests)
+            return;
+    	
         new TestHelper("ticket748A-two-subselects",// testURI,
                 "ticket748A-two-subselects.rq",// queryFileURL
                 "ticket748-two-subselects.ttl",// dataFileURL

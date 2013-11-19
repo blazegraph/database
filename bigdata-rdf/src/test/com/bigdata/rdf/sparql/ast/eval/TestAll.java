@@ -26,6 +26,7 @@ package com.bigdata.rdf.sparql.ast.eval;
 import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.eval.reif.TestReificationDoneRightEval;
 
+import junit.extensions.TestSetup;
 import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
@@ -55,7 +56,7 @@ public class TestAll extends TestCase {
      * Returns a test that will run each of the implementation specific test
      * suites in turn.
      */
-    public static Test suite()
+    private static TestSuite coreSuite()
     {
 
         final TestSuite suite = new TestSuite("AST Evaluation");
@@ -179,6 +180,33 @@ public class TestAll extends TestCase {
 
         return suite;
         
+    }
+    
+
+    /**
+     * Returns a test that will run each of the implementation specific test
+     * suites in turn.
+     */
+    public static Test suite()
+    {
+
+        final TestSuite suite = new TestSuite("AST Evaluation (all)");
+        final TestSuite tHash = coreSuite();
+        tHash.setName("AST Evaluation (tHash)");
+        suite.addTest(new TestSetup(tHash) {
+
+            protected void setUp() throws Exception {
+            	AST2BOpContext.DEFAULT_NATIVE_HASH_JOINS = true;
+            }
+            protected void tearDown() throws Exception {
+            	AST2BOpContext.DEFAULT_NATIVE_HASH_JOINS = false;
+            }
+        	
+        });
+        final TestSuite jvmHash = coreSuite();
+        jvmHash.setName("AST Evaluation (jvmHash)");
+        suite.addTest(jvmHash);
+        return suite;
     }
     
 }
