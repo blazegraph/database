@@ -57,7 +57,7 @@ public class AST2BOpContext implements IdFactory, IEvaluationContext {
 	/**
 	 * This field is public non-final so that we can change its value during testing.
 	 */
-	public static boolean DEFAULT_NATIVE_HASH_JOINS = true; // QueryHints.DEFAULT_NATIVE_HASH_JOINS;
+	public static boolean DEFAULT_NATIVE_HASH_JOINS = QueryHints.DEFAULT_NATIVE_HASH_JOINS;
 
     /**
      * The {@link ASTContainer}
