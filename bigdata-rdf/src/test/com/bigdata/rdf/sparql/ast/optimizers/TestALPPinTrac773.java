@@ -28,6 +28,7 @@ import static com.bigdata.rdf.sparql.ast.optimizers.AbstractOptimizerTestCase.He
 
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.sparql.ast.ArbitraryLengthPathNode;
+import com.bigdata.rdf.sparql.ast.GroupMemberNodeBase;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -53,13 +54,15 @@ public class TestALPPinTrac773 extends AbstractOptimizerTestCase {
 		public NotNestedHelper(HelperFlag zero_or_one_to_one_or_more, String sym, boolean switchOrdering) {
 			String pattern = "c" + sym;
 
-    		given = select( varNode(z), 
+			StatementPatternNode spn1 = statementPatternNode(varNode(y), constantNode(c),  varNode(x), 15431);
+    		StatementPatternNode spn2 = statementPatternNode(varNode(z), constantNode(a),  varNode(w), 2054);
+			given = select( varNode(z), 
     				where (
 
     						joinGroupNode(propertyPathNode(varNode(x),pattern, constantNode(b))),
-    						statementPatternNode(varNode(y), constantNode(c),  varNode(x), 15431),
+    						spn1,
     						propertyPathNode(varNode(x),pattern, varNode(z)),
-    			    		statementPatternNode(varNode(z), constantNode(a),  varNode(w), 2054)
+    			    		spn2
     				) );
     		
     		varCount = 0;
@@ -74,16 +77,12 @@ public class TestALPPinTrac773 extends AbstractOptimizerTestCase {
     		} else {
     			alpp1 = alpp1(zero_or_one_to_one_or_more);
     			alpp2 = alpp2(zero_or_one_to_one_or_more);
-
     		}
+    		final GroupMemberNodeBase<?> gmn[] = alpp1.lowerBound() == 0 
+    				? new GroupMemberNodeBase[]{alpp1, spn1, alpp2, spn2}
+    		        : new GroupMemberNodeBase[]{alpp1, alpp2, spn2, spn1};
     		
-			expected = select( varNode(z), 
-    				where (
-    						alpp1,
-    					    alpp2,
-    			    		statementPatternNode(varNode(z), constantNode(a),  varNode(w), 2054),
-    						statementPatternNode(varNode(y), constantNode(c),  varNode(x), 15431)
-    				) );
+			expected = select( varNode(z),  where ( gmn ) );
     		varCount = 0;
     		
     	}
@@ -99,30 +98,33 @@ public class TestALPPinTrac773 extends AbstractOptimizerTestCase {
 	private class NestedHelper extends Helper {
 		
 		public NestedHelper(HelperFlag zero_or_one_to_one_or_more, String sym) {
-			String pattern = "c" + sym;
+			String pattern = "d" + sym;
 
-    		given = select( varNode(z), 
+			StatementPatternNode spn1 = statementPatternNode(varNode(y), constantNode(c),  varNode(x), 15431);
+    		StatementPatternNode spn2 = statementPatternNode(varNode(z), constantNode(a),  varNode(w), 2054);
+			given = select( varNode(z), 
     				where (
     						joinGroupNode(propertyPathNode(varNode(x),pattern, constantNode(b))),
-    						statementPatternNode(varNode(y), constantNode(c),  varNode(x), 15431),
+    						spn1,
     						joinGroupNode(propertyPathNode(varNode(x),pattern, varNode(z))),
-    			    		statementPatternNode(varNode(z), constantNode(a),  varNode(w), 2054)
+    			    		spn2
     				) );
     		
     		varCount = 0;
-    		expected = select( varNode(z), 
-    				where (
-    						arbitartyLengthPropertyPath(varNode(x), constantNode(b), zero_or_one_to_one_or_more,
-    										joinGroupNode( 
-    												statementPatternNode(leftVar(), constantNode(c),  rightVar(), 26)
-    												) ),
-    						arbitartyLengthPropertyPath(varNode(x), varNode(z), zero_or_one_to_one_or_more,
-    										joinGroupNode( 
-    												statementPatternNode(leftVar(), constantNode(c),  rightVar(), 3135)
-    												) ),
-    			    		statementPatternNode(varNode(z), constantNode(a),  varNode(w), 2054),
-    						statementPatternNode(varNode(y), constantNode(c),  varNode(x), 15431)
-    				) );
+    		ArbitraryLengthPathNode alpp1 = arbitartyLengthPropertyPath(varNode(x), constantNode(b), zero_or_one_to_one_or_more,
+							joinGroupNode( 
+									statementPatternNode(leftVar(), constantNode(d),  rightVar(), 26)
+									) );
+			ArbitraryLengthPathNode alpp2 = arbitartyLengthPropertyPath(varNode(x), varNode(z), zero_or_one_to_one_or_more,
+							joinGroupNode( 
+									statementPatternNode(leftVar(), constantNode(d),  rightVar(), 3135)
+									) );
+
+    		final GroupMemberNodeBase<?> gmn[] = alpp1.lowerBound() == 0 
+    				? new GroupMemberNodeBase[]{alpp1, spn1, alpp2, spn2}
+    		        : new GroupMemberNodeBase[]{alpp1, alpp2, spn2, spn1};
+    				
+			expected = select( varNode(z), where ( gmn ) );
     		varCount = 0;
     		
     	}
@@ -195,7 +197,7 @@ public class TestALPPinTrac773 extends AbstractOptimizerTestCase {
     						joinGroupNode( 
     								arbitartyLengthPropertyPath(varNode(x), constantNode(b), ZERO_OR_MORE,
     										joinGroupNode( 
-    												statementPatternNode(leftVar(), constantNode(c),  rightVar(), 26)
+    												statementPatternNode(leftVar(), constantNode(d),  rightVar(), 26)
     												) )
     										
     										),
@@ -203,7 +205,7 @@ public class TestALPPinTrac773 extends AbstractOptimizerTestCase {
     						joinGroupNode( 
     								arbitartyLengthPropertyPath(varNode(x), varNode(z), ZERO_OR_MORE,
     										joinGroupNode( 
-    												statementPatternNode(leftVar(), constantNode(c),  rightVar(), 3135)
+    												statementPatternNode(leftVar(), constantNode(d),  rightVar(), 3135)
     												) )
     										
     										),

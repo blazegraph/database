@@ -472,9 +472,5 @@ public class StaticAnalysisBase {
         return set;
 
     }
-    
-    public ITripleStore getDB() {
-    	return evaluationContext.getAbstractTripleStore();
-    }
 
 }

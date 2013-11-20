@@ -349,12 +349,12 @@ public class JoinGroupNode extends GraphPatternGroup<IGroupMemberNode> {
         
     }
 
-    public List<IReorderableNode> getReorderableChildren(ITripleStore db) {
+    public List<IReorderableNode> getReorderableChildren() {
     	final List<IReorderableNode> nodes = getChildren(IReorderableNode.class);
     	final Iterator<IReorderableNode> it = nodes.iterator();
     	while (it.hasNext()) {
     		final IReorderableNode node = it.next();
-    		if (!node.isReorderable(db)) {
+    		if (!node.isReorderable()) {
     			it.remove();
     		}
     	}   	

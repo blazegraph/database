@@ -93,22 +93,22 @@ public class UnionNode extends GraphPatternGroup<JoinGroupNode>  implements IReo
     
 
 	@Override
- 	public long getEstimatedCardinality(StaticOptimizer optimizer, ITripleStore db) {
+ 	public long getEstimatedCardinality(StaticOptimizer optimizer) {
  		long cardinality = 0;
  		for (JoinGroupNode child : this) {
- 			StaticOptimizer opt = new StaticOptimizer(optimizer, child.getReorderableChildren(db));
+ 			StaticOptimizer opt = new StaticOptimizer(optimizer, child.getReorderableChildren());
  			cardinality += opt.getCardinality();
  		}
  		return cardinality;
  	}
 
 	@Override
-	public boolean isReorderable(ITripleStore db) {
+	public boolean isReorderable() {
 		for (JoinGroupNode child : this) {
 			for (IGroupMemberNode grandchild : child) {
 				if (! (grandchild instanceof IReorderableNode))
 					return false;
-				if (! ((IReorderableNode)grandchild).isReorderable(db))
+				if (! ((IReorderableNode)grandchild).isReorderable())
 					return false;
 			}
 		}

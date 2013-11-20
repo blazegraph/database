@@ -466,7 +466,7 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
 		/*
 		 * Let the optimizer handle the simple optionals too.
 		 */
-		final List<IReorderableNode> nodes = joinGroup.getReorderableChildren(ctx.getAbstractTripleStore());
+		final List<IReorderableNode> nodes = joinGroup.getReorderableChildren();
 		
 		if (!nodes.isEmpty()) {
 
