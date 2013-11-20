@@ -167,18 +167,28 @@ public class NV implements Serializable, Comparable<NV> {
      * Wrap name/value pairs as a map.
      * 
      * @param nameValuePairs
-     *            Pairs each being a string followed by an object, being the name value pair in the resulting map.
-     *            
+     *            Pairs each being a string followed by an object, being the
+     *            name value pair in the resulting map.
+     * 
      * @return The map.
      */
-    static public Map<String,Object> asMap(Object ... nameValuePairs) {
-		assert nameValuePairs.length % 2 == 0;
-		final Map<String,Object> rslt = new LinkedHashMap<String,Object>(nameValuePairs.length/2);
-		for (int i=0;i<nameValuePairs.length;i+=2) {
-			rslt.put((String)nameValuePairs[i], nameValuePairs[i+1]);
-		}
-		return rslt;
-	}
+    static public Map<String, Object> asMap(final Object... nameValuePairs) {
+
+        if (nameValuePairs.length % 2 != 0)
+            throw new IllegalArgumentException();
+
+        final Map<String, Object> rslt = new LinkedHashMap<String, Object>(
+                nameValuePairs.length / 2);
+
+        for (int i = 0; i < nameValuePairs.length; i += 2) {
+
+            rslt.put((String) nameValuePairs[i], nameValuePairs[i + 1]);
+
+        }
+
+        return rslt;
+
+    }
 
     /**
      * Wrap an array name/value pairs as a {@link Map}.
