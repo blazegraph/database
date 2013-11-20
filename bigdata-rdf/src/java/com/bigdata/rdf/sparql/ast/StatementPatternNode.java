@@ -636,7 +636,7 @@ public class StatementPatternNode extends
 	 * @see com.bigdata.rdf.sparql.ast.IReorderableNode#isReorderable()
 	 */
 	@Override
-	public boolean isReorderable(ITripleStore db) {
+	public boolean isReorderable() {
 		
 		return !isOptional();
 		
@@ -646,7 +646,7 @@ public class StatementPatternNode extends
 	 * @see com.bigdata.rdf.sparql.ast.IReorderableNode#getEstimatedCardinality()
 	 */
 	@Override
-	public long getEstimatedCardinality(StaticOptimizer opt, ITripleStore db) {
+	public long getEstimatedCardinality(StaticOptimizer opt) {
         
 		return getProperty(AST2BOpBase.Annotations.ESTIMATED_CARDINALITY, -1l);
         

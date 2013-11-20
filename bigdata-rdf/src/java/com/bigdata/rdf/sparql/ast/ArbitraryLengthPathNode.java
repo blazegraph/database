@@ -220,17 +220,17 @@ public class ArbitraryLengthPathNode
 
 	}
 
-//	@Override
-	public boolean isReorderable(ITripleStore db) {
+	@Override
+	public boolean isReorderable() {
 
-		final long estCard = getEstimatedCardinality(null, db);
+		final long estCard = getEstimatedCardinality(null);
 		
 		return estCard >= 0 && estCard < Long.MAX_VALUE;
 		
 	}
 
-//	@Override
-	public long getEstimatedCardinality(StaticOptimizer opt, ITripleStore db) {
+	@Override
+	public long getEstimatedCardinality(StaticOptimizer opt) {
 		
 		final JoinGroupNode group = subgroup();
 		
@@ -256,7 +256,10 @@ public class ArbitraryLengthPathNode
 				zeroMatchAdjustment = 1;
 				break;
 			case 2:
-				zeroMatchAdjustment = db.getURICount() + db.getBNodeCount(); // this is too big when we are looking in a reduced dataset
+				zeroMatchAdjustment =  Long.MAX_VALUE / 2;
+				// The following is more accurate, but more expensive and unnecessary.
+				// db.getURICount() + db.getBNodeCount(); 
+				System.err.println("adj: "+zeroMatchAdjustment);
 				break;
 			}
 		}

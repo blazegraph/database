@@ -44,7 +44,7 @@ public interface IReorderableNode extends IGroupMemberNode, IBindingProducerNode
 	 * by examining the type - individual instances of a particular type
 	 * may or may not be reorderable.
 	 */
-	boolean isReorderable(ITripleStore db);
+	boolean isReorderable();
 	
 	/**
 	 * Return the estimated cardinality - either the range count of a 
@@ -52,6 +52,6 @@ public interface IReorderableNode extends IGroupMemberNode, IBindingProducerNode
 	 * group.
 	 * @param opt This optimizer can be used to help work out the estimate
 	 */
-	long getEstimatedCardinality(StaticOptimizer opt, ITripleStore db);
+	long getEstimatedCardinality(StaticOptimizer opt);
 	
 }
