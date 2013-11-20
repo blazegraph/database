@@ -47,7 +47,7 @@ public class OR extends BOpBase implements BooleanValueExpression {
     }
 
 	/**
-     * Constructor required for {@link com.bigdata.bop.BOpUtility#deepCopy(FilterNode)}.
+     * Shallow copy constructor (required).
      */
     public OR(final BOp[] args, final Map<String, Object> anns) {
     	super(args, anns);
