@@ -106,6 +106,7 @@ import com.bigdata.rdf.sail.sparql.Bigdata2ASTSPARQLParser;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.AbstractASTEvaluationTestCase;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
+import com.bigdata.rdf.sparql.ast.eval.AbstractDataAndSPARQLTestCase.AbsHelper;
 import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
@@ -120,7 +121,7 @@ import com.bigdata.rdf.store.AbstractTripleStore;
  *          TODO Support manifest driven test suite.
  */
 public class AbstractDataDrivenSPARQLTestCase extends
-        AbstractASTEvaluationTestCase {
+        AbstractDataAndSPARQLTestCase {
 
     private static final Logger log = Logger
             .getLogger(AbstractDataDrivenSPARQLTestCase.class);
@@ -144,21 +145,14 @@ public class AbstractDataDrivenSPARQLTestCase extends
      * Note: This class was derived from the openrdf SPARQLQueryTest file (Aduna
      * BSD style license).
      */
-    public class TestHelper {
+    public class TestHelper extends AbsHelper {
 
-        private final String testURI;
         
-        private final String queryFileURL;
-        private final String[] dataFileURLs;
         private final String resultFileURL;
 
-        private final boolean laxCardinality;
         private final boolean checkOrder;
         
-        private final String queryStr;
-
-        private final ASTContainer astContainer;
-//        private final AST2BOpContext context;
+        
        
 //        private final PipelineOp queryPlan;
 
@@ -173,6 +167,7 @@ public class AbstractDataDrivenSPARQLTestCase extends
             return store;
             
         }
+        
         
         /**
          * 
@@ -199,7 +194,7 @@ public class AbstractDataDrivenSPARQLTestCase extends
                 throws Exception {
             
             this(testURI, queryFileURL, dataFileURL, resultFileURL,
-                    false/* laxCardinality */, false/* checkOrder */);
+                    false/* checkOrder */);
             
         }
 
@@ -208,17 +203,17 @@ public class AbstractDataDrivenSPARQLTestCase extends
                 throws Exception {
             
             this(testURI, queryFileURL, dataFileURLs, resultFileURL,
-                    false/* laxCardinality */, false/* checkOrder */);
+                    false/* checkOrder */);
             
         }
 
         public TestHelper(final String testURI, final String queryFileURL,
                 final String dataFileURL, final String resultFileURL,
-                final boolean laxCardinality, final boolean checkOrder)
+                final boolean checkOrder)
                 throws Exception {
             
             this(testURI, queryFileURL, new String[] { dataFileURL },
-                    resultFileURL, laxCardinality, checkOrder);
+                    resultFileURL, checkOrder);
 
         }
         
@@ -229,26 +224,21 @@ public class AbstractDataDrivenSPARQLTestCase extends
          * @param queryFileURL
          * @param dataFileURLs
          * @param resultFileURL
-         * @param laxCardinality
          * @param checkOrder
          * @throws Exception
          */
         public TestHelper(final String testURI, final String queryFileURL,
                 final String[] dataFileURLs, final String resultFileURL,
-                final boolean laxCardinality, final boolean checkOrder)
+                final boolean checkOrder)
                 throws Exception {
+        	super(getResourceAsString(queryFileURL));
 
             if (log.isInfoEnabled())
                 log.info("\ntestURI:\n" + testURI);
 
-            this.testURI = testURI;
-            this.queryFileURL = queryFileURL;
-            this.dataFileURLs = dataFileURLs;
             this.resultFileURL = resultFileURL;
-            this.laxCardinality = laxCardinality;
             this.checkOrder = checkOrder;
 
-            this.queryStr = getResourceAsString(queryFileURL);
 
             if (log.isInfoEnabled())
                 log.info("\nquery:\n" + queryStr);
@@ -514,9 +504,7 @@ public class AbstractDataDrivenSPARQLTestCase extends
 				final TupleQueryResult expectedResult)
 				throws QueryEvaluationException {
 
-			AbstractQueryEngineTestCase.compareTupleQueryResults(getName(),
-					testURI, store, astContainer, queryResult, expectedResult,
-					laxCardinality, checkOrder);
+			compareTupleQueryResults(queryResult, expectedResult, checkOrder);
 
 		}
 
@@ -526,125 +514,6 @@ public class AbstractDataDrivenSPARQLTestCase extends
 			AbstractQueryEngineTestCase.compareGraphs(getName(), queryResult,
 					expectedResult);
 		}
-
-		protected InputStream getResourceAsStream(final String resource) {
-
-            // try the classpath
-            InputStream is = getClass().getResourceAsStream(resource);
-
-            if (is == null) {
-
-                // Searching for the resource from the root of the class
-                // returned
-                // by getClass() (relative to the class' package) failed.
-                // Next try searching for the desired resource from the root
-                // of the jar; that is, search the jar file for an exact match
-                // of the input string.
-                is = getClass().getClassLoader().getResourceAsStream(resource);
-
-            }
-
-            if (is == null) {
-
-                final File file = new File(resource);
-
-                if (file.exists()) {
-
-                    try {
-
-                        is = new FileInputStream(resource);
-
-                    } catch (FileNotFoundException e) {
-
-                        throw new RuntimeException(e);
-
-                    }
-
-                }
-
-            }
-
-            if (is == null) {
-
-                try {
-
-                    is = new URL(resource).openStream();
-
-                } catch (MalformedURLException e) {
-
-                    /*
-                     * Ignore. we will handle the problem below if this was not
-                     * a URL.
-                     */
-
-                } catch (IOException e) {
-
-                    throw new RuntimeException(e);
-
-                }
-
-            }
-
-            if (is == null)
-                throw new RuntimeException("Not found: " + resource);
-
-            return is;
-
-        }
-
-        /**
-         * Return the contents of the resource.
-         * 
-         * @param resource
-         *            The resource.
-         * 
-         * @return It's contents.
-         */
-        protected String getResourceAsString(final String resource) {
-
-            final StringBuilder sb = new StringBuilder();
-
-            final InputStream is = getResourceAsStream(resource);
-
-            if (is == null)
-                throw new RuntimeException("Not found: " + resource);
-
-            try {
-
-                final LineNumberReader r = new LineNumberReader(
-                        new InputStreamReader(is));
-
-                String s;
-                while ((s = r.readLine()) != null) {
-
-                    sb.append(s);
-
-                    sb.append("\n");
-
-                }
-
-                return sb.toString();
-
-            } catch (IOException e) {
-
-                throw new RuntimeException(e);
-
-            } finally {
-
-                try {
-
-                    if (is != null)
-                        is.close();
-
-                } catch (IOException e) {
-
-                    throw new RuntimeException(e);
-
-                }
-
-            }
-
-        }
 
         /**
          * Load some RDF data.
@@ -658,50 +527,41 @@ public class AbstractDataDrivenSPARQLTestCase extends
          */
         protected long loadData(final String resource) {
 
-            final RDFFormat rdfFormat = RDFFormat.forFileName(resource);
-
-            final RDFParserFactory rdfParserFactory = RDFParserRegistry
-                    .getInstance().get(rdfFormat);
-
-            final RDFParser rdfParser = rdfParserFactory.getParser();
-
-            rdfParser.setValueFactory(store.getValueFactory());
-
-            rdfParser.setVerifyData(true);
-
-            rdfParser.setStopAtFirstError(true);
-
-            rdfParser.setDatatypeHandling(RDFParser.DatatypeHandling.IGNORE);
-
-            final AddStatementHandler handler = new AddStatementHandler();
-
-            handler.setContext(new URIImpl(new File(resource).toURI().toString()));
+    		return loadData(getResourceAsStream(resource), RDFFormat.forFileName(resource), new File(resource).toURI().toString());
             
-            rdfParser.setRDFHandler(handler);
-                        
-            /*
-             * Run the parser, which will cause statements to be inserted.
-             */
+        }
+       
+    }
+    
 
-            final InputStream is = getResourceAsStream(resource);
+	private static InputStream getResourceAsStream(final String resource) {
 
-            try {
+        // try the classpath
+        InputStream is = AbstractDataDrivenSPARQLTestCase.class.getResourceAsStream(resource);
 
-                rdfParser.parse(is, baseURI);
+        if (is == null) {
 
-                return handler.close();
+            // Searching for the resource from the root of the class
+            // returned
+            // by getClass() (relative to the class' package) failed.
+            // Next try searching for the desired resource from the root
+            // of the jar; that is, search the jar file for an exact match
+            // of the input string.
+            is =  AbstractDataDrivenSPARQLTestCase.class.getClassLoader().getResourceAsStream(resource);
 
-            } catch (Exception e) {
+        }
 
-                throw new RuntimeException(e);
+        if (is == null) {
 
-            } finally {
+            final File file = new File(resource);
+
+            if (file.exists()) {
 
                 try {
 
-                    is.close();
+                    is = new FileInputStream(resource);
 
-                } catch (IOException e) {
+                } catch (FileNotFoundException e) {
 
                     throw new RuntimeException(e);
 
@@ -711,62 +571,88 @@ public class AbstractDataDrivenSPARQLTestCase extends
 
         }
 
-        /**
-         * Helper class adds statements to the sail as they are visited by a
-         * parser.
-         */
-        private class AddStatementHandler extends RDFHandlerBase {
+        if (is == null) {
 
-            private final StatementBuffer<Statement> buffer;
+            try {
 
-            private Resource context = null;
-            
-            private long n = 0L;
+                is = new URL(resource).openStream();
 
-            public AddStatementHandler() {
+            } catch (MalformedURLException e) {
 
-                buffer = new StatementBuffer<Statement>(store, 100/* capacity */);
+                /*
+                 * Ignore. we will handle the problem below if this was not
+                 * a URL.
+                 */
 
-            }
+            } catch (IOException e) {
 
-            public void setContext(final Resource context) {
-
-                this.context = context;
-                
-            }
-            
-            public void handleStatement(final Statement stmt)
-                    throws RDFHandlerException {
-
-                final Resource s = stmt.getSubject();
-                final URI p = stmt.getPredicate();
-                final Value o = stmt.getObject();
-                final Resource c = stmt.getContext() == null ? this.context
-                        : stmt.getContext();
-
-                if (log.isDebugEnabled())
-                    log.debug("<" + s + "," + p + "," + o + "," + c + ">");
-
-                buffer.add(s, p, o, c, StatementEnum.Explicit);
-
-                n++;
+                throw new RuntimeException(e);
 
             }
 
-            /**
-             * 
-             * @return The #of statements visited by the parser.
-             */
-            public long close() {
+        }
 
-                buffer.flush();
+        if (is == null)
+            throw new RuntimeException("Not found: " + resource);
 
-                return n;
+        return is;
+
+    }
+
+    /**
+     * Return the contents of the resource.
+     * 
+     * @param resource
+     *            The resource.
+     * 
+     * @return It's contents.
+     */
+    private static String getResourceAsString(final String resource) {
+
+        final StringBuilder sb = new StringBuilder();
+
+        final InputStream is = getResourceAsStream(resource);
+
+        if (is == null)
+            throw new RuntimeException("Not found: " + resource);
+
+        try {
+
+            final LineNumberReader r = new LineNumberReader(
+                    new InputStreamReader(is));
+
+            String s;
+            while ((s = r.readLine()) != null) {
+
+                sb.append(s);
+
+                sb.append("\n");
+
+            }
+
+            return sb.toString();
+
+        } catch (IOException e) {
+
+            throw new RuntimeException(e);
+
+        } finally {
+
+            try {
+
+                if (is != null)
+                    is.close();
+
+            } catch (IOException e) {
+
+                throw new RuntimeException(e);
 
             }
 
         }
 
     }
+
+    
 
 }

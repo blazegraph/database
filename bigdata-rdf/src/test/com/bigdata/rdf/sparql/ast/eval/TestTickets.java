@@ -27,8 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.eval;
 
-import com.bigdata.BigdataStatics;
-
 /**
  * Test suite for tickets at <href a="http://sourceforge.net/apps/trac/bigdata">
  * trac </a>.
@@ -180,11 +178,6 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
 
     }
     public void test_ticket_748() throws Exception {
-    	// Concerning omitting the test with hash joins, see Trac776 and 
-    	// com.bigdata.rdf.internal.encoder.AbstractBindingSetEncoderTestCase.test_solutionWithOneMockIV()
-  
-    	if(AST2BOpContext.DEFAULT_NATIVE_HASH_JOINS && !BigdataStatics.runKnownBadTests)
-            return;
 
         new TestHelper("ticket748-subselect",// testURI,
                 "ticket748-subselect.rq",// queryFileURL
@@ -197,9 +190,6 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
 
     public void test_ticket_748a() throws Exception {
 
-    	if(AST2BOpContext.DEFAULT_NATIVE_HASH_JOINS && !BigdataStatics.runKnownBadTests)
-            return;
-
         new TestHelper("ticket748A-subselect",// testURI,
                 "ticket748A-subselect.rq",// queryFileURL
                 "ticket748-subselect.ttl",// dataFileURL
@@ -210,9 +200,6 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
 
     public void test_ticket_two_subselects_748() throws Exception {
 
-    	if(AST2BOpContext.DEFAULT_NATIVE_HASH_JOINS && !BigdataStatics.runKnownBadTests)
-            return;
-    	
         new TestHelper("ticket748-two-subselects",// testURI,
                 "ticket748-two-subselects.rq",// queryFileURL
                 "ticket748-two-subselects.ttl",// dataFileURL
@@ -224,9 +211,6 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
 
     public void test_ticket_two_subselects_748a() throws Exception {
 
-    	if(AST2BOpContext.DEFAULT_NATIVE_HASH_JOINS && !BigdataStatics.runKnownBadTests)
-            return;
-    	
         new TestHelper("ticket748A-two-subselects",// testURI,
                 "ticket748A-two-subselects.rq",// queryFileURL
                 "ticket748-two-subselects.ttl",// dataFileURL
@@ -263,7 +247,6 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
                 "ticket563-DistinctOrderBy.rq",// queryFileURL
                 "ticket563-DistinctOrderBy.n3",// dataFileURL
                 "ticket563-DistinctOrderBy.srx",// resultFileURL
-                false, // laxCardinality
                 true // checkOrder
         ).runTest();
 
@@ -276,7 +259,6 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
                 "aggregate-min.rq",// queryFileURL
                 "aggregate-min-max.ttl",// dataFileURL
                 "aggregate-min.srx",// resultFileURL
-                false, // laxCardinality
                 true // checkOrder
         ).runTest();
 
@@ -288,7 +270,6 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
                 "aggregate-max.rq",// queryFileURL
                 "aggregate-min-max.ttl",// dataFileURL
                 "aggregate-max.srx",// resultFileURL
-                false, // laxCardinality
                 true // checkOrder
         ).runTest();
 
@@ -300,7 +281,6 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
                 "aggregate-min1.rq",// queryFileURL
                 "aggregate-min-max.ttl",// dataFileURL
                 "aggregate-min1.srx",// resultFileURL
-                false, // laxCardinality
                 true // checkOrder
         ).runTest();
 
@@ -312,7 +292,6 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
                 "aggregate-max1.rq",// queryFileURL
                 "aggregate-min-max.ttl",// dataFileURL
                 "aggregate-max1.srx",// resultFileURL
-                false, // laxCardinality
                 true // checkOrder
         ).runTest();
 
@@ -324,7 +303,6 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
                 "aggregate-min2.rq",// queryFileURL
                 "aggregate-min-max.ttl",// dataFileURL
                 "aggregate-min2.srx",// resultFileURL
-                false, // laxCardinality
                 true // checkOrder
         ).runTest();
 
@@ -336,7 +314,6 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
                 "aggregate-max2.rq",// queryFileURL
                 "aggregate-min-max.ttl",// dataFileURL
                 "aggregate-max2.srx",// resultFileURL
-                false, // laxCardinality
                 true // checkOrder
         ).runTest();
 

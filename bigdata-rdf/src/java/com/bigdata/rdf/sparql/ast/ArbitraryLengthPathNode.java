@@ -11,7 +11,6 @@ import com.bigdata.bop.NV;
 import com.bigdata.rdf.sparql.ast.PathNode.PathMod;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpBase;
 import com.bigdata.rdf.sparql.ast.optimizers.StaticOptimizer;
-import com.bigdata.rdf.store.ITripleStore;
 
 /**
  * A special kind of AST node that represents the SPARQL 1.1 arbitrary length
