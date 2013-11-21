@@ -127,7 +127,6 @@ public class TestInclude extends AbstractDataDrivenSPARQLTestCase {
         		"include_01.rq",// query URL
         		"include_01.trig",// data URL
         		"include_01.srx",// results URL
-        		false,// lax cardinality
         		true  // check order(!)
         		);
 
@@ -238,7 +237,6 @@ public class TestInclude extends AbstractDataDrivenSPARQLTestCase {
         		"include_02.rq",// query URL
         		"include_02.trig",// data URL
         		"include_02.srx",// results URL
-        		false,// lax cardinality
         		true  // check order(!)
         		);
 
@@ -372,7 +370,6 @@ public class TestInclude extends AbstractDataDrivenSPARQLTestCase {
                 "include_03a.rq",// query URL
                 "include_03.trig",// data URL
                 "include_03.srx",// results URL
-                false,// lax cardinality
                 false // check order
                 );
 
@@ -519,7 +516,6 @@ public class TestInclude extends AbstractDataDrivenSPARQLTestCase {
         		"include_03.rq",// query URL
         		"include_03.trig",// data URL
         		"include_03.srx",// results URL
-        		false,// lax cardinality
         		false // check order
         		);
 

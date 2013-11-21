@@ -300,7 +300,6 @@ public class TestServiceRegistry extends AbstractBigdataExprBuilderTestCase {
 
                 // De-register alias
                 ServiceRegistry.getInstance().remove(serviceURI1);
-                ServiceRegistry.getInstance().remove(serviceURI2);
 
             }
 

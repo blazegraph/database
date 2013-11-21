@@ -757,7 +757,6 @@ public class TestTCK extends AbstractDataDrivenSPARQLTestCase {
                 "sparql11-order-02.rq",// queryFileURL
                 "sparql11-order-02.ttl",// dataFileURL
                 "sparql11-order-02.srx"// resultFileURL
-                ,false// laxCardinality
                 ,true// checkOrder
         ).runTest();
 
@@ -782,7 +781,6 @@ public class TestTCK extends AbstractDataDrivenSPARQLTestCase {
                 "sparql11-order-02-workaround.rq",// queryFileURL
                 "sparql11-order-02.ttl",// dataFileURL
                 "sparql11-order-02.srx"// resultFileURL
-                ,false// laxCardinality
                 ,true// checkOrder
         ).runTest();
 
@@ -806,7 +804,6 @@ public class TestTCK extends AbstractDataDrivenSPARQLTestCase {
                 "sparql11-order-03.rq",// queryFileURL
                 "sparql11-order-03.ttl",// dataFileURL
                 "sparql11-order-03.srx"// resultFileURL
-                ,false// laxCardinality
                 ,true// checkOrder
         ).runTest();
 
@@ -859,7 +856,6 @@ public class TestTCK extends AbstractDataDrivenSPARQLTestCase {
                 "join_with_no_shared_variables.rq",// queryFileURL
                 "join_with_no_shared_variables.ttl",// dataFileURL
                 "join_with_no_shared_variables.srx"// resultFileURL
-                ,false// laxCardinality
                 ,false// checkOrder
         ).runTest();
 
