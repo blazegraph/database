@@ -1051,6 +1051,13 @@ ${postInstallMessage}</echo>
             todir="${dist.bin}" />
       <chmod file="${dist.bin}/startHAServices" perm="755" />
 
+      <copy file="${src.resources}/bin/bigdataHA"
+            todir="${dist.bin}" />
+      <chmod file="${dist.bin}/bigdataHA" perm="755" />
+
+      <copy file="${src.resources}/bin/bigdataHAEnv"
+            todir="${dist.bin}" />
+
       <copy file="${src.resources}/bin/config/browser.config"
             todir="${dist.bin.config}" />
       <copy file="${src.resources}/bin/config/reggie.config"
