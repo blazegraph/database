@@ -31,6 +31,13 @@ pidFile=$lockDir/pid
 ##
 export JVM_OPTS="-server -Xmx4G -XX:MaxDirectMemorySize=3000m"
 
+# Apache River
+export GROUPS="$FEDNAME"
+export LOCATORS="jini://bigdata15/,jini://bigdata16/,jini://bigdata17/"
+
+# Apache Zookeeper
+export ZK_SERVERS="bigdata15:2081,bigdata16:2081,bigdata17:2081";
+
 ##
 # HAJournalServer configuration parameter overrides (see HAJournal.config).
 #
@@ -43,23 +50,29 @@ export JVM_OPTS="-server -Xmx4G -XX:MaxDirectMemorySize=3000m"
 # Note: Many of these properties have defaults.
 ##
 
-export FEDNAME=installTest
-export LOGICAL_SERVICE_ID=HAJournalServer-1
-export FED_DIR=$INSTALL_DIR
-export REPLICATION_FACTOR=3
-export HA_PORT=9090
-export NSS_PORT=8080
+# Conditional defaults for required properties.  These can (and should) be
+# overridden from the environment outside of this script.  The defaults are
+# not suitable for deployment.
+if [ -z "${FEDNAME}" ]; then
+   export FEDNAME=installTest
+fi
+if [ -z "${LOGICAL_SERVICE_ID}" ]; then
+   export LOGICAL_SERVICE_ID=HAJournalServer-1
+fi
+if [ -z "${FED_DIR}" ]; then
+   export FED_DIR=$INSTALL_DIR
+fi
+
+# All of these have defaults.
+#export REPLICATION_FACTOR=3
+#export HA_PORT=9090
+#export NSS_PORT=8080
 #export QUERY_THREAD_POOL_SIZE=
 #export COLLECT_QUEUE_STATISTICS=
 #export COLLECT_PLATFORM_STATISTICS=
 #export GANGLIA_REPORT=
 #export GANGLIA_LISTENER=
 #export SYSSTAT_DIR=
-
-#export GROUPS=
-#export LOCATORS=
-
-export ZK_SERVERS="bigdata15:2081,bigdata16:2081,bigdata17:2081";
 
 export HAOPTS="\
  -DFEDNAME=${FEDNAME}\
