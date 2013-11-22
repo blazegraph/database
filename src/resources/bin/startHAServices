@@ -1,0 +1,119 @@
+#!/bin/bash
+
+# Start the services and put the JVM in the background.  All services will
+# run in a single JVM.  See Apache River com.sun.jini.start.ServiceStarter
+# for more details.  The services are configured in the accompanying 
+# startHAServices.config file.  Specific configuration options for each
+# service are defined in the documentation for that service.  
+#
+# Note: One drawback with running each service in the same JVM is that the
+# GC load of all services is combined and all services would be suspended
+# at the same time by a Full GC pass.  If this is a problem, then you can
+# break out the river services (ClassServer and Reggie) into a separate 
+# ServiceStarter instance from the HAJournalServer.
+
+# The top-level of the installation.
+pushd `dirname $0` > /dev/null;cd ..;INSTALL_DIR=`pwd`;popd > /dev/null
+
+# Setup the directory for the pid of the ServiceStarter process.
+lockDir=${INSTALL_DIR}/var/lock
+mkdir -p $lockDir
+pidFile=$lockDir/pid
+
+##
+# ServiceStarter JVM options.
+#
+# The ServiceStarter is launched as a JVM with the following JVM options.
+# The other services (including the HAJournalServer) will run inside of 
+# this JVM. This is where you specify the size of the Java heap and the
+# size of the direct memory heap (used for the write cache buffers and
+# some related things).
+##
+export JVM_OPTS="-server -Xmx4G -XX:MaxDirectMemorySize=3000m"
+
+##
+# HAJournalServer configuration parameter overrides (see HAJournal.config).
+#
+# The bigdata HAJournal.config file may be heavily parameterized through 
+# environment variables that get passed through into the JVM started by 
+# this script and are thus made available to the HAJournalServer when it
+# interprets the contents of the HAJournal.config file. See HAJournal.config
+# for the meaning of these environment variables.
+#
+# Note: Many of these properties have defaults.
+##
+
+export FEDNAME=installTest
+export LOGICAL_SERVICE_ID=HAJournalServer-1
+export FED_DIR=$INSTALL_DIR
+export REPLICATION_FACTOR=3
+export HA_PORT=9090
+export NSS_PORT=8080
+#export QUERY_THREAD_POOL_SIZE=
+#export COLLECT_QUEUE_STATISTICS=
+#export COLLECT_PLATFORM_STATISTICS=
+#export GANGLIA_REPORT=
+#export GANGLIA_LISTENER=
+#export SYSSTAT_DIR=
+
+#export GROUPS=
+#export LOCATORS=
+
+export ZK_SERVERS="bigdata15:2081,bigdata16:2081,bigdata17:2081";
+
+export HAOPTS="\
+ -DFEDNAME=${FEDNAME}\
+ -DLOGICAL_SERVICE_ID=${LOGICAL_SERVICE_ID}\
+ -DFED_DIR=${FED_DIR}\
+ -DREPLICATION_FACTOR=${REPLICATION_FACTOR}\
+ -DHA_PORT=${HA_PORT}\
+ -DNSS_PORT=${NSS_PORT}\
+ -DQUERY_THREAD_POOL_SIZE=${QUERY_THREAD_POOL_SIZE}\
+ -DCOLLECT_QUEUE_STATISTICS=${COLLECT_QUEUE_STATISTICS}\
+ -DCOLLECT_PLATFORM_STATISTICS=${COLLECT_PLATFORM_STATISTICS}\
+ -DGANGLIA_REPORT=${GANGLIA_REPORT}\
+ -DSYSSTAT_DIR=${SYSSTAT_DIR}\
+ -Dcom.bigdata.counters.linux.sysstat.path=${SYSSTAT_DIR}\
+"
+
+##
+# ServiceStarter configuration parameters (see startHAServices.conf).
+##
+
+export LIB_DIR=${INSTALL_DIR}/lib
+export CONFIG_DIR=${INSTALL_DIR}/var/config
+export JINI_CLASS_SERVER_PORT=8081
+export JINI_CONFIG=${CONFIG_DIR}/jini/startHAServices.config
+export POLICY_FILE=${CONFIG_DIR}/policy/policy.all
+export LOGGING_CONFIG=${CONFIG_DIR}/logging/logging.properties
+export LOG4J_CONFIG=${CONFIG_DIR}/logging/log4jHA.properties
+
+# TODO Explicitly enumerate JARs so we can control order if necessary and
+# deploy on OS without find and tr.
+export HAJOURNAL_CLASSPATH=`find ${LIB_DIR} -name '*.jar' -print0 | tr '\0' ':'`
+
+export JAVA_OPTS="\
+ ${JVM_OPTS}\
+ -Djava.security.policy=${POLICY_FILE}\
+ -Djava.util.logging.config.file=${LOGGING_CONFIG}\
+ -Dlog4j.configuration=${LOG4J_CONFIG}\
+ -DLIB_DIR=${INSTALL_DIR}/lib\
+ -DLIBDL_DIR=${INSTALL_DIR}/lib-dl\
+ -DCONFIG_DIR=${CONFIG_DIR}\
+ -DPOLICY_FILE=${POLICY_FILE}\
+ -DJINI_CLASS_SERVER_PORT=${JINI_CLASS_SERVER_PORT}\
+ -DFEDNAME=${FEDNAME}\
+ -DHAJOURNAL_CLASSPATH=${HAJOURNAL_CLASSPATH}\
+"
+
+cmd="java ${JAVA_OPTS} \
+    -cp ${HAJOURNAL_CLASSPATH} \
+    com.sun.jini.start.ServiceStarter \
+    ${JINI_CONFIG}"
+echo "Running: $cmd"
+$cmd&
+pid=$!
+echo "PID=$pid"
+echo "$pid">$pidFile
+
+# Note: To obtain the pid, do: read pid < "$pidFile"
