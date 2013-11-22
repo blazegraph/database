@@ -427,4 +427,30 @@ public class ConfigMath {
 
     }
 
+    /**
+     * Return the value for the named property -or- the default value if the
+     * property name is not defined or evaluates to an empty string after
+     * trimming any whitespace.
+     * 
+     * @param key
+     *            The property name.
+     * @param def
+     *            The default value.
+     * @return The value for the named property -or- the default value if the
+     *         property name is not defined or evaluates to an empty string
+     *         after trimming any whitespace.
+     */
+    public static String getProperty(final String key, final String def) {
+
+        String tmp = System.getProperty(key);
+
+        if (tmp == null || tmp.trim().length() == 0) {
+
+            return def;
+        }
+
+        return tmp;
+
+    }
+
 }
