@@ -79,6 +79,9 @@ public class TestAll extends TestCase {
 
         final TestSuite suite = new TestSuite("jini");
 
+        // jini configuration helpers.
+        suite.addTest(com.bigdata.jini.util.TestAll.suite());
+
         // zookeeper client library (queues, locks, etc).
         suite.addTest(com.bigdata.zookeeper.TestAll.suite());
 

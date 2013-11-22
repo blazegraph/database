@@ -28,9 +28,14 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.jini.util;
 
 import java.io.File;
+import java.net.MalformedURLException;
 import java.util.concurrent.TimeUnit;
 
+import javax.net.SocketFactory;
+
 import net.jini.config.Configuration;
+import net.jini.core.discovery.LookupLocator;
+import net.jini.discovery.LookupDiscovery;
 
 import com.sun.jini.config.ConfigUtil;
 
@@ -331,5 +336,95 @@ public class ConfigMath {
         return o != null;
         
     }
-    
+
+    /**
+     * Parse a comma delimited list of zero or more unicast URIs of the form
+     * <code>jini://host/</code> or <code>jini://host:port/</code>.
+     * <p>
+     * This MAY be an empty array if you want to use multicast discovery
+     * <strong>and</strong> you have specified the groups as
+     * {@link LookupDiscovery#ALL_GROUPS} (a <code>null</code>).
+     * <p>
+     * Note: This method is intended for overrides expressed from scripts using
+     * environment variables where we need to parse an interpret the value
+     * rather than given the value directly in a {@link Configuration} file. As
+     * a consequence, you can not specify the optional {@link SocketFactory} for
+     * the {@link LookupLocator} with this method.
+     * 
+     * @param locators
+     *            The locators, expressed as a comma delimited list of URIs.
+     * 
+     * @return An array of zero or more {@link LookupLocator}s.
+     * 
+     * @throws MalformedURLException
+     *             if any of the parse URLs is invalid.
+     * 
+     * @throws IllegalArgumentException
+     *             if the <i>locators</i> is <code>null</code>.
+     */
+    public static LookupLocator[] getLocators(final String locators)
+            throws MalformedURLException {
+
+        if (locators == null)
+            throw new IllegalArgumentException();
+
+        final String[] a = locators.split(",");
+
+        final LookupLocator[] b = new LookupLocator[a.length];
+
+        if (a.length == 1 && a[0].trim().length() == 0) {
+
+            return new LookupLocator[0];
+
+        }
+        
+        for (int i = 0; i < a.length; i++) {
+
+            final String urlStr = a[i];
+
+            final LookupLocator locator = new LookupLocator(urlStr);
+
+            b[i] = locator;
+            
+        }
+        
+        return b;
+
+    }
+
+    /**
+     * Return an array of zero or more groups -or- <code>null</code> if the
+     * given argument is either <code>null</code> or <code>"null"</code>.
+     * <p>
+     * Note: a <code>null</code> corresponds to
+     * {@link LookupDiscovery#ALL_GROUPS}. This option is only permissible when
+     * you have a single setup and are using multicast discovery. In all other
+     * cases, you need to specify the group(s).
+     * 
+     * @param groups
+     *            The groups, expressed as a comma delimited list or zero or
+     *            more groups.
+     *            
+     * @return A string array parsed out of that argument.
+     */
+    public static String[] getGroups(final String groups) {
+
+        if (groups == null)
+            return null;
+
+        if (groups.trim().equals("null"))
+            return null;
+        
+        final String[] a = groups.split(",");
+
+        if (a.length == 1 && a[0].trim().length() == 0) {
+
+            return new String[0];
+
+        }
+        
+        return a;
+
+    }
+
 }
