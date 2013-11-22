@@ -74,7 +74,7 @@ fi
 #export GANGLIA_LISTENER=
 #export SYSSTAT_DIR=
 
-export HAOPTS="\
+export HA_OPTS="\
  -DFEDNAME=${FEDNAME}\
  -DLOGICAL_SERVICE_ID=${LOGICAL_SERVICE_ID}\
  -DFED_DIR=${FED_DIR}\
@@ -107,6 +107,7 @@ export HAJOURNAL_CLASSPATH=`find ${LIB_DIR} -name '*.jar' -print0 | tr '\0' ':'`
 
 export JAVA_OPTS="\
  ${JVM_OPTS}\
+ ${HA_OPTS}\
  -Djava.security.policy=${POLICY_FILE}\
  -Djava.util.logging.config.file=${LOGGING_CONFIG}\
  -Dlog4j.configuration=${LOG4J_CONFIG}\
@@ -115,7 +116,6 @@ export JAVA_OPTS="\
  -DCONFIG_DIR=${CONFIG_DIR}\
  -DPOLICY_FILE=${POLICY_FILE}\
  -DJINI_CLASS_SERVER_PORT=${JINI_CLASS_SERVER_PORT}\
- -DFEDNAME=${FEDNAME}\
  -DHAJOURNAL_CLASSPATH=${HAJOURNAL_CLASSPATH}\
 "
 
