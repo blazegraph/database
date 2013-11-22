@@ -556,6 +556,17 @@ public class HAJournalServer extends AbstractServer {
 
         super(args, lifeCycle);
 
+        /*
+         * Start the HAJournalServer and wait for it to terminate.
+         * 
+         * Note: This is invoked from within the constructor of the concrete
+         * service class. This ensures that all initialization of the service is
+         * complete and is compatible with the Apache River ServiceStarter
+         * (doing this in main() is not compatible since the ServiceStarter does
+         * not expect the service to implement Runnable).
+         */
+        run();
+        
     }
 
     /*
@@ -4541,9 +4552,19 @@ public class HAJournalServer extends AbstractServer {
         final HAJournalServer server = new HAJournalServer(args,
                 new FakeLifeCycle());
 
-        // Wait for the HAJournalServer to terminate.
-        server.run();
+        /*
+         * Note: The server.run() call was pushed into the constructor to be
+         * compatible with the ServiceStarter pattern.
+         */
+//        // Wait for the HAJournalServer to terminate.
+//        server.run();
         
+        /*
+         * Note: The System.exit() call here appears to be required for the
+         * timely release of allocated ports. Commenting out this line tends to
+         * cause startup failures in CI due to ports that are already (aka,
+         * "still") bound.
+         */
         System.exit(0);
 
     }

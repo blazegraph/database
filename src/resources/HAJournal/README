@@ -2,7 +2,9 @@ This directory contains some sample configuration for a highly available
 Journal.  
 
 Note: The bigdata scripts bundled in this directory are designed to be run
-from the root directory of the SVN checkout of the bigdata code base.
+from the root directory of the SVN checkout of the bigdata code base. This
+is used for developers.  The installation is done using the top-level ant
+build file and the "ant deploy-artifact" target.
 
 The basic procedure is:
 
@@ -68,8 +70,8 @@ HAJournalServer.sh - A shell script that will start the HAJournalServer.
                      commit point when the quorum is fully met.  These HALog files
                      can get large if you are doing a long running update.
 
-log4j.properties - A default log4j configuration file for use by the bigdata
-                   services.
+log4jHA.properties - A default log4j configuration file for use by the bigdata
+                     services.
 				   
 logging.properties - A default Java logging configuration.  This may be used
 					 to control the log levels for jini/river components inside
@@ -78,4 +80,3 @@ logging.properties - A default Java logging configuration.  This may be used
 
 policy.all - A default java permissions file.  This file grants ALL permissions.
 			 You may specify a more rigorous security policy.
-

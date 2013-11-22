@@ -1047,6 +1047,10 @@ ${postInstallMessage}</echo>
             todir="${dist.bin}" />
       <chmod file="${dist.bin}/pstart" perm="755" />
 
+      <copy file="${src.resources}/bin/startHAServices"
+            todir="${dist.bin}" />
+      <chmod file="${dist.bin}/startHAServices" perm="755" />
+
       <copy file="${src.resources}/bin/config/browser.config"
             todir="${dist.bin.config}" />
       <copy file="${src.resources}/bin/config/reggie.config"
@@ -1082,6 +1086,10 @@ ${postInstallMessage}</echo>
       <copy file="${server.log4j.from.file}"
             todir="${logging.to.path}" />
 
+      <property name="haserver.log4j.from.file" location="${src.resources}/HAJournal/log4jHA.properties" />
+      <copy file="${haserver.log4j.from.file}"
+            todir="${logging.to.path}" />
+
       <!-- Stage service-specific logging config file -->
 
       <property name="bigdata-jini.root" location="${bigdata-jini.dir}/src/java/com/bigdata" />
@@ -1108,6 +1116,12 @@ ${postInstallMessage}</echo>
       <copy file="${src.resources.config}/bigdataCluster16.config"
             todir="${dist.var.config.jini}" />
 
+      <!-- Stage the HAJournal service config file -->
+      <copy file="${src.resources}/HAJournal/HAJournal.config"
+            todir="${dist.var.config.jini}" />
+      <copy file="${src.resources}/HAJournal/startHAServices.config"
+            todir="${dist.var.config.jini}" />
+
       <!-- Stage the infrastructure service config files -->
 
       <copy file="${src.resources.config}/jini/reggie.config"
@@ -1117,7 +1131,7 @@ ${postInstallMessage}</echo>
       <copy file="${src.resources.config}/jini/startAll.config"
             todir="${dist.var.config.jini}" />
     	
-	  <!-- Stage top-level license file and copyright NOTICE file. -->
+    	<!-- Stage top-level license file and copyright NOTICE file. -->
 	  <copy toDir="${dist.doc}">
         <fileset file="${bigdata.dir}/LICENSE.txt"/>
         <fileset file="${bigdata.dir}/NOTICE"/>
@@ -1183,6 +1197,7 @@ ${postInstallMessage}</echo>
           <include name="bigdata/**" />
           <exclude name="bigdata/bin/disco-tool" />
           <exclude name="bigdata/bin/pstart" />
+          <exclude name="bigdata/bin/startHAServices" />
         </tarfileset>
 
         <!-- Add scripts separately, making them executable -->
@@ -1190,6 +1205,7 @@ ${postInstallMessage}</echo>
         <tarfileset dir="${bigdata.dir}/dist" filemode="755">
           <include name="bigdata/bin/disco-tool" />
           <include name="bigdata/bin/pstart" />
+          <include name="bigdata/bin/startHAServices" />
         </tarfileset>
       </tar>
 
@@ -1325,6 +1341,7 @@ ${postInstallMessage}</echo>
 
           <exclude name="dist/bigdata/bin/disco-tool" />
           <exclude name="dist/bigdata/bin/pstart" />
+          <exclude name="dist/bigdata/bin/startHAServices" /> 
         </tarfileset>
 
         <!-- Add dist files separately, minus scripts -->
@@ -1333,6 +1350,7 @@ ${postInstallMessage}</echo>
           <include name="dist/bigdata/**" />
           <exclude name="dist/bigdata/bin/disco-tool" />
           <exclude name="dist/bigdata/bin/pstart" />
+          <exclude name="dist/bigdata/bin/startHAServices" />
         </tarfileset>
 
         <!-- Add dist scripts separately, making them executable -->
@@ -1340,6 +1358,7 @@ ${postInstallMessage}</echo>
         <tarfileset dir="${bigdata.dir}" prefix="${version}" filemode="755">
           <include name="dist/bigdata/bin/disco-tool" />
           <include name="dist/bigdata/bin/pstart" />
+          <include name="dist/bigdata/bin/startHAServices" />
         </tarfileset>
       </tar>
 

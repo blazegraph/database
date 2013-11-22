@@ -1816,7 +1816,13 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
     }
     
     /**
-     * Run the server (this should be invoked from <code>main</code>.
+     * Start the HAJournalServer and wait for it to terminate.
+     * <p>
+     * Note: This is invoked from within the constructor of the concrete service
+     * class. This ensures that all initialization of the service is complete
+     * and is compatible with the Apache River ServiceStarter (doing this in
+     * main() is not compatible since the ServiceStarter does not expect the
+     * service to implement Runnable).
      */
     @Override
     public void run() {
