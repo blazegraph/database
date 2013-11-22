@@ -36,8 +36,6 @@ import java.util.Map;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.counters.AbstractStatisticsCollector;
-
 /**
  * Some utility methods related to integration with <code>sysstat</code>.
  * 
@@ -46,14 +44,19 @@ import com.bigdata.counters.AbstractStatisticsCollector;
  */
 public class SysstatUtil {
 
-    final protected static Logger log = Logger
-            .getLogger(AbstractStatisticsCollector.class);
+    final private static Logger log = Logger.getLogger(SysstatUtil.class);
 
     public interface Options {
+        /**
+         * The name of the optional property whose value specifies the default
+         * location of the SYSSTAT package (pidstat, iostat, etc) (default
+         * {@value #DEFAULT_PATH}).
+         * 
+         * @see #DEFAULT_PATH
+         */
+        String PATH = "com.bigdata.counters.linux.sysstat.path";
     	
-    	String PATH = "com.bigdata.counters.linux.sysstat.path";
-    	
-    	String DEFAULT_PATH = "/usr/bin";
+        String DEFAULT_PATH = "/usr/bin";
     }
 
 	/**
@@ -73,8 +76,8 @@ public class SysstatUtil {
     static public final File getPath(final String cmd) {
 
 		File f, path;
-		final File configuredPath = path = new File(System.getProperty(Options.PATH,
-				Options.DEFAULT_PATH));
+        final File configuredPath = path = new File(System.getProperty(
+                Options.PATH, Options.DEFAULT_PATH));
 
         if (log.isInfoEnabled())
             log.info(Options.PATH + "=" + configuredPath);
