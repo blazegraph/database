@@ -1218,6 +1218,46 @@ ${postInstallMessage}</echo>
 
     </target>
 
+    <!-- FIXME DEBUG and add 'depends="javadoc, stage" (should stage stage javadoc?)' -->
+    <!-- Note: can require 'rpm' and 'rpm-build. -->
+    <!-- TODO: We do not need both this and "deploy-artifact". -->
+    <target name="rpm" depends="prepare" description="Build RPM installer.">
+      <property name="rpm.dir" value="${build.dir}/rpm" />
+      <property name="stage.dir" value="dist" />
+      <mkdir dir="${rpm.dir}" />
+      <mkdir dir="${rpm.dir}/BUILD" />
+      <mkdir dir="${rpm.dir}/BUILDROOT" />
+      <mkdir dir="${rpm.dir}/RPMS" />
+      <mkdir dir="${rpm.dir}/SOURCES" />
+      <mkdir dir="${rpm.dir}/SPECS" />
+      <mkdir dir="${rpm.dir}/SRPMS" />
+      <copy file="${bigdata.dir}/src/resources/rpm/bigdata.spec" todir="${rpm.dir}/SPECS"/>
+      <!-- build version of tarball that includes the version number in the filename. -->
+      <copydir dest="${rpm.dir}/SOURCES/${version}" src="${stage.dir}/bigdata" />
+      <tar destfile="${rpm.dir}/SOURCES/${version}.tar.gz"
+           compression="gzip">
+        <tarfileset dir="${rpm.dir}/SOURCES">
+          <include name="${version}/**" />
+          <exclude name="${version}/bin/disco-tool" />
+          <exclude name="${version}/bin/pstart" />
+          <exclude name="${version}/bin/startHAServices" />
+        </tarfileset>
+        <!-- Add scripts separately, making them executable -->
+        <tarfileset dir="${rpm.dir}/SOURCES" filemode="755">
+          <include name="${version}/bin/disco-tool" />
+          <include name="${version}/bin/pstart" />
+          <include name="${version}/bin/startHAServices" />
+        </tarfileset>
+      </tar>
+<!--      <copy file="${bigdata.dir}/REL.${version}.tgz" tofile="${rpm.dir}/SOURCES/${version}.tar.gz"/> -->
+      <rpm
+        specFile="bigdata.spec"
+        topDir="ant-build/rpm"
+        cleanBuildDir="true"
+        failOnError="false"/>
+
+    </target>
+
     <target name="ant-install-prepare" depends="jar, bundle"
             description="Stage all files (src, lib, config, etc.) needed for ant based install.">
 
