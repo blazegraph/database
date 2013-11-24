@@ -31,13 +31,6 @@ pidFile=$lockDir/pid
 ##
 export JVM_OPTS="-server -Xmx4G -XX:MaxDirectMemorySize=3000m"
 
-# Apache River
-export GROUPS="$FEDNAME"
-export LOCATORS="jini://bigdata15/,jini://bigdata16/,jini://bigdata17/"
-
-# Apache Zookeeper
-export ZK_SERVERS="bigdata15:2081,bigdata16:2081,bigdata17:2081";
-
 ##
 # HAJournalServer configuration parameter overrides (see HAJournal.config).
 #
@@ -61,6 +54,15 @@ if [ -z "${LOGICAL_SERVICE_ID}" ]; then
 fi
 if [ -z "${FED_DIR}" ]; then
    export FED_DIR=$INSTALL_DIR
+fi
+if [ -z "${GROUPS}" ]; then
+    export GROUPS="$FEDNAME"
+fi
+if [ -z "${LOCATORS}" ]; then
+    export LOCATORS="jini://bigdata15/,jini://bigdata16/,jini://bigdata17/"
+fi
+if [ -z "${ZK_SERVERS}" ]; then
+    export ZK_SERVERS="bigdata15:2081,bigdata16:2081,bigdata17:2081";
 fi
 
 # All of these have defaults.
