@@ -1,82 +1,141 @@
-This directory contains some sample configuration for a highly available
-Journal.  
+Bigdata Highly Available Replication Cluster
 
-Note: The bigdata scripts bundled in this directory are designed to be run
-from the root directory of the SVN checkout of the bigdata code base. This
-is used for developers.  The installation is done using the top-level ant
-build file and the "ant deploy-artifact" target.
+========== INSTALL ==========
 
-The basic procedure is:
+0. The nodes MUST have synchronized clocks, both for logging and to
+   ensure that the transaction services have closely correlated clocks
+   for assigning timestamps.  Make sure that ntp or a similar service
+   is running to synchronize the clocks.
 
-0. The nodes MUST have synchronized clocks, both for logging and to ensure
-   that the transaction services have closely correlated clocks for assigning
-   timestamps.  Make sure that ntp or a similar service is running to synchronize
-   the clocks.
+1. Edit the various configuration files.  At a minimum, you must edit
+   bigdataHA.conf.
 
-1. Edit the various configuration files.  You will have to specify the
-   replicationFactor for the HAJournal in the HAJournal.config file.  Make
-   sure to check all the configuration properties.
+2. Make sure that ZooKeeper is up and running with a consistent
+   configuration and that it is logging somewhere where you can find
+   the log later. For a highly available ZooKeeper configuration, you
+   need to be running at least 3 ZooKeeper nodes.  Consult the
+   ZooKeeper documentation for more information.
 
-2. Make sure that zookeeper is up and running with a consistent configuration
-   and that it is logging somewhere where you can find the log later.  A good
-   approach is to use nohup so the console output will wind up in the directory
-   from which you start zookeeper.  Do not put zookeeper in the background or
-   it can block once the console buffer is full.  For a highly available zk
-   configuration, you need to be running at least 3 zk nodes.  Consult the zk
-   documentation for more information.
+   Bigdata does NOT start/stop Apache ZooKeeper. ZooKeeper is
+   generally administered separately.  If you are not already using
+   Apache ZooKeeper, then you should install three VMs with Apache
+   ZooKeeper onto machines with fixed IP addresses.
 
-3. Start the ClassServer on each machine.  This will let the service registrar
-   find the downloadable jars on that machine.
+   Note: If you begin with a standalone ZooKeeper instance, then you
+   WILL NOT be able to automatically migrate to a highly available
+   configuration without stopping your standalone ZooKeeper instance.
+   Your life will be significantly easier if you begin with a highly
+   available ZooKeeper instance.  Bigdata does not put a heavy load on
+   ZooKeeper, but running bigdata and ZooKeeper on the same instances
+   will make it more complex to administer your environment since
+   stopping a single node will reduce availability for both ZooKeeper
+   and bigdata.  A recommended practice is to allocate three ZooKeeper
+   VMs with fixed IP addresses when you begin to setup your bigdata
+   cluster.
 
-4. Start the service registrar on at least one machine (as configured by
-   the locators).  A highly available jini/river service will run multiple
-   service registrar and provide either multiple unicast locators or support
-   multicast discovery of the service registrar.  Consult the jini/river
-   documentation for more information.
+3. Once Apache ZooKeeper is setup, do:
+
+      sudo /etc/init.d bigdataHA start
+
+   This will start the ClassServer, the service registrar (Reggie),
+   and the HAJournalServer.  All of these processes will run inside of
+   a single JVM named "ServiceStarter". See below for more information
+   on these services.
+
+========== KEY FILES ==========
+
+/etc/init.d/bigdataHA
+
+   An init.d script to start/stop of bigdata HA.
+
+/etc/bigdata/bigdataHA.conf - configuration for the HA installation.
+
+   This script is sourced by /etc/init.d/bigdataHA and provides the
+   critical configuration variables for your installation.  The
+   environment variables set in this script are passed through into
+   startHAServices and from there into the HAJournal.config file.  You
+   need to review these settings.
+
+The following are located under the installation root:
+
+bin/startHAServices
+
+  Script runs the Apache River ServiceStarter.
+
+bin/disco-tool
+
+  A utility that can be used to identify running Apache River
+  services.
+
+doc/
+
+  Documentation.
+
+lib/
+
+  The bigdata jar and other dependencies.
+
+lib-dl/
+
+  Downloadable jars for Apache River.
+
+lib-ext/
+
+  Security policy provider for Apache River.
+
+var/config/startHAServices.config 
+
+  An Apache River ServiceStarter configuration for starting:
+  
+    - ClassServer : This provides downloadable code for the lib-dl
+      directory required to run Reggie.  An instance of this service
+      is started on every node.
+
+    - Reggie : This is the Apache River service registrar.  Bigdata
+      services discover service registrars using locators and then
+      register themselves. The service registrar is also used by the
+      bigdata services to discover one another. The set of locators is
+      defined using the LOCATORS environment variable in
+      /etc/bigdata/bigdataHA.config; and
+
+    - HAJournalServer : This is the highly available bigdata graph
+      database engine and RDF/SPARQL end point.  The service process
+      maintains all of its state in the "serviceDir". The location of
+      that directory is determined by the FED_DIR environment variable
+      and the HAJournal.config file.  Important files in this
+      directory include:
+
+	serviceDir/service.id     - the assigned ServiceID for this service.
+	serviceDir/bigdata-ha.jnl - the journal data file.
+   	serviceDir/HALog/*        - the transaction log files.
+	serviceDir/snapshot       - full backups of the journal.
+
+var/config/HAJournal.config 
+
+  An Apache River configuration file for HAJournalServer.  You should
+  review the settings in this file.  The most relevant will be the
+  configuration parameters for the default kb instance, especially
+  whether it is in triples mode or quads mode.  The configuration
+  parameters for the journal are also specified in this file.  Many,
+  but not all, parameters can be overridden through environment
+  variables defined in /etc/bigdata/bigdataHA.config. This file is
+  also used to configure the online backup policy (snapshotPolicy) and
+  point in time restore window (restorePolicy).
+
+var/logging/log4jHA.properties
+
+   The HAJournalServer log4j configuration file.  Note: The default
+   log4j configuration writes onto a file named "HAJournalServer.log"
+   -- that is where you need to look for errors and any other
+   information about the running HAJournalServer process.
+
+var/logging/logging.properties
+
+   A default Java logging configuration.  This may be used to control
+   the log levels for jini/river components inside of the bigdata
+   services. Those components use java logging rather than log4j.
+
+var/policy/policy.all
    
-5. Start the HAJournalServer on [k] machines, where [k] is the replication
-   factor you specified in the HAJournal.config file.  The quorum should
-   meet once (k+1)/2 services join (majority rule).  At this point one of
-   the nodes will be elected as the leader.  You can write on that node
-   (e.g., using SPARQL UPDATE).  You can read on any node that is joined
-   with the met quorum.
-   
-   Note: The default log4j configuration writes onto a file named 
-   "HAJournalServer.log" -- that is where you need to look for errors
-   and any other information about the running HAJournalServer process.
-
-A brief description of the files in this directory follows:
-
-HAJournal.env - A shell script containing sample configuration values. This
-                is sourced by the various scripts.  You need to review all
-                of these settings.
-
-HAJournal.config - A sample configuration file for the HAJournalServer. You
-                   need to review the settings in this file as well.
-
-classServer.sh - A shell script that will start the jini class server (for
-                 downloadable code).
-                 
-lookupStarter.sh - A shell script that will start the jini service registrar.
-
-HAJournalServer.sh - A shell script that will start the HAJournalServer. 
-
-                     The server process will create a directory in which it 
-                     logs the replicated writes in case other services need to 
-                     resynchronize.  This directory is named "HALog" by default
-                     and may be located on a normal disk.  The ha-log files in
-                     that directory are pure append files and do not need to be
-                     on a fast disk.  The ha-log files will be purged at any
-                     commit point when the quorum is fully met.  These HALog files
-                     can get large if you are doing a long running update.
-
-log4jHA.properties - A default log4j configuration file for use by the bigdata
-                     services.
-				   
-logging.properties - A default Java logging configuration.  This may be used
-					 to control the log levels for jini/river components inside
-					 of the bigdata services. Those components use java logging
-					 rather than log4j.
-
-policy.all - A default java permissions file.  This file grants ALL permissions.
-			 You may specify a more rigorous security policy.
+   A default java permissions file.  This file grants ALL permissions.
+   You may specify a more rigorous security policy.
