@@ -880,6 +880,9 @@ ${postInstallMessage}</echo>
       <mkdir dir="${dist.var.config.jini}" />
       <mkdir dir="${dist.doc}" />
       <mkdir dir="${dist.doc.legal}" />
+      <mkdir dir="${dist.dir}/etc" />
+      <mkdir dir="${dist.dir}/etc/init.d" />
+      <mkdir dir="${dist.dir}/etc/bigdata" />
 
       <!-- Copy the jar files created by the jar target to        -->
       <!-- an application-specific but non-version-specific       -->
@@ -1051,12 +1054,12 @@ ${postInstallMessage}</echo>
             todir="${dist.bin}" />
       <chmod file="${dist.bin}/startHAServices" perm="755" />
 
-      <copy file="${src.resources}/bin/bigdataHA"
-            todir="${dist.bin}" />
-      <chmod file="${dist.bin}/bigdataHA" perm="755" />
+      <copy file="${src.resources}/etc/init.d/bigdataHA"
+            todir="${dist.dir}/etc/init.d" />
+      <chmod file="${dist.dir}/etc/init.d/bigdataHA" perm="755" />
 
-      <copy file="${src.resources}/bin/bigdataHAEnv"
-            todir="${dist.bin}" />
+      <copy file="${src.resources}/etc/bigdata/bigdataHA.config"
+            todir="${dist.dir}/etc/bigdata" />
 
       <copy file="${src.resources}/bin/config/browser.config"
             todir="${dist.bin.config}" />
@@ -1150,6 +1153,18 @@ ${postInstallMessage}</echo>
     	  <include name="**/LEGAL/*" />
     	</fileset>
       </copy>
+
+    	<!-- Stage README. -->
+      <copy file="${src.resources}/HAJournal/README"
+            todir="${dist.dir}/doc" />
+
+      	<!-- Stage documentation from the wiki. -->
+      <get dest="${dist.doc}/HAJournalServer.html"
+          src="http://sourceforge.net/apps/mediawiki/bigdata/index.php?title=HAJournalServer&amp;printable=yes"
+         />
+      <get dest="${dist.doc}/NanoSparqlServer.html" 
+          src="http://sourceforge.net/apps/mediawiki/bigdata/index.php?title=NanoSparqlServer&amp;printable=yes"
+         />
     	
     </target>
 
@@ -1193,6 +1208,14 @@ ${postInstallMessage}</echo>
 	bigdata/doc/LEGAL - license files for dependencies.
 	bigdata/doc/LICENSE.txt - bigdata license file.
 	bigdata/doc/NOTICE - copyright NOTICE files.
+	bigdata/doc/docs - javadoc (FIXME INSTALL JAVADOC, HA wiki page)
+	bigdata/etc/init.d/bigdataHA - HA services start/stop script.
+	bigdata/etc/bigdata/bigdataHA.config - HA services required config file.
+	
+	Note: This directory structure is currently reused for the rpm, but the
+	top-level of the rpm directory structure includes the release version as
+	bigdata.X.Y.Z rather than just "bigdata".  I think that this is a better
+	practice and the two may be converged.
 	-->
     <target name="deploy-artifact" depends="clean, stage"
             description="Create compressed tar file for deployment.">

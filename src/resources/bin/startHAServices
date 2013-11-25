@@ -65,17 +65,6 @@ if [ -z "${ZK_SERVERS}" ]; then
     export ZK_SERVERS="bigdata15:2081,bigdata16:2081,bigdata17:2081";
 fi
 
-# All of these have defaults.
-#export REPLICATION_FACTOR=3
-#export HA_PORT=9090
-#export NSS_PORT=8080
-#export QUERY_THREAD_POOL_SIZE=
-#export COLLECT_QUEUE_STATISTICS=
-#export COLLECT_PLATFORM_STATISTICS=
-#export GANGLIA_REPORT=
-#export GANGLIA_LISTENER=
-#export SYSSTAT_DIR=
-
 export HA_OPTS="\
  -DFEDNAME=${FEDNAME}\
  -DLOGICAL_SERVICE_ID=${LOGICAL_SERVICE_ID}\
