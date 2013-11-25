@@ -9,7 +9,8 @@ Source0: %{name}-%{version}.tar.gz
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root
 BuildArch: noarch
 
-Requires: java
+Requires: java >= 1.6
+Requires: zookeeper >= 3.3
 
 %description
 
@@ -18,7 +19,7 @@ Bigdata is a horizontally-scaled, open-source architecture for indexed data with
 Distributed processing offers greater throughput but does not reduce query or update latency.  Choose the Journal when the anticipated scale and throughput requirements permit.  Choose the HAJournalServer for high availability and linear scaling in query throughput.  Choose the Federation when the administrative and machine overhead associated with operating a cluster is an acceptable tradeoff to have essentially unlimited data scaling and throughput.
 
 %package javadoc
-Summary:        API documentation for %{name}-%{version}
+Summary: API documentation for %{name}-%{version}
 BuildArch: noarch
 
 %description javadoc
@@ -29,14 +30,10 @@ API documentation for %{name}-%{version}
 
 %build
 # NOP: The RPM is generated from "binaries".
-#echo "BUILD: pwd=`pwd`"
-#ls -l
 
 %install
 rm -rf $RPM_BUILD_ROOT
-#echo "RPM_BUILD_ROOT=$RPM_BUILD_ROOT"
-#echo "INSTALL: pwd=`pwd`"
-# copy files from BUILD to BUILDROOT
+# Copy all files from BUILD to BUILDROOT
 %{__cp} -Rip %{_builddir}/* $RPM_BUILD_ROOT
 
 %clean
@@ -45,18 +42,10 @@ rm -rf $RPM_BUILD_ROOT
 %files
 %defattr(-,root,root,-)
 %doc /doc
-#%config /etc/bigdata
+%config /etc/bigdata
 %config /var/config
-/bin/bigdataHA
-/bin/bigdataHAEnv
-/bin/config/browser.config
-/bin/config/disco-logging.properties
-/bin/config/disco.config
-/bin/config/reggie.config
-/bin/config/serviceStarter.config
-/bin/disco-tool
-/bin/pstart
-/bin/startHAServices
+/etc/init.d/bigdataHA
+/bin
 /lib-dl
 /lib-ext
 /lib
