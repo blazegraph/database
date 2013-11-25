@@ -1254,7 +1254,27 @@ ${postInstallMessage}</echo>
       <mkdir dir="${rpm.dir}/SOURCES" />
       <mkdir dir="${rpm.dir}/SPECS" />
       <mkdir dir="${rpm.dir}/SRPMS" />
-      <copy file="${bigdata.dir}/src/resources/rpm/bigdata.spec" todir="${rpm.dir}/SPECS"/>
+      <!-- Copy rpm spec file, replacing meta variables in the target. -->
+      <copy file="${bigdata.dir}/src/resources/rpm/bigdata.spec" todir="${rpm.dir}/SPECS">
+        <filterchain>
+          <replacetokens>
+            <token key="build.ver" value="${build.ver}" />
+	    <token key="java.version" value="${javac.source}" />
+	    <token key="zookeeper.version" value="${zookeeper.version}" />
+            <token key="package.release" value="${package.release}" />
+            <token key="package.prefix" value="${package.prefix}" /><!--/usr-->
+            <token key="package.conf.dir" value="${package.conf.dir}" /><!--/etc/bigdata-->
+            <token key="package.pid.dir" value="${package.pid.dir}" /><!--/var/run/bigdata-->
+            <token key="package.var.dir" value="${package.var.dir}" /><!--/var/lib/bigdata-->
+            <token key="package.share.dir" value="${package.share.dir}" />
+            <!--
+	    <token key="final.name" value="${final.name}" />
+            <token key="package.build.dir" value="${package.build.dir}" />
+            <token key="package.log.dir" value="${package.log.dir}" />
+            <token key="c.lib" value="${c.lib}" /> -->
+          </replacetokens>
+        </filterchain>
+      </copy>
       <!-- build version of tarball that includes the version number in the filename. -->
       <copydir dest="${rpm.dir}/SOURCES/${version}" src="${stage.dir}/bigdata" />
       <tar destfile="${rpm.dir}/SOURCES/${version}.tar.gz"
@@ -1272,13 +1292,22 @@ ${postInstallMessage}</echo>
           <include name="${version}/bin/startHAServices" />
         </tarfileset>
       </tar>
-<!--      <copy file="${bigdata.dir}/REL.${version}.tgz" tofile="${rpm.dir}/SOURCES/${version}.tar.gz"/> -->
+      <!-- build rpm. -->
       <rpm
         specFile="bigdata.spec"
         topDir="ant-build/rpm"
         cleanBuildDir="true"
-        failOnError="false"/>
-
+        failOnError="true"/>
+      <!-- copy to target location in build.dir. -->
+      <copy todir="${build.dir}/" flatten="true">
+        <fileset dir="${rpm.dir}/RPMS">
+          <include name="**/${version}*.rpm" />
+        </fileset>
+        <fileset dir="${rpm.dir}/SRPMS">
+          <include name="**/${version}*.rpm" />
+        </fileset>
+      </copy>
+      <delete dir="${rpm.dir}" quiet="true" verbose="false"/>
     </target>
 
     <target name="ant-install-prepare" depends="jar, bundle"
