@@ -1,4 +1,4 @@
-Summary: bigdata RDF/graph database
+Summary: bigdata highly available RDF/graph/SPARQL database
 Name: bigdata
 Version: 1.2.3
 Release: 1
@@ -19,6 +19,7 @@ Distributed processing offers greater throughput but does not reduce query or up
 
 %package javadoc
 Summary:        API documentation for %{name}-%{version}
+BuildArch: noarch
 
 %description javadoc
 API documentation for %{name}-%{version}
@@ -27,20 +28,39 @@ API documentation for %{name}-%{version}
 %setup -q
 
 %build
+# NOP: The RPM is generated from "binaries".
+#echo "BUILD: pwd=`pwd`"
+#ls -l
 
 %install
 rm -rf $RPM_BUILD_ROOT
+#echo "RPM_BUILD_ROOT=$RPM_BUILD_ROOT"
+#echo "INSTALL: pwd=`pwd`"
+# copy files from BUILD to BUILDROOT
+%{__cp} -Rip %{_builddir}/* $RPM_BUILD_ROOT
 
 %clean
 rm -rf $RPM_BUILD_ROOT
 
-
 %files
 %defattr(-,root,root,-)
-%doc
-
+%doc /doc
+#%config /etc/bigdata
+%config /var/config
+/bin/bigdataHA
+/bin/bigdataHAEnv
+/bin/config/browser.config
+/bin/config/disco-logging.properties
+/bin/config/disco.config
+/bin/config/reggie.config
+/bin/config/serviceStarter.config
+/bin/disco-tool
+/bin/pstart
+/bin/startHAServices
+/lib-dl
+/lib-ext
+/lib
 
 %changelog
 * Sun Nov 24 2013 EC2 Default User <ec2-user@ip-10-164-101-74.ec2.internal> - 
-- Initial build.
-
+- Initial packaging as rpm.
