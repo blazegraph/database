@@ -195,6 +195,7 @@ public class RDFParserOptions implements Serializable, IRDFParserOptions {
         
     }
     
+    @Override
     public synchronized String toString() {
         return super.toString() + //
                 "{verifyData=" + verifyData + //
@@ -255,6 +256,7 @@ public class RDFParserOptions implements Serializable, IRDFParserOptions {
         p.setVerifyData(verifyData);
     }
 
+    @Override
     public boolean equals(final Object o) {
 
         if (this == o)
