@@ -256,6 +256,21 @@ public class RDFParserOptions implements Serializable, IRDFParserOptions {
         p.setVerifyData(verifyData);
     }
 
+    /**
+     * Utility method applies the options to the {@link RDFParser}.
+     * 
+     * @param opts
+     *            The options.
+     * @param p
+     *            The parser.
+     */
+    public static void apply(final IRDFParserOptions opts, final RDFParser p) {
+        p.setDatatypeHandling(opts.getDatatypeHandling());
+        p.setPreserveBNodeIDs(opts.getPreserveBNodeIDs());
+        p.setStopAtFirstError(opts.getStopAtFirstError());
+        p.setVerifyData(opts.getVerifyData());
+    }
+
     @Override
     public boolean equals(final Object o) {
 
