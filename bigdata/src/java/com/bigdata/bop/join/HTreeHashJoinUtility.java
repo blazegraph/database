@@ -349,6 +349,7 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
      * Human readable representation of the {@link IHashJoinUtility} metadata
      * (but not the solutions themselves).
      */
+    @Override
     public String toString() {
 
         final StringBuilder sb = new StringBuilder();
@@ -417,30 +418,35 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
         
     }
 
+    @Override
     public JoinTypeEnum getJoinType() {
         
         return joinType;
         
     }
-    
+
+    @Override
     public IVariable<?> getAskVar() {
         
         return askVar;
         
     }
-    
+
+    @Override
     public IVariable<?>[] getJoinVars() {
 
         return joinVars;
         
     }
-    
+
+    @Override
     public IVariable<?>[] getSelectVars() {
         
         return selectVars;
         
     }
-    
+
+    @Override
     public IConstraint[] getConstraints() {
         
         return constraints;
@@ -1114,8 +1120,8 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
 
                                 nJoinsConsidered.increment();
 
-                                if (noJoinVars&&
-                                        nJoinsConsidered.get() == noJoinVarsLimit) {
+                                if (noJoinVars
+                                        && nJoinsConsidered.get() == noJoinVarsLimit) {
 
                                     if (nleftConsidered.get() > 1
                                             && nrightConsidered.get() > 1) {
@@ -1354,7 +1360,7 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
              * 
              * Note: EXISTS depends on this to have the correct cardinality. If
              * EXISTS allows duplicate solutions into the join set then having
-             * multiple left solutions which satisify the EXISTS filter will
+             * multiple left solutions which satisfy the EXISTS filter will
              * cause multiple copies of the right solution to be output! If you
              * change the joinSet to allow duplicates, then it MUST NOT allow
              * them for EXISTS!
@@ -1424,7 +1430,14 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
 
                 final ITuple<?> t = sitr.next();
 
-                IBindingSet rightSolution = decodeSolution(t);
+                final ByteArrayBuffer tb = t.getValueBuffer();
+
+                /*
+                 * Note: This MUST be treated as effectively immutable since we
+                 * may have to output multiple solutions for each rightSolution.
+                 * Those output solutions MUST NOT side-effect [rightSolutions].
+                 */
+                final IBindingSet rightSolution = decodeSolution(t);
 
                 // The hash code is based on the entire solution for the
                 // joinSet.
@@ -1441,8 +1454,6 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
                     // Note: Compare full solutions, not just the hash code!
 
                     final ITuple<?> xt = jitr.next();
-
-                    final ByteArrayBuffer tb = t.getValueBuffer();
 
                     final ByteArrayBuffer xb = xt.getValueBuffer();
 
@@ -1466,25 +1477,27 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
                      * it as an optional solution.
                      */
 
-                    if (selectVars != null) {// && selectVars.length > 0) {
+                    IBindingSet bs = rightSolution;
 
-                        // Only output the projected variables.
-                        rightSolution = rightSolution.copy(selectVars);
+                    if (selectVars != null) {
+
+                        // Drop variables which are not projected.
+                        bs = bs.copy(selectVars);
 
                     }
 
-                    encoder.resolveCachedValues(rightSolution);
+                    encoder.resolveCachedValues(bs);
 
                     if (f != null) {
 
-                        if (selectVars == null)
-                            rightSolution = rightSolution.clone();
-                        
-                        rightSolution.set( askVar, f);
+                        if (bs == rightSolution)
+                            bs = rightSolution.clone();
+
+                        bs.set(askVar, f);
 
                     }
 
-                    outputBuffer.add(rightSolution);
+                    outputBuffer.add(bs);
 
                 }
 
