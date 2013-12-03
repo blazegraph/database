@@ -85,6 +85,7 @@ import com.bigdata.jini.start.process.ProcessHelper;
 import com.bigdata.jini.util.ConfigMath;
 import com.bigdata.jini.util.JiniUtil;
 import com.bigdata.journal.IRootBlockView;
+import com.bigdata.journal.StoreState;
 import com.bigdata.journal.jini.ha.HAJournalServer.ConfigurationOptions;
 import com.bigdata.journal.jini.ha.HAJournalTest.HAGlueTest;
 import com.bigdata.quorum.AbstractQuorumClient;
@@ -2688,6 +2689,39 @@ public class AbstractHA3JournalServerTestCase extends
         
     }
     
+	protected void assertStoreStates(final HAGlue[] services) throws IOException {
+		if (services.length < 2)
+			return; // nothing to compare
+
+		final StoreState test = ((HAGlueTest) services[0]).getStoreState();
+		final String tname = serviceName(services[0]);
+
+		for (int s = 1; s < services.length; s++) {
+			final StoreState other = ((HAGlueTest) services[s]).getStoreState();
+
+			if (!test.equals(other)) {
+				final String oname = serviceName(services[s]);
+				final String msg = "StoreState mismatch \n" + tname + "\n"
+						+ test.toString() + "\n" + oname + "\n"
+						+ other.toString();
+				fail(msg);
+			}
+		}
+	}
+	
+	protected String serviceName(final HAGlue s) {
+		if (s == serverA) {
+			return "serverA";
+		} else if (s == serverB) {
+			return "serverB";
+		} else if (s == serverC) {
+			return "serverC";
+		} else {
+			return "NA";
+		}
+	}
+
+    
     /**
      * Task loads a large data set.
      */
@@ -2695,6 +2729,7 @@ public class AbstractHA3JournalServerTestCase extends
         
         private final long token;
         private final boolean reallyLargeLoad;
+        private final boolean dropAll;
 
         /**
          * Large load.
@@ -2708,6 +2743,10 @@ public class AbstractHA3JournalServerTestCase extends
             
         }
         
+
+        public LargeLoadTask(long token, boolean reallyLargeLoad) {
+			this(token, reallyLargeLoad, true/*dropAll*/);
+		}
         /**
          * Either large or really large load.
          * 
@@ -2716,17 +2755,20 @@ public class AbstractHA3JournalServerTestCase extends
          * @param reallyLargeLoad
          *            if we will also load the 3 degrees of freedom file.
          */
-        public LargeLoadTask(final long token, final boolean reallyLargeLoad) {
+        public LargeLoadTask(final long token, final boolean reallyLargeLoad, final boolean dropAll) {
 
             this.token = token;
             
             this.reallyLargeLoad = reallyLargeLoad;
+
+            this.dropAll = dropAll;
 
         }
 
         public Void call() throws Exception {
 
             final StringBuilder sb = new StringBuilder();
+            if (dropAll)
             sb.append("DROP ALL;\n");
             sb.append("LOAD <" + getFoafFileUrl("data-0.nq.gz") + ">;\n");
             sb.append("LOAD <" + getFoafFileUrl("data-1.nq.gz") + ">;\n");

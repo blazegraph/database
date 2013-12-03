@@ -2942,6 +2942,26 @@ public class WORMStrategy extends AbstractBufferStrategy implements
 //      m_rebuildSequence++;
     }
 
+    @Override
+    public StoreState getStoreState() {
+        return new WormStoreState();
+    }
+    
+    public static class WormStoreState implements StoreState {
+
+        private static final long serialVersionUID = 1L;
+
+        @Override
+        public boolean equals(final Object obj) {
+            if (obj == null || !(obj instanceof WormStoreState))
+                return false;
+            final WormStoreState other = (WormStoreState) obj;
+            // Nothing to compare.
+            return true;
+        }
+        
+    }
+
 //  @Override
 //  public void prepareForRebuild(HARebuildRequest req) {
 //      assert m_rebuildRequest == null;

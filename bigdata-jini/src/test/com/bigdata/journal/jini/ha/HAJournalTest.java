@@ -84,8 +84,10 @@ import com.bigdata.ha.msg.IHAWriteMessage;
 import com.bigdata.ha.msg.IHAWriteSetStateRequest;
 import com.bigdata.ha.msg.IHAWriteSetStateResponse;
 import com.bigdata.journal.AbstractJournal;
+import com.bigdata.journal.IHABufferStrategy;
 import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.ITx;
+import com.bigdata.journal.StoreState;
 import com.bigdata.journal.jini.ha.HAJournalServer.HAQuorumService;
 import com.bigdata.journal.jini.ha.HAJournalServer.RunStateEnum;
 import com.bigdata.quorum.AsynchronousQuorumCloseException;
@@ -307,6 +309,11 @@ public class HAJournalTest extends HAJournal {
          * rather than committing the transaction.
          */
         public void simpleTransaction_abort() throws IOException, Exception;
+        
+        /**
+         * Supports consistency checking between HA services
+         */
+        public StoreState getStoreState() throws IOException;
         
     }
 
@@ -1162,6 +1169,12 @@ public class HAJournalTest extends HAJournal {
 
             return null;
         
+        }
+
+		@Override
+        public StoreState getStoreState() throws IOException {
+            return ((IHABufferStrategy) (getIndexManager().getBufferStrategy()))
+                    .getStoreState();
         }
 
 //		@Override

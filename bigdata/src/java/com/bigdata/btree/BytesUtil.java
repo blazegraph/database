@@ -1576,6 +1576,9 @@ public class BytesUtil {
      */
     static public String toHexString(final byte[] buf) {
         
+        if (buf == null)
+            return "NULL";
+
         return toHexString(buf, buf.length);
         
     }
@@ -1591,6 +1594,10 @@ public class BytesUtil {
      * @return The hex string.
      */
     static public String toHexString(final byte[] buf, int n) {
+
+        if (buf == null)
+            return "NULL";
+
         n = n < buf.length ? n : buf.length;
         final StringBuffer out = new StringBuffer();
         for (int i = 0; i < n; i++) {
