@@ -906,6 +906,11 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy,
 	    return m_store.getWriteCacheService();
 	}
 	
+	@Override
+	public StoreState getStoreState() {
+		return m_store.getStoreState();
+	}
+	
 //	@Override
 //	public boolean isFlushed() {
 //		return m_store.isFlushed();

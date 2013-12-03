@@ -100,6 +100,7 @@ import com.bigdata.journal.ICommitter;
 import com.bigdata.journal.IHABufferStrategy;
 import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.RootBlockView;
+import com.bigdata.journal.StoreState;
 import com.bigdata.journal.StoreTypeEnum;
 import com.bigdata.quorum.Quorum;
 import com.bigdata.quorum.QuorumException;
@@ -1219,31 +1220,44 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
         
     }
     
-    /*
-     * Utility to encapsulate RootBlock interpreation
+    /**
+     * Utility to encapsulate RootBlock interpretation.
      */
-    static class RootBlockInfo {
+    static private class RootBlockInfo {
         
-        static int nextAllocation(final IRootBlockView rb) {
-            final long nxtOffset = rb.getNextOffset();
-
-            // next allocation to be made (in -32K units).
-            final int ret = -(int) (nxtOffset >> 32);
-            
-            /*
-             * Skip the first 32K in the file. The root blocks live here but
-             * nothing else.
-             */
-            return ret == 0 ? -(1 + META_ALLOCATION) : ret;
-        }
+//        int nextAllocation(final IRootBlockView rb) {
+//            final long nxtOffset = rb.getNextOffset();
+//
+//            // next allocation to be made (in -32K units).
+//            final int ret = -(int) (nxtOffset >> 32);
+//            
+//            /*
+//             * Skip the first 32K in the file. The root blocks live here but
+//             * nothing else.
+//             */
+//            return ret == 0 ? -(1 + META_ALLOCATION) : ret;
+//        }
         
-        /*
+        /**
+         * Used to transparently re-open the backing channel if it has been closed
+         * by an interrupt during an IO.
+         */
+        private final ReopenFileChannel m_reopener;
+        /**
          * Meta-Allocations stored as {int address; int[8] bits}, so each block
          * holds 8*32=256 allocation slots of 1K totaling 256K.
-         * 
+         * <p>
          * The returned int array is a flattened list of these int[9] blocks
          */
-        static int[] metabits(final IRootBlockView rb, final ReopenFileChannel reopener) throws IOException {
+        private final int[] m_metabits;
+        private final long m_storageStatsAddr;
+        private final long m_lastDeferredReleaseTime;
+        
+        RootBlockInfo(final IRootBlockView rb,
+                final ReopenFileChannel reopener) throws IOException {
+            
+            this.m_reopener = reopener;
+            
             final long rawmbaddr = rb.getMetaBitsAddr();
             
             /*
@@ -1265,17 +1279,17 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
              */
             final byte[] buf = new byte[metaBitsStore * 4];
 
-            FileChannelUtility.readAll(reopener, ByteBuffer.wrap(buf), pmaddr);
+            FileChannelUtility.readAll(m_reopener, ByteBuffer.wrap(buf), pmaddr);
     
             final DataInputStream strBuf = new DataInputStream(new ByteArrayInputStream(buf));
             
             // Can handle minor store version incompatibility
             strBuf.readInt(); // STORE VERSION
-            strBuf.readLong(); // Last Deferred Release Time
+            m_lastDeferredReleaseTime = strBuf.readLong(); // Last Deferred Release Time
             strBuf.readInt(); // cDefaultMetaBitsSize
             
             final int allocBlocks = strBuf.readInt();
-            strBuf.readLong(); // m_storageStatsAddr
+            m_storageStatsAddr = strBuf.readLong(); // m_storageStatsAddr
 
             // step over those reserved ints
             for (int i = 0; i < cReservedMetaBits; i++) {
@@ -1291,7 +1305,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
             // Must be multiple of 9
             assert metaBitsSize % 9 == 0;
             
-            int[] ret = new int[metaBitsSize];
+            final int[] ret = new int[metaBitsSize];
             for (int i = 0; i < metaBitsSize; i++) {
                 ret[i] = strBuf.readInt();
             }
@@ -1300,8 +1314,9 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
              * Meta-Allocations stored as {int address; int[8] bits}, so each block
              * holds 8*32=256 allocation slots of 1K totaling 256K.
              */
-            return ret;
+            m_metabits = ret;
         }
+        
     }
     
     /**
@@ -3157,6 +3172,13 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
             log.trace("commitChanges for: " + m_nextAllocation + ", "
                     + m_metaBitsAddr + ", active contexts: "
                     + m_contexts.size());
+
+        if (log.isDebugEnabled() && m_quorum.isHighlyAvailable()) {
+            
+            log.debug(showAllocatorList());
+
+        }
+
     }
     
     /**
@@ -6216,13 +6238,39 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
                         log.trace("Allocator " + index + ", size: " + xfa.m_size + ", startAddress: " + xfa.getStartAddr() + ", allocated: " + (xfa.getAllocatedSlots()/xfa.m_size));
                     }
                 }
-
+                
+                // Update m_metaBits addr and m_nextAllocation to ensure able to allocate as well as read!
+                {
+	                final long nxtOffset = rbv.getNextOffset();
+	
+	                // next allocation to be made (in -32K units).
+	                m_nextAllocation = -(int) (nxtOffset >> 32);
+	                
+	                if (m_nextAllocation == 0) {
+	                	throw new IllegalStateException("Invalid state for non-empty store");
+	                }
+	                
+	                m_committedNextAllocation = m_nextAllocation;
+	        
+	                final long savedMetaBitsAddr = m_metaBitsAddr;
+	                // latched offset of the metabits region.
+	                m_metaBitsAddr = -(int) nxtOffset;
+	                
+	                if (savedMetaBitsAddr != m_metaBitsAddr)
+	                	log.warn("Old metaBitsAddr: " + savedMetaBitsAddr + ", new metaBitsAddr: " + m_metaBitsAddr);
+                }
+                
                 final ArrayList<FixedAllocator> nallocs = new ArrayList<FixedAllocator>();
                 
                 // current metabits
                 final int[] oldmetabits = m_metaBits;
                 // new metabits
-                m_metaBits = RootBlockInfo.metabits(rbv, m_reopener);
+                final RootBlockInfo rbi = new RootBlockInfo(rbv, m_reopener);
+                m_metaBits = rbi.m_metabits;
+                
+                // and grab the last deferred release and storageStats!
+                m_lastDeferredReleaseTime = rbi.m_lastDeferredReleaseTime;
+                m_storageStatsAddr = rbi.m_storageStatsAddr;
                 
                 if(log.isTraceEnabled())
                     log.trace("Metabits length: " + m_metaBits.length);
@@ -6925,6 +6973,16 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 
     }
 
+	private String showAllocatorList() {
+		final StringBuilder sb = new StringBuilder();
+		
+        for (int index = 0; index < m_allocs.size(); index++) {
+            final FixedAllocator xfa = m_allocs.get(index);
+            sb.append("Allocator " + index + ", size: " + xfa.m_size + ", startAddress: " + xfa.getStartAddr() + ", allocated: " + xfa.getAllocatedSlots() + "\n");
+        }
+        
+        return sb.toString();
+	}
 //    /**
 //     * 
 //     * @return whether WCS is flushed
@@ -6934,6 +6992,79 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 //	public boolean isFlushed() {
 //		return this.m_writeCacheService.isFlushed();
 //	}
+
+	public static class RWStoreState implements StoreState {
+
+		/**
+		 * Generated ID
+		 */
+		private static final long serialVersionUID = 4315400143557397323L;
+		
+		/*
+		 * Transient state necessary for consistent ha leader transition
+		 */
+		private final int m_fileSize;
+		private final int m_nextAllocation;
+		private final int m_committedNextAllocation;
+		private final long m_minReleaseAge;
+		private final long m_lastDeferredReleaseTime;
+		private final long m_storageStatsAddr;
+		private final int m_allocsSize;
+		private final int m_metaBitsAddr;
+		private final int m_metaBitsSize;
+
+        private RWStoreState(final RWStore store) {
+            m_fileSize = store.m_fileSize;
+            m_nextAllocation = store.m_nextAllocation;
+            m_committedNextAllocation = store.m_committedNextAllocation;
+            m_minReleaseAge = store.m_minReleaseAge;
+            m_lastDeferredReleaseTime = store.m_lastDeferredReleaseTime;
+            m_storageStatsAddr = store.m_storageStatsAddr;
+            m_allocsSize = store.m_allocs.size();
+            m_metaBitsAddr = store.m_metaBitsAddr;
+            m_metaBitsSize = store.m_metaBits.length;
+		}
+		
+        @Override
+		public boolean equals(final Object obj) {
+			if (obj == null || !(obj instanceof RWStoreState))
+				return false;
+			final RWStoreState other = (RWStoreState) obj;
+			return m_fileSize == other.m_fileSize
+					&& m_nextAllocation == other.m_nextAllocation
+					&& m_committedNextAllocation == other.m_committedNextAllocation
+					&& m_minReleaseAge == other.m_minReleaseAge
+					&& m_lastDeferredReleaseTime == other.m_lastDeferredReleaseTime
+					&& m_storageStatsAddr == other.m_storageStatsAddr
+					&& m_allocsSize == other.m_allocsSize
+					&& m_metaBitsAddr == other.m_metaBitsAddr
+					&& m_metaBitsSize == other.m_metaBitsSize;
+		}
+		
+		@Override
+		public String toString() {
+			final StringBuilder sb = new StringBuilder();
+			
+			sb.append("RWStoreState\n");
+			sb.append("fileSize: " + m_fileSize + "\n");
+			sb.append("nextAllocation: " + m_nextAllocation + "\n");
+			sb.append("committedNextAllocation: " + m_committedNextAllocation + "\n");
+			sb.append("minReleaseAge: " + m_minReleaseAge + "\n");
+			sb.append("lastDeferredReleaseTime: " + m_lastDeferredReleaseTime + "\n");
+			sb.append("storageStatsAddr: " + m_storageStatsAddr + "\n");
+			sb.append("allocsSize: " + m_allocsSize + "\n");
+			sb.append("metaBitsAddr: " + m_metaBitsAddr + "\n");
+			sb.append("metaBitsSize: " + m_metaBitsSize + "\n");
+			
+			return sb.toString();
+		}
+	}
+	
+	public StoreState getStoreState() {
+		final RWStoreState ret = new RWStoreState(this);
+		
+		return ret;
+	}
 
 //  public void prepareForRebuild(final HARebuildRequest req) {
 //      assert m_rebuildRequest == null;

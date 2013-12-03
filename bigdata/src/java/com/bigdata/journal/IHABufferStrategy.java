@@ -280,4 +280,11 @@ public interface IHABufferStrategy extends IBufferStrategy {
      */
     WriteCacheService getWriteCacheService();
     
+    /**
+     * A StoreState object references critical transient data that can be used
+     * to determine a degree of consistency between stores, specifically for an
+     * HA context.
+     */
+    StoreState getStoreState();
+
 }

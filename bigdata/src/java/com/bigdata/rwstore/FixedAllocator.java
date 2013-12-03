@@ -180,6 +180,8 @@ public class FixedAllocator implements Allocator {
 			
 		    m_store.showWriteCacheDebug(paddr);			
 			
+		    log.warn("Physical address " + paddr + " not accessible for Allocator of size " + m_size);
+			
 			return 0L;
 		}
 	}
