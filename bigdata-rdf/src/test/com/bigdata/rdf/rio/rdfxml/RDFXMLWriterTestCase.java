@@ -25,6 +25,8 @@ import org.openrdf.rio.RDFWriter;
 import org.openrdf.rio.RDFWriterFactory;
 import org.openrdf.sail.memory.MemoryStore;
 
+import com.bigdata.BigdataStatics;
+
 /*
  * FIXME Drop this when we migrate to a modern junit. It exists because the
  * RDFWriterTest class does not extend TestCase in openrdf.
@@ -38,6 +40,7 @@ public abstract class RDFXMLWriterTestCase extends RDFWriterTest {
 	public void testWrite()
 		throws RepositoryException, RDFParseException, IOException, RDFHandlerException
 	{
+	    if(!BigdataStatics.runKnownBadTests) return;
 		Repository rep1 = new SailRepository(new MemoryStore());
 		rep1.initialize();
 

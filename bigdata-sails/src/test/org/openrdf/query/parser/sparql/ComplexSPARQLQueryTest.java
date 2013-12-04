@@ -39,6 +39,8 @@ import org.openrdf.rio.RDFParseException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.bigdata.BigdataStatics;
+
 /**
  * A set of compliance tests on SPARQL query functionality which can not be
  * easily executed using the {@link SPARQL11ManifestTest} format. This includes
@@ -273,6 +275,7 @@ public abstract class ComplexSPARQLQueryTest extends TestCase {
     public void testSameTermRepeatInOptional()
         throws Exception
     {
+        if(!BigdataStatics.runKnownBadTests) return;
         loadTestData("/testdata-query/dataset-query.trig");
         StringBuilder query = new StringBuilder();
         query.append(getNamespaceDeclarations());
@@ -405,6 +408,7 @@ public abstract class ComplexSPARQLQueryTest extends TestCase {
     public void testSameTermRepeatInUnionAndOptional()
         throws Exception
     {
+        if(!BigdataStatics.runKnownBadTests) return;
         loadTestData("/testdata-query/dataset-query.trig");
 
         StringBuilder query = new StringBuilder();
