@@ -4,6 +4,7 @@ import java.util.Random;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
 
+import com.bigdata.BigdataStatics;
 import com.bigdata.ha.HAGlue;
 import com.bigdata.journal.jini.ha.HAJournalTest.HAGlueTest;
 
@@ -91,6 +92,7 @@ public class TestHA3ChangeLeader extends AbstractHA3JournalServerTestCase  {
     }
     
     public void testStartABC_KillLeader_RandomTrans() throws Exception {
+        if(BigdataStatics.runKnownBadTests)return;
         fail("Test disabled pending reconcilation of socket ticket");
         final Random r = new Random();
         final int ntrans = r.nextInt(900);
