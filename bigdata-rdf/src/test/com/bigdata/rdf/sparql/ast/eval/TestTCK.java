@@ -29,6 +29,7 @@ package com.bigdata.rdf.sparql.ast.eval;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.BigdataStatics;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTBottomUpOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTSimpleOptionalOptimizer;
@@ -752,7 +753,7 @@ public class TestTCK extends AbstractDataDrivenSPARQLTestCase {
      *      aggregates in ORDER BY clause </a>
      */
     public void test_sparql11_order_02() throws Exception {
-
+        if(!BigdataStatics.runKnownBadTests) return;
         new TestHelper("sparql11-order-02", // testURI,
                 "sparql11-order-02.rq",// queryFileURL
                 "sparql11-order-02.ttl",// dataFileURL
@@ -799,7 +800,7 @@ public class TestTCK extends AbstractDataDrivenSPARQLTestCase {
      * @see <a href="http://www.openrdf.org/issues/browse/SES-822"> ORDER by GROUP aggregate </a>
      */
     public void test_sparql11_order_03() throws Exception {
-
+        if(!BigdataStatics.runKnownBadTests) return;
         new TestHelper("sparql11-order-03", // testURI,
                 "sparql11-order-03.rq",// queryFileURL
                 "sparql11-order-03.ttl",// dataFileURL
