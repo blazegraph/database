@@ -172,16 +172,11 @@ extends SPARQLASTQueryTest // Bigdata native AST based evaluation
         if (hideDatasetTests)
             suite1 = filterOutTests(suite1, "dataset");
 
-        /*
-         * FIXME Remove this when implementing property paths.
-         * 
-         * @see https://sourceforge.net/apps/trac/bigdata/ticket/495 (SPARQL 1.1
-         * Property Paths)
-         */
-//        suite1 = filterOutTests(suite1, "property-paths");
-        
         suite1 = filterOutTests(suite1, badTests);
-        
+
+        if (!BigdataStatics.runKnownBadTests)
+            suite1 = filterOutTests(suite1, knownBadTests);
+
         /**
          * BSBM BI use case query 5
          * 
