@@ -6252,12 +6252,9 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 	                
 	                m_committedNextAllocation = m_nextAllocation;
 	        
-	                final long savedMetaBitsAddr = m_metaBitsAddr;
 	                // latched offset of the metabits region.
 	                m_metaBitsAddr = -(int) nxtOffset;
 	                
-	                if (savedMetaBitsAddr != m_metaBitsAddr)
-	                	log.warn("Old metaBitsAddr: " + savedMetaBitsAddr + ", new metaBitsAddr: " + m_metaBitsAddr);
                 }
                 
                 final ArrayList<FixedAllocator> nallocs = new ArrayList<FixedAllocator>();
@@ -6326,7 +6323,8 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
                                     log.trace("Allocator at: " + paddr);
                                 
                                 // metaBit
-                                final int metaBit = (i * cDefaultMetaBitsSize * 32) + (j * 32) + b;
+//                                final int metaBit = (i * cDefaultMetaBitsSize * 32) + (j * 32) + b;
+                                final int metaBit = ((i + j) * 32) + b;
                                 
                                 // Now try to read it in
                                 final FixedAllocator nalloc = readAllocator(paddr);
