@@ -27,9 +27,11 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.rio;
 
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.Map;
 import java.util.Set;
 
@@ -39,11 +41,13 @@ import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
+import org.semanticweb.yars.nx.namespace.RDF;
 
 import com.bigdata.rdf.changesets.ChangeAction;
 import com.bigdata.rdf.changesets.ChangeRecord;
 import com.bigdata.rdf.changesets.IChangeLog;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.impl.bnode.SidIV;
 import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataBNodeImpl;
 import com.bigdata.rdf.model.BigdataResource;
@@ -151,6 +155,14 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
      * the canonicalizing {@link #bnodes} mapping.
      */
     private Set<BigdataStatement> deferredStmts;
+    
+    /**
+     * RDR statements.  Map to a bnode used in other statements.  Need to defer
+     * both the reified statement (since it comes in piecemeal) and the 
+     * statements about it (since we need to make sure the ground version is 
+     * present).
+     */
+    private Map<BigdataBNodeImpl, ReifiedStmt> reifiedStmts;
 
     /**
      * <code>true</code> if statement identifiers are enabled.
@@ -358,7 +370,7 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
             
             log.info("capacity=" + capacity + ", sids=" + statementIdentifiers
                     + ", statementStore=" + statementStore + ", database="
-                    + database);
+                    + database + ", arity=" + arity);
             
         }
         
@@ -445,12 +457,62 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
             log.info("processing " + deferredStmts.size()
                     + " deferred statements");
 
-//        incrementalWrite();
+        /*
+         * Need to flush the terms out to the dictionary or the reification 
+         * process will not work correctly.
+         */
+        incrementalWrite();
         
         try {
             
             // Note: temporary override - clear by finally{}.
             statementIdentifiers = false;
+            
+            // stage 0
+            if (reifiedStmts != null) {
+            	
+            	for (Map.Entry<BigdataBNodeImpl, ReifiedStmt> e : reifiedStmts.entrySet()) {
+            	
+            		final BigdataBNodeImpl sid = e.getKey();
+            		
+            		final ReifiedStmt reifiedStmt = e.getValue();
+            		
+            		if (!reifiedStmt.isFullyBound(arity)) {
+            			
+            			log.warn("unfinished reified stmt: " + reifiedStmt);
+            			
+            			continue;
+            			
+            		}
+
+            		final BigdataStatement stmt = valueFactory.createStatement(
+            				reifiedStmt.getSubject(), 
+            				reifiedStmt.getPredicate(), 
+            				reifiedStmt.getObject(), 
+            				reifiedStmt.getContext(), 
+							StatementEnum.Explicit);
+            		
+            		sid.setStatement(stmt);
+            		
+            		sid.setIV(new SidIV(new SPO(stmt)));
+            		
+            		if (log.isInfoEnabled()) {
+            			log.info("reified sid conversion: sid=" + sid + ", stmt=" + stmt);
+            		}
+            		
+            	}
+            	
+            	if (log.isInfoEnabled()) {
+            	
+            		for (BigdataBNodeImpl sid : reifiedStmts.keySet()) {
+            	
+            			log.info("sid: " + sid + ", iv=" + sid.getIV());
+            			
+            		}
+            		
+            	}
+            	
+            }
             
             // stage 1.
             {
@@ -464,6 +526,10 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
                 while(itr.hasNext()) {
                     
                     final BigdataStatement stmt = itr.next();
+                    
+                    if (log.isDebugEnabled()) {
+                    	log.debug(stmt.getSubject() + ", sid=" + ((BigdataBNode) stmt.getSubject()).isStatementIdentifier() + ", iv=" + stmt.s());
+                    }
                     
                     if (stmt.getSubject() instanceof BNode
                             && ((BigdataBNode) stmt.getSubject()).isStatementIdentifier())
@@ -520,6 +586,10 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
                         
                         final BigdataStatement stmt = itr.next();
 
+                        if (log.isDebugEnabled()) {
+                        	log.debug(stmt.getSubject() + ", iv=" + stmt.s());
+                        }
+                        
                         if (stmt.getSubject() instanceof BNode
                                 && ((BigdataBNode) stmt.getSubject()).isStatementIdentifier()
                                 && stmt.s() == null)
@@ -571,6 +641,14 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
 
                 if (nremaining > 0) {
 
+                	if (log.isDebugEnabled()) {
+                		
+                		for (BigdataStatement s : deferredStmts) {
+                			log.debug("could not ground: " + s);
+                		}
+                		
+                	}
+                	
                     throw new StatementCyclesException(
                             "" + nremaining
                             + " statements can not be grounded");
@@ -586,6 +664,8 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
             statementIdentifiers = true;
 
             deferredStmts = null;
+            
+            reifiedStmts = null;
             
         }
         
@@ -610,6 +690,8 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
         bnodes = null;
         
         deferredStmts = null;
+        
+        reifiedStmts = null;
         
     }
     
@@ -742,6 +824,10 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
         if (log.isInfoEnabled()) {
 
             log.info("writing " + numTerms);
+            
+            for (int i = 0; i < numTerms; i++) {
+            	log.info("term: " + terms[i]);
+            }
 
         }
         
@@ -913,13 +999,13 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
                 if (c == null)
                     continue;
 
-                if (c instanceof URI) {
-
-                    throw new UnificationException(
-                            "URI not permitted in context position when statement identifiers are enabled: "
-                                    + stmt);
-                    
-                }
+//                if (c instanceof URI) {
+//
+//                    throw new UnificationException(
+//                            "URI not permitted in context position when statement identifiers are enabled: "
+//                                    + stmt);
+//                    
+//                }
                 
                 if( c instanceof BNode) {
 
@@ -1016,6 +1102,10 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
 
             log.info("writing " + numStmts + " on "
                     + (statementStore != null ? "statementStore" : "database"));
+            
+            for (int i = 0; i < numStmts; i++) {
+            	log.info("spo: " + stmts[i]);
+            }
 
         }
 
@@ -1165,6 +1255,8 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
     protected void handleStatement(Resource s, URI p, Value o, Resource c,
             StatementEnum type) {
         
+//    	if (arity == 3) c = null;
+    	
         s = (Resource) valueFactory.asValue(s);
         p = (URI)      valueFactory.asValue(p);
         o =            valueFactory.asValue(o);
@@ -1229,16 +1321,56 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
                  * that it is being used as a statement identifier).
                  */
                 
-                if (deferredStmts == null) {
+            	log.info(stmt);
+            	
+            	if (s instanceof BNode && 
+            			(RDF.SUBJECT.toString().equals(p.toString()) || RDF.PREDICATE.toString().equals(p.toString()) || RDF.OBJECT.toString().equals(p.toString())) || 
+            			(RDF.STATEMENT.toString().equals(o.toString()) && RDF.TYPE.toString().equals(p.toString()))) {
+            		
+            		if (!(RDF.STATEMENT.toString().equals(o.toString()) && RDF.TYPE.toString().equals(p.toString()))) {
+            			
+            		final BigdataBNodeImpl sid = (BigdataBNodeImpl) s;
+            		
+            		if (reifiedStmts == null) {
+            			
+            			reifiedStmts = new HashMap<BigdataBNodeImpl, ReifiedStmt>();
+            			
+            		}
+            		
+            		final ReifiedStmt reifiedStmt;
+            		if (reifiedStmts.containsKey(sid)) {
+            			
+            			reifiedStmt = reifiedStmts.get(sid);
+            			
+            		} else {
+            			
+            			reifiedStmt = new ReifiedStmt();
+            			
+            			reifiedStmts.put(sid, reifiedStmt);
+            			
+            		}
+            				
+            		reifiedStmt.set(p, (BigdataValue) o);	
+            		
+	                if (log.isDebugEnabled()) 
+	                    log.debug("reified piece: "+stmt);
+	                
+            		}
 
-                    deferredStmts = new HashSet<BigdataStatement>(stmts.length);
-
-                }
-
-                deferredStmts.add(stmt);
-
-                if (log.isDebugEnabled()) 
-                    log.debug("deferred: "+stmt);
+            	} else {
+            	
+	                if (deferredStmts == null) {
+	
+	                    deferredStmts = new HashSet<BigdataStatement>(stmts.length);
+	
+	                }
+	
+	                deferredStmts.add(stmt);
+	
+	                if (log.isDebugEnabled()) 
+	                    log.debug("deferred: "+stmt);
+	                
+            	}
                 
             } else {
 
@@ -1358,6 +1490,95 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
             
         }
 
+    }
+    
+    private static class ReifiedStmt implements Statement {
+
+    	/**
+		 * 
+		 */
+		private static final long serialVersionUID = -7706421769807306702L;
+		
+		private BigdataResource s;
+    	private BigdataURI p;
+    	private BigdataValue o;
+    	private BigdataResource c;
+    	
+    	public ReifiedStmt() {
+    	}
+    	
+    	public boolean isFullyBound(final int arity) {
+    		return s != null && p != null && o != null && (arity > 3 ? c != null : true);
+    	}
+    	
+		@Override
+		public BigdataResource getContext() {
+			return c;
+		}
+
+		@Override
+		public BigdataValue getObject() {
+			return o;
+		}
+
+		@Override
+		public BigdataURI getPredicate() {
+			return p;
+		}
+
+		@Override
+		public BigdataResource getSubject() {
+			return s;
+		}
+
+		public void set(final URI p, final BigdataValue o) {
+			
+			if (p.toString().equals(RDF.SUBJECT.toString())) {
+				
+				setSubject((BigdataResource) o);
+			
+			} else if (p.toString().equals(RDF.PREDICATE.toString())) {
+				
+				setPredicate((BigdataURI) o);
+			
+			} else if (p.toString().equals(RDF.OBJECT.toString())) {
+				
+				setObject(o);
+			
+//			} else if (p.equals(RDF.CONTEXT)) {
+//				
+//				setPredicate((URI) c);
+//			
+			} else {
+
+				throw new IllegalArgumentException();
+				
+			}
+			
+		}
+		
+		public void setSubject(final BigdataResource s) {
+			this.s = s;
+		}
+
+		public void setPredicate(final BigdataURI p) {
+			this.p = p;
+		}
+
+		public void setObject(final BigdataValue o) {
+			this.o = o;
+		}
+
+		public void setContext(final BigdataResource c) {
+			this.c = c;
+		}
+		
+	    public String toString() {
+	        
+	        return "<" + s + ", " + p + ", " + o + ", " + c + ">";
+
+	    }
+    	
     }
 
 }
