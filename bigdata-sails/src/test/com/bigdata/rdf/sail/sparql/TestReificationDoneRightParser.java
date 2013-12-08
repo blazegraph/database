@@ -29,6 +29,7 @@ package com.bigdata.rdf.sail.sparql;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Properties;
 
 import org.apache.log4j.Logger;
 import org.openrdf.query.MalformedQueryException;
@@ -44,6 +45,7 @@ import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryType;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
+import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
  * Test suite for the proposed standardization of "reification done right".
@@ -582,5 +584,5 @@ public class TestReificationDoneRightParser extends
 		assertSameAST(sparql, expected, actual);
 
 	}
-	
+
 }
