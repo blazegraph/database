@@ -219,8 +219,7 @@ public interface QuorumActor<S extends Remote, C extends QuorumClient<S>> {
      * 
      * @param serviceId
      *            The UUID of the service to be removed.
-     * @throws InterruptedException 
      */
-    public void forceRemoveService(UUID serviceId) throws InterruptedException;
+    public void forceRemoveService(UUID serviceId);
 
 }
