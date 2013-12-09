@@ -2289,15 +2289,78 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
 
         abstract protected void doMemberAdd();
 
-        abstract protected void doMemberRemove();
+        final protected void doMemberRemove() {
+            doMemberRemove(serviceId);
+        }
+
+        abstract protected void doMemberRemove(UUID serviceId);
 
         abstract protected void doCastVote(long lastCommitTime);
 
-        abstract protected void doWithdrawVote();
+        final protected void doWithdrawVote() {
+            doWithdrawVote(serviceId);
+        }
+
+        abstract protected void doWithdrawVote(UUID serviceId);
 
         abstract protected void doPipelineAdd();
 
-        abstract protected void doPipelineRemove();
+        final protected void doPipelineRemove() {
+            doPipelineRemove(serviceId);
+        }
+
+        abstract protected void doPipelineRemove(UUID serviceId);
+
+        abstract protected void doServiceJoin();
+
+        final protected void doServiceLeave() {
+            doServiceLeave(serviceId);
+        }
+
+        abstract protected void doServiceLeave(UUID serviceId);
+
+        abstract protected void doSetToken(long newToken);
+
+//        abstract protected void doSetLastValidToken(long newToken);
+//
+//        abstract protected void doSetToken();
+        
+        abstract protected void doClearToken();
+
+
+        /**
+         * {@inheritDoc}
+         * <p>
+         * Note: This implements an unconditional remove of the specified
+         * service. It is intended to force a different service out of the
+         * pipeline. This code deliberately takes this action unconditionally
+         * and does NOT await the requested state change.
+         * <p>
+         * Note: This code could potentially cause the remote service to
+         * deadlock in one of the conditionalXXX() methods if it is concurrently
+         * attempting to execute quorum action on itself. If this problem is
+         * observed, we should add a timeout to the conditionalXXX() methods
+         * that will force them to fail rather than block forever. This will
+         * then force the service into an error state if its QuorumActor can not
+         * carry out the requested action within a specified timeout.
+         * 
+         * @throws InterruptedException 
+         */
+        @Override
+        final public void forceRemoveService(final UUID psid)
+                throws InterruptedException {
+            lock.lockInterruptibly();
+            try {
+                log.warn("Forcing remove of service" + ": thisService="
+                        + serviceId + ", otherServiceId=" + psid);
+                doMemberRemove(psid);
+                doWithdrawVote(psid);
+                doPipelineRemove(psid);
+                doServiceLeave(psid);
+            } finally {
+                lock.unlock();
+            }
+        }
 
         /**
          * Invoked when our client will become the leader to (a) reorganize the
@@ -2394,18 +2457,6 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
             return modified;
         }
         
-        abstract protected void doServiceJoin();
-
-        abstract protected void doServiceLeave();
-
-        abstract protected void doSetToken(long newToken);
-
-//        abstract protected void doSetLastValidToken(long newToken);
-//
-//        abstract protected void doSetToken();
-        
-        abstract protected void doClearToken();
-
     }
 
     /**
