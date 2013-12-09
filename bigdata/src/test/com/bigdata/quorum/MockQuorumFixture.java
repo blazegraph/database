@@ -846,32 +846,20 @@ public class MockQuorumFixture {
                 fixture.memberAdd(serviceId);
             }
 
-            protected void doMemberRemove() {
-                fixture.memberRemove(serviceId);
-            }
-
             protected void doCastVote(final long lastCommitTime) {
                 fixture.castVote(serviceId, lastCommitTime);
-            }
-
-            protected void doWithdrawVote() {
-                fixture.withdrawVote(serviceId);
             }
 
             protected void doPipelineAdd() {
                 fixture.pipelineAdd(serviceId);
             }
 
-            protected void doPipelineRemove() {
-                fixture.pipelineRemove(serviceId);
-            }
-
             protected void doServiceJoin() {
                 fixture.serviceJoin(serviceId);
             }
 
-            protected void doServiceLeave() {
-                fixture.serviceLeave(serviceId);
+            protected void doServiceLeave(final UUID service) {
+                fixture.serviceLeave(service);
             }
 
             protected void doSetToken(final long newToken) {
@@ -889,6 +877,21 @@ public class MockQuorumFixture {
             protected void doClearToken() {
                 fixture.clearToken();
             }
+
+			@Override
+			protected void doMemberRemove(UUID service) {
+				fixture.memberRemove(service);
+			}
+
+			@Override
+			protected void doWithdrawVote(UUID service) {
+				fixture.withdrawVote(service);
+			}
+
+			@Override
+			protected void doPipelineRemove(UUID service) {
+				fixture.pipelineRemove(service);
+			}
 
 //            /**
 //             * {@inheritDoc}
