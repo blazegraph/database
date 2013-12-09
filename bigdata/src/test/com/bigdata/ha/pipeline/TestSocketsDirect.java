@@ -78,10 +78,22 @@ public class TestSocketsDirect extends TestCase3 {
         final ServerSocket ss1 = new ServerSocket();
         try {
 
+            // bind the ServerSocket to the specified port.
             ss1.bind(serverAddr1);
 
             assertTrue(ss1.getChannel() == null);
 
+            /*
+             * Without a new connect request we should not be able to accept() a
+             * new connection.
+             */
+            try {
+                accept(ss1);
+                fail("Expected timeout failure");
+            } catch (AssertionFailedError afe) {
+                // expected
+            }
+            
             // Now the first Client SocketChannel
             final SocketChannel cs1 = SocketChannel.open();
             try {
@@ -110,6 +122,17 @@ public class TestSocketsDirect extends TestCase3 {
                     log.info("Ignoring expected exception: "+ex);
             } finally {
                 cs2.close();
+            }
+
+            /*
+             * Without a new connect request we should not be able to accept() a
+             * new connection.
+             */
+            try {
+                accept(ss1);
+                fail("Expected timeout failure");
+            } catch (AssertionFailedError afe) {
+                // expected
             }
 
         } finally {
@@ -388,7 +411,8 @@ public class TestSocketsDirect extends TestCase3 {
 
                 /*
                  * Having closed the input, without a new connect request we
-                 * should not be able to accept the new write.
+                 * should not be able to accept the new write since the data
+                 * were written on a different client connection.
                  */
                 try {
                     final Socket s3 = accept(ss);
@@ -413,55 +437,105 @@ public class TestSocketsDirect extends TestCase3 {
      * @throws IOException
      */
     public void testMultipleClients() throws IOException {
+
+        // The payload size that we will use.
+        final int DATA_LEN = 200;
+        final Random r = new Random();
+        final byte[] data = new byte[DATA_LEN];
+        r.nextBytes(data);
+
+        final int nclients = 10;
+
+        final ArrayList<SocketChannel> clients = new ArrayList<SocketChannel>();
+        final ArrayList<Socket> sockets = new ArrayList<Socket>();
+
         final InetSocketAddress serverAddr = new InetSocketAddress(getPort(0));
 
         final ServerSocket ss = new ServerSocket();
-        ss.bind(serverAddr);
-        
-        assertTrue(ss.getChannel() == null);
-        
-        final int nclients = 10;
-        
-        final ArrayList<SocketChannel> clients = new ArrayList<SocketChannel>();
-        final ArrayList<Socket> sockets = new ArrayList<Socket>();
-        
-        final Random r = new Random();
-        final byte[] data = new byte[200];
-        r.nextBytes(data);
-        assertNoTimeout(10, TimeUnit.SECONDS, new Callable<Void>() {
+        try {
 
-			@Override
-			public Void call() throws Exception {
-		        for (int c = 0; c < nclients; c++) {
-		            final SocketChannel cs = SocketChannel.open();           
-		            cs.connect(serverAddr);
-		            
-		            clients.add(cs);
-		            sockets.add(ss.accept());
-		            
-		            // write to each SocketChannel (after connect/accept)
-		            cs.write(ByteBuffer.wrap(data));
-		        }
-				return null;
-			}
-        	
-        });     
-        
-        // Now read from all Sockets accepted on the server
-        final byte[] dst = new byte[200];
-        for (Socket s : sockets) {
-        	assertFalse(s.isClosed());
-        	
-            final InputStream instr = s.getInputStream();
+            // bind the ServerSocket to the specified port.
+            ss.bind(serverAddr);
             
-            assertFalse(-1 == instr.read(dst)); // doesn't return -1
+            assertTrue(ss.getChannel() == null);
+
+            final int receiveBufferSize = ss.getReceiveBufferSize();
+
+            // Make sure that we have enough room to receive all client writes
+            // before draining any of them.
+            assertTrue(DATA_LEN * nclients <= receiveBufferSize);
             
-            assertTrue(BytesUtil.bytesEqual(data, dst));
+            assertNoTimeout(10, TimeUnit.SECONDS, new Callable<Void>() {
+
+                @Override
+                public Void call() throws Exception {
+
+                    for (int c = 0; c < nclients; c++) {
+                        
+                        // client connects to server.
+                        final SocketChannel cs = SocketChannel.open();
+                        cs.connect(serverAddr);
+                        clients.add(cs);
+                        
+                        // accept connection on server.
+                        sockets.add(ss.accept()); 
+
+                        // write to each SocketChannel (after connect/accept)
+                        cs.write(ByteBuffer.wrap(data));
+                    }
+
+                    return null;
+                    
+                }
+
+            });
+
+            /*
+             * Now read from all Sockets accepted on the server.
+             * 
+             * Note: This is a simple loop, not a parallel read. The same buffer
+             * is reused on each iteration.
+             */
+            {
+
+                final byte[] dst = new byte[DATA_LEN];
+
+                for (Socket s : sockets) {
+
+                    assertFalse(s.isClosed());
+
+                    final InputStream instr = s.getInputStream();
+
+                    assertFalse(-1 == instr.read(dst)); // doesn't return -1
+
+                    assertTrue(BytesUtil.bytesEqual(data, dst));
+
+                    // Close each Socket to ensure it is different
+                    s.close();
+
+                    assertTrue(s.isClosed());
+
+                }
             
-            // Close each Socket to ensure it is different
-            s.close();
+            }
+
+        } finally {
+
+            // ensure client side connections are closed.
+            for (SocketChannel ch : clients) {
+                if (ch != null)
+                    ch.close();
+            }
             
-        	assertTrue(s.isClosed());
+            // ensure server side connections are closed.
+            for (Socket s : sockets) {
+                if (s != null)
+                    s.close();
+            }
+            
+            // close the server socket.
+            ss.close();
+
         }
 
     }
