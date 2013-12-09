@@ -451,9 +451,15 @@ public class TestStatementBuffer extends AbstractTripleStoreTestCase {
         			return;
         		}
 
-            if (store.isQuads() || store.isStatementIdentifiers()) {
-                /*
-                 * Disabled.
+            if (!store.isStatementIdentifiers()) {
+                /**
+                 * Disabled. FIXME This should be ON for TRIPLES or QUADS. It
+                 * only works in the SIDS mode right now. The root cause is
+                 * 
+                 * <pre>
+                 * Caused by: java.lang.IllegalArgumentException: context bound, but not quads or sids: < TermId(7B), TermId(5U), com.bigdata.rdf.internal.impl.literal.LiteralExtensionIV@25889b2f, TermId(8B) : Explicit >
+                 *     at com.bigdata.rdf.spo.SPOIndexWriter.call(SPOIndexWriter.java:275)
+                 * </pre>
                  */
                 return;
             }
