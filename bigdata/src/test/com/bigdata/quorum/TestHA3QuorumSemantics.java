@@ -1340,6 +1340,7 @@ public class TestHA3QuorumSemantics extends AbstractQuorumTestCase {
              * Rejoin the service.
              */
             actor1.memberAdd();
+            fixture.awaitDeque();
             actor1.pipelineAdd();
             fixture.awaitDeque();
             actor1.castVote(lastCommitTime);
@@ -1680,6 +1681,7 @@ public class TestHA3QuorumSemantics extends AbstractQuorumTestCase {
         }
         
     }
+
     /**
      * Unit tests for pipeline reorganization when the leader is elected. This
      * tests the automatic reorganization of the pipeline order where the
