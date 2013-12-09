@@ -1,20 +1,11 @@
 package com.bigdata.journal.jini.ha;
 
-import java.util.UUID;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
 
-import com.bigdata.ha.HAGlue;
-import com.bigdata.ha.IndexManagerCallable;
-import com.bigdata.ha.QuorumService;
-import com.bigdata.journal.AbstractJournal;
-import com.bigdata.journal.IIndexManager;
-import com.bigdata.journal.jini.ha.AbstractHA3JournalServerTestCase.ABC;
-import com.bigdata.journal.jini.ha.AbstractHA3JournalServerTestCase.LargeLoadTask;
-import com.bigdata.quorum.Quorum;
-
 import net.jini.config.Configuration;
-import junit.framework.TestCase;
+
+import com.bigdata.ha.HAGlue;
 
 public class TestHA3JustKills extends AbstractHA3JournalServerTestCase {
 
@@ -78,7 +69,7 @@ public class TestHA3JustKills extends AbstractHA3JournalServerTestCase {
 			
 			// FIXME: in the face of no implemented error propagation we can explicitly
 			//	tell the leader to remove the killed service!
-			startup.serverA.submit(new ForceRemoveService(getServiceCId()), true);
+			startup.serverA.submit(new ForceRemoveService(getServiceCId()), true).get();
 
 			awaitPipeline(20, TimeUnit.SECONDS, new HAGlue[] {startup.serverA, startup.serverB});
 
@@ -143,7 +134,7 @@ public class TestHA3JustKills extends AbstractHA3JournalServerTestCase {
 			kill(startup.serverB);
 			
 			// FIXME: temporary call to explicitly remove the service prior to correct protocol
-			startup.serverA.submit(new ForceRemoveService(getServiceBId()), true);
+			startup.serverA.submit(new ForceRemoveService(getServiceBId()), true).get();
 
 			awaitPipeline(10, TimeUnit.SECONDS, new HAGlue[] {startup.serverA, startup.serverC});
 			
