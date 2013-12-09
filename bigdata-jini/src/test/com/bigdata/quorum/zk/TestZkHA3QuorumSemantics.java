@@ -1073,6 +1073,9 @@ public class TestZkHA3QuorumSemantics extends AbstractZkQuorumTestCase {
         
     }
 
+    /**
+     * Unit test of {@link QuorumActor#forceRemoveService(UUID)}.
+     */
     public void test_serviceJoin3_simpleForceRemove() throws InterruptedException {
 
         final Quorum<?, ?> quorum0 = quorums[0];
