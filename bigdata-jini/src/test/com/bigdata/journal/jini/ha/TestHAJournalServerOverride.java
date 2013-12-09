@@ -44,6 +44,7 @@ import com.bigdata.journal.AbstractTask;
 import com.bigdata.journal.jini.ha.HAJournalServer.RunStateEnum;
 import com.bigdata.journal.jini.ha.HAJournalTest.HAGlueTest;
 import com.bigdata.journal.jini.ha.HAJournalTest.SpuriousTestException;
+import com.bigdata.quorum.QuorumActor;
 import com.bigdata.quorum.zk.ZKQuorumImpl;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
 import com.bigdata.util.ClocksNotSynchronizedException;
@@ -705,7 +706,7 @@ public class TestHAJournalServerOverride extends AbstractHA3JournalServerTestCas
     	}
     }
     
-    public void doBounceFollower() throws Exception {
+    private void doBounceFollower() throws Exception {
         
         final HAGlue serverA = startA();
         final HAGlue serverB = startB();
@@ -993,6 +994,295 @@ public class TestHAJournalServerOverride extends AbstractHA3JournalServerTestCas
 //        }
 //        
 //    }
+
+    /**
+     * Test of {@link QuorumActor#forceRemoveService(UUID)}. Start A + B. Once
+     * the quorum meets, we figure out which service is the leader. The leader
+     * then forces the other service out of the quorum.
+     */
+    public void test_AB_forceRemoveService_B() throws Exception {
+        
+        final HAGlue serverA = startA();
+        final HAGlue serverB = startB();
+        
+        final long token1 = quorum.awaitQuorum(awaitQuorumTimeout, TimeUnit.MILLISECONDS);
+
+        doNSSStatusRequest(serverA);
+        doNSSStatusRequest(serverB);
+
+        // Await initial commit point (KB create).
+        awaitCommitCounter(1L, serverA, serverB);
+
+        // Await [A] up and running as leader.
+        assertEquals(HAStatusEnum.Leader, awaitNSSAndHAReady(serverA));
+
+        // Await [B] up and running as follower.
+        assertEquals(HAStatusEnum.Follower, awaitNSSAndHAReady(serverB));
+
+        // Verify self-reporting by RMI in their respective roles.
+        awaitHAStatus(serverA, HAStatusEnum.Leader);
+        awaitHAStatus(serverB, HAStatusEnum.Follower);
+        
+        // Verify binary equality on the journal files.
+        assertDigestsEquals(new HAGlue[] { serverA, serverB });
+
+        if (log.isInfoEnabled()) {
+            log.info("Zookeeper before quorum break:\n" + dumpZoo());
+        }
+        
+        /*
+         * Force the follower out of the quorum. Verify quorum meets again and
+         * that we can read on all services.
+         */
+        {
+
+            final HAGlue leader = quorum.getClient().getLeader(token1);
+
+            if (leader.equals(serverA)) {
+
+                leader.submit(new ForceRemoveService(getServiceBId()), true).get();
+
+            } else {
+
+                leader.submit(new ForceRemoveService(getServiceAId()), true).get();
+
+            }
+            
+            // Thread.sleep(100000); // sleep to allow thread dump for analysis
+            // Okay, is the problem that the quorum doesn't break?
+            // assertFalse(quorum.isQuorumMet());
+            
+            // Right so the Quorum is not met, but the follower deosn't seem to know it's broken
+            
+            // Wait for the quorum to break and then meet again.
+            final long token2 = awaitNextQuorumMeet(token1);
+
+            if (log.isInfoEnabled()) {
+                log.info("Zookeeper after quorum meet:\n" + dumpZoo());
+            }
+            
+            /*
+             * Bouncing the connection broke the quorun, so verify that the
+             * quorum token was advanced.
+             */
+            assertEquals(token1 + 1, token2);
+            
+            // The leader MAY have changed (since the quorum broke).
+            final HAGlue leader2 = quorum.getClient().getLeader(token2);
+
+            // Verify leader self-reports in new role.
+            awaitHAStatus(leader2, HAStatusEnum.Leader);
+
+//            final UUID leaderId2 = leader2.getServiceId();
+//
+//            assertFalse(leaderId1.equals(leaderId2));
+            
+            /*
+             * Verify we can read on the KB on both nodes.
+             * 
+             * Note: It is important to test the reads for the first commit on
+             * both the leader and the follower.
+             */
+            for (HAGlue service : new HAGlue[] { serverA, serverB }) {
+
+                awaitNSSAndHAReady(service);
+
+                final RemoteRepository repo = getRemoteRepository(service);
+
+                // Should be empty.
+                assertEquals(
+                        0L,
+                        countResults(repo.prepareTupleQuery(
+                                "SELECT * {?a ?b ?c} LIMIT 10").evaluate()));
+
+            }
+
+        }
+        
+    }
+
+    /**
+     * Test of {@link QuorumActor#forceRemoveService(UUID)}. Start A + B + C in
+     * strict order. Wait until the quorum is fully met and the initial KB
+     * create transaction is done. The leader then forces B out of the quorum.
+     * We verify that the quorum fully meets again, that B is now the last
+     * service in the pipeline order, and that the quorum did not break (same
+     * token).
+     */
+    public void test_ABC_forceRemoveService_B() throws Exception {
+        
+        final ABC services = new ABC(true/*sequential*/);
+        final HAGlue serverA = services.serverA;
+        final HAGlue serverB = services.serverB;
+        final HAGlue serverC = services.serverC;
+        
+        final long token1 = awaitFullyMetQuorum();
+
+        doNSSStatusRequest(serverA);
+        doNSSStatusRequest(serverB);
+        doNSSStatusRequest(serverC);
+
+        // Await initial commit point (KB create).
+        awaitCommitCounter(1L, serverA, serverB, serverC);
+
+        // Await [A] up and running as leader.
+        assertEquals(HAStatusEnum.Leader, awaitNSSAndHAReady(serverA));
+
+        // Await [B] up and running as follower.
+        assertEquals(HAStatusEnum.Follower, awaitNSSAndHAReady(serverB));
+
+        // Verify self-reporting by RMI in their respective roles.
+        awaitHAStatus(serverA, HAStatusEnum.Leader);
+        awaitHAStatus(serverB, HAStatusEnum.Follower);
+        awaitHAStatus(serverC, HAStatusEnum.Follower);
+        
+        // Verify binary equality on the journal files.
+        assertDigestsEquals(new HAGlue[] { serverA, serverB, serverC });
+
+        if (log.isInfoEnabled()) {
+            log.info("Zookeeper before forcing service remove:\n" + dumpZoo());
+        }
+        
+        /*
+         * Bounce the 1st follower out of the quorum. Verify quorum meets again
+         * and that we can read on all services.
+         */
+        {
+
+            serverA.submit(new ForceRemoveService(getServiceBId()), true).get();
+            
+            // Wait for the quorum to fully meet again.
+            final long token2 = awaitFullyMetQuorum();
+
+            if (log.isInfoEnabled()) {
+                log.info("Zookeeper after quorum fully met again:\n" + dumpZoo());
+            }
+            
+            /*
+             * The quorum did not break. The token is unchanged.
+             */
+            assertEquals(token1, token2);
+            
+            /*
+             * Service B came back in at the end of the pipeline.
+             */
+            awaitPipeline(new HAGlue[] { serverA, serverC, serverB });
+
+            /*
+             * Verify we can read on the KB on all nodes.
+             * 
+             * Note: It is important to test the reads for the first commit on
+             * both the leader and the follower.
+             */
+            for (HAGlue service : new HAGlue[] { serverA, serverB, serverC }) {
+
+                awaitNSSAndHAReady(service);
+
+                final RemoteRepository repo = getRemoteRepository(service);
+
+                // Should be empty.
+                assertEquals(
+                        0L,
+                        countResults(repo.prepareTupleQuery(
+                                "SELECT * {?a ?b ?c} LIMIT 10").evaluate()));
+
+            }
+
+        }
+        
+    }
+
+    /**
+     * Test of {@link QuorumActor#forceRemoveService(UUID)}. Start A + B + C in
+     * strict order. Wait until the quorum is fully met and the initial KB
+     * create transaction is done. The leader then forces C out of the quorum.
+     * We verify that the quorum fully meets again, that C is again the last
+     * service in the pipeline order, and that the quorum did not break (same
+     * token).
+     */
+    public void test_ABC_forceRemoveService_C() throws Exception {
+        
+        final ABC services = new ABC(true/*sequential*/);
+        final HAGlue serverA = services.serverA;
+        final HAGlue serverB = services.serverB;
+        final HAGlue serverC = services.serverC;
+        
+        final long token1 = awaitFullyMetQuorum();
+
+        doNSSStatusRequest(serverA);
+        doNSSStatusRequest(serverB);
+        doNSSStatusRequest(serverC);
+
+        // Await initial commit point (KB create).
+        awaitCommitCounter(1L, serverA, serverB, serverC);
+
+        // Await [A] up and running as leader.
+        assertEquals(HAStatusEnum.Leader, awaitNSSAndHAReady(serverA));
+
+        // Await [B] up and running as follower.
+        assertEquals(HAStatusEnum.Follower, awaitNSSAndHAReady(serverB));
+
+        // Verify self-reporting by RMI in their respective roles.
+        awaitHAStatus(serverA, HAStatusEnum.Leader);
+        awaitHAStatus(serverB, HAStatusEnum.Follower);
+        awaitHAStatus(serverC, HAStatusEnum.Follower);
+        
+        // Verify binary equality on the journal files.
+        assertDigestsEquals(new HAGlue[] { serverA, serverB, serverC });
+
+        if (log.isInfoEnabled()) {
+            log.info("Zookeeper before forcing service remove:\n" + dumpZoo());
+        }
+        
+        /*
+         * Bounce the 1st follower out of the quorum. Verify quorum meets again
+         * and that we can read on all services.
+         */
+        {
+
+            serverA.submit(new ForceRemoveService(getServiceCId()), true).get();
+            
+            // Wait for the quorum to fully meet again.
+            final long token2 = awaitFullyMetQuorum();
+
+            if (log.isInfoEnabled()) {
+                log.info("Zookeeper after quorum fully met again:\n" + dumpZoo());
+            }
+            
+            /*
+             * The quorum did not break. The token is unchanged.
+             */
+            assertEquals(token1, token2);
+            
+            /*
+             * Service C came back in at the end of the pipeline (i.e., the
+             * pipeline is unchanged).
+             */
+            awaitPipeline(new HAGlue[] { serverA, serverB, serverC });
+            
+            /*
+             * Verify we can read on the KB on all nodes.
+             * 
+             * Note: It is important to test the reads for the first commit on
+             * both the leader and the follower.
+             */
+            for (HAGlue service : new HAGlue[] { serverA, serverB, serverC }) {
+
+                awaitNSSAndHAReady(service);
+
+                final RemoteRepository repo = getRemoteRepository(service);
+
+                // Should be empty.
+                assertEquals(
+                        0L,
+                        countResults(repo.prepareTupleQuery(
+                                "SELECT * {?a ?b ?c} LIMIT 10").evaluate()));
+
+            }
+
+        }
+        
+    }
 
     /**
      * Verify ability to stop and restart the zookeeper process under test
