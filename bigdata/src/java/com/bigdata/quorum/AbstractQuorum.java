@@ -1860,22 +1860,22 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
             }
         }
 
-        /**
-         * An interruptable version of {@link #memberRemove()}.
-         * <p>
-         * Note: This is used by {@link AbstractQuorum#terminate()}. That code
-         * is already holding the lock in the caller's thread. Therefore it
-         * needs to run these operations in the same thread to avoid a deadlock
-         * with itself.
-         */
-        protected void memberRemoveInterruptable() throws InterruptedException {
-            if (!lock.isHeldByCurrentThread())
-                throw new IllegalMonitorStateException();
-            conditionalServiceLeaveImpl();
-            conditionalPipelineRemoveImpl();
-            conditionalWithdrawVoteImpl();
-            conditionalMemberRemoveImpl();
-        }
+//        /**
+//         * An interruptable version of {@link #memberRemove()}.
+//         * <p>
+//         * Note: This is used by {@link AbstractQuorum#terminate()}. That code
+//         * is already holding the lock in the caller's thread. Therefore it
+//         * needs to run these operations in the same thread to avoid a deadlock
+//         * with itself.
+//         */
+//        protected void memberRemoveInterruptable() throws InterruptedException {
+//            if (!lock.isHeldByCurrentThread())
+//                throw new IllegalMonitorStateException();
+//            conditionalServiceLeaveImpl();
+//            conditionalPipelineRemoveImpl();
+//            conditionalWithdrawVoteImpl();
+//            conditionalMemberRemoveImpl();
+//        }
 
         @Override
         final public void withdrawVote() {
