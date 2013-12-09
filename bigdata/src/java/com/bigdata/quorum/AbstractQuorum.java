@@ -2343,22 +2343,25 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
          * that will force them to fail rather than block forever. This will
          * then force the service into an error state if its QuorumActor can not
          * carry out the requested action within a specified timeout.
-         * 
-         * @throws InterruptedException 
          */
         @Override
-        final public void forceRemoveService(final UUID psid)
-                throws InterruptedException {
-            lock.lockInterruptibly();
-            try {
+        final public void forceRemoveService(final UUID psid) {
+            runActorTask(new ForceRemoveServiceTask(psid));
+        }
+
+        private class ForceRemoveServiceTask extends ActorTask {
+            private final UUID psid;
+            ForceRemoveServiceTask(final UUID psid) {
+                this.psid = psid;
+            }
+            @Override
+            protected void doAction() throws InterruptedException {
                 log.warn("Forcing remove of service" + ": thisService="
                         + serviceId + ", otherServiceId=" + psid);
                 doMemberRemove(psid);
                 doWithdrawVote(psid);
                 doPipelineRemove(psid);
                 doServiceLeave(psid);
-            } finally {
-                lock.unlock();
             }
         }
 
