@@ -72,6 +72,7 @@ import org.apache.zookeeper.data.ACL;
 
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.HAStatusEnum;
+import com.bigdata.ha.IndexManagerCallable;
 import com.bigdata.ha.RunState;
 import com.bigdata.ha.msg.HARootBlockRequest;
 import com.bigdata.ha.msg.HASnapshotDigestRequest;
@@ -1099,6 +1100,34 @@ public class AbstractHA3JournalServerTestCase extends
         }
 
     }
+
+    /**
+     * Debug class to explicitly ask one service to remove another.
+     * 
+     * This emulates the behaviour of the service in receiving correct notification
+     * of a target service failure -for example after a wire pull or sure kill.
+     * 
+     */
+	protected static class ForceRemoveService extends IndexManagerCallable<Void> {
+
+        private static final long serialVersionUID = 1L;
+        private final UUID service;
+
+        ForceRemoveService(final UUID service) {
+            this.service = service;
+        }
+    	
+		@Override
+		public Void call() throws Exception {
+
+		    final HAJournal ha = (HAJournal) this.getIndexManager();
+			
+			ha.getQuorum().getActor().forceRemoveService(service);
+			
+			return null;
+		}
+		
+	}
 
     private void safeShutdown(final HAGlue haGlue, final File serviceDir,
             final ServiceListener serviceListener) {

@@ -78,7 +78,7 @@ public class TestHA3JustKills extends AbstractHA3JournalServerTestCase {
 			
 			// FIXME: in the face of no implemented error propagation we can explicitly
 			//	tell the leader to remove the killed service!
-			startup.serverA.submit(new RemoveService(getServiceCId()), true);
+			startup.serverA.submit(new ForceRemoveService(getServiceCId()), true);
 
 			awaitPipeline(20, TimeUnit.SECONDS, new HAGlue[] {startup.serverA, startup.serverB});
 
@@ -99,31 +99,6 @@ public class TestHA3JustKills extends AbstractHA3JournalServerTestCase {
 
 	    }
 	    
-	    /**
-	     * Debug class to explicitly ask one service to remove another.
-	     * 
-	     * This emulates the behaviour of the service in receiving correct notification
-	     * of a target service failure -for example after a wire pull or sure kill.
-	     * 
-	     */
-	    static class RemoveService extends IndexManagerCallable<Void> {
-	    	final UUID m_sid;
-	    	RemoveService(final UUID sid) {
-	    		m_sid = sid;
-	    	}
-	    	
-			@Override
-			public Void call() throws Exception {
-				final AbstractJournal journal = (AbstractJournal) getIndexManager();
-				final Quorum<HAGlue, QuorumService<HAGlue>> quorum = journal
-						.getQuorum();
-				
-				quorum.getActor().forceRemoveService(m_sid);
-				
-				return null;
-			}
-	    }
-
 	    public void testStressABC_LiveLoadRemainsMet_kill_C() throws Exception {
 	        for (int i = 0; i < 5; i++) {
 	            try {
@@ -168,7 +143,7 @@ public class TestHA3JustKills extends AbstractHA3JournalServerTestCase {
 			kill(startup.serverB);
 			
 			// FIXME: temporary call to explicitly remove the service prior to correct protocol
-			startup.serverA.submit(new RemoveService(getServiceBId()), true);
+			startup.serverA.submit(new ForceRemoveService(getServiceBId()), true);
 
 			awaitPipeline(10, TimeUnit.SECONDS, new HAGlue[] {startup.serverA, startup.serverC});
 			
