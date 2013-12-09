@@ -2289,15 +2289,35 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
 
         abstract protected void doMemberAdd();
 
-        abstract protected void doMemberRemove();
+        final protected void doMemberRemove() {
+            doMemberRemove(serviceId);
+        }
+
+        abstract protected void doMemberRemove(UUID serviceId);
 
         abstract protected void doCastVote(long lastCommitTime);
 
-        abstract protected void doWithdrawVote();
+        final protected void doWithdrawVote() {
+            doWithdrawVote(serviceId);
+        }
+
+        abstract protected void doWithdrawVote(UUID serviceId);
 
         abstract protected void doPipelineAdd();
 
-        abstract protected void doPipelineRemove();
+        final protected void doPipelineRemove() {
+            doPipelineRemove(serviceId);
+        }
+
+        abstract protected void doPipelineRemove(UUID serviceId);
+
+        @Override
+        public void forceRemoveService(final UUID psid) {
+            doMemberRemove(psid);
+            doWithdrawVote(psid);
+            doPipelineRemove(psid);
+            doServiceLeave(psid);
+        }
 
         /**
          * Invoked when our client will become the leader to (a) reorganize the
@@ -2396,7 +2416,11 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
         
         abstract protected void doServiceJoin();
 
-        abstract protected void doServiceLeave();
+        final protected void doServiceLeave() {
+            doServiceLeave(serviceId);
+        }
+
+        abstract protected void doServiceLeave(UUID serviceId);
 
         abstract protected void doSetToken(long newToken);
 
