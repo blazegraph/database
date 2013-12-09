@@ -6209,6 +6209,15 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
      * <p>
      * Note: Reads on the {@link RWStore} MUST block during this method since
      * some allocators may be replaced as part of the post-commit protocol.
+     * <p>
+     * Ticket #778 was for a problem when a follower takes over as leader and
+     * was not correctly synchronised.  This was traced, eventually, to a problem
+     * in calculating the diskAddr metabit for the modified Allocator.  The problem
+     * was demonstrated by a temporary method to reserve metaAllocations by extending and
+     * setting the m_transient bits.  But that has to be done within the commit() method
+     * before it attempts to save all the dirty allocators.  If we need to contrive a similar
+     * scenario in the future a better approach would be a special debug property on the 
+     * RWStore that indicates a "TRANSIENT_RESERVE" or something similar.
      * 
      * @param rbv
      *            The new {@link IRootBlockView}.
