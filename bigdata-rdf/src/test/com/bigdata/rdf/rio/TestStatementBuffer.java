@@ -450,6 +450,13 @@ public class TestStatementBuffer extends AbstractTripleStoreTestCase {
         			 */
         			return;
         		}
+
+            if (store.isQuads() || store.isStatementIdentifiers()) {
+                /*
+                 * Disabled.
+                 */
+                return;
+            }
         	
 			// * @prefix : <http://example.com/> .
 			// * @prefix news: <http://example.com/news/> .
