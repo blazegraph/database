@@ -52,6 +52,7 @@ import java.util.zip.Adler32;
 import org.apache.log4j.Logger;
 
 import com.bigdata.ha.QuorumPipelineImpl;
+import com.bigdata.ha.msg.IHAMessage;
 import com.bigdata.ha.msg.IHASyncRequest;
 import com.bigdata.ha.msg.IHAWriteMessage;
 import com.bigdata.ha.msg.IHAWriteMessageBase;
@@ -1079,6 +1080,11 @@ public class HAReceiveService<M extends IHAWriteMessageBase> extends Thread {
 
                     rem -= rdlen;
 
+                    if (callback != null) {
+                        // notify of incremental read.
+                        callback.incReceive(message, reads, rdlen, rem);
+                    }
+
                     /*
                      * Now forward the most recent transfer bytes downstream
                      * 
@@ -1349,6 +1355,25 @@ public class HAReceiveService<M extends IHAWriteMessageBase> extends Thread {
          */
         void callback(M msg, ByteBuffer data) throws Exception;
 
+        /**
+         * Notify that some payload bytes have been incrementally received for
+         * an {@link IHAMessage}. This is invoked each time some data has been
+         * read from the upstream socket.
+         * 
+         * @param msg
+         *            The message.
+         * @param nreads
+         *            The number of reads performed against the upstream socket
+         *            for this message.
+         * @param rdlen
+         *            The number of bytes read from the socket in this read.
+         * @param rem
+         *            The number of bytes remaining before the payload has been
+         *            fully read.
+         * 
+         * @throws Exception
+         */
+        void incReceive(M msg, int nreads, int rdlen, int rem) throws Exception;
     }
 
     /**

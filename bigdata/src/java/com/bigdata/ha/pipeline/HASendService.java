@@ -131,9 +131,29 @@ public class HASendService {
      * @see #start(InetSocketAddress)
      */
     public HASendService() {
-        
-	}
 
+        this(true/* blocking */);
+
+    }
+
+    /**
+     * Note: This constructor is not exposed yet. We need to figure out whether
+     * to allow the configuration of the socket options and how to support that.
+     * 
+     * @param blocking
+     */
+    private HASendService(final boolean blocking) {
+
+        this.blocking = blocking;
+        
+    }
+
+    /**
+     * <code>true</code> iff the client socket will be setup in a blocking mode.
+     * This is the historical behavior until at least Dec 10, 2013.
+     */
+    private final boolean blocking;
+    
     /**
      * Extended to ensure that the private executor service is always
      * terminated.
@@ -422,21 +442,28 @@ public class HASendService {
      * 
      * @throws IOException
      */
-    static private SocketChannel openChannel(final InetSocketAddress addr)
+    private SocketChannel openChannel(final InetSocketAddress addr)
             throws IOException {
 
         final SocketChannel socketChannel = SocketChannel.open();
 
         try {
 
-            socketChannel.configureBlocking(true);
+            socketChannel.configureBlocking(blocking);
 
             if (log.isTraceEnabled())
                 log.trace("Connecting to " + addr);
 
-            socketChannel.connect(addr);
-
-            socketChannel.finishConnect();
+            if (!socketChannel.connect(addr)) {
+                while (!socketChannel.finishConnect()) {
+                    try {
+                        Thread.sleep(10/* millis */);
+                    } catch (InterruptedException e) {
+                        // Propagate interrupt.
+                        Thread.currentThread().interrupt();
+                    }
+                }
+            }
 
         } catch (IOException ex) {
 
@@ -520,7 +547,7 @@ public class HASendService {
                      * socket buffer exchange and the send() Future will report
                      * success even through the application code on the receiver
                      * could fail once it gets control back from select(). This
-                     * twist can be a bit suprising. Therefore it is useful to
+                     * twist can be a bit surprising. Therefore it is useful to
                      * write tests with both small payloads (the data transfer
                      * will succeed at the socket level even if the application
                      * logic then fails the transfer) and for large payloads.

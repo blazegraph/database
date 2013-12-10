@@ -109,6 +109,15 @@ abstract public class QuorumServiceBase<S extends HAGlue, L extends AbstractJour
             }
             
             @Override
+            protected void incReceive(final IHASyncRequest req,
+                    final IHAWriteMessage msg, final int nreads,
+                    final int rdlen, final int rem) throws Exception {
+
+                QuorumServiceBase.this.incReceive(req, msg, nreads, rdlen, rem);
+
+            }
+            
+            @Override
             protected long getRetrySendTimeoutNanos() {
 
                 return QuorumServiceBase.this.getRetrySendTimeoutNanos();
@@ -262,8 +271,31 @@ abstract public class QuorumServiceBase<S extends HAGlue, L extends AbstractJour
      */
     abstract protected void handleReplicatedWrite(IHASyncRequest req,
             IHAWriteMessage msg, ByteBuffer data) throws Exception;
- 
+
     /**
+     * Core implementation of callback for monitoring progress of replicated
+     * writes.
+     * 
+     * @param req
+     *            The synchronization request (optional). When non-
+     *            <code>null</code> the message and payload are historical data.
+     *            When <code>null</code> they are live data.
+     * @param msg
+     *            Metadata about a buffer containing data replicated to this
+     *            node.
+     * @param rdlen
+     *            The number of bytes read from the socket in this read.
+     * @param rem
+     *            The number of bytes remaining before the payload has been
+     *            fully read.
+     *            
+     * @throws Exception
+     */
+    abstract protected void incReceive(final IHASyncRequest req,
+            final IHAWriteMessage msg, final int nreads, final int rdlen,
+            final int rem) throws Exception;
+
+        /**
      * {@inheritDoc}
      * <p>
      * Note: The default implementation is a NOP.

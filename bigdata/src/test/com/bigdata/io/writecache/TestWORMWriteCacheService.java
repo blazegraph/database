@@ -339,6 +339,13 @@ public class TestWORMWriteCacheService extends TestCase3 {
                 }
 
                 @Override
+                protected void incReceive(final IHASyncRequest req,
+                        final IHAWriteMessage msg, final int nreads,
+                        final int rdlen, final int rem) throws Exception {
+                    // NOP
+                }
+                
+                @Override
                 public UUID getStoreUUID() {
                     return MyMockQuorumMember.this.getStoreUUID();
                 }
@@ -380,7 +387,7 @@ public class TestWORMWriteCacheService extends TestCase3 {
                     MyMockQuorumMember.this.purgeHALogs(token);
                     
                 }
-                
+
             });
 
         }
