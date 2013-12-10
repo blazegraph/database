@@ -847,10 +847,19 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> /*extends
                 // Setup the receive service.
                 receiveService = new HAReceiveService<HAMessageWrapper>(addrSelf,
                         addrNext, new IHAReceiveCallback<HAMessageWrapper>() {
+                            @Override
                             public void callback(final HAMessageWrapper msg,
                                     final ByteBuffer data) throws Exception {
                                 // delegate handling of write cache blocks.
                                 handleReplicatedWrite(msg.req, msg.msg, data);
+                            }
+                            @Override
+                            public void incReceive(final HAMessageWrapper msg,
+                                    final int nreads, final int rdlen,
+                                    final int rem) throws Exception {
+                                // delegate handling of incremental receive notify.
+                                QuorumPipelineImpl.this.incReceive(msg.req,
+                                        msg.msg, nreads, rdlen, rem);
                             }
                         });
                 // Start the receive service - will not return until service is
@@ -2054,6 +2063,27 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> /*extends
      */
     abstract protected void handleReplicatedWrite(final IHASyncRequest req,
             final IHAWriteMessage msg, final ByteBuffer data) throws Exception;
+
+    /**
+     * Notify that some payload bytes have been incrementally received for an
+     * {@link IHAMessage}.
+     * 
+     * @param msg
+     *            The message.
+     * @param nreads
+     *            The number of reads performed against the upstream socket for
+     *            this message.
+     * @param rdlen
+     *            The number of bytes read from the socket in this read.
+     * @param rem
+     *            The number of bytes remaining before the payload has been
+     *            fully read.
+     * 
+     * @throws Exception
+     */
+    abstract protected void incReceive(final IHASyncRequest req,
+            final IHAWriteMessage msg, final int nreads, final int rdlen,
+            final int rem) throws Exception;
 
     /**
      * A utility class that bundles together the Internet address and port at which

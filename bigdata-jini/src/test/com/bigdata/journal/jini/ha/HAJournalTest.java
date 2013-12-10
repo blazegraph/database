@@ -90,6 +90,7 @@ import com.bigdata.journal.ITx;
 import com.bigdata.journal.StoreState;
 import com.bigdata.journal.jini.ha.HAJournalServer.HAQuorumService;
 import com.bigdata.journal.jini.ha.HAJournalServer.RunStateEnum;
+import com.bigdata.journal.jini.ha.HAJournalServer.HAQuorumService.IHAProgressListener;
 import com.bigdata.quorum.AsynchronousQuorumCloseException;
 import com.bigdata.quorum.Quorum;
 import com.bigdata.quorum.zk.ZKQuorumImpl;
@@ -275,7 +276,20 @@ public class HAJournalTest extends HAJournal {
          * @see IHA2PhaseCommitMessage#failCommit_beforeClosingHALog()
          */
         public void failCommit_beforeClosingHALog() throws IOException;
-        
+
+        /**
+         * Message may be used to force a write replication failure when the
+         * specified number of bytes have been received for the live or
+         * historical writes for the given commit point. Only one such trigger
+         * is honored at a time. This method sets the trigger. The trigger is
+         * not removed automatically but may take responsiblity for removing
+         * itself once it runs.
+         * 
+         * @see HAJournalServer.HAQuorumService#progressListenerRef
+         */
+        public void failWriteReplication(IHAProgressListener listener)
+                throws IOException;
+
         /**
          * Set the next value to be reported by {@link BasicHA#nextTimestamp()}.
          * <p>
@@ -638,6 +652,7 @@ public class HAJournalTest extends HAJournal {
 
         private class EnterErrorStateTask implements Runnable {
 
+            @Override
             public void run() {
 
                 @SuppressWarnings("unchecked")
@@ -1319,6 +1334,20 @@ public class HAJournalTest extends HAJournal {
                 conn.rollback();
 
             }
+
+        }
+
+        @Override
+        public void failWriteReplication(final IHAProgressListener listener)
+                throws IOException {
+
+            final Quorum<HAGlue, QuorumService<HAGlue>> quorum = getQuorum();
+            
+            // Note: Throws IllegalStateException if quorum is not running.
+            final QuorumService<HAGlue> quorumService = quorum.getClient();
+            
+            ((HAQuorumService<?, ?>) quorumService).progressListenerRef
+                    .set(listener);
 
         }
         

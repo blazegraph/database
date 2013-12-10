@@ -928,7 +928,8 @@ public class AbstractHA3JournalServerTestCase extends
      * @return true unless an exception was encountered (a <code>true</code>
      *         return is not a sure indicator of success).
      */
-    protected boolean trySignal(final SignalEnum signalEnum, final int pid){
+    static protected boolean trySignal(final SignalEnum signalEnum,
+            final int pid) {
 
         final String cmd = "kill -" + signalEnum.symbol() + " " + pid;
 
