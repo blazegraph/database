@@ -419,4 +419,96 @@ public class TestHA3JustKills extends AbstractHA3JournalServerTestCase {
         
     }
 
+    /**
+     * Test where we start A+B+C in strict sequence. Once we observe that all
+     * services have gone through the initial KB create, we do a sudden kill of
+     * B. We then start the live load. This test explores what happens when A is
+     * not yet aware that B is dead when the UPDATE operation starts.
+     * 
+     * @throws Exception
+     */
+    public void testABC_awaitKBCreate_killB_LiveLoadRemainsMet()
+            throws Exception {
+
+        // enforce join order
+        final ABC startup = new ABC(true /* sequential */);
+
+        final long token = awaitFullyMetQuorum();
+
+        // await the initial KB commit on all services.
+        awaitCommitCounter(1L, new HAGlue[] { startup.serverA, startup.serverB,
+                startup.serverC });
+
+        kill(startup.serverB);
+
+        // start concurrent task loads that continue until fully met
+        final FutureTask<Void> ft = new FutureTask<Void>(new LargeLoadTask(
+                token));
+
+        executorService.submit(ft);
+
+        awaitPipeline(getZKSessionTimeout() + 5000, TimeUnit.MILLISECONDS,
+                new HAGlue[] { startup.serverA, startup.serverC });
+
+        // also check members and joined
+        awaitMembers(new HAGlue[] { startup.serverA, startup.serverC });
+        awaitJoined(new HAGlue[] { startup.serverA, startup.serverC });
+
+        // token must remain unchanged to indicate same quorum
+        assertEquals(token, awaitMetQuorum());
+
+        // Await LOAD, but with a timeout.
+        ft.get(longLoadTimeoutMillis, TimeUnit.MILLISECONDS);
+
+        // token must remain unchanged to indicate same quorum
+        assertEquals(token, awaitMetQuorum());
+        
+    }
+
+    /**
+     * Test where we start A+B+C in strict sequence. Once we observe that all
+     * services have gone through the initial KB create, we do a sudden kill of
+     * C. We then start the live load. This test explores what happens when A
+     * and B are not yet aware that C is dead when the UPDATE operation starts.
+     * 
+     * @throws Exception
+     */
+    public void testABC_awaitKBCreate_killC_LiveLoadRemainsMet()
+            throws Exception {
+
+        // enforce join order
+        final ABC startup = new ABC(true /* sequential */);
+
+        final long token = awaitFullyMetQuorum();
+
+        // await the initial KB commit on all services.
+        awaitCommitCounter(1L, new HAGlue[] { startup.serverA, startup.serverB,
+                startup.serverC });
+
+        kill(startup.serverC);
+
+        // start concurrent task loads that continue until fully met
+        final FutureTask<Void> ft = new FutureTask<Void>(new LargeLoadTask(
+                token));
+
+        executorService.submit(ft);
+
+        awaitPipeline(getZKSessionTimeout() + 5000, TimeUnit.MILLISECONDS,
+                new HAGlue[] { startup.serverA, startup.serverB });
+
+        // also check members and joined
+        awaitMembers(new HAGlue[] { startup.serverA, startup.serverB });
+        awaitJoined(new HAGlue[] { startup.serverA, startup.serverB });
+
+        // token must remain unchanged to indicate same quorum
+        assertEquals(token, awaitMetQuorum());
+
+        // Await LOAD, but with a timeout.
+        ft.get(longLoadTimeoutMillis, TimeUnit.MILLISECONDS);
+
+        // token must remain unchanged to indicate same quorum
+        assertEquals(token, awaitMetQuorum());
+        
+    }
+
 }

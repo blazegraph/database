@@ -233,7 +233,7 @@ public class AbstractHA3JournalServerTestCase extends
      */
     private ServiceListener serviceListenerA = null, serviceListenerB = null;
 
-	protected ServiceListener serviceListenerC = null;
+	private ServiceListener serviceListenerC = null;
     
     private LookupDiscoveryManager lookupDiscoveryManager = null;
 
@@ -268,6 +268,10 @@ public class AbstractHA3JournalServerTestCase extends
         return zookeeper;
     }
     
+    /**
+     * Return the negotiated zookeeper session timeout in milliseconds (if
+     * available) and otherwise the requested zookeeper session timeout.
+     */
     protected int getZKSessionTimeout() {
         final ZooKeeper zookeeper = this.zookeeper;
         if (zookeeper != null) {
