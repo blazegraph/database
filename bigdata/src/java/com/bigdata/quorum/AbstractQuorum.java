@@ -2343,6 +2343,9 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
          * that will force them to fail rather than block forever. This will
          * then force the service into an error state if its QuorumActor can not
          * carry out the requested action within a specified timeout.
+         * 
+         * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/724" >
+         *      HA wire pulling and sure kill testing </a>
          */
         @Override
         final public void forceRemoveService(final UUID psid) {
