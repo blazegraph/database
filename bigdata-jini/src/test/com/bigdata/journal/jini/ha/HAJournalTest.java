@@ -43,6 +43,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 
 import net.jini.config.Configuration;
 import net.jini.config.ConfigurationException;
@@ -89,8 +90,8 @@ import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.StoreState;
 import com.bigdata.journal.jini.ha.HAJournalServer.HAQuorumService;
-import com.bigdata.journal.jini.ha.HAJournalServer.RunStateEnum;
 import com.bigdata.journal.jini.ha.HAJournalServer.HAQuorumService.IHAProgressListener;
+import com.bigdata.journal.jini.ha.HAJournalServer.RunStateEnum;
 import com.bigdata.quorum.AsynchronousQuorumCloseException;
 import com.bigdata.quorum.Quorum;
 import com.bigdata.quorum.zk.ZKQuorumImpl;
@@ -124,6 +125,16 @@ public class HAJournalTest extends HAJournal {
 
         return new HAGlueTestImpl(serviceId);
 
+    }
+
+    /**
+     * The service implementation object that gets exported (not the proxy, but
+     * the thing that gets exported as the {@link HAGlueTest} proxy).
+     */
+    public HAGlueTestImpl getRemoteImpl() {
+        
+        return (HAGlueTestImpl) getHAJournalServer().getRemoteImpl();
+        
     }
     
     /**
@@ -328,7 +339,21 @@ public class HAJournalTest extends HAJournal {
          * Supports consistency checking between HA services
          */
         public StoreState getStoreState() throws IOException;
-        
+     
+        /**
+         * Gets and clears a root cause that was set on the remote service. This
+         * is used to inspect the root cause when an RMI method is interrupted
+         * in the local JVM. Since the RMI was interrupted, we can not observe
+         * the outcome or root cause of the associated failure on the remote
+         * service. However, test glue can explicitly set that root cause such
+         * that it can then be reported using this method.
+         */
+        public Throwable getAndClearLastRootCause() throws IOException;
+
+        /**
+         * Variant that does not clear out the last root cause.
+         */
+        public Throwable getLastRootCause() throws IOException;
     }
 
     /**
@@ -437,7 +462,7 @@ public class HAJournalTest extends HAJournal {
      * 
      * @see HAJournal.HAGlueService
      */
-    private class HAGlueTestImpl extends HAJournal.HAGlueService
+    class HAGlueTestImpl extends HAJournal.HAGlueService
             implements HAGlue, HAGlueTest, RemoteDestroyAdmin {
 
         /**
@@ -479,7 +504,7 @@ public class HAJournalTest extends HAJournal {
                 false);
 
         private final AtomicLong nextTimestamp = new AtomicLong(-1L);
-        
+
         private HAGlueTestImpl(final UUID serviceId) {
 
             super(serviceId);
@@ -1350,6 +1375,44 @@ public class HAJournalTest extends HAJournal {
                     .set(listener);
 
         }
+
+        @Override
+        public Throwable getAndClearLastRootCause() throws IOException {
+
+            final Throwable t = lastRootCause.getAndSet(null/* newValue */);
+
+            if (t != null)
+                log.warn("lastRootCause: " + t, t);
+
+            return t;
+
+        }
+        
+        @Override
+        public Throwable getLastRootCause() throws IOException {
+
+            final Throwable t = lastRootCause.get();
+
+            if (t != null)
+                log.warn("lastRootCause: " + t, t);
+
+            return t;
+
+        }
+        public void setLastRootCause(final Throwable t) {
+
+            if (log.isInfoEnabled())
+                log.info("Setting lastRootCause: " + t);
+            
+            lastRootCause.set(t);
+            
+        }
+        
+        /**
+         * @see HAGlueTest#getAndClearLastRootCause()
+         */
+        private AtomicReference<Throwable> lastRootCause = new AtomicReference<Throwable>();
+        
         
     } // class HAGlueTestImpl
 

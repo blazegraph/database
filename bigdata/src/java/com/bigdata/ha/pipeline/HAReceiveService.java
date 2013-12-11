@@ -983,6 +983,19 @@ public class HAReceiveService<M extends IHAWriteMessageBase> extends Thread {
         private void doReceiveAndReplicate(final Client client)
                 throws Exception {
 
+            /**
+             * The first cause if downstream replication fails. We make a note
+             * of this first cause, continue to drain the payload, and then
+             * rethrow the first cause once the payload has been fully drained.
+             * This is necessary to ensure that the socket channel does not have
+             * partial data remaining from an undrained payload.
+             * 
+             * @see <a
+             *      href="https://sourceforge.net/apps/trac/bigdata/ticket/724"
+             *      > HA wire pulling and sure kill testing </a>
+             */
+            Throwable downstreamFirstCause = null;
+            
             /*
              * We should now have parameters ready in the WriteMessage and can
              * begin transferring data from the stream to the writeCache.
@@ -1085,64 +1098,21 @@ public class HAReceiveService<M extends IHAWriteMessageBase> extends Thread {
                         callback.incReceive(message, reads, rdlen, rem);
                     }
 
-                    /*
-                     * Now forward the most recent transfer bytes downstream
-                     * 
-                     * @todo Since the downstream writes are against a blocking
-                     * mode channel, the receiver on this node runs in sync with
-                     * the receiver on the downstream node. In fact, those
-                     * processes could be decoupled with a bit more effort and
-                     * are only required to synchronize by the end of each
-                     * received payload.
-                     * 
-                     * Note: [addrNext] is final. If the downstream address is
-                     * changed, then the ReadTask is interrupted using its
-                     * Future and the WriteCacheService will handle the error by
-                     * retransmitting the current cache block.
-                     * 
-                     * The rdlen is checked for non zero to avoid an
-                     * IllegalArgumentException.
-                     * 
-                     * Note: loop since addrNext might change asynchronously.
-                     */
-                    while(true) {
-                    if (rdlen != 0 && addrNextRef.get() != null) {
-                        if (log.isTraceEnabled())
-                            log.trace("Incremental send of " + rdlen + " bytes");
-                        final ByteBuffer out = localBuffer.asReadOnlyBuffer();
-                        out.position(localBuffer.position() - rdlen);
-                        out.limit(localBuffer.position());
-                        synchronized (sendService) {
-                            /*
-                             * Note: Code block is synchronized on [downstream]
-                             * to make the decision to start the HASendService
-                             * that relays to [addrNext] atomic. The
-                             * HASendService uses [synchronized] for its public
-                             * methods so we can coordinate this lock with its
-                             * synchronization API.
-                             */
-                            if (!sendService.isRunning()) {
-                                /*
-                                 * Prepare send service for incremental
-                                 * transfers to the specified address.
-                                 */
-                                // Check for termination.
-                                client.checkFirstCause();
-                                // Note: use then current addrNext!
-                                sendService.start(addrNextRef.get());
-                                continue;
-                            }
+                    if (downstreamFirstCause == null) {
+                        try {
+                            forwardReceivedBytes(client, rdlen);
+                        } catch (ExecutionException ex) {
+                            log.error(
+                                    "Downstream replication failure"
+                                            + ": will drain payload and then rethrow exception: rootCause="
+                                            + ex, ex);
+                            downstreamFirstCause = ex;
                         }
-                        // Check for termination.
-                        client.checkFirstCause();
-                        // Send and await Future.
-                        sendService.send(out).get();
-                        }
-                        break;
                     }
-                }
 
-            } // while( rem > 0 )
+                } // while(itr.hasNext())
+
+            } // while( rem > 0 && !EOS )
 
             if (localBuffer.position() != message.getSize())
                 throw new IOException("Receive length error: localBuffer.pos="
@@ -1164,12 +1134,109 @@ public class HAReceiveService<M extends IHAWriteMessageBase> extends Thread {
                         + ", actual=" + (int) chk.getValue());
             }
 
+            if (downstreamFirstCause != null) {
+                
+                /**
+                 * Replication to the downstream service failed. The payload has
+                 * been fully drained. This ensures that we do not leave part of
+                 * the payload in the upstream socket channel. We now wrap and
+                 * rethrow the root cause of the downstream failure. The leader
+                 * will handle this by forcing the remove of the downstream
+                 * service and then re-replicating the payload.
+                 * 
+                 * @see <a
+                 *      href="https://sourceforge.net/apps/trac/bigdata/ticket/724"
+                 *      > HA wire pulling and sure kill testing </a>
+                 */
+
+                throw new RuntimeException(
+                        "Downstream replication failure: msg=" + message
+                                + ", ex=" + downstreamFirstCause,
+                        downstreamFirstCause);
+
+            }
+			
             if (callback != null) {
+
+                /*
+                 * The message was received and (if there is a downstream
+                 * service) successfully replicated to the downstream service.
+                 * We now invoke the callback to given this service an
+                 * opportunity to handle the message and the fully received
+                 * payload.
+                 */
+                
                 callback.callback(message, localBuffer);
+                
             }
 
         } // call()
 
+        /**
+         * Now forward the most recent transfer bytes downstream.
+         * <p>
+         * 
+         * Note: [addrNext] is final. If the downstream address is changed, then
+         * the {@link ReadTask} is interrupted using its {@link Future} and the
+         * WriteCacheService on the leader will handle the error by
+         * retransmitting the current cache block.
+         * 
+         * The rdlen is checked for non zero to avoid an
+         * IllegalArgumentException.
+         * 
+         * Note: loop since addrNext might change asynchronously.
+         * 
+         * @throws ExecutionException
+         * @throws InterruptedException
+         * 
+         * @todo Since the downstream writes are against a blocking mode
+         *       channel, the receiver on this node runs in sync with the
+         *       receiver on the downstream node. In fact, those processes could
+         *       be decoupled with a bit more effort and are only required to
+         *       synchronize by the end of each received payload.
+         * 
+         * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/724" >
+         *      HA wire pulling and sure kill testing </a>
+         */
+        private void forwardReceivedBytes(final Client client, final int rdlen)
+                throws InterruptedException, ExecutionException {
+            while (true) {
+                if (rdlen != 0 && addrNextRef.get() != null) {
+                    if (log.isTraceEnabled())
+                        log.trace("Incremental send of " + rdlen + " bytes");
+                    final ByteBuffer out = localBuffer.asReadOnlyBuffer();
+                    out.position(localBuffer.position() - rdlen);
+                    out.limit(localBuffer.position());
+                    synchronized (sendService) {
+                        /*
+                         * Note: Code block is synchronized on [downstream] to
+                         * make the decision to start the HASendService that
+                         * relays to [addrNext] atomic. The HASendService uses
+                         * [synchronized] for its public methods so we can
+                         * coordinate this lock with its synchronization API.
+                         */
+                        if (!sendService.isRunning()) {
+                            /*
+                             * Prepare send service for incremental transfers to
+                             * the specified address.
+                             */
+                            // Check for termination.
+                            client.checkFirstCause();
+                            // Note: use then current addrNext!
+                            sendService.start(addrNextRef.get());
+                            continue;
+                        }
+                    }
+                    // Check for termination.
+                    client.checkFirstCause();
+                    // Send and await Future.
+                    sendService.send(out).get();
+                }
+                break; // break out of the inner while loop.
+            } // while(true)
+
+        }
+        
 //        private void ack(final Client client) throws IOException {
 //            
 //            if (log.isTraceEnabled())

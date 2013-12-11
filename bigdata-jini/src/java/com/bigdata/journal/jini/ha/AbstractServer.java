@@ -311,12 +311,12 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
     /**
      * The service implementation object.
      */
-    protected Remote impl;
+    private Remote impl;
 
     /**
      * The exported proxy for the service implementation object.
      */
-    protected Remote proxy;
+    private Remote proxy;
 
     /**
      * The name of the host on which the server is running.
@@ -349,10 +349,23 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
 
     /**
      * The exported proxy for the service implementation object.
+     * 
+     * @see #getRemoteImpl()
      */
     public Remote getProxy() {
         
         return proxy;
+        
+    }
+    
+    /**
+     * The service implementation object.
+     * 
+     * @see #getProxy()
+     */
+    public Remote getRemoteImpl() {
+        
+        return impl;
         
     }
     
