@@ -2358,10 +2358,18 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
             protected void doAction() throws InterruptedException {
                 log.warn("Forcing remove of service" + ": thisService="
                         + serviceId + ", otherServiceId=" + psid);
-                doMemberRemove(psid);
+                /**
+                 * Note: The JOINED[] entry MUST be removed first in case the
+                 * service is not truely dead.
+                 * 
+                 * @see <a
+                 *      href="https://sourceforge.net/apps/trac/bigdata/ticket/724"
+                 *      > HA wire pulling and sure kill testing </a>
+                 */
+                doServiceLeave(psid);
                 doWithdrawVote(psid);
                 doPipelineRemove(psid);
-                doServiceLeave(psid);
+                doMemberRemove(psid);
             }
         }
         
