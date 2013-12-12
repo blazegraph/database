@@ -28,8 +28,10 @@ import java.io.InputStream;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.SocketOption;
 import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
+import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
 import java.util.Random;
@@ -48,8 +50,21 @@ import com.bigdata.io.TestCase3;
 
 /**
  * Test suite for basic socket behaviors.
+ * <p>
+ * Note: Tests in this suite should use direct byte buffers (non-heap NIO)
+ * buffers in order accurately model the conditions that bigdata uses for write
+ * replication. If you use heap byte[]s, then they are copied into an NIO direct
+ * buffer before they are transmitted over a socket. By using NIO direct
+ * buffers, we stay within the zero-copy pattern for sockets.
+ * <p>
+ * Note: Tests in this suite need to use {@link ServerSocketChannel#open()} to
+ * get access to the stream oriented listening interface for the server side of
+ * the socket. This is what is used by the {@link HAReceiveService}. It also
+ * sets up the {@link ServerSocketChannel} in a non-blocking mode and then uses
+ * the selectors to listen for available data. See {@link HAReceiveService}.
  * 
- * @author <a href="mailto:martyncutcher@users.sourceforge.net">Martyn Cutcher</a>
+ * @author <a href="mailto:martyncutcher@users.sourceforge.net">Martyn
+ *         Cutcher</a>
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
 public class TestSocketsDirect extends TestCase3 {
@@ -61,6 +76,75 @@ public class TestSocketsDirect extends TestCase3 {
         super(name);
     }
 
+    /**
+     * Writes out the available options for the client and server socket.
+     * 
+     * @throws IOException
+     */
+    public void testDirectSockets_options() throws IOException {
+
+        // Get a socket addresss for an unused port.
+        final InetSocketAddress serverAddr = new InetSocketAddress(getPort(0));
+
+        // First our ServerSocketChannel
+        final ServerSocketChannel ssc = ServerSocketChannel.open();
+        try {
+            
+            // bind the ServerSocket to the specified port.
+            ssc.bind(serverAddr);
+            
+            // Now the first Client SocketChannel
+            final SocketChannel cs = SocketChannel.open();
+            try {
+                /*
+                 * Note: true if connection made. false if connection in
+                 * progress. 
+                 */
+                final boolean immediate = cs.connect(serverAddr);
+                if (!immediate) {
+                    // Did not connect immediately, so finish connect now.
+                    if (!cs.finishConnect()) {
+                        fail("Did not connect.");
+                    }
+                }
+
+                /*
+                 * Write out the client socket options.
+                 */
+                log.info("Client:: isOpen=" + cs.isOpen());
+                log.info("Client:: isBlocking=" + cs.isBlocking());
+                log.info("Client:: isRegistered=" + cs.isRegistered());
+                log.info("Client:: isConnected=" + cs.isConnected());
+                log.info("Client:: isConnectionPending="
+                        + cs.isConnectionPending());
+                for (SocketOption<?> opt : cs.supportedOptions()) {
+                    log.info("Client:: " + opt + " := " + cs.getOption(opt));
+                }
+
+                /*
+                 * Note: We need to use ServerSocketChannel.open() to get access
+                 * to the stream oriented listening interface for the server
+                 * side of the socket.
+                 */
+                log.info("Server:: isOpen=" + ssc.isOpen());
+                log.info("Server:: isBlocking=" + ssc.isBlocking());
+                log.info("Server:: isRegistered=" + ssc.isRegistered());
+                for (SocketOption<?> opt : ssc.supportedOptions()) {
+                    log.info("Server:: " + opt + " := " + cs.getOption(opt));
+                }
+
+            } finally {
+                cs.close();
+            }
+
+        } finally {
+
+            ssc.close();
+            
+        }        
+
+    }
+    
     /**
      * Simple test of connecting to a server socket and the failure to connect
      * to a port not associated with a server socket.
@@ -144,6 +228,80 @@ public class TestSocketsDirect extends TestCase3 {
     }
     
     /**
+     * Test of a large write on a socket to understand what happens when the
+     * write is greater than the combined size of the client send buffer and the
+     * server receive buffer and the server side of the socket is either not
+     * accepted or already shutdown.
+     * 
+     * @throws IOException
+     * @throws InterruptedException
+     */
+    public void testDirectSockets_largeWrite_NotAccepted() throws IOException,
+            InterruptedException {
+
+        final Random r = new Random();
+        
+        // Get a socket addresss for an unused port.
+        final InetSocketAddress serverAddr = new InetSocketAddress(getPort(0));
+
+        // First our ServerSocket
+        final ServerSocket ss = new ServerSocket();
+        try {
+            
+            // Size of the server socket receive buffer.
+            final int receiveBufferSize = ss.getReceiveBufferSize();
+
+            // Allocate buffer twice as large as the receive buffer.
+            final byte[] largeBuffer = new byte[receiveBufferSize * 10];
+
+            if (log.isInfoEnabled()) {
+                log.info("receiveBufferSize=" + receiveBufferSize
+                        + ", largeBufferSize=" + largeBuffer.length);
+            }
+            
+            // fill buffer with random data.
+            r.nextBytes(largeBuffer);
+            
+            // bind the ServerSocket to the specified port.
+            ss.bind(serverAddr);
+            
+            // Now the first Client SocketChannel
+            final SocketChannel cs = SocketChannel.open();
+            try {
+                /*
+                 * Note: true if connection made. false if connection in
+                 * progress. 
+                 */
+                final boolean immediate = cs.connect(serverAddr);
+                if (!immediate) {
+                    // Did not connect immediately, so finish connect now.
+                    if (!cs.finishConnect()) {
+                        fail("Did not connect.");
+                    }
+                }
+
+                /*
+                 * Attempt to write data. The server socket is not yet accepted.
+                 * This should hit a timeout.
+                 */
+                assertTimeout(10L, TimeUnit.SECONDS, new WriteBufferTask(cs,
+                        ByteBuffer.wrap(largeBuffer)));
+
+                accept(ss);
+
+            } finally {
+                cs.close();
+            }
+
+        } finally {
+
+            ss.close();
+            
+        }
+        
+    }
+
+    /**
      * The use of threaded tasks in the send/receive service makes it difficult to
      * observer the socket state changes.
      * 
@@ -195,119 +353,134 @@ public class TestSocketsDirect extends TestCase3 {
 
             }
             
-            /*
-             * InputStream for server side of socket connection - set below and
-             * then reused outside of the try/finally block.
-             */
-            InputStream instr = null;
-
-            // Now the first Client SocketChannel
-            final SocketChannel cs1 = SocketChannel.open();
-            try {
-
+            {
                 /*
-                 * Note: true if connection made. false if connection in
-                 * progress.
+                 * InputStream for server side of socket connection - set below and
+                 * then reused outside of the try/finally block.
                  */
-                final boolean immediate1 = cs1.connect(serverAddr);
-                if (!immediate1) {
-                    if (!cs1.finishConnect()) {
-                        fail("Did not connect?");
-                    }
-                }
+                InputStream instr = null;
 
-                assertTrue(ss.getChannel() == null);
-
-                /*
-                 * We are connected.
-                 */
-
-                final ByteBuffer src = ByteBuffer.wrap(data);
-
-                // Write some data on the client socket.
-                cs1.write(src);
-
-                /*
-                 * Accept client's connection on server (after connect and
-                 * write).
-                 */
-                final Socket readSckt1 = accept(ss);
-
-                // Stream to read the data from the socket on the server side.
-                instr = readSckt1.getInputStream();
-
-                // and read the data
-                instr.read(dst);
-
-                // confirming the read is correct
-                assertTrue(BytesUtil.bytesEqual(data, dst));
-
-                assertTrue(ss.getChannel() == null);
-
-                /*
-                 * Attempting to read more returns ZERO because there is nothing
-                 * in the buffer and the connection is still open on the client
-                 * side.
-                 * 
-                 * Note: instr.read(buf) will BLOCK until the data is available,
-                 * the EOF is detected, or an exception is thrown.
-                 */
-                assertEquals(0,instr.available());
-//                assertEquals(0, instr.read(dst));
-
-                /*
-                 * Now write some more data into the channel and *then* close
-                 * it.
-                 */
-                cs1.write(ByteBuffer.wrap(data));
-
-                // close the client side of the socket
-                cs1.close();
-
-                // The server side of client connection is still open.
-                assertTrue(readSckt1.isConnected());
-                assertFalse(readSckt1.isClosed());
-
-                /*
-                 * Now try writing some more data. This should be disallowed
-                 * since we closed the client side of the socket.
-                 */
+                // Now the first Client SocketChannel
+                final SocketChannel cs1 = SocketChannel.open();
                 try {
-                    cs1.write(ByteBuffer.wrap(data));
-                    fail("Expected closed channel exception");
-                } catch (ClosedChannelException e) {
-                    // expected
-                }
 
-                /*
-                 * Since we closed the client side of the socket, when we try to
-                 * read more data on the server side of the connection. The data
-                 * that we already buffered is still available on the server
-                 * side of the socket.
-                 */
-                {
-                    // the already buffered data should be available.
-                    final int rdlen = instr.read(dst);
-                    assertEquals(DATA_LEN, rdlen);
+                    /*
+                     * Note: true if connection made. false if connection in
+                     * progress.
+                     */
+                    final boolean immediate1 = cs1.connect(serverAddr);
+                    if (!immediate1) {
+                        if (!cs1.finishConnect()) {
+                            fail("Did not connect?");
+                        }
+                    }
+
+                    assertTrue(ss.getChannel() == null);
+
+                    /*
+                     * We are connected.
+                     */
+
+                    final ByteBuffer src = ByteBuffer.wrap(data);
+
+                    // Write some data on the client socket.
+                    cs1.write(src);
+
+                    /*
+                     * Accept client's connection on server (after connect and
+                     * write).
+                     */
+                    final Socket readSckt1 = accept(ss);
+
+                    // Stream to read the data from the socket on the server
+                    // side.
+                    instr = readSckt1.getInputStream();
+
+                    // and read the data
+                    instr.read(dst);
+
+                    // confirming the read is correct
                     assertTrue(BytesUtil.bytesEqual(data, dst));
+
+                    assertTrue(ss.getChannel() == null);
+
+                    /*
+                     * Attempting to read more returns ZERO because there is
+                     * nothing in the buffer and the connection is still open on
+                     * the client side.
+                     * 
+                     * Note: instr.read(buf) will BLOCK until the data is
+                     * available, the EOF is detected, or an exception is
+                     * thrown.
+                     */
+                    assertEquals(0, instr.available());
+                    // assertEquals(0, instr.read(dst));
+
+                    /*
+                     * Now write some more data into the channel and *then*
+                     * close it.
+                     */
+                    cs1.write(ByteBuffer.wrap(data));
+
+                    // close the client side of the socket
+                    cs1.close();
+
+                    // The server side of client connection is still open.
+                    assertTrue(readSckt1.isConnected());
+                    assertFalse(readSckt1.isClosed());
+
+                    /*
+                     * Now try writing some more data. This should be disallowed
+                     * since we closed the client side of the socket.
+                     */
+                    try {
+                        cs1.write(ByteBuffer.wrap(data));
+                        fail("Expected closed channel exception");
+                    } catch (ClosedChannelException e) {
+                        // expected
+                    }
+
+                    /*
+                     * Since we closed the client side of the socket, when we
+                     * try to read more data on the server side of the
+                     * connection. The data that we already buffered is still
+                     * available on the server side of the socket.
+                     */
+                    {
+                        // the already buffered data should be available.
+                        final int rdlen = instr.read(dst);
+                        assertEquals(DATA_LEN, rdlen);
+                        assertTrue(BytesUtil.bytesEqual(data, dst));
+                    }
+
+                    /*
+                     * We have drained the buffered data. There is no more
+                     * buffered data and client side is closed, so an attempt to
+                     * read more data on the server side of the socket will
+                     * return EOF (-1).
+                     */
+                    assertEquals(-1, instr.read(dst)); // read EOF
+
+                    // if so then should we explicitly close its socket?
+                    readSckt1.close();
+                    assertTrue(readSckt1.isClosed());
+
+                    /*
+                     * Still reports EOF after the accepted server socket is
+                     * closed.
+                     */
+                    assertEquals(-1, instr.read(dst));
+
+                    assertFalse(ss.isClosed());
+                    assertTrue(ss.getChannel() == null);
+
+                } finally {
+                    cs1.close();
                 }
 
-                /*
-                 * We have drained the buffered data. There is no more buffered
-                 * data and client side is closed, so an attempt to read more
-                 * data on the server side of the socket will return EOF (-1).
-                 */
-                assertEquals(-1, instr.read(dst)); // read EOF
-
-                // if so then should we explicitly close its socket?
-                readSckt1.close();
-                assertTrue(readSckt1.isClosed());
-
-                assertFalse(ss.isClosed());
-                assertTrue(ss.getChannel() == null);
-
-            } finally {
-                cs1.close();
+                // failing to read from original stream
+                final int nrlen = instr.read(dst);
+                assertEquals(-1, nrlen);
             }
 
             /*
@@ -330,10 +503,6 @@ public class TestSocketsDirect extends TestCase3 {
                 // Client writes to the SocketChannel
                 final int wlen = cs2.write(ByteBuffer.wrap(data));
                 assertEquals(DATA_LEN, wlen); // verify data written.
-
-                // failing to read from original stream
-                final int nrlen = instr.read(dst);
-                assertEquals(-1, nrlen);
 
                 // but succeeding to read from the new Socket
                 final InputStream instr2 = s2.getInputStream();
@@ -559,20 +728,38 @@ public class TestSocketsDirect extends TestCase3 {
         return av.get();
     }
 
-    private void assertTimeout(long timeout, TimeUnit unit, Callable<Void> callable) {
+    /**
+     * Fail the test if the {@link Callable} completes before the specified
+     * timeout.
+     * 
+     * @param timeout
+     * @param unit
+     * @param callable
+     */
+    private void assertTimeout(final long timeout, final TimeUnit unit,
+            final Callable<Void> callable) {
         final ExecutorService es = Executors.newSingleThreadExecutor();
         final Future<Void> ret = es.submit(callable);
+        final long begin = System.currentTimeMillis();
         try {
+            // await Future with timeout.
             ret.get(timeout, unit);
-            fail("Expected timeout");
+            final long elapsed = System.currentTimeMillis() - begin;
+            fail("Expected timeout: elapsed=" + elapsed + "ms, timeout="
+                    + timeout + " " + unit);
         } catch (TimeoutException e) {
             // that is expected
+            final long elapsed = System.currentTimeMillis() - begin;
+            if (log.isInfoEnabled())
+                log.info("timeout after " + elapsed + "ms");
             return;
         } catch (Exception e) {
-            fail("Expected timeout");
+            final long elapsed = System.currentTimeMillis() - begin;
+            fail("Expected timeout: elapsed=" + elapsed + ", timeout="
+                    + timeout + " " + unit, e);
         } finally {
-        	log.warn("Cancelling task - should interrupt accept()");
-        	ret.cancel(true);
+            log.warn("Cancelling task - should interrupt accept()");
+            ret.cancel(true/* mayInterruptIfRunning */);
             es.shutdown();
         }
     }
@@ -605,4 +792,27 @@ public class TestSocketsDirect extends TestCase3 {
         }
     }
 
+    /**
+     * Task writes the data on the client {@link SocketChannel}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     */
+    private static class WriteBufferTask implements Callable<Void> {
+
+        final private ByteBuffer buf;
+        final private SocketChannel cs;
+        
+        public WriteBufferTask(final SocketChannel cs, final ByteBuffer buf) {
+            this.cs = cs;
+            this.buf = buf;
+        }
+        
+        @Override
+        public Void call() throws Exception {
+            cs.write(buf);
+            return null;
+        }
+        
+    }
+    
 }

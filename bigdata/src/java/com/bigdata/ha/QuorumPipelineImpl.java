@@ -41,15 +41,17 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.RunnableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.ha.msg.HAWriteMessageBase;
-import com.bigdata.ha.msg.IHALogRequest;
+import com.bigdata.ha.msg.HAMessageWrapper;
+import com.bigdata.ha.msg.HASendState;
 import com.bigdata.ha.msg.IHAMessage;
+import com.bigdata.ha.msg.IHASendState;
 import com.bigdata.ha.msg.IHASyncRequest;
 import com.bigdata.ha.msg.IHAWriteMessage;
 import com.bigdata.ha.pipeline.HAReceiveService;
@@ -190,7 +192,7 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> /*extends
      * href="https://sourceforge.net/apps/trac/bigdata/ticket/724">HA wire
      * pulling and sudden kill testing</a>.
      */
-    private final int RETRY_SLEEP = 100; //200; // 50; // milliseconds.
+    private final int RETRY_SLEEP = 30; //200; // 50; // milliseconds.
     
     /**
      * Once this timeout is elapsed, retrySend() will fail.
@@ -207,12 +209,12 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> /*extends
     /**
      * The {@link QuorumMember}.
      */
-    protected final QuorumMember<S> member;
+    private final QuorumMember<S> member;
 
     /**
      * The service {@link UUID} for the {@link QuorumMember}.
      */
-    protected final UUID serviceId;
+    private final UUID serviceId;
     
     /**
      * Lock managing the various mutable aspects of the pipeline state.
@@ -243,6 +245,11 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> /*extends
      */
     private final InnerEventHandler innerEventHandler = new InnerEventHandler();
 
+    /**
+     * One up message identifier.
+     */
+    private final AtomicLong messageId = new AtomicLong(0L);
+    
     /**
      * Core implementation of the handler for the various events. Always run
      * while holding the {@link #lock}.
@@ -851,15 +858,19 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> /*extends
                             public void callback(final HAMessageWrapper msg,
                                     final ByteBuffer data) throws Exception {
                                 // delegate handling of write cache blocks.
-                                handleReplicatedWrite(msg.req, msg.msg, data);
+                                handleReplicatedWrite(msg.getHASyncRequest(),
+                                        (IHAWriteMessage) msg
+                                                .getHAWriteMessage(), data);
                             }
                             @Override
                             public void incReceive(final HAMessageWrapper msg,
                                     final int nreads, final int rdlen,
                                     final int rem) throws Exception {
                                 // delegate handling of incremental receive notify.
-                                QuorumPipelineImpl.this.incReceive(msg.req,
-                                        msg.msg, nreads, rdlen, rem);
+                                QuorumPipelineImpl.this.incReceive(//
+                                        msg.getHASyncRequest(),
+                                        (IHAWriteMessage) msg.getHAWriteMessage(), //
+                                        nreads, rdlen, rem);
                             }
                         });
                 // Start the receive service - will not return until service is
@@ -1170,35 +1181,16 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> /*extends
     /*
      * End of QuorumStateChangeListener.
      */
-    
-    /**
-     * Glue class wraps the {@link IHAWriteMessage} and the
-     * {@link IHALogRequest} message and exposes the requires {@link IHAMessage}
-     * interface to the {@link HAReceiveService}. This class is never persisted.
-     * It just let's us handshake with the {@link HAReceiveService} and get back
-     * out the original {@link IHAWriteMessage} as well as the optional
-     * {@link IHALogRequest} message.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
-     *         Thompson</a>
-     */
-    private static class HAMessageWrapper extends HAWriteMessageBase {
 
-        private static final long serialVersionUID = 1L;
+    private IHASendState newSendState() {
 
-        final IHASyncRequest req;
-        final IHAWriteMessage msg;
-        
-        public HAMessageWrapper(final IHASyncRequest req,
-                final IHAWriteMessage msg) {
+        final Quorum<?, ?> quorum = member.getQuorum();
 
-            // Use size and checksum from real IHAWriteMessage.
-            super(msg.getSize(),msg.getChk());
-            
-            this.req = req; // MAY be null;
-            this.msg = msg;
-            
-        }
+        final IHASendState snd = new HASendState(messageId.incrementAndGet(),
+                serviceId/* originalSenderId */, serviceId/* senderId */,
+                quorum.token(), quorum.replicationFactor());
+
+        return snd;
 
     }
     
@@ -1214,7 +1206,8 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> /*extends
         lock();
         try {
 
-            ft = new FutureTask<Void>(new RobustReplicateTask(req, msg, b));
+            ft = new FutureTask<Void>(new RobustReplicateTask(req,
+                    newSendState(), msg, b));
 
         } finally {
 
@@ -1243,6 +1236,11 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> /*extends
         private final IHASyncRequest req;
         
         /**
+         * Metadata about the state of the sender for this message.
+         */
+        private final IHASendState snd;
+        
+        /**
          * The {@link IHAWriteMessage}.
          */
         private final IHAWriteMessage msg;
@@ -1265,9 +1263,13 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> /*extends
         private final long quorumToken;
 
         public RobustReplicateTask(final IHASyncRequest req,
-                final IHAWriteMessage msg, final ByteBuffer b) {
+                final IHASendState snd, final IHAWriteMessage msg,
+                final ByteBuffer b) {
             
             // Note: [req] MAY be null.
+
+            if (snd == null)
+                throw new IllegalArgumentException();
 
             if (msg == null)
                 throw new IllegalArgumentException();
@@ -1277,6 +1279,8 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> /*extends
 
             this.req = req;
 
+            this.snd = snd;
+            
             this.msg = msg;
             
             this.b = b;
@@ -1467,6 +1471,7 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> /*extends
          *     at com.bigdata.ha.pipeline.HAReceiveService.run(HAReceiveService.java:431)
          * </pre>
          */
+        @Override
         public Void call() throws Exception {
 
             final long beginNanos = System.nanoTime();
@@ -1549,7 +1554,7 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> /*extends
 
                 final ByteBuffer b = this.b.duplicate();
 
-                new SendBufferTask<S>(member, quorumToken, req, msg, b,
+                new SendBufferTask<S>(member, quorumToken, req, snd, msg, b,
                         downstream, sendService, sendLock).call();
 
                 return;
@@ -1674,6 +1679,7 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> /*extends
         private final QuorumMember<S> member;
         private final long token; // member MUST remain leader for token.
         private final IHASyncRequest req;
+        private final IHASendState snd;
         private final IHAWriteMessage msg;
         private final ByteBuffer b;
         private final PipelineState<S> downstream;
@@ -1681,13 +1687,15 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> /*extends
         private final Lock sendLock;
 
         public SendBufferTask(final QuorumMember<S> member, final long token,
-                final IHASyncRequest req, final IHAWriteMessage msg,
-                final ByteBuffer b, final PipelineState<S> downstream,
+                final IHASyncRequest req, final IHASendState snd,
+                final IHAWriteMessage msg, final ByteBuffer b,
+                final PipelineState<S> downstream,
                 final HASendService sendService, final Lock sendLock) {
 
             this.member = member;
             this.token = token; 
             this.req = req; // Note: MAY be null.
+            this.snd = snd;
             this.msg = msg;
             this.b = b;
             this.downstream = downstream;
@@ -1696,6 +1704,7 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> /*extends
 
         }
 
+        @Override
         public Void call() throws Exception {
 
             /*
@@ -1723,13 +1732,13 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> /*extends
                 ExecutionException, IOException {
 
             // Get Future for send() outcome on local service.
-            final Future<Void> futSnd = sendService.send(b);
+			final Future<Void> futSnd = sendService.send(b, snd.getMarker());
 
             try {
 
                 // Get Future for receive outcome on the remote service (RMI).
                 final Future<Void> futRec = downstream.service
-                        .receiveAndReplicate(req, msg);
+                        .receiveAndReplicate(req, snd, msg);
 
                 try {
 
@@ -1780,7 +1789,8 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> /*extends
 
     @Override
     public Future<Void> receiveAndReplicate(final IHASyncRequest req,
-            final IHAWriteMessage msg) throws IOException {
+            final IHASendState snd, final IHAWriteMessage msg)
+            throws IOException {
 
         /*
          * FIXME We should probably pass the quorum token through from the
@@ -1837,7 +1847,7 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> /*extends
                  */
 
                 ft = new FutureTask<Void>(new ReceiveTask<S>(member, token,
-                        req, msg, b, receiveService));
+                        req, snd, msg, b, receiveService));
                 
 //                try {
 //
@@ -1862,7 +1872,8 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> /*extends
                  */
 
                 ft = new FutureTask<Void>(new ReceiveAndReplicateTask<S>(
-                        member, token, req, msg, b, downstream, receiveService));
+                        member, token, req, snd, msg, b, downstream,
+                        receiveService));
 
             }
 
@@ -1891,6 +1902,7 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> /*extends
         private final QuorumMember<S> member;
         private final long token;
         private final IHASyncRequest req;
+        private final IHASendState snd;
         private final IHAWriteMessage msg;
         private final ByteBuffer b;
         private final HAReceiveService<HAMessageWrapper> receiveService;
@@ -1898,6 +1910,7 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> /*extends
         public ReceiveTask(final QuorumMember<S> member,
                 final long token, 
                 final IHASyncRequest req,
+                final IHASendState snd,
                 final IHAWriteMessage msg, final ByteBuffer b,
                 final HAReceiveService<HAMessageWrapper> receiveService
                 ) {
@@ -1905,16 +1918,18 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> /*extends
             this.member = member;
             this.token = token;
             this.req = req; // Note: MAY be null.
+            this.snd = snd;
             this.msg = msg;
             this.b = b;
             this.receiveService = receiveService;
         }
         
+        @Override
         public Void call() throws Exception {
 
-            // wrap the messages together.
+            // wrap the messages together. 
             final HAMessageWrapper wrappedMsg = new HAMessageWrapper(
-                    req, msg);
+                    req, snd, msg);
 
             // Get Future for send() outcome on local service.
             final Future<Void> futSnd = receiveService.receiveData(wrappedMsg,
@@ -1957,6 +1972,7 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> /*extends
         private final QuorumMember<S> member;
         private final long token;
         private final IHASyncRequest req;
+        private final IHASendState snd;
         private final IHAWriteMessage msg;
         private final ByteBuffer b;
         private final PipelineState<S> downstream;
@@ -1964,6 +1980,7 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> /*extends
 
         public ReceiveAndReplicateTask(final QuorumMember<S> member,
                 final long token, final IHASyncRequest req,
+                final IHASendState snd,
                 final IHAWriteMessage msg, final ByteBuffer b,
                 final PipelineState<S> downstream,
                 final HAReceiveService<HAMessageWrapper> receiveService) {
@@ -1971,17 +1988,19 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> /*extends
             this.member = member;
             this.token = token;
             this.req = req; // Note: MAY be null.
+            this.snd = snd;
             this.msg = msg;
             this.b = b;
             this.downstream = downstream;
             this.receiveService = receiveService;
         }
 
+        @Override
         public Void call() throws Exception {
 
             // wrap the messages together.
             final HAMessageWrapper wrappedMsg = new HAMessageWrapper(
-                    req, msg);
+                    req, snd, msg);
 
             // Get Future for send() outcome on local service.
             final Future<Void> futSnd = receiveService.receiveData(wrappedMsg,
@@ -1992,7 +2011,7 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> /*extends
                 // Get future for receive outcome on the remote
                 // service.
                 final Future<Void> futRec = downstream.service
-                        .receiveAndReplicate(req, msg);
+                        .receiveAndReplicate(req, snd, msg);
 
                 try {
 

@@ -287,6 +287,10 @@ public class HASendService {
      * 
      * @param buffer
      *            The buffer.
+     * @param marker
+     *            A marker that will be used to prefix the payload for the
+     *            message in the write replication socket stream. The marker is
+     *            used to ensure synchronization when reading on the stream.
      * 
      * @return The {@link Future} which can be used to await the outcome of this
      *         operation.
@@ -301,8 +305,8 @@ public class HASendService {
      * @todo throws IOException if the {@link SocketChannel} was not open and
      *       could not be opened.
      */
-	public Future<Void> send(final ByteBuffer buffer) {
-     
+	public Future<Void> send(final ByteBuffer buffer, final byte[] marker) {
+	     
 	    if (buffer == null)
             throw new IllegalArgumentException();
 
@@ -320,10 +324,9 @@ public class HASendService {
 
 //        reopenChannel();
         
-        return tmp.submit(newIncSendTask(buffer.asReadOnlyBuffer()));
+        return tmp.submit(newIncSendTask(buffer.asReadOnlyBuffer(), marker));
 
 	}
-
     /**
      * A series of timeouts used when we need to re-open the
      * {@link SocketChannel}.
@@ -422,13 +425,17 @@ public class HASendService {
      * 
      * @param buffer
      *            The buffer whose data are to be sent.
+     * @param marker
+     *            A marker that will be used to prefix the payload for the
+     *            message in the write replication socket stream. The marker is
+     *            used to ensure synchronization when reading on the stream.
      *            
      * @return The task which will send the data to the configured
      *         {@link InetSocketAddress}.
      */
-    protected Callable<Void> newIncSendTask(final ByteBuffer buffer) {
+    protected Callable<Void> newIncSendTask(final ByteBuffer buffer, final byte[] marker) {
 
-        return new IncSendTask(buffer);
+        return new IncSendTask(buffer, marker);
          
     }
 
@@ -485,24 +492,20 @@ public class HASendService {
      */
     protected /*static*/ class IncSendTask implements Callable<Void> {
 
-//        private final SocketChannel socketChannel;
-        private final ByteBuffer data;
+      private final ByteBuffer data;
+      private final byte[] marker;
 
-        public IncSendTask(/*final SocketChannel socketChannel, */final ByteBuffer data) {
+      public IncSendTask(final ByteBuffer data, final byte[] marker) {
 
-//            if (socketChannel == null)
-//                throw new IllegalArgumentException();
+          if (data == null)
+              throw new IllegalArgumentException();
 
-            if (data == null)
-                throw new IllegalArgumentException();
+          this.data = data;
+          this.marker = marker;
+      }
 
-//            this.socketChannel = socketChannel;
-            
-            this.data = data;
-
-        }
-
-        public Void call() throws Exception {
+      @Override
+      public Void call() throws Exception {
 
             // defer until we actually run.
             final SocketChannel socketChannel = reopenChannel();
@@ -521,9 +524,21 @@ public class HASendService {
 
             try {
 
-                int nwritten = 0;
+                int nmarker = 0; // #of marker bytes written.
+                int nwritten = 0; // #of payload bytes written.
+
+                final ByteBuffer markerBB = marker != null ? ByteBuffer
+                        .wrap(marker) : null;
                 
                 while (nwritten < remaining) {
+                	
+                    if (marker != null && nmarker < marker.length) {
+                    
+                        nmarker += socketChannel.write(markerBB);
+
+                        continue;
+                        
+                    }
 
                     /*
                      * Write the data. Depending on the channel, will either

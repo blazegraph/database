@@ -51,7 +51,9 @@ import java.util.zip.Adler32;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.btree.BytesUtil;
 import com.bigdata.ha.QuorumPipelineImpl;
+import com.bigdata.ha.msg.HAMessageWrapper;
 import com.bigdata.ha.msg.IHAMessage;
 import com.bigdata.ha.msg.IHASyncRequest;
 import com.bigdata.ha.msg.IHAWriteMessage;
@@ -73,7 +75,7 @@ import com.bigdata.util.ChecksumError;
  * @author Martyn Cutcher
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
-public class HAReceiveService<M extends IHAWriteMessageBase> extends Thread {
+public class HAReceiveService<M extends HAMessageWrapper> extends Thread {
 
     private static final Logger log = Logger
             .getLogger(HAReceiveService.class);
@@ -225,6 +227,7 @@ public class HAReceiveService<M extends IHAWriteMessageBase> extends Thread {
     /*
      * Note: toString() implementation is non-blocking.
      */
+    @Override
     public String toString() {
 
         return super.toString() + "{addrSelf=" + addrSelf + ", addrNext="
@@ -725,7 +728,7 @@ public class HAReceiveService<M extends IHAWriteMessageBase> extends Thread {
      *       <p>
      *       report the #of payloads.
      */
-    static private class ReadTask<M extends IHAWriteMessageBase> implements
+    static private class ReadTask<M extends HAMessageWrapper> implements
             Callable<Void> {
 
         private final ServerSocketChannel server;
@@ -983,18 +986,25 @@ public class HAReceiveService<M extends IHAWriteMessageBase> extends Thread {
         private void doReceiveAndReplicate(final Client client)
                 throws Exception {
 
-            /**
-             * The first cause if downstream replication fails. We make a note
-             * of this first cause, continue to drain the payload, and then
-             * rethrow the first cause once the payload has been fully drained.
-             * This is necessary to ensure that the socket channel does not have
-             * partial data remaining from an undrained payload.
-             * 
-             * @see <a
-             *      href="https://sourceforge.net/apps/trac/bigdata/ticket/724"
-             *      > HA wire pulling and sure kill testing </a>
-             */
-            Throwable downstreamFirstCause = null;
+//            /**
+//             * The first cause if downstream replication fails. We make a note
+//             * of this first cause, continue to drain the payload, and then
+//             * rethrow the first cause once the payload has been fully drained.
+//             * This is necessary to ensure that the socket channel does not have
+//             * partial data remaining from an undrained payload.
+//             * 
+//             * @see <a
+//             *      href="https://sourceforge.net/apps/trac/bigdata/ticket/724"
+//             *      > HA wire pulling and sure kill testing </a>
+//             * 
+//             *      Note: It appears that attempting to drain the
+//             *      payload is risky since there are a variety of ways in which
+//             *      the process might be terminated. It seems to be safer to
+//             *      drain the socket channel until we reach a marker that gives
+//             *      us confidence that we are at the payload for the message
+//             *      that is being processed.
+//             */
+//            Throwable downstreamFirstCause = null;
             
             /*
              * We should now have parameters ready in the WriteMessage and can
@@ -1012,6 +1022,9 @@ public class HAReceiveService<M extends IHAWriteMessageBase> extends Thread {
             // for debug retain number of low level reads
             int reads = 0;
             
+            final DrainToMarkerUtil drainUtil = message.getHASendState() != null ? new DrainToMarkerUtil(
+                    message.getHASendState().getMarker(), client) : null;
+
             while (rem > 0 && !EOS) {
 
                 // block up to the timeout.
@@ -1070,8 +1083,15 @@ public class HAReceiveService<M extends IHAWriteMessageBase> extends Thread {
                 
                 while (iter.hasNext()) {
                 
+                    // Check for termination.
+                    client.checkFirstCause();
+
                     iter.next();
                     iter.remove();
+
+                    if (!drainUtil.foundMarker()) {
+                        continue;
+                    }
 
                     final int rdlen = client.client.read(localBuffer);
 
@@ -1098,17 +1118,17 @@ public class HAReceiveService<M extends IHAWriteMessageBase> extends Thread {
                         callback.incReceive(message, reads, rdlen, rem);
                     }
 
-                    if (downstreamFirstCause == null) {
-                        try {
+//                    if (downstreamFirstCause == null) {
+//                        try {
                             forwardReceivedBytes(client, rdlen);
-                        } catch (ExecutionException ex) {
-                            log.error(
-                                    "Downstream replication failure"
-                                            + ": will drain payload and then rethrow exception: rootCause="
-                                            + ex, ex);
-                            downstreamFirstCause = ex;
-                        }
-                    }
+//                        } catch (ExecutionException ex) {
+//                            log.error(
+//                                    "Downstream replication failure"
+//                                            + ": will drain payload and then rethrow exception: rootCause="
+//                                            + ex, ex);
+//                            downstreamFirstCause = ex;
+//                        }
+//                    }
 
                 } // while(itr.hasNext())
 
@@ -1134,28 +1154,31 @@ public class HAReceiveService<M extends IHAWriteMessageBase> extends Thread {
                         + ", actual=" + (int) chk.getValue());
             }
 
-            if (downstreamFirstCause != null) {
-                
-                /**
-                 * Replication to the downstream service failed. The payload has
-                 * been fully drained. This ensures that we do not leave part of
-                 * the payload in the upstream socket channel. We now wrap and
-                 * rethrow the root cause of the downstream failure. The leader
-                 * will handle this by forcing the remove of the downstream
-                 * service and then re-replicating the payload.
-                 * 
-                 * @see <a
-                 *      href="https://sourceforge.net/apps/trac/bigdata/ticket/724"
-                 *      > HA wire pulling and sure kill testing </a>
-                 */
-
-                throw new RuntimeException(
-                        "Downstream replication failure: msg=" + message
-                                + ", ex=" + downstreamFirstCause,
-                        downstreamFirstCause);
-
-            }
+//            if (downstreamFirstCause != null) {
+//                
+//                /**
+//                 * Replication to the downstream service failed. The payload has
+//                 * been fully drained. This ensures that we do not leave part of
+//                 * the payload in the upstream socket channel. We now wrap and
+//                 * rethrow the root cause of the downstream failure. The leader
+//                 * will handle this by forcing the remove of the downstream
+//                 * service and then re-replicating the payload.
+//                 * 
+//                 * @see <a
+//                 *      href="https://sourceforge.net/apps/trac/bigdata/ticket/724"
+//                 *      > HA wire pulling and sure kill testing </a>
+//                 */
+//
+//                throw new RuntimeException(
+//                        "Downstream replication failure: msg=" + message
+//                                + ", ex=" + downstreamFirstCause,
+//                        downstreamFirstCause);
+//
+//            }
 			
+            // Check for termination.
+            client.checkFirstCause();
+
             if (callback != null) {
 
                 /*
@@ -1173,7 +1196,7 @@ public class HAReceiveService<M extends IHAWriteMessageBase> extends Thread {
         } // call()
 
         /**
-         * Now forward the most recent transfer bytes downstream.
+         * Forward the most recent transfer bytes downstream.
          * <p>
          * 
          * Note: [addrNext] is final. If the downstream address is changed, then
@@ -1229,105 +1252,121 @@ public class HAReceiveService<M extends IHAWriteMessageBase> extends Thread {
                     }
                     // Check for termination.
                     client.checkFirstCause();
-                    // Send and await Future.
-                    sendService.send(out).get();
+                    /*
+                     * Send and await Future. If this is the first chunk of a
+                     * payload and a marker exists, then send the marker as
+                     * well.
+                     */
+                    sendService
+                            .send(out,
+                                    out.position() == 0
+                                            && message.getHASendState() != null ? message
+                                            .getHASendState().getMarker()
+                                            : null).get();
                 }
                 break; // break out of the inner while loop.
             } // while(true)
 
         }
-        
-//        private void ack(final Client client) throws IOException {
-//            
-//            if (log.isTraceEnabled())
-//                log.trace("Will ACK");
-//            
-//            ack(client.client, HASendService.ACK);
-//            
-//            if (log.isTraceEnabled())
-//                log.trace("Did ACK");
-//
-//        }
-//
-//        private void nack(final Client client) throws IOException {
-//
-//            if (log.isTraceEnabled())
-//                log.trace("Will NACK");
-//
-//            ack(client.client, HASendService.NACK);
-//
-//            if (log.isTraceEnabled())
-//                log.trace("Did NACK");
-//
-//        }
-//
-//        /**
-//         * ACK/NACK the payload.
-//         * 
-//         * @param client
-//         * @throws IOException
-//         */
-//        private void ack(final SocketChannel client, final byte ret)
-//                throws IOException {
-//
-//            // FIXME optimize.
-//            final ByteBuffer b = ByteBuffer.wrap(new byte[] { ret /* ACK */});
-//
-//            // The #of bytes to transfer.
-//            final int remaining = b.remaining();
-//
-////            if (log.isTraceEnabled())
-////                log.trace("Will send " + remaining + " bytes");
-//
-////            try {
-//
-//                int nwritten = 0;
-//                
-//                while (nwritten < remaining) {
-//
-//                    /*
-//                     * Write the data. Depending on the channel, will either
-//                     * block or write as many bytes as can be written
-//                     * immediately (this latter is true for socket channels in a
-//                     * non-blocking mode). IF it blocks, should block until
-//                     * finished or until this thread is interrupted, e.g., by
-//                     * shutting down the thread pool on which it is running.
-//                     * 
-//                     * Note: If the SocketChannel is closed by an interrupt,
-//                     * then the send request for the [data] payload will fail.
-//                     * However, the SocketChannel will be automatically reopened
-//                     * for the next request (unless the HASendService has been
-//                     * terminated).
-//                     */
-//
-//                    final int nbytes = client.write(b);
-//
-//                    nwritten += nbytes;
-//
-////                    if (log.isTraceEnabled())
-////                        log.trace("Sent " + nbytes + " bytes with " + nwritten
-////                                + " of out " + remaining + " written so far");
-//
-//                }
-//                return;
-//            
-////            while (client.isOpen()) {
-////
-////                if (client.write(b) > 0) {
-////                    
-////                    // Sent (N)ACK byte.
-////                    return;
-////
-////                }
-////
-////            }
-//            
-////            // channel is closed.
-////            throw new AsynchronousCloseException();
-//            
-//        }
-            
+           
     } // class ReadTask
+
+    /**
+     * Helper class to drain bytes from the upstream socket until we encounter a
+     * marker in the stream that immediately proceeds the desired payload.
+     * 
+     * @author <a href="mailto:martyncutcher@users.sourceforge.net">Martyn
+     *         Cutcher</a>
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/724" > HA
+     *      wire pulling and sure kill testing </a>
+     */
+    static private class DrainToMarkerUtil {
+
+        final private byte[] marker;
+        final private byte[] markerBuffer;
+        final private ByteBuffer markerBB;
+        final private Client client;
+
+        private int markerIndex = 0;
+        private int nmarkerreads = 0;
+        private int nmarkerbytematches = 0;
+
+        DrainToMarkerUtil(final byte[] marker, final Client client) {
+            this.marker = marker;
+            this.markerBuffer = marker == null ? null : new byte[marker.length];
+            this.markerBB = marker == null ? null : ByteBuffer
+                    .wrap(markerBuffer);
+            this.client = client;
+
+            if (log.isDebugEnabled())
+                log.debug("Receive token: " + BytesUtil.toHexString(marker));
+
+        }
+
+        /**
+         * Note that the logic for finding the token bytes depends on the first
+         * byte in the token being unique!
+         * <p>
+         * We have to be a bit clever to be sure we do not read beyond the token
+         * and therefore complicate the reading into the localBuffer.
+         * <p>
+         * This is optimized for the normal case where the marker is read as
+         * from the next bytes from the stream. In the worst case scenario this
+         * could read large amounts of data only a few bytes at a time, however
+         * this is not in reality a significant overhead.
+         */
+        boolean foundMarker() throws IOException {
+
+            if (log.isDebugEnabled())
+                log.debug("Looking for token, " + BytesUtil.toHexString(marker)
+                        + ", reads: " + nmarkerreads);
+
+            while (markerIndex < marker.length) {
+
+                final int remtok = marker.length - markerIndex;
+                markerBB.limit(remtok);
+                markerBB.position(0);
+
+                final int rdLen = client.client.read(markerBB);
+                for (int i = 0; i < rdLen; i++) {
+                    if (markerBuffer[i] != marker[markerIndex]) {
+                        if (nmarkerreads < 2)
+                            log.warn("TOKEN MISMATCH");
+                        markerIndex = 0;
+                        if (markerBuffer[i] == marker[markerIndex]) {
+                            markerIndex++;
+                        }
+                    } else {
+                        markerIndex++;
+                        nmarkerbytematches++;
+                    }
+                }
+
+                nmarkerreads++;
+                if (nmarkerreads % 10000 == 0) {
+                    if (log.isDebugEnabled())
+                        log.debug("...still looking, reads: " + nmarkerreads);
+                }
+
+            }
+
+            if (markerIndex != marker.length) { // not sufficient data ready
+                if (log.isDebugEnabled())
+                    log.debug("Not found token yet!");
+                return false;
+            } else {
+                if (log.isDebugEnabled())
+                    log.debug("Found token after " + nmarkerreads
+                            + " token reads and " + nmarkerbytematches
+                            + " byte matches");
+
+                return true;
+            }
+
+        }
+
+    }
 
     /**
      * Receive data into the caller's buffer as described by the caller's
@@ -1408,21 +1447,6 @@ public class HAReceiveService<M extends IHAWriteMessageBase> extends Thread {
     public interface IHAReceiveCallback<M extends IHAWriteMessageBase> {
 
         /**
-         * Hook invoked once a buffer has been received.
-         * 
-         * @param msg
-         *            The message.
-         * @param data
-         *            The buffer containing the data. The position() will be
-         *            ZERO (0). The limit() will be the #of bytes available. The
-         *            implementation MAY have side effects on the buffer state
-         *            (position, limit, etc).
-         * 
-         * @throws Exception
-         */
-        void callback(M msg, ByteBuffer data) throws Exception;
-
-        /**
          * Notify that some payload bytes have been incrementally received for
          * an {@link IHAMessage}. This is invoked each time some data has been
          * read from the upstream socket.
@@ -1441,6 +1465,22 @@ public class HAReceiveService<M extends IHAWriteMessageBase> extends Thread {
          * @throws Exception
          */
         void incReceive(M msg, int nreads, int rdlen, int rem) throws Exception;
+        
+        /**
+         * Hook invoked once a buffer has been received.
+         * 
+         * @param msg
+         *            The message.
+         * @param data
+         *            The buffer containing the data. The position() will be
+         *            ZERO (0). The limit() will be the #of bytes available. The
+         *            implementation MAY have side effects on the buffer state
+         *            (position, limit, etc).
+         * 
+         * @throws Exception
+         */
+        void callback(M msg, ByteBuffer data) throws Exception;
+
     }
 
     /**

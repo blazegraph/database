@@ -493,6 +493,10 @@ public class TestHA3JustKills extends AbstractHA3JournalServerTestCase {
 
         executorService.submit(ft);
 
+        // FIXME RESYNC_PIPELINE: move into QuorumPipelineImpl.
+        startup.serverA.submit(new ForceRemoveService(getServiceCId()), true)
+                .get();
+
         awaitPipeline(getZKSessionTimeout() + 5000, TimeUnit.MILLISECONDS,
                 new HAGlue[] { startup.serverA, startup.serverB });
 

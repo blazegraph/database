@@ -75,6 +75,7 @@ import com.bigdata.ha.msg.IHARebuildRequest;
 import com.bigdata.ha.msg.IHARemoteRebuildRequest;
 import com.bigdata.ha.msg.IHARootBlockRequest;
 import com.bigdata.ha.msg.IHARootBlockResponse;
+import com.bigdata.ha.msg.IHASendState;
 import com.bigdata.ha.msg.IHASendStoreResponse;
 import com.bigdata.ha.msg.IHASnapshotDigestRequest;
 import com.bigdata.ha.msg.IHASnapshotDigestResponse;
@@ -242,7 +243,7 @@ public class HAJournalTest extends HAJournal {
 //        public Future<Void> reopenZookeeperConnection() throws IOException;
 
         /**
-         * Set a fail point on a future invocation of the specified methosuper. The
+         * Set a fail point on a future invocation of the specified method. The
          * method must be declared by the {@link HAGlue} interface or by one of
          * the interfaces which it extends. The method will throw a
          * {@link SpuriousTestException} when the failure criteria are
@@ -251,23 +252,23 @@ public class HAJournalTest extends HAJournal {
          * @param name
          *            The name method to fail.
          * @param parameterTypes
-         *            The parameter types for that methosuper.
+         *            The parameter types for that method.
          * @param nwait
-         *            The #of invocations to wait before failing the methosuper.
+         *            The #of invocations to wait before failing the method.
          * @param nfail
-         *            The #of times to fail the methosuper.
+         *            The #of times to fail the method.
          */
         public void failNext(final String name,
                 final Class<?>[] parameterTypes, final int nwait,
                 final int nfail) throws IOException;
 
         /**
-         * Clear any existing fail request for the specified methosuper.
+         * Clear any existing fail request for the specified method.
          * 
          * @param name
          *            The name method to fail.
          * @param parameterTypes
-         *            The parameter types for that methosuper.
+         *            The parameter types for that method.
          */
         public void clearFail(final String name, final Class<?>[] parameterTypes)
                 throws IOException;
@@ -385,13 +386,13 @@ public class HAJournalTest extends HAJournal {
      * <p>
      * Note: Any method lookup failures are logged @ ERROR. All of the
      * {@link HAGlue} methods on {@link HAGlueTestImpl} are annotated with this
-     * methosuper. If any of them can not resolve itself, then the method will fail,
+     * method. If any of them can not resolve itself, then the method will fail,
      * which is why we log all such method resolution failures here.
      * 
      * @param name
-     *            The name of the methosuper.
+     *            The name of the method.
      * @param parameterTypes
-     *            The parameter types of the methosuper.
+     *            The parameter types of the method.
      * 
      * @return The {@link Method} and never <code>null</code>.
      * 
@@ -543,8 +544,8 @@ public class HAJournalTest extends HAJournal {
             /*
              * Verify we can find the method in the map.
              * 
-             * Note: This is a cross check on Methosuper.hashCode() and
-             * Methosuper.equals(), not a data race check on the CHM.
+             * Note: This is a cross check on method.hashCode() and
+             * method.equals(), not a data race check on the CHM.
              */
             if (failSet.get(m) == null) {
 
@@ -594,9 +595,9 @@ public class HAJournalTest extends HAJournal {
          * {@link #failSet} and (b) it is due to fail on this invocation.
          * 
          * @param name
-         *            The name of the methosuper.
+         *            The name of the method.
          * @param parameterTypes
-         *            The parameter types for the methosuper.
+         *            The parameter types for the method.
          */
         protected void checkMethod(final String name,
                 final Class<?>[] parameterTypes) {
@@ -614,11 +615,11 @@ public class HAJournalTest extends HAJournal {
             // Determine whether method will fail on this invocation.
             final boolean willFail = n >= d.nwait && n < (d.nwait + d.nfail);
 
-            // Check conditions for failing the methosuper.
+            // Check conditions for failing the method.
             if (willFail) {
 
                 /*
-                 * Fail the methosuper.
+                 * Fail the method.
                  */
 
                 log.error("Will fail HAGlue method: m=" + m + ", n=" + n
@@ -633,7 +634,7 @@ public class HAJournalTest extends HAJournal {
         }
 
         // /**
-        // * Set a fail point on the next invocation of the specified methosuper.
+        // * Set a fail point on the next invocation of the specified method.
         // */
         // public void failNext(final Method m) {
         //
@@ -1112,12 +1113,14 @@ public class HAJournalTest extends HAJournal {
 
         @Override
         public Future<Void> receiveAndReplicate(final IHASyncRequest req,
-                final IHAWriteMessage msg) throws IOException {
+                final IHASendState snd, final IHAWriteMessage msg)
+                throws IOException {
 
             checkMethod("receiveAndReplicate", new Class[] {
-                    IHASyncRequest.class, IHAWriteMessage.class });
+                    IHASyncRequest.class, IHASendState.class,
+                    IHAWriteMessage.class });
 
-            return super.receiveAndReplicate(req, msg);
+            return super.receiveAndReplicate(req, snd, msg);
 
         }
 

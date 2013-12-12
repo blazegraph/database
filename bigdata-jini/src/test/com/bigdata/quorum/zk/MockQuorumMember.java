@@ -16,6 +16,7 @@ import com.bigdata.ha.msg.IHALogRequest;
 import com.bigdata.ha.msg.IHALogRootBlocksRequest;
 import com.bigdata.ha.msg.IHALogRootBlocksResponse;
 import com.bigdata.ha.msg.IHARebuildRequest;
+import com.bigdata.ha.msg.IHASendState;
 import com.bigdata.ha.msg.IHASendStoreResponse;
 import com.bigdata.ha.msg.IHASyncRequest;
 import com.bigdata.ha.msg.IHAWriteMessage;
@@ -235,7 +236,8 @@ abstract class MockQuorumMember<S extends Remote> extends
 
         @Override
         public Future<Void> receiveAndReplicate(final IHASyncRequest req,
-                IHAWriteMessage msg) throws IOException {
+                final IHASendState snd, final IHAWriteMessage msg)
+                throws IOException {
             throw new UnsupportedOperationException();
         }
         

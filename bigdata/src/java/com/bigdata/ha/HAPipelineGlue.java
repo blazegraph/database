@@ -37,6 +37,7 @@ import com.bigdata.ha.msg.IHALogRequest;
 import com.bigdata.ha.msg.IHALogRootBlocksRequest;
 import com.bigdata.ha.msg.IHALogRootBlocksResponse;
 import com.bigdata.ha.msg.IHARebuildRequest;
+import com.bigdata.ha.msg.IHASendState;
 import com.bigdata.ha.msg.IHASendStoreResponse;
 import com.bigdata.ha.msg.IHASyncRequest;
 import com.bigdata.ha.msg.IHAWriteMessage;
@@ -128,14 +129,17 @@ public interface HAPipelineGlue extends Remote {
      *            A request for an HALog (optional). This is only non-null when
      *            historical {@link WriteCache} blocks are being replayed down
      *            the write pipeline in order to synchronize a service.
+     * @param snd
+     *            Metadata about the state of the sender and potentially the
+     *            routing of the payload along the write replication pipeline.
      * @param msg
      *            The metadata.
      * 
      * @return The {@link Future} which will become available once the buffer
      *         transfer is complete.
      */
-    Future<Void> receiveAndReplicate(IHASyncRequest req, IHAWriteMessage msg)
-            throws IOException;
+    Future<Void> receiveAndReplicate(IHASyncRequest req, IHASendState snd,
+            IHAWriteMessage msg) throws IOException;
 
     /**
      * Request metadata about the current write set from the quorum leader.

@@ -132,6 +132,7 @@ import com.bigdata.ha.msg.IHARebuildRequest;
 import com.bigdata.ha.msg.IHARemoteRebuildRequest;
 import com.bigdata.ha.msg.IHARootBlockRequest;
 import com.bigdata.ha.msg.IHARootBlockResponse;
+import com.bigdata.ha.msg.IHASendState;
 import com.bigdata.ha.msg.IHASendStoreResponse;
 import com.bigdata.ha.msg.IHASnapshotDigestRequest;
 import com.bigdata.ha.msg.IHASnapshotDigestResponse;
@@ -7841,13 +7842,14 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
          */
         @Override
         public Future<Void> receiveAndReplicate(final IHASyncRequest req,
-                final IHAWriteMessage msg) throws IOException {
+                final IHASendState snd, final IHAWriteMessage msg)
+                throws IOException {
 
             if (haLog.isDebugEnabled())
                 haLog.debug("req=" + req + ", msg=" + msg);
 
             final Future<Void> ft = quorum.getClient().receiveAndReplicate(req,
-                    msg);
+                    snd, msg);
 
             return getProxy(ft);
 
