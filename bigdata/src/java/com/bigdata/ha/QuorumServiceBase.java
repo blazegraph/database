@@ -36,6 +36,7 @@ import java.util.concurrent.TimeoutException;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.ha.msg.IHASendState;
 import com.bigdata.ha.msg.IHASyncRequest;
 import com.bigdata.ha.msg.IHAWriteMessage;
 import com.bigdata.journal.AbstractJournal;
@@ -233,9 +234,10 @@ abstract public class QuorumServiceBase<S extends HAGlue, L extends AbstractJour
 
     @Override
     public Future<Void> receiveAndReplicate(final IHASyncRequest req,
-            final IHAWriteMessage msg) throws IOException {
-        
-        return pipelineImpl.receiveAndReplicate(req, msg);
+            final IHASendState snd, final IHAWriteMessage msg)
+            throws IOException {
+
+        return pipelineImpl.receiveAndReplicate(req, snd, msg);
         
     }
 

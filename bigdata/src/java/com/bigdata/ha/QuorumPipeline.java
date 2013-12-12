@@ -33,6 +33,7 @@ import java.util.UUID;
 import java.util.concurrent.Future;
 
 import com.bigdata.ha.halog.HALogWriter;
+import com.bigdata.ha.msg.IHASendState;
 import com.bigdata.ha.msg.IHASyncRequest;
 import com.bigdata.ha.msg.IHAWriteMessage;
 import com.bigdata.io.writecache.WriteCache;
@@ -85,11 +86,14 @@ public interface QuorumPipeline<S extends HAPipelineGlue> {
      *            A synchronization request (optional). This is only non-null
      *            when historical {@link WriteCache} blocks are being replayed
      *            down the write pipeline in order to synchronize a service.
+     * @param snd
+     *            Metadata about the state of the sender and potentially the
+     *            routing of the payload along the write replication pipeline.
      * @param msg
      *            The RMI metadata about the payload.
      */
-    Future<Void> receiveAndReplicate(IHASyncRequest req, IHAWriteMessage msg)
-            throws IOException;
+    Future<Void> receiveAndReplicate(IHASyncRequest req, IHASendState snd,
+            IHAWriteMessage msg) throws IOException;
 
     /*
      * Note: Method removed since it does not appear necessary to let this
