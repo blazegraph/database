@@ -92,6 +92,18 @@ public class HAStatusServletUtil {
      */
     static final String REBUILD = "rebuild";
 
+    /**
+     * Force this service into the error state. It will automatically attempt to
+     * recover from the error state. This basically "kicks" the service.
+     * 
+     * @see QuorumService#enterErrorState()
+     * 
+     *      TODO Move this declaration to {@link StatusServlet} once we are done
+     *      reconciling between the 1.2.x maintenance branch and the READ_CACHE
+     *      branch.
+     */
+    static final String ERROR = "error";
+
     final private IIndexManager indexManager;
 
     public HAStatusServletUtil(final IIndexManager indexManager) {
@@ -585,6 +597,23 @@ public class HAStatusServletUtil {
 
             }
 
+        }
+
+        if (quorumService != null) {
+
+            /*
+             * Force the service into the "ERROR" state. It will automatically
+             * attempt to recover.
+             */
+
+            final String val = req.getParameter(HAStatusServletUtil.ERROR);
+
+            if (val != null) {
+
+                quorumService.enterErrorState();
+
+            }
+    
         }
         
         /*
