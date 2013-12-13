@@ -159,7 +159,7 @@ public class TestHASendAndReceive3Nodes extends
 	}
 
     public void testSimpleExchange() throws InterruptedException,
-            ExecutionException, TimeoutException {
+            ExecutionException, TimeoutException, ImmediateDownstreamReplicationException {
 
         final long timeout = 5000; // ms
 		final ByteBuffer tst1 = getRandomData(50);
@@ -177,7 +177,7 @@ public class TestHASendAndReceive3Nodes extends
 		assertEquals(rcv1, rcv2);
 	}
 
-	public void testChecksumError() throws InterruptedException, ExecutionException
+	public void testChecksumError() throws InterruptedException, ExecutionException, ImmediateDownstreamReplicationException
 
 	{
 		final ByteBuffer tst1 = getRandomData(50);

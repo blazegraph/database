@@ -87,6 +87,10 @@ public class TestHA3JustKills extends AbstractHA3JournalServerTestCase {
 		
 		final long token = awaitFullyMetQuorum();
 		
+        // await the initial KB commit on all services.
+        awaitCommitCounter(1L, new HAGlue[] { startup.serverA, startup.serverB,
+                startup.serverC });
+
         // start concurrent task loads that continue until fully met
         final FutureTask<Void> ft = new FutureTask<Void>(new LargeLoadTask(
                 token));
@@ -94,7 +98,7 @@ public class TestHA3JustKills extends AbstractHA3JournalServerTestCase {
         executorService.submit(ft);
 
         // allow load head start
-        Thread.sleep(300/* ms */);
+        Thread.sleep(2000/* ms */);
 
 		// Verify load is still running.
 		assertFalse(ft.isDone());
@@ -103,10 +107,9 @@ public class TestHA3JustKills extends AbstractHA3JournalServerTestCase {
 		log.warn("ZOOKEEPER\n" + dumpZoo());
 		
 		kill(startup.serverC);
-		
-		// FIXME: in the face of no implemented error propagation we can explicitly
-		//	tell the leader to remove the killed service!
-		// startup.serverA.submit(new ForceRemoveService(getServiceCId()), true).get();
+
+		// Note: Automatic.
+//		startup.serverA.submit(new ForceRemoveService(getServiceCId()), true).get();
 
 		awaitPipeline(20, TimeUnit.SECONDS, new HAGlue[] {startup.serverA, startup.serverB});
 
@@ -153,6 +156,10 @@ public class TestHA3JustKills extends AbstractHA3JournalServerTestCase {
 		
 		final long token = awaitFullyMetQuorum();
 		
+        // await the initial KB commit on all services.
+        awaitCommitCounter(1L, new HAGlue[] { startup.serverA, startup.serverB,
+                startup.serverC });
+
         // start concurrent task loads that continue until fully met
         final FutureTask<Void> ft = new FutureTask<Void>(new LargeLoadTask(
                 token));
@@ -160,7 +167,7 @@ public class TestHA3JustKills extends AbstractHA3JournalServerTestCase {
         executorService.submit(ft);
 
         // allow load head start
-        Thread.sleep(1000/* ms */);
+        Thread.sleep(2000/* ms */);
 
 		// Verify load is still running.
 		assertFalse(ft.isDone());
@@ -170,8 +177,8 @@ public class TestHA3JustKills extends AbstractHA3JournalServerTestCase {
 		
 		kill(startup.serverB);
 		
-		// FIXME: temporary call to explicitly remove the service prior to correct protocol
-		// startup.serverA.submit(new ForceRemoveService(getServiceBId()), true).get();
+		// Note: automatic.
+//		startup.serverA.submit(new ForceRemoveService(getServiceBId()), true).get();
 
 		awaitPipeline(10, TimeUnit.SECONDS, new HAGlue[] {startup.serverA, startup.serverC});
 		
@@ -311,14 +318,9 @@ public class TestHA3JustKills extends AbstractHA3JournalServerTestCase {
         // Dump Zookeeper
         log.warn("ZOOKEEPER\n" + dumpZoo());
 
-        // Note: sure kill is done automatically when we hit the desired point
-        // in the write replication.
-        //        kill(startup.serverB);
-
-        // FIXME: temporary call to explicitly remove the service prior to
-        // correct protocol
-        // startup.serverA.submit(new ForceRemoveService(getServiceBId()), true)
-        //        .get();
+        // Note: automatic.
+//        startup.serverA.submit(new ForceRemoveService(getServiceBId()), true)
+//                .get();
 
         awaitPipeline(10, TimeUnit.SECONDS, new HAGlue[] { startup.serverA,
                 startup.serverC });
@@ -390,14 +392,9 @@ public class TestHA3JustKills extends AbstractHA3JournalServerTestCase {
         // Dump Zookeeper
         log.warn("ZOOKEEPER\n" + dumpZoo());
 
-        // Note: sure kill is done automatically when we hit the desired point
-        // in the write replication.
-        //        kill(startup.serverB);
-
-        // FIXME: temporary call to explicitly remove the service prior to
-        // correct protocol
-        // startup.serverA.submit(new ForceRemoveService(getServiceCId()), true)
-        //         .get();
+        // Note: automatic.
+//        startup.serverA.submit(new ForceRemoveService(getServiceCId()), true)
+//                .get();
 
         awaitPipeline(10, TimeUnit.SECONDS, new HAGlue[] { startup.serverA,
                 startup.serverB });
@@ -415,8 +412,80 @@ public class TestHA3JustKills extends AbstractHA3JournalServerTestCase {
         // token must remain unchanged to indicate same quorum
         assertEquals(token, awaitMetQuorum());
 
-        // TODO We could finally restart the killed service and verify resync.
-        
+    }
+
+    /**
+     * Start A+B+C in strict sequence. Wait until the quorum fully meets. Start
+     * a long running LOAD. While the LOAD is running, C will issue a sure kill
+     * of B (the 1st follower) when it has received a specified number of bytes
+     * of data from B. Verify that the LOAD completes successfully with the
+     * remaining services (A+C).
+     */
+    public void testABC_LiveLoadRemainsMet_C_kills_B_duringIncrementalReplication()
+            throws Exception {
+
+        // enforce join order
+        final ABC startup = new ABC(true /* sequential */);
+
+        final long token = awaitFullyMetQuorum();
+
+        // await the initial KB commit on all services.
+        awaitCommitCounter(1L, new HAGlue[] { startup.serverA, startup.serverB,
+                startup.serverC });
+
+        // Set a trigger to sure kill B once C reaches the specified
+        // replication point.
+        ((HAGlueTest) startup.serverC)
+                .failWriteReplication(new HAProgressListenerKillPID_1(
+                        ((HAGlueTest) startup.serverB).getPID()));
+
+        // start large load.
+        final FutureTask<Void> ft = new FutureTask<Void>(new LargeLoadTask(
+                token));
+
+        executorService.submit(ft);
+
+        // Wait until B is killed.
+        assertCondition(new Runnable() {
+            public void run() {
+                try {
+                    startup.serverB.getWritePipelineAddr();
+                    fail("B is still running.");
+                } catch (IOException ex) {
+                    if (log.isInfoEnabled())
+                        log.info("Expected exception: B is no longer responding: "
+                                + ex);
+                    return;
+                }
+            }
+        }, 20000, TimeUnit.MILLISECONDS);
+
+        // Verify load is still running.
+        assertFalse(ft.isDone());
+
+        // Dump Zookeeper
+        log.warn("ZOOKEEPER\n" + dumpZoo());
+
+        // Note: automatic.
+//        startup.serverA.submit(new ForceRemoveService(getServiceCId()), true)
+//                .get();
+
+        awaitPipeline(10, TimeUnit.SECONDS, new HAGlue[] { startup.serverA,
+                startup.serverC });
+
+        // also check members and joined
+        awaitMembers(new HAGlue[] { startup.serverA, startup.serverC });
+        awaitJoined(new HAGlue[] { startup.serverA, startup.serverC });
+
+        // token must remain unchanged to indicate same quorum
+        assertEquals(token, awaitMetQuorum());
+
+        // Await LOAD, but with a timeout.
+        ft.get(longLoadTimeoutMillis, TimeUnit.MILLISECONDS);
+
+        // token must remain unchanged to indicate same quorum
+        assertEquals(token, awaitMetQuorum());
+
     }
 
     /**
@@ -471,8 +540,6 @@ public class TestHA3JustKills extends AbstractHA3JournalServerTestCase {
      * C. We then start the live load. This test explores what happens when A
      * and B are not yet aware that C is dead when the UPDATE operation starts.
      * 
-     * Can I commit this
-     * 
      * @throws Exception
      */
     public void testABC_awaitKBCreate_killC_LiveLoadRemainsMet()
@@ -495,9 +562,9 @@ public class TestHA3JustKills extends AbstractHA3JournalServerTestCase {
 
         executorService.submit(ft);
 
-        // FIXME RESYNC_PIPELINE: move into QuorumPipelineImpl.
-        // startup.serverA.submit(new ForceRemoveService(getServiceCId()), true)
-        //        .get();
+        // Note: Automatic.
+//        startup.serverA.submit(new ForceRemoveService(getServiceCId()), true)
+//                .get();
 
         awaitPipeline(getZKSessionTimeout() + 5000, TimeUnit.MILLISECONDS,
                 new HAGlue[] { startup.serverA, startup.serverB });
