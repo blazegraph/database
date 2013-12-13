@@ -4181,7 +4181,10 @@ public class HAJournalServer extends AbstractServer {
                      * Halt operation.
                      * 
                      * Note: This is not an error, but we can not remove
-                     * snapshots or HALogs if this invariant is violated.
+                     * snapshots or HALogs if this invariant is violated. This
+                     * is because a leader fail could then cause the
+                     * IRestorePolicy to be violated if a service that lacked
+                     * some HALogs was elected as the leader.
                      */
                     return;
                 }
