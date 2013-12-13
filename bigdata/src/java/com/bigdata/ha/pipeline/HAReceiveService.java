@@ -763,6 +763,10 @@ public class HAReceiveService<M extends HAMessageWrapper> extends Thread {
          * more efficient bulk copy operations from the NIO buffer into a local
          * byte[] on the Java heap against which we then track the evolving
          * checksum of the data.
+         * 
+         * FIXME Why isn't this buffer scoped to the outer HAReceiveService? By
+         * being an inner class field, we allocate it once per payload
+         * received....
          */
         private final byte[] a = new byte[512];
 
@@ -1118,17 +1122,7 @@ public class HAReceiveService<M extends HAMessageWrapper> extends Thread {
                         callback.incReceive(message, reads, rdlen, rem);
                     }
 
-//                    if (downstreamFirstCause == null) {
-//                        try {
-                            forwardReceivedBytes(client, rdlen);
-//                        } catch (ExecutionException ex) {
-//                            log.error(
-//                                    "Downstream replication failure"
-//                                            + ": will drain payload and then rethrow exception: rootCause="
-//                                            + ex, ex);
-//                            downstreamFirstCause = ex;
-//                        }
-//                    }
+                    forwardReceivedBytes(client, rdlen);
 
                 } // while(itr.hasNext())
 
@@ -1154,28 +1148,6 @@ public class HAReceiveService<M extends HAMessageWrapper> extends Thread {
                         + ", actual=" + (int) chk.getValue());
             }
 
-//            if (downstreamFirstCause != null) {
-//                
-//                /**
-//                 * Replication to the downstream service failed. The payload has
-//                 * been fully drained. This ensures that we do not leave part of
-//                 * the payload in the upstream socket channel. We now wrap and
-//                 * rethrow the root cause of the downstream failure. The leader
-//                 * will handle this by forcing the remove of the downstream
-//                 * service and then re-replicating the payload.
-//                 * 
-//                 * @see <a
-//                 *      href="https://sourceforge.net/apps/trac/bigdata/ticket/724"
-//                 *      > HA wire pulling and sure kill testing </a>
-//                 */
-//
-//                throw new RuntimeException(
-//                        "Downstream replication failure: msg=" + message
-//                                + ", ex=" + downstreamFirstCause,
-//                        downstreamFirstCause);
-//
-//            }
-			
             // Check for termination.
             client.checkFirstCause();
 
@@ -1211,6 +1183,7 @@ public class HAReceiveService<M extends HAMessageWrapper> extends Thread {
          * 
          * @throws ExecutionException
          * @throws InterruptedException
+         * @throws ImmediateDownstreamReplicationException
          * 
          * @todo Since the downstream writes are against a blocking mode
          *       channel, the receiver on this node runs in sync with the
@@ -1222,8 +1195,11 @@ public class HAReceiveService<M extends HAMessageWrapper> extends Thread {
          *      HA wire pulling and sure kill testing </a>
          */
         private void forwardReceivedBytes(final Client client, final int rdlen)
-                throws InterruptedException, ExecutionException {
+                throws InterruptedException, ExecutionException,
+                ImmediateDownstreamReplicationException {
+
             while (true) {
+
                 if (rdlen != 0 && addrNextRef.get() != null) {
                     if (log.isTraceEnabled())
                         log.trace("Incremental send of " + rdlen + " bytes");
@@ -1265,6 +1241,7 @@ public class HAReceiveService<M extends HAMessageWrapper> extends Thread {
                                             : null).get();
                 }
                 break; // break out of the inner while loop.
+            
             } // while(true)
 
         }

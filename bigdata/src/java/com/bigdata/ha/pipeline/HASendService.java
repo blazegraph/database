@@ -30,6 +30,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.nio.channels.WritableByteChannel;
 import java.util.concurrent.Callable;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -37,6 +38,9 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.log4j.Logger;
+
+import com.bigdata.util.InnerCause;
+import com.bigdata.util.concurrent.Haltable;
 
 /**
  * A service for sending raw {@link ByteBuffer}s across a socket. This service
@@ -82,9 +86,6 @@ public class HASendService {
 	
     private static final Logger log = Logger.getLogger(HASendService.class);
 
-//    static final byte ACK = 1;
-//    static final byte NACK = 0;
-    
     /**
      * The Internet socket address of the receiving service.
      */
@@ -104,6 +105,7 @@ public class HASendService {
 	/*
 	 * Note: toString() must be thread-safe.
 	 */
+	@Override
     public String toString() {
 
         return super.toString() + "{addrNext=" + addrNext + "}";
@@ -295,6 +297,9 @@ public class HASendService {
      * @return The {@link Future} which can be used to await the outcome of this
      *         operation.
      * 
+     * @throws InterruptedException
+     * @throws ImmediateDownstreamReplicationException
+     * 
      * @throws IllegalArgumentException
      *             if the buffer is <code>null</code>.
      * @throws IllegalArgumentException
@@ -305,8 +310,10 @@ public class HASendService {
      * @todo throws IOException if the {@link SocketChannel} was not open and
      *       could not be opened.
      */
-	public Future<Void> send(final ByteBuffer buffer, final byte[] marker) {
-	     
+    public Future<Void> send(final ByteBuffer buffer, final byte[] marker)
+            throws ImmediateDownstreamReplicationException,
+            InterruptedException {
+
 	    if (buffer == null)
             throw new IllegalArgumentException();
 
@@ -324,9 +331,63 @@ public class HASendService {
 
 //        reopenChannel();
         
-        return tmp.submit(newIncSendTask(buffer.asReadOnlyBuffer(), marker));
+        try {
+
+            return tmp
+                    .submit(newIncSendTask(buffer.asReadOnlyBuffer(), marker));
+
+        } catch (Throwable t) {
+
+            launderThrowable(t);
+            
+            // make the compiler happy.
+            throw new AssertionError();
+            
+        }
 
 	}
+	
+    /**
+     * Test the {@link Throwable} for its root cause and distinguish between a
+     * root cause with immediate downstream replication, normal termination
+     * through {@link InterruptedException}, {@link CancellationException}, and
+     * nested {@link AbstractPipelineException}s thrown by a downstream service.
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/724" > HA
+     *      wire pulling and sure kill testing </a>
+     */
+    private void launderThrowable(final Throwable t)
+            throws InterruptedException,
+            ImmediateDownstreamReplicationException {
+
+        if (Haltable.isTerminationByInterrupt(t)) {
+
+            // root cause is interrupt or cancellation exception.
+            throw new RuntimeException(t);
+
+        }
+
+        if (InnerCause.isInnerCause(t, AbstractPipelineException.class)) {
+
+            /*
+             * The root cause is NOT the inability to replicate to our immediate
+             * downstream service. Instead, some service (not us) has a problem
+             * with pipline replication.
+             */
+
+            throw new NestedPipelineException(t);
+
+        }
+
+        /*
+         * We have a problem with replication to our immediate downstream
+         * service.
+         */
+
+        throw new ImmediateDownstreamReplicationException(toString(), t);
+
+    }
+    
     /**
      * A series of timeouts used when we need to re-open the
      * {@link SocketChannel}.

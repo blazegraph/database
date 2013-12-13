@@ -114,8 +114,9 @@ public class TestHASendAndReceive extends AbstractHASendAndReceiveTestCase {
      * @throws ExecutionException
      * @throws InterruptedException
      * @throws TimeoutException 
+     * @throws ImmediateDownstreamReplicationException 
      */
-    public void testSimpleExchange() throws InterruptedException, ExecutionException, TimeoutException {
+    public void testSimpleExchange() throws InterruptedException, ExecutionException, TimeoutException, ImmediateDownstreamReplicationException {
 
         final long timeout = 5000;// ms
         {
@@ -149,9 +150,10 @@ public class TestHASendAndReceive extends AbstractHASendAndReceiveTestCase {
      * @throws TimeoutException
      * @throws ExecutionException
      * @throws InterruptedException
+     * @throws ImmediateDownstreamReplicationException 
      */
     public void testStress() throws TimeoutException, InterruptedException,
-            ExecutionException {
+            ExecutionException, ImmediateDownstreamReplicationException {
 
         final long timeout = 5000; // ms
         for (int i = 0; i < 100; i++) {

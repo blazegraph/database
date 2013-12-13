@@ -21,36 +21,35 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
-
-package com.bigdata.ha;
-
-import java.util.UUID;
+package com.bigdata.ha.pipeline;
 
 /**
- * PipelineException is thrown from RMI calls to communicate
- * the root cause of a pipeline problem.  The caller is then able
- * to take action: for example to remove the problem service
- * from the quorum.
+ * An exception that is used to wrap and rethrow a cause whose root cause is
+ * another {@link AbstractPipelineException}.
+ * 
+ * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
-public class PipelineException extends RuntimeException {
-	
-	/**
-	 * Generated ID
-	 */
-	private static final long serialVersionUID = 8019938954269914574L;
-	
-	/** The UUID of the service that could not be reached. */
-	private final UUID serviceId;
+public class NestedPipelineException extends AbstractPipelineException {
 
-	public PipelineException(final UUID serviceId, final Throwable t) {
-		super(t);
-		
-		this.serviceId = serviceId;
-	}
-	
-	/** Return the UUID of the service that could not be reached. */
-	public UUID getProblemServiceId() {
-		return serviceId;
-	}
+    /**
+     * 
+     */
+    private static final long serialVersionUID = 1L;
+
+    public NestedPipelineException() {
+        super();
+    }
+
+    public NestedPipelineException(String message, Throwable cause) {
+        super(message, cause);
+    }
+
+    public NestedPipelineException(String message) {
+        super(message);
+    }
+
+    public NestedPipelineException(Throwable cause) {
+        super(cause);
+    }
 
 }
