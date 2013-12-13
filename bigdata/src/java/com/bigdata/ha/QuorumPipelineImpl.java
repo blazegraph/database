@@ -1756,7 +1756,7 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> /*extends
                          * local Future and only check the remote Future every
                          * second. Timeouts are ignored during this loop.
                          */
-                        while (!futSnd.isDone() && !futRec.isDone()) {
+                        while (!futSnd.isDone() || !futRec.isDone()) {
                             /*
                              * Make sure leader's quorum token remains valid for
                              * ALL writes.
@@ -1771,6 +1771,8 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> /*extends
                             } catch (TimeoutException ignore) {
                             }
                         }
+                        
+                        // Note: Both futures are DONE at this point!
                         futSnd.get();
                         futRec.get();
 
@@ -2121,7 +2123,7 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> /*extends
                          * local Future and only check the remote Future every
                          * second. Timeouts are ignored during this loop.
                          */
-                        while (!futRec.isDone() && !futRep.isDone()) {
+                        while (!futRec.isDone() || !futRep.isDone()) {
                             /*
                              * The token must remain valid, even if this service
                              * is not joined with the met quorum. If fact,
@@ -2139,6 +2141,8 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> /*extends
                             } catch (TimeoutException ignore) {
                             }
                         }
+                        
+                        // Note: Both futures are DONE at this point!
                         futRec.get();
                         futRep.get();
 
