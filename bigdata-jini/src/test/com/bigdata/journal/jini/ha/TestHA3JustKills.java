@@ -106,7 +106,7 @@ public class TestHA3JustKills extends AbstractHA3JournalServerTestCase {
 		
 		// FIXME: in the face of no implemented error propagation we can explicitly
 		//	tell the leader to remove the killed service!
-		startup.serverA.submit(new ForceRemoveService(getServiceCId()), true).get();
+		// startup.serverA.submit(new ForceRemoveService(getServiceCId()), true).get();
 
 		awaitPipeline(20, TimeUnit.SECONDS, new HAGlue[] {startup.serverA, startup.serverB});
 
@@ -171,7 +171,7 @@ public class TestHA3JustKills extends AbstractHA3JournalServerTestCase {
 		kill(startup.serverB);
 		
 		// FIXME: temporary call to explicitly remove the service prior to correct protocol
-		startup.serverA.submit(new ForceRemoveService(getServiceBId()), true).get();
+		// startup.serverA.submit(new ForceRemoveService(getServiceBId()), true).get();
 
 		awaitPipeline(10, TimeUnit.SECONDS, new HAGlue[] {startup.serverA, startup.serverC});
 		
@@ -317,8 +317,8 @@ public class TestHA3JustKills extends AbstractHA3JournalServerTestCase {
 
         // FIXME: temporary call to explicitly remove the service prior to
         // correct protocol
-        startup.serverA.submit(new ForceRemoveService(getServiceBId()), true)
-                .get();
+        // startup.serverA.submit(new ForceRemoveService(getServiceBId()), true)
+        //        .get();
 
         awaitPipeline(10, TimeUnit.SECONDS, new HAGlue[] { startup.serverA,
                 startup.serverC });
@@ -396,8 +396,8 @@ public class TestHA3JustKills extends AbstractHA3JournalServerTestCase {
 
         // FIXME: temporary call to explicitly remove the service prior to
         // correct protocol
-        startup.serverA.submit(new ForceRemoveService(getServiceCId()), true)
-                .get();
+        // startup.serverA.submit(new ForceRemoveService(getServiceCId()), true)
+        //         .get();
 
         awaitPipeline(10, TimeUnit.SECONDS, new HAGlue[] { startup.serverA,
                 startup.serverB });
@@ -496,8 +496,8 @@ public class TestHA3JustKills extends AbstractHA3JournalServerTestCase {
         executorService.submit(ft);
 
         // FIXME RESYNC_PIPELINE: move into QuorumPipelineImpl.
-        startup.serverA.submit(new ForceRemoveService(getServiceCId()), true)
-                .get();
+        // startup.serverA.submit(new ForceRemoveService(getServiceCId()), true)
+        //        .get();
 
         awaitPipeline(getZKSessionTimeout() + 5000, TimeUnit.MILLISECONDS,
                 new HAGlue[] { startup.serverA, startup.serverB });
