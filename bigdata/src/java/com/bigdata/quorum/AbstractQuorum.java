@@ -2349,6 +2349,9 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
          */
         @Override
         final public void forceRemoveService(final UUID psid) {
+            if (log.isInfoEnabled())
+                log.info("Will force remove of service" + ": thisService="
+                        + serviceId + ", otherServiceId=" + psid);
             runActorTask(new ForceRemoveServiceTask(psid));
         }
 
