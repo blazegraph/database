@@ -2091,15 +2091,23 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> /*extends
 					futSnd.cancel(true/* mayInterruptIfRunning */);
 				}
 			} catch (Throwable t) {
-				// determine next pipeline service id
-				// FIXME: should this check for problem from further downstream for
-				//	quorums with > 3 services?
-				final UUID[] priorAndNext = member.getQuorum()
-						.getPipelinePriorAndNext(member.getServiceId());
-				log.warn("Problem with downstream service: " + priorAndNext[1],
+				// determine the problem service, which may be further downstream
+				//	if the Throwable contains a PipelineException innerCause
+				final PipelineException pe = (PipelineException) InnerCause
+						.getInnerCause(t, PipelineException.class);
+				final UUID problemService;
+				if (pe != null) {
+					problemService = pe.getProblemServiceId();
+				} else {
+					final UUID[] priorAndNext = member.getQuorum()
+							.getPipelinePriorAndNext(member.getServiceId());
+					problemService = priorAndNext[1];
+				}
+
+				log.warn("Problem with downstream service: " + problemService,
 						t);
 
-				throw new PipelineException(priorAndNext[1], t);
+				throw new PipelineException(problemService, t);
 			}
 
 			// done
