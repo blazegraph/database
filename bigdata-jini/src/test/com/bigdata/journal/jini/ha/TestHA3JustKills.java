@@ -471,6 +471,8 @@ public class TestHA3JustKills extends AbstractHA3JournalServerTestCase {
      * C. We then start the live load. This test explores what happens when A
      * and B are not yet aware that C is dead when the UPDATE operation starts.
      * 
+     * Can I commit this
+     * 
      * @throws Exception
      */
     public void testABC_awaitKBCreate_killC_LiveLoadRemainsMet()
