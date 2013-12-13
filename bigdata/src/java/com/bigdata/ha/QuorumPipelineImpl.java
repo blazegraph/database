@@ -1729,56 +1729,91 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> /*extends
         }
         
         private void doRunWithLock() throws InterruptedException,
-                ExecutionException, IOException {
+				ExecutionException, IOException {
 
-            // Get Future for send() outcome on local service.
-			final Future<Void> futSnd = sendService.send(b, snd.getMarker());
+			try {
+				// Get Future for send() outcome on local service.
+				final Future<Void> futSnd = sendService
+						.send(b, snd.getMarker());
 
-            try {
+				try {
 
-                // Get Future for receive outcome on the remote service (RMI).
-                final Future<Void> futRec = downstream.service
-                        .receiveAndReplicate(req, snd, msg);
+					// Get Future for receive outcome on the remote service
+					// (RMI).
+					final Future<Void> futRec = downstream.service
+							.receiveAndReplicate(req, snd, msg);
 
-                try {
+					try {
 
-                    /*
-                     * Await the Futures, but spend more time waiting on the
-                     * local Future and only check the remote Future every
-                     * second. Timeouts are ignored during this loop.
-                     */
-                    while (!futSnd.isDone() && !futRec.isDone()) {
-                        /*
-                         * Make sure leader's quorum token remains valid for ALL
-                         * writes.
-                         */
-                        member.assertLeader(token);
-                        try {
-                            futSnd.get(1L, TimeUnit.SECONDS);
-                        } catch (TimeoutException ignore) {
-                        }
-                        try {
-                            futRec.get(10L, TimeUnit.MILLISECONDS);
-                        } catch (TimeoutException ignore) {
-                        }
-                    }
-                    futSnd.get();
-                    futRec.get();
+						/*
+						 * Await the Futures, but spend more time waiting on the
+						 * local Future and only check the remote Future every
+						 * second. Timeouts are ignored during this loop.
+						 */
+						while (!futSnd.isDone() && !futRec.isDone()) {
+							/*
+							 * Make sure leader's quorum token remains valid for
+							 * ALL writes.
+							 */
+							member.assertLeader(token);
+							try {
+								futSnd.get(1L, TimeUnit.SECONDS);
+							} catch (TimeoutException ignore) {
+							}
+							try {
+								futRec.get(10L, TimeUnit.MILLISECONDS);
+							} catch (TimeoutException ignore) {
+							}
+						}
+						futSnd.get();
+						futRec.get();
 
-                } finally {
-                    if (!futRec.isDone()) {
-                        // cancel remote Future unless done.
-                        futRec.cancel(true/* mayInterruptIfRunning */);
-                    }
-                }
+					} finally {
+						if (!futRec.isDone()) {
+							// cancel remote Future unless done.
+							futRec.cancel(true/* mayInterruptIfRunning */);
+						}
+					}
 
-            } finally {
-                // cancel the local Future.
-                futSnd.cancel(true/* mayInterruptIfRunning */);
-            }
+				} finally {
+					// cancel the local Future.
+					futSnd.cancel(true/* mayInterruptIfRunning */);
+				}
 
-        }
-        
+			} catch (Throwable t) {
+				// check inner cause for downstream PipelineException
+				final PipelineException pe = (PipelineException) InnerCause
+						.getInnerCause(t, PipelineException.class);
+				final UUID problemService;
+				if (pe != null) {
+					// throw pe; // throw it upstream - already should have been
+					// handled
+					problemService = pe.getProblemServiceId();
+				} else {
+					final UUID[] priorAndNext = member.getQuorum()
+							.getPipelinePriorAndNext(member.getServiceId());
+					problemService = priorAndNext[1];
+				}
+
+				// determine next pipeline service id
+				log.warn("Problem with downstream service: " + problemService,
+						t);
+
+				// Carry out remedial work directly - BAD
+				log.error("Really need to remove service " + problemService);
+
+				try {
+					member.getActor().forceRemoveService(problemService);
+				} catch (Exception e) {
+					log.warn("Problem on node removal", e);
+
+					throw new RuntimeException(e);
+				}
+
+				throw new PipelineException(problemService, t);
+
+			}
+		}
     }
     
     /**
@@ -1996,68 +2031,80 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> /*extends
         }
 
         @Override
-        public Void call() throws Exception {
+		public Void call() throws Exception {
 
-            // wrap the messages together.
-            final HAMessageWrapper wrappedMsg = new HAMessageWrapper(
-                    req, snd, msg);
+			// wrap the messages together.
+			final HAMessageWrapper wrappedMsg = new HAMessageWrapper(req, snd,
+					msg);
 
-            // Get Future for send() outcome on local service.
-            final Future<Void> futSnd = receiveService.receiveData(wrappedMsg,
-                    b);
+			// Get Future for send() outcome on local service.
+			final Future<Void> futSnd = receiveService.receiveData(wrappedMsg,
+					b);
 
-            try {
+			try {
+				try {
 
-                // Get future for receive outcome on the remote
-                // service.
-                final Future<Void> futRec = downstream.service
-                        .receiveAndReplicate(req, snd, msg);
+					// Get future for receive outcome on the remote
+					// service.
+					final Future<Void> futRec = downstream.service
+							.receiveAndReplicate(req, snd, msg);
 
-                try {
+					try {
 
-                    /*
-                     * Await the Futures, but spend more time
-                     * waiting on the local Future and only check
-                     * the remote Future every second. Timeouts are
-                     * ignored during this loop.
-                     */
-                    while (!futSnd.isDone() && !futRec.isDone()) {
-                        /*
-                         * The token must remain valid, even if this service is
-                         * not joined with the met quorum. If fact, services
-                         * MUST replicate writes regardless of whether or not
-                         * they are joined with the met quorum, but only while
-                         * there is a met quorum.
-                         */
-                        member.getQuorum().assertQuorum(token);
-                        try {
-                            futSnd.get(1L, TimeUnit.SECONDS);
-                        } catch (TimeoutException ignore) {
-                        }
-                        try {
-                            futRec.get(10L, TimeUnit.MILLISECONDS);
-                        } catch (TimeoutException ignore) {
-                        }
-                    }
-                    futSnd.get();
-                    futRec.get();
+						/*
+						 * Await the Futures, but spend more time waiting on the
+						 * local Future and only check the remote Future every
+						 * second. Timeouts are ignored during this loop.
+						 */
+						while (!futSnd.isDone() && !futRec.isDone()) {
+							/*
+							 * The token must remain valid, even if this service
+							 * is not joined with the met quorum. If fact,
+							 * services MUST replicate writes regardless of
+							 * whether or not they are joined with the met
+							 * quorum, but only while there is a met quorum.
+							 */
+							member.getQuorum().assertQuorum(token);
+							try {
+								futSnd.get(1L, TimeUnit.SECONDS);
+							} catch (TimeoutException ignore) {
+							}
+							try {
+								futRec.get(10L, TimeUnit.MILLISECONDS);
+							} catch (TimeoutException ignore) {
+							}
+						}
+						futSnd.get();
+						futRec.get();
 
-                } finally {
-                    if (!futRec.isDone()) {
-                        // cancel remote Future unless done.
-                        futRec
-                                .cancel(true/* mayInterruptIfRunning */);
-                    }
-                }
+					} finally {
+						if (!futRec.isDone()) {
+							// cancel remote Future unless done.
+							futRec.cancel(true/* mayInterruptIfRunning */);
+						}
+					}
 
-            } finally {
-                // cancel the local Future.
-                futSnd.cancel(true/* mayInterruptIfRunning */);
-            }
+				} finally {
+					// Is it possible that this cancel conflicts with throwing
+					// the PipelineException?
+					// cancel the local Future.
+					futSnd.cancel(true/* mayInterruptIfRunning */);
+				}
+			} catch (Throwable t) {
+				// determine next pipeline service id
+				// FIXME: should this check for problem from further downstream for
+				//	quorums with > 3 services?
+				final UUID[] priorAndNext = member.getQuorum()
+						.getPipelinePriorAndNext(member.getServiceId());
+				log.warn("Problem with downstream service: " + priorAndNext[1],
+						t);
 
-            // done
-            return null;
-        }
+				throw new PipelineException(priorAndNext[1], t);
+			}
+
+			// done
+			return null;
+		}
 
     }
 
