@@ -10,7 +10,7 @@ Starting with the 1.0.0 release, we offer a WAR artifact [8] for easy installati
 
 Starting with the 1.3.0 release, we offer a tarball artifact [10] for easy installation of the HA replication cluster.  
 
-You can download the WAR from:
+You can download the WAR (standalone) or HA artifacts from:
 
 http://sourceforge.net/projects/bigdata/
 
