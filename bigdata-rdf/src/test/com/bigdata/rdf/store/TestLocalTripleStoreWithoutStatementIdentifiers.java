@@ -64,7 +64,7 @@ public class TestLocalTripleStoreWithoutStatementIdentifiers extends AbstractTes
          * Use a proxy test suite and specify the delegate.
          */
 
-        ProxyTestSuite suite = new ProxyTestSuite(delegate,
+        final ProxyTestSuite suite = new ProxyTestSuite(delegate,
                 "Local Triple Store Without Statement Identifiers");
 
         /*
@@ -95,6 +95,7 @@ public class TestLocalTripleStoreWithoutStatementIdentifiers extends AbstractTes
         
     }
 
+    @Override
     public Properties getProperties() {
         
         final Properties properties = super.getProperties();
@@ -114,7 +115,8 @@ public class TestLocalTripleStoreWithoutStatementIdentifiers extends AbstractTes
         
     }
     
-    protected AbstractTripleStore getStore(Properties properties) {
+    @Override
+    protected AbstractTripleStore getStore(final Properties properties) {
         
         return LocalTripleStore.getInstance(properties);
         
@@ -133,6 +135,7 @@ public class TestLocalTripleStoreWithoutStatementIdentifiers extends AbstractTes
      *                be re-opened, e.g., from failure to obtain a file lock,
      *                etc.
      */
+    @Override
     protected AbstractTripleStore reopenStore(final AbstractTripleStore store) {
         
         // close the store.
@@ -146,13 +149,13 @@ public class TestLocalTripleStoreWithoutStatementIdentifiers extends AbstractTes
         }
 
         // Note: clone to avoid modifying!!!
-        Properties properties = (Properties) getProperties().clone();
+        final Properties properties = (Properties) getProperties().clone();
 
         // Turn this off now since we want to re-open the same store.
         properties.setProperty(Options.CREATE_TEMP_FILE, "false");
 
         // The backing file that we need to re-open.
-        File file = ((LocalTripleStore) store).getIndexManager().getFile();
+        final File file = ((LocalTripleStore) store).getIndexManager().getFile();
 
         assertNotNull(file);
 
