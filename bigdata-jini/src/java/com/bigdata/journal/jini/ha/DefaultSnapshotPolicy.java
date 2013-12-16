@@ -136,6 +136,7 @@ public class DefaultSnapshotPolicy implements ISnapshotPolicy {
         
     }
 
+    @Override
     public void init(final HAJournal jnl) {
         
         // delay until next run (ms).
