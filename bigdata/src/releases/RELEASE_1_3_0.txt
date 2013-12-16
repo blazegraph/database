@@ -20,10 +20,8 @@ https://bigdata.svn.sourceforge.net/svnroot/bigdata/tags/BIGDATA_RELEASE_1_3_0
 
 New features:
 
-- High availability.
+- High availability [10].
 - Property Path performance enhancements.
-- Reification Done Right (alpha).
-- RDF Graph Mining API (alpha).
 - Plus numerous other bug fixes and performance enhancements. 
 
 Feature summary:
@@ -40,6 +38,8 @@ Feature summary:
 
 Road map [3]:
 
+- RDF Graph Mining API ([12]).
+- Reification Done Right ([11]).
 - Runtime Query Optimizer for Analytic Query mode; 
 - Performance optimization for scale-out clusters; and
 - Simplified deployment, configuration, and administration for scale-out clusters.
@@ -347,6 +347,8 @@ For more information about bigdata(R), please see the following links:
 [8] http://sourceforge.net/projects/bigdata/files/bigdata/
 [9] http://sourceforge.net/apps/mediawiki/bigdata/index.php?title=DataMigration
 [10] http://sourceforge.net/apps/mediawiki/bigdata/index.php?title=HAJournalServer
+[11] http://www.bigdata.com/whitepapers/reifSPARQL.pdf
+[12] http://sourceforge.net/apps/mediawiki/bigdata/index.php?title=RDF_GAS_API
 
 About bigdata: 
 
