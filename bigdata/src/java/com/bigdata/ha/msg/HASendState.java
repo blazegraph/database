@@ -1,6 +1,8 @@
 package com.bigdata.ha.msg;
 
+import java.io.ByteArrayInputStream;
 import java.io.DataInput;
+import java.io.DataInputStream;
 import java.io.DataOutput;
 import java.io.Externalizable;
 import java.io.IOException;
@@ -8,7 +10,6 @@ import java.io.ObjectInput;
 import java.io.ObjectOutput;
 import java.util.UUID;
 
-import com.bigdata.io.DataInputBuffer;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.rawstore.Bytes;
 
@@ -87,7 +88,12 @@ public class HASendState implements IHASendState, Externalizable {
     @Override
     public byte[] getMarker() {
 
-        final byte[] a = new byte[MAGIC_SIZE + currentVersionLen];
+        final int len = MAGIC_SIZE + currentVersionLen;
+
+//        final ByteArrayOutputStream baos = new ByteArrayOutputStream(len);
+//
+//        final DataOutputStream dob = new DataOutputStream(baos);
+        final byte[] a = new byte[len];
 
         final DataOutputBuffer dob = new DataOutputBuffer(0/* len */, a);
 
@@ -97,13 +103,16 @@ public class HASendState implements IHASendState, Externalizable {
             
             writeExternal2(dob);
 
+            dob.flush();
+
+//            return baos.toByteArray();
+            return a;
+            
         } catch (IOException e) {
 
             throw new RuntimeException(e);
 
         }
-
-        return a;
 
     }
 
@@ -150,6 +159,7 @@ public class HASendState implements IHASendState, Externalizable {
     
     private static final transient short VERSION0 = 0x0;
     private static final transient int VERSION0_LEN = //
+            Bytes.SIZEOF_SHORT + // version
             Bytes.SIZEOF_LONG + // messageId
             Bytes.SIZEOF_UUID + // originalSenderId
             Bytes.SIZEOF_UUID + // senderId
@@ -205,23 +215,23 @@ public class HASendState implements IHASendState, Externalizable {
      *         <code>null</code>.
      */
     static public IHASendState decode(final byte[] a) throws IOException {
-        return null;
-//        if (a == null)
-//            return null;
-//        
-//        final HASendState tmp = new HASendState();
-//
-//        final DataInputBuffer dis = new DataInputBuffer(a);
-//
-//        final long magic = dis.readLong();
-//
-//        if (magic != MAGIC)
-//            throw new IOException("Bad magic: expected=" + MAGIC + ", actual="
-//                    + magic);
-//
-//        tmp.readExternal2(dis);
-//
-//        return tmp;
+        
+        if (a == null)
+            return null;
+        
+        final HASendState tmp = new HASendState();
+
+        final DataInputStream dis = new DataInputStream(new ByteArrayInputStream(a));
+
+        final long magic = dis.readLong();
+
+        if (magic != MAGIC)
+            throw new IOException("Bad magic: expected=" + MAGIC + ", actual="
+                    + magic);
+
+        tmp.readExternal2(dis);
+
+        return tmp;
 
     }
     
