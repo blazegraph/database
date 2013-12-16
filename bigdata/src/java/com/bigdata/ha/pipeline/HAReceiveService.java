@@ -698,7 +698,7 @@ public class HAReceiveService<M extends HAMessageWrapper> extends Thread {
 
         }
 
-        public void close() throws IOException {
+        private void close() throws IOException {
 
             if (log.isInfoEnabled())
                 log.info("Closing client connection");
@@ -718,6 +718,31 @@ public class HAReceiveService<M extends HAMessageWrapper> extends Thread {
 //                    }
 //                }
             }
+            
+        }
+
+        /**
+         * Wraps {@link SocketChannel#read(ByteBuffer)} to test for an EOF and
+         * calls {@link #close()} if an EOF is reached.
+         * 
+         * @param dst
+         *            The destination buffer.
+         * 
+         * @return The #of bytes read.
+         * 
+         * @throws IOException
+         */
+        private int read(final ByteBuffer dst) throws IOException {
+
+            final int rdlen = client.read(dst);
+
+            if (rdlen == -1) {
+
+                close();
+
+            }
+
+            return rdlen;
 
         }
 
@@ -726,7 +751,7 @@ public class HAReceiveService<M extends HAMessageWrapper> extends Thread {
          * control back to the leader. The leader will then handle this in
          * {@link QuorumPipelineImpl}'s retrySend() method.
          */
-        public void checkFirstCause() throws RuntimeException {
+        private void checkFirstCause() throws RuntimeException {
 
             final Throwable t = firstCause.getAndSet(null);
 
@@ -1162,7 +1187,7 @@ public class HAReceiveService<M extends HAMessageWrapper> extends Thread {
                         
                     }
 
-                    final int rdlen = client.client.read(localBuffer);
+                    final int rdlen = client.read(localBuffer);
 
                     if (log.isTraceEnabled())
                         log.trace("Read " + rdlen + " bytes with "
@@ -1381,7 +1406,7 @@ public class HAReceiveService<M extends HAMessageWrapper> extends Thread {
                 markerBB.limit(remtok);
                 markerBB.position(0);
 
-                final int rdLen = client.client.read(markerBB);
+                final int rdLen = client.read(markerBB);
                 if (rdLen == -1) {
                     throw new IOException("EOF: nreads=" + nreads
                             + ", bytesRead=" + bytesRead);
