@@ -914,6 +914,37 @@ public class HAReceiveService<M extends HAMessageWrapper> extends Thread {
         
         @Override
         public Void call() throws Exception {
+         
+            try {
+
+                return doInnerCall();
+                
+            } catch (Throwable t) {
+                
+                /*
+                 * Log anything thrown out of this task. We check the Future of
+                 * this task, but that does not tell us what exception is thrown
+                 * in the Thread executing the task when the Future is cancelled
+                 * and that thread is interrupted. In particular, we are looking
+                 * for the InterruptedException, ClosedByInterruptException,
+                 * etc.
+                 */
+                
+                log.error(t, t);
+                
+                if (t instanceof Exception)
+                    throw (Exception) t;
+                
+                if (t instanceof RuntimeException)
+                    throw (RuntimeException) t;
+                
+                throw new RuntimeException(t);
+                
+            }
+            
+        }
+        
+        private Void doInnerCall() throws Exception {
         
 //          awaitAccept();
 //          
