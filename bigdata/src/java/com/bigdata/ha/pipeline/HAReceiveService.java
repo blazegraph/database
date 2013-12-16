@@ -656,7 +656,9 @@ public class HAReceiveService<M extends HAMessageWrapper> extends Thread {
                  */
                 client = server.accept();
                 client.configureBlocking(false);
-
+                if (!client.finishConnect())
+                    throw new IOException("Upstream client not connected");
+                
                 clientSelector = Selector.open();
 
                 // must register OP_READ selector on the new client
@@ -680,6 +682,16 @@ public class HAReceiveService<M extends HAMessageWrapper> extends Thread {
                 
             }
             
+        }
+
+        @Override
+        public String toString() {
+
+            return super.toString() //
+                    + "{client.isOpen()=" + client.isOpen()//
+                    + ",clientSelector.isOpen=" + clientSelector.isOpen()//
+                    + "}";
+
         }
 
         public void close() throws IOException {
@@ -929,9 +941,8 @@ public class HAReceiveService<M extends HAMessageWrapper> extends Thread {
                  * for the InterruptedException, ClosedByInterruptException,
                  * etc.
                  */
-                
-                log.error(t, t);
-                
+                log.error("client=" + clientRef.get() + ", cause=" + t, t);
+
                 if (t instanceof Exception)
                     throw (Exception) t;
                 
@@ -986,8 +997,11 @@ public class HAReceiveService<M extends HAMessageWrapper> extends Thread {
 //
 //          }
           
-            if (client == null || !client.client.isOpen()) {
+            if (client == null || !client.client.isOpen()
+                    || !client.clientSelector.isOpen()) {
 
+                log.warn("Re-opening upstream client connection");
+                
                 final Client tmp = clientRef.getAndSet(null);
                 if (tmp != null) {
                     // Close existing connection if not open.
@@ -1137,8 +1151,11 @@ public class HAReceiveService<M extends HAMessageWrapper> extends Thread {
                     iter.next();
                     iter.remove();
 
-                    if (!drainUtil.foundMarker()) {
+                    if (!drainUtil.findMarker()) {
+
+                        // continue to drain until the marker.
                         continue;
+                        
                     }
 
                     final int rdlen = client.client.read(localBuffer);
@@ -1341,8 +1358,15 @@ public class HAReceiveService<M extends HAMessageWrapper> extends Thread {
          * could read large amounts of data only a few bytes at a time, however
          * this is not in reality a significant overhead.
          */
-        boolean foundMarker() throws IOException {
+        boolean findMarker() throws IOException {
 
+            if (markerIndex == marker.length) {
+                
+                // Marker already found for this payload.
+                return true;
+
+            }
+            
             if (log.isDebugEnabled())
                 log.debug("Looking for token, " + BytesUtil.toHexString(marker)
                         + ", reads: " + nreads);
