@@ -55,6 +55,7 @@ import org.apache.log4j.Logger;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.ha.QuorumPipelineImpl;
 import com.bigdata.ha.msg.HAMessageWrapper;
+import com.bigdata.ha.msg.HASendState;
 import com.bigdata.ha.msg.IHAMessage;
 import com.bigdata.ha.msg.IHASyncRequest;
 import com.bigdata.ha.msg.IHAWriteMessage;
@@ -665,7 +666,10 @@ public class HAReceiveService<M extends HAMessageWrapper> extends Thread {
                 // must register OP_READ selector on the new client
                 clientKey = client.register(clientSelector,
                         SelectionKey.OP_READ);
-
+                
+                if (log.isInfoEnabled())
+                    log.info("Accepted new connection");
+                
 //                this.downstream = downstream;
 //                
 //                // Prepare downstream (if any) for incremental transfers
@@ -687,7 +691,9 @@ public class HAReceiveService<M extends HAMessageWrapper> extends Thread {
 
         @Override
         public String toString() {
+
             final Socket s = client.socket();
+            
             return super.toString() //
                     + "{client.isOpen()=" + client.isOpen()//
                     + ",client.isConnected()=" + client.isConnected()//
@@ -701,7 +707,7 @@ public class HAReceiveService<M extends HAMessageWrapper> extends Thread {
         private void close() throws IOException {
 
             if (log.isInfoEnabled())
-                log.info("Closing client connection");
+                log.info("Closing client connection: " + this);
             
             clientKey.cancel();
             
@@ -970,7 +976,14 @@ public class HAReceiveService<M extends HAMessageWrapper> extends Thread {
                  * for the InterruptedException, ClosedByInterruptException,
                  * etc.
                  */
-                log.error("client=" + clientRef.get() + ", cause=" + t, t);
+                log.error(
+                        "client="
+                                + clientRef.get()
+                                + ", msg="
+                                + message
+                                + ", marker="
+                                + HASendState.decode(message.getHASendState()
+                                        .getMarker()) + ", cause=" + t, t);
 
                 if (t instanceof Exception)
                     throw (Exception) t;

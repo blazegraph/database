@@ -39,6 +39,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.ha.msg.HASendState;
 import com.bigdata.util.InnerCause;
 import com.bigdata.util.concurrent.Haltable;
 
@@ -589,7 +590,8 @@ public class HASendService {
                         + sc
                         + (sc == null ? "" : ", sc.isOpen()=" + sc.isOpen()
                                 + ", sc.isConnected()=" + sc.isConnected())
-                        + ", cause=" + t, t);
+                        + ", marker=" + HASendState.decode(marker) + ", cause="
+                        + t, t);
 
                 if (t instanceof Exception)
                     throw (Exception) t;
@@ -668,7 +670,27 @@ public class HASendService {
                      * buffer.
                      */
 
-                    final int nbytes = socketChannel.write(data);
+                    final int nbytes;
+                    if (false&&log.isDebugEnabled()) { // add debug latency
+                        final int limit = data.limit();
+                        if (data.position() < (limit - 50000)) {
+                            data.limit(data.position() + 50000);
+                        }
+                        nbytes = socketChannel.write(data);
+                        data.limit(limit);
+
+                        nwritten += nbytes;
+                        log.debug("Written " + nwritten + " of total "
+                                + data.limit());
+
+                        if (nwritten < limit) {
+                            Thread.sleep(1);
+                        }
+                    } else {
+
+                        nbytes = socketChannel.write(data);
+                        nwritten += nbytes;
+                    }
 
                     nwritten += nbytes;
 

@@ -1785,7 +1785,7 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> /*extends
 
                 } finally {
                     // cancel the local Future.
-                    futSnd.cancel(true/* mayInterruptIfRunning */);
+                    futSnd.cancel(true/* mayInterruptIfRunning */); // FIXME Cancel hits wrong send() payload.
                 }
             } catch (Throwable t) {
                 launderPipelineException(true/* isLeader */, member, t);
@@ -1795,10 +1795,14 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> /*extends
     }
 
     /**
-     * Launder an exception thrown during pipeline replication.  
+     * Launder an exception thrown during pipeline replication.
+     * 
      * @param isLeader
+     *            <code>true</code> iff this service is the quorum leader.
      * @param member
+     *            The {@link QuorumMember} for this service.
      * @param t
+     *            The throwable.
      */
     static private void launderPipelineException(final boolean isLeader,
             final QuorumMember<?> member, final Throwable t) {
@@ -2155,7 +2159,7 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> /*extends
 
                 } finally {
                     // cancel the local Future.
-                    futRec.cancel(true/* mayInterruptIfRunning */);
+                    futRec.cancel(true/* mayInterruptIfRunning */); // FIXME Cancel hits wrong send() payload?
                 }
             } catch (Throwable t) {
                 launderPipelineException(false/* isLeader */, member, t);
