@@ -1,5 +1,6 @@
 package com.bigdata.ha.msg;
 
+import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.Externalizable;
 import java.io.IOException;
@@ -7,6 +8,7 @@ import java.io.ObjectInput;
 import java.io.ObjectOutput;
 import java.util.UUID;
 
+import com.bigdata.io.DataInputBuffer;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.rawstore.Bytes;
 
@@ -162,6 +164,12 @@ public class HASendState implements IHASendState, Externalizable {
     public void readExternal(final ObjectInput in) throws IOException,
             ClassNotFoundException {
 
+        readExternal2(in);
+
+    }
+
+    private void readExternal2(final DataInput in) throws IOException {
+        
         final short version = in.readShort();
 
         if (version != VERSION0)
@@ -185,6 +193,38 @@ public class HASendState implements IHASendState, Externalizable {
 
     }
 
+    /**
+     * Decode the value returned by {@link #getMarker()}. This has the magic
+     * followed by {@link #writeExternal2(DataOutput)}. It does not have the
+     * object serialization metadata.
+     * 
+     * @param a
+     *            The encoded marker.
+     * 
+     * @return The decoded marker -or- <code>null</code> iff the argument is
+     *         <code>null</code>.
+     */
+    static public IHASendState decode(final byte[] a) throws IOException {
+
+        if (a == null)
+            return null;
+        
+        final HASendState tmp = new HASendState();
+
+        final DataInputBuffer dis = new DataInputBuffer(a);
+
+        final long magic = dis.readLong();
+
+        if (magic != MAGIC)
+            throw new IOException("Bad magic: expected=" + MAGIC + ", actual="
+                    + magic);
+
+        tmp.readExternal2(dis);
+
+        return tmp;
+
+    }
+    
     @Override
     public void writeExternal(final ObjectOutput out) throws IOException {
 
