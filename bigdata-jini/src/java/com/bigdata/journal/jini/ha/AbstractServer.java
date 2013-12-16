@@ -1393,7 +1393,8 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
 
                 if (log.isInfoEnabled())
                     log.info("ServiceID saved: file=" + serviceIdFile
-                            + ", serviceID=" + serviceID);
+                            + ", serviceID=" + serviceID + ", serviceUUID="
+                            + JiniUtil.serviceID2UUID(serviceID));
 
             } finally {
 
