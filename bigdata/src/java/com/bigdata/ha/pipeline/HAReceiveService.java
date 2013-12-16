@@ -683,9 +683,16 @@ public class HAReceiveService<M extends HAMessageWrapper> extends Thread {
         }
 
         public void close() throws IOException {
+
+            if (log.isInfoEnabled())
+                log.info("Closing client connection");
+            
             clientKey.cancel();
+            
             try {
+
                 client.close();
+            
             } finally {
 //                try {
                     clientSelector.close();
@@ -695,6 +702,7 @@ public class HAReceiveService<M extends HAMessageWrapper> extends Thread {
 //                    }
 //                }
             }
+
         }
 
         /**
@@ -1134,7 +1142,8 @@ public class HAReceiveService<M extends HAMessageWrapper> extends Thread {
             } // while( rem > 0 && !EOS )
 
             if (localBuffer.position() != message.getSize())
-                throw new IOException("Receive length error: localBuffer.pos="
+                throw new IOException("Receive length error: rem=" + rem
+                        + ", EOS=" + EOS + ", localBuffer.pos="
                         + localBuffer.position() + ", message.size="
                         + message.getSize());
 
@@ -1651,7 +1660,8 @@ public class HAReceiveService<M extends HAMessageWrapper> extends Thread {
 
                 if (oldClient != null) {
 
-//                    log.warn("Cleared Client reference.");
+                    if (log.isInfoEnabled())
+                        log.info("Closing client connection");
                     
                     try {
                     
