@@ -205,23 +205,23 @@ public class HASendState implements IHASendState, Externalizable {
      *         <code>null</code>.
      */
     static public IHASendState decode(final byte[] a) throws IOException {
-
-        if (a == null)
-            return null;
-        
-        final HASendState tmp = new HASendState();
-
-        final DataInputBuffer dis = new DataInputBuffer(a);
-
-        final long magic = dis.readLong();
-
-        if (magic != MAGIC)
-            throw new IOException("Bad magic: expected=" + MAGIC + ", actual="
-                    + magic);
-
-        tmp.readExternal2(dis);
-
-        return tmp;
+        return null;
+//        if (a == null)
+//            return null;
+//        
+//        final HASendState tmp = new HASendState();
+//
+//        final DataInputBuffer dis = new DataInputBuffer(a);
+//
+//        final long magic = dis.readLong();
+//
+//        if (magic != MAGIC)
+//            throw new IOException("Bad magic: expected=" + MAGIC + ", actual="
+//                    + magic);
+//
+//        tmp.readExternal2(dis);
+//
+//        return tmp;
 
     }
     
