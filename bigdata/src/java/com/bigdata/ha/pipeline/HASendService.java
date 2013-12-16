@@ -587,8 +587,8 @@ public class HASendService {
 
                 log.error("socketChannel="
                         + sc
-                        + (sc == null ? "" : ", sc.isOpen()" + sc.isOpen()
-                                + ", sc.isConnected()" + sc.isConnected())
+                        + (sc == null ? "" : ", sc.isOpen()=" + sc.isOpen()
+                                + ", sc.isConnected()=" + sc.isConnected())
                         + ", cause=" + t, t);
 
                 if (t instanceof Exception)
