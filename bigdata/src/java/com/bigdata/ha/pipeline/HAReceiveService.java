@@ -27,6 +27,7 @@ package com.bigdata.ha.pipeline;
 import java.io.IOException;
 import java.net.BindException;
 import java.net.InetSocketAddress;
+import java.net.Socket;
 import java.nio.ByteBuffer;
 import java.nio.channels.AsynchronousCloseException;
 import java.nio.channels.SelectionKey;
@@ -686,9 +687,12 @@ public class HAReceiveService<M extends HAMessageWrapper> extends Thread {
 
         @Override
         public String toString() {
-
+            final Socket s = client.socket();
             return super.toString() //
                     + "{client.isOpen()=" + client.isOpen()//
+                    + ",client.isConnected()=" + client.isConnected()//
+                    + ",socket.isInputShutdown()="
+                    + (s == null ? "N/A" : s.isInputShutdown())//
                     + ",clientSelector.isOpen=" + clientSelector.isOpen()//
                     + "}";
 

@@ -553,21 +553,58 @@ public class HASendService {
      */
     protected /*static*/ class IncSendTask implements Callable<Void> {
 
-      private final ByteBuffer data;
-      private final byte[] marker;
+        private final ByteBuffer data;
+        private final byte[] marker;
 
-      public IncSendTask(final ByteBuffer data, final byte[] marker) {
+        public IncSendTask(final ByteBuffer data, final byte[] marker) {
 
-          if (data == null)
-              throw new IllegalArgumentException();
+            if (data == null)
+                throw new IllegalArgumentException();
 
-          this.data = data;
-          this.marker = marker;
-      }
+            this.data = data;
+            this.marker = marker;
+        }
 
-      @Override
-      public Void call() throws Exception {
+        @Override
+        public Void call() throws Exception {
 
+            try {
+
+                return doInnerCall();
+
+            } catch (Throwable t) {
+
+                /*
+                 * Log anything thrown out of this task. We check the Future of
+                 * this task, but that does not tell us what exception is thrown
+                 * in the Thread executing the task when the Future is cancelled
+                 * and that thread is interrupted. In particular, we are looking
+                 * for the InterruptedException, ClosedByInterruptException,
+                 * etc.
+                 */
+
+                final SocketChannel sc = socketChannel.get();
+
+                log.error("socketChannel="
+                        + sc
+                        + (sc == null ? "" : ", sc.isOpen()" + sc.isOpen()
+                                + ", sc.isConnected()" + sc.isConnected())
+                        + ", cause=" + t, t);
+
+                if (t instanceof Exception)
+                    throw (Exception) t;
+
+                if (t instanceof RuntimeException)
+                    throw (RuntimeException) t;
+
+                throw new RuntimeException(t);
+
+            }
+
+        }
+
+      private Void doInnerCall() throws Exception {
+          
             // defer until we actually run.
             final SocketChannel socketChannel = reopenChannel();
 
