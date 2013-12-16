@@ -224,6 +224,15 @@ public class HAReceiveService<M extends HAMessageWrapper> extends Thread {
      */
     private final AtomicReference<InetSocketAddress> addrNextRef;
 
+    /**
+     * Private buffer used to incrementally compute the checksum of the data as
+     * it is received. The purpose of this buffer is to take advantage of more
+     * efficient bulk copy operations from the NIO buffer into a local byte[] on
+     * the Java heap against which we then track the evolving checksum of the
+     * data.
+     */
+    private final byte[] heapBuffer = new byte[512];
+
     /*
      * Note: toString() implementation is non-blocking.
      */
@@ -533,8 +542,8 @@ public class HAReceiveService<M extends HAMessageWrapper> extends Thread {
                     // Setup task to read buffer for that message.
                     readFuture = waitFuture = new FutureTask<Void>(
                             new ReadTask<M>(server, clientRef, msg,
-                                    localBuffer, sendService, addrNextRef,
-                                    callback));
+                                    localBuffer, heapBuffer, sendService,
+                                    addrNextRef, callback));
 
                     // [waitFuture] is available for receiveData().
                     futureReady.signalAll();
@@ -568,7 +577,7 @@ public class HAReceiveService<M extends HAMessageWrapper> extends Thread {
                 try {
                     readFuture.get();
                 } catch (Exception e) {
-                    log.warn(e, e);
+                    log.error(e, e);
                 }
 
                 lock.lockInterruptibly();
@@ -757,19 +766,8 @@ public class HAReceiveService<M extends HAMessageWrapper> extends Thread {
         
         private final Adler32 chk = new Adler32();
 
-        /**
-         * Private buffer used to incrementally compute the checksum of the data
-         * as it is received. The purpose of this buffer is to take advantage of
-         * more efficient bulk copy operations from the NIO buffer into a local
-         * byte[] on the Java heap against which we then track the evolving
-         * checksum of the data.
-         * 
-         * FIXME Why isn't this buffer scoped to the outer HAReceiveService? By
-         * being an inner class field, we allocate it once per payload
-         * received....
-         */
-        private final byte[] a = new byte[512];
-
+        private final byte[] heapBuffer;
+        
         /**
          * 
          * @param server
@@ -797,7 +795,8 @@ public class HAReceiveService<M extends HAMessageWrapper> extends Thread {
          */
         public ReadTask(final ServerSocketChannel server,
                 final AtomicReference<Client> clientRef, final M message,
-                final ByteBuffer localBuffer, final HASendService downstream,
+                final ByteBuffer localBuffer, final byte[] heapBuffer,
+                final HASendService downstream,
                 final AtomicReference<InetSocketAddress> addrNextRef,
                 final IHAReceiveCallback<M> callback) {
 
@@ -806,6 +805,8 @@ public class HAReceiveService<M extends HAMessageWrapper> extends Thread {
             if (clientRef == null)
                 throw new IllegalArgumentException();
             if (message == null)
+                throw new IllegalArgumentException();
+            if (heapBuffer == null)
                 throw new IllegalArgumentException();
             if (localBuffer == null)
                 throw new IllegalArgumentException();
@@ -816,6 +817,7 @@ public class HAReceiveService<M extends HAMessageWrapper> extends Thread {
             this.clientRef = clientRef;
             this.message = message;
             this.localBuffer = localBuffer;
+            this.heapBuffer = heapBuffer;
             this.sendService = downstream;
             this.addrNextRef = addrNextRef;
             this.callback = callback;
@@ -868,8 +870,10 @@ public class HAReceiveService<M extends HAMessageWrapper> extends Thread {
         }
 
         /**
-         * Update the running checksum.
-         *  
+         * Update the running checksum. This uses the {@link #heapBuffer} to
+         * amoritize the cost of the transfers for the incremental checksum
+         * maintenance.
+         * 
          * @param rdlen
          *            The #of bytes read in the last read from the socket into
          *            the {@link #localBuffer}.
@@ -885,21 +889,22 @@ public class HAReceiveService<M extends HAMessageWrapper> extends Thread {
             // rewind to the first byte to be read.
             b.position(mark - rdlen);
             
-            for (int pos = mark - rdlen; pos < mark; pos += a.length) {
+            for (int pos = mark - rdlen; pos < mark; pos += heapBuffer.length) {
 
                 // #of bytes to copy into the local byte[]. 
-                final int len = Math.min(mark - pos, a.length);
+                final int len = Math.min(mark - pos, heapBuffer.length);
 
                 // copy into Java heap byte[], advancing b.position().
-                b.get(a, 0/* off */, len);
+                b.get(heapBuffer, 0/* off */, len);
 
                 // update the running checksum.
-                chk.update(a, 0/* off */, len);
+                chk.update(heapBuffer, 0/* off */, len);
 
             }
             
         }
         
+        @Override
         public Void call() throws Exception {
         
 //          awaitAccept();
@@ -1265,11 +1270,14 @@ public class HAReceiveService<M extends HAMessageWrapper> extends Thread {
         final private ByteBuffer markerBB;
         final private Client client;
 
+        private boolean foundMarkerInInitialPosition = true;
         private int markerIndex = 0;
-        private int nmarkerreads = 0;
+        private int nreads = 0;
         private int nmarkerbytematches = 0;
+        private long bytesRead = 0L;
 
         DrainToMarkerUtil(final byte[] marker, final Client client) {
+
             this.marker = marker;
             this.markerBuffer = marker == null ? null : new byte[marker.length];
             this.markerBB = marker == null ? null : ByteBuffer
@@ -1297,7 +1305,7 @@ public class HAReceiveService<M extends HAMessageWrapper> extends Thread {
 
             if (log.isDebugEnabled())
                 log.debug("Looking for token, " + BytesUtil.toHexString(marker)
-                        + ", reads: " + nmarkerreads);
+                        + ", reads: " + nreads);
 
             while (markerIndex < marker.length) {
 
@@ -1306,10 +1314,23 @@ public class HAReceiveService<M extends HAMessageWrapper> extends Thread {
                 markerBB.position(0);
 
                 final int rdLen = client.client.read(markerBB);
+                if (rdLen == -1) {
+                    throw new IOException("EOF: nreads=" + nreads
+                            + ", bytesRead=" + bytesRead);
+                }
+                nreads++;
+                bytesRead += rdLen;
                 for (int i = 0; i < rdLen; i++) {
                     if (markerBuffer[i] != marker[markerIndex]) {
-                        if (nmarkerreads < 2)
-                            log.warn("TOKEN MISMATCH");
+                        if (foundMarkerInInitialPosition) {
+                            /*
+                             * The marker was not found in the initial position
+                             * in the stream. We are going to drain data until
+                             * we can match the marker.
+                             */
+                            foundMarkerInInitialPosition = false;
+                            log.error("Marker not found: skipping");
+                        }
                         markerIndex = 0;
                         if (markerBuffer[i] == marker[markerIndex]) {
                             markerIndex++;
@@ -1320,21 +1341,25 @@ public class HAReceiveService<M extends HAMessageWrapper> extends Thread {
                     }
                 }
 
-                nmarkerreads++;
-                if (nmarkerreads % 10000 == 0) {
+                if (nreads % 10000 == 0) {
                     if (log.isDebugEnabled())
-                        log.debug("...still looking, reads: " + nmarkerreads);
+                        log.debug("...still looking: reads=" + nreads
+                                + ", bytesRead=" + bytesRead);
                 }
 
             }
 
-            if (markerIndex != marker.length) { // not sufficient data ready
+            if (markerIndex != marker.length) { 
+                /*
+                 * Partial marker has been read, but we do not have enough data
+                 * for a full match yet.
+                 */
                 if (log.isDebugEnabled())
                     log.debug("Not found token yet!");
                 return false;
             } else {
                 if (log.isDebugEnabled())
-                    log.debug("Found token after " + nmarkerreads
+                    log.debug("Found token after " + nreads
                             + " token reads and " + nmarkerbytematches
                             + " byte matches");
 

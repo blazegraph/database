@@ -247,8 +247,8 @@ public class HASendService {
      * {@link HAReceiveService}.
      */
     synchronized public void terminate() {
-        if (log.isDebugEnabled())
-            log.debug(toString() + " : stopping.");
+        if (log.isInfoEnabled())
+            log.info(toString() + " : stopping.");
         final ExecutorService tmp = executorRef.getAndSet(null);
         if (tmp == null) {
             // Not running.
@@ -446,13 +446,13 @@ public class HASendService {
 
                     socketChannel.set(sc = openChannel(addrNext.get()));
 
-                    if (log.isTraceEnabled())
-                    	log.trace("Opened channel on try: " + tryno);
+                    if (log.isInfoEnabled())
+                        log.info("Opened channel on try: " + tryno);
 
                 } catch (IOException e) {
 
                     if (log.isInfoEnabled())
-                    	log.info("Failed to open channel on try: " + tryno);
+                        log.info("Failed to open channel on try: " + tryno);
 
                     if (tryno < retryMillis.length) {
 
