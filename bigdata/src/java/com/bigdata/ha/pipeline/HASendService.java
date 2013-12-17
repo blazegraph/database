@@ -269,14 +269,14 @@ public class HASendService {
         }
     }
 
-    /**
-     * Close the {@link SocketChannel} to the downsteam service (blocking).
-     */
-    public void closeChannel() {
-        synchronized (this.socketChannel) {
-            closeSocketChannelNoBlock();
-        }
-    }
+//    /**
+//     * Close the {@link SocketChannel} to the downsteam service (blocking).
+//     */
+//    public void closeChannel() {
+//        synchronized (this.socketChannel) {
+//            closeSocketChannelNoBlock();
+//        }
+//    }
 
     /**
      * Close the {@link SocketChannel} to the downstream service (non-blocking).
