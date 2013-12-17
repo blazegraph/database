@@ -1117,7 +1117,7 @@ public class HAJournalTest extends HAJournal {
         public Future<IHAPipelineResetResponse> resetPipeline(
                 final IHAPipelineResetRequest req) throws IOException {
 
-            checkMethod("resetPipeline", new Class[] {});
+            checkMethod("resetPipeline", new Class[] {IHAPipelineResetRequest.class});
 
             return super.resetPipeline(req);
         }
