@@ -1939,7 +1939,7 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> /*extends
                 // Log and continue.
                 log.error("Problem on node removal", e);
                 
-                if(InnerCause.isInnerCause(t, InterruptedException.class)) {
+                if(InnerCause.isInnerCause(e, InterruptedException.class)) {
                     // Propagate interrupt.
                     Thread.currentThread().interrupt();
                 }
@@ -1970,7 +1970,7 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> /*extends
                 // Log and continue.
                 log.error("Problem on reset pipeline", e);
 
-                if(InnerCause.isInnerCause(t, InterruptedException.class)) {
+                if(InnerCause.isInnerCause(e, InterruptedException.class)) {
                     // Propagate interrupt.
                     Thread.currentThread().interrupt();
                 }
