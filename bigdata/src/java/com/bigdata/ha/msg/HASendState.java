@@ -121,7 +121,7 @@ public class HASendState implements IHASendState, Externalizable {
 
         return super.toString() + "{messageId=" + messageId
                 + ",originalSenderId=" + originalSenderId + ",senderId="
-                + senderId + ",token=" + token + ", replicationFactor="
+                + senderId + ",token=" + token + ",replicationFactor="
                 + replicationFactor + "}";
 
     }
