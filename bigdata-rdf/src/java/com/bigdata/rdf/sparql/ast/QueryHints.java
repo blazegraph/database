@@ -459,7 +459,7 @@ public interface QueryHints {
 	 */
     String REIFICATION_DONE_RIGHT = "reificationDoneRight";
 
-    boolean DEFAULT_REIFICATION_DONE_RIGHT = true;
+    boolean DEFAULT_REIFICATION_DONE_RIGHT = false;
     
     /**
      * Used to mark a predicate as "range safe" - that is, we can safely
