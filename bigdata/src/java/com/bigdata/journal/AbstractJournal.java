@@ -100,6 +100,8 @@ import com.bigdata.ha.CommitResponse;
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.HAStatusEnum;
 import com.bigdata.ha.HATXSGlue;
+import com.bigdata.ha.IHAPipelineResetRequest;
+import com.bigdata.ha.IHAPipelineResetResponse;
 import com.bigdata.ha.IIndexManagerCallable;
 import com.bigdata.ha.IJoinedAndNonJoinedServices;
 import com.bigdata.ha.JoinedAndNonJoinedServices;
@@ -8018,6 +8020,14 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
             return getProxy(ft);
         }
 
+        @Override
+        public Future<IHAPipelineResetResponse> resetPipeline(
+                final IHAPipelineResetRequest req) throws IOException {
+            final Future<IHAPipelineResetResponse> f = quorum.getClient()
+                    .resetPipeline(req);
+            return getProxy(f);
+        }
+
         /*
          * HATXSGlue.
          * 
@@ -8242,7 +8252,6 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
             return getProxy(ft, asyncFuture);
 
         }
-
 
 	};
 
