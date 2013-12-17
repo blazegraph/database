@@ -41,6 +41,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.RunnableFuture;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
@@ -594,6 +595,14 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> /*extends
             super.pipelineChange(oldDownStreamId, newDownStreamId);
             lock.lock();
             try {
+                if (oldDownStreamId != null && newDownStreamId != null
+                        && oldDownStreamId.equals(newDownStreamId)) {
+                    /*
+                     * Nothing to do. The pipeline is already configured
+                     * correctly.
+                     */
+                    return;
+                }
                 // The address of the next service in the pipeline.
                 final InetSocketAddress addrNext = newDownStreamId == null ? null
                         : getAddrNext(newDownStreamId);
@@ -1222,7 +1231,6 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> /*extends
     private class ResetPipelineTaskImpl implements
             Callable<IHAPipelineResetResponse> {
 
-        @SuppressWarnings("unused")
         private final IHAPipelineResetRequest req;
         
         public ResetPipelineTaskImpl(final IHAPipelineResetRequest req) {
@@ -1234,20 +1242,30 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> /*extends
         @Override
         public IHAPipelineResetResponse call() throws Exception {
 
-            // FIXME Versus using the inner handler?
-//            innerEventHandler.pipelineUpstreamChange();
-//            innerEventHandler.pipelineChange(oldDownStreamId, newDownStreamId);
-            log.warn("Will reset pipeline");
-            if (receiveService != null) {
-
-                receiveService.changeUpStream();
-
+            lock.lock();
+            try {
+                return doRunWithLock();
+            } finally {
+                lock.unlock();
             }
+            
+        }
 
-            if (sendService != null) {
+        private IHAPipelineResetResponse doRunWithLock() throws Exception {
 
-                sendService.closeChannel();
+            log.warn("Will reset pipeline: req=" + req);
 
+            // tear down send and/or receive services.
+            innerEventHandler.tearDown();
+
+            // The current pipeline order.
+            final UUID[] pipelineOrder = member.getQuorum().getPipeline();
+            // The index of this service in the pipeline order.
+            final int index = getIndex(serviceId, pipelineOrder);
+            if (index == 0) {
+                innerEventHandler.setUpSendService();
+            } else if (index > 0) {
+                innerEventHandler.setUpReceiveService();
             }
 
             return new HAPipelineResetResponse();
@@ -1748,14 +1766,14 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> /*extends
         private final PipelineState<S> downstream;
         private final HASendService sendService;
         private final QuorumPipelineImpl<S> outerClass;
-        private final Lock sendLock;
+        private final Semaphore sendLock;
 
         public SendBufferTask(final QuorumMember<S> member, final long token,
                 final IHASyncRequest req, final IHASendState snd,
                 final IHAWriteMessage msg, final ByteBuffer b,
                 final PipelineState<S> downstream,
                 final HASendService sendService,
-                final QuorumPipelineImpl<S> outerClass, final Lock sendLock) {
+                final QuorumPipelineImpl<S> outerClass, final Semaphore sendLock) {
 
             this.member = member;
             this.token = token; 
@@ -1778,7 +1796,7 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> /*extends
              * write pipeline at a time.
              */
 
-            sendLock.lock();
+            sendLock.acquire();
 
             try {
 
@@ -1788,7 +1806,7 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> /*extends
                 
             } finally {
                 
-                sendLock.unlock();
+                sendLock.release();
                 
             }
 
@@ -1920,25 +1938,29 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> /*extends
 
                     problemServiceId = priorAndNext[1];
                             
-                    member.getActor().forceRemoveService(problemServiceId);
-
                 } else if (remoteCause != null) {
 
                     problemServiceId = remoteCause.getProblemServiceId();
-
-                    member.getActor().forceRemoveService(problemServiceId);
 
                 } else {
                     
                     // Do not remove anybody.
                     
                 }
+
+                if (problemServiceId != null) {
+
+                    // Force out the problem service.
+                    member.getActor().forceRemoveService(problemServiceId);
+
+                }
                 
             } catch (Throwable e) {
 
                 // Log and continue.
-                log.error("Problem on node removal", e);
-                
+                log.error("Problem on force remove: problemServiceId="
+                        + problemServiceId, e);
+
                 if(InnerCause.isInnerCause(e, InterruptedException.class)) {
                     // Propagate interrupt.
                     Thread.currentThread().interrupt();
@@ -2009,7 +2031,7 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> /*extends
      */
     private void resetPipeline(final long token, final UUID problemServiceId) {
 
-        log.error("Leader will reset pipeline: " + token);
+        log.error("Leader will reset pipeline: token=" + token+", problemServiceId=" + problemServiceId);
 
         /*
          * We will only message the services that are in the pipeline.
@@ -2134,7 +2156,8 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> /*extends
      * Lock used to ensure that at most one message is being sent along the
      * write pipeline at a time.
      */
-    private final Lock sendLock = new ReentrantLock();
+//    private final Lock sendLock = new ReentrantLock();
+    private final Semaphore sendLock = new Semaphore(1/*permits*/);
 
     @Override
     public Future<Void> receiveAndReplicate(final IHASyncRequest req,
