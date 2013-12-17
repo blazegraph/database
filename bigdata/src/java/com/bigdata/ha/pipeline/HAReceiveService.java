@@ -117,9 +117,14 @@ public class HAReceiveService<M extends HAMessageWrapper> extends Thread {
      * data to a downstream service.
      */
     private final HASendService sendService;
-   
-    private final ExecutorService executor = Executors.newSingleThreadExecutor();
-   
+
+    public HASendService getSendService() {
+        return sendService;
+    }
+
+    private final ExecutorService executor = Executors
+            .newSingleThreadExecutor();
+
 //    private ServerSocketChannel server;
 //    private FutureTask<Void> readFuture;
 

@@ -54,6 +54,8 @@ import com.bigdata.concurrent.FutureTaskMon;
 import com.bigdata.counters.PIDUtil;
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.HAStatusEnum;
+import com.bigdata.ha.IHAPipelineResetRequest;
+import com.bigdata.ha.IHAPipelineResetResponse;
 import com.bigdata.ha.QuorumService;
 import com.bigdata.ha.RunState;
 import com.bigdata.ha.msg.IHA2PhaseAbortMessage;
@@ -1109,6 +1111,15 @@ public class HAJournalTest extends HAJournal {
             checkMethod("moveToEndOfPipeline", new Class[] {});
 
             return super.moveToEndOfPipeline();
+        }
+
+        @Override
+        public Future<IHAPipelineResetResponse> resetPipeline(
+                final IHAPipelineResetRequest req) throws IOException {
+
+            checkMethod("resetPipeline", new Class[] {});
+
+            return super.resetPipeline(req);
         }
 
         @Override

@@ -49,6 +49,8 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.ha.HAGlueBase;
 import com.bigdata.ha.HAPipelineGlue;
+import com.bigdata.ha.IHAPipelineResetRequest;
+import com.bigdata.ha.IHAPipelineResetResponse;
 import com.bigdata.ha.QuorumPipeline;
 import com.bigdata.ha.QuorumPipelineImpl;
 import com.bigdata.ha.msg.IHALogRequest;
@@ -268,6 +270,12 @@ public class TestWORMWriteCacheService extends TestCase3 {
         @Override
         public IHAWriteSetStateResponse getHAWriteSetState(
                 IHAWriteSetStateRequest req) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public Future<IHAPipelineResetResponse> resetPipeline(
+                final IHAPipelineResetRequest req) throws IOException {
             throw new UnsupportedOperationException();
         }
 
@@ -492,6 +500,12 @@ public class TestWORMWriteCacheService extends TestCase3 {
             
             // NOP
             
+        }
+
+        @Override
+        public Future<IHAPipelineResetResponse> resetPipeline(
+                IHAPipelineResetRequest req) throws IOException {
+            throw new UnsupportedOperationException();
         }
         
     } // MockQuorumMemberImpl

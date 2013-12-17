@@ -258,16 +258,7 @@ public class HASendService {
             return;
         }
         try {
-            final SocketChannel socketChannel = this.socketChannel.get();
-            if (socketChannel != null) {
-                try {
-                    socketChannel.close();
-                } catch (IOException ex) {
-                    log.error("Ignoring exception during close: " + ex, ex);
-                } finally {
-                    this.socketChannel.set(null);
-                }
-            }
+            closeSocketChannelNoBlock();
         } finally {
             // shutdown executor.
             tmp.shutdownNow();
@@ -275,6 +266,33 @@ public class HASendService {
             addrNext.set(null);
             if (log.isInfoEnabled())
                 log.info(toString() + " : stopped.");
+        }
+    }
+
+    /**
+     * Close the {@link SocketChannel} to the downsteam service (blocking).
+     */
+    public void closeChannel() {
+        synchronized (this.socketChannel) {
+            closeSocketChannelNoBlock();
+        }
+    }
+
+    /**
+     * Close the {@link SocketChannel} to the downstream service (non-blocking).
+     */
+    private void closeSocketChannelNoBlock() {
+        final SocketChannel socketChannel = this.socketChannel.get();
+        if (socketChannel != null) {
+            try {
+                socketChannel.close();
+            } catch (IOException ex) {
+                log.error("Ignoring exception during close: " + ex, ex);
+            } finally {
+                this.socketChannel.set(null);
+            }
+            if (log.isInfoEnabled())
+                log.info("Closed socket channel");
         }
     }
 
@@ -393,7 +411,7 @@ public class HASendService {
      * A series of timeouts used when we need to re-open the
      * {@link SocketChannel}.
      */
-    private final static long[] retryMillis = new long[] { 1, 5, 10, 50, 100, 250, 500 };
+    private final static long[] retryMillis = new long[] { 1, 5, 10, 50, 100, 250, 250, 250, 250 };
 
     /**
      * (Re-)open the {@link SocketChannel} if it is closed and this service is
@@ -448,12 +466,14 @@ public class HASendService {
                     socketChannel.set(sc = openChannel(addrNext.get()));
 
                     if (log.isInfoEnabled())
-                        log.info("Opened channel on try: " + tryno);
+                        log.info("Opened channel on try: " + tryno
+                                + ", addrNext=" + addrNext);
 
                 } catch (IOException e) {
 
                     if (log.isInfoEnabled())
-                        log.info("Failed to open channel on try: " + tryno);
+                        log.info("Failed to open channel on try: " + tryno
+                                + ", addrNext=" + addrNext);
 
                     if (tryno < retryMillis.length) {
 
@@ -671,7 +691,7 @@ public class HASendService {
                      */
 
                     final int nbytes;
-                    if (false&&log.isDebugEnabled()) { // add debug latency
+                    if (false || log.isDebugEnabled()) { // FIXME add debug latency
                         final int limit = data.limit();
                         if (data.position() < (limit - 50000)) {
                             data.limit(data.position() + 50000);

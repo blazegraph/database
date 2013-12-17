@@ -12,6 +12,8 @@ import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 
 import com.bigdata.ha.HAPipelineGlue;
+import com.bigdata.ha.IHAPipelineResetRequest;
+import com.bigdata.ha.IHAPipelineResetResponse;
 import com.bigdata.ha.msg.IHALogRequest;
 import com.bigdata.ha.msg.IHALogRootBlocksRequest;
 import com.bigdata.ha.msg.IHALogRootBlocksResponse;
@@ -262,6 +264,12 @@ abstract class MockQuorumMember<S extends Remote> extends
         @Override
         public IHAWriteSetStateResponse getHAWriteSetState(
                 IHAWriteSetStateRequest req) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public Future<IHAPipelineResetResponse> resetPipeline(
+                IHAPipelineResetRequest req) throws IOException {
             throw new UnsupportedOperationException();
         }
 

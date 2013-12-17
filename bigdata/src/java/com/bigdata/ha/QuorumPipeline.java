@@ -36,6 +36,8 @@ import com.bigdata.ha.halog.HALogWriter;
 import com.bigdata.ha.msg.IHASendState;
 import com.bigdata.ha.msg.IHASyncRequest;
 import com.bigdata.ha.msg.IHAWriteMessage;
+import com.bigdata.ha.pipeline.HAReceiveService;
+import com.bigdata.ha.pipeline.HASendService;
 import com.bigdata.io.writecache.WriteCache;
 import com.bigdata.journal.IRootBlockView;
 import com.bigdata.quorum.Quorum;
@@ -94,6 +96,26 @@ public interface QuorumPipeline<S extends HAPipelineGlue> {
      */
     Future<Void> receiveAndReplicate(IHASyncRequest req, IHASendState snd,
             IHAWriteMessage msg) throws IOException;
+
+    /**
+     * Reset the pipeline (blocking). This message is used to handle an error in
+     * pipeline replication. If replication fails, the socket connections both
+     * upstream and downstream of the point of failure can be left in an
+     * indeterminate state with partially buffered data. In order to bring the
+     * pipeline back into a known state (without forcing a quorum break) we
+     * message each service in the pipeline to reset its
+     * {@link HAReceiveService} (including the inner {@link HASendService}). The
+     * next message and payload relayed from the leader will cause new socket
+     * connections to be established.
+     * 
+     * @param msg The request.
+     * 
+     * @return The {@link Future} for the operation on the local service.
+     * 
+     * @throws IOException
+     */
+    Future<IHAPipelineResetResponse> resetPipeline(IHAPipelineResetRequest req)
+            throws IOException;
 
     /*
      * Note: Method removed since it does not appear necessary to let this
