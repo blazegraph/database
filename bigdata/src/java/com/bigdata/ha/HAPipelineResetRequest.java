@@ -23,6 +23,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.ha;
 
+import java.util.UUID;
+
 public class HAPipelineResetRequest implements IHAPipelineResetRequest {
 
     /**
@@ -31,11 +33,16 @@ public class HAPipelineResetRequest implements IHAPipelineResetRequest {
     private static final long serialVersionUID = 1L;
 
     private long token;
-    
-    public HAPipelineResetRequest(final long token) {
+    private UUID problemServiceId;
+    private long timeoutNanos;
+
+    public HAPipelineResetRequest(final long token,
+            final UUID problemServiceId, final long timeoutNanos) {
         this.token = token;
+        this.problemServiceId = problemServiceId;
+        this.timeoutNanos = timeoutNanos;
     }
-    
+
     @Override
     public long token() {
         return token;
@@ -43,7 +50,18 @@ public class HAPipelineResetRequest implements IHAPipelineResetRequest {
 
     @Override
     public String toString() {
-        return super.toString() + "{token=" + token + "}";
+        return super.toString() + "{token=" + token + ", problemServiceId="
+                + problemServiceId + ", timeoutNanos=" + timeoutNanos + "}";
+    }
+
+    @Override
+    public UUID getProblemServiceId() {
+        return problemServiceId;
+    }
+
+    @Override
+    public long getTimeoutNanos() {
+        return timeoutNanos;
     }
     
 }
