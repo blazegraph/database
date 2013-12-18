@@ -691,7 +691,13 @@ public class HASendService {
                      */
 
                     final int nbytes;
-                    if (false || log.isDebugEnabled()) { // FIXME add debug latency
+                    if (false || log.isDebugEnabled()) {
+                        /*
+                         * Debug only code. This breaks down the payload into
+                         * small packets and adds some latency between them as
+                         * well. This models what is otherwise a less common,
+                         * but more stressful, pattern.
+                         */
                         final int limit = data.limit();
                         if (data.position() < (limit - 50000)) {
                             data.limit(data.position() + 50000);
@@ -712,21 +718,11 @@ public class HASendService {
                         nwritten += nbytes;
                     }
 
-                    nwritten += nbytes;
-
                     if (log.isTraceEnabled())
                         log.trace("Sent " + nbytes + " bytes with " + nwritten
                                 + " of out " + remaining + " written so far");
 
                 }
-                
-                /*
-                 * The ACK by the receiver divides the HASend requests into
-                 * distinct operations. Without this handshaking, the next
-                 * available payload would be on the way as soon as the last
-                 * byte of the current payload was written.
-                 */
-//                awaitAck(socketChannel);
 
             } finally {
 
@@ -746,145 +742,6 @@ public class HASendService {
             return null;
 
         }
-
-//        /**
-//         * 
-//         * @param socketChannel
-//         * @throws IOException
-//         */
-//        private void awaitAck(final SocketChannel socketChannel)
-//                throws IOException {
-//
-//            log.debug("Awaiting (N)ACK");
-//
-//            // FIXME Optimize.
-//            final ByteBuffer b = ByteBuffer.wrap(new byte[] { -1 });
-//
-//            while (socketChannel.isOpen()) {
-//
-//                final int nread = socketChannel.read(b);
-//
-//                if (nread == 1) {
-//
-//                    final byte ret = b.array()[0];
-//
-//                    if (ret == ACK) {
-//
-//                        // Received ACK.
-//                        log.debug("ACK");
-//                        return;
-//
-//                    }
-//
-//                    log.error("NACK");
-//                    return;
-//
-//                }
-//
-//                throw new IOException("Expecting ACK, not " + nread + " bytes");
-//
-//            }
-//            
-//            // channel is closed.
-//            throw new AsynchronousCloseException();
-//            
-////            /*
-////             * We should now have parameters ready in the WriteMessage and can
-////             * begin transferring data from the stream to the writeCache.
-////             */
-////            final long begin = System.currentTimeMillis();
-////            long mark = begin;
-////
-////            // #of bytes remaining (to be received).
-////            int rem = b.remaining();
-////
-////            // End of stream flag.
-////            boolean EOS = false;
-////            
-////            // for debug retain number of low level reads
-////            int reads = 0;
-////            
-////            while (rem > 0 && !EOS) {
-////
-////                // block up to the timeout.
-////                final int nkeys = client.clientSelector.select(10000/* ms */);
-////            
-////                if (nkeys == 0) {
-////                
-////                    /*
-////                     * Nothing available.
-////                     */
-////                    
-////                    // time since last mark.
-////                    final long now = System.currentTimeMillis();
-////                    final long elapsed = now - mark;
-////                    
-////                    if (elapsed > 10000) {
-////                        // Issue warning if we have been blocked for a while.
-////                        log.warn("Blocked: awaiting " + rem + " out of "
-////                                + message.getSize() + " bytes.");
-////                        mark = now;// reset mark.
-////                    }
-////
-////                    if (!client.client.isOpen()
-////                            || !client.clientSelector.isOpen()) {
-////                        
-////                        /*
-////                         * The channel has been closed. The request must be
-////                         * failed. TODO Or set EOF:=true? 
-////                         * 
-////                         * Note: The [callback] is NOT notified. The service
-////                         * that issued the RMI request to this service to
-////                         * receive the payload over the HAReceivedService will
-////                         * see this exception thrown back across the RMI
-////                         * request.
-////                         * 
-////                         * @see HAReceiveService.receiveData().
-////                         */
-////                        
-////                        throw new AsynchronousCloseException();
-////                        
-////                    }
-////                    
-////                    // no keys. nothing to read.
-////                    continue;
-////                    
-////                }
-////
-////                final Set<SelectionKey> keys = client.clientSelector
-////                        .selectedKeys();
-////                
-////                final Iterator<SelectionKey> iter = keys.iterator();
-////                
-////                while (iter.hasNext()) {
-////                
-////                    iter.next();
-////                    iter.remove();
-////
-////                    final int rdlen = client.client.read(b);
-////
-////                    if (log.isTraceEnabled())
-////                        log.trace("Read " + rdlen + " bytes of "
-////                                + (rdlen > 0 ? rem - rdlen : rem)
-////                                + " bytes remaining.");
-////
-////                    if (rdlen > 0) {
-////                        reads++;
-////                    }
-////
-////                    if (rdlen == -1) {
-////                        // The stream is closed?
-////                        EOS = true;
-////                        break;
-////                    }
-////
-////                    rem -= rdlen;
-////
-////                }
-////
-////            } // while( rem > 0 )
-//
-//        }
 
     }
 
