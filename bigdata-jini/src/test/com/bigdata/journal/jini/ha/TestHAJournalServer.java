@@ -42,6 +42,10 @@ import com.bigdata.ha.msg.HADigestRequest;
  * of a quorum of 3. The quorum will not meet for these unit tests.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * 
+ *         TODO Add test to verify that we do not permit a double-start of a
+ *         service (correctly fails, reporting that the service is already
+ *         running).
  */
 public class TestHAJournalServer extends AbstractHA3JournalServerTestCase {
 
