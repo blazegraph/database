@@ -23,6 +23,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.ha;
 
+import java.util.UUID;
+
 import com.bigdata.ha.msg.IHAMessage;
 
 /**
@@ -36,5 +38,21 @@ public interface IHAPipelineResetRequest extends IHAMessage {
      * The quorum token in effect on the leader when this request was generated.
      */
     long token();
+
+    /**
+     * The {@link UUID} of the service that the leader has forced from the
+     * pipeline
+     * 
+     * @return The {@link UUID} of the problem service -or- <code>null</code> if
+     *         the leader did not identify a problem service.
+     */
+    UUID getProblemServiceId();
     
+    /**
+     * How long to await the state where the problem service is no longer part
+     * of the write pipeline for a service that is upstream or downstream of the
+     * problem service.
+     */
+    long getTimeoutNanos();
+
 }
