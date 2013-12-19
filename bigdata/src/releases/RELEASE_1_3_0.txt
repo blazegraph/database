@@ -1,4 +1,4 @@
-This is a minor release of bigdata(R).
+This is a major release of bigdata(R).
 
 Bigdata is a horizontally-scaled, open-source architecture for indexed data with an emphasis on RDF capable of loading 1B triples in under one hour on a 15 node cluster.  Bigdata operates in both a single machine mode (Journal), highly available replication cluster mode (HAJournalServer), and a horizontally sharded cluster mode (BigdataFederation).  The Journal provides fast scalable ACID indexed storage for very large data sets, up to 50 billion triples / quads.  The HAJournalServer adds replication, online backup, horizontal scaling of query, and high availability.  The federation provides fast scalable shard-wise parallel indexed storage using dynamic sharding and shard-wise ACID updates and incremental cluster size growth.  Both platforms support fully concurrent readers with snapshot isolation.
 
@@ -8,7 +8,9 @@ See [1,2,8] for instructions on installing bigdata(R), [4] for the javadoc, and 
 
 Starting with the 1.0.0 release, we offer a WAR artifact [8] for easy installation of the single machine RDF database.  For custom development and cluster installations we recommend checking out the code from SVN using the tag for this release. The code will build automatically under eclipse.  You can also build the code using the ant script.  The cluster installer requires the use of the ant script.
 
-You can download the WAR from:
+Starting with the 1.3.0 release, we offer a tarball artifact [10] for easy installation of the HA replication cluster.  
+
+You can download the WAR (standalone) or HA artifacts from:
 
 http://sourceforge.net/projects/bigdata/
 
@@ -18,16 +20,15 @@ https://bigdata.svn.sourceforge.net/svnroot/bigdata/tags/BIGDATA_RELEASE_1_3_0
 
 New features:
 
-- SPARQL 1.1 Update Extensions (SPARQL UPDATE for named solution sets). See https://sourceforge.net/apps/mediawiki/bigdata/index.php?title=SPARQL_Update for more information.
-- SPARQL 1.1 Property Paths.
-- Remote Java client for Multi-Tenancy extensions NanoSparqlServer
-- Sesame 2.6.10 dependency
+- High availability [10].
+- Property Path performance enhancements.
 - Plus numerous other bug fixes and performance enhancements. 
 
 Feature summary:
 
+- Highly Available Replication Clusters (HAJournalServer [10])
 - Single machine data storage to ~50B triples/quads (RWStore);
-- Clustered data storage is essentially unlimited;
+- Clustered data storage is essentially unlimited (BigdataFederation);
 - Simple embedded and/or webapp deployment (NanoSparqlServer);
 - Triples, quads, or triples with provenance (SIDs);
 - Fast RDFS+ inference and truth maintenance;
@@ -37,13 +38,93 @@ Feature summary:
 
 Road map [3]:
 
-- High availability for the journal and the cluster.
-- Runtime Query Optimizer for Analytic Query mode; and
-- Simplified deployment, configuration, and administration for clusters.
+- RDF Graph Mining API [12];
+- Reification Done Right [11];
+- Column-wise indexing;
+- Runtime Query Optimizer for Analytic Query mode; 
+- Performance optimization for scale-out clusters; and
+- Simplified deployment, configuration, and administration for scale-out clusters.
 
 Change log:
 
   Note: Versions with (*) MAY require data migration. For details, see [9].
+
+1.3.0:
+
+- http://sourceforge.net/apps/trac/bigdata/ticket/530 (Journal HA)
+- http://sourceforge.net/apps/trac/bigdata/ticket/621 (Coalesce write cache records and install reads in cache)
+- http://sourceforge.net/apps/trac/bigdata/ticket/623 (HA TXS)
+- http://sourceforge.net/apps/trac/bigdata/ticket/639 (Remove triple-buffering in RWStore)
+- http://sourceforge.net/apps/trac/bigdata/ticket/645 (HA backup)
+- http://sourceforge.net/apps/trac/bigdata/ticket/646 (River not compatible with newer 1.6.0 and 1.7.0 JVMs)
+- http://sourceforge.net/apps/trac/bigdata/ticket/648 (Add a custom function to use full text index for filtering.)
+- http://sourceforge.net/apps/trac/bigdata/ticket/651 (RWS test failure)
+- http://sourceforge.net/apps/trac/bigdata/ticket/652 (Compress write cache blocks for replication and in HALogs)
+- http://sourceforge.net/apps/trac/bigdata/ticket/662 (Latency on followers during commit on leader)
+- http://sourceforge.net/apps/trac/bigdata/ticket/663 (Issue with OPTIONAL blocks)
+- http://sourceforge.net/apps/trac/bigdata/ticket/664 (RWStore needs post-commit protocol)
+- http://sourceforge.net/apps/trac/bigdata/ticket/665 (HA3 LOAD non-responsive with node failure)
+- http://sourceforge.net/apps/trac/bigdata/ticket/666 (Occasional CI deadlock in HALogWriter testConcurrentRWWriterReader)
+- http://sourceforge.net/apps/trac/bigdata/ticket/670 (Accumulating HALog files cause latency for HA commit)
+- http://sourceforge.net/apps/trac/bigdata/ticket/671 (Query on follower fails during UPDATE on leader)
+- http://sourceforge.net/apps/trac/bigdata/ticket/673 (DGC in release time consensus protocol causes native thread leak in HAJournalServer at each commit)
+- http://sourceforge.net/apps/trac/bigdata/ticket/674 (WCS write cache compaction causes errors in RWS postHACommit())
+- http://sourceforge.net/apps/trac/bigdata/ticket/676 (Bad patterns for timeout computations)
+- http://sourceforge.net/apps/trac/bigdata/ticket/677 (HA deadlock under UPDATE + QUERY)
+- http://sourceforge.net/apps/trac/bigdata/ticket/678 (DGC Thread and Open File Leaks: sendHALogForWriteSet())
+- http://sourceforge.net/apps/trac/bigdata/ticket/679 (HAJournalServer can not restart due to logically empty log file)
+- http://sourceforge.net/apps/trac/bigdata/ticket/681 (HAJournalServer deadlock: pipelineRemove() and getLeaderId())
+- http://sourceforge.net/apps/trac/bigdata/ticket/684 (Optimization with skos altLabel)
+- http://sourceforge.net/apps/trac/bigdata/ticket/686 (Consensus protocol does not detect clock skew correctly)
+- http://sourceforge.net/apps/trac/bigdata/ticket/687 (HAJournalServer Cache not populated)
+- http://sourceforge.net/apps/trac/bigdata/ticket/689 (Missing URL encoding in RemoteRepositoryManager)
+- http://sourceforge.net/apps/trac/bigdata/ticket/690 (Error when using the alias "a" instead of rdf:type for a multipart insert)
+- http://sourceforge.net/apps/trac/bigdata/ticket/691 (Failed to re-interrupt thread in HAJournalServer)
+- http://sourceforge.net/apps/trac/bigdata/ticket/692 (Failed to re-interrupt thread)
+- http://sourceforge.net/apps/trac/bigdata/ticket/693 (OneOrMorePath SPARQL property path expression ignored)
+- http://sourceforge.net/apps/trac/bigdata/ticket/694 (Transparently cancel update/query in RemoteRepository)
+- http://sourceforge.net/apps/trac/bigdata/ticket/695 (HAJournalServer reports "follower" but is in SeekConsensus and is not participating in commits.)
+- http://sourceforge.net/apps/trac/bigdata/ticket/701 (Problems in BackgroundTupleResult)
+- http://sourceforge.net/apps/trac/bigdata/ticket/702 (InvocationTargetException on /namespace call)
+- http://sourceforge.net/apps/trac/bigdata/ticket/704 (ask does not return json)
+- http://sourceforge.net/apps/trac/bigdata/ticket/705 (Race between QueryEngine.putIfAbsent() and shutdownNow())
+- http://sourceforge.net/apps/trac/bigdata/ticket/706 (MultiSourceSequentialCloseableIterator.nextSource() can throw NPE)
+- http://sourceforge.net/apps/trac/bigdata/ticket/707 (BlockingBuffer.close() does not unblock threads)
+- http://sourceforge.net/apps/trac/bigdata/ticket/708 (BIND heisenbug - race condition on select query with BIND)
+- http://sourceforge.net/apps/trac/bigdata/ticket/711 (sparql protocol: mime type application/sparql-query)
+- http://sourceforge.net/apps/trac/bigdata/ticket/712 (SELECT ?x { OPTIONAL { ?x eg:doesNotExist eg:doesNotExist } } incorrect)
+- http://sourceforge.net/apps/trac/bigdata/ticket/715 (Interrupt of thread submitting a query for evaluation does not always terminate the AbstractRunningQuery)
+- http://sourceforge.net/apps/trac/bigdata/ticket/716 (Verify that IRunningQuery instances (and nested queries) are correctly cancelled when interrupted)
+- http://sourceforge.net/apps/trac/bigdata/ticket/718 (HAJournalServer needs to handle ZK client connection loss)
+- http://sourceforge.net/apps/trac/bigdata/ticket/720 (HA3 simultaneous service start failure)
+- http://sourceforge.net/apps/trac/bigdata/ticket/723 (HA asynchronous tasks must be canceled when invariants are changed)
+- http://sourceforge.net/apps/trac/bigdata/ticket/725 (FILTER EXISTS in subselect)
+- http://sourceforge.net/apps/trac/bigdata/ticket/726 (Logically empty HALog for committed transaction)
+- http://sourceforge.net/apps/trac/bigdata/ticket/727 (DELETE/INSERT fails with OPTIONAL non-matching WHERE)
+- http://sourceforge.net/apps/trac/bigdata/ticket/728 (Refactor to create HAClient)
+- http://sourceforge.net/apps/trac/bigdata/ticket/729 (ant bundleJar not working)
+- http://sourceforge.net/apps/trac/bigdata/ticket/731 (CBD and Update leads to 500 status code)
+- http://sourceforge.net/apps/trac/bigdata/ticket/732 (describe statement limit does not work)
+- http://sourceforge.net/apps/trac/bigdata/ticket/733 (Range optimizer not optimizing Slice service)
+- http://sourceforge.net/apps/trac/bigdata/ticket/734 (two property paths interfere)
+- http://sourceforge.net/apps/trac/bigdata/ticket/736 (MIN() malfunction)
+- http://sourceforge.net/apps/trac/bigdata/ticket/737 (class cast exception)
+- http://sourceforge.net/apps/trac/bigdata/ticket/739 (Inconsistent treatment of bind and optional property path)
+- http://sourceforge.net/apps/trac/bigdata/ticket/741 (ctc-striterators should build as independent top-level project (Apache2))
+- http://sourceforge.net/apps/trac/bigdata/ticket/743 (AbstractTripleStore.destroy() does not filter for correct prefix)
+- http://sourceforge.net/apps/trac/bigdata/ticket/746 (Assertion error)
+- http://sourceforge.net/apps/trac/bigdata/ticket/747 (BOUND bug)
+- http://sourceforge.net/apps/trac/bigdata/ticket/748 (incorrect join with subselect renaming vars)
+- http://sourceforge.net/apps/trac/bigdata/ticket/754 (Failure to setup SERVICE hook and changeLog for Unisolated and Read/Write connections)
+- http://sourceforge.net/apps/trac/bigdata/ticket/755 (Concurrent QuorumActors can interfere leading to failure to progress)
+- http://sourceforge.net/apps/trac/bigdata/ticket/756 (order by and group_concat)
+- http://sourceforge.net/apps/trac/bigdata/ticket/760 (Code review on 2-phase commit protocol)
+- http://sourceforge.net/apps/trac/bigdata/ticket/764 (RESYNC failure (HA))
+- http://sourceforge.net/apps/trac/bigdata/ticket/770 (alpp ordering)
+- http://sourceforge.net/apps/trac/bigdata/ticket/772 (Query timeout only checked at operator start/stop.)
+- http://sourceforge.net/apps/trac/bigdata/ticket/776 (Closed as duplicate of #490)
+- http://sourceforge.net/apps/trac/bigdata/ticket/778 (HA Leader fail results in transient problem with allocations on other services)
+- http://sourceforge.net/apps/trac/bigdata/ticket/783 (Operator Alerts (HA))
 
 1.2.4:
 
@@ -293,6 +374,9 @@ For more information about bigdata(R), please see the following links:
 [7] http://www.systap.com/bigdata.htm
 [8] http://sourceforge.net/projects/bigdata/files/bigdata/
 [9] http://sourceforge.net/apps/mediawiki/bigdata/index.php?title=DataMigration
+[10] http://sourceforge.net/apps/mediawiki/bigdata/index.php?title=HAJournalServer
+[11] http://www.bigdata.com/whitepapers/reifSPARQL.pdf
+[12] http://sourceforge.net/apps/mediawiki/bigdata/index.php?title=RDF_GAS_API
 
 About bigdata: 
 
