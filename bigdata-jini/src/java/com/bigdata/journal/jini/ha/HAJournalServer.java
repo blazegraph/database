@@ -3634,8 +3634,11 @@ public class HAJournalServer extends AbstractServer {
                         if (InnerCause.isInnerCause(t,
                                 ClosedByInterruptException.class)) {
                             // propagate interrupt
-                            Thread.currentThread().interrupt();
-                            return;
+                            // Thread.currentThread().interrupt();
+                            
+                            // wrap and re-throw
+                            throw new RuntimeException(t);
+                            // return;
                         }
                         /*
                          * Error handler.
