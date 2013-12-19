@@ -27,7 +27,11 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.eval.reif;
 
+import java.util.Properties;
+
 import com.bigdata.bop.ap.Predicate;
+import com.bigdata.journal.BufferMode;
+import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.internal.XSD;
 import com.bigdata.rdf.internal.impl.bnode.SidIV;
 import com.bigdata.rdf.model.BigdataBNode;
@@ -37,9 +41,11 @@ import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.StatementEnum;
+import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sparql.ast.eval.AbstractDataDrivenSPARQLTestCase;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPO;
+import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.vocab.decls.DCTermsVocabularyDecl;
 
 /**
@@ -94,7 +100,7 @@ public class TestReificationDoneRightEval extends AbstractDataDrivenSPARQLTestCa
     public TestReificationDoneRightEval(String name) {
         super(name);
 	}
-
+    
 	/**
 	 * Bootstrap test. The data are explicitly entered into the KB by hand. This
 	 * makes it possible to test evaluation without having to fix the RDF data
@@ -122,14 +128,14 @@ public class TestReificationDoneRightEval extends AbstractDataDrivenSPARQLTestCa
 		store.addTerms(terms);
 		
 		// ground statement.
-		final BigdataStatement s0 = vf.createStatement(SAP, bought, sybase,
+		final BigdataStatement s0 = vf.createStatement(SAP, bought, sybase, 
 				context, StatementEnum.Explicit);
 		
 		// Setup blank node with SidIV for that Statement.
 		final BigdataBNode s1 = vf.createBNode("s1");
 		s1.setStatementIdentifier(true);
-		final ISPO spo = new SPO(SAP.getIV(), bought.getIV(), sybase.getIV(),
-				null/* NO CONTEXT */, StatementEnum.Explicit);
+		final ISPO spo = new SPO(s0);//SAP.getIV(), bought.getIV(), sybase.getIV(),
+//				null/* NO CONTEXT */, StatementEnum.Explicit);
 		s1.setIV(new SidIV<BigdataBNode>(spo));
 
 		// metadata statements.
@@ -140,7 +146,7 @@ public class TestReificationDoneRightEval extends AbstractDataDrivenSPARQLTestCa
 		final BigdataStatement mds2 = vf.createStatement(s1, dcCreated,
 				createdDate, context, StatementEnum.Explicit);
 
-		final ISPO[] stmts = new ISPO[] { s0, mds1, mds2 };
+		final ISPO[] stmts = new ISPO[] { new SPO(s0), new SPO(mds1), new SPO(mds2) };
 
 		store.addStatements(stmts, stmts.length);
 
@@ -205,7 +211,7 @@ public class TestReificationDoneRightEval extends AbstractDataDrivenSPARQLTestCa
 		final BigdataStatement mds2 = vf.createStatement(s1, dcCreated,
 				createdDate, context, StatementEnum.Explicit);
 
-		final ISPO[] stmts = new ISPO[] { s0, mds1, mds2 };
+		final ISPO[] stmts = new ISPO[] { new SPO(s0), new SPO(mds1), new SPO(mds2) };
 
 		store.addStatements(stmts, stmts.length);
 
@@ -265,7 +271,7 @@ public class TestReificationDoneRightEval extends AbstractDataDrivenSPARQLTestCa
 		new TestHelper("reif/rdr-01a", // testURI,
                 "reif/rdr-01a.rq",// queryFileURL
                 "reif/rdr-01.ttl",// dataFileURL
-                "reif/rdr-01.srx"// resultFileURL
+                "reif/rdr-01a.srx"// resultFileURL
                 ).runTest();
 
 	}
@@ -380,5 +386,37 @@ public class TestReificationDoneRightEval extends AbstractDataDrivenSPARQLTestCa
                 ).runTest();
 
 	}
+
+    @Override
+    public Properties getProperties() {
+
+        // Note: clone to avoid modifying!!!
+        final Properties properties = (Properties) super.getProperties().clone();
+
+        // turn off quads.
+        properties.setProperty(AbstractTripleStore.Options.QUADS, "false");
+        
+        properties.setProperty(AbstractTripleStore.Options.STATEMENT_IDENTIFIERS, "true");
+
+        // TM not available with quads.
+        properties.setProperty(BigdataSail.Options.TRUTH_MAINTENANCE,"false");
+
+//        // override the default vocabulary.
+//        properties.setProperty(AbstractTripleStore.Options.VOCABULARY_CLASS,
+//                NoVocabulary.class.getName());
+
+        // turn off axioms.
+        properties.setProperty(AbstractTripleStore.Options.AXIOMS_CLASS,
+                NoAxioms.class.getName());
+
+        // no persistence.
+        properties.setProperty(com.bigdata.journal.Options.BUFFER_MODE,
+                BufferMode.Transient.toString());
+        
+//        properties.setProperty(AbstractTripleStore.Options.STORE_BLANK_NODES, "true");
+
+        return properties;
+
+    }
 
 }

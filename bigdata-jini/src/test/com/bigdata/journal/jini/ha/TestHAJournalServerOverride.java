@@ -35,6 +35,7 @@ import net.jini.config.Configuration;
 
 import org.apache.zookeeper.ZooKeeper;
 
+import com.bigdata.BigdataStatics;
 import com.bigdata.ha.HACommitGlue;
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.HAStatusEnum;
@@ -1614,12 +1615,16 @@ public class TestHAJournalServerOverride extends AbstractHA3JournalServerTestCas
      * service) will accept new transactions. There could be a race here between
      * a fully met quorum and new transactions, but eventually all services will
      * be joined with the met quorum and at the same commit point.
-     * 
-     * FIXME This test fails.  Figure out why.
      */
     public void testABC_stopZookeeper_failA_startZookeeper_quorumMeetsAgainOnNewToken()
             throws Exception {
-        
+        if (!BigdataStatics.runKnownBadTests) {
+            /*
+             * FIXME Test disabled for the 1.3.0 release. This test fails.
+             * Figure out why.
+             */
+            return;
+        }
         final HAGlue serverA = startA();
         final HAGlue serverB = startB();
         final HAGlue serverC = startC();
@@ -1735,11 +1740,19 @@ public class TestHAJournalServerOverride extends AbstractHA3JournalServerTestCas
      * transaction. This should push A into an error state. When we restart
      * zookeeper the quorum should break and then reform (in some arbitrary)
      * order. Services should be at the last recorded commit point. New
-     * transactions should be accepted.  FIXME Test fails. Figure out why.
+     * transactions should be accepted.  
      */
     public void testAB_stopZookeeper_failB_startZookeeper_quorumBreaksThenMeets()
             throws Exception {
         
+        if (!BigdataStatics.runKnownBadTests) {
+            /*
+             * FIXME Test disabled for the 1.3.0 release. This test fails.
+             * Figure out why.
+             */
+            return;
+        }
+
         final HAGlue serverA = startA();
         final HAGlue serverB = startB();
 

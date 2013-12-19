@@ -28,6 +28,7 @@ import com.bigdata.rdf.sail.sparql.ast.SyntaxTreeBuilderTreeConstants;
 import com.bigdata.rdf.sail.sparql.ast.VisitorException;
 import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.store.BD;
+import com.bigdata.rdf.store.BDS;
 import com.bigdata.rdf.vocab.decls.FOAFVocabularyDecl;
 
 /**
@@ -193,6 +194,8 @@ public class PrefixDeclProcessor {
             final String namespace;
             if (prefix.equals("bd")) {
                 prefixMap.put("bd", namespace = BD.NAMESPACE);
+            } else if (prefix.equals("bds")) {
+                prefixMap.put("bds", namespace = BDS.NAMESPACE);
             } else if (prefix.equals("hint")) {
                 prefixMap.put("hint", namespace = QueryHints.NAMESPACE);
             } else if (prefix.equals("rdf")) {

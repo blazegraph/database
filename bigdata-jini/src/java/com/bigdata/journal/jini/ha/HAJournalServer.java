@@ -4229,6 +4229,16 @@ public class HAJournalServer extends AbstractServer {
                      * 
                      * Note: This is not an error, but we can not remove
                      * snapshots or HALogs if this invariant is violated.
+                     * 
+                     * Note: We do not permit HALog files to be purged if the
+                     * quorum is not fully met. This is done in order to prevent
+                     * a situation a leader would not have sufficient log files
+                     * on hand to restore the failed service. If this were to
+                     * occur, then the failed service would have to undergo a
+                     * disaster rebuild rather than simply resynchronizing from
+                     * the leader. Hence, HALog files are NOT purged unless the
+                     * quorum is fully met (all services for its replication
+                     * count are joined with the met quorum).
                      */
                     return;
                 }
