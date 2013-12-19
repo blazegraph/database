@@ -28,7 +28,7 @@ import java.io.InputStream;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.net.SocketOption;
+//import java.net.SocketOption;
 import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.ServerSocketChannel;
@@ -76,74 +76,75 @@ public class TestSocketsDirect extends TestCase3 {
         super(name);
     }
 
-    /**
-     * Writes out the available options for the client and server socket.
-     * 
-     * @throws IOException
-     */
-    public void testDirectSockets_options() throws IOException {
-
-        // Get a socket addresss for an unused port.
-        final InetSocketAddress serverAddr = new InetSocketAddress(getPort(0));
-
-        // First our ServerSocketChannel
-        final ServerSocketChannel ssc = ServerSocketChannel.open();
-        try {
-            
-            // bind the ServerSocket to the specified port.
-            ssc.bind(serverAddr);
-            
-            // Now the first Client SocketChannel
-            final SocketChannel cs = SocketChannel.open();
-            try {
-                /*
-                 * Note: true if connection made. false if connection in
-                 * progress. 
-                 */
-                final boolean immediate = cs.connect(serverAddr);
-                if (!immediate) {
-                    // Did not connect immediately, so finish connect now.
-                    if (!cs.finishConnect()) {
-                        fail("Did not connect.");
-                    }
-                }
-
-                /*
-                 * Write out the client socket options.
-                 */
-                log.info("Client:: isOpen=" + cs.isOpen());
-                log.info("Client:: isBlocking=" + cs.isBlocking());
-                log.info("Client:: isRegistered=" + cs.isRegistered());
-                log.info("Client:: isConnected=" + cs.isConnected());
-                log.info("Client:: isConnectionPending="
-                        + cs.isConnectionPending());
-                for (SocketOption<?> opt : cs.supportedOptions()) {
-                    log.info("Client:: " + opt + " := " + cs.getOption(opt));
-                }
-
-                /*
-                 * Note: We need to use ServerSocketChannel.open() to get access
-                 * to the stream oriented listening interface for the server
-                 * side of the socket.
-                 */
-                log.info("Server:: isOpen=" + ssc.isOpen());
-                log.info("Server:: isBlocking=" + ssc.isBlocking());
-                log.info("Server:: isRegistered=" + ssc.isRegistered());
-                for (SocketOption<?> opt : ssc.supportedOptions()) {
-                    log.info("Server:: " + opt + " := " + cs.getOption(opt));
-                }
-
-            } finally {
-                cs.close();
-            }
-
-        } finally {
-
-            ssc.close();
-            
-        }        
-
-    }
+    // FIXME RESTORE WHEN WE MOVE TO JAVA 7.
+//    /**
+//     * Writes out the available options for the client and server socket.
+//     * 
+//     * @throws IOException
+//     */
+//    public void testDirectSockets_options() throws IOException {
+//
+//        // Get a socket addresss for an unused port.
+//        final InetSocketAddress serverAddr = new InetSocketAddress(getPort(0));
+//
+//        // First our ServerSocketChannel
+//        final ServerSocketChannel ssc = ServerSocketChannel.open();
+//        try {
+//            
+//            // bind the ServerSocket to the specified port.
+//            ssc.bind(serverAddr);
+//            
+//            // Now the first Client SocketChannel
+//            final SocketChannel cs = SocketChannel.open();
+//            try {
+//                /*
+//                 * Note: true if connection made. false if connection in
+//                 * progress. 
+//                 */
+//                final boolean immediate = cs.connect(serverAddr);
+//                if (!immediate) {
+//                    // Did not connect immediately, so finish connect now.
+//                    if (!cs.finishConnect()) {
+//                        fail("Did not connect.");
+//                    }
+//                }
+//
+//                /*
+//                 * Write out the client socket options.
+//                 */
+//                log.info("Client:: isOpen=" + cs.isOpen());
+//                log.info("Client:: isBlocking=" + cs.isBlocking());
+//                log.info("Client:: isRegistered=" + cs.isRegistered());
+//                log.info("Client:: isConnected=" + cs.isConnected());
+//                log.info("Client:: isConnectionPending="
+//                        + cs.isConnectionPending());
+//                for (SocketOption<?> opt : cs.supportedOptions()) {
+//                    log.info("Client:: " + opt + " := " + cs.getOption(opt));
+//                }
+//
+//                /*
+//                 * Note: We need to use ServerSocketChannel.open() to get access
+//                 * to the stream oriented listening interface for the server
+//                 * side of the socket.
+//                 */
+//                log.info("Server:: isOpen=" + ssc.isOpen());
+//                log.info("Server:: isBlocking=" + ssc.isBlocking());
+//                log.info("Server:: isRegistered=" + ssc.isRegistered());
+//                for (SocketOption<?> opt : ssc.supportedOptions()) {
+//                    log.info("Server:: " + opt + " := " + cs.getOption(opt));
+//                }
+//
+//            } finally {
+//                cs.close();
+//            }
+//
+//        } finally {
+//
+//            ssc.close();
+//            
+//        }        
+//
+//    }
     
     /**
      * Simple test of connecting to a server socket and the failure to connect
