@@ -140,7 +140,7 @@ public class InsertServlet extends BigdataRDFServlet {
         final String namespace = getNamespace(req);
 
         final String contentType = req.getContentType();
-
+        if(contentType==null) buildResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN, "Content-Type not specified.");
         if (log.isInfoEnabled())
             log.info("Request body: " + contentType);
 
