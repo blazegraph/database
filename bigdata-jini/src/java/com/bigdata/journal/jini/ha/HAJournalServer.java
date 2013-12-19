@@ -31,6 +31,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.net.InetSocketAddress;
 import java.net.URL;
 import java.nio.ByteBuffer;
+import java.nio.channels.ClosedByInterruptException;
 import java.rmi.Remote;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -3625,6 +3626,13 @@ public class HAJournalServer extends AbstractServer {
                     } catch(Throwable t) {
                         if (InnerCause.isInnerCause(t,
                                 InterruptedException.class)) {
+                            // propagate interrupt
+                            Thread.currentThread().interrupt();
+                            return;
+                        }
+                        // Add check for ClosedByInterruptException - but is this sufficient if the channel is now closed?
+                        if (InnerCause.isInnerCause(t,
+                                ClosedByInterruptException.class)) {
                             // propagate interrupt
                             Thread.currentThread().interrupt();
                             return;
