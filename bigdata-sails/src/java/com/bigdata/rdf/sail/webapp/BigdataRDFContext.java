@@ -132,6 +132,12 @@ public class BigdataRDFContext extends BigdataBaseContext {
     protected static final String EXPLAIN = "explain";
     
     /**
+     * Optional value for the {@link #EXPLAIN} URL query parameter that may be
+     * used to request more detail in the "EXPLAIN" of a query.
+     */
+    protected static final String EXPLAIN_DETAILS = "details";
+    
+    /**
      * URL Query parameter used to request the "analytic" query hints. MAY be
      * <code>null</code>, in which case we do not set
      * {@link QueryHints#ANALYTIC} query hint.
@@ -443,6 +449,36 @@ public class BigdataRDFContext extends BigdataBaseContext {
 
     }
     
+    /**
+     * Invoked if {@link #EXPLAIN} is found as a URL request parameter to
+     * see whether it exists with {@link #EXPLAIN_DETAILS} as a value. We
+     * have to check each value since there might be more than one.
+     * 
+     * @param req
+     *            The request.
+     * @return
+     */
+    static private boolean isExplainDetails(final HttpServletRequest req) {
+
+        final String[] vals = req.getParameterValues(EXPLAIN);
+
+        if (vals == null) {
+
+            return false;
+
+        }
+
+        for (String val : vals) {
+
+            if (val.equals(EXPLAIN_DETAILS))
+                return true;
+
+        }
+
+        return false;
+
+    }
+    
 	/**
      * Abstract base class for running queries handles the timing, pipe,
      * reporting, obtains the connection, and provides the finally {} semantics
@@ -566,6 +602,12 @@ public class BigdataRDFContext extends BigdataBaseContext {
          * query.
          */
         final boolean explain;
+
+        /**
+         * When <code>true</code>, provide an additional level of detail for the
+         * query explanation.
+         */
+        final boolean explainDetails;
 
         /**
          * When <code>true</code>, enable the "analytic" query hints. 
@@ -706,6 +748,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
             this.req = req;
             this.resp = resp;
             this.explain = req.getParameter(EXPLAIN) != null;
+            this.explainDetails = explain && isExplainDetails(req);
             this.analytic = getEffectiveBooleanValue(
                     req.getParameter(ANALYTIC), QueryHints.DEFAULT_ANALYTIC);
             this.xhtml = getEffectiveBooleanValue(req.getParameter(XHTML),
@@ -776,6 +819,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
             this.req = req;
             this.resp = resp;
             this.explain = req.getParameter(EXPLAIN) != null;
+            this.explainDetails = explain && isExplainDetails(req);
             this.analytic = getEffectiveBooleanValue(
                     req.getParameter(ANALYTIC), QueryHints.DEFAULT_ANALYTIC);
             this.xhtml = getEffectiveBooleanValue(req.getParameter(XHTML),

@@ -1189,9 +1189,17 @@ public class StatusServlet extends BigdataRDFServlet {
 
             current.node("h2", "Query Evaluation Statistics");
 
+            // iff scale-out.
+            final boolean clusterStats = q.getFederation() != null;
+            // detailed explain not enabled on this code path.
+            final boolean detailedStats = false;
+            // no mutation for query.
+            final boolean mutationStats = false;
+            
             // Format as a table, writing onto the response.
             QueryLog.getTableXHTML(queryString, q, children, w,
-                    !showQueryDetails, maxBopLength);
+                    !showQueryDetails, maxBopLength, clusterStats,
+                    detailedStats, mutationStats);
 
         }
 
