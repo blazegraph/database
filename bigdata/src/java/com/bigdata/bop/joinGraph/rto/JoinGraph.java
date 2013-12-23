@@ -228,6 +228,7 @@ public class JoinGraph extends PipelineOp {
 
 	}
 
+    @Override
 	public FutureTask<Void> eval(final BOpContext<IBindingSet> context) {
 
 		return new FutureTask<Void>(new JoinGraphTask(context));
@@ -278,12 +279,17 @@ public class JoinGraph extends PipelineOp {
 
 	    }
 
-		/**
-		 * {@inheritDoc}
-		 * 
-		 * 
-		 * TODO where to handle DISTINCT, ORDER BY, GROUP BY for join graph?
-		 */
+        /**
+         * {@inheritDoc}
+         * 
+         * 
+         * TODO where to handle DISTINCT, ORDER BY, GROUP BY for join graph?
+         * 
+         * FIXME When run as sub-query, we need to fix point the upstream
+         * solutions and then flood them into the join graph. Samples of the
+         * known bound variables can be pulled from those initial solutions.
+         */
+	    @Override
 	    public Void call() throws Exception {
 
 	        // Create the join graph.
