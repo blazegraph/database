@@ -75,6 +75,7 @@ abstract public class CoreBaseBOp implements BOp {
      * <p>
      * {@inheritDoc}
      */
+    @Override
     public CoreBaseBOp clone() {
         final Class<? extends CoreBaseBOp> cls = getClass();
         final Constructor<? extends CoreBaseBOp> ctor;
@@ -98,6 +99,7 @@ abstract public class CoreBaseBOp implements BOp {
      * General contract is a short (non-recursive) representation of the
      * {@link BOp}.
      */
+    @Override
     public String toShortString() {
         final BOp t = this;
         if (t instanceof IValueExpression<?>
@@ -125,6 +127,7 @@ abstract public class CoreBaseBOp implements BOp {
      * Return a non-recursive representation of the arguments and annotations
      * for this {@link BOp}.
      */
+    @Override
     public String toString() {
         
         final StringBuilder sb = new StringBuilder();
@@ -181,6 +184,7 @@ abstract public class CoreBaseBOp implements BOp {
         }
     }
     
+    @Override
     final public Object getRequiredProperty(final String name) {
 
         final Object tmp = getProperty(name);
@@ -193,6 +197,7 @@ abstract public class CoreBaseBOp implements BOp {
         
     }
 
+    @Override
     @SuppressWarnings("unchecked")
     final public <T> T getProperty(final String name, final T defaultValue) {
 
@@ -229,18 +234,22 @@ abstract public class CoreBaseBOp implements BOp {
 
     }
 
+    @Override
     final public int getId() {
         
         return (Integer) getRequiredProperty(Annotations.BOP_ID);
         
     }
-        
+
+    @Override
     final public boolean isController() {
-        
-        return getProperty(Annotations.CONTROLLER, false);
-        
+
+        return getProperty(Annotations.CONTROLLER,
+                Annotations.DEFAULT_CONTROLLER);
+
     }
     
+    @Override
     final public BOpEvaluationContext getEvaluationContext() {
 
         return getProperty(Annotations.EVALUATION_CONTEXT,
@@ -251,6 +260,7 @@ abstract public class CoreBaseBOp implements BOp {
     /**
      * <code>true</code> if all arguments and annotations are the same.
      */
+    @Override
     public boolean equals(final Object other) {
 
         if (this == other)
@@ -378,6 +388,7 @@ abstract public class CoreBaseBOp implements BOp {
     /**
      * The hash code is based on the hash of the operands (cached).
      */
+    @Override
     public int hashCode() {
 
         int h = hash;
