@@ -123,6 +123,7 @@ import com.bigdata.rdf.sparql.ast.OrderByNode;
 import com.bigdata.rdf.sparql.ast.ProjectionNode;
 import com.bigdata.rdf.sparql.ast.QueryBase;
 import com.bigdata.rdf.sparql.ast.QueryHints;
+import com.bigdata.rdf.sparql.ast.QueryOptimizerEnum;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.RangeNode;
 import com.bigdata.rdf.sparql.ast.SliceNode;
@@ -165,7 +166,7 @@ import cutthecrap.utils.striterators.NOPFilter;
  *      >Query Evaluation</a>.
  *      
  */
-public class AST2BOpUtility extends AST2BOpJoins {
+public class AST2BOpUtility extends AST2BOpRTO {
 
     private static final transient Logger log = Logger
             .getLogger(AST2BOpUtility.class);
@@ -176,9 +177,8 @@ public class AST2BOpUtility extends AST2BOpJoins {
      * <p>
      * <strong>NOTE:</strong> This is the entry for {@link ASTEvalHelper}. Do
      * NOT use this entry point directly. It will evolve when we integrate the
-     * RTO and/or the BindingsClause of the SPARQL 1.1 Federation extension.
-     * Applications should use the public entry points on {@link ASTEvalHelper}
-     * rather that this entry point.
+     * RTO. Applications should use public entry points on {@link ASTEvalHelper}
+     * instead.
      * 
      * @param ctx
      *            The evaluation context.
@@ -191,15 +191,15 @@ public class AST2BOpUtility extends AST2BOpJoins {
      *         TODO We could handle the IBindingSet[] by stuffing the data into
      *         a named solution set during the query rewrite and attaching that
      *         named solution set to the AST. This could allow for very large
-     *         solution sets to be passed into a query.  Any such change would
+     *         solution sets to be passed into a query. Any such change would
      *         have to be deeply integrated with the SPARQL parser in order to
      *         provide any benefit for the Java heap.
-     *         
-     *         TODO This logic is currently single-threaded.  If we allow internal
-     *         concurrency or when we integrate the RTO, we will need to ensure that
-     *         the logic remains safely cancelable by an interrupt of the thread in
-     *         which the query was submitted. See <a 
-     *         href="https://sourceforge.net/apps/trac/bigdata/ticket/715" > 
+     * 
+     *         TODO This logic is currently single-threaded. If we allow
+     *         internal concurrency or when we integrate the RTO, we will need
+     *         to ensure that the logic remains safely cancelable by an
+     *         interrupt of the thread in which the query was submitted. See <a
+     *         href="https://sourceforge.net/apps/trac/bigdata/ticket/715" >
      *         Interrupt of thread submitting a query for evaluation does not
      *         always terminate the AbstractRunningQuery </a>.
      */
@@ -2506,6 +2506,26 @@ public class AST2BOpUtility extends AST2BOpJoins {
             left = doMergeJoin(left, joinGroup, doneSet, start, ctx);
             
         }
+
+        if (joinGroup.getProperty(QueryHints.OPTIMIZER,
+                QueryOptimizerEnum.Static).equals(QueryOptimizerEnum.Runtime)) {
+
+            /*
+             * Inspect the remainder of the join group. If we can isolate a join
+             * graph and filters, then we will push them down into an RTO
+             * JoinGroup. Since the joins have already been ordered by the
+             * static optimizer, we can accept them in sequence along with any
+             * attachable filters.
+             */
+            
+            left = convertRTOJoinGraph(left, joinGroup, doneSet, ctx, start);
+            
+            /*
+             * Fall through. Anything not handled in this section will be
+             * handled as part of normal join group processing below.
+             */
+
+        }
         
         /*
          * Translate the remainder of the group. 
@@ -2539,12 +2559,12 @@ public class AST2BOpUtility extends AST2BOpJoins {
                         sp.getQueryHints());
                 continue;
             } else if (child instanceof ArbitraryLengthPathNode) {
-            	@SuppressWarnings("unchecked")
+//            	@SuppressWarnings("unchecked")
             	final ArbitraryLengthPathNode alpNode = (ArbitraryLengthPathNode) child;
                 left = convertArbitraryLengthPath(left, alpNode, doneSet, ctx);
                 continue;
             } else if (child instanceof ZeroLengthPathNode) {
-            	@SuppressWarnings("unchecked")
+//            	@SuppressWarnings("unchecked")
             	final ZeroLengthPathNode zlpNode = (ZeroLengthPathNode) child;
                 left = convertZeroLengthPath(left, zlpNode, doneSet, ctx);
                 continue;
@@ -2588,7 +2608,7 @@ public class AST2BOpUtility extends AST2BOpJoins {
                 }
                 continue;
             } else if (child instanceof UnionNode) {
-                @SuppressWarnings("unchecked")
+//                @SuppressWarnings("unchecked")
                 final UnionNode unionNode = (UnionNode) child;
                 left = convertUnion(left, unionNode, doneSet, ctx);
                 continue;
@@ -3955,7 +3975,7 @@ public class AST2BOpUtility extends AST2BOpJoins {
      *      DataSetJoin with an "inline" access path.)
      */
     @SuppressWarnings("rawtypes")
-    private static final Predicate toPredicate(final StatementPatternNode sp,
+    protected static final Predicate toPredicate(final StatementPatternNode sp,
             final AST2BOpContext ctx) {
 
         final QueryRoot query = ctx.astContainer.getOptimizedAST();
