@@ -28,17 +28,16 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.store;
 
-import org.openrdf.model.Resource;
 import org.openrdf.model.URI;
-import org.openrdf.model.Value;
 import org.openrdf.model.impl.URIImpl;
-import org.openrdf.model.vocabulary.SESAME;
-
-import com.bigdata.rdf.sparql.ast.cache.DescribeServiceFactory;
 
 
 /**
  * A vocabulary for bigdata specific extensions.
+ * 
+ * @see <a
+ *      href="http://sourceforge.net/apps/mediawiki/bigdata/index.php?title=FullTextSearch">
+ *      Free Text Index </a>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id: BD.java 6786 2012-12-19 18:43:27Z thompsonbry $
@@ -86,9 +85,11 @@ public interface BDS {
     final URI SEARCH = new URIImpl(NAMESPACE+"search");
     
     /**
-     * Magic predicate used to query for free text search metadata.  Use 
-     * in conjunction with {@link #SEARCH} as follows:
+     * Magic predicate used to query for free text search metadata, reporting
+     * the relevance of the search result to the search query. Use in
+     * conjunction with {@link #SEARCH} as follows:
      * <p>
+     * 
      * <pre>
      * 
      * select ?s ?relevance
@@ -98,13 +99,20 @@ public interface BDS {
      * }
      * 
      * </pre>
+     * 
+     * @see #MIN_RELEVANCE
+     * @see #MAX_RELEVANCE
      */
     final URI RELEVANCE = new URIImpl(NAMESPACE+"relevance");
     
     /**
-     * Magic predicate used to query for free text search metadata.  Use 
-     * in conjunction with {@link #SEARCH} as follows:
+     * Magic predicate used to query for free text search metadata, reporting
+     * the rank (origin ONE (1)) of the search result amoung the search results
+     * obtained for the search query. The rank is from ONE to N, where N is the
+     * number of search results from the full text index. Use in conjunction
+     * with {@link #SEARCH} as follows:
      * <p>
+     * 
      * <pre>
      * 
      * select ?s ?rank
@@ -114,13 +122,18 @@ public interface BDS {
      * }
      * 
      * </pre>
+     * 
+     * @see #MIN_RANK
+     * @see #MAX_RANK
      */
     final URI RANK = new URIImpl(NAMESPACE+"rank");
     
     /**
-     * Magic predicate used to query for free text search metadata.  Use 
+     * Magic predicate used to limit the maximum rank of the free text search
+     * results to the specified value (default {@value #DEFAULT_MAX_RANK)}. Use
      * in conjunction with {@link #SEARCH} as follows:
      * <p>
+     * 
      * <pre>
      * 
      * select ?s
@@ -131,7 +144,13 @@ public interface BDS {
      * 
      * </pre>
      * 
-     * The default is {@value #DEFAULT_MAX_RANK}.
+     * You can use {@link #MIN_RANK} and {@link #MAX_RANK} together to page
+     * through the search results. This is often key to achieving low latency
+     * graph search. By limiting the number of results that are fed into the
+     * remained of the SPARQL query, you can ensure that the SPARQL query runs
+     * quickly. If you do not get enough results from the SPARQL query, you can
+     * feed the next "page" of free text results by changing the values for the
+     * {@link #MIN_RANK} AND {@link #MAX_RANK} query hints.
      */
     final URI MAX_RANK = new URIImpl(NAMESPACE+"maxRank");
 
@@ -141,9 +160,11 @@ public interface BDS {
     final int DEFAULT_MAX_RANK = Integer.MAX_VALUE;
     
     /**
-     * Magic predicate used to query for free text search metadata.  Use 
+     * Magic predicate used to limit the minimum rank of the free text search
+     * results to the specified value (default {@value #DEFAULT_MIN_RANK}). Use
      * in conjunction with {@link #SEARCH} as follows:
      * <p>
+     * 
      * <pre>
      * 
      * select ?s
