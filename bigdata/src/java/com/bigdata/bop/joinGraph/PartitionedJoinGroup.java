@@ -1143,14 +1143,14 @@ public class PartitionedJoinGroup {
          * 
          * [This should perhaps be moved into the caller.]
          */
-        lastOp = new EndOp(new BOp[] { lastOp }, NV
-                .asMap(new NV[] {
-                        new NV(JoinGraph.Annotations.BOP_ID, idFactory.nextId()), //
-                        new NV(JoinGraph.Annotations.EVALUATION_CONTEXT,
-                                BOpEvaluationContext.CONTROLLER)//
-//                        new NV(PipelineOp.Annotations.SHARED_STATE,true),//
-                        }) //
-        );
+//        lastOp = new EndOp(new BOp[] { lastOp }, NV
+//                .asMap(new NV[] {
+//                        new NV(JoinGraph.Annotations.BOP_ID, idFactory.nextId()), //
+//                        new NV(JoinGraph.Annotations.EVALUATION_CONTEXT,
+//                                BOpEvaluationContext.CONTROLLER)//
+////                        new NV(PipelineOp.Annotations.SHARED_STATE,true),//
+//                        }) //
+//        );
 
         return lastOp;
 

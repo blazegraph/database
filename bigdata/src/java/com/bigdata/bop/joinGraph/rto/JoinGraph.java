@@ -44,6 +44,7 @@ import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.ap.SampleIndex;
 import com.bigdata.bop.ap.SampleIndex.SampleType;
 import com.bigdata.bop.controller.AbstractSubqueryOp;
+import com.bigdata.bop.engine.AbstractRunningQuery;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.joinGraph.PartitionedJoinGroup;
@@ -304,6 +305,7 @@ public class JoinGraph extends PipelineOp {
 	        final BOpIdFactory idFactory = new BOpIdFactory();
 
 			// Generate the query from the join path.
+	        // FIXME Update this using StaticAnalysis logic.
 			final PipelineOp queryOp = PartitionedJoinGroup.getQuery(idFactory,
 					false/* distinct */, getSelected(), p.getPredicates(),
 					getConstraints());
@@ -361,12 +363,16 @@ public class JoinGraph extends PipelineOp {
 
         ICloseableIterator<IBindingSet[]> subquerySolutionItr = null;
 
-        final IRunningQuery runningQuery = queryEngine.eval(queryOp);
+        final IRunningQuery runningSubquery = queryEngine.eval(queryOp);
 
         try {
 
+            // Declare the child query to the parent.
+            ((AbstractRunningQuery) parentContext.getRunningQuery())
+                    .addChild(runningSubquery);
+
             // Iterator visiting the subquery solutions.
-            subquerySolutionItr = runningQuery.iterator();
+            subquerySolutionItr = runningSubquery.iterator();
 
             // Copy solutions from the subquery to the query.
             final long nout = BOpUtility.copy(subquerySolutionItr,
@@ -377,7 +383,7 @@ public class JoinGraph extends PipelineOp {
 //            System.out.println("nout=" + nout);
 
             // verify no problems.
-            runningQuery.get();
+            runningSubquery.get();
 
 //            System.out.println("Future Ok");
 
@@ -400,7 +406,7 @@ public class JoinGraph extends PipelineOp {
 
         } finally {
 
-            runningQuery.cancel(true/* mayInterruptIfRunning */);
+            runningSubquery.cancel(true/* mayInterruptIfRunning */);
 
             if (subquerySolutionItr != null)
                 subquerySolutionItr.close();
