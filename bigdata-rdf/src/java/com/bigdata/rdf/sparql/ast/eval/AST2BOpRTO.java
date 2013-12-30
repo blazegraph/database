@@ -101,6 +101,13 @@ public class AST2BOpRTO extends AST2BOpJoins {
             final JoinGroupNode joinGroup, final Set<IVariable<?>> doneSet,
             final AST2BOpContext ctx, final AtomicInteger start) {
 
+        if (ctx.isQuads()) {
+
+            // FIXME The RTO does not handle quads yet.
+            return left;
+
+        }
+        
         final int arity = joinGroup.arity();
 
         // The predicates for the RTO join group.
