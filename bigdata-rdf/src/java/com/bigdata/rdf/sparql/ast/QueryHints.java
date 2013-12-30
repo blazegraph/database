@@ -32,6 +32,7 @@ import java.util.UUID;
 import com.bigdata.bop.BufferAnnotations;
 import com.bigdata.bop.IPredicate.Annotations;
 import com.bigdata.bop.PipelineOp;
+import com.bigdata.bop.ap.SampleIndex.SampleType;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.fed.QueryEngineFactory;
@@ -88,6 +89,46 @@ public interface QueryHints {
     String OPTIMIZER = "optimizer";//QueryHints.class.getName() + ".optimizer";
 
     QueryOptimizerEnum DEFAULT_OPTIMIZER = QueryOptimizerEnum.Static;
+
+    /**
+     * The sampling bias for the runtime query optimizer. Dense sampling
+     * maximizes index locality but reduces robustness to correlations that do
+     * not exist in the head of the access path key range. Random sampling
+     * maximizes robustness, but pays a heavy IO cost. Even sampling also
+     * increases robustness, but will visit every Nth tuple and pays a heavy IO
+     * cost as a result. Thus dense sampling should be much faster but random or
+     * even sampling should detect bias that might not otherwise be exposed to
+     * the runtime query optimizer.
+     * 
+     * @see SampleType
+     */
+    String RTO_SAMPLE_TYPE = "RTO-sampleType";
+
+    SampleType DEFAULT_RTO_SAMPLE_TYPE = SampleType.DENSE;
+
+    /**
+     * The limit for sampling a vertex and the initial limit for cutoff join
+     * evaluation (default {@value #DEFAULT_RTO_LIMIT}). A larger limit and a
+     * random sample will provide a more accurate estimate of the cost of the
+     * join paths but are increase the runtime overhead of the RTO optimizer.
+     */
+    String RTO_LIMIT = "RTO-limit";
+
+    int DEFAULT_RTO_LIMIT = 20;
+
+    /**
+     * The <i>nedges</i> edges of the join graph having the lowest cardinality
+     * will be used to generate the initial join paths (default
+     * {@value #DEFAULT_NEDGES}). This must be a positive integer. The edges in
+     * the join graph are sorted in order of increasing cardinality and up to
+     * <i>nedges</i> of those edges having the lowest cardinality are used to
+     * form the initial set of join paths. For each edge selected to form a join
+     * path, the starting vertex will be the vertex of that edge having the
+     * lower cardinality.
+     */
+    String RTO_NEDGES = "RTO-nedges";
+
+    int DEFAULT_RTO_NEDGES = 2;
 
     /**
      * Query hint sets the optimistic threshold for the static join order

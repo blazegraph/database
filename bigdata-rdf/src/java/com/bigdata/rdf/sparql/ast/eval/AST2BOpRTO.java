@@ -42,12 +42,15 @@ import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.ap.Predicate;
+import com.bigdata.bop.ap.SampleIndex.SampleType;
 import com.bigdata.bop.joinGraph.rto.JGraph;
 import com.bigdata.bop.joinGraph.rto.JoinGraph;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.constraints.INeedsMaterialization;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
+import com.bigdata.rdf.sparql.ast.QueryHints;
+import com.bigdata.rdf.sparql.ast.QueryOptimizerEnum;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.StaticAnalysis;
 
@@ -228,6 +231,8 @@ public class AST2BOpRTO extends AST2BOpJoins {
          * (unless we are going to run the RTO "bottom up") and build a hash
          * index. When the hash index is ready, we can execute the join group.
          */
+        final SampleType sampleType = joinGroup.getProperty(
+                QueryHints.RTO_SAMPLE_TYPE, QueryHints.DEFAULT_RTO_SAMPLE_TYPE);
         left = new JoinGraph(leftOrEmpty(left),//
                 new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
                 new NV(BOp.Annotations.EVALUATION_CONTEXT,
@@ -245,8 +250,7 @@ public class AST2BOpRTO extends AST2BOpJoins {
                         JoinGraph.Annotations.DEFAULT_LIMIT),//
                 new NV(JoinGraph.Annotations.NEDGES,
                         JoinGraph.Annotations.DEFAULT_NEDGES),//
-                new NV(JoinGraph.Annotations.SAMPLE_TYPE,
-                        JoinGraph.Annotations.DEFAULT_SAMPLE_TYPE)//
+                new NV(JoinGraph.Annotations.SAMPLE_TYPE, sampleType.name())//
         );
 
         // These joins were consumed.
