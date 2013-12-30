@@ -83,6 +83,7 @@ public class PathIds {
      * vertices may be expressed and also recognizes that the vertex hash codes
      * are based on the bop ids, which are often small integers.
      */
+    @Override
     public int hashCode() {
 
         int h = hash;

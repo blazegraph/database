@@ -1004,7 +1004,7 @@ public class JGraph {
      */
     public Path[] expand(final QueryEngine queryEngine, int limitIn,
             final int round, final Path[] a,
-            final Map<PathIds, EdgeSample> edgeSamples) throws Exception {
+            Map<PathIds, EdgeSample> edgeSamples) throws Exception {
 
         if (queryEngine == null)
             throw new IllegalArgumentException();
@@ -1016,7 +1016,14 @@ public class JGraph {
             throw new IllegalArgumentException();
         if (a.length == 0)
             throw new IllegalArgumentException();
-        
+
+        /*
+         * Ensure that we use a synchronized view of this collection since we
+         * will write on it from parallel threads when we expand the join paths
+         * in parallel.
+         */
+        edgeSamples = Collections.synchronizedMap(edgeSamples);
+
 //        // increment the limit by itself in each round.
 //        final int limit = (round + 1) * limitIn;
 
@@ -1031,137 +1038,27 @@ public class JGraph {
         if (log.isDebugEnabled())
 			log.debug("Expanding paths: #paths(in)=" + a.length);
 
-        final List<Path> tmp = new LinkedList<Path>();
+        // The new set of paths to be explored.
+        final List<Path> tmpAll = new LinkedList<Path>();
 
+        // Setup tasks to expand the current join paths.
+        final List<Callable<List<Path>>> tasks = new LinkedList<Callable<List<Path>>>();
         for (Path x : a) {
 
-			/*
-			 * We already increased the sample limit for the path in the loop
-			 * above.
-			 */
-			final int limit = x.edgeSample.limit;
+            tasks.add(new ExpandPathTask(queryEngine, x, edgeSamples));
 
-			/*
-             * The set of vertices used to expand this path in this round.
-             */
-            final Set<Vertex> used = new LinkedHashSet<Vertex>();
+        }
 
-            {
+        // Expand paths in parallel.
+        final List<Future<List<Path>>> futures = queryEngine.getIndexManager().getExecutorService()
+                .invokeAll(tasks);
+        
+        // Check future, collecting new paths from each task.
+        for(Future<List<Path>> f : futures) {
 
-                /*
-                 * Any vertex which (a) does not appear in the path to be
-                 * extended; (b) has not already been used to extend the path;
-                 * and (c) does not share any variables indirectly via
-                 * constraints is added to this collection.
-                 * 
-                 * If we are not able to extend the path at least once using a
-                 * constrained join then we will use this collection as the
-                 * source of unconnected edges which need to be used to extend
-                 * the path.
-                 */
-                final Set<Vertex> nothingShared = new LinkedHashSet<Vertex>();
-                
-                // Consider all vertices.
-                for (Vertex tVertex : V) {
-
-                    // Figure out which vertices are already part of this path.
-                    final boolean vFound = x.contains(tVertex);
-
-                    if (vFound) {
-                        // Vertex is already part of this path.
-                        if (log.isTraceEnabled())
-                            log.trace("Vertex: " + tVertex
-                                    + " - already part of this path.");
-                        continue;
-                    }
-
-                    if (used.contains(tVertex)) {
-                        // Vertex already used to extend this path.
-                        if (log.isTraceEnabled())
-                            log
-                                    .trace("Vertex: "
-                                            + tVertex
-                                            + " - already used to extend this path.");
-                        continue;
-                    }
-
-                    // FIXME RTO: Replace with StaticAnalysis.
-                    if (!PartitionedJoinGroup.canJoinUsingConstraints(//
-                            x.getPredicates(),// path
-                            tVertex.pred,// vertex
-                            C// constraints
-                            )) {
-                        /*
-                         * Vertex does not share variables either directly
-                         * or indirectly.
-                         */
-                        if (log.isTraceEnabled())
-                            log
-                                    .trace("Vertex: "
-                                            + tVertex
-                                            + " - unconstrained join for this path.");
-                        nothingShared.add(tVertex);
-                        continue;
-                    }
-
-                    // add the new vertex to the set of used vertices.
-                    used.add(tVertex);
-
-					// Extend the path to the new vertex.
-					final Path p = x
-							.addEdge(queryEngine, limit, tVertex, /* dynamicEdge, */
-									C, x.getVertexCount() + 1 == V.length/* pathIsComplete */);
-
-                    // Add to the set of paths for this round.
-                    tmp.add(p);
-
-                    // Record the sample for the new path.
-                    if (edgeSamples.put(new PathIds(p.getVertexIds()),
-                            p.edgeSample) != null)
-                        throw new AssertionError();
-
-                    if (log.isTraceEnabled())
-                        log.trace("Extended path with dynamic edge: vnew="
-                                + tVertex.pred.getId() + ", new path=" + p);
-
-                } // next vertex.
-
-                if (tmp.isEmpty()) {
-
-                    /*
-                     * No constrained joins were identified so we must consider
-                     * edges which represent fully unconstrained joins.
-                     */
-
-                    assert !nothingShared.isEmpty();
-
-                    /*
-                     * Choose any vertex from the set of those which do
-                     * not share any variables with the join path. Since
-                     * all of these are fully unconstrained joins we do
-                     * not want to expand the join path along multiple
-                     * edges in this iterator, just along a single
-                     * unconstrained edge.
-                     */
-                    final Vertex tVertex = nothingShared.iterator().next();
-                    
-                    // Extend the path to the new vertex.
-					final Path p = x
-							.addEdge(queryEngine, limit, tVertex,/* dynamicEdge */
-									C, x.getVertexCount() + 1 == V.length/* pathIsComplete */);
-
-                    // Add to the set of paths for this round.
-                    tmp.add(p);
-
-                    if (log.isTraceEnabled())
-                        log.trace("Extended path with dynamic edge: vnew="
-                                + tVertex.pred.getId() + ", new path=" + p);
-
-                }
-
-            } 
-
-        } // next path
+            tmpAll.addAll(f.get());
+            
+        }
 
         /*
          * Now examine the set of generated and sampled join paths. If any paths
@@ -1169,7 +1066,7 @@ public class JGraph {
          * best alternative now and prune the other alternatives for those
          * vertices.
          */
-        final Path[] paths_tp1 = tmp.toArray(new Path[tmp.size()]);
+        final Path[] paths_tp1 = tmpAll.toArray(new Path[tmpAll.size()]);
 
         final Path[] paths_tp1_pruned = pruneJoinPaths(paths_tp1, edgeSamples);
 
@@ -1189,6 +1086,166 @@ public class JGraph {
 
     }
 
+    /**
+     * Task expands a path by one edge into one or more new paths.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     */
+    private class ExpandPathTask implements Callable<List<Path>> {
+
+        private final QueryEngine queryEngine;
+        private final Path x;
+        /**
+         * Note: The collection provided by the caller MUST be thread-safe since
+         * this task will be run by parallel threads over the different join
+         * paths from the last round. There will not be any conflict over writes
+         * on this map since each {@link PathIds} instance resulting from the
+         * expansion will be unique, but we still need to use a thread-safe
+         * collection since there will be concurrent modifications to this map.
+         */
+        private final Map<PathIds, EdgeSample> edgeSamples;
+
+        public ExpandPathTask(final QueryEngine queryEngine, final Path x,
+                final Map<PathIds, EdgeSample> edgeSamples) {
+            this.queryEngine = queryEngine;
+            this.x = x;
+            this.edgeSamples = edgeSamples;
+        }
+        
+        @Override
+        public List<Path> call() throws Exception {
+            /*
+             * We already increased the sample limit for the path in the loop
+             * above.
+             */
+            final int limit = x.edgeSample.limit;
+
+            /*
+             * The set of vertices used to expand this path in this round.
+             */
+            final Set<Vertex> used = new LinkedHashSet<Vertex>();
+
+            /*
+             * Any vertex which (a) does not appear in the path to be
+             * extended; (b) has not already been used to extend the path;
+             * and (c) does not share any variables indirectly via
+             * constraints is added to this collection.
+             * 
+             * If we are not able to extend the path at least once using a
+             * constrained join then we will use this collection as the
+             * source of unconnected edges which need to be used to extend
+             * the path.
+             */
+            final Set<Vertex> nothingShared = new LinkedHashSet<Vertex>();
+            
+            // The new set of paths to be explored as extensions to this path.
+            final List<Path> tmp = new LinkedList<Path>();
+            
+            // Consider all vertices.
+            for (Vertex tVertex : V) {
+
+                // Figure out which vertices are already part of this path.
+                final boolean vFound = x.contains(tVertex);
+
+                if (vFound) {
+                    // Vertex is already part of this path.
+                    if (log.isTraceEnabled())
+                        log.trace("Vertex: " + tVertex
+                                + " - already part of this path.");
+                    continue;
+                }
+
+                if (used.contains(tVertex)) {
+                    // Vertex already used to extend this path.
+                    if (log.isTraceEnabled())
+                        log
+                                .trace("Vertex: "
+                                        + tVertex
+                                        + " - already used to extend this path.");
+                    continue;
+                }
+
+                // FIXME RTO: Replace with StaticAnalysis.
+                if (!PartitionedJoinGroup.canJoinUsingConstraints(//
+                        x.getPredicates(),// path
+                        tVertex.pred,// vertex
+                        C// constraints
+                        )) {
+                    /*
+                     * Vertex does not share variables either directly
+                     * or indirectly.
+                     */
+                    if (log.isTraceEnabled())
+                        log
+                                .trace("Vertex: "
+                                        + tVertex
+                                        + " - unconstrained join for this path.");
+                    nothingShared.add(tVertex);
+                    continue;
+                }
+
+                // add the new vertex to the set of used vertices.
+                used.add(tVertex);
+
+                // Extend the path to the new vertex.
+                final Path p = x
+                        .addEdge(queryEngine, limit, tVertex, /* dynamicEdge, */
+                                C, x.getVertexCount() + 1 == V.length/* pathIsComplete */);
+
+                // Add to the set of paths for this round.
+                tmp.add(p);
+
+                // Record the sample for the new path.
+                if (edgeSamples.put(new PathIds(p.getVertexIds()),
+                        p.edgeSample) != null)
+                    throw new AssertionError();
+
+                if (log.isTraceEnabled())
+                    log.trace("Extended path with dynamic edge: vnew="
+                            + tVertex.pred.getId() + ", new path=" + p);
+
+            } // next target vertex.
+
+            if (tmp.isEmpty()) {
+
+                /*
+                 * No constrained joins were identified as extensions of this
+                 * join path, so we must consider edges which represent fully
+                 * unconstrained joins.
+                 */
+
+                assert !nothingShared.isEmpty();
+
+                /*
+                 * Choose any vertex from the set of those which do
+                 * not share any variables with the join path. Since
+                 * all of these are fully unconstrained joins we do
+                 * not want to expand the join path along multiple
+                 * edges in this iterator, just along a single
+                 * unconstrained edge.
+                 */
+                final Vertex tVertex = nothingShared.iterator().next();
+                
+                // Extend the path to the new vertex.
+                final Path p = x
+                        .addEdge(queryEngine, limit, tVertex,/* dynamicEdge */
+                                C, x.getVertexCount() + 1 == V.length/* pathIsComplete */);
+
+                // Add to the set of paths for this round.
+                tmp.add(p);
+
+                if (log.isTraceEnabled())
+                    log.trace("Extended path with dynamic edge: vnew="
+                            + tVertex.pred.getId() + ", new path=" + p);
+
+            } // if(tmp.isEmpty())
+
+            return tmp;
+
+        }
+        
+    }
+    
     /**
      * Return the {@link Vertex} whose {@link IPredicate} is associated with
      * the given {@link BOp.Annotations#BOP_ID}.
