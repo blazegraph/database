@@ -51,6 +51,11 @@ import com.bigdata.bop.engine.RunState.RunStateEnum;
 import com.bigdata.bop.join.IHashJoinUtility;
 import com.bigdata.bop.join.PipelineJoin;
 import com.bigdata.bop.join.PipelineJoinStats;
+import com.bigdata.bop.joinGraph.rto.EdgeSample;
+import com.bigdata.bop.joinGraph.rto.JGraph;
+import com.bigdata.bop.joinGraph.rto.JoinGraph;
+import com.bigdata.bop.joinGraph.rto.Path;
+import com.bigdata.bop.joinGraph.rto.PathIds;
 import com.bigdata.bop.rdf.join.ChunkedMaterializationOp;
 import com.bigdata.counters.render.XHTMLRenderer;
 import com.bigdata.rawstore.Bytes;
@@ -768,9 +773,9 @@ public class QueryLog {
         w.write("<th>evalOrder</th>"); // [0..n-1]
         if (clusterStats) {
             w.write("<th>evalContext</th>");
-            w.write("<th>controller</th>");
         }
         if (detailedStats) {
+            w.write("<th>controller</th>");
             w.write("<th>bopId</th>");
             w.write("<th>predId</th>");
         }
@@ -996,9 +1001,9 @@ public class QueryLog {
             w.write(TDx);
             if (clusterStats) {
                 w.write(TD); w.write(TDx); // evalContext
-                w.write(TD); w.write(TDx); // controller?
             }
             if (detailedStats) {
+                w.write(TD); w.write(TDx); // controller
                 w.write(TD);
                 w.write("total"); // bopId
                 w.write(TDx);
@@ -1035,12 +1040,12 @@ public class QueryLog {
                 w.write(TD);
                 w.write(cdata(bop.getEvaluationContext().toString()));
                 w.write(TDx);
-                w.write(TD);
-                w.write(cdata(bop.getProperty(BOp.Annotations.CONTROLLER,
-                        BOp.Annotations.DEFAULT_CONTROLLER).toString()));
-                w.write(TDx);
             }
             if (detailedStats) {
+                w.write(TD);
+                w.write(cdata(bop.getProperty(BOp.Annotations.CONTROLLER,
+                      BOp.Annotations.DEFAULT_CONTROLLER).toString()));
+                w.write(TDx);
                 w.write(TD);
                 w.write(Integer.toString(bopId));
                 w.write(TDx);
@@ -1074,6 +1079,7 @@ public class QueryLog {
         }
         w.write(TDx);
 
+        // summary
         w.write(TD);
         if (pred != null) {
             w.write(cdata(pred.getClass().getSimpleName()));
@@ -1153,7 +1159,18 @@ public class QueryLog {
                     .getProperty(ChunkedMaterializationOp.Annotations.VARS);
             w.write(cdata(Arrays.toString(vars)));
         }
-        w.write(TDx);
+        if (bop instanceof JoinGraph) {
+            final Path p = ((JoinGraph) bop).getPath(q);
+            final Map<PathIds, EdgeSample> samples = ((JoinGraph) bop)
+                    .getSamples(q);
+            if (p != null && samples != null) {
+                // Show the RTO discovered join path.
+                w.write("<pre>");
+                w.write(cdata(JGraph.showPath(p, samples)));
+                w.write("</pre>");
+            }
+        }
+        w.write(TDx); // end summary
 
         /*
          * Static optimizer metadata.
@@ -1432,13 +1449,13 @@ public class QueryLog {
 
     }
 
-    private static String cdata(String s) {
+    private static String cdata(final String s) {
         
         return XHTMLRenderer.cdata(s);
         
     }
 
-    private static String attrib(String s) {
+    private static String attrib(final String s) {
         
         return XHTMLRenderer.attrib(s);
         

@@ -234,6 +234,7 @@ public class JGraph {
         return Collections.unmodifiableList(Arrays.asList(V));
     }
 
+    @Override
     public String toString() {
         final StringBuilder sb = new StringBuilder();
         sb.append("JoinGraph");
@@ -354,19 +355,88 @@ public class JGraph {
      * @throws IllegalArgumentException
      *             if <i>nedges</i> is non-positive.
      * @throws Exception
-     * 
-     * @todo It is possible that this could throw a {@link NoSolutionsException}
-     *       if the cutoff joins do not use a large enough sample to find a join
-     *       path which produces at least one solution (except that no solutions
-     *       for an optional join do not cause the total to fail, nor do no
-     *       solutions for some part of a UNION).
-     * 
-     *       TODO We need to automatically increase the depth of search for
-     *       queries where we have cardinality estimation underflows or punt to
-     *       another method to decide the join order.
      */
     public Path runtimeOptimizer(final QueryEngine queryEngine,
-            final int limit, final int nedges)
+            final int limit, final int nedges) throws NoSolutionsException,
+            Exception {
+
+        /*
+         * This map is used to associate join path segments (expressed as an
+         * ordered array of bopIds) with edge sample to avoid redundant effort.
+         * 
+         * FIXME RTO: HEAP MANAGMENT : This map holds references to the cutoff
+         * join samples. To ensure that the map has the minimum heap footprint,
+         * it must be scanned each time we prune the set of active paths and any
+         * entry which is not a prefix of an active path should be removed.
+         * 
+         * TODO RTO: MEMORY MANAGER : When an entry is cleared from this map,
+         * the corresponding allocation in the memory manager (if any) must be
+         * released. The life cycle of the map needs to be bracketed by a
+         * try/finally in order to ensure that all allocations associated with
+         * the map are released no later than when we leave the lexicon scope of
+         * that clause.
+         */
+        final Map<PathIds, EdgeSample> edgeSamples = new LinkedHashMap<PathIds, EdgeSample>();
+
+        return runtimeOptimizer(queryEngine, limit, nedges, edgeSamples);
+
+    }
+
+    /**
+     * Find a good join path in the data given the join graph. The join path is
+     * not guaranteed to be the best join path (the search performed by the
+     * runtime optimizer is not exhaustive) but it should always be a "good"
+     * join path and may often be the "best" join path.
+     * 
+     * @param queryEngine
+     *            The query engine.
+     * @param limit
+     *            The limit for sampling a vertex and the initial limit for
+     *            cutoff join evaluation.
+     * @param nedges
+     *            The edges in the join graph are sorted in order of increasing
+     *            cardinality and up to <i>nedges</i> of the edges having the
+     *            lowest cardinality are used to form the initial set of join
+     *            paths. For each edge selected to form a join path, the
+     *            starting vertex will be the vertex of that edge having the
+     *            lower cardinality.
+     * @param sampleType
+     *            Type safe enumeration indicating the algorithm which will be
+     *            used to sample the initial vertices.
+     * @param edgeSamples
+     *            A map that will be populated with the samples associated with
+     *            each non-pruned join path. This map is used to associate join
+     *            path segments (expressed as an ordered array of bopIds) with
+     *            edge sample to avoid redundant effort.
+     * 
+     * @return The join path identified by the runtime query optimizer as the
+     *         best path given the join graph and the data.
+     * 
+     * @throws NoSolutionsException
+     *             If there are no solutions for the join graph in the data (the
+     *             query does not have any results).
+     * @throws IllegalArgumentException
+     *             if <i>queryEngine</i> is <code>null</code>.
+     * @throws IllegalArgumentException
+     *             if <i>limit</i> is non-positive.
+     * @throws IllegalArgumentException
+     *             if <i>nedges</i> is non-positive.
+     * @throws Exception
+     * 
+     *             TODO It is possible that this could throw a
+     *             {@link NoSolutionsException} if the cutoff joins do not use a
+     *             large enough sample to find a join path which produces at
+     *             least one solution (except that no solutions for an optional
+     *             join do not cause the total to fail, nor do no solutions for
+     *             some part of a UNION).
+     * 
+     *             TODO We need to automatically increase the depth of search
+     *             for queries where we have cardinality estimation underflows
+     *             or punt to another method to decide the join order.
+     */
+    public Path runtimeOptimizer(final QueryEngine queryEngine,
+            final int limit, final int nedges,
+            final Map<PathIds, EdgeSample> edgeSamples)
             throws Exception, NoSolutionsException {
 
         if (queryEngine == null)
@@ -374,6 +444,8 @@ public class JGraph {
         if (limit <= 0)
             throw new IllegalArgumentException();
         if (nedges <= 0)
+            throw new IllegalArgumentException();
+        if (edgeSamples == null)
             throw new IllegalArgumentException();
 
         // Setup the join graph.
@@ -396,24 +468,6 @@ public class JGraph {
 
         int round = 1;
 
-        /*
-         * This map is used to associate join path segments (expressed as an
-         * ordered array of bopIds) with edge sample to avoid redundant effort.
-         * 
-         * FIXME HEAP MANAGMENT : This map holds references to the cutoff join
-         * samples. To ensure that the map has the minimum heap footprint, it
-         * must be scanned each time we prune the set of active paths and any
-         * entry which is not a prefix of an active path should be removed.
-         * 
-         * TODO MEMORY MANAGER : When an entry is cleared from this map, the
-         * corresponding allocation in the memory manager (if any) must be
-         * released. The life cycle of the map needs to be bracketed by a
-         * try/finally in order to ensure that all allocations associated with
-         * the map are released no later than when we leave the lexicon scope of
-         * that clause.
-         */
-        final Map<PathIds, EdgeSample> edgeSamples = new LinkedHashMap<PathIds, EdgeSample>();
-        
         while (paths.length > 0 && round < nvertices - 1) {
 
 			/*
@@ -1027,6 +1081,7 @@ public class JGraph {
                         continue;
                     }
 
+                    // FIXME RTO: Replace with StaticAnalysis.
                     if (!PartitionedJoinGroup.canJoinUsingConstraints(//
                             x.getPredicates(),// path
                             tVertex.pred,// vertex
@@ -1616,7 +1671,8 @@ public class JGraph {
      * @param edgeSamples
      *            A map containing the samples utilized by the {@link Path}.
      */
-    static String showPath(final Path x, final Map<PathIds, EdgeSample> edgeSamples) {
+    static public String showPath(final Path x,
+            final Map<PathIds, EdgeSample> edgeSamples) {
         if (x == null)
             throw new IllegalArgumentException();
         final StringBuilder sb = new StringBuilder();
@@ -1672,20 +1728,20 @@ public class JGraph {
                             predId,//
                             NA, "", NA, NA, NA, NA, NA, NA, NA, NA, NA, "", NA, NA);//,NA,NA);
                 } else if(sample instanceof VertexSample) {
-					/*
-					 * Show the vertex sample for the initial vertex.
-					 * 
-					 * Note: we do not store all fields for a vertex sample
-					 * which are stored for an edge sample because so many of
-					 * the values are redundant for a vertex sample. Therefore,
-					 * this sets up local variables which are equivalent to the
-					 * various edge sample columns that we will display.
-					 */
-                	final long sumRangeCount = sample.estCard;
-                	final long estRead = sample.estCard;
-					final long tuplesRead = Math.min(sample.estCard, sample.limit);
-					final long outputCount = Math.min(sample.estCard, sample.limit);
-					final long adjCard = Math.min(sample.estCard, sample.limit);
+					                    /*
+                     * Show the vertex sample for the initial vertex.
+                     * 
+                     * Note: we do not store all fields for a vertex sample
+                     * which are stored for an edge sample because so many of
+                     * the values are redundant for a vertex sample. Therefore,
+                     * this sets up local variables which are equivalent to the
+                     * various edge sample columns that we will display.
+                     */
+                    final long sumRangeCount = sample.estCard;
+                    final long estRead = sample.estCard;
+                    final long tuplesRead = Math.min(sample.estCard, sample.limit);
+                    final long outputCount = Math.min(sample.estCard, sample.limit);
+                    final long adjCard = Math.min(sample.estCard, sample.limit);
                     f.format("% 4d %10s%1s * %10s (%8s %8s %8s %8s %8s %8s) = % 10d % 10d%1s : %10d %10d",// %10d %10s",//
                             predId,//
                             " ",//srcSample.estCard

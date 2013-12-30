@@ -50,9 +50,7 @@ import com.bigdata.rdf.internal.constraints.INeedsMaterialization;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.QueryHints;
-import com.bigdata.rdf.sparql.ast.QueryOptimizerEnum;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
-import com.bigdata.rdf.sparql.ast.StaticAnalysis;
 
 /**
  * Integration with the Runtime Optimizer (RTO).
@@ -122,7 +120,10 @@ public class AST2BOpRTO extends AST2BOpJoins {
                 final StatementPatternNode sp = (StatementPatternNode) child;
                 final boolean optional = sp.isOptional();
                 if(optional) {
-                    // TODO Handle optional SPs in joinGraph.
+                    /*
+                     * TODO Handle optional SPs in joinGraph (by ordering them
+                     * in the tail so as to minimize the cost function).
+                     */
                     break;
                 }
                 
@@ -165,8 +166,6 @@ public class AST2BOpRTO extends AST2BOpJoins {
                 // Something the RTO can handle.
                 sps.add(sp);
                 /*
-                 * TODO Assign predId?
-                 * 
                  * FIXME Handle Triples vs Quads, Default vs Named Graph, and
                  * DataSet. This probably means pushing more logic down into 
                  * the RTO from AST2BOpJoins.
@@ -237,7 +236,7 @@ public class AST2BOpRTO extends AST2BOpJoins {
                 new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
                 new NV(BOp.Annotations.EVALUATION_CONTEXT,
                         BOpEvaluationContext.CONTROLLER),//
-                new NV(BOp.Annotations.CONTROLLER, true),// TODO DROP the "CONTROLLER" annotation. The concept is not required.
+                new NV(BOp.Annotations.CONTROLLER, true),// Drop "CONTROLLER" annotation?
                 // new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
                 // new NV(PipelineOp.Annotations.LAST_PASS, true),// required
                 new NV(JoinGraph.Annotations.SELECTED, selectVars

@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.bop.joinGraph.rto;
 
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.FutureTask;
@@ -132,9 +133,32 @@ public class JoinGraph extends PipelineOp {
         String SAMPLE_TYPE = JoinGraph.class.getName() + ".sampleType";
         
         String DEFAULT_SAMPLE_TYPE = SampleType.RANDOM.name();
-	
+
 	}
 
+    /**
+     * Query attribute names for the {@link JoinGraph}. The fully qualified name
+     * of the attribute is formed by appending the attribute name to the
+     * "bopId-", where <code>bopId</code> is the value returned by
+     * {@link BOp#getId()}
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+     *         Thompson</a>
+     */
+    public interface Attributes {
+
+        /**
+         * The join path selected by the RTO (output).
+         */
+        String PATH = JoinGraph.class.getName() + ".path";
+
+        /**
+         * The samples associated with join path selected by the RTO (output).
+         */
+        String SAMPLES = JoinGraph.class.getName() + ".samples";
+
+	}
+	
 	/**
 	 * @see Annotations#SELECTED
 	 */
@@ -189,7 +213,55 @@ public class JoinGraph extends PipelineOp {
                 Annotations.DEFAULT_SAMPLE_TYPE));
 	    
 	}
-	
+
+	/**
+	 * Return the computed join path.
+	 * 
+	 * @see Attributes#PATH
+	 */
+    public Path getPath(final IRunningQuery q) {
+
+        return (Path) q.getAttributes().get(getId() + "-" + Attributes.PATH);
+
+    }
+
+    /**
+     * Return the samples associated with the computed join path.
+     * 
+     * @see Annotations#SAMPLES
+     */
+    @SuppressWarnings("unchecked")
+    public Map<PathIds, EdgeSample> getSamples(final IRunningQuery q) {
+
+        return (Map<PathIds, EdgeSample>) q.getAttributes().get(
+                getId() + "-" + Attributes.SAMPLES);
+
+    }    
+
+    private void setPath(final IRunningQuery q, final Path p) {
+
+        q.getAttributes().put(getId() + "-" + Attributes.PATH, p);
+        
+    }
+
+    private void setSamples(final IRunningQuery q,
+            final Map<PathIds, EdgeSample> samples) {
+        
+        q.getAttributes().put(getId() + "-" + Attributes.SAMPLES, samples);
+        
+    }
+
+    /**
+     * Deep copy constructor.
+     * 
+     * @param op
+     */
+    public JoinGraph(final JoinGraph op) {
+    
+        super(op);
+        
+    }
+
     public JoinGraph(final BOp[] args, final NV... anns) {
 
         this(args, NV.asMap(anns));
@@ -257,11 +329,11 @@ public class JoinGraph extends PipelineOp {
 
 	//  private final JGraph g;
 
-	    final private int limit;
-	    
-	    final private int nedges;
-	    
-	    private final SampleType sampleType;
+//	    final private int limit;
+//	    
+//	    final private int nedges;
+//	    
+//	    final private SampleType sampleType;
 
 	    JoinGraphTask(final BOpContext<IBindingSet> context) {
 
@@ -270,13 +342,13 @@ public class JoinGraph extends PipelineOp {
 
 	        this.context = context;
 
-	        // The initial cutoff sampling limit.
-	        limit = getLimit();
-
-	        // The initial number of edges (1 step paths) to explore.
-	        nedges = getNEdges();
-
-	        sampleType = getSampleType();
+//	        // The initial cutoff sampling limit.
+//	        limit = getLimit();
+//
+//	        // The initial number of edges (1 step paths) to explore.
+//	        nedges = getNEdges();
+//
+//	        sampleType = getSampleType();
 	        
 //	      if (limit <= 0)
 //	          throw new IllegalArgumentException();
@@ -303,13 +375,37 @@ public class JoinGraph extends PipelineOp {
 	        
 	        final long begin = System.nanoTime();
 	        
-	        // Create the join graph.
+            // Create the join graph.
             final JGraph g = new JGraph(getVertices(), getConstraints(),
-                    sampleType);
+                    getSampleType());
 
-	        // Find the best join path.
-	        final Path p = g.runtimeOptimizer(context.getRunningQuery()
-	                .getQueryEngine(), limit, nedges);
+            /*
+             * This map is used to associate join path segments (expressed as an
+             * ordered array of bopIds) with edge sample to avoid redundant effort.
+             * 
+             * FIXME RTO: HEAP MANAGMENT : This map holds references to the cutoff
+             * join samples. To ensure that the map has the minimum heap footprint,
+             * it must be scanned each time we prune the set of active paths and any
+             * entry which is not a prefix of an active path should be removed.
+             * 
+             * TODO RTO: MEMORY MANAGER : When an entry is cleared from this map,
+             * the corresponding allocation in the memory manager (if any) must be
+             * released. The life cycle of the map needs to be bracketed by a
+             * try/finally in order to ensure that all allocations associated with
+             * the map are released no later than when we leave the lexicon scope of
+             * that clause.
+             */
+            final Map<PathIds, EdgeSample> edgeSamples = new LinkedHashMap<PathIds, EdgeSample>();
+
+            // Find the best join path.
+            final Path p = g.runtimeOptimizer(context.getRunningQuery()
+                    .getQueryEngine(), getLimit(), getNEdges(), edgeSamples);
+
+            // Set attribute for the join path result.
+            setPath(context.getRunningQuery(), p);
+
+            // Set attribute for the join path samples.
+            setSamples(context.getRunningQuery(), edgeSamples);
 
 	        final long mark = System.nanoTime();
 	        
