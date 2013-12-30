@@ -21,7 +21,6 @@ import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
-import com.bigdata.bop.bset.EndOp;
 import com.bigdata.bop.join.PipelineJoin;
 import com.bigdata.bop.joinGraph.rto.JoinGraph;
 import com.bigdata.bop.solutions.JVMDistinctBindingSetsOp;
@@ -1133,24 +1132,6 @@ public class PartitionedJoinGroup {
 					})//
 			);
 		}
-
-        /*
-         * FIXME Why does wrapping with this slice appear to be
-         * necessary? (It is causing runtime errors when not wrapped).
-         * Is this a bopId collision which is not being detected?
-         * 
-         * @see https://sourceforge.net/apps/trac/bigdata/ticket/227
-         * 
-         * [This should perhaps be moved into the caller.]
-         */
-//        lastOp = new EndOp(new BOp[] { lastOp }, NV
-//                .asMap(new NV[] {
-//                        new NV(JoinGraph.Annotations.BOP_ID, idFactory.nextId()), //
-//                        new NV(JoinGraph.Annotations.EVALUATION_CONTEXT,
-//                                BOpEvaluationContext.CONTROLLER)//
-////                        new NV(PipelineOp.Annotations.SHARED_STATE,true),//
-//                        }) //
-//        );
 
         return lastOp;
 

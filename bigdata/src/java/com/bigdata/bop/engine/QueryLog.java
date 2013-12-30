@@ -964,8 +964,12 @@ public class QueryLog {
             w.write(TDx);
         }
         w.write(TD);
-        if (cause != null)
-            w.write(cause.getLocalizedMessage());
+        if (cause != null) {
+            String msg = cause.getLocalizedMessage();
+            if (msg == null)
+                msg = cause.toString();
+            w.write(cdata(msg));
+        }
         w.write(TDx);
         
         final Map<Integer, BOp> bopIndex = q.getBOpIndex();
