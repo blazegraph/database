@@ -52,7 +52,6 @@ import com.bigdata.bop.engine.AbstractRunningQuery;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.joinGraph.PartitionedJoinGroup;
-import com.bigdata.relation.accesspath.BufferClosedException;
 import com.bigdata.util.concurrent.Haltable;
 
 import cutthecrap.utils.striterators.ICloseableIterator;
@@ -81,7 +80,10 @@ public class JoinGraph extends PipelineOp {
 
 	private static final long serialVersionUID = 1L;
 
-	/**
+    private static final transient Logger log = Logger
+            .getLogger(JoinGraph.class);
+
+    /**
 	 * Known annotations.
 	 */
 	public interface Annotations extends PipelineOp.Annotations {
@@ -156,6 +158,13 @@ public class JoinGraph extends PipelineOp {
          * The samples associated with join path selected by the RTO (output).
          */
         String SAMPLES = JoinGraph.class.getName() + ".samples";
+
+        /**
+         * The physical query plan generated from the RTO determined best join
+         * ordering (output). This is used to specify the query plan to be
+         * executed by a downstream operator.
+         */
+        String QUERY_PLAN = JoinGraph.class.getName() + ".queryPlan";
 
 	}
 	
@@ -252,6 +261,26 @@ public class JoinGraph extends PipelineOp {
     }
 
     /**
+     * Return the query plan to be executed based on the RTO determined join
+     * ordering.
+     * 
+     * @see Attributes#QUERY_PLAN
+     */
+    public PipelineOp getQueryPlan(final IRunningQuery q) {
+
+        return (PipelineOp) q.getAttributes().get(
+                getId() + "-" + Attributes.QUERY_PLAN);
+
+    }
+
+    private void setQueryPlan(final IRunningQuery q,
+            final PipelineOp queryPlan) {
+        
+        q.getAttributes().put(getId() + "-" + Attributes.QUERY_PLAN, queryPlan);
+        
+    }
+
+    /**
      * Deep copy constructor.
      * 
      * @param op
@@ -327,14 +356,6 @@ public class JoinGraph extends PipelineOp {
 
 	    private final BOpContext<IBindingSet> context;
 
-	//  private final JGraph g;
-
-//	    final private int limit;
-//	    
-//	    final private int nedges;
-//	    
-//	    final private SampleType sampleType;
-
 	    JoinGraphTask(final BOpContext<IBindingSet> context) {
 
 	        if (context == null)
@@ -342,29 +363,10 @@ public class JoinGraph extends PipelineOp {
 
 	        this.context = context;
 
-//	        // The initial cutoff sampling limit.
-//	        limit = getLimit();
-//
-//	        // The initial number of edges (1 step paths) to explore.
-//	        nedges = getNEdges();
-//
-//	        sampleType = getSampleType();
-	        
-//	      if (limit <= 0)
-//	          throw new IllegalArgumentException();
-	//
-//	      if (nedges <= 0)
-//	          throw new IllegalArgumentException();
-
-//	        g = new JGraph(getVertices(), getConstraints());
-
 	    }
 
         /**
          * {@inheritDoc}
-         * 
-         * 
-         * TODO where to handle DISTINCT, ORDER BY, GROUP BY for join graph?
          * 
          * FIXME When run as sub-query, we need to fix point the upstream
          * solutions and then flood them into the join graph. Samples of the
@@ -414,13 +416,22 @@ public class JoinGraph extends PipelineOp {
 	        // Factory avoids reuse of bopIds assigned to the predicates.
 	        final BOpIdFactory idFactory = new BOpIdFactory();
 
-			// Generate the query from the join path.
-	        // FIXME Update this using StaticAnalysis logic.
+            /*
+             * Generate the query from the join path.
+             * 
+             * FIXME Update this using StaticAnalysis logic. Also, both this and
+             * the JGraph need to handle triples versus named graph versus
+             * default graph APs. Further, JGraph should handle filters that
+             * require conditional materialization.
+             */
 			final PipelineOp queryOp = PartitionedJoinGroup.getQuery(idFactory,
 					false/* distinct */, getSelected(), p.getPredicates(),
 					getConstraints());
 
-	        // Run the query, blocking until it is done.
+            // Set attribute for the join path samples.
+            setQueryPlan(context.getRunningQuery(), queryOp);
+
+            // Run the query, blocking until it is done.
 	        JoinGraph.runSubquery(context, queryOp);
 
 	        final long elapsed_queryExecution = System.nanoTime() - mark;
@@ -436,7 +447,6 @@ public class JoinGraph extends PipelineOp {
 	    }
 
 	} // class JoinGraphTask
-    private static final transient Logger log = Logger.getLogger(JGraph.class);
 
     /**
      * Execute the selected join path.
@@ -461,10 +471,6 @@ public class JoinGraph extends PipelineOp {
      * @todo If there are source binding sets then they need to be applied above
      *       (when we are sampling) and below (when we evaluate the selected
      *       join path).
-     * 
-     *       FIXME runQuery() is not working correctly. The query is being
-     *       halted by a {@link BufferClosedException} which appears before it
-     *       has materialized the necessary results.
      */
     static private void runSubquery(
             final BOpContext<IBindingSet> parentContext,

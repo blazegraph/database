@@ -1149,7 +1149,7 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
                 stats = op.newStats();
 //        		log.warn("bopId=" + bopId + ", stats=" + stats);
             }
-            assert stats != null;
+            assert stats != null : "No stats: op=" + op;
 
 //            // The groupId (if any) for this operator.
 //            final Integer fromGroupId = (Integer) op
