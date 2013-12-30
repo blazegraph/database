@@ -181,6 +181,7 @@ public class Path {
         
     }
 
+	@Override
     public String toString() {
         final StringBuilder sb = new StringBuilder();
         sb.append("Path{[");
@@ -751,7 +752,7 @@ public class Path {
         if (sourceSample.getSample() == null)
             throw new IllegalArgumentException();
         
-        // Figure out which constraints attach to each predicate.
+        // Figure out which constraints attach to each predicate. FIXME RTO Replace with StaticAnalysis.
         final IConstraint[][] constraintAttachmentArray = PartitionedJoinGroup
                 .getJoinGraphConstraints(path, constraints, null/*knownBound*/,
                 		pathIsComplete);
