@@ -57,6 +57,7 @@ import com.bigdata.bop.joinGraph.rto.JoinGraph;
 import com.bigdata.bop.joinGraph.rto.Path;
 import com.bigdata.bop.joinGraph.rto.PathIds;
 import com.bigdata.bop.rdf.join.ChunkedMaterializationOp;
+import com.bigdata.bop.solutions.ProjectionOp;
 import com.bigdata.counters.render.XHTMLRenderer;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpJoins;
@@ -1079,62 +1080,39 @@ public class QueryLog {
         }
         w.write(TDx);
 
-        // summary
+        // operator summary (not shown for the "total" line).
         w.write(TD);
-        if (pred != null) {
-            w.write(cdata(pred.getClass().getSimpleName()));
-            w.write(cdata("[" + predId + "]("));
-            final Iterator<BOp> itr = pred.argIterator();
-            boolean first = true;
-            while (itr.hasNext()) {
-                if (first) {
-                    first = false;
-                } else
-                    w.write(cdata(", "));
-                final IVariableOrConstant<?> x = (IVariableOrConstant<?>) itr
-                        .next();
-                if (x.isVar()) {
-                    w.write(cdata("?"));
-                    w.write(cdata(x.getName()));
-                } else {
-                    w.write(cdata(x.get().toString()));
-                    //sb.append(((IV)x.get()).getValue());
-                }
-            }
-            w.write(cdata(")"));
-        }
-        if (bop.getProperty(NamedSetAnnotations.NAMED_SET_REF) != null) {
-            /*
-             * Named Solution Set(s) summary.
-             */
-            final Object namedSetRef = bop
-                    .getProperty(NamedSetAnnotations.NAMED_SET_REF);
-            if (namedSetRef instanceof INamedSolutionSetRef) {
-                final INamedSolutionSetRef ref = (INamedSolutionSetRef) namedSetRef;
-                final IRunningQuery t = getRunningQuery(q, ref.getQueryId());
-                if (t != null) {
-                    final IQueryAttributes attrs = t == null ? null : t
-                            .getAttributes();
-                    final IHashJoinUtility state = (IHashJoinUtility) (attrs == null ? null
-                            : attrs.get(ref));
-                    if (state != null) {
-                        // Prefer the IHashUtilityState
-                        w.write(cdata(state.toString()));
-                        w.write(cdata(",namedSet="));
-                        w.write(cdata(ref.getLocalName()));
+        if(!summary) {
+            if (pred != null) {
+                w.write(cdata(pred.getClass().getSimpleName()));
+                w.write(cdata("[" + predId + "]("));
+                final Iterator<BOp> itr = pred.argIterator();
+                boolean first = true;
+                while (itr.hasNext()) {
+                    if (first) {
+                        first = false;
+                    } else
+                        w.write(cdata(", "));
+                    final IVariableOrConstant<?> x = (IVariableOrConstant<?>) itr
+                            .next();
+                    if (x.isVar()) {
+                        w.write(cdata("?"));
+                        w.write(cdata(x.getName()));
                     } else {
-                        // Otherwise the NamedSolutionSetRef
-                        w.write(cdata(ref.toString()));
+                        w.write(cdata(x.get().toString()));
+                        //sb.append(((IV)x.get()).getValue());
                     }
-                    // w.write(cdata(", joinvars=" +
-                    // Arrays.toString(ref.joinVars)));
                 }
-            } else {
-                final INamedSolutionSetRef[] refs = (INamedSolutionSetRef[]) namedSetRef;
-                for (int i = 0; i < refs.length; i++) {
-                    final INamedSolutionSetRef ref = refs[i];
-                    if (i > 0)
-                        w.write(cdata(","));
+                w.write(cdata(")"));
+            }
+            if (bop.getProperty(NamedSetAnnotations.NAMED_SET_REF) != null) {
+                /*
+                 * Named Solution Set(s) summary.
+                 */
+                final Object namedSetRef = bop
+                        .getProperty(NamedSetAnnotations.NAMED_SET_REF);
+                if (namedSetRef instanceof INamedSolutionSetRef) {
+                    final INamedSolutionSetRef ref = (INamedSolutionSetRef) namedSetRef;
                     final IRunningQuery t = getRunningQuery(q, ref.getQueryId());
                     if (t != null) {
                         final IQueryAttributes attrs = t == null ? null : t
@@ -1144,30 +1122,60 @@ public class QueryLog {
                         if (state != null) {
                             // Prefer the IHashUtilityState
                             w.write(cdata(state.toString()));
+                            w.write(cdata(",namedSet="));
+                            w.write(cdata(ref.getLocalName()));
                         } else {
                             // Otherwise the NamedSolutionSetRef
                             w.write(cdata(ref.toString()));
                         }
+                        // w.write(cdata(", joinvars=" +
+                        // Arrays.toString(ref.joinVars)));
                     }
-                    // w.write(cdata(", joinvars=" +
-                    // Arrays.toString(refs[0].joinVars)));
+                } else {
+                    final INamedSolutionSetRef[] refs = (INamedSolutionSetRef[]) namedSetRef;
+                    for (int i = 0; i < refs.length; i++) {
+                        final INamedSolutionSetRef ref = refs[i];
+                        if (i > 0)
+                            w.write(cdata(","));
+                        final IRunningQuery t = getRunningQuery(q, ref.getQueryId());
+                        if (t != null) {
+                            final IQueryAttributes attrs = t == null ? null : t
+                                    .getAttributes();
+                            final IHashJoinUtility state = (IHashJoinUtility) (attrs == null ? null
+                                    : attrs.get(ref));
+                            if (state != null) {
+                                // Prefer the IHashUtilityState
+                                w.write(cdata(state.toString()));
+                            } else {
+                                // Otherwise the NamedSolutionSetRef
+                                w.write(cdata(ref.toString()));
+                            }
+                        }
+                        // w.write(cdata(", joinvars=" +
+                        // Arrays.toString(refs[0].joinVars)));
+                    }
                 }
             }
-        }
-        if (bop instanceof ChunkedMaterializationOp) {
-            final IVariable<?>[] vars = (IVariable<?>[]) bop
-                    .getProperty(ChunkedMaterializationOp.Annotations.VARS);
-            w.write(cdata(Arrays.toString(vars)));
-        }
-        if (bop instanceof JoinGraph) {
-            final Path p = ((JoinGraph) bop).getPath(q);
-            final Map<PathIds, EdgeSample> samples = ((JoinGraph) bop)
-                    .getSamples(q);
-            if (p != null && samples != null) {
-                // Show the RTO discovered join path.
-                w.write("<pre>");
-                w.write(cdata(JGraph.showPath(p, samples)));
-                w.write("</pre>");
+            if (bop instanceof ChunkedMaterializationOp) {
+                final IVariable<?>[] vars = (IVariable<?>[]) bop
+                        .getProperty(ChunkedMaterializationOp.Annotations.VARS);
+                w.write(cdata(Arrays.toString(vars)));
+            }
+            if (bop instanceof JoinGraph) {
+                final Path p = ((JoinGraph) bop).getPath(q);
+                final Map<PathIds, EdgeSample> samples = ((JoinGraph) bop)
+                        .getSamples(q);
+                if (p != null && samples != null) {
+                    // Show the RTO discovered join path.
+                    w.write("<pre>");
+                    w.write(cdata(JGraph.showPath(p, samples)));
+                    w.write("</pre>");
+                }
+            }
+            if (bop instanceof ProjectionOp) {
+                final IVariable<?>[] vars = (IVariable<?>[]) bop
+                        .getProperty(ProjectionOp.Annotations.SELECT);
+                w.write(cdata(Arrays.toString(vars)));
             }
         }
         w.write(TDx); // end summary

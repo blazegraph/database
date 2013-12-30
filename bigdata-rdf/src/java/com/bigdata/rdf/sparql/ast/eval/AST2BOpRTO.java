@@ -232,6 +232,10 @@ public class AST2BOpRTO extends AST2BOpJoins {
          */
         final SampleType sampleType = joinGroup.getProperty(
                 QueryHints.RTO_SAMPLE_TYPE, QueryHints.DEFAULT_RTO_SAMPLE_TYPE);
+        final int limit = joinGroup.getProperty(QueryHints.RTO_LIMIT,
+                QueryHints.DEFAULT_RTO_LIMIT);
+        final int nedges = joinGroup.getProperty(QueryHints.RTO_NEDGES,
+                QueryHints.DEFAULT_RTO_NEDGES);
         left = new JoinGraph(leftOrEmpty(left),//
                 new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
                 new NV(BOp.Annotations.EVALUATION_CONTEXT,
@@ -245,10 +249,8 @@ public class AST2BOpRTO extends AST2BOpJoins {
                         preds.toArray(new Predicate[preds.size()])),//
                 new NV(JoinGraph.Annotations.CONSTRAINTS, constraints
                         .toArray(new IConstraint[constraints.size()])),//
-                new NV(JoinGraph.Annotations.LIMIT,
-                        JoinGraph.Annotations.DEFAULT_LIMIT),//
-                new NV(JoinGraph.Annotations.NEDGES,
-                        JoinGraph.Annotations.DEFAULT_NEDGES),//
+                new NV(JoinGraph.Annotations.LIMIT, limit),//
+                new NV(JoinGraph.Annotations.NEDGES, nedges),//
                 new NV(JoinGraph.Annotations.SAMPLE_TYPE, sampleType.name())//
         );
 
