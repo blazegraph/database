@@ -799,15 +799,21 @@ public class JGraph {
 
 			}
 
-			for (Path x : a) {
-
-				final Vertex v = x.vertices[0];
-
-				final int limit = vertexLimit.get(v).intValue();
-
-				v.sample(queryEngine, limit, sampleType);
-
-			}
+			// re-sample vertices.
+			sampleVertices(queryEngine, vertexLimit);
+			
+//            for (Map.Entry<Vertex, AtomicInteger> e : vertexLimit.entrySet()) {
+//
+////				final Vertex v = x.vertices[0];
+////              final int limit = vertexLimit.get(v).intValue();
+//
+//			    final Vertex v = e.getKey();
+//
+//			    final int limit = e.getValue().get();
+//
+//				v.sample(queryEngine, limit, sampleType);
+//
+//			}
 
 		}
 
@@ -830,15 +836,15 @@ public class JGraph {
         int nunderflow = 0;
         for (Path x : a) {
 
-			/*
-			 * Get the new sample limit for the path.
-			 * 
-			 * TODO We only need to increase the sample limit starting at the
-			 * vertex where we have a cardinality underflow or variability in
-			 * the cardinality estimate. This is increasing the limit in each
-			 * round of expansion, which means that we are reading more data
-			 * than we really need to read.
-			 */
+            /*
+             * Get the new sample limit for the path.
+             * 
+             * TODO We only need to increase the sample limit starting at the
+             * vertex where we have a cardinality underflow or variability in
+             * the cardinality estimate. This is increasing the limit in each
+             * round of expansion, which means that we are reading more data
+             * than we really need to read.
+             */
 			final int limit = x.getNewLimit(limitIn);
 
 			// The cutoff join sample of the one step shorter path segment.
@@ -1289,10 +1295,44 @@ public class JGraph {
 	 */
     public void sampleAllVertices(final QueryEngine queryEngine, final int limit) {
 
-        // Setup tasks to sample vertices.
-        final List<Callable<Void>> tasks = new LinkedList<Callable<Void>>();
+        final Map<Vertex, AtomicInteger> vertexLimit = new LinkedHashMap<Vertex, AtomicInteger>();
+        
         for (Vertex v : V) {
 
+            vertexLimit.put(v,new AtomicInteger(limit));
+            
+        }
+
+        sampleVertices(queryEngine, vertexLimit);
+        
+    }
+
+    /**
+     * (Re-)sample a set of vertices. Sampling is done in parallel.
+     * <p>
+     * Note: A request to re-sample a vertex is a NOP unless the limit has been
+     * increased since the last time the vertex was sampled. It is also a NOP if
+     * the vertex has been fully materialized.
+     * 
+     * @param queryEngine
+     * @param vertexLimit
+     *            A map whose keys are the {@link Vertex vertices} to be
+     *            (re-)samples and whose values are the <code>limit</code> to be
+     *            used when sampling the associated vertex. This map is
+     *            read-only so it only needs to be thread-safe for concurrent
+     *            readers.
+     */
+    private void sampleVertices(final QueryEngine queryEngine,
+            final Map<Vertex, AtomicInteger> vertexLimit) {
+
+        // Setup tasks to sample vertices.
+        final List<Callable<Void>> tasks = new LinkedList<Callable<Void>>();
+        for (Map.Entry<Vertex, AtomicInteger> e : vertexLimit.entrySet()) {
+
+            final Vertex v = e.getKey();
+            
+            final int limit = e.getValue().get();
+            
             tasks.add(new SampleVertexTask(queryEngine, v, limit, sampleType));
 
         }
