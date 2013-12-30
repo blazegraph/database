@@ -1162,9 +1162,13 @@ public class QueryLog {
                 w.write(cdata(Arrays.toString(vars)));
             }
             if (bop instanceof JoinGraph) {
-                final Path p = ((JoinGraph) bop).getPath(q);
-                final Map<PathIds, EdgeSample> samples = ((JoinGraph) bop)
+                final JoinGraph t = ((JoinGraph) bop);
+                final Path p = t.getPath(q);
+                final Map<PathIds, EdgeSample> samples = t
                         .getSamples(q);
+                w.write(cdata("sampleType=" + t.getSampleType()));
+                w.write(cdata(", limit=" + t.getLimit()));
+                w.write(cdata(", nedges=" + t.getNEdges()));
                 if (p != null && samples != null) {
                     // Show the RTO discovered join path.
                     w.write("<pre>");
