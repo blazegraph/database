@@ -30,6 +30,9 @@ package com.bigdata.bop.joinGraph.rto;
 import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.FutureTask;
+import java.util.concurrent.TimeUnit;
+
+import org.apache.log4j.Logger;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
@@ -107,11 +110,16 @@ public class JoinGraph extends PipelineOp {
 
 		int DEFAULT_LIMIT = 100;
 
-		/**
-		 * The <i>nedges</i> edges of the join graph having the lowest
-		 * cardinality will be used to generate the initial join paths (default
-		 * {@value #DEFAULT_NEDGES}). This must be a positive integer.
-		 */
+        /**
+         * The <i>nedges</i> edges of the join graph having the lowest
+         * cardinality will be used to generate the initial join paths (default
+         * {@value #DEFAULT_NEDGES}). This must be a positive integer. The edges
+         * in the join graph are sorted in order of increasing cardinality and
+         * up to <i>nedges</i> of those edges having the lowest cardinality are
+         * used to form the initial set of join paths. For each edge selected to
+         * form a join path, the starting vertex will be the vertex of that edge
+         * having the lower cardinality.
+         */
 		String NEDGES = JoinGraph.class.getName() + ".nedges";
 
 		int DEFAULT_NEDGES = 2;
@@ -292,7 +300,9 @@ public class JoinGraph extends PipelineOp {
          */
 	    @Override
 	    public Void call() throws Exception {
-
+	        
+	        final long begin = System.nanoTime();
+	        
 	        // Create the join graph.
             final JGraph g = new JGraph(getVertices(), getConstraints(),
                     sampleType);
@@ -301,6 +311,10 @@ public class JoinGraph extends PipelineOp {
 	        final Path p = g.runtimeOptimizer(context.getRunningQuery()
 	                .getQueryEngine(), limit, nedges);
 
+	        final long mark = System.nanoTime();
+	        
+	        final long elapsed_queryOptimizer = mark - begin;
+	        
 	        // Factory avoids reuse of bopIds assigned to the predicates.
 	        final BOpIdFactory idFactory = new BOpIdFactory();
 
@@ -313,11 +327,20 @@ public class JoinGraph extends PipelineOp {
 	        // Run the query, blocking until it is done.
 	        JoinGraph.runSubquery(context, queryOp);
 
+	        final long elapsed_queryExecution = System.nanoTime() - mark;
+	        
+            if (log.isInfoEnabled())
+                log.info("RTO: queryOptimizer="
+                        + TimeUnit.NANOSECONDS.toMillis(elapsed_queryOptimizer)
+                        + ", queryExecution="
+                        + TimeUnit.NANOSECONDS.toMillis(elapsed_queryExecution));
+
 	        return null;
 
 	    }
 
 	} // class JoinGraphTask
+    private static final transient Logger log = Logger.getLogger(JGraph.class);
 
     /**
      * Execute the selected join path.

@@ -100,6 +100,9 @@ public class QueryHintRegistry {
         add(new RunLastHint());
         add(new RunOnceHint());
         add(new OptimizerQueryHint());
+        add(new RTOSampleTypeQueryHint());
+        add(new RTOLimitQueryHint());
+        add(new RTONEdgesQueryHint());
         add(new OptimisticQueryHint());
 
         add(new AnalyticQueryHint());
