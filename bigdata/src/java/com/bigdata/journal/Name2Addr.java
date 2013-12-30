@@ -36,6 +36,7 @@ import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Properties;
@@ -80,6 +81,7 @@ import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.resources.IndexManager;
 import com.bigdata.resources.ResourceManager;
+import com.bigdata.util.concurrent.ExecutionExceptions;
 import com.ibm.icu.text.Collator;
 
 import cutthecrap.utils.striterators.Filter;
@@ -738,6 +740,7 @@ public class Name2Addr extends BTree {
         }
         
         // for each entry in the snapshot of the commit list.
+        final List<Throwable> causes = new LinkedList<Throwable>();
         for (Future<CommitIndexTask> f : futures) {
             
             try {
@@ -775,11 +778,13 @@ public class Name2Addr extends BTree {
                 
             } catch (InterruptedException e) {
 
-                throw new RuntimeException(e);
+                log.error("l.name: " + e, e);
+                causes.add(e);
                 
             } catch (ExecutionException e) {
                 
-                throw new RuntimeException(e);
+                log.error("l.name: " + e, e);
+                causes.add(e);
                 
             }
             
@@ -842,6 +847,17 @@ public class Name2Addr extends BTree {
 //            // set commitTime on the btree (transient field).
 //            l.btree.setLastCommitTime(commitTime);
             
+        } // next Future.
+        
+        /*
+         * If there were any errors, then throw an exception listing them.
+         */
+        if (!causes.isEmpty()) {
+            // Throw exception back to the leader.
+            if (causes.size() == 1)
+                throw new RuntimeException(causes.get(0));
+            throw new RuntimeException("nerrors=" + causes.size(),
+                    new ExecutionExceptions(causes));
         }
         
         // and flushes out this btree as well.
