@@ -111,10 +111,18 @@ public interface QueryHints {
      * evaluation (default {@value #DEFAULT_RTO_LIMIT}). A larger limit and a
      * random sample will provide a more accurate estimate of the cost of the
      * join paths but are increase the runtime overhead of the RTO optimizer.
+     * Smaller value can lead to underflow in the cardinality estimates of the
+     * cutoff joins resulting in a longer execution time for the RTO since more
+     * paths may be explored or the explored paths must be deepened in order to
+     * differentiate their costs. Values corresponding to up to the expected
+     * number of triples on an index page should have the same IO cost since
+     * there will be a single page read for the vertex and the output of the
+     * join will be cutoff once the desired number of join results has been
+     * produced.
      */
     String RTO_LIMIT = "RTO-limit";
 
-    int DEFAULT_RTO_LIMIT = 20;
+    int DEFAULT_RTO_LIMIT = 100;
 
     /**
      * The <i>nedges</i> edges of the join graph having the lowest cardinality
@@ -124,11 +132,14 @@ public interface QueryHints {
      * <i>nedges</i> of those edges having the lowest cardinality are used to
      * form the initial set of join paths. For each edge selected to form a join
      * path, the starting vertex will be the vertex of that edge having the
-     * lower cardinality.
+     * lower cardinality. If ONE (1), then only those join paths that start with
+     * the two vertices having the lowest cardinality will be explored (this was
+     * the published behavior for ROX). When greater than ONE, a broader search
+     * of the join paths will be carried out.
      */
     String RTO_NEDGES = "RTO-nedges";
 
-    int DEFAULT_RTO_NEDGES = 2;
+    int DEFAULT_RTO_NEDGES = 1;
 
     /**
      * Query hint sets the optimistic threshold for the static join order

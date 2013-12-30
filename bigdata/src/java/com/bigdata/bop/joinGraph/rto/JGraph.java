@@ -37,6 +37,9 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.log4j.Logger;
@@ -50,6 +53,7 @@ import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.joinGraph.NoSolutionsException;
 import com.bigdata.bop.joinGraph.PartitionedJoinGroup;
 import com.bigdata.bop.rdf.join.DataSetJoin;
+import com.bigdata.util.concurrent.ExecutionExceptions;
 
 /**
  * A runtime optimizer for a join graph. The {@link JoinGraph} bears some
@@ -1225,18 +1229,90 @@ public class JGraph {
 	 *            not share a variable directly and hence will materialize the
 	 *            full cross product before filtering which is *really*
 	 *            expensive.
-	 * 
 	 */
     public void sampleAllVertices(final QueryEngine queryEngine, final int limit) {
 
+        // Setup tasks to sample vertices.
+        final List<Callable<Void>> tasks = new LinkedList<Callable<Void>>();
         for (Vertex v : V) {
 
-            v.sample(queryEngine, limit, sampleType);
+            tasks.add(new SampleVertexTask(queryEngine, v, limit, sampleType));
 
+        }
+
+        // Sample vertices in parallel.
+        final List<Future<Void>> futures;
+        try {
+
+            futures = queryEngine.getIndexManager().getExecutorService()
+                    .invokeAll(tasks);
+
+        } catch (InterruptedException e) {
+            // propagate interrupt.
+            Thread.currentThread().interrupt();
+            return;
+        }
+
+        // Check futures for errors.
+        final List<Throwable> causes = new LinkedList<Throwable>();
+        for (Future<Void> f : futures) {
+            try {
+                f.get();
+            } catch (InterruptedException e) {
+                log.error(e);
+                causes.add(e);
+            } catch (ExecutionException e) {
+                log.error(e);
+                causes.add(e);
+            }
+        }
+
+        /*
+         * If there were any errors, then throw an exception listing them.
+         */
+        if (!causes.isEmpty()) {
+            // Throw exception back to the leader.
+            if (causes.size() == 1)
+                throw new RuntimeException(causes.get(0));
+            throw new RuntimeException("nerrors=" + causes.size(),
+                    new ExecutionExceptions(causes));
         }
 
     }
 
+    /**
+     * Task to sample a vertex.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+     *         Thompson</a>
+     */
+    static private class SampleVertexTask implements Callable<Void> {
+
+        private final QueryEngine queryEngine;
+        private final Vertex v;
+        private final int limit;
+        private final SampleType sampleType;
+        
+        public SampleVertexTask(final QueryEngine queryEngine, final Vertex v,
+                final int limit, final SampleType sampleType) {
+
+            this.queryEngine = queryEngine;
+            this.v = v;
+            this.limit = limit;
+            this.sampleType = sampleType;
+
+        }
+        
+        @Override
+        public Void call() throws Exception {
+
+            v.sample(queryEngine, limit, sampleType);
+
+            return null;
+        }
+        
+    }
+    
     /**
      * Estimate the cardinality of each edge. This is only invoked by
      * {@link #round0(QueryEngine, int, int)} when it is trying to select the
@@ -1362,9 +1438,9 @@ public class JGraph {
 
 				paths.add(p);
 
-			}
+			} // next other vertex.
         
-        }
+        } // next vertex
         
         return paths.toArray(new Path[paths.size()]);
 
@@ -1393,7 +1469,7 @@ public class JGraph {
      */
     public Path[] pruneJoinPaths(final Path[] a,
             final Map<PathIds, EdgeSample> edgeSamples) {
-    	final boolean neverPruneUnderflow = true;
+        final boolean neverPruneUnderflow = true;
         /*
          * Find the length of the longest path(s). All shorter paths are
          * dropped in each round.
