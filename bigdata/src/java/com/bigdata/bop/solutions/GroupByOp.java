@@ -29,7 +29,6 @@ package com.bigdata.bop.solutions;
 
 import java.util.Map;
 
-
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.aggregate.IAggregate;
@@ -135,5 +134,23 @@ abstract public class GroupByOp extends PipelineOp {
      * operations which would violate either of these constraints.
      */
     abstract public boolean isPipelinedAggregationOp();
+
+    /**
+     * @see Annotations#GROUP_BY_STATE
+     */
+    public IGroupByState getGroupByState() {
+
+        return (IGroupByState) getRequiredProperty(Annotations.GROUP_BY_STATE);
+
+    }
+
+    /**
+     * @see Annotations#GROUP_BY_REWRITE
+     */
+    public IGroupByRewriteState getGroupByRewrite() {
+
+        return (IGroupByRewriteState) getRequiredProperty(Annotations.GROUP_BY_REWRITE);
+
+    }
 
 }

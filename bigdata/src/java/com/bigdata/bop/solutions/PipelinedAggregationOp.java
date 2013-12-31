@@ -83,6 +83,7 @@ public class PipelinedAggregationOp extends GroupByOp {
      * MAY NOT be used to evaluate aggregation requests which use DISTINCT or
      * which nest {@link IAggregate}s in other {@link IAggregate}s.
      */
+    @Override
     public boolean isPipelinedAggregationOp() {
 
         return true;
@@ -173,6 +174,7 @@ public class PipelinedAggregationOp extends GroupByOp {
     	
     }
 
+    @Override
     public FutureTask<Void> eval(final BOpContext<IBindingSet> context) {
 
         return new FutureTask<Void>(new ChunkTask(this, context));
@@ -193,6 +195,7 @@ public class PipelinedAggregationOp extends GroupByOp {
          */
         private final IConstant<?>[] vals;
 
+        @Override
         public String toString() {
             return super.toString() + //
                     "{group=" + Arrays.toString(vals) + //
@@ -252,10 +255,12 @@ public class PipelinedAggregationOp extends GroupByOp {
             this.hash = java.util.Arrays.hashCode(vals);
         }
 
+        @Override
         public int hashCode() {
             return hash;
         }
 
+        @Override
         public boolean equals(final Object o) {
             if (this == o)
                 return true;
@@ -622,6 +627,7 @@ public class PipelinedAggregationOp extends GroupByOp {
             
         }
 
+        @Override
         public Void call() throws Exception {
 
             final ICloseableIterator<IBindingSet[]> itr = context
