@@ -105,9 +105,9 @@ abstract public class CoreBaseBOp implements BOp {
         if (t instanceof IValueExpression<?>
                 || t instanceof IValueExpressionNode) {
             /*
-             * Note: toString() is intercepted for a few bops, mainly those with
-             * a pretty simple structure. This delegates to toString() in those
-             * cases.
+             * Note: toShortString() is intercepted for a few bops, mainly those
+             * with a pretty simple structure. This delegates to toString() in
+             * those cases.
              */
             return t.toString();
         } else {
