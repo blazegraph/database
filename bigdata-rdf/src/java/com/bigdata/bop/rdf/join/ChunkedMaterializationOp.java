@@ -102,11 +102,12 @@ public class ChunkedMaterializationOp extends PipelineOp {
      * @param args
      * @param annotations
      */
-    public ChunkedMaterializationOp(BOp[] args, Map<String, Object> annotations) {
+    public ChunkedMaterializationOp(final BOp[] args,
+            final Map<String, Object> annotations) {
 
         super(args, annotations);
         
-        final IVariable<?>[] vars = (IVariable<?>[]) getProperty(Annotations.VARS);
+        final IVariable<?>[] vars = getVars();
 
         if (vars != null && vars.length == 0)
             throw new IllegalArgumentException();
@@ -120,13 +121,13 @@ public class ChunkedMaterializationOp extends PipelineOp {
     /**
      * @param op
      */
-    public ChunkedMaterializationOp(ChunkedMaterializationOp op) {
+    public ChunkedMaterializationOp(final ChunkedMaterializationOp op) {
 
         super(op);
         
     }
 
-    public ChunkedMaterializationOp(final BOp[] args, NV... annotations) {
+    public ChunkedMaterializationOp(final BOp[] args, final NV... annotations) {
 
         this(args, NV.asMap(annotations));
 
@@ -154,6 +155,20 @@ public class ChunkedMaterializationOp extends PipelineOp {
     }
     
     /**
+     * Return the variables to be materialized.
+     * 
+     * @return The variables to be materialized -or- <code>null</code> iff all
+     *         variables should be materialized.
+     * 
+     * @see Annotations#VARS
+     */
+    public IVariable<?>[] getVars() {
+
+        return (IVariable<?>[]) getProperty(Annotations.VARS);
+        
+    }
+
+    /**
      * When <code>true</code>, inline {@link IV}s are also materialized.
      * 
      * @see Annotations#MATERIALIZE_INLINE_IVS
@@ -165,6 +180,7 @@ public class ChunkedMaterializationOp extends PipelineOp {
 
     }
 
+    @Override
     public FutureTask<Void> eval(final BOpContext<IBindingSet> context) {
 
         return new FutureTask<Void>(new ChunkTask(this, context));
@@ -195,10 +211,7 @@ public class ChunkedMaterializationOp extends PipelineOp {
 
             this.context = context;
 
-            this.vars = (IVariable<?>[]) op.getProperty(Annotations.VARS);
-
-            if (vars != null && vars.length == 0)
-                throw new IllegalArgumentException();
+            this.vars = op.getVars();
 
             namespace = ((String[]) op.getProperty(Annotations.RELATION_NAME))[0];
 
@@ -208,6 +221,7 @@ public class ChunkedMaterializationOp extends PipelineOp {
 
         }
 
+        @Override
         public Void call() throws Exception {
 
             final BOpStats stats = context.getStats();

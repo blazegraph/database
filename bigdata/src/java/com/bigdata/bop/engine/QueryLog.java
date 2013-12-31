@@ -43,8 +43,9 @@ import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IQueryAttributes;
-import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IVariableOrConstant;
+import com.bigdata.bop.PipelineOp;
+import com.bigdata.bop.bset.ConditionalRoutingOp;
 import com.bigdata.bop.controller.INamedSolutionSetRef;
 import com.bigdata.bop.controller.NamedSetAnnotations;
 import com.bigdata.bop.engine.RunState.RunStateEnum;
@@ -57,6 +58,8 @@ import com.bigdata.bop.joinGraph.rto.JoinGraph;
 import com.bigdata.bop.joinGraph.rto.Path;
 import com.bigdata.bop.joinGraph.rto.PathIds;
 import com.bigdata.bop.rdf.join.ChunkedMaterializationOp;
+import com.bigdata.bop.solutions.DropOp;
+import com.bigdata.bop.solutions.GroupByOp;
 import com.bigdata.bop.solutions.ProjectionOp;
 import com.bigdata.counters.render.XHTMLRenderer;
 import com.bigdata.rawstore.Bytes;
@@ -401,6 +404,16 @@ public class QueryLog {
         } else {
             sb.append(bop.getClass().getSimpleName());
             sb.append("[" + bopId + "]");
+            final Integer defaultSink = (Integer) bop
+                    .getProperty(PipelineOp.Annotations.SINK_REF);
+            final Integer altSink = (Integer) bop
+                    .getProperty(PipelineOp.Annotations.ALT_SINK_REF);
+            if (defaultSink != null) {
+                sb.append(", sink=" + defaultSink);
+            }
+            if (altSink != null) {
+                sb.append(", altSink=" + altSink);
+            }
         }
         sb.append('\t');
         if (pred != null) {
@@ -476,9 +489,40 @@ public class QueryLog {
             }
         }
         if (bop instanceof ChunkedMaterializationOp) {
-            final IVariable<?>[] vars = (IVariable<?>[]) bop
-                    .getProperty(ChunkedMaterializationOp.Annotations.VARS);
-            sb.append(Arrays.toString(vars));
+            sb.append(cdata("vars="
+                    + Arrays.toString(((ChunkedMaterializationOp) bop)
+                            .getVars()) + ",materializeInlineIVs="
+                    + ((ChunkedMaterializationOp) bop).materializeInlineIVs()));
+        }
+        if (bop instanceof GroupByOp) {
+            sb.append(cdata(((GroupByOp) bop).getGroupByState().toString()));
+            sb.append(cdata(" "));// whitespace to break the line.
+            sb.append(cdata(((GroupByOp) bop).getGroupByRewrite().toString()));
+        }
+        if (bop instanceof DropOp) {
+            sb.append(cdata(Arrays.toString(((DropOp)bop).getDropVars())));
+        }
+        if (bop instanceof ConditionalRoutingOp) {
+            sb.append(cdata(((ConditionalRoutingOp) bop).getCondition()
+                    .toString()));
+        }
+        if (bop instanceof JoinGraph) {
+            final JoinGraph t = ((JoinGraph) bop);
+//            final Path p = t.getPath(q);
+//            final Map<PathIds, EdgeSample> samples = t
+//                    .getSamples(q);
+            sb.append(cdata("sampleType=" + t.getSampleType()));
+            sb.append(cdata(", limit=" + t.getLimit()));
+            sb.append(cdata(", nedges=" + t.getNEdges()));
+//            if (p != null && samples != null) { // Note: breaks table formatting.
+//                // Show the RTO discovered join path.
+//                w.write("<pre>");
+//                w.write(cdata(JGraph.showPath(p, samples)));
+//                w.write("</pre>");
+//            }
+        }
+        if (bop instanceof ProjectionOp) {
+            sb.append(cdata(Arrays.toString(((ProjectionOp) bop).getVariables())));
         }
 
         /*
@@ -1081,10 +1125,28 @@ public class QueryLog {
         } else {
             w.write(cdata(bop.getClass().getSimpleName()));
             w.write(cdata("[" + bopId + "]"));
+            final Integer defaultSink = (Integer) bop
+                    .getProperty(PipelineOp.Annotations.SINK_REF);
+            final Integer altSink = (Integer) bop
+                    .getProperty(PipelineOp.Annotations.ALT_SINK_REF);
+            if (defaultSink != null) {
+                w.write(cdata(", sink=" + defaultSink));
+            }
+            if (altSink != null) {
+                w.write(cdata(", altSink=" + altSink));
+            }
         }
         w.write(TDx);
 
-        // operator summary (not shown for the "total" line).
+        /*
+         * Pperator summary (not shown for the "total" line).
+         * 
+         * TODO We should have self-reporting of the summary for each operator,
+         * potentially as XHTML. Also, the parser should pass along the SPARQL
+         * snip that corresponds to the operator so we can display it here. We
+         * already handle this for the SERVICE call's inner graph pattern. It
+         * could be handled in general.
+         */
         w.write(TD);
         if(!summary) {
             if (pred != null) {
@@ -1161,9 +1223,27 @@ public class QueryLog {
                 }
             }
             if (bop instanceof ChunkedMaterializationOp) {
-                final IVariable<?>[] vars = (IVariable<?>[]) bop
-                        .getProperty(ChunkedMaterializationOp.Annotations.VARS);
-                w.write(cdata(Arrays.toString(vars)));
+                w.write(cdata("vars="
+                        + Arrays.toString(((ChunkedMaterializationOp) bop)
+                                .getVars())
+                        + ",materializeInlineIVs="
+                        + ((ChunkedMaterializationOp) bop)
+                                .materializeInlineIVs()));
+            }
+            if (bop instanceof GroupByOp) {
+                w.write(cdata(((GroupByOp) bop).getGroupByState().toString()));
+                if (detailedStats) {
+                    w.write(cdata(" "));// whitespace to break the line.
+                    w.write(cdata(((GroupByOp) bop).getGroupByRewrite()
+                            .toString()));
+                }
+            }
+            if (bop instanceof DropOp) {
+                w.write(cdata(Arrays.toString(((DropOp) bop).getDropVars())));
+            }
+            if (bop instanceof ConditionalRoutingOp) {
+                w.write(cdata(((ConditionalRoutingOp) bop).getCondition()
+                        .toString()));
             }
             if (bop instanceof JoinGraph) {
                 final JoinGraph t = ((JoinGraph) bop);
@@ -1181,9 +1261,8 @@ public class QueryLog {
                 }
             }
             if (bop instanceof ProjectionOp) {
-                final IVariable<?>[] vars = (IVariable<?>[]) bop
-                        .getProperty(ProjectionOp.Annotations.SELECT);
-                w.write(cdata(Arrays.toString(vars)));
+                w.write(cdata(Arrays.toString(((ProjectionOp) bop)
+                        .getVariables())));
             }
         }
         w.write(TDx); // end summary
