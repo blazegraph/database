@@ -87,6 +87,7 @@ public class MemoryGroupByOp extends GroupByOp {
      * Returns <code>false</code>. This is a generalized aggregation operator
      * and may be used to evaluate any aggregation request.
      */
+    @Override
     final public boolean isPipelinedAggregationOp() {
 
         return false;
@@ -145,6 +146,7 @@ public class MemoryGroupByOp extends GroupByOp {
 
     }
 
+    @Override
     public FutureTask<Void> eval(final BOpContext<IBindingSet> context) {
 
         return new FutureTask<Void>(new GroupByTask(this, context));
@@ -165,6 +167,7 @@ public class MemoryGroupByOp extends GroupByOp {
          */
         private final IConstant<?>[] vals;
 
+        @Override
 		public String toString() {
 			return super.toString() + //
 					"{group=" + Arrays.toString(vals) + //
@@ -234,10 +237,12 @@ public class MemoryGroupByOp extends GroupByOp {
             this.hash = java.util.Arrays.hashCode(vals);
         }
 
+        @Override
         public int hashCode() {
             return hash;
         }
 
+        @Override
         public boolean equals(final Object o) {
             if (this == o)
                 return true;
@@ -368,6 +373,7 @@ public class MemoryGroupByOp extends GroupByOp {
 
         }
 
+        @Override
         public Void call() throws Exception {
 
 			final ICloseableIterator<IBindingSet[]> itr = context
@@ -914,12 +920,14 @@ public class MemoryGroupByOp extends GroupByOp {
 
         }
 
+        @Override
         public int hashCode() {
 
             return hash;
 
         }
 
+        @Override
         public boolean equals(final Object o) {
             if (this == o)
                 return true;

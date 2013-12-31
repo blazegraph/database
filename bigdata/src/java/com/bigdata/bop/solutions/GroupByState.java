@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.bop.solutions;
 
 import java.io.Serializable;
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -71,26 +72,43 @@ public class GroupByState implements IGroupByState, Serializable {
     final private boolean nestedAggregates;
     final private boolean simpleHaving;
 
+    @Override
+    public String toString() {
+        final StringBuilder sb = new StringBuilder();
+        sb.append(getClass().getSimpleName());
+        sb.append("{select=" + Arrays.toString(select));
+        sb.append(",groupBy=" + Arrays.toString(groupBy));
+        sb.append(",having=" + Arrays.toString(having));
+        sb.append("}");
+        return sb.toString();
+    }
+    
+    @Override
     public IValueExpression<?>[] getGroupByClause() {
         return groupBy;
     }
 
+    @Override
     public LinkedHashSet<IVariable<?>> getGroupByVars() {
         return groupByVars;
     }
 
+    @Override
     public IValueExpression<?>[] getSelectClause() {
         return select;
     }
 
+    @Override
     public LinkedHashSet<IVariable<?>> getSelectVars() {
         return selectVars;
     }
 
+    @Override
     public IConstraint[] getHavingClause() {
         return having;
     }
 
+    @Override
     public LinkedHashSet<IVariable<?>> getColumnVars() {
         return columnVars;
     }
@@ -99,18 +117,22 @@ public class GroupByState implements IGroupByState, Serializable {
 //        return distinctColumnVars;
 //    }
 
+    @Override
     public boolean isAnyDistinct() {
         return anyDistinct;
     }
 
+    @Override
     public boolean isSelectDependency() {
         return selectDependency;
     }
 
+    @Override
     public boolean isNestedAggregates() {
         return nestedAggregates;
     }
     
+    @Override
     public boolean isSimpleHaving() {
         return simpleHaving;
     }
