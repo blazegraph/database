@@ -2545,9 +2545,6 @@ public class AST2BOpUtility extends AST2BOpRTO {
                  * 
                  * Note: This winds up handling materialization steps as well
                  * (it calls through to Rule2BOpUtility).
-                 * 
-                 * TODO The RTO will need to assign the ids to joins so it can
-                 * correlate them with the {@link IJoinNode}s.
                  */
                 final Predicate<?> pred = toPredicate(sp, ctx);
                 final boolean optional = sp.isOptional();
