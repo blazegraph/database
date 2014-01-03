@@ -62,6 +62,18 @@ final class PipelineMaxParallelHint extends AbstractIntQueryHint {
 
         }
 
+//        if (QueryHintScope.Query.equals(scope)) {
+//
+//            /*
+//             * Also stuff the query hint on the global context for things which
+//             * look there.
+//             */
+//
+//            conditionalSetGlobalProperty(context,
+//                    PipelineOp.Annotations.MAX_PARALLEL, value);
+//
+//        }
+
     }
 
 }

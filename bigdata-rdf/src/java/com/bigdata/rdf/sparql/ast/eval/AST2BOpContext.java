@@ -1,3 +1,26 @@
+/**
+
+Copyright (C) SYSTAP, LLC 2006-2011.  All rights reserved.
+
+Contact:
+     SYSTAP, LLC
+     4501 Tower Road
+     Greensboro, NC 27410
+     licenses@bigdata.com
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; version 2 of the License.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+*/
 package com.bigdata.rdf.sparql.ast.eval;
 
 import java.util.Collections;
@@ -39,6 +62,8 @@ import com.bigdata.rdf.sparql.ast.StaticAnalysis;
 import com.bigdata.rdf.sparql.ast.cache.CacheConnectionFactory;
 import com.bigdata.rdf.sparql.ast.cache.ICacheConnection;
 import com.bigdata.rdf.sparql.ast.cache.IDescribeCache;
+import com.bigdata.rdf.sparql.ast.hints.IQueryHint;
+import com.bigdata.rdf.sparql.ast.hints.QueryHintRegistry;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTOptimizerList;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTQueryHintOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.DefaultOptimizerList;
@@ -50,7 +75,8 @@ import com.bigdata.service.IBigdataFederation;
 /**
  * Convenience class for passing around the various pieces of context necessary
  * to construct the bop pipeline.
- *      FIXME Rolling back r7319 which broke UNION processing. 
+ * 
+ * FIXME Rolling back r7319 which broke UNION processing.
  */
 public class AST2BOpContext implements IdFactory, IEvaluationContext {
 
@@ -88,12 +114,24 @@ public class AST2BOpContext implements IdFactory, IEvaluationContext {
      */
     public final IDescribeCache describeCache;
 
-	/**
-	 * The query hints from the original {@link #query}.
-	 * 
-	 * @see QueryHints
-	 * @see ASTQueryHintOptimizer
-	 */
+    /**
+     * The query hints from the original {@link #query}.
+     * <p>
+     * Note: This acts as a default source for query hints to be applied to the
+     * generated AST nodes. In addition, the {@link ASTQueryHintOptimizer} uses
+     * registered {@link IQueryHint} implementations to annotate the original
+     * AST as one of the steps when transforming it into the optimized AST. This
+     * is done both for the global {@link #queryHints}s and for magic predicates
+     * using the {@link QueryHints#NAMESPACE} that appear in the query. Once a
+     * query hint is set on an AST node, it will eventually be copied across to
+     * {@link PipelineOp}s generated from that AST node.
+     * 
+     * @see QueryHints
+     * @see QueryHintRegistry
+     * @see ASTQueryHintOptimizer
+     * @see <a href="http://sourceforge.net/apps/trac/bigdata/ticket/791" >
+     *      Clean up query hints </a>
+     */
     public final Properties queryHints;
     
     /**

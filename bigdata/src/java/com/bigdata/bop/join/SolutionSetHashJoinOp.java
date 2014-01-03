@@ -44,6 +44,7 @@ import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.controller.HTreeNamedSubqueryOp;
 import com.bigdata.bop.controller.INamedSolutionSetRef;
+import com.bigdata.bop.controller.INamedSubqueryOp;
 import com.bigdata.bop.controller.JVMNamedSubqueryOp;
 import com.bigdata.bop.controller.NamedSetAnnotations;
 import com.bigdata.bop.engine.IRunningQuery;
@@ -51,9 +52,6 @@ import com.bigdata.htree.HTree;
 import com.bigdata.relation.accesspath.AbstractUnsynchronizedArrayBuffer;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.UnsyncLocalOutputBuffer;
-import com.bigdata.striterator.Dechunkerator;
-
-import cutthecrap.utils.striterators.ICloseableIterator;
 
 /**
  * Operator joins a solution set modeled as a hash index into the pipeline. The
@@ -80,6 +78,9 @@ import cutthecrap.utils.striterators.ICloseableIterator;
  * 
  * TODO This class could be made concrete. There is no logic it in that is
  * specific to either the {@link HTree} or JVM hash join operation.
+ * 
+ * @see INamedSubqueryOp
+ * @see HashIndexOp
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id: NamedSubqueryIncludeOp.java 5178 2011-09-12 19:09:23Z
@@ -132,7 +133,7 @@ abstract public class SolutionSetHashJoinOp extends PipelineOp {
     /**
      * Deep copy constructor.
      */
-    public SolutionSetHashJoinOp(SolutionSetHashJoinOp op) {
+    public SolutionSetHashJoinOp(final SolutionSetHashJoinOp op) {
 
         super(op);
         
@@ -170,6 +171,7 @@ abstract public class SolutionSetHashJoinOp extends PipelineOp {
         
     }
     
+    @Override
     public BaseJoinStats newStats() {
 
         return new BaseJoinStats();
@@ -268,6 +270,7 @@ abstract public class SolutionSetHashJoinOp extends PipelineOp {
 
         }
 
+        @Override
         public Void call() throws Exception {
 
             try {
@@ -317,10 +320,7 @@ abstract public class SolutionSetHashJoinOp extends PipelineOp {
             final UnsyncLocalOutputBuffer<IBindingSet> unsyncBuffer = new UnsyncLocalOutputBuffer<IBindingSet>(
                     op.getChunkCapacity(), sink);
 
-            final ICloseableIterator<IBindingSet> leftItr = new Dechunkerator<IBindingSet>(
-                    context.getSource());
-
-            state.hashJoin2(leftItr, unsyncBuffer, //true/* leftIsPipeline */,
+            state.hashJoin2(context.getSource(), stats, unsyncBuffer,
                     constraints);
 
             if (context.isLastInvocation()) {

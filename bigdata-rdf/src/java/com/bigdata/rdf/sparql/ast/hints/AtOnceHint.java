@@ -27,9 +27,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.hints;
 
+import com.bigdata.bop.BufferAnnotations;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.rdf.sparql.ast.ASTBase;
-import com.bigdata.rdf.sparql.ast.IJoinNode;
+import com.bigdata.rdf.sparql.ast.IQueryNode;
 import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 
@@ -55,7 +56,7 @@ final class AtOnceHint extends AbstractBooleanQueryHint {
     public void handle(final AST2BOpContext context,
             final QueryHintScope scope, final ASTBase op, final Boolean value) {
 
-        if (op instanceof IJoinNode) {
+        if (op instanceof IQueryNode) {
 
             /*
              * Note: This is set on the queryHint Properties object and then
@@ -66,6 +67,18 @@ final class AtOnceHint extends AbstractBooleanQueryHint {
                     !value);
 
         }
+
+//        if (QueryHintScope.Query.equals(scope)) {
+//            
+//            /*
+//             * Also stuff the query hint on the global context for things
+//             * which look there.
+//             */
+//
+//            conditionalSetGlobalProperty(context,
+//                    PipelineOp.Annotations.PIPELINED, !value);
+//
+//        }
 
     }
 
