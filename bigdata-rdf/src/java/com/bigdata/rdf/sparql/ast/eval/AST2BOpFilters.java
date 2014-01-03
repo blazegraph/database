@@ -251,12 +251,13 @@ public class AST2BOpFilters extends AST2BOpBase {
              * logic unless a performance advantage can be demonstrated either
              * on a Journal or a cluster.
              */
-            return (PipelineOp) new ChunkedMaterializationOp(leftOrEmpty(left),
+            return (PipelineOp) applyQueryHints(new ChunkedMaterializationOp(leftOrEmpty(left),
                     new NV(ChunkedMaterializationOp.Annotations.VARS, vars.toArray(new IVariable[nvars])),//
                     new NV(ChunkedMaterializationOp.Annotations.RELATION_NAME, new String[] { ns }), //
                     new NV(ChunkedMaterializationOp.Annotations.TIMESTAMP, timestamp), //
                     new NV(PipelineOp.Annotations.SHARED_STATE, !ctx.isCluster()),// live stats, but not on the cluster.
                     new NV(BOp.Annotations.BOP_ID, ctx.nextId())//
+                    ), (Properties) null/*nodeQueryHints*/, ctx // FIXME HINTS: Pass in the caller's AST node query hints.
                     );
 //                    vars.toArray(new IVariable[nvars]), ns, timestamp)
 //                    .setProperty(BOp.Annotations.BOP_ID, ctx.nextId());

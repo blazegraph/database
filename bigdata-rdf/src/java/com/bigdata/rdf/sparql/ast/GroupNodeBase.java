@@ -1,3 +1,26 @@
+/**
+
+Copyright (C) SYSTAP, LLC 2006-2011.  All rights reserved.
+
+Contact:
+     SYSTAP, LLC
+     4501 Tower Road
+     Greensboro, NC 27410
+     licenses@bigdata.com
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; version 2 of the License.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+*/
 package com.bigdata.rdf.sparql.ast;
 
 import java.util.Arrays;
@@ -29,7 +52,7 @@ public abstract class GroupNodeBase<E extends IGroupMemberNode> extends
     /**
      * Constructor required for {@link com.bigdata.bop.BOpUtility#deepCopy(FilterNode)}.
      */
-    public GroupNodeBase(GroupNodeBase<E> op) {
+    public GroupNodeBase(final GroupNodeBase<E> op) {
 
         super(op);
         
@@ -38,7 +61,7 @@ public abstract class GroupNodeBase<E extends IGroupMemberNode> extends
     /**
      * Required shallow copy constructor.
      */
-    public GroupNodeBase(BOp[] args, Map<String, Object> anns) {
+    public GroupNodeBase(final BOp[] args, final Map<String, Object> anns) {
 
         super(args, anns);
 
@@ -154,6 +177,7 @@ public abstract class GroupNodeBase<E extends IGroupMemberNode> extends
         
     }
 
+    @Override
     public IGroupNode<E> addChild(final E child) {
 		
         addArg((BOp) child);
@@ -164,6 +188,7 @@ public abstract class GroupNodeBase<E extends IGroupMemberNode> extends
 		
 	}
 	
+    @Override
     public IGroupNode<E> removeChild(final E child) {
 
         removeArg((BOp) child);
@@ -173,13 +198,15 @@ public abstract class GroupNodeBase<E extends IGroupMemberNode> extends
         return this;
 
 	}
-	
+
+    @Override
     public boolean isEmpty() {
         
         return arity() == 0;
         
     }
     
+    @Override
 	public int size() {
 		
 		return arity();
@@ -238,6 +265,7 @@ public abstract class GroupNodeBase<E extends IGroupMemberNode> extends
     /**
      * Simple but robust version of to-String 
      */
+    @Override
     public String toString(final int indent) {
         
         final String s = indent(indent);
@@ -252,17 +280,30 @@ public abstract class GroupNodeBase<E extends IGroupMemberNode> extends
 
             if (joinNode.isOptional())
                 sb.append(" [optional]");
-            
+
             if (joinNode.isMinus())
                 sb.append(" [minus]");
 
-            if (this instanceof JoinGroupNode
-                    && ((JoinGroupNode) this).getContext() != null) {
+        }
 
-                sb.append(" [context=" + ((JoinGroupNode) this).getContext() + "]");
+        if (this instanceof JoinGroupNode) {
+
+            final JoinGroupNode joinGroup = (JoinGroupNode) this;
+
+            if (joinGroup.getContext() != null) {
+
+                sb.append(" [context=" + joinGroup.getContext() + "]");
+
+            }
+
+            if (joinGroup.getProperty(JoinGroupNode.Annotations.OPTIMIZER) != null) {
+
+                // Show non-default value.
+                sb.append(" [" + JoinGroupNode.Annotations.OPTIMIZER + "="
+                        + joinGroup.getQueryOptimizer() + "]");
                 
             }
-            
+
         }
         
         if (this instanceof GraphPatternGroup) {
@@ -343,7 +384,7 @@ public abstract class GroupNodeBase<E extends IGroupMemberNode> extends
 
         if (getQueryHints() != null && !getQueryHints().isEmpty()) {
             sb.append("\n");
-            sb.append(indent(indent + 1));
+            sb.append(indent(indent));
             sb.append(Annotations.QUERY_HINTS);
             sb.append("=");
             sb.append(getQueryHints().toString());
@@ -363,19 +404,19 @@ public abstract class GroupNodeBase<E extends IGroupMemberNode> extends
     @Override
     public int replaceWith(final BOp oldChild, final BOp newChild) {
 
-    	final int i = super.replaceWith(oldChild, newChild);
+        final int i = super.replaceWith(oldChild, newChild);
 
-    	if (i > 0) {
+        if (i > 0) {
 
             if (((E) oldChild).getParent() == this) {
                 ((E) oldChild).setParent(null);
             }
-    	
-    		((E) newChild).setParent((IGroupNode<IGroupMemberNode>) this);
-    		
-    	}
-    	
-    	return i;
+
+            ((E) newChild).setParent((IGroupNode<IGroupMemberNode>) this);
+
+        }
+
+        return i;
     	
     }
 

@@ -1410,6 +1410,7 @@ public class PipelineJoin<E> extends PipelineOp implements
 
 			}
 
+			@Override
 			public int hashCode() {
 				return super.hashCode();
 			}
@@ -1697,8 +1698,8 @@ public class PipelineJoin<E> extends PipelineOp implements
             			IPredicate.Annotations.DEFAULT_CUTOFF_LIMIT);
             	
                 // Obtain the iterator for the current join dimension.
-				final ICloseableIterator<IBindingSet> itr = ((IBindingSetAccessPath<?>) accessPath)
-						.solutions(cutoffLimit, stats);
+                final ICloseableIterator<IBindingSet[]> itr = ((IBindingSetAccessPath<?>) accessPath)
+                        .solutions(cutoffLimit, stats);
 
                 try {
 
@@ -1713,11 +1714,13 @@ public class PipelineJoin<E> extends PipelineOp implements
 
                         halted();
                         
-                        int bindex = 0;
                         int naccepted = 0;
                         
-                        final IBindingSet right = itr.next(); // access path solutions
+                        final IBindingSet[] rightChunk = itr.next(); // AP solution chunk.
                         
+                        for(IBindingSet right : rightChunk) { // next solution from AP.
+                        
+                        int bindex = 0; // index 1:1 with bindingSets[].
                         for (IBindingSet left : bindingSets) { // upstream pipeline solutions.
 
                             // join solutions.
@@ -1771,8 +1774,10 @@ public class PipelineJoin<E> extends PipelineOp implements
                                         + right);
                             }
 
-                    } // next chunk.
+                    } // next left (upstream) solution from leftChunk (aka bindingSets).
 
+                    } // next right (AP) solution from rightChunk
+                    
                     if (optional) {
 
                         /*

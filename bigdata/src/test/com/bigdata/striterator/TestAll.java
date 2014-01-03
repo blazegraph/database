@@ -73,7 +73,9 @@ public class TestAll extends TestCase {
         suite.addTestSuite(TestDechunkerator.class);
         
         suite.addTestSuite(TestDistinctFilter.class);
-         
+        
+        suite.addTestSuite(TestCloseableChunkedIteratorWrapperConverter.class);
+        
         return suite;
         
     }

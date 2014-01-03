@@ -61,6 +61,8 @@ import com.bigdata.bop.rdf.join.ChunkedMaterializationOp;
 import com.bigdata.bop.solutions.DropOp;
 import com.bigdata.bop.solutions.GroupByOp;
 import com.bigdata.bop.solutions.ProjectionOp;
+import com.bigdata.bop.solutions.SliceOp;
+import com.bigdata.btree.Tuple;
 import com.bigdata.counters.render.XHTMLRenderer;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpJoins;
@@ -826,6 +828,10 @@ public class QueryLog {
         }
         w.write("<th>bopSummary</th>");
         w.write("<th>predSummary</th>");
+        if (detailedStats) {
+            w.write("<th>bopAnnotations</th>");
+            w.write("<th>predAnnotations</th>");
+        }
         // metadata considered by the static optimizer.
         if(detailedStats) {
             w.write("<th>staticBestKeyOrder</th>"); // original key order assigned
@@ -1119,25 +1125,16 @@ public class QueryLog {
             w.write(TDx);
         }
 
+        // bopSummary
         w.write(TD);
-        if(summary) {
+        if (summary) {
             w.write("total");
         } else {
             w.write(cdata(bop.getClass().getSimpleName()));
             w.write(cdata("[" + bopId + "]"));
-            final Integer defaultSink = (Integer) bop
-                    .getProperty(PipelineOp.Annotations.SINK_REF);
-            final Integer altSink = (Integer) bop
-                    .getProperty(PipelineOp.Annotations.ALT_SINK_REF);
-            if (defaultSink != null) {
-                w.write(cdata(", sink=" + defaultSink));
-            }
-            if (altSink != null) {
-                w.write(cdata(", altSink=" + altSink));
-            }
         }
         w.write(TDx);
-
+        
         /*
          * Pperator summary (not shown for the "total" line).
          * 
@@ -1264,8 +1261,28 @@ public class QueryLog {
                 w.write(cdata(Arrays.toString(((ProjectionOp) bop)
                         .getVariables())));
             }
+            if (bop instanceof SliceOp) {
+                w.write(cdata("offset=" + ((SliceOp) bop).getOffset()));
+                w.write(cdata(", limit=" + ((SliceOp) bop).getLimit()));
+            }
         }
-        w.write(TDx); // end summary
+        w.write(TDx); // end predSummary
+
+        if (detailedStats) {
+            // bopAnnotations
+            w.write(TD);
+            showAnnotations(w, bop.annotations());
+            w.write(TDx);
+        }
+
+        if (detailedStats) {
+            // predAnnotations
+            w.write(TD);
+            if (pred != null) {
+                showAnnotations(w, pred.annotations());
+            }
+            w.write(TDx);
+        }
 
         /*
          * Static optimizer metadata.
@@ -1502,6 +1519,41 @@ public class QueryLog {
         }
         w.write("</tr\n>");
 
+    }
+
+    /**
+     * Shows annotations on a {@link BOp}.
+     * 
+     * @param w
+     *            Where to write the XHTML data.
+     * @param anns
+     *            The annotations (optional).
+     * @throws IOException
+     */
+    static private void showAnnotations(final Writer w,
+            final Map<String, Object> anns) throws IOException {
+        if (anns != null && !anns.isEmpty()) {
+            w.write("<dl>");
+            for (Map.Entry<String, Object> e : anns.entrySet()) {
+                w.write("<dt>");
+                final String key = e.getKey();
+                w.write(cdata(key));
+                w.write("</dt><dd>");
+                final Object val = e.getValue();
+                // See CoreBaseBop for this pattern.
+                if (val != null && val.getClass().isArray()) {
+                    w.write(cdata(Arrays.toString((Object[]) val)));
+                } else if (key.equals(IPredicate.Annotations.FLAGS)) {
+                    w.write(cdata(Tuple.flagString((Integer) val)));
+                } else if (val instanceof BOp) {
+                    w.write(cdata(((BOp) val).toShortString()));
+                } else {
+                    w.write(cdata("" + val));
+                }
+                w.write("</dd>");
+            }
+            w.write("</dl>");
+        }
     }
 
     /**

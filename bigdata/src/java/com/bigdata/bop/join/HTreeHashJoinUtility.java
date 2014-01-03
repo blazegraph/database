@@ -75,8 +75,6 @@ import com.bigdata.relation.accesspath.BufferClosedException;
 import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.rwstore.sector.IMemoryManager;
 import com.bigdata.rwstore.sector.MemStore;
-import com.bigdata.striterator.Chunkerator;
-import com.bigdata.striterator.Dechunkerator;
 import com.bigdata.util.InnerCause;
 
 import cutthecrap.utils.striterators.Expander;
@@ -178,7 +176,12 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
             // Works Ok.
             h = 31 * h + c.hashCode();
             
-//          // Martyn's version.  Also works Ok.
+            /*
+             * TODO Martyn's version. Also works Ok. Compare rate of hash
+             * collisions and impact on join performance. Also compare use of
+             * 64-bit hash codes and impact on join performance (there should be
+             * fewer hash collisions).
+             */
             // @see http://burtleburtle.net/bob/hash/integer.html
 //            
 //            final int hc = c.hashCode();
@@ -210,15 +213,10 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
      */
     private final PipelineOp op;
     
-    /**
-     * This basically controls the vectoring of the hash join.
-     * 
-     * TODO parameter from operator annotations. Note that 10k tends to put too
-     * much heap pressure on the system if the source chunks happen to be
-     * smallish. 1000k or 100 is probably the right value until we improve
-     * vectoring of the query engine.
-     */
-    private final int chunkSize = 1000;//ChunkedWrappedIterator.DEFAULT_CHUNK_SIZE;
+//    /**
+//     * This basically controls the vectoring of the hash join.
+//     */
+//    private final int chunkSize = 1000;//ChunkedWrappedIterator.DEFAULT_CHUNK_SIZE;
 
     /**
      * Utility class for compactly and efficiently encoding and decoding
@@ -305,7 +303,7 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
      * The maximum #of (left,right) solution joins that will be considered
      * before failing the join. This is used IFF there are no join variables.
      * 
-     * FIXME Annotation and query hint for this. Probably on
+     * TODO HINTS: Annotation and query hint for this. Probably on
      * {@link HashJoinAnnotations}.
      */
     private final long noJoinVarsLimit = HashJoinAnnotations.DEFAULT_NO_JOIN_VARS_LIMIT;
@@ -357,8 +355,8 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
         sb.append(getClass().getSimpleName());
         
         sb.append("{open=" + open);
-        sb.append(",joinType="+joinType);
-        sb.append(",chunkSize=" + chunkSize);
+        sb.append(",joinType=" + joinType);
+//        sb.append(",chunkSize=" + chunkSize);
 //        sb.append(",optional=" + optional);
 //        sb.append(",filter=" + filter);
         if (askVar != null)
@@ -707,30 +705,8 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
             final IKeyBuilder keyBuilder = htree.getIndexMetadata()
                     .getKeyBuilder();
 
-            /*
-             * Rechunk in order to have a nice fat vector size for ordered
-             * inserts.
-             * 
-             * TODO This should probably be eliminated in favor of the existing
-             * chunk size. That allows us to control the vectoring directly from
-             * the pipeline annotations for the query engine. If 1000 (the
-             * current [chunkSize] hard wired into this class) makes a
-             * significant difference over 100 (the current default pipeline
-             * chunk capacity) then we should simply override the default chunk
-             * capacity for the htree hash join operators (i.e., analytic
-             * operators always imply a larger default chunk capacity, as could
-             * operators running on a cluster). This change should be verified
-             * against the GOVTRACK dataset and also by using BSBM with JVM and
-             * HTree hash joins and measuring the change in the performance
-             * delta when the HTree hash join vector size is changed.
-             * 
-             * @see https://sourceforge.net/apps/trac/bigdata/ticket/483
-             * (Eliminate unnecessary dechunking and rechunking)
-             */
-
-            final ICloseableIterator<IBindingSet[]> it = new Chunkerator<IBindingSet>(
-                    new Dechunkerator<IBindingSet>(itr), chunkSize,
-                    IBindingSet.class);
+            // Note: We no longer re-chunk here.
+            final ICloseableIterator<IBindingSet[]> it = itr;
             
             try {
                 
@@ -805,16 +781,13 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
 
         final IKeyBuilder keyBuilder = htree.getIndexMetadata().getKeyBuilder();
 
-        /*
-         * Rechunk in order to have a nice fat vector size for ordered inserts.
-         */
-        final Iterator<IBindingSet[]> it = new Chunkerator<IBindingSet>(
-                new Dechunkerator<IBindingSet>(itr), chunkSize,
-                IBindingSet.class);
+        // Note: We no longer rechunk here.
+        final Iterator<IBindingSet[]> it = itr;
 
         final AtomicInteger vectorSize = new AtomicInteger();
         while (it.hasNext()) {
 
+            // Vector a chunk of solutions.
             final BS[] a = vector(it.next(), joinVars, selectVars,
                     true/* ignoreUnboundVariables */, vectorSize);
   
@@ -943,6 +916,7 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
             return 0;
         }
         
+        @Override
         public String toString() {
             return getClass().getName() + "{hashCode=" + hashCode + ",bset="
                     + bset + "}";
@@ -974,6 +948,7 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
             return 0;
         }
         
+        @Override
         public String toString() {
             return getClass().getName() + "{hashCode=" + hashCode + ",value="
                     + BytesUtil.toString(value) + "}";
@@ -983,20 +958,25 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
     
     @Override
     public void hashJoin(//
-            final ICloseableIterator<IBindingSet> leftItr,//
+            final ICloseableIterator<IBindingSet[]> leftItr,//
+            final BOpStats stats,
             final IBuffer<IBindingSet> outputBuffer//
             ) {
 
-        hashJoin2(leftItr, outputBuffer, constraints);
+        hashJoin2(leftItr, stats, outputBuffer, constraints);
         
     }
 
     @Override
     public void hashJoin2(//
-            final ICloseableIterator<IBindingSet> leftItr,//
+            final ICloseableIterator<IBindingSet[]> leftItr,//
+            final BOpStats stats,//
             final IBuffer<IBindingSet> outputBuffer,//
             final IConstraint[] constraints//
             ) {
+
+        // Note: We no longer rechunk in this method.
+        final Iterator<IBindingSet[]> it = leftItr;
 
         try {
 
@@ -1012,22 +992,37 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
             final IKeyBuilder keyBuilder = rightSolutions.getIndexMetadata()
                     .getKeyBuilder();
 
-            final Iterator<IBindingSet[]> it = new Chunkerator<IBindingSet>(
-                    leftItr, chunkSize, IBindingSet.class);
-
             // true iff there are no join variables.
             final boolean noJoinVars = joinVars.length == 0;
             
             final AtomicInteger vectorSize = new AtomicInteger();
             while (it.hasNext()) {
 
-                final BS[] a = vector(it.next(), joinVars,
-                        null/* selectVars */,
-                        false/* ignoreUnboundVariables */, vectorSize);
-                
-                final int n = vectorSize.get();
+                final BS[] a; // vectored solutions.
+                final int n; // #of valid elements in a[].
+                {
+                    // Next chunk of solutions from left.
+                    final IBindingSet[] b = it.next();
+                    if (stats != null) {
+                        stats.chunksIn.increment();
+                        stats.unitsIn.add(b.length);
+                    }
 
-                nleftConsidered.add(n);
+                    // Vector a chunk of solutions, ordering by hashCode.
+                    a = vector(b, joinVars, null/* selectVars */,
+                            false/* ignoreUnboundVariables */, vectorSize);
+
+                    // The size of that vector.
+                    n = vectorSize.get();
+                    
+                    nleftConsidered.add(n);
+
+                    if (log.isTraceEnabled())
+                        log.trace("Vectoring chunk for HTree locality: " + n
+                                + " out of " + a.length
+                                + " solutions are preserved.");
+
+                }
                 
                 int fromIndex = 0;
 
@@ -1056,7 +1051,8 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
 
                     if (log.isTraceEnabled())
                         log.trace("hashCode=" + hashCode + ": #left="
-                                + bucketSize + ", firstLeft=" + a[fromIndex]);
+                                + bucketSize + ", vectorSize=" + n
+                                + ", firstLeft=" + a[fromIndex]);
 
                     /*
                      * Note: all source solutions in [fromIndex:toIndex) have
@@ -1080,7 +1076,8 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
                     int nrejected = 0;
                     {
 
-                        final byte[] key = keyBuilder.reset().append(hashCode).getKey();
+                        final byte[] key = keyBuilder.reset().append(hashCode)
+                                .getKey();
                         
                         // visit all source solutions having the same hash code
                         final ITupleIterator<?> titr = rightSolutions
@@ -1278,7 +1275,11 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
      *            When <code>true</code>, an unbound variable will not cause a
      *            {@link JoinVariableNotBoundException} to be thrown.
      * @param vectorSize
-     *            The vector size (set by side-effect).
+     *            The vector size (set by side-effect). This will be LTE the
+     *            number of solutions in <code>leftSolutions</code>. (If some
+     *            solutions are eliminated because they lack a binding for a
+     *            required join variable, then vectorSize is LT the number of
+     *            <code>leftSolutions</code>).
      * 
      * @return The vectored chunk of solutions ordered by hash code.
      */

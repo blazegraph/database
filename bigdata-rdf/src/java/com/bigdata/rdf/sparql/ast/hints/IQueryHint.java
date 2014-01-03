@@ -72,6 +72,10 @@ public interface IQueryHint<T> {
      * name of the annotation. This method may be used to attach zero or more
      * annotations as appropriate to the AST structure. It may also be used to
      * change defaults in the {@link AST2BOpContext} or take similar actions.
+     * <p>
+     * Note: When <code>scope</code> EQ {@link QueryHintScope#Query}, the
+     * implementation SHOULD also act on {@link AST2BOpContext#queryHints},
+     * setting the value in the global scope.
      * 
      * @param ctx
      *            The query evaluation context.

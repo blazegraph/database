@@ -20,6 +20,7 @@ import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpEvaluationContext;
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.Bind;
+import com.bigdata.bop.BufferAnnotations;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBind;
 import com.bigdata.bop.IBindingSet;
@@ -533,7 +534,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
                             BOpEvaluationContext.CONTROLLER),//
                     new NV(PipelineOp.Annotations.SHARED_STATE,true),// live stats
                     new NV(ProjectionOp.Annotations.SELECT, projectedVars)//
-            ), queryBase.getQueryHints());
+            ), queryBase, ctx);
             
             if(materializeProjection) {
                 
@@ -566,14 +567,14 @@ public class AST2BOpUtility extends AST2BOpRTO {
                     final IVariable<?>[] vars = tmp.toArray(new IVariable[tmp
                             .size()]);
                     
-                    left = new ChunkedMaterializationOp(leftOrEmpty(left),
+                    left = applyQueryHints(new ChunkedMaterializationOp(leftOrEmpty(left),
                             new NV(ChunkedMaterializationOp.Annotations.VARS, vars),//
                             new NV(ChunkedMaterializationOp.Annotations.RELATION_NAME, new String[] { ns }), //
                             new NV(ChunkedMaterializationOp.Annotations.TIMESTAMP, timestamp), //
                             new NV(ChunkedMaterializationOp.Annotations.MATERIALIZE_INLINE_IVS, true), //
                             new NV(PipelineOp.Annotations.SHARED_STATE, !ctx.isCluster()),// live stats, but not on the cluster.
                             new NV(BOp.Annotations.BOP_ID, ctx.nextId())//
-                            );
+                            ), queryBase, ctx);
 
 //                    left = (PipelineOp) new ChunkedMaterializationOp(
 //                            leftOrEmpty(left), vars, ns, timestamp)
@@ -791,7 +792,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
                 .newInstance(ctx.queryId, subqueryRoot.getName(), joinVars);
 
         if(ctx.nativeHashJoins) {
-            left = new HTreeNamedSubqueryOp(leftOrEmpty(left), //
+            left = applyQueryHints(new HTreeNamedSubqueryOp(leftOrEmpty(left), //
                 new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
                 new NV(BOp.Annotations.EVALUATION_CONTEXT,
                         BOpEvaluationContext.CONTROLLER),//
@@ -803,10 +804,10 @@ public class AST2BOpUtility extends AST2BOpRTO {
                 new NV(HTreeNamedSubqueryOp.Annotations.SUBQUERY, subqueryPlan),//
                 new NV(HTreeNamedSubqueryOp.Annotations.JOIN_VARS, joinVars),//
                 new NV(NamedSetAnnotations.NAMED_SET_REF,
-                        namedSolutionSet)//
-        );
+                                namedSolutionSet)//
+                ), subqueryRoot, ctx);
         } else {
-            left = new JVMNamedSubqueryOp(leftOrEmpty(left), //
+            left = applyQueryHints(new JVMNamedSubqueryOp(leftOrEmpty(left), //
                     new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
                     new NV(BOp.Annotations.EVALUATION_CONTEXT,
                             BOpEvaluationContext.CONTROLLER),//
@@ -816,8 +817,8 @@ public class AST2BOpUtility extends AST2BOpRTO {
                     new NV(HTreeNamedSubqueryOp.Annotations.SUBQUERY, subqueryPlan),//
                     new NV(HTreeNamedSubqueryOp.Annotations.JOIN_VARS, joinVars),//
                     new NV(NamedSetAnnotations.NAMED_SET_REF,
-                            namedSolutionSet)//
-            );
+                                    namedSolutionSet)//
+                    ), subqueryRoot, ctx);
         }
 
         return left;
@@ -1321,12 +1322,13 @@ public class AST2BOpUtility extends AST2BOpRTO {
                 final JoinTypeEnum joinType = JoinTypeEnum.Normal;
 
                 if (ctx.nativeHashJoins) {
-                    left = new HTreeHashIndexOp(
+                    left = applyQueryHints(new HTreeHashIndexOp(
                             leftOrEmpty(left),//
                             new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
                             new NV(BOp.Annotations.EVALUATION_CONTEXT,
                                     BOpEvaluationContext.CONTROLLER),//
                             new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
+//                            new NV(PipelineOp.Annotations.CHUNK_CAPACITY, 1),// TODO Why ONE (1)?  Is this because there is a single source solution?  Is that true? Why not use the default?
                             new NV(PipelineOp.Annotations.LAST_PASS, true),// required
                             new NV(PipelineOp.Annotations.SHARED_STATE, true),// live
                                                                               // stats.
@@ -1340,9 +1342,9 @@ public class AST2BOpUtility extends AST2BOpRTO {
                                     sourceSet),//
                             new NV(HashIndexOp.Annotations.NAMED_SET_REF,
                                     generatedSet)//
-                    );
+                        ), nsi, ctx);
                 } else {
-                    left = new JVMHashIndexOp(
+                    left = applyQueryHints(new JVMHashIndexOp(
                             leftOrEmpty(left),//
                             new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
                             new NV(BOp.Annotations.EVALUATION_CONTEXT,
@@ -1359,7 +1361,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
                                     sourceSet),//
                             new NV(HashIndexOp.Annotations.NAMED_SET_REF,
                                     generatedSet)//
-                    );
+                        ), nsi, ctx);
                 }
 
                 // true since we are building the hash index.
@@ -1410,7 +1412,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
         
         if (ctx.nativeHashJoins) {
             
-            left = new HTreeSolutionSetHashJoinOp(leftOrEmpty(left), //
+            left = applyQueryHints(new HTreeSolutionSetHashJoinOp(leftOrEmpty(left), //
                     new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
                     new NV(BOp.Annotations.EVALUATION_CONTEXT,
                             BOpEvaluationContext.CONTROLLER),//
@@ -1425,11 +1427,11 @@ public class AST2BOpUtility extends AST2BOpRTO {
 							release)//
 //					new NV(HTreeSolutionSetHashJoinOp.Annotations.LAST_PASS,
 //							isLastPassRequested)//
-            );
+                ), nsi, ctx);
 
         } else {
             
-            left = new JVMSolutionSetHashJoinOp(leftOrEmpty(left), //
+            left = applyQueryHints(new JVMSolutionSetHashJoinOp(leftOrEmpty(left), //
                     new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
                     new NV(BOp.Annotations.EVALUATION_CONTEXT,
                             BOpEvaluationContext.CONTROLLER),//
@@ -1444,7 +1446,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
                             release)//
 //    					new NV(JVMSolutionSetHashJoinOp.Annotations.LAST_PASS,
 //    							isLastPassRequested)//
-            );
+                ), nsi, ctx);
             
         }
         
@@ -1671,7 +1673,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
                 : ctx.maxParallelForSolutionSetHashJoin;
 
         if(ctx.nativeHashJoins) {
-            left = new HTreeHashIndexOp(leftOrEmpty(left),//
+            left = applyQueryHints(new HTreeHashIndexOp(leftOrEmpty(left),//
                 new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
                 new NV(BOp.Annotations.EVALUATION_CONTEXT,
                         BOpEvaluationContext.CONTROLLER),//
@@ -1684,9 +1686,9 @@ public class AST2BOpUtility extends AST2BOpRTO {
                 new NV(HTreeHashIndexOp.Annotations.CONSTRAINTS, joinConstraints),// Note: will be applied by the solution set hash join.
 //                    new NV(HTreeHashIndexOp.Annotations.SELECT, projectedVars),//
                 new NV(HTreeHashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
-        );
+            ), subqueryRoot, ctx);
         } else {
-            left = new JVMHashIndexOp(leftOrEmpty(left),//
+            left = applyQueryHints(new JVMHashIndexOp(leftOrEmpty(left),//
                 new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
                 new NV(BOp.Annotations.EVALUATION_CONTEXT,
                         BOpEvaluationContext.CONTROLLER),//
@@ -1698,7 +1700,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
                 new NV(JVMHashIndexOp.Annotations.CONSTRAINTS, joinConstraints),// Note: will be applied by the solution set hash join.
 //                    new NV(HTreeHashIndexOp.Annotations.SELECT, projectedVars),//
                 new NV(JVMHashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
-            ); 
+            ), subqueryRoot, ctx);
         }
 
         /*
@@ -1710,19 +1712,19 @@ public class AST2BOpUtility extends AST2BOpRTO {
          * they can be reunited with the solutions for the subquery in the
          * solution set hash join at the end of the subquery plan.
          */
-        left = new ProjectionOp(leftOrEmpty(left), //
+        left = applyQueryHints(new ProjectionOp(leftOrEmpty(left), //
                 new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
                 new NV(BOp.Annotations.EVALUATION_CONTEXT,
                         BOpEvaluationContext.CONTROLLER),//
                 new NV(PipelineOp.Annotations.SHARED_STATE,true),// live stats
                 new NV(ProjectionOp.Annotations.SELECT, projectedVars)//
-        );
+                ), subqueryRoot, ctx);
         
         // Append the subquery plan.
         left = convertQueryBase(left, subqueryRoot, doneSet, ctx);
         
         if(ctx.nativeHashJoins) {
-            left = new HTreeSolutionSetHashJoinOp(
+            left = applyQueryHints(new HTreeSolutionSetHashJoinOp(
                 leftOrEmpty(left),//
                 new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
                 new NV(BOp.Annotations.EVALUATION_CONTEXT,
@@ -1736,9 +1738,9 @@ public class AST2BOpUtility extends AST2BOpRTO {
                 new NV(HTreeSolutionSetHashJoinOp.Annotations.RELEASE, release),//
                 new NV(HTreeSolutionSetHashJoinOp.Annotations.LAST_PASS, lastPass),//
                 new NV(HTreeSolutionSetHashJoinOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
-                );
+            ), subqueryRoot, ctx);
         } else {
-            left = new JVMSolutionSetHashJoinOp(
+            left = applyQueryHints(new JVMSolutionSetHashJoinOp(
                 leftOrEmpty(left),//
                 new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
                 new NV(BOp.Annotations.EVALUATION_CONTEXT,
@@ -1752,7 +1754,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
                 new NV(JVMSolutionSetHashJoinOp.Annotations.RELEASE, release),//
                 new NV(JVMSolutionSetHashJoinOp.Annotations.LAST_PASS, lastPass),//
                 new NV(JVMSolutionSetHashJoinOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
-                );
+            ), subqueryRoot, ctx);
         }
 
         /*
@@ -1919,7 +1921,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
             throw new UnsupportedOperationException();
 
         if(ctx.nativeHashJoins) {
-            left = new HTreeHashIndexOp(leftOrEmpty(left),//
+            left = applyQueryHints(new HTreeHashIndexOp(leftOrEmpty(left),//
                 new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
                 new NV(BOp.Annotations.EVALUATION_CONTEXT,
                         BOpEvaluationContext.CONTROLLER),//
@@ -1933,9 +1935,9 @@ public class AST2BOpUtility extends AST2BOpRTO {
                 new NV(HTreeHashIndexOp.Annotations.SELECT, selectVars),//
                 new NV(HTreeHashIndexOp.Annotations.ASK_VAR, askVar),//
                 new NV(HTreeHashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
-        );
+            ), subqueryRoot, ctx);
         } else {
-            left = new JVMHashIndexOp(leftOrEmpty(left),//
+            left = applyQueryHints(new JVMHashIndexOp(leftOrEmpty(left),//
                 new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
                 new NV(BOp.Annotations.EVALUATION_CONTEXT,
                         BOpEvaluationContext.CONTROLLER),//
@@ -1948,7 +1950,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
                 new NV(HTreeHashIndexOp.Annotations.SELECT, selectVars),//
                 new NV(HTreeHashIndexOp.Annotations.ASK_VAR, askVar),//
                 new NV(JVMHashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
-            ); 
+            ), subqueryRoot, ctx);
         }
 
         // Everything is visible inside of the EXISTS graph pattern.
@@ -1978,7 +1980,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
 //                false /* materializeProjection */, ctx);
         
         if(ctx.nativeHashJoins) {
-            left = new HTreeSolutionSetHashJoinOp(
+            left = applyQueryHints(new HTreeSolutionSetHashJoinOp(
                 leftOrEmpty(left),//
                 new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
                 new NV(BOp.Annotations.EVALUATION_CONTEXT,
@@ -1992,9 +1994,9 @@ public class AST2BOpUtility extends AST2BOpRTO {
                 new NV(HTreeSolutionSetHashJoinOp.Annotations.RELEASE, release),//
                 new NV(HTreeSolutionSetHashJoinOp.Annotations.LAST_PASS, lastPass),//
                 new NV(HTreeSolutionSetHashJoinOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
-                );
+            ), subqueryRoot, ctx);
         } else {
-            left = new JVMSolutionSetHashJoinOp(
+            left = applyQueryHints(new JVMSolutionSetHashJoinOp(
                 leftOrEmpty(left),//
                 new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
                 new NV(BOp.Annotations.EVALUATION_CONTEXT,
@@ -2008,7 +2010,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
                 new NV(JVMSolutionSetHashJoinOp.Annotations.RELEASE, release),//
                 new NV(JVMSolutionSetHashJoinOp.Annotations.LAST_PASS, lastPass),//
                 new NV(JVMSolutionSetHashJoinOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
-                );
+            ), subqueryRoot, ctx);
         }
 
         /*
@@ -2507,8 +2509,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
             
         }
 
-        if (joinGroup.getProperty(QueryHints.OPTIMIZER,
-                QueryOptimizerEnum.Static).equals(QueryOptimizerEnum.Runtime)) {
+        if (QueryOptimizerEnum.Runtime.equals(joinGroup.getQueryOptimizer())) {
 
             /*
              * Inspect the remainder of the join group. If we can isolate a join
@@ -2552,17 +2553,14 @@ public class AST2BOpUtility extends AST2BOpRTO {
                         optional ? new LinkedHashSet<IVariable<?>>(doneSet)
                                 : doneSet,
                         getJoinConstraints(sp), 
-//                        new BOpContextBase(ctx.queryEngine), ctx.idFactory,
                         sp.getQueryHints());
                 continue;
             } else if (child instanceof ArbitraryLengthPathNode) {
-//            	@SuppressWarnings("unchecked")
-            	final ArbitraryLengthPathNode alpNode = (ArbitraryLengthPathNode) child;
+                final ArbitraryLengthPathNode alpNode = (ArbitraryLengthPathNode) child;
                 left = convertArbitraryLengthPath(left, alpNode, doneSet, ctx);
                 continue;
             } else if (child instanceof ZeroLengthPathNode) {
-//            	@SuppressWarnings("unchecked")
-            	final ZeroLengthPathNode zlpNode = (ZeroLengthPathNode) child;
+                final ZeroLengthPathNode zlpNode = (ZeroLengthPathNode) child;
                 left = convertZeroLengthPath(left, zlpNode, doneSet, ctx);
                 continue;
             } else if (child instanceof ServiceNode) {
@@ -2658,10 +2656,10 @@ public class AST2BOpUtility extends AST2BOpRTO {
         if (!dropVars.isEmpty()) {
             final IVariable<?>[] a = dropVars.toArray(new IVariable[dropVars
                     .size()]);
-            left = new DropOp(leftOrEmpty(left), new NV(BOp.Annotations.BOP_ID,
+            left = applyQueryHints(new DropOp(leftOrEmpty(left), new NV(BOp.Annotations.BOP_ID,
                     ctx.nextId()), //
                     new NV(DropOp.Annotations.DROP_VARS, a)//
-            );
+            ), joinGroup, ctx);
         }
         
         /*
@@ -2942,7 +2940,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
             left = addNamedSubqueryInclude(left, firstInclude, doneSet, ctx);
             
             if(ctx.nativeHashJoins) {
-                left = new HTreeHashIndexOp(leftOrEmpty(left),//
+                left = applyQueryHints(new HTreeHashIndexOp(leftOrEmpty(left),//
                     new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
                     new NV(BOp.Annotations.EVALUATION_CONTEXT,
                             BOpEvaluationContext.CONTROLLER),//
@@ -2955,9 +2953,9 @@ public class AST2BOpUtility extends AST2BOpRTO {
                     new NV(HTreeHashIndexOp.Annotations.JOIN_VARS, joinvars2),//
         //                new NV(HTreeHashIndexOp.Annotations.SELECT, selectVars),//
                     new NV(HTreeHashIndexOp.Annotations.NAMED_SET_REF, firstNamedSolutionSetRef)//
-            );
+                ), joinGroup, ctx);
             } else {
-                left = new JVMHashIndexOp(leftOrEmpty(left),//
+                left = applyQueryHints(new JVMHashIndexOp(leftOrEmpty(left),//
                     new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
                     new NV(BOp.Annotations.EVALUATION_CONTEXT,
                             BOpEvaluationContext.CONTROLLER),//
@@ -2969,7 +2967,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
                     new NV(JVMHashIndexOp.Annotations.JOIN_VARS, joinvars2),//
         //                new NV(JVMHashIndexOp.Annotations.SELECT, selectVars),//
                     new NV(JVMHashIndexOp.Annotations.NAMED_SET_REF, firstNamedSolutionSetRef)//
-                ); 
+                ), joinGroup, ctx);
             }
         }
         
@@ -3020,7 +3018,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
          */
         if (ctx.nativeHashJoins) {
             
-            left = new HTreeMergeJoin(leftOrEmpty(left), //
+            left = applyQueryHints(new HTreeMergeJoin(leftOrEmpty(left), //
                     new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
                     new NV(BOp.Annotations.EVALUATION_CONTEXT,
                             BOpEvaluationContext.CONTROLLER),//
@@ -3033,11 +3031,11 @@ public class AST2BOpUtility extends AST2BOpRTO {
                     new NV(HTreeMergeJoin.Annotations.CONSTRAINTS, c),//
                     new NV(HTreeMergeJoin.Annotations.RELEASE,
                                 release)//
-            );
+            ), joinGroup, ctx);
 
         } else {
             
-            left = new JVMMergeJoin(leftOrEmpty(left), //
+            left = applyQueryHints(new JVMMergeJoin(leftOrEmpty(left), //
                     new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
                     new NV(BOp.Annotations.EVALUATION_CONTEXT,
                             BOpEvaluationContext.CONTROLLER),//
@@ -3050,7 +3048,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
                     new NV(JVMMergeJoin.Annotations.CONSTRAINTS, c),//
                     new NV(JVMMergeJoin.Annotations.RELEASE,
                             release)//
-            );
+            ), joinGroup, ctx);
 
         }
 
@@ -3437,7 +3435,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
 
         final PipelineOp op;
         if(ctx.nativeHashJoins) {
-            op = new HTreeHashIndexOp(leftOrEmpty(left),//
+            op = applyQueryHints(new HTreeHashIndexOp(leftOrEmpty(left),//
                 new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
                 new NV(BOp.Annotations.EVALUATION_CONTEXT,
                         BOpEvaluationContext.CONTROLLER),//
@@ -3450,9 +3448,9 @@ public class AST2BOpUtility extends AST2BOpRTO {
                 new NV(HTreeHashIndexOp.Annotations.PROJECT_IN_VARS, subgroup.getProjectInVars()),//
                 new NV(HTreeHashIndexOp.Annotations.SELECT, selectVars),//
                 new NV(HTreeHashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
-        );
+            ), subgroup, ctx);
         } else {
-            op = new JVMHashIndexOp(leftOrEmpty(left),//
+            op = applyQueryHints(new JVMHashIndexOp(leftOrEmpty(left),//
                 new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
                 new NV(BOp.Annotations.EVALUATION_CONTEXT,
                         BOpEvaluationContext.CONTROLLER),//
@@ -3464,7 +3462,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
                 new NV(HTreeHashIndexOp.Annotations.PROJECT_IN_VARS, subgroup.getProjectInVars()),//
                 new NV(JVMHashIndexOp.Annotations.SELECT, selectVars),//
                 new NV(JVMHashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
-            ); 
+            ), subgroup, ctx);
         }
 
         final PipelineOp subqueryPlan = convertJoinGroupOrUnion(op/* left */,
@@ -3482,7 +3480,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
                 : ctx.maxParallelForSolutionSetHashJoin;
 
         if(ctx.nativeHashJoins) {
-            left = new HTreeSolutionSetHashJoinOp(
+            left = applyQueryHints(new HTreeSolutionSetHashJoinOp(
                 new BOp[] { subqueryPlan },//
                 new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
                 new NV(BOp.Annotations.EVALUATION_CONTEXT,
@@ -3496,9 +3494,9 @@ public class AST2BOpUtility extends AST2BOpRTO {
                 new NV(HTreeSolutionSetHashJoinOp.Annotations.RELEASE, release),//
                 new NV(HTreeSolutionSetHashJoinOp.Annotations.LAST_PASS, lastPass),//
                 new NV(HTreeSolutionSetHashJoinOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
-        );
+                ), subgroup, ctx);
         } else {
-            left = new JVMSolutionSetHashJoinOp(
+            left = applyQueryHints(new JVMSolutionSetHashJoinOp(
                     new BOp[] { subqueryPlan },//
                     new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
                     new NV(BOp.Annotations.EVALUATION_CONTEXT,
@@ -3512,7 +3510,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
                     new NV(JVMSolutionSetHashJoinOp.Annotations.RELEASE, release),//
                     new NV(JVMSolutionSetHashJoinOp.Annotations.LAST_PASS, lastPass),//
                     new NV(JVMSolutionSetHashJoinOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
-            );
+            ), subgroup, ctx);
         }
 
         /*
@@ -3657,7 +3655,8 @@ public class AST2BOpUtility extends AST2BOpRTO {
             );
         }
 
-        left = applyQueryHints(op, ctx.queryHints);
+        // Note: applies query hints to JVM or HTree based DISTINCT.
+        left = applyQueryHints(op, query, ctx);
 
         return left;
 
@@ -3943,7 +3942,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
                 new NV(SliceOp.Annotations.PIPELINED, true),//
                 new NV(SliceOp.Annotations.MAX_PARALLEL, 1),//
                 new NV(MemorySortOp.Annotations.SHARED_STATE, true)//
-                ), ctx.queryHints);
+                ), slice, ctx);
 
         return left;
 
@@ -4017,13 +4016,46 @@ public class AST2BOpUtility extends AST2BOpRTO {
         anns.add(new NV(Annotations.ORIGINAL_INDEX,
                 sp.getProperty(Annotations.ORIGINAL_INDEX)));
 
+        /*
+         * BufferAnnotations are used by all PipelineOps to control their
+         * vectoring. However, some BufferAnnotations are *also* used by the
+         * AccessPath associated with a Predicate. We now copy those annotations
+         * from the StatementPatternNode onto the Predicate. See
+         * AccessPath<init>() for the set of annotations that it pulls from the
+         * Predicate asssociated with the AccessPath.
+         * 
+         * Note: These annotations are *also* present on the PipelineOp
+         * generated from the StatementPatternNode. On the Predicate, they
+         * control the behavior of the AccessPath. On the PipelineOp, e.g.,
+         * PipelineJoin, the control the vectoring of the pipeline operator.
+         */
         {
-            // Propagate the optional query hint override for the index to use.
-            final Object tmp = sp.getQueryHint(IPredicate.Annotations.KEY_ORDER);
-            if (tmp != null) {
-                anns.add(new NV(IPredicate.Annotations.KEY_ORDER, tmp));
-            }
+
+            final Properties queryHints = sp.getQueryHints();
+            
+            conditionalCopy(anns, queryHints, BufferAnnotations.CHUNK_CAPACITY);
+            
+            conditionalCopy(anns, queryHints,
+                    BufferAnnotations.CHUNK_OF_CHUNKS_CAPACITY);
+            
+            conditionalCopy(anns, queryHints,
+                    IPredicate.Annotations.FULLY_BUFFERED_READ_THRESHOLD);
+
+            conditionalCopy(anns, queryHints, IPredicate.Annotations.KEY_ORDER);
+
+            // Note: moved up from below and modified to use conditionalCopy().
+            conditionalCopy(anns, queryHints,
+                    IPredicate.Annotations.CUTOFF_LIMIT);
+            
         }
+
+//        {
+//            // Propagate the optional query hint override for the index to use.
+//            final Object tmp = sp.getQueryHint(IPredicate.Annotations.KEY_ORDER);
+//            if (tmp != null) {
+//                anns.add(new NV(IPredicate.Annotations.KEY_ORDER, tmp));
+//            }
+//        }
 
         if (sp.isOptional()) {
             // Mark the join as optional.
@@ -4046,15 +4078,18 @@ public class AST2BOpUtility extends AST2BOpRTO {
         
         final RangeNode range = sp.getRange();
         if (range != null) {
-        	// Add the RangeBOp
-        	anns.add(new NV(IPredicate.Annotations.RANGE, range.getRangeBOp()));
+            // Add the RangeBOp
+            anns.add(new NV(IPredicate.Annotations.RANGE, range.getRangeBOp()));
         }
 
-        final String cutoffLimit = sp.getQueryHint(QueryHints.CUTOFF_LIMIT);
-        if (cutoffLimit != null) {
-        	// Add the cutoff limit
-        	anns.add(new NV(IPredicate.Annotations.CUTOFF_LIMIT, Long.valueOf(cutoffLimit)));
-        }
+//        Note: Move above and modified to use conditionalCopy.
+//        
+//        final String cutoffLimit = sp.getQueryHint(QueryHints.CUTOFF_LIMIT);
+//        if (cutoffLimit != null) {
+//            // Add the cutoff limit
+//            anns.add(new NV(IPredicate.Annotations.CUTOFF_LIMIT, Long
+//                    .valueOf(cutoffLimit)));
+//        }
 
         final Properties queryHints = sp.getQueryHints();
         
@@ -4293,6 +4328,34 @@ public class AST2BOpUtility extends AST2BOpRTO {
 
     }
 
+    /**
+     * Conditionally copy a query hint, adding it to the caller's list.
+     * 
+     * @param anns
+     *            The caller's list.
+     * @param queryHints
+     *            The query hints (optional).
+     * @param name
+     *            The name of a query hint to copy. It will be added to
+     *            <code>anns</code> if a non-default value is found in the given
+     *            <code>queryHints</code>.
+     */
+    private static void conditionalCopy(final List<NV> anns,
+            final Properties queryHints, final String name) {
+        
+        if (queryHints == null)
+            return;
+
+        final Object val = queryHints.getProperty(name);
+
+        if (val != null) {
+        
+            anns.add(new NV(name, val));
+            
+        }
+        
+    }
+    
     /**
      * Convert an {@link IValueExpressionNode} (recursively) to an
      * {@link IValueExpression}. If the {@link IValueExpression} can be reduced

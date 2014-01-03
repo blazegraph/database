@@ -1,6 +1,6 @@
-/*
+/**
 
-Copyright (C) SYSTAP, LLC 2006-2008.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2010.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
@@ -20,24 +20,23 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-
 */
-/*
- * Created on Aug 7, 2008
- */
+package com.bigdata.bop.controller;
 
-package com.bigdata.striterator;
+import com.bigdata.bop.join.SolutionSetHashJoinOp;
 
 /**
- * Generic-enabled streaming iterator pattern for chunked iterators.
+ * Marker interface for named subquery evaluation. Solutions from the pipeline
+ * flow through this operator without modification. The subquery is evaluated
+ * exactly once, the first time this operator is invoked, and the solutions for
+ * the subquery are written onto a hash index. Those solutions are then joined
+ * back within the query at latter points in the query plan using a solution set
+ * hash join.
+ * 
+ * @see SolutionSetHashJoinOp
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
-public interface IChunkedStriterator<I extends IChunkedIterator<E>, E> extends
-        IChunkedIterator<E>, IStriterator<I, E> {
-
-    @Override
-    public IChunkedStriterator<I, E> addFilter(IFilter<I, ?, E> filter);
+public interface INamedSubqueryOp {
 
 }

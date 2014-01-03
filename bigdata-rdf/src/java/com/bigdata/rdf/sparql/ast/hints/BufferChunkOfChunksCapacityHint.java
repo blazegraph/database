@@ -29,14 +29,14 @@ package com.bigdata.rdf.sparql.ast.hints;
 
 import com.bigdata.bop.BufferAnnotations;
 import com.bigdata.rdf.sparql.ast.ASTBase;
-import com.bigdata.rdf.sparql.ast.StatementPatternNode;
+import com.bigdata.rdf.sparql.ast.IQueryNode;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 
 /**
  * The maximum #of chunks that can be buffered before an the producer would
- * block (default {@value #DEFAULT_CHUNK_OF_CHUNKS_CAPACITY}). Note that partial
- * chunks may be combined into full chunks whose nominal capacity is specified
- * by {@link #CHUNK_CAPACITY}.
+ * block (default {@value BufferAnnotations#DEFAULT_CHUNK_OF_CHUNKS_CAPACITY}).
+ * Note that partial chunks may be combined into full chunks whose nominal
+ * capacity is specified by {@link BufferAnnotations#CHUNK_CAPACITY}.
  * 
  * @see BufferAnnotations#CHUNK_OF_CHUNKS_CAPACITY
  */
@@ -51,7 +51,7 @@ final class BufferChunkOfChunksCapacityHint extends AbstractIntQueryHint {
     public void handle(final AST2BOpContext context,
             final QueryHintScope scope, final ASTBase op, final Integer value) {
 
-        if (op instanceof StatementPatternNode) {
+        if (op instanceof IQueryNode) {
 
             /*
              * Note: This is set on the queryHint Properties object and then
@@ -61,6 +61,18 @@ final class BufferChunkOfChunksCapacityHint extends AbstractIntQueryHint {
             _setQueryHint(context, scope, op, getName(), value);
 
         }
+
+//        if (QueryHintScope.Query.equals(scope)) {
+//            
+//            /*
+//             * Also stuff the query hint on the global context for things which
+//             * look there.
+//             */
+//
+//            conditionalSetGlobalProperty(context,
+//                    BufferAnnotations.CHUNK_OF_CHUNKS_CAPACITY, value);
+//
+//        }
 
     }
 

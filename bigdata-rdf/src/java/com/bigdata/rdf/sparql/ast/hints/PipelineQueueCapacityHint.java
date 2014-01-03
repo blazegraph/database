@@ -29,7 +29,7 @@ package com.bigdata.rdf.sparql.ast.hints;
 
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.rdf.sparql.ast.ASTBase;
-import com.bigdata.rdf.sparql.ast.StatementPatternNode;
+import com.bigdata.rdf.sparql.ast.IQueryNode;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 
 /**
@@ -51,7 +51,7 @@ final class PipelineQueueCapacityHint extends AbstractIntQueryHint {
     public void handle(final AST2BOpContext context,
             final QueryHintScope scope, final ASTBase op, final Integer value) {
 
-        if (op instanceof StatementPatternNode) {
+        if (op instanceof IQueryNode) {
 
             /*
              * Note: This is set on the queryHint Properties object and then
@@ -61,6 +61,17 @@ final class PipelineQueueCapacityHint extends AbstractIntQueryHint {
             _setQueryHint(context, scope, op, getName(), value);
 
         }
+
+//        if (QueryHintScope.Query.equals(scope)) {
+//
+//            /*
+//             * Also stuff the query hint on the global context for things which
+//             * look there.
+//             */
+//
+//            conditionalSetGlobalProperty(context, getName(), value);
+//
+//        }
 
     }
 

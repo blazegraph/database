@@ -57,6 +57,9 @@ import com.bigdata.rdf.sparql.ast.optimizers.ASTStaticJoinOptimizer;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @see <a href="http://sourceforge.net/apps/trac/bigdata/ticket/791" > Clean up
+ *      query hints </a>
  */
 public interface QueryHints {
 

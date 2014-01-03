@@ -149,10 +149,16 @@ public class JVMHashIndex {
 
         int h = ONE;
 
-        for (IVariable<?> v : keyVars) {
+//        for (IVariable<?> v : keyVars) {
+//
+//            final IConstant<?> c = bset.get(v);
 
-            final IConstant<?> c = bset.get(v);
+        for (int i = 0; i < keyVars.length; i++) {
 
+            final IVariable<?> v = keyVars[i];
+            
+            final IConstant<?> c = vals[i];
+            
             if (c == null) {
 
                 if (!indexSolutionsHavingUnboundJoinVars) {
@@ -200,11 +206,13 @@ public class JVMHashIndex {
             this.vals = vals;
             this.hash = hashCode;
         }
-
+        
+        @Override
         public int hashCode() {
             return hash;
         }
 
+        @Override
         public boolean equals(final Object o) {
             if (this == o)
                 return true;
@@ -252,6 +260,7 @@ public class JVMHashIndex {
 
         }
 
+        @Override
         public String toString() {
 
             return getClass().getName() + "{nhits=" + nhits + ",solution="
@@ -278,6 +287,7 @@ public class JVMHashIndex {
          */
         private final List<SolutionHit> solutions = new LinkedList<SolutionHit>();
 
+        @Override
         public String toString() {
             return super.toString()
                     + //
@@ -354,6 +364,7 @@ public class JVMHashIndex {
 
         }
 
+        @Override
         final public Iterator<SolutionHit> iterator() {
 
             // return Collections.unmodifiableList(solutions).iterator();

@@ -68,6 +68,8 @@ public class ASTBase extends ModifiableBOpBase {
          * {@link AST2BOpContext}.
          * 
          * @see ASTQueryHintOptimizer
+         * @see <a href="http://sourceforge.net/apps/trac/bigdata/ticket/791" >
+         *      Clean up query hints </a>
          */
         String QUERY_HINTS = "queryHints";
         
@@ -76,15 +78,17 @@ public class ASTBase extends ModifiableBOpBase {
     /**
      * Constructor required for {@link com.bigdata.bop.BOpUtility#deepCopy(FilterNode)}.
      */
-    public ASTBase(ASTBase op) {
+    public ASTBase(final ASTBase op) {
         super(op);
     }
 
     /**
      * Required shallow copy constructor.
      */
-    public ASTBase(BOp[] args, Map<String, Object> annotations) {
+    public ASTBase(final BOp[] args, final Map<String, Object> annotations) {
+
         super(args, annotations);
+        
     }
 
     /**
@@ -191,12 +195,12 @@ public class ASTBase extends ModifiableBOpBase {
      */
     public void setQueryHint(final String name, final String value) {
 
-        if(name == null)
+        if (name == null)
             throw new IllegalArgumentException();
 
-        if(value == null)
+        if (value == null)
             throw new IllegalArgumentException();
-        
+
         Properties queryHints = getQueryHints();
 
         if (queryHints == null) {

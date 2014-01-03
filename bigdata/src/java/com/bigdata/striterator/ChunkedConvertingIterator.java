@@ -52,8 +52,8 @@ public class ChunkedConvertingIterator<E, F> implements IChunkedOrderedIterator<
      * @param converter
      *            The chunk-at-a-time converter.
      */
-    public ChunkedConvertingIterator(IChunkedOrderedIterator<E> src,
-            IChunkConverter<E, F> converter) {
+    public ChunkedConvertingIterator(final IChunkedOrderedIterator<E> src,
+            final IChunkConverter<E, F> converter) {
 
         this(src, converter, (IKeyOrder<F>) src.getKeyOrder());
         
@@ -70,9 +70,9 @@ public class ChunkedConvertingIterator<E, F> implements IChunkedOrderedIterator<
      *            The {@link IKeyOrder} for the converted chunks -or-
      *            <code>null</code> iff not known.
      */
-    public ChunkedConvertingIterator(IChunkedOrderedIterator<E> src,
-            IChunkConverter<E, F> converter, IKeyOrder<F> keyOrder) {
-        
+    public ChunkedConvertingIterator(final IChunkedOrderedIterator<E> src,
+            final IChunkConverter<E, F> converter, final IKeyOrder<F> keyOrder) {
+
         if (src == null)
             throw new IllegalArgumentException();
 
@@ -118,12 +118,14 @@ public class ChunkedConvertingIterator<E, F> implements IChunkedOrderedIterator<
         
     }
 
+    @Override
     public void close() {
         
         src.close();
         
     }
 
+    @Override
     public F next() {
         
         if (!hasNext())
@@ -149,6 +151,7 @@ public class ChunkedConvertingIterator<E, F> implements IChunkedOrderedIterator<
      * @return true iff there is a non-empty chunk and pos is LT the length of
      * that chunk.
      */
+    @Override
     public boolean hasNext() {
         
         /*
@@ -179,12 +182,14 @@ public class ChunkedConvertingIterator<E, F> implements IChunkedOrderedIterator<
         
     }
 
+    @Override
     public IKeyOrder<F> getKeyOrder() {
         
         return keyOrder;
         
     }
 
+    @Override
     public F[] nextChunk() {
 
         if (!hasNext())
@@ -228,7 +233,8 @@ public class ChunkedConvertingIterator<E, F> implements IChunkedOrderedIterator<
         
     }
 
-    public F[] nextChunk(IKeyOrder<F> keyOrder) {
+    @Override
+    public F[] nextChunk(final IKeyOrder<F> keyOrder) {
 
         if (keyOrder == null)
             throw new IllegalArgumentException();
@@ -251,6 +257,7 @@ public class ChunkedConvertingIterator<E, F> implements IChunkedOrderedIterator<
      * @throws UnsupportedOperationException
      *             always.
      */
+    @Override
     public void remove() {
 
         throw new UnsupportedOperationException();
