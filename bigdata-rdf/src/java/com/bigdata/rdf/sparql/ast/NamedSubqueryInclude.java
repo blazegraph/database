@@ -104,7 +104,7 @@ public class NamedSubqueryInclude extends
     /**
      * Constructor required for {@link com.bigdata.bop.BOpUtility#deepCopy(FilterNode)}.
      */
-    public NamedSubqueryInclude(NamedSubqueryInclude op) {
+    public NamedSubqueryInclude(final NamedSubqueryInclude op) {
 
         super(op);
         
@@ -113,7 +113,7 @@ public class NamedSubqueryInclude extends
     /**
      * Required shallow copy constructor.
      */
-    public NamedSubqueryInclude(BOp[] args, Map<String, Object> anns) {
+    public NamedSubqueryInclude(final BOp[] args, final Map<String, Object> anns) {
 
         super(args, anns);
 
@@ -129,12 +129,14 @@ public class NamedSubqueryInclude extends
         
     }
 
+    @Override
     public String getName() {
 
         return (String) getProperty(Annotations.NAMED_SET);
 
     }
 
+    @Override
     public void setName(final String name) {
 
         if (name == null)
@@ -195,6 +197,7 @@ public class NamedSubqueryInclude extends
     /**
      * Returns <code>false</code>.
      */
+    @Override
     final public boolean isOptional() {
         
         return false;
@@ -204,12 +207,14 @@ public class NamedSubqueryInclude extends
     /**
      * Returns <code>false</code>.
      */
+    @Override
     final public boolean isMinus() {
      
         return false;
         
     }
     
+    @Override
     final public List<FilterNode> getAttachedJoinFilters() {
 
         @SuppressWarnings("unchecked")
@@ -225,6 +230,7 @@ public class NamedSubqueryInclude extends
 
     }
 
+    @Override
     final public void setAttachedJoinFilters(final List<FilterNode> filters) {
 
         setProperty(Annotations.FILTERS, filters);
