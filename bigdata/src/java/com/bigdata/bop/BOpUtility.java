@@ -54,6 +54,7 @@ import com.bigdata.striterator.CloseableIteratorWrapper;
 import cutthecrap.utils.striterators.EmptyIterator;
 import cutthecrap.utils.striterators.Expander;
 import cutthecrap.utils.striterators.Filter;
+import cutthecrap.utils.striterators.ICloseable;
 import cutthecrap.utils.striterators.ICloseableIterator;
 import cutthecrap.utils.striterators.SingleValueIterator;
 import cutthecrap.utils.striterators.Striterator;
@@ -988,9 +989,9 @@ public class BOpUtility {
 
         } finally {
             
-            if (itr instanceof ICloseableIterator<?>) {
+            if (itr instanceof ICloseable) {
              
-                ((ICloseableIterator<?>) itr).close();
+                ((ICloseable) itr).close();
                 
             }
             
