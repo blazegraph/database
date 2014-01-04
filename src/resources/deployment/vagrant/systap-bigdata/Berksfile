@@ -1,0 +1,7 @@
+site :opscode
+
+cookbook "apt"
+cookbook "java", "~> 1.14.0"
+cookbook "tomcat"
+
+metadata
