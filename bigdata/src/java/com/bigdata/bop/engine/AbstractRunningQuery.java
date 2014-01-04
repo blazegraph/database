@@ -493,6 +493,7 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
         
     }
     
+    @Override
     final public Map<Integer, BOp> getBOpIndex() {
 
         return bopIndex;
