@@ -55,34 +55,42 @@ public class LocalChunkMessage implements IChunkMessage<IBindingSet> {
      */
     private IBindingSet[][] bindingSetChunks;
 
+    @Override
     public IQueryClient getQueryController() {
         return queryController;
     }
 
+    @Override
     public UUID getQueryControllerId() {
         return queryControllerId;
     }
     
+    @Override
     public UUID getQueryId() {
         return queryId;
     }
 
+    @Override
     public int getBOpId() {
         return bopId;
     }
 
+    @Override
     public int getPartitionId() {
         return partitionId;
     }
 
+    @Override
     public boolean isLastInvocation() {
         return false; // Never.
     }
 
+    @Override
     public boolean isMaterialized() {
         return true;
     }
 
+    @Override
     public int getSolutionCount() {
         return solutionCount;
     }
@@ -153,6 +161,7 @@ public class LocalChunkMessage implements IChunkMessage<IBindingSet> {
         
     }
 
+    @Override
     public String toString() {
 
         return getClass().getName() + "{queryId=" + queryId + ",bopId=" + bopId
@@ -161,10 +170,12 @@ public class LocalChunkMessage implements IChunkMessage<IBindingSet> {
 
     }
 
+    @Override
     public void materialize(FederatedRunningQuery runningQuery) {
         // NOP
     }
 
+    @Override
     public void release() {
         final ChunkAccessor tmp = chunkAccessor;
         if (tmp != null) {
@@ -177,6 +188,7 @@ public class LocalChunkMessage implements IChunkMessage<IBindingSet> {
         }
     }
     
+    @Override
     public IChunkAccessor<IBindingSet> getChunkAccessor() {
         if (chunkAccessor == null) {
             chunkAccessor = new ChunkAccessor();
