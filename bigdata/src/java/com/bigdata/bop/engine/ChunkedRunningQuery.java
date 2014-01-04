@@ -663,13 +663,12 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
                 /*
                  * Submit task for execution (asynchronous).
                  */
-                if (log.isDebugEnabled()) {
-                    log.debug("Running task: bop=" + bundle.bopId
-                            + ", atOnceReady=" + atOnceReady + ", bop="
+                if (log.isInfoEnabled())
+                    log.info("Running task: bop=" + bundle.bopId
+                            + (pipelined?"":", atOnceReady=" + atOnceReady) + ", bop="
                             + bop.toShortString() + ", messages=" + naccepted
                             + ", solutions=" + solutionsAccepted
-                            + ", runState=" + runStateString());
-                }
+                            + (log.isDebugEnabled()?", runState=" + runStateString():""));
                 getQueryEngine().execute(cft);
                 return true;
             } catch(Throwable t) {
