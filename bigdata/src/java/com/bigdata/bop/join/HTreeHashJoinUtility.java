@@ -600,6 +600,7 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
      * This exposes a view of the {@link HTree} which is safe for concurrent
      * readers.
      */
+    @Override
     public void saveSolutionSet() {
 
         if (!open.get())
@@ -642,6 +643,9 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
             // Checkpoint the HTree.
             final Checkpoint checkpoint = tmp.writeCheckpoint2();
 
+            if (log.isInfoEnabled())
+                log.info(checkpoint.toString());
+            
             final HTree readOnly = HTree.load(store,
                     checkpoint.getCheckpointAddr(), true/* readOnly */);
 
@@ -735,7 +739,7 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
     
                         // Encode the solution.
                         final byte[] val = encoder.encodeSolution(tmp.bset);
-    
+//log.warn("insert: key="+BytesUtil.toString(key));
                         // Insert binding set under hash code for that key.
                         htree.insert(key, val);
     
@@ -755,6 +759,10 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
                 
             }
 
+            if (log.isInfoEnabled())
+                log.info("naccepted=" + naccepted + ", nright="
+                        + htree.getEntryCount());
+            
             return naccepted;
 
         } catch(Throwable t) {
@@ -813,13 +821,20 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
 
                 /*
                  * Search the hash index for a match.
+                 * 
+                 * TODO VECTOR: This does not take explicit advantage of the
+                 * fact that different source solutions will fall into the
+                 * same hash bucket in the HTree. The solutions are ordered
+                 * by hashCode by vector() above, but we are using one lookupAll()
+                 * invocation per source solution here rather than recognizing that
+                 * multiple source solutions will hit the same hash bucket.
                  */
                 boolean found = false;
-                
+            
                 final ITupleIterator<?> titr = htree.lookupAll(key);
 
-                while(titr.hasNext()) {
-                
+                while (titr.hasNext()) {
+
                     final ITuple<?> t = titr.next();
                     
                     final ByteArrayBuffer tb = t.getValueBuffer();
@@ -967,6 +982,14 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
         
     }
 
+    /*
+     * The hash join is vectored. We compute the hashCode for each source
+     * solution from the leftItr and then sort those left solutions. This gives
+     * us an ordered progression through the hash buckets for the HTree.
+     * Further, since we know that any left solution having the same hash code
+     * will read on the same hash bucket, we probe that hash bucket once for all
+     * left solutions that hash into the same bucket.
+     */
     @Override
     public void hashJoin2(//
             final ICloseableIterator<IBindingSet[]> leftItr,//
@@ -976,7 +999,13 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
             ) {
 
         // Note: We no longer rechunk in this method.
-        final Iterator<IBindingSet[]> it = leftItr;
+        final Iterator<IBindingSet[]> it;
+        it = leftItr;// incremental.
+        /*
+         * Note: This forces all source chunks into a single chunk. This could
+         * improve vectoring, but was really added for debugging.
+         */
+//        it = new SingletonIterator<IBindingSet[]>(BOpUtility.toArray(leftItr, null/*stats*/)); 
 
         try {
 
@@ -996,6 +1025,7 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
             final boolean noJoinVars = joinVars.length == 0;
             
             final AtomicInteger vectorSize = new AtomicInteger();
+            
             while (it.hasNext()) {
 
                 final BS[] a; // vectored solutions.
@@ -1016,11 +1046,6 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
                     n = vectorSize.get();
                     
                     nleftConsidered.add(n);
-
-                    if (log.isTraceEnabled())
-                        log.trace("Vectoring chunk for HTree locality: " + n
-                                + " out of " + a.length
-                                + " solutions are preserved.");
 
                 }
                 
@@ -1079,9 +1104,37 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
                         final byte[] key = keyBuilder.reset().append(hashCode)
                                 .getKey();
                         
-                        // visit all source solutions having the same hash code
-                        final ITupleIterator<?> titr = rightSolutions
-                                .lookupAll(key);
+                        /**
+                         * Visit all source solutions having the same hash code.
+                         * 
+                         * @see <a
+                         *      href="https://sourceforge.net/apps/trac/bigdata/ticket/763#comment:19">
+                         *      Stochastic results with Analytic Query Mode)
+                         *      </a>
+                         * 
+                         *      FIXME This appears to be the crux of the problem
+                         *      for #764. If you replace lookupAll(key) with
+                         *      rangeIterator() then the hash join is correct.
+                         *      Of course, it is also scanning all tuples each
+                         *      time so it is very inefficient. The root cause
+                         *      is the FrontCodedRabaCoder. It is doing a binary
+                         *      search on the BucketPage. However, the
+                         *      FrontCodedRabaCoder was not developed to deal
+                         *      with duplicates on the page. Therefore it is
+                         *      returning an offset into the middle of a run of
+                         *      duplicate keys when it does its binary search.
+                         *      We will either need to modify this IRabaCoder to
+                         *      handle this case (where duplicate keys are
+                         *      allowed) or write a new IRabaCoder that is smart
+                         *      about duplicates.
+                         */
+                        final ITupleIterator<?> titr;
+                        if (true) {// scan just the hash bucket for that key.
+//log.warn(" probe: key="+BytesUtil.toString(key));
+                            titr = rightSolutions.lookupAll(key);
+                        } else { // do a full scan on the HTree. 
+                            titr = rightSolutions.rangeIterator();
+                        }
 
                         long sameHashCodeCount = 0;
                         
@@ -1167,7 +1220,6 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
                                         // Join failed.
                                         continue;
                                     }
-
                                     // Resolve against ivCache.
                                     encoder.resolveCachedValues(outSolution);
                                     
@@ -1247,6 +1299,9 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
 
             } // while(itr.hasNext()
 
+            if (log.isInfoEnabled())
+                log.info("done: " + toString());
+
         } catch(Throwable t) {
 
             throw launderThrowable(t);
@@ -1292,7 +1347,8 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
         final BS[] a = new BS[leftSolutions.length];
 
         int n = 0; // The #of non-dropped source solutions.
-
+        int ndropped = 0; // The #of dropped solutions.
+        
         for (int i = 0; i < a.length; i++) {
 
             /*
@@ -1317,6 +1373,8 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
                 
                     if (log.isTraceEnabled())
                         log.trace(ex);
+
+                    ndropped++;
                     
                     continue;
                     
@@ -1338,7 +1396,11 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
         
         // Indicate the actual vector size to the caller via a side-effect.
         vectorSize.set(n);
-        
+
+        if (log.isTraceEnabled())
+            log.trace("Vectoring chunk for HTree locality: naccepted=" + n
+                    + ", ndropped=" + ndropped);
+
         return a;
         
     }
