@@ -241,6 +241,7 @@ public class SliceOp extends PipelineOp {
         
     }
     
+    @Override
     public FutureTask<Void> eval(final BOpContext<IBindingSet> context) {
 
         return new FutureTask<Void>(new SliceTask(this, context));
