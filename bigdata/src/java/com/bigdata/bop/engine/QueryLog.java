@@ -1271,7 +1271,9 @@ public class QueryLog {
         if (detailedStats) {
             // bopAnnotations
             w.write(TD);
-            showAnnotations(w, bop.annotations());
+            if (!summary) {
+                showAnnotations(w, bop.annotations());
+            }
             w.write(TDx);
         }
 
