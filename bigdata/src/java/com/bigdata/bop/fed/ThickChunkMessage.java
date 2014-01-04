@@ -84,34 +84,42 @@ public class ThickChunkMessage<E> implements IChunkMessage<E>, Externalizable {
     
     private byte[] data;
 
+    @Override
     public IQueryClient getQueryController() {
         return queryController;
     }
     
+    @Override
     public UUID getQueryControllerId() {
         return queryControllerId;
     }
 
+    @Override
     public UUID getQueryId() {
         return queryId;
     }
 
+    @Override
     public int getBOpId() {
         return bopId;
     }
 
+    @Override
     public int getPartitionId() {
         return partitionId;
     }
     
+    @Override
     public boolean isLastInvocation() {
         return false; // Never.
     }
 
+    @Override
     public boolean isMaterialized() {
         return true;
     }
 
+    @Override
     public int getSolutionCount() {
         return solutionCount;
     }
@@ -120,6 +128,7 @@ public class ThickChunkMessage<E> implements IChunkMessage<E>, Externalizable {
         return data.length;
     }
 
+    @Override
     public String toString() {
 
         return getClass().getName() + "{queryId=" + queryId + ",bopId=" + bopId
@@ -197,10 +206,12 @@ public class ThickChunkMessage<E> implements IChunkMessage<E>, Externalizable {
 
     }
 
+    @Override
     public void materialize(final FederatedRunningQuery runningQuery) {
         // NOP
     }
 
+    @Override
     public void release() {
         if (chunkAccessor != null)
             chunkAccessor.close();
@@ -208,6 +219,7 @@ public class ThickChunkMessage<E> implements IChunkMessage<E>, Externalizable {
 
     private transient volatile ChunkAccessor chunkAccessor = null;
 
+    @Override
     public IChunkAccessor<E> getChunkAccessor() {
 
         return new ChunkAccessor();

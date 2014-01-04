@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sparql.ast.hints;
 
 import com.bigdata.bop.PipelineOp;
+import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.rdf.sparql.ast.ASTBase;
 import com.bigdata.rdf.sparql.ast.IQueryNode;
 import com.bigdata.rdf.sparql.ast.QueryHints;
@@ -35,9 +36,11 @@ import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 
 /**
  * Query hint marks the operator as requiring "at-once" evaluation. All
- * solutions will be buffered by the query engine before the operator is
+ * solutions will be buffered by the {@link QueryEngine} before the operator is
  * evaluated. When it is evaluated, it will receive all solutions in a single
- * "chunk".
+ * invocation of that operator. However, the solutions MAY appear in multiple
+ * chunks since the {@link QueryEngine} does not guarantee that the chunk will
+ * be merged before the operator is invoked.
  * <p>
  * Note: The "at-once" hint is basically turned into <code>NOT(PIPELINED)</code>.
  * 
