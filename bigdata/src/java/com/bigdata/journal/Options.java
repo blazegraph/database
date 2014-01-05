@@ -256,12 +256,15 @@ public interface Options {
     String WRITE_CACHE_MIN_CLEAN_LIST_SIZE = AbstractJournal.class.getName()+".writeCacheMinCleanListSize";
 
     /**
-     * Option may be used to control whether the {@link WriteCacheService} will
-     * compact the {@link WriteCache} buffers in order to reduce the number of
-     * writes to the disk (default
-     * {@value #DEFAULT_WRITE_CACHE_COMPACTION_THRESHOLD}) by specifying the
-     * minimum percentage of the {@link WriteCache} buffer that could be
-     * reclaimed.
+     * Option specifies the minimum percentage of empty space in a
+     * {@link WriteCache} buffer that could be recovered before we will attempt
+     * to compact the buffer (in [0:100], default
+     * {@value #DEFAULT_WRITE_CACHE_COMPACTION_THRESHOLD}). Free space is
+     * created in a dirty buffer when allocation slots written on that buffer
+     * are recycled before the buffer is evicted to the disk. Such recycling is
+     * common in large transactions. Compaction is disabled when the buffers are
+     * flushed during the commit protocol since all data must be written through
+     * to the disk.
      * <p>
      * Note: This option has no effect for a WORM mode journal.
      * <p>
