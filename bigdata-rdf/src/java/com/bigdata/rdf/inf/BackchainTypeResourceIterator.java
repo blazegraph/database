@@ -30,7 +30,9 @@ package com.bigdata.rdf.inf;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
+
 import org.apache.log4j.Logger;
+
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.rdf.internal.IV;
@@ -48,8 +50,10 @@ import com.bigdata.striterator.ChunkedArrayIterator;
 import com.bigdata.striterator.IChunkedIterator;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 import com.bigdata.striterator.IKeyOrder;
+
 import cutthecrap.utils.striterators.Filter;
 import cutthecrap.utils.striterators.FilterBase;
+import cutthecrap.utils.striterators.ICloseable;
 import cutthecrap.utils.striterators.ICloseableIterator;
 import cutthecrap.utils.striterators.Resolver;
 import cutthecrap.utils.striterators.Striterator;
@@ -281,7 +285,8 @@ public class BackchainTypeResourceIterator implements
 
 					private static final long serialVersionUID = 1L;
 
-					public boolean isValid(Object arg0) {
+				    @Override
+					public boolean isValid(final Object arg0) {
 
 						final SPO o = (SPO) arg0;
 
@@ -318,9 +323,6 @@ public class BackchainTypeResourceIterator implements
 	 *            The source iterator. {@link #nextChunk()} will sort statements
 	 *            into the {@link IKeyOrder} reported by this iterator (as long
 	 *            as the {@link IKeyOrder} is non-<code>null</code>).
-	 * @param db
-	 *            The database from which we will read the distinct subject
-	 *            identifiers (iff this is an all unbound triple pattern).
 	 * @param rdfType
 	 *            The term identifier that corresponds to rdf:Type for the
 	 *            database.
@@ -331,7 +333,7 @@ public class BackchainTypeResourceIterator implements
 	 * @see #newInstance(IChunkedOrderedIterator, IAccessPath,
 	 *      AbstractTripleStore, long, long)
 	 */
-	@SuppressWarnings( { "unchecked", "serial" })
+	@SuppressWarnings( "rawtypes" )
 	private BackchainTypeResourceIterator(IChunkedOrderedIterator<ISPO> _src,//
 			Iterator<ISPO> src,//
 			PushbackIterator<IV> resourceIds,//
@@ -359,12 +361,14 @@ public class BackchainTypeResourceIterator implements
 
 	}
 
+    @Override
 	public IKeyOrder<ISPO> getKeyOrder() {
 
 		return keyOrder;
 
 	}
 
+	@Override
 	public void close() {
 
 		if (!open)
@@ -388,6 +392,7 @@ public class BackchainTypeResourceIterator implements
 
 	}
 
+	@Override
 	public boolean hasNext() {
 
 		if (!open) {
@@ -447,6 +452,7 @@ public class BackchainTypeResourceIterator implements
 	 * statement iterator is an explicit statement for the current subject, then
 	 * we emit the explicit statement. Otherwise we emit an inferred statement.
 	 */
+    @Override
 	public ISPO next() {
 
 		if (!hasNext()) {
@@ -560,6 +566,7 @@ public class BackchainTypeResourceIterator implements
 	 * a chunk the backchained entailments will always begin on a chunk
 	 * boundary.
 	 */
+    @Override
 	public ISPO[] nextChunk() {
 
 		if (!hasNext())
@@ -648,7 +655,8 @@ public class BackchainTypeResourceIterator implements
 
 	}
 
-	public ISPO[] nextChunk(IKeyOrder<ISPO> keyOrder) {
+    @Override
+	public ISPO[] nextChunk(final IKeyOrder<ISPO> keyOrder) {
 
 		if (keyOrder == null)
 			throw new IllegalArgumentException();
@@ -672,6 +680,7 @@ public class BackchainTypeResourceIterator implements
 	 * statement visited by {@link #next()} is "explicit" then the request is
 	 * delegated to the source iterator.
 	 */
+    @Override
 	public void remove() {
 
 		if (!open)
@@ -719,6 +728,7 @@ public class BackchainTypeResourceIterator implements
 
 		}
 
+		@Override
 		public void close() {
 
 			src1.close();
@@ -730,10 +740,12 @@ public class BackchainTypeResourceIterator implements
 		/**
 		 * Note: Not implemented since not used above and this class is private.
 		 */
+		@Override
 		public T[] nextChunk() {
 			throw new UnsupportedOperationException();
 		}
 
+		@Override
 		public boolean hasNext() {
 
 			return tmp1 != null || tmp2 != null || src1.hasNext()
@@ -744,6 +756,7 @@ public class BackchainTypeResourceIterator implements
 		private T tmp1;
 		private T tmp2;
 
+		@Override
 		public T next() {
 
 			if (!hasNext())
@@ -813,6 +826,7 @@ public class BackchainTypeResourceIterator implements
 
 		}
 
+		@Override
 		public void remove() {
 
 			throw new UnsupportedOperationException();
@@ -881,12 +895,14 @@ public class BackchainTypeResourceIterator implements
 
 		}
 
+		@Override
 		public boolean hasNext() {
 
 			return buffer != null || src.hasNext();
 
 		}
 
+		@Override
 		public E next() {
 
 			if (!hasNext())
@@ -932,17 +948,19 @@ public class BackchainTypeResourceIterator implements
 
 		}
 
+	    @Override
 		public void remove() {
 
 			throw new UnsupportedOperationException();
 
 		}
 
+	    @Override
 		public void close() {
 
-			if (src instanceof ICloseableIterator) {
+			if (src instanceof ICloseable) {
 
-				((ICloseableIterator<E>) src).close();
+				((ICloseable) src).close();
 
 			}
 
@@ -986,17 +1004,20 @@ public class BackchainTypeResourceIterator implements
 			}
 		}
 
+	    @Override
 		public boolean hasNext() {
 			return _src.hasNext() || (appender != null && appender.hasNext());
 		}
 
+	    @Override
 		public IKeyOrder<ISPO> getKeyOrder() {
 			return _src.getKeyOrder();
 		}
 
-		public ISPO[] nextChunk(IKeyOrder<ISPO> keyOrder) {
+	    @Override
+		public ISPO[] nextChunk(final IKeyOrder<ISPO> keyOrder) {
 			if (_src.hasNext()) {
-				ISPO[] chunk = _src.nextChunk(keyOrder);
+			    final ISPO[] chunk = _src.nextChunk(keyOrder);
 				for (ISPO spo : chunk) {
 					testSPO(spo);
 				}
@@ -1009,9 +1030,10 @@ public class BackchainTypeResourceIterator implements
 			return null;
 		}
 
+	    @Override
 		public ISPO next() {
 			if (_src.hasNext()) {
-				ISPO spo = _src.next();
+			    final ISPO spo = _src.next();
 				testSPO(spo);
 				canRemove = true;
 				return spo;
@@ -1022,9 +1044,10 @@ public class BackchainTypeResourceIterator implements
 			return null;
 		}
 
-		public ISPO[] nextChunk() {
+	    @Override
+	    public ISPO[] nextChunk() {
 			if (_src.hasNext()) {
-				ISPO[] chunk = _src.nextChunk();
+				final ISPO[] chunk = _src.nextChunk();
 				for (ISPO spo : chunk) {
 					testSPO(spo);
 				}
@@ -1037,12 +1060,14 @@ public class BackchainTypeResourceIterator implements
 			return null;
 		}
 
+	    @Override
 		public void remove() {
 			if (canRemove) {
 				_src.remove();
 			}
 		}
 
+	    @Override
 		public void close() {
 			_src.close();
 		}
