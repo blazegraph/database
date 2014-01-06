@@ -244,7 +244,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
              * output.
              */
 
-            left = addStartOp(ctx);
+            left = addStartOp(optimizedQuery, ctx);
 
         }
         
@@ -363,7 +363,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
 
         if (left == null) {
 
-            left = addStartOpOnCluster(ctx);
+            left = addStartOpOnCluster(queryBase, ctx);
             
         }
 
@@ -443,8 +443,8 @@ public class AST2BOpUtility extends AST2BOpRTO {
                 for (AssignmentNode assignmentNode : projection
                         .getAssignmentProjections()) {
 
-                    left = addAssignment(left, assignmentNode, doneSet, ctx,
-                            true/* projection */);
+                    left = addAssignment(left, assignmentNode, doneSet,
+                            projection.getQueryHints(), ctx, true/* projection */);
 
                 }
 
@@ -482,7 +482,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
                 
                 preserveOrder = true;
 
-                left = addOrderBy(left, orderBy, ctx);
+                left = addOrderBy(left, queryBase, orderBy, ctx);
 
             } else {
                 
@@ -504,7 +504,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
             
             if (orderBy != null && !orderBy.isEmpty()) {
 
-                left = addOrderBy(left, orderBy, ctx);
+                left = addOrderBy(left, queryBase, orderBy, ctx);
 
             }
 
@@ -591,7 +591,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
         
         if(queryBase.hasSlice()) {
 
-            left = addSlice(left, queryBase.getSlice(), ctx);
+            left = addSlice(left, queryBase, queryBase.getSlice(), ctx);
 
         }
 
@@ -839,6 +839,9 @@ public class AST2BOpUtility extends AST2BOpRTO {
             final ServiceNode serviceNode, final Set<IVariable<?>> doneSet,
             final AST2BOpContext ctx) {
 
+        // The query hints are taken from the SERVICE node.
+        final Properties queryHints = serviceNode.getQueryHints();
+        
         @SuppressWarnings("rawtypes")
         final Map<IConstraint, Set<IVariable<IV>>> needsMaterialization = new LinkedHashMap<IConstraint, Set<IVariable<IV>>>();
 
@@ -994,7 +997,8 @@ public class AST2BOpUtility extends AST2BOpRTO {
             if (!vars.isEmpty()) {
 
                 // Add the materialization step.
-                left = addMaterializationSteps(left, rightId, (Collection) vars, ctx);
+                left = addMaterializationSteps2(left, rightId,
+                        (Collection) vars, queryHints, ctx);
 
                 // These variables have now been materialized.
                 doneSet.addAll(vars);
@@ -1046,15 +1050,15 @@ public class AST2BOpUtility extends AST2BOpRTO {
         anns.put(JoinAnnotations.CONSTRAINTS, joinConstraints);
 
         left = applyQueryHints(new ServiceCallJoin(leftOrEmpty(left), anns),
-                serviceNode.getQueryHints());
+                queryHints, ctx);
 
         /*
          * For each filter which requires materialization steps, add the
          * materializations steps to the pipeline and then add the filter to the
          * pipeline.
          */
-        left = addMaterializationSteps(ctx, left, doneSet, needsMaterialization,
-                serviceNode.getQueryHints());
+        left = addMaterializationSteps3(left, doneSet, needsMaterialization,
+                queryHints, ctx);
 
         return left;
 
@@ -1455,8 +1459,8 @@ public class AST2BOpUtility extends AST2BOpRTO {
          * materializations steps to the pipeline and then add the filter to the
          * pipeline.
          */
-        left = addMaterializationSteps(ctx, left, doneSet, needsMaterialization,
-                nsi.getQueryHints());
+        left = addMaterializationSteps3(left, doneSet, needsMaterialization,
+                nsi.getQueryHints(), ctx);
 
         return left;
 
@@ -1575,8 +1579,8 @@ public class AST2BOpUtility extends AST2BOpRTO {
          * materializations steps to the pipeline and then add the filter to the
          * pipeline.
          */
-        left = addMaterializationSteps(ctx, left, doneSet,
-                needsMaterialization, nsi.getQueryHints());
+        left = addMaterializationSteps3(left, doneSet, needsMaterialization,
+                nsi.getQueryHints(), ctx);
 
 		return left;
 
@@ -1762,8 +1766,8 @@ public class AST2BOpUtility extends AST2BOpRTO {
          * materializations steps to the pipeline and then add the filter to the
          * pipeline.
          */
-        left = addMaterializationSteps(ctx, left, doneSet, needsMaterialization,
-                subqueryRoot.getQueryHints());
+        left = addMaterializationSteps3(left, doneSet, needsMaterialization,
+                subqueryRoot.getQueryHints(), ctx);
 
         return left;
 
@@ -2018,8 +2022,8 @@ public class AST2BOpUtility extends AST2BOpRTO {
          * materializations steps to the pipeline and then add the filter to the
          * pipeline.
          */
-        left = addMaterializationSteps(ctx, left, doneSet, needsMaterialization,
-                subqueryRoot.getQueryHints());
+        left = addMaterializationSteps3(left, doneSet, needsMaterialization,
+                subqueryRoot.getQueryHints(), ctx);
 
         return left;
 
@@ -2220,9 +2224,10 @@ public class AST2BOpUtility extends AST2BOpRTO {
             	
             }
             
-        	left = applyQueryHints(new Tee(leftOrEmpty(left),
-                    NV.asMap(anns.toArray(new NV[anns.size()]))), ctx.queryHints);
-        	
+            left = applyQueryHints(
+                    new Tee(leftOrEmpty(left), NV.asMap(anns
+                            .toArray(new NV[anns.size()]))), unionNode, ctx);
+
         }
         
         /*
@@ -2286,7 +2291,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
                 new NV(Predicate.Annotations.BOP_ID, downstreamId),//
                 new NV(BOp.Annotations.EVALUATION_CONTEXT,
                         BOpEvaluationContext.CONTROLLER)//
-                ), ctx.queryHints);
+                ), unionNode, ctx);
 
         // Add in anything which was known materialized for all child groups.
         doneSet.addAll(doneSetsIntersection);
@@ -2302,7 +2307,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
             final ArbitraryLengthPathNode alpNode, final Set<IVariable<?>> doneSet,
             final AST2BOpContext ctx) {
 
-    	final JoinGroupNode subgroup = (JoinGroupNode) alpNode.subgroup();
+        final JoinGroupNode subgroup = (JoinGroupNode) alpNode.subgroup();
     	
         // Convert the child join group.
         final PipelineOp subquery = convertJoinGroup(null,
@@ -2324,10 +2329,10 @@ public class AST2BOpUtility extends AST2BOpRTO {
          * We need to drop the internal variables bound by the subquery (in the
          * case where the subquery is a nested path).
          */
-    	final Set<IVariable<?>> varsToDrop = new LinkedHashSet<IVariable<?>>();
-    	ctx.sa.getDefinitelyProducedBindings(subgroup, varsToDrop, true);
-    	varsToDrop.remove(tVarLeft);
-    	varsToDrop.remove(tVarRight);
+        final Set<IVariable<?>> varsToDrop = new LinkedHashSet<IVariable<?>>();
+        ctx.sa.getDefinitelyProducedBindings(subgroup, varsToDrop, true);
+        varsToDrop.remove(tVarLeft);
+        varsToDrop.remove(tVarRight);
     	
         left = applyQueryHints(new ArbitraryLengthPathOp(leftOrEmpty(left),//
     			new NV(ArbitraryLengthPathOp.Annotations.SUBQUERY, subquery),
@@ -2342,7 +2347,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
                 new NV(Predicate.Annotations.BOP_ID, ctx.nextId()),//
                 new NV(BOp.Annotations.EVALUATION_CONTEXT,
                         BOpEvaluationContext.CONTROLLER)//
-                ), ctx.queryHints);
+                ), alpNode, ctx);
 
         return left;
 
@@ -2367,7 +2372,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
                 new NV(Predicate.Annotations.BOP_ID, ctx.nextId()),//
                 new NV(BOp.Annotations.EVALUATION_CONTEXT,
                         BOpEvaluationContext.CONTROLLER)//
-                ), ctx.queryHints);
+                ), zlpNode, ctx);
 
         return left;
 
@@ -2549,11 +2554,11 @@ public class AST2BOpUtility extends AST2BOpRTO {
                  */
                 final Predicate<?> pred = toPredicate(sp, ctx);
                 final boolean optional = sp.isOptional();
-                left = join(ctx, left, pred,
+                left = join(left, pred,
                         optional ? new LinkedHashSet<IVariable<?>>(doneSet)
                                 : doneSet,
                         getJoinConstraints(sp), 
-                        sp.getQueryHints());
+                        sp.getQueryHints(), ctx);
                 continue;
             } else if (child instanceof ArbitraryLengthPathNode) {
                 final ArbitraryLengthPathNode alpNode = (ArbitraryLengthPathNode) child;
@@ -2641,12 +2646,12 @@ public class AST2BOpUtility extends AST2BOpRTO {
                     continue;
                 }
                 // FILTER
-                left = addConditional(left, filter, doneSet, ctx);
+                left = addConditional(left, joinGroup, filter, doneSet, ctx);
                 continue;
             } else if (child instanceof AssignmentNode) {
                 // LET / BIND
                 left = addAssignment(left, (AssignmentNode) child, doneSet,
-                        ctx, false/* projection */);
+                        joinGroup.getQueryHints(), ctx, false/* projection */);
                 continue;
             } else {
                 throw new UnsupportedOperationException("child: " + child);
@@ -2656,8 +2661,8 @@ public class AST2BOpUtility extends AST2BOpRTO {
         if (!dropVars.isEmpty()) {
             final IVariable<?>[] a = dropVars.toArray(new IVariable[dropVars
                     .size()]);
-            left = applyQueryHints(new DropOp(leftOrEmpty(left), new NV(BOp.Annotations.BOP_ID,
-                    ctx.nextId()), //
+            left = applyQueryHints(new DropOp(leftOrEmpty(left), //
+                    new NV(BOp.Annotations.BOP_ID, ctx.nextId()), //
                     new NV(DropOp.Annotations.DROP_VARS, a)//
             ), joinGroup, ctx);
         }
@@ -3060,17 +3065,21 @@ public class AST2BOpUtility extends AST2BOpRTO {
     }
     
     /**
-	 * Conditionally add a {@link StartOp} iff the query will rin on a cluster.
-	 * 
-	 * @param ctx
-	 * 
-	 * @return The {@link StartOp} iff this query will run on a cluster and
-	 *         otherwise <code>null</code>.
-	 * 
-	 * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/478">
-	 *      Cluster does not map input solution(s) across shards</a>
-	 */
-	private static final PipelineOp addStartOpOnCluster(final AST2BOpContext ctx) {
+     * Conditionally add a {@link StartOp} iff the query will rin on a cluster.
+     * 
+     * @param queryBase
+     *            The {@link QueryBase} for which a {@link StartOp} might be
+     *            required.
+     * @param ctx
+     * 
+     * @return The {@link StartOp} iff this query will run on a cluster and
+     *         otherwise <code>null</code>.
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/478">
+     *      Cluster does not map input solution(s) across shards</a>
+     */
+    private static final PipelineOp addStartOpOnCluster(
+            final QueryBase queryBase, final AST2BOpContext ctx) {
 
 		if (ctx.isCluster()) {
 		
@@ -3086,7 +3095,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
 			 * @see https://sourceforge.net/apps/trac/bigdata/ticket/478
 			 */
 			
-			return addStartOp(ctx);
+			return addStartOp(queryBase, ctx);
 			
 		}
 
@@ -3106,7 +3115,8 @@ public class AST2BOpUtility extends AST2BOpRTO {
      * 
      * @return The {@link StartOp}.
      */
-    private static final PipelineOp addStartOp(final AST2BOpContext ctx) {
+    private static final PipelineOp addStartOp(final QueryBase queryBase,
+            final AST2BOpContext ctx) {
 
         final PipelineOp start = applyQueryHints(
                 new StartOp(BOp.NOARGS, NV.asMap(new NV[] {//
@@ -3114,7 +3124,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
                                         .nextId()),
                                 new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
                                         BOpEvaluationContext.CONTROLLER), })),
-                ctx.queryHints);
+                queryBase, ctx);
 
         return start;
 
@@ -3125,15 +3135,23 @@ public class AST2BOpUtility extends AST2BOpRTO {
      * 
      * @param left
      * @param assignmentNode
+     *            The {@link AssignmentNode} (LET() or BIND()).
      * @param doneSet
+     * @param queryHints
+     *            The query hints from the AST node that dominates the
+     *            assignment and from which we will take any query hints. E.g.,
+     *            a PROJECTION or a JOIN GROUP.
      * @param ctx
      * @param projection
      * @return
      */
     @SuppressWarnings({ "unchecked", "rawtypes" })
     private static final PipelineOp addAssignment(PipelineOp left,
-            final AssignmentNode assignmentNode,
-            final Set<IVariable<?>> doneSet, final AST2BOpContext ctx,
+//            final ASTBase dominatingASTNode,//
+            final AssignmentNode assignmentNode,//
+            final Set<IVariable<?>> doneSet, //
+            final Properties queryHints,//
+            final AST2BOpContext ctx,//
             final boolean projection) {
 
         final IValueExpression ve = assignmentNode.getValueExpression();
@@ -3167,7 +3185,8 @@ public class AST2BOpUtility extends AST2BOpRTO {
          */
         if (vars.size() > 0) {
 
-            left = addMaterializationSteps(left, bopId, ve, vars, ctx);
+            left = addMaterializationSteps1(left, bopId, ve, vars,
+                    queryHints, ctx);
 
             if(req.getRequirement()==Requirement.ALWAYS) {
 
@@ -3186,9 +3205,9 @@ public class AST2BOpUtility extends AST2BOpRTO {
 
         left = applyQueryHints(//
                 new ConditionalRoutingOp(leftOrEmpty(left), //
-                        new NV(BOp.Annotations.BOP_ID, bopId), //
-                        new NV(ConditionalRoutingOp.Annotations.CONDITION, c)//
-                ), ctx.queryHints);
+                new NV(BOp.Annotations.BOP_ID, bopId), //
+                new NV(ConditionalRoutingOp.Annotations.CONDITION, c)//
+            ), queryHints, ctx);
 
         return left;
 
@@ -3199,6 +3218,8 @@ public class AST2BOpUtility extends AST2BOpRTO {
      * pipeline.
      * 
      * @param left
+     * @param joinGroup
+     *            The parent join group.
      * @param filter
      *            The filter.
      * @param doneSet
@@ -3208,9 +3229,12 @@ public class AST2BOpUtility extends AST2BOpRTO {
      * @return
      */
     @SuppressWarnings("rawtypes")
-    private static final PipelineOp addConditional(PipelineOp left,
-            final FilterNode filter,
-            final Set<IVariable<?>> doneSet, final AST2BOpContext ctx) {
+    private static final PipelineOp addConditional(//
+            PipelineOp left,//
+            final JoinGroupNode joinGroup,//
+            final FilterNode filter,//
+            final Set<IVariable<?>> doneSet, //
+            final AST2BOpContext ctx) {
 
         @SuppressWarnings("unchecked")
         final IValueExpression<IV> ve = (IValueExpression<IV>) filter
@@ -3240,7 +3264,8 @@ public class AST2BOpUtility extends AST2BOpRTO {
         if (!vars.isEmpty()) {
 
             // Add materialization steps for those variables.
-            left = addMaterializationSteps(left, bopId, ve, vars, ctx);
+            left = addMaterializationSteps1(left, bopId, ve, vars,
+                    joinGroup.getQueryHints(), ctx);
 
             if (req.getRequirement() == Requirement.ALWAYS) {
                 
@@ -3261,7 +3286,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
         left = applyQueryHints(new ConditionalRoutingOp(leftOrEmpty(left),//
                 new NV(BOp.Annotations.BOP_ID, bopId), //
                 new NV(ConditionalRoutingOp.Annotations.CONDITION, c)//
-                ), ctx.queryHints);
+                ), joinGroup, ctx);
 
         return left;
 
@@ -3277,6 +3302,9 @@ public class AST2BOpUtility extends AST2BOpRTO {
      *      keep it, we could use a {@link JVMSolutionSetHashJoinOp}. Just push
      *      the data into the hash index and then just that operator to join it
      *      into the pipeline. Then we could ditch the {@link DataSetJoin}.
+     *      <p>
+     *      See {@link JoinGroupNode#getInFilters()} for how and where this is
+     *      currently disabled.
      */
     @SuppressWarnings("rawtypes")
     private static final PipelineOp addKnownInConditional(PipelineOp left,
@@ -3518,8 +3546,8 @@ public class AST2BOpUtility extends AST2BOpRTO {
          * materializations steps to the pipeline and then add the filter to the
          * pipeline.
          */
-        left = addMaterializationSteps(ctx, left, doneSet, needsMaterialization,
-                subgroup.getQueryHints());
+        left = addMaterializationSteps3(left, doneSet, needsMaterialization,
+                subgroup.getQueryHints(), ctx);
 
         return left;
         
@@ -3663,10 +3691,11 @@ public class AST2BOpUtility extends AST2BOpRTO {
     }
 
     /**
-     * Add an aggregation operator. It will handle the grouping (if any),
-     * optional having filter, and projected select expressions. A generalized
-     * aggregation operator will be used unless the aggregation corresponds to
-     * some special case.
+     * Add an aggregation operator. It will handle the <code>GROUP BY</code> (if
+     * any), the optional <code>HAVING</code> filter, and projected
+     * <code>SELECT</code> expressions. A generalized aggregation operator will
+     * be used unless the aggregation corresponds to some special case, e.g.,
+     * pipelined aggregation.
      * 
      * @param left
      *            The previous operator in the pipeline.
@@ -3701,6 +3730,9 @@ public class AST2BOpUtility extends AST2BOpRTO {
         final IGroupByRewriteState groupByRewrite = new GroupByRewriter(
                 groupByState);
 
+        // The query hints are taken from the PROJECTION.
+        final Properties queryHints = projection.getQueryHints();
+        
         final int bopId = ctx.nextId();
 
         final GroupByOp op;
@@ -3784,7 +3816,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
 
         }
 
-        left = addMaterializationSteps(left, bopId, vars, ctx);
+        left = addMaterializationSteps2(left, bopId, vars, queryHints, ctx);
 
         if (!groupByState.isAnyDistinct() && !groupByState.isSelectDependency()
                 && !groupByState.isNestedAggregates()) {
@@ -3847,7 +3879,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
 
         }
 
-        left = applyQueryHints(op, ctx.queryHints);
+        left = applyQueryHints(op, queryHints, ctx);
 
         return left;
 
@@ -3858,7 +3890,11 @@ public class AST2BOpUtility extends AST2BOpRTO {
      */
     @SuppressWarnings({ "unchecked", "rawtypes" })
     private static final PipelineOp addOrderBy(PipelineOp left,
-            final OrderByNode orderBy, final AST2BOpContext ctx) {
+            final QueryBase queryBase, final OrderByNode orderBy,
+            final AST2BOpContext ctx) {
+
+        // The query hints are taken from the QueryBase
+        final Properties queryHints = queryBase.getQueryHints();
 
         final Set<IVariable<IV>> vars = new LinkedHashSet<IVariable<IV>>();
 
@@ -3899,7 +3935,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
 
         final int sortId = ctx.nextId();
 
-        left = addMaterializationSteps(left, sortId, vars, ctx);
+        left = addMaterializationSteps2(left, sortId, vars, queryHints, ctx);
 
         left = applyQueryHints(
                 new MemorySortOp(
@@ -3919,7 +3955,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
 //                                new NV(MemorySortOp.Annotations.SHARED_STATE,
 //                                        true),//
                                 new NV(MemorySortOp.Annotations.LAST_PASS, true),//
-                        })), ctx.queryHints);
+                        })), queryHints, ctx);
 
         return left;
 
@@ -3929,7 +3965,8 @@ public class AST2BOpUtility extends AST2BOpRTO {
      * Impose an OFFSET and/or LIMIT on a query.
      */
     private static final PipelineOp addSlice(PipelineOp left,
-            final SliceNode slice, final AST2BOpContext ctx) {
+            final QueryBase queryBase, final SliceNode slice,
+            final AST2BOpContext ctx) {
 
         final int bopId = ctx.nextId();
 
@@ -3942,7 +3979,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
                 new NV(SliceOp.Annotations.PIPELINED, true),//
                 new NV(SliceOp.Annotations.MAX_PARALLEL, 1),//
                 new NV(MemorySortOp.Annotations.SHARED_STATE, true)//
-                ), slice, ctx);
+                ), queryBase, ctx);
 
         return left;
 

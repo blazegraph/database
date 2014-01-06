@@ -97,7 +97,6 @@ public class AST2BOpJoins extends AST2BOpFilters {
      * named-graph and default graph join patterns whether on a single machine
      * or on a cluster.
      * 
-     * @param ctx
      * @param left
      * @param pred
      *            The predicate describing the statement pattern.
@@ -107,16 +106,16 @@ public class AST2BOpJoins extends AST2BOpFilters {
      *            Constraints on that join (optional).
      * @param queryHints
      *            Query hints associated with that {@link StatementPatternNode}.
-     * @return
+     * @param ctx The evaluation context.
      */
     @SuppressWarnings("rawtypes")
     public static PipelineOp join(//
-            final AST2BOpContext ctx,//
             PipelineOp left,//
             Predicate pred,//
             final Set<IVariable<?>> doneSet,// variables known to be materialized.
             final Collection<IConstraint> constraints,//
-            final Properties queryHints//
+            final Properties queryHints,//
+            final AST2BOpContext ctx//
             ) {
 
         final int joinId = ctx.nextId();
@@ -189,8 +188,8 @@ public class AST2BOpJoins extends AST2BOpFilters {
          * pipeline.
          */
 
-        left = addMaterializationSteps(ctx, left, doneSet,
-                needsMaterialization, queryHints);
+        left = addMaterializationSteps3(left, doneSet, needsMaterialization,
+                queryHints, ctx);
 
         return left;
 
@@ -233,8 +232,8 @@ public class AST2BOpJoins extends AST2BOpFilters {
 
         anns.add(new NV(PipelineJoin.Annotations.PREDICATE, pred));
 
-        return newJoin(ctx, left, anns, queryHints,
-                false/* defaultGraphFilter */, null/* summary */);
+        return newJoin(left, anns, false/* defaultGraphFilter */,
+                null/* summary */, queryHints, ctx);
 
     }
 
@@ -284,8 +283,8 @@ public class AST2BOpJoins extends AST2BOpFilters {
 
             anns.add(new NV(PipelineJoin.Annotations.PREDICATE,pred));
 
-            return newJoin(ctx, left, anns, queryHints,
-                    false/* defaultGraphFilter */, null/* summary */);
+            return newJoin(left, anns, false/* defaultGraphFilter */,
+                    null/* summary */, queryHints, ctx);
 
         }
 
@@ -297,8 +296,8 @@ public class AST2BOpJoins extends AST2BOpFilters {
 
             anns.add(new NV(PipelineJoin.Annotations.PREDICATE, pred));
 
-            return newJoin(ctx, left, anns, queryHints,
-                    false/* defaultGraphFilter */, null/* summary */);
+            return newJoin(left, anns, false/* defaultGraphFilter */,
+                    null/* summary */, queryHints, ctx);
         }
 
         /*
@@ -325,8 +324,8 @@ public class AST2BOpJoins extends AST2BOpFilters {
 
             anns.add(new NV(PipelineJoin.Annotations.PREDICATE,pred));
 
-            return newJoin(ctx, left, anns, queryHints,
-                    false/* defaultGraphFilter */, summary);
+            return newJoin(left, anns, false/* defaultGraphFilter */, summary,
+                    queryHints, ctx);
 
         }
 
@@ -349,8 +348,8 @@ public class AST2BOpJoins extends AST2BOpFilters {
 
             anns.add(new NV(PipelineJoin.Annotations.PREDICATE,pred));
 
-            return newJoin(ctx, left, anns, queryHints,
-                    false/* defaultGraphFilter */, summary);
+            return newJoin(left, anns, false/* defaultGraphFilter */, summary,
+                    queryHints, ctx);
 
         }
 
@@ -425,8 +424,8 @@ public class AST2BOpJoins extends AST2BOpFilters {
 
             anns.add(new NV(PipelineJoin.Annotations.PREDICATE,pred));
 
-            return newJoin(ctx, left, anns, queryHints,
-                    false/* defaultGraphFilter */, summary);
+            return newJoin(left, anns, false/* defaultGraphFilter */, summary,
+                    queryHints, ctx);
 
         } else {
 
@@ -456,8 +455,8 @@ public class AST2BOpJoins extends AST2BOpFilters {
 
             anns.add(new NV(PipelineJoin.Annotations.PREDICATE,pred));
 
-            return newJoin(ctx, left, anns, queryHints,
-                    false/* defaultGraphFilter */, summary);
+            return newJoin(left, anns, false/* defaultGraphFilter */, summary,
+                    queryHints, ctx);
 
         }
 
@@ -495,8 +494,9 @@ public class AST2BOpJoins extends AST2BOpFilters {
             
             anns.add(new NV(PipelineJoin.Annotations.PREDICATE, pred));
 
-            return newJoin(ctx, left, anns, queryHints, true/* defaultGraphFilter */,
-                    summary);
+            return newJoin(left, anns, true/* defaultGraphFilter */, summary,
+                    queryHints, ctx);
+        
         }
 
         if (summary != null && summary.nknown == 0) {
@@ -513,8 +513,8 @@ public class AST2BOpJoins extends AST2BOpFilters {
 
             anns.add(new NV(PipelineJoin.Annotations.PREDICATE,pred));
 
-            return newJoin(ctx, left, anns, queryHints,
-                    false/* defaultGraphFilter */, summary);
+            return newJoin(left, anns, false/* defaultGraphFilter */, summary,
+                    queryHints, ctx);
 
         }
 
@@ -542,8 +542,8 @@ public class AST2BOpJoins extends AST2BOpFilters {
 
             anns.add(new NV(PipelineJoin.Annotations.PREDICATE, pred));
 
-            return newJoin(ctx, left, anns, queryHints,
-                    false/* defaultGraphFilter */, summary);
+            return newJoin(left, anns, false/* defaultGraphFilter */, summary,
+                    queryHints, ctx);
 
         }
 
@@ -754,8 +754,8 @@ public class AST2BOpJoins extends AST2BOpFilters {
 
             anns.add(new NV(PipelineJoin.Annotations.PREDICATE, pred));
 
-            return newJoin(ctx, left, anns, queryHints,
-                    true/* defaultGraphFilter */, summary);
+            return newJoin(left, anns, true/* defaultGraphFilter */, summary,
+                    queryHints, ctx);
 
         } else {
 
@@ -842,9 +842,9 @@ public class AST2BOpJoins extends AST2BOpFilters {
 
             anns.add(new NV(PipelineJoin.Annotations.PREDICATE,pred));
            
-            return newJoin(ctx, left, anns, queryHints,
-                    true/* defaultGraphFilter */, summary);
-            
+            return newJoin(left, anns, true/* defaultGraphFilter */, summary,
+                    queryHints, ctx);
+
         }
 
     }
@@ -930,7 +930,6 @@ public class AST2BOpJoins extends AST2BOpFilters {
      * 
      * @param left
      * @param anns
-     * @param queryHints
      * @param defaultGraphFilter
      *            <code>true</code> iff a DISTINCT filter must be imposed on the
      *            SPOs. This is never done for a named graph query. It is
@@ -939,6 +938,10 @@ public class AST2BOpJoins extends AST2BOpFilters {
      *            need to bother.
      * @param summary
      *            The {@link DataSetSummary} (when available).
+     * @param queryHints
+     *            The query hints from the dominating operator context.
+     * @param ctx
+     *            The evaluation context.
      * @return
      * 
      * @see Annotations#HASH_JOIN
@@ -946,11 +949,13 @@ public class AST2BOpJoins extends AST2BOpFilters {
      * @see Annotations#ESTIMATED_CARDINALITY
      */
     @SuppressWarnings({ "rawtypes", "unchecked" })
-    static private PipelineOp newJoin(final AST2BOpContext ctx,
-            PipelineOp left, final List<NV> anns,
-            final Properties queryHints, 
-            final boolean defaultGraphFilter,
-            final DataSetSummary summary) {
+    static private PipelineOp newJoin(//
+            PipelineOp left, //
+            final List<NV> anns,//
+            final boolean defaultGraphFilter,//
+            final DataSetSummary summary,//
+            final Properties queryHints, //
+            final AST2BOpContext ctx) {
 
         final Map<String, Object> map = NV.asMap(anns.toArray(new NV[anns
                 .size()]));
@@ -1073,7 +1078,7 @@ public class AST2BOpJoins extends AST2BOpFilters {
 
         }
 
-        left = applyQueryHints(left, queryHints);
+        left = applyQueryHints(left, queryHints, ctx);
 
         return left;
 
