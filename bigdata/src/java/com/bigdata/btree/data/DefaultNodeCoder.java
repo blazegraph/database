@@ -74,6 +74,7 @@ public class DefaultNodeCoder implements IAbstractNodeDataCoder<INodeData>,
     
     private IRabaCoder keysCoder;
 
+    @Override
     public void readExternal(final ObjectInput in) throws IOException,
             ClassNotFoundException {
 
@@ -89,6 +90,7 @@ public class DefaultNodeCoder implements IAbstractNodeDataCoder<INodeData>,
         
     }
 
+    @Override
     public void writeExternal(final ObjectOutput out) throws IOException {
 
         out.write(VERSION0);
@@ -98,6 +100,7 @@ public class DefaultNodeCoder implements IAbstractNodeDataCoder<INodeData>,
     }
 
     /** No. */
+    @Override
     final public boolean isLeafDataCoder() {
         
         return false;
@@ -105,12 +108,14 @@ public class DefaultNodeCoder implements IAbstractNodeDataCoder<INodeData>,
     }
 
     /** Yes. */
+    @Override
     public boolean isNodeDataCoder() {
 
         return true;
         
     }
 
+    @Override
     public String toString() {
 
         return super.toString() + "{keysCoder=" + keysCoder + "}";
@@ -138,13 +143,14 @@ public class DefaultNodeCoder implements IAbstractNodeDataCoder<INodeData>,
 
     }
 
+    @Override
     public INodeData decode(final AbstractFixedByteArrayBuffer data) {
 
         return new ReadOnlyNodeData(data, keysCoder);
         
     }
 
-
+    @Override
     public INodeData encodeLive(final INodeData node, final DataOutputBuffer buf) {
 
         if (node == null)
@@ -349,6 +355,7 @@ public class DefaultNodeCoder implements IAbstractNodeDataCoder<INodeData>,
         
     }
 
+    @Override
     public AbstractFixedByteArrayBuffer encode(final INodeData node,
             final DataOutputBuffer buf) {
 
@@ -630,12 +637,14 @@ public class DefaultNodeCoder implements IAbstractNodeDataCoder<INodeData>,
             
         }
         
+        @Override
         final public boolean hasVersionTimestamps() {
             
             return ((flags & FLAG_VERSION_TIMESTAMPS) != 0);
             
         }
 
+        @Override
         final public long getMinimumVersionTimestamp() {
             
             if(!hasVersionTimestamps())
@@ -648,6 +657,7 @@ public class DefaultNodeCoder implements IAbstractNodeDataCoder<INodeData>,
             
         }
 
+        @Override
         final public long getMaximumVersionTimestamp() {
             
             if(!hasVersionTimestamps())
@@ -663,6 +673,7 @@ public class DefaultNodeCoder implements IAbstractNodeDataCoder<INodeData>,
         /**
          * Always returns <code>false</code>.
          */
+        @Override
         final public boolean isLeaf() {
 
             return false;
@@ -672,6 +683,7 @@ public class DefaultNodeCoder implements IAbstractNodeDataCoder<INodeData>,
         /**
          * Yes.
          */
+        @Override
         final public boolean isReadOnly() {
             
             return true;
@@ -681,6 +693,7 @@ public class DefaultNodeCoder implements IAbstractNodeDataCoder<INodeData>,
         /**
          * Yes.
          */
+        @Override
         final public boolean isCoded() {
             
             return true;
@@ -690,6 +703,7 @@ public class DefaultNodeCoder implements IAbstractNodeDataCoder<INodeData>,
         /**
          * {@inheritDoc}. This field is cached.
          */
+        @Override
         final public int getKeyCount() {
             
             return nkeys;
@@ -699,6 +713,7 @@ public class DefaultNodeCoder implements IAbstractNodeDataCoder<INodeData>,
         /**
          * {@inheritDoc}. This field is cached.
          */
+        @Override
         final public int getChildCount() {
             
             return nkeys + 1;
@@ -708,6 +723,7 @@ public class DefaultNodeCoder implements IAbstractNodeDataCoder<INodeData>,
         /**
          * {@inheritDoc}. This field is cached.
          */
+        @Override
         final public long getSpannedTupleCount() {
             
             return nentries;
@@ -732,6 +748,7 @@ public class DefaultNodeCoder implements IAbstractNodeDataCoder<INodeData>,
             
         }
 
+        @Override
         final public long getChildAddr(final int index) {
 
             assert assertChildIndex(index);
@@ -740,6 +757,7 @@ public class DefaultNodeCoder implements IAbstractNodeDataCoder<INodeData>,
 
 		}
 
+        @Override
 		final public long getChildEntryCount(final int index) {
 
 			assert assertChildIndex(index);
@@ -793,12 +811,14 @@ public class DefaultNodeCoder implements IAbstractNodeDataCoder<INodeData>,
 
         }
 
+        @Override
         final public IRaba getKeys() {
 
             return keys;
 
         }
 
+        @Override
         public String toString() {
 
             final StringBuilder sb = new StringBuilder();
