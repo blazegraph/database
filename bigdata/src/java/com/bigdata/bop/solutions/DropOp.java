@@ -71,7 +71,7 @@ public class DropOp extends PipelineOp {
     /**
      * @param op
      */
-    public DropOp(DropOp op) {
+    public DropOp(final DropOp op) {
         super(op);
     }
 
