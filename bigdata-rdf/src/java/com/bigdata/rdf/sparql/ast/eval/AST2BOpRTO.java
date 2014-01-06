@@ -103,7 +103,7 @@ public class AST2BOpRTO extends AST2BOpJoins {
 
         if (ctx.isQuads()) {
 
-            // FIXME The RTO does not handle quads yet.
+            // FIXME RTO: The RTO does not handle quads yet.
             return left;
 
         }
@@ -173,7 +173,7 @@ public class AST2BOpRTO extends AST2BOpJoins {
                 // Something the RTO can handle.
                 sps.add(sp);
                 /*
-                 * FIXME Handle Triples vs Quads, Default vs Named Graph, and
+                 * FIXME RTO: Handle Triples vs Quads, Default vs Named Graph, and
                  * DataSet. This probably means pushing more logic down into 
                  * the RTO from AST2BOpJoins.
                  */
@@ -231,7 +231,7 @@ public class AST2BOpRTO extends AST2BOpJoins {
         }
         
         /*
-         * FIXME When running the RTO as anything other than the top-level join
+         * FIXME RTO: When running the RTO as anything other than the top-level join
          * group in the query plan and for the *FIRST* joins in the query plan,
          * we need to flow in any solutions that are already in the pipeline
          * (unless we are going to run the RTO "bottom up") and build a hash

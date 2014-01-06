@@ -1108,7 +1108,7 @@ public class QueryLog {
         }        
 
         @SuppressWarnings("rawtypes")
-        final IPredicate pred = (IPredicate<?>) bop
+        final IPredicate pred = summary ? null : (IPredicate<?>) bop
                 .getProperty(PipelineJoin.Annotations.PREDICATE);
         final Integer predId = pred == null ? null : (Integer) pred
                 .getProperty(BOp.Annotations.BOP_ID);
