@@ -20,17 +20,28 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
- */
+*/
 package com.bigdata.bop;
 
-/**
- * An interface for a bop identifier factory.
- */
-public interface IdFactory {
+import java.util.concurrent.atomic.AtomicInteger;
+
+public class SimpleIdFactory implements IdFactory {
 
     /**
-     * Issue the next bop identifier.
+     * Note: The ids are assigned using {@link AtomicInteger#incrementAndGet()}
+     * so ONE (1) is the first id that will be assigned when we pass in ZERO (0)
+     * as the initial state of the {@link AtomicInteger}.
      */
-	public int nextId();
-	
+    private final AtomicInteger nextId = new AtomicInteger(0);
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public int nextId() {
+
+        return nextId.incrementAndGet();
+        
+    }
+
 }

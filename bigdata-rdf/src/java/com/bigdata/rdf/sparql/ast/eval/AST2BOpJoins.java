@@ -220,7 +220,7 @@ public class AST2BOpJoins extends AST2BOpFilters {
             anns.add(new NV(Predicate.Annotations.EVALUATION_CONTEXT,
                     BOpEvaluationContext.SHARDED));
 
-            pred = (Predicate) pred.setProperty(
+            pred = (Predicate<?>) pred.setProperty(
                     Predicate.Annotations.REMOTE_ACCESS_PATH, false);
 
         } else {
@@ -267,7 +267,7 @@ public class AST2BOpJoins extends AST2BOpFilters {
              */
             anns.add(new NV(Predicate.Annotations.EVALUATION_CONTEXT,
                     BOpEvaluationContext.SHARDED));
-            pred = (Predicate) pred.setProperty(
+            pred = (Predicate<?>) pred.setProperty(
                     Predicate.Annotations.REMOTE_ACCESS_PATH, false);
         } else {
             anns.add(new NV(Predicate.Annotations.EVALUATION_CONTEXT,

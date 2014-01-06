@@ -28,7 +28,6 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 import com.bigdata.bop.BOp;
@@ -38,6 +37,7 @@ import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IdFactory;
 import com.bigdata.bop.NamedSolutionSetRefUtility;
 import com.bigdata.bop.PipelineOp;
+import com.bigdata.bop.SimpleIdFactory;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.fed.QueryEngineFactory;
@@ -79,7 +79,7 @@ import com.bigdata.service.IBigdataFederation;
 public class AST2BOpContext implements IdFactory, IEvaluationContext {
 
     /**
-     * The {@link ASTContainer}
+     * The {@link ASTContainer} and never <code>null</code>.
      */
 	public final ASTContainer astContainer;
 	
@@ -88,7 +88,7 @@ public class AST2BOpContext implements IdFactory, IEvaluationContext {
 	 * 
 	 * @see #nextId()
 	 */
-	private final AtomicInteger idFactory;
+	private final IdFactory idFactory;
 	
 	/**
 	 * The KB instance.
@@ -368,8 +368,9 @@ public class AST2BOpContext implements IdFactory, IEvaluationContext {
 
     /**
      * 
-     * @param queryRoot
-     *            The root of the query.
+     * @param astContainer
+     *            The top-level {@link ASTContainer} for the query or update
+     *            request to be evaluated (required).
      * @param db
      *            The KB instance.
      * 
@@ -382,7 +383,15 @@ public class AST2BOpContext implements IdFactory, IEvaluationContext {
      *            {@link FunctionRegistry}.
      */
     public AST2BOpContext(final ASTContainer astContainer,
-                final AbstractTripleStore db) {
+            final AbstractTripleStore db) {
+
+        this(astContainer, db, new SimpleIdFactory());
+        
+    }
+
+    // Note: Exposed to AST2BOpRTO
+    AST2BOpContext(final ASTContainer astContainer,
+            final AbstractTripleStore db, final IdFactory idFactory) {
 
         if (astContainer == null)
             throw new IllegalArgumentException();
@@ -390,18 +399,16 @@ public class AST2BOpContext implements IdFactory, IEvaluationContext {
         if (db == null)
             throw new IllegalArgumentException();
 
+        if (idFactory == null)
+            throw new IllegalArgumentException();
+        
         this.astContainer = astContainer;
 
         this.db = db;
 
         this.optimizers = new DefaultOptimizerList();
 
-        /*
-         * Note: The ids are assigned using incrementAndGet() so ONE (1) is the
-         * first id that will be assigned when we pass in ZERO (0) as the
-         * initial state of the AtomicInteger.
-         */
-        this.idFactory = new AtomicInteger(0);
+        this.idFactory = idFactory;
         
         this.queryEngine = QueryEngineFactory.getQueryController(db
                 .getIndexManager());
@@ -496,7 +503,8 @@ public class AST2BOpContext implements IdFactory, IEvaluationContext {
     @Override
     public int nextId() {
 
-        return idFactory.incrementAndGet();
+        return idFactory.nextId();
+//        return idFactory.incrementAndGet();
 
     }
 
