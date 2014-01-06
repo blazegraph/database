@@ -495,7 +495,7 @@ public class AST2BOpContext implements IdFactory, IEvaluationContext {
 
     }
     
-    /**      FIXME Rolling back r7319 which broke UNION processing. */
+    @Override
     public int nextId() {
 
         return idFactory.incrementAndGet();
