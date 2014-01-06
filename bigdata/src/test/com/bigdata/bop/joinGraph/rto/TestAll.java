@@ -45,7 +45,7 @@ public class TestAll extends TestCase {
     /**
      * @param arg0
      */
-    public TestAll(String arg0) {
+    public TestAll(final String arg0) {
      
         super(arg0);
         
@@ -64,7 +64,8 @@ public class TestAll extends TestCase {
         suite.addTestSuite(TestJoinGraph.class);
 
         // runtime query optimizer behavior.
-        suite.addTestSuite(TestJGraph.class);
+        // FIXME This test suite is empty. Either test at the AST eval level or add tests here.
+//        suite.addTestSuite(TestJGraph.class);
 
         return suite;
         

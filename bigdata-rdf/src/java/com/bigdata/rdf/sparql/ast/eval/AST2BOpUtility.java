@@ -165,7 +165,6 @@ import cutthecrap.utils.striterators.NOPFilter;
  * @see <a href=
  *      "https://sourceforge.net/apps/mediawiki/bigdata/index.php?title=QueryEvaluation"
  *      >Query Evaluation</a>.
- *      
  */
 public class AST2BOpUtility extends AST2BOpRTO {
 
@@ -2428,15 +2427,21 @@ public class AST2BOpUtility extends AST2BOpRTO {
      * @param doneSet
      *            The set of variables which are already known to be
      *            materialized.
+     * @param ctx
+     *            The evaluation context.
+     * @param needsEndOp
+     *            When <code>true</code> and the parent is not-
+     *            <code>null</code>, adds an {@link EndOp} to the plan.
      */
-    private static PipelineOp convertJoinGroup(PipelineOp left,
-            final JoinGroupNode joinGroup,
-            final Set<IVariable<?>> doneSet,
-            final AST2BOpContext ctx, 
+    private static PipelineOp convertJoinGroup(//
+            PipelineOp left,//
+            final JoinGroupNode joinGroup,//
+            final Set<IVariable<?>> doneSet,//
+            final AST2BOpContext ctx,//
             final boolean needsEndOp) {
 
-        final StaticAnalysis sa = ctx.sa;
-
+//        final StaticAnalysis sa = ctx.sa;
+//
         // /*
         // * Place the StartOp at the beginning of the pipeline.
         // *
@@ -2554,11 +2559,13 @@ public class AST2BOpUtility extends AST2BOpRTO {
                  */
                 final Predicate<?> pred = toPredicate(sp, ctx);
                 final boolean optional = sp.isOptional();
-                left = join(left, pred,
+                left = join(left, //
+                        pred,//
                         optional ? new LinkedHashSet<IVariable<?>>(doneSet)
-                                : doneSet,
-                        getJoinConstraints(sp), 
-                        sp.getQueryHints(), ctx);
+                                : doneSet,//
+                        getJoinConstraints(sp), //
+                        sp.getQueryHints(), //
+                        ctx);
                 continue;
             } else if (child instanceof ArbitraryLengthPathNode) {
                 final ArbitraryLengthPathNode alpNode = (ArbitraryLengthPathNode) child;

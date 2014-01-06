@@ -523,10 +523,11 @@ public class AST2BOpFilters extends AST2BOpBase {
                 // remove any terms already materialized
                 terms.removeAll(alreadyMaterialized);
 
-                if (c instanceof INeedsMaterialization && ((INeedsMaterialization) c).getRequirement() == Requirement.ALWAYS) {
-                	
-	                // add any new terms to the list of already materialized
-	                alreadyMaterialized.addAll(terms);
+                if (c instanceof INeedsMaterialization
+                        && ((INeedsMaterialization) c).getRequirement() == Requirement.ALWAYS) {
+
+                    // add any new terms to the list of already materialized
+                    alreadyMaterialized.addAll(terms);
 	                
                 }
 

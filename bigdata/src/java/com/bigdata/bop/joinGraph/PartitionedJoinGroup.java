@@ -1018,24 +1018,25 @@ public class PartitionedJoinGroup {
 		/*
 		 * Reserve ids used by the join graph or its constraints.
 		 */
-		{
-			for (IPredicate<?> p : preds) {
-				idFactory.reserve(p.getId());
-			}
-			if (constraints != null) {
-				for (IConstraint c : constraints) {
-					final Iterator<BOp> itr = BOpUtility
-							.preOrderIteratorWithAnnotations(c);
-					while (itr.hasNext()) {
-						final BOp y = itr.next();
-						final Integer anId = (Integer) y
-								.getProperty(BOp.Annotations.BOP_ID);
-						if (anId != null)
-							idFactory.reserve(anId.intValue());
-					}
-				}
-			}
-		}
+	    idFactory.reserveIds(preds, constraints);
+//		{
+//			for (IPredicate<?> p : preds) {
+//				idFactory.reserve(p.getId());
+//			}
+//			if (constraints != null) {
+//				for (IConstraint c : constraints) {
+//					final Iterator<BOp> itr = BOpUtility
+//							.preOrderIteratorWithAnnotations(c);
+//					while (itr.hasNext()) {
+//						final BOp y = itr.next();
+//						final Integer anId = (Integer) y
+//								.getProperty(BOp.Annotations.BOP_ID);
+//						if (anId != null)
+//							idFactory.reserve(anId.intValue());
+//					}
+//				}
+//			}
+//		}
 
         // figure out which constraints are attached to which predicates.
         final IConstraint[][] assignedConstraints = PartitionedJoinGroup
