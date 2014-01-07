@@ -64,6 +64,7 @@ import com.bigdata.rdf.sparql.ast.TermNode;
 import com.bigdata.rdf.sparql.ast.UnionNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
+import com.bigdata.rdf.sparql.ast.service.ServiceNode;
 
 public abstract class AbstractOptimizerTestCase extends AbstractASTEvaluationTestCase {
 
@@ -425,6 +426,18 @@ public abstract class AbstractOptimizerTestCase extends AbstractASTEvaluationTes
 
 		protected FilterNode filter(IValueExpressionNode f) {
 			return new FilterNode(f);
+		}
+
+		protected IValueExpressionNode functionNode(String uri, ValueExpressionNode ... args) {
+			return new FunctionNode(new URIImpl(uri), null, args);
+		}
+
+		protected ServiceNode service(TermNode serviceRef, GraphPatternGroup<IGroupMemberNode> groupNode) {
+			return new ServiceNode(serviceRef, groupNode);
+		}
+
+		protected AssignmentNode bind(IValueExpressionNode valueNode, VarNode varNode) {
+			return new AssignmentNode(varNode, valueNode);
 		}
 	}
 

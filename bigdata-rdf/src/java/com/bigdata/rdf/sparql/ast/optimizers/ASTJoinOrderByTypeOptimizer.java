@@ -183,17 +183,20 @@ public class ASTJoinOrderByTypeOptimizer extends AbstractJoinGroupOptimizer
      * 
      *    Required joins:
      *    
-     *   3. Service calls (Bigdata SEARCH)
+     *   3. Some Service calls (e.g. Bigdata SEARCH)
      *   4. Subquery-includes
      *   5. Statement patterns
      *   7. Sparql11 subqueries
      *   8. Non-optional subgroups
+     *   9. Other service calls
      *   
+     *   TODO: the placement of OPTIONALS should really be more complicated than this.
+     *   e.g. consider interaction with SERVICE calls etc.
      *   Optional joins:
-     *   9. Simple optionals & optional subgroups
+     *   10. Simple optionals & optional subgroups
      * 
-     * 10. Assignments
-     * 11. Post-conditionals
+     * 11. Assignments
+     * 12. Post-conditionals
      * </pre> 
      * Most of this logic was lifted out of {@link AST2BOpUtility}.
      * <p>
