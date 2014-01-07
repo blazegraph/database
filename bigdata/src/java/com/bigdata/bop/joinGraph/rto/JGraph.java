@@ -208,6 +208,10 @@ import com.bigdata.util.concurrent.ExecutionExceptions;
  *       will be no paths identified by the optimizer and the final path length
  *       becomes zero.
  * 
+ * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/64">Runtime
+ *      Query Optimization</a>
+ * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/258">Integrate
+ *      RTO into SAIL</a>
  * @see <a
  *      href="http://www-db.informatik.uni-tuebingen.de/files/research/pathfinder/publications/rox-demo.pdf">
  *      ROX </a>
@@ -286,7 +290,7 @@ public class JGraph {
 	 * @todo unit test when the join graph has a single vertex.
 	 */
     public JGraph(final IPredicate<?>[] v, final IConstraint[] constraints,
-            final SampleType sampleType) {
+                final SampleType sampleType) {
 
         if (v == null)
             throw new IllegalArgumentException();
