@@ -233,6 +233,8 @@ public class TestNanoSparqlServerWithProxyIndexManager<S extends IIndexManager>
         suite.addTestSuite(TestInsertFilterFalse727.class);
         suite.addTestSuite(TestCBD731.class);
         
+        suite.addTestSuite(TestService794.class);
+        
 
         // SPARQL UPDATE test suite.
         switch(testMode) {
