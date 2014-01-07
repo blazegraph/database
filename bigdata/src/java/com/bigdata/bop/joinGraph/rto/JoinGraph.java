@@ -50,6 +50,7 @@ import com.bigdata.bop.ap.SampleIndex;
 import com.bigdata.bop.ap.SampleIndex.SampleType;
 import com.bigdata.bop.controller.AbstractSubqueryOp;
 import com.bigdata.bop.engine.AbstractRunningQuery;
+import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.rdf.sparql.ast.IJoinNode;
@@ -206,6 +207,9 @@ public class JoinGraph extends PipelineOp {
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
      *         Thompson</a>
+     * 
+     *         TODO This could also be put on a {@link BOpStats} interface,
+     *         which is the other way for accessing shared state.
      */
     public interface Attributes {
 

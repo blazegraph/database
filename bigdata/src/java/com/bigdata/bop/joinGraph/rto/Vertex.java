@@ -83,6 +83,7 @@ public class Vertex implements Serializable {
 
     }
 
+    @Override
     public String toString() {
 
         return "Vertex{pred=" + pred + ",sample=" + sample + "}";
@@ -92,6 +93,7 @@ public class Vertex implements Serializable {
     /**
      * Equals is based on a reference test.
      */
+    @Override
     public boolean equals(Object o) {
         return this == o;
     }
@@ -100,6 +102,7 @@ public class Vertex implements Serializable {
      * The hash code is just the {@link BOp.Annotations#BOP_ID} of the
      * associated {@link IPredicate}.
      */
+    @Override
     public int hashCode() {
         return pred.getId();
     }
