@@ -1944,8 +1944,14 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> /*extends
                          * also ignored. We want to continue this loop until
                          * both Futures are done. Interrupts are not trapped, so
                          * an interrupt will still exit the loop.
+                         * 
+                         * It appears that it is possible for futSnd to be blocked
+                         * and not generate an error. If we do not exit the loop
+                         * and check the futRec future in this case then we coul loop
+                         * continuously.  This does rather beg the question of
+                         * whether we should only be checking futRec at this stage.
                          */
-                        while (!futSnd.isDone() || !futRec.isDone()) {
+                        while (!(futSnd.isDone() || futRec.isDone())) {
                             /*
                              * Make sure leader's quorum token remains valid for
                              * ALL writes.
@@ -2491,7 +2497,7 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> /*extends
 
         @Override
         public Void call() throws Exception {
-
+        	
             // wrap the messages together.
             final HAMessageWrapper wrappedMsg = new HAMessageWrapper(
                     req, snd, msg);
@@ -2524,8 +2530,11 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> /*extends
                          * also ignored. We want to continue this loop until
                          * both Futures are done. Interrupts are not trapped, so
                          * an interrupt will still exit the loop.
+                         * 
+                         * TODO: check the comparative logic with this and robustReplicate
+                         * to confirm the equivalence of checking the different futures.
                          */
-                        while (!futRec.isDone() || !futRep.isDone()) {
+                        while (!(futRec.isDone() || futRep.isDone())) {
                             /*
                              * The token must remain valid, even if this service
                              * is not joined with the met quorum. If fact,
@@ -2547,7 +2556,7 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> /*extends
                         }
                         
                         /*
-                         * Note: Both futures are DONE at this point. However,
+                         * Note: Both futures are DONE (or not - check condition above) at this point. However,
                          * we want to check the remote Future for the downstream
                          * service first in order to accurately report the
                          * service that was the source of a pipeline replication
