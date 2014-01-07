@@ -28,6 +28,7 @@ package com.bigdata.rdf.sparql.ast.eval;
 
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.LinkedList;
@@ -39,11 +40,14 @@ import java.util.concurrent.atomic.AtomicInteger;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpEvaluationContext;
 import com.bigdata.bop.BOpIdFactory;
+import com.bigdata.bop.BadBOpIdTypeException;
+import com.bigdata.bop.DuplicateBOpIdException;
 import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
+import com.bigdata.bop.NoBOpIdException;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.ap.Predicate;
 import com.bigdata.bop.ap.SampleIndex.SampleType;
@@ -97,6 +101,19 @@ import com.bigdata.util.NT;
  */
 public class AST2BOpRTO extends AST2BOpJoins {
 
+    public interface Annotations extends AST2BOpJoins.Annotations {
+        
+        /**
+         * Annotation is used to tag the {@link StatementPatternNode}s in a
+         * {@link JoinGroupNode} with the identified assigned to the
+         * corresponding {@link IPredicate}. This makes it possible to lookup
+         * the SPO from the {@link IPredicate} when the RTO hands us back an
+         * ordered join path.
+         */
+        String PREDICATE_ID = "PredicateId";
+        
+    }
+    
     /**
      * When <code>true</code>, the RTO will only accept simple joins into the
      * join graph. Simple joins includes triples-mode joins and filters that do
@@ -222,7 +239,7 @@ public class AST2BOpRTO extends AST2BOpJoins {
 //        final Set<StatementPatternNode> sps = new LinkedHashSet<StatementPatternNode>();
         // The predicates for the join graph.
         @SuppressWarnings("rawtypes")
-        final Set<Predicate> preds = new LinkedHashSet<Predicate>();
+        final LinkedList<Predicate> preds = new LinkedList<Predicate>();
         // The constraints for the join graph.
         final List<IConstraint> constraints = new LinkedList<IConstraint>();
         // The #of JOINs accepted into the RTO's join group.
@@ -296,7 +313,6 @@ public class AST2BOpRTO extends AST2BOpJoins {
     
                     // Something the RTO can handle.
                     sp = (StatementPatternNode) sp.clone();// TODO Use destructive move.
-//                    sp.setId(ctx.nextId()); // assign id so we can reference back later.
                     rtoJoinGroup.addChild(sp); // add to group.
                     naccepted++;
                     /*
@@ -310,17 +326,24 @@ public class AST2BOpRTO extends AST2BOpJoins {
                      * when we take the selected join path from the RTO and
                      * compile it into a query plan to fully execute the join
                      * group.
+                     * 
+                     * Note: This assigns ids to the predicates as a
+                     * side-effect. Those ids are assigned by the
+                     * AST2BOpContext's BOpIdFactory. You can not rely on
+                     * specific ID values being assigned, so you need to build a
+                     * map and track the correspondence between the SPs and the
+                     * predicates.
                      */
-                    final Predicate<?> pred = AST2BOpUtility.toPredicate(sp, ctx);
-    //              final int joinId = ctx.nextId();
-    //
-    //              // annotations for this join.
-    //              final List<NV> anns = new LinkedList<NV>();
-    //
-    //              anns.add(new NV(BOp.Annotations.BOP_ID, joinId));
+                    final Predicate<?> pred = AST2BOpUtility.toPredicate(sp,
+                            ctx);
                     preds.add(pred);
+                    // tag the SP with predicate's ID.
+                    sp.setProperty(Annotations.PREDICATE_ID, pred.getId());
                     if (attachedConstraints != null) {
-                        // RTO will figure out where to attach these constraints.
+                        /*
+                         * The RTO will figure out where to attach these
+                         * constraints.
+                         */
                         constraints.addAll(attachedConstraints);
                     }
     
@@ -492,8 +515,8 @@ public class AST2BOpRTO extends AST2BOpJoins {
         final JoinGroupNode rtoJoinGroup = (JoinGroupNode) joinGraph
                 .getRequiredProperty(JoinGraph.Annotations.JOIN_GROUP);
 
-//        // Build an index over the bopIds in that JoinGroupNode.
-//        final Map<Integer, BOp> index = getIndex(rtoJoinGroup);
+        // Build an index over the bopIds in that JoinGroupNode.
+        final Map<Integer, StatementPatternNode> index = getIndex(rtoJoinGroup);
 
         // Factory avoids reuse of bopIds assigned to the predicates.
         final BOpIdFactory idFactory = new BOpIdFactory();
@@ -530,26 +553,8 @@ public class AST2BOpRTO extends AST2BOpJoins {
 
             final boolean optional = pred.isOptional();
 
-            /*
-             * Lookup the AST node for that predicate.
-             * 
-             * Note: The predicates are assigned bopIds by the RTO starting with
-             * ONE (1). Therefore we substract out ONE from the predicate's id
-             * to find its index into the join group.
-             * 
-             * TODO This assumes that the join group does not contain anything
-             * other than the SPs for the predicates that we are using.,
-             * 
-             * TODO HINTS: The Predicate's query hints should the hints for that
-             * specific join (aks the SP or other type of IJoinNode), not the
-             * hints for the JoinGroupNode or the JoinGraph operator. We could
-             * just pass the AST nodes themselves from the JoinGroupNode. That
-             * might make things easier, even if it make the query serialization
-             * fatter on a cluster.
-             */
-//            final ASTBase astNode = (ASTBase) index.get(pred.getId());
-            
-            final ASTBase astNode = (ASTBase) rtoJoinGroup.get(pred.getId() - 1);
+            // Lookup the AST node for that predicate.
+            final StatementPatternNode sp = index.get(pred.getId());
             
             left = join(left, //
                     pred, //
@@ -557,7 +562,7 @@ public class AST2BOpRTO extends AST2BOpJoins {
                             : doneSet, //
                     attachedJoinConstraints == null ? null : Arrays
                             .asList(attachedJoinConstraints),//
-                    astNode.getQueryHints(),//
+                    sp.getQueryHints(),//
                     ctx);
 
         }
@@ -616,61 +621,60 @@ public class AST2BOpRTO extends AST2BOpJoins {
 
     }
 
-//    /**
-//     * Return an index from the {@link BOp.Annotations#BOP_ID} to the
-//     * {@link BOp}.
-//     * <p>
-//     * {@link BOp}s should form directed acyclic graphs, but this is not
-//     * strictly enforced. The recursive traversal iterators declared by this
-//     * class do not protect against loops in the operator tree. However,
-//     * {@link #getIndex(BOp)} detects and report loops based on duplicate
-//     * {@link Annotations#BOP_ID}s -or- duplicate {@link BOp} references.
-//     * 
-//     * @param op
-//     *            A {@link BOp}.
-//     * 
-//     * @return The index, which is immutable and thread-safe.
-//     * 
-//     * @throws DuplicateBOpIdException
-//     *             if there are two or more {@link BOp}s having the same
-//     *             {@link Annotations#BOP_ID}.
-//     * @throws BadBOpIdTypeException
-//     *             if the {@link Annotations#BOP_ID} is not an {@link Integer}.
-//     * @throws NoBOpIdException
-//     *             if a {@link PipelineOp} does not have a
-//     *             {@link Annotations#BOP_ID}.
-//     */
-//    static private Map<Integer,BOp> getIndex(final JoinGroupNode op) {
-//        if(op == null)
-//            throw new IllegalArgumentException();
-//        final LinkedHashMap<Integer, BOp> map = new LinkedHashMap<Integer, BOp>();
-//        final Iterator<BOp> itr = op.argIterator();
-//        while (itr.hasNext()) {
-//            final BOp t = itr.next();
-////            if(!(t instanceof PipelineOp))
-////                throw new NotPipelineOpException(t.toString());
-//            final Object x = t.getProperty(BOp.Annotations.BOP_ID);
-//            if (x == null) {
-//                throw new NoBOpIdException(t.toString());
-//            }
-//            if (!(x instanceof Integer)) {
-//                throw new BadBOpIdTypeException("Must be Integer, not: "
-//                        + x.getClass() + ": " + BOp.Annotations.BOP_ID);
-//            }
-//            final Integer id = (Integer) t.getProperty(BOp.Annotations.BOP_ID);
-//            final BOp conflict = map.put(id, t);
-//            if (conflict != null) {
-//                /*
-//                 * BOp appears more than once. This is not allowed for
-//                 * pipeline operators. If you are getting this exception for
-//                 * a non-pipeline operator, you should remove the bopId.
-//                 */
-//                throw new DuplicateBOpIdException("duplicate id=" + id
-//                        + " for " + conflict + " and " + t);
-//            }
-//        }
-//        // wrap to ensure immutable and thread-safe.
-//        return Collections.unmodifiableMap(map);
-//    }
+    /**
+     * Return a map from the {@link Annotations#PREDICATE_ID} to the
+     * corresponding {@link StatementPatternNode}.
+     * 
+     * @param op
+     *            The join group.
+     * 
+     * @return The index, which is immutable and thread-safe.
+     * 
+     * @throws DuplicateBOpIdException
+     *             if there are two or more {@link BOp}s having the same
+     *             {@link Annotations#PREDICATE_ID}.
+     * @throws BadBOpIdTypeException
+     *             if the {@link Annotations#PREDICATE_ID} is not an
+     *             {@link Integer}.
+     * @throws NoBOpIdException
+     *             if a {@link StatementPatternNode} does not have a
+     *             {@link Annotations#PREDICATE_ID}.
+     */
+    static private Map<Integer, StatementPatternNode> getIndex(
+            final JoinGroupNode op) {
+        if (op == null)
+            throw new IllegalArgumentException();
+        final LinkedHashMap<Integer, StatementPatternNode> map = new LinkedHashMap<Integer, StatementPatternNode>();
+        final Iterator<IGroupMemberNode> itr = op.iterator();
+        while (itr.hasNext()) {
+            final BOp t = itr.next();
+            if(!(t instanceof StatementPatternNode)) {
+                // Skip non-SP nodes.
+                continue;
+            }
+            final StatementPatternNode sp = (StatementPatternNode) t;
+            final Object x = t.getProperty(Annotations.PREDICATE_ID);
+            if (x == null) {
+                throw new NoBOpIdException(t.toString());
+            }
+            if (!(x instanceof Integer)) {
+                throw new BadBOpIdTypeException("Must be Integer, not: "
+                        + x.getClass() + ": " + Annotations.PREDICATE_ID);
+            }
+            final Integer id = (Integer) x;
+            final BOp conflict = map.put(id, sp);
+            if (conflict != null) {
+                /*
+                 * BOp appears more than once. This is not allowed for
+                 * pipeline operators. If you are getting this exception for
+                 * a non-pipeline operator, you should remove the bopId.
+                 */
+                throw new DuplicateBOpIdException("duplicate id=" + id
+                        + " for " + conflict + " and " + t);
+            }
+        }
+        // wrap to ensure immutable and thread-safe.
+        return Collections.unmodifiableMap(map);
+    }
 
 }

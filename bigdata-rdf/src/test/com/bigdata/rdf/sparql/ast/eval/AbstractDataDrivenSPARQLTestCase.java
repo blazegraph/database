@@ -71,13 +71,11 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.LinkedHashSet;
 import java.util.Set;
+import java.util.zip.GZIPInputStream;
+import java.util.zip.ZipInputStream;
 
 import org.apache.log4j.Logger;
-import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
-import org.openrdf.model.URI;
-import org.openrdf.model.Value;
-import org.openrdf.model.impl.URIImpl;
 import org.openrdf.query.GraphQueryResult;
 import org.openrdf.query.QueryEvaluationException;
 import org.openrdf.query.TupleQueryResult;
@@ -90,23 +88,15 @@ import org.openrdf.query.resultio.QueryResultIO;
 import org.openrdf.query.resultio.TupleQueryResultFormat;
 import org.openrdf.query.resultio.TupleQueryResultParser;
 import org.openrdf.rio.RDFFormat;
-import org.openrdf.rio.RDFHandlerException;
 import org.openrdf.rio.RDFParser;
 import org.openrdf.rio.RDFParser.DatatypeHandling;
-import org.openrdf.rio.RDFParserFactory;
-import org.openrdf.rio.RDFParserRegistry;
 import org.openrdf.rio.Rio;
-import org.openrdf.rio.helpers.RDFHandlerBase;
 import org.openrdf.rio.helpers.StatementCollector;
 
 import com.bigdata.bop.engine.AbstractQueryEngineTestCase;
-import com.bigdata.rdf.model.StatementEnum;
-import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.sail.sparql.Bigdata2ASTSPARQLParser;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
-import com.bigdata.rdf.sparql.ast.AbstractASTEvaluationTestCase;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
-import com.bigdata.rdf.sparql.ast.eval.AbstractDataAndSPARQLTestCase.AbsHelper;
 import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
@@ -231,7 +221,8 @@ public class AbstractDataDrivenSPARQLTestCase extends
                 final String[] dataFileURLs, final String resultFileURL,
                 final boolean checkOrder)
                 throws Exception {
-        	super(getResourceAsString(queryFileURL));
+
+            super(getResourceAsString(queryFileURL));
 
             if (log.isInfoEnabled())
                 log.info("\ntestURI:\n" + testURI);
@@ -527,12 +518,64 @@ public class AbstractDataDrivenSPARQLTestCase extends
          */
         protected long loadData(final String resource) {
 
-    		return loadData(getResourceAsStream(resource), RDFFormat.forFileName(resource), new File(resource).toURI().toString());
+            if (log.isInfoEnabled())
+                log.info("Loading " + resource);
             
+            final String baseURL = new File(resource).toURI().toString();
+
+            InputStream is = null;
+            try {
+
+                is = getResourceAsStream(resource);
+
+                final RDFFormat rdfFormat = RDFFormat.forFileName(resource);
+
+                if (rdfFormat == null)
+                    throw new RuntimeException("Unknown format: resource="
+                            + resource);
+
+                // final RDFFormat rdfFormat = guessFormat(new File(resource),
+                // null/* default */);
+
+                return loadData(is, rdfFormat, baseURL);
+
+            } finally {
+                if (is != null) {
+                    try {
+                        is.close();
+                    } catch (IOException e) {
+                        log.error("Could not close: resource=" + resource, e);
+                    }
+                    is = null;
+                }
+            }
+
+
         }
        
     }
     
+//    private static RDFFormat guessFormat(final File file,
+//            final RDFFormat defaultFormat) {
+//
+//        final String n = file.getName();
+//
+//        RDFFormat fmt = RDFFormat.forFileName(n);
+//
+//        if (fmt == null && n.endsWith(".zip")) {
+//            fmt = RDFFormat.forFileName(n.substring(0, n.length() - 4));
+//        }
+//
+//        if (fmt == null && n.endsWith(".gz")) {
+//            fmt = RDFFormat.forFileName(n.substring(0, n.length() - 3));
+//        }
+//
+//        if (fmt == null) // fallback
+//            fmt = defaultFormat;
+//
+//        return fmt;
+//
+//    }
 
 	private static InputStream getResourceAsStream(final String resource) {
 
@@ -595,6 +638,20 @@ public class AbstractDataDrivenSPARQLTestCase extends
         if (is == null)
             throw new RuntimeException("Not found: " + resource);
 
+        if (resource.toLowerCase().endsWith(".gz")) {
+
+            try {
+                is = new GZIPInputStream(is);
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+
+        } else if (resource.toLowerCase().endsWith(".zip")) {
+
+            is = new ZipInputStream(is);
+
+        }
+        
         return is;
 
     }
