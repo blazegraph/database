@@ -101,6 +101,7 @@ import com.bigdata.rdf.sail.SPARQLUpdateEvent;
 import com.bigdata.rdf.sail.sparql.Bigdata2ASTSPARQLParser;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.QueryHints;
+import com.bigdata.rdf.sparql.ast.QueryOptimizerEnum;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryType;
 import com.bigdata.rdf.sparql.ast.Update;
@@ -143,6 +144,12 @@ public class BigdataRDFContext extends BigdataBaseContext {
      * {@link QueryHints#ANALYTIC} query hint.
      */
     protected static final String ANALYTIC = "analytic";
+    
+    /**
+     * URL Query parameter used to request the use of the Runtime Query
+     * Optimizer.
+     */
+    protected static final String RTO = "RTO";
     
     /**
      * URL Query parameter used to request an XHTML response for SPARQL
@@ -612,8 +619,13 @@ public class BigdataRDFContext extends BigdataBaseContext {
         /**
          * When <code>true</code>, enable the "analytic" query hints. 
          */
-        final Boolean analytic;
+        final boolean analytic;
 
+        /**
+         * When <code>true</code>, enable the Runtime Query Optimizer.
+         */
+        final boolean rto;
+        
         /**
          * When <code>true</code>, provide an view of the XHTML representation
          * of the solutions or graph result (SPARQL QUERY)
@@ -751,6 +763,9 @@ public class BigdataRDFContext extends BigdataBaseContext {
             this.explainDetails = explain && isExplainDetails(req);
             this.analytic = getEffectiveBooleanValue(
                     req.getParameter(ANALYTIC), QueryHints.DEFAULT_ANALYTIC);
+            this.rto = getEffectiveBooleanValue(req.getParameter(RTO),
+                    QueryHints.DEFAULT_OPTIMIZER
+                            .equals(QueryOptimizerEnum.Runtime));
             this.xhtml = getEffectiveBooleanValue(req.getParameter(XHTML),
                     false);
             this.monitor = getEffectiveBooleanValue(req.getParameter(MONITOR),
@@ -822,6 +837,9 @@ public class BigdataRDFContext extends BigdataBaseContext {
             this.explainDetails = explain && isExplainDetails(req);
             this.analytic = getEffectiveBooleanValue(
                     req.getParameter(ANALYTIC), QueryHints.DEFAULT_ANALYTIC);
+            this.rto = getEffectiveBooleanValue(req.getParameter(RTO),
+                    QueryHints.DEFAULT_OPTIMIZER
+                            .equals(QueryOptimizerEnum.Runtime));
             this.xhtml = getEffectiveBooleanValue(req.getParameter(XHTML),
                     false);
             this.monitor = getEffectiveBooleanValue(req.getParameter(MONITOR),
@@ -898,13 +916,18 @@ public class BigdataRDFContext extends BigdataBaseContext {
             // Override query if data set protocol parameters were used.
 			overrideDataset(query);
 
-            if (analytic != null) {
+            if (analytic) {
 
                 // Turn analytic query on/off as requested.
-//                astContainer.getOriginalAST().setQueryHint(QueryHints.ANALYTIC,
-//                        analytic.toString());
-                astContainer.setQueryHint(QueryHints.ANALYTIC,
-                        analytic.toString());
+                astContainer.setQueryHint(QueryHints.ANALYTIC, "true");
+
+            }
+
+            if (rto) {
+
+                // Turn analytic query on/off as requested.
+                astContainer.setQueryHint(QueryHints.OPTIMIZER,
+                        QueryOptimizerEnum.Runtime.toString());
                 
             }
 
@@ -951,13 +974,18 @@ public class BigdataRDFContext extends BigdataBaseContext {
             // Override query if data set protocol parameters were used.
             overrideDataset(update);
 
-            if (analytic != null) {
+            if (analytic) {
 
                 // Turn analytic query on/off as requested.
-//                astContainer.getOriginalAST().setQueryHint(QueryHints.ANALYTIC,
-//                        analytic.toString());
-                astContainer.setQueryHint(QueryHints.ANALYTIC,
-                        analytic.toString());
+                astContainer.setQueryHint(QueryHints.ANALYTIC, "true");
+
+            }
+
+            if (rto) {
+
+                // Turn analytic query on/off as requested.
+                astContainer.setQueryHint(QueryHints.OPTIMIZER,
+                        QueryOptimizerEnum.Runtime.toString());
                 
             }
 
