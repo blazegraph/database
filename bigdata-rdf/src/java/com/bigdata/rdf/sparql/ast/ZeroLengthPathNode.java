@@ -14,7 +14,9 @@ import com.bigdata.bop.NV;
  * A special kind of AST node that represents the SPARQL 1.1 zero length path
  * operator.
  * 
- * @deprecated Does not work - leads to cardinality problems.
+ * @deprecated Does not work - leads to cardinality problems and can be removed.
+ *             Zero Length Paths are integrated into the ALP node /
+ *             ArbitraryLengthPathOp now.
  */
 public class ZeroLengthPathNode 
 	extends GroupMemberNodeBase<ZeroLengthPathNode> 

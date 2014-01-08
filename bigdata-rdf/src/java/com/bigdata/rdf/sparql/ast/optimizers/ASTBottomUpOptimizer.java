@@ -524,6 +524,10 @@ public class ASTBottomUpOptimizer implements IASTOptimizer {
 
         final NamedSubqueryRoot nsr = new NamedSubqueryRoot(QueryType.SELECT,
                 namedSet);
+        
+        // Copy across query hints for the join group.
+        nsr.setQueryHints(p.getQueryHints());
+        
         {
         
             {
@@ -551,6 +555,9 @@ public class ASTBottomUpOptimizer implements IASTOptimizer {
         }
         
         final NamedSubqueryInclude nsi = new NamedSubqueryInclude(namedSet);
+
+        // Copy across query hints for the join group.
+        nsi.setQueryHints(p.getQueryHints());
 
         if (p.isOptional()) {
 

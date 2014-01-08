@@ -33,12 +33,14 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Properties;
 
+import org.apache.log4j.Logger;
 import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.IValueExpression;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.sparql.ast.ASTBase;
@@ -46,11 +48,11 @@ import com.bigdata.rdf.sparql.ast.ConstantNode;
 import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.IQueryNode;
+import com.bigdata.rdf.sparql.ast.IValueExpressionNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueriesNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryBase;
 import com.bigdata.rdf.sparql.ast.QueryHints;
-import com.bigdata.rdf.sparql.ast.QueryNodeBase;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.SubqueryRoot;
@@ -107,7 +109,8 @@ import com.bigdata.rdf.sparql.ast.service.ServiceNode;
  */
 public class ASTQueryHintOptimizer implements IASTOptimizer {
 
-//    private static final Logger log = Logger.getLogger(ASTQueryHintOptimizer.class);
+    private static final Logger log = Logger
+            .getLogger(ASTQueryHintOptimizer.class);
     
     @SuppressWarnings("unchecked")
     @Override
@@ -155,13 +158,33 @@ public class ASTQueryHintOptimizer implements IASTOptimizer {
      */
     private boolean isNodeAcceptingQueryHints(final BOp op) {
       
-        if (op instanceof QueryNodeBase) {
+        /**
+         * Note: Historically, only visited QueryNodeBase, but that does not let
+         * query hints be applied to a variety of relevant AST nodes, including
+         * the SliceOp. The new pattern is to exclude those parts of the AST
+         * interface heirarchy that should not have query hints applied, which
+         * is basically the value expressions.
+         * 
+         * @see <a href="http://sourceforge.net/apps/trac/bigdata/ticket/791" >
+         *      Clean up query hints </a>
+         */
         
-            return true;
+        if (op instanceof IValueExpressionNode) {
             
+            // Skip value expressions.
+            return false;
+
         }
 
-        return false;
+        if (op instanceof IValueExpression) {
+
+            // Skip value expressions.
+            return false;
+
+        }
+
+        // Visit anything else.
+        return true;
         
     }
     
@@ -255,7 +278,7 @@ public class ASTQueryHintOptimizer implements IASTOptimizer {
         @SuppressWarnings("rawtypes")
         final IQueryHint queryHint = QueryHintRegistry.get(name);
         
-        if(queryHint == null) {
+        if (queryHint == null) {
             
             // Unknown query hint.
             throw new QueryHintException(scope, t, name, value);
@@ -264,6 +287,10 @@ public class ASTQueryHintOptimizer implements IASTOptimizer {
 
         // Parse/validate and handle type conversion for the query hint value.
         final Object value2 = queryHint.validate(value);
+
+        if (log.isTraceEnabled())
+            log.trace("Applying hint: hint=" + queryHint.getName() + ", value="
+                    + value2 + ", node=" + t.getClass().getName());
 
         // Apply the query hint.
         queryHint.handle(context, scope, t, value2);
@@ -341,7 +368,7 @@ public class ASTQueryHintOptimizer implements IASTOptimizer {
             final QueryRoot queryRoot, final QueryBase queryBase,
             final GraphPatternGroup<IGroupMemberNode> group) {
 
-        if(group == null)
+        if (group == null)
             return;
         
         /*
@@ -371,13 +398,16 @@ public class ASTQueryHintOptimizer implements IASTOptimizer {
 
                 if (child instanceof StatementPatternNode) {
 
+                    // Look for a query hint.
                     final StatementPatternNode sp = (StatementPatternNode) child;
 
                     if (!isQueryHint(sp)) {
+                        // Not a query hint.
                         prior = sp;
                         continue;
                     }
 
+                    // Apply query hint.
                     applyQueryHint(context, queryRoot, queryBase, group, prior,
                             sp);
 
@@ -388,7 +418,7 @@ public class ASTQueryHintOptimizer implements IASTOptimizer {
                 }
 
                 /*
-                 * Recursion.
+                 * Recursion (looking for query hints to be applied).
                  */
                 if(child instanceof GraphPatternGroup<?>) {
                     processGroup(context, queryRoot, queryBase,
@@ -440,12 +470,37 @@ public class ASTQueryHintOptimizer implements IASTOptimizer {
 
     /**
      * Return <code>true</code> iff this {@link StatementPatternNode} is a query
-     * hint.
+     * hint. This method checks the namespace of the predicate. All query hints
+     * MUST start with the <code>hint:</code> namespace, which is given by
+     * {@link QueryHints#NAMESPACE}.
+     * <p>
+     * Within that namespace we have public query hints whose localName is
+     * declared in the {@link QueryHints} interface, e.g.,
+     * {@link QueryHints#CHUNK_SIZE} which appears as follows in a query:
+     * 
+     * <pre>
+     * hint:chunkSize
+     * </pre>
+     * 
+     * We also have non-public, fully qualified, query hints, e.g.,
+     * 
+     * <pre>
+     * hint:com.bigdata.relation.accesspath.IBuffer.chunkCapacity
+     * </pre>
+     * 
+     * In both cases, an {@link IQueryHint} is registered with the
+     * {@link QueryHintRegistry}. The "non-public" query hints are simply not
+     * declared by the {@link QueryHints} interface and are intended more for
+     * internal development and performance testing rather than as generally
+     * useful query hints.
      * 
      * @param sp
      *            The {@link StatementPatternNode}.
-     *            
+     * 
      * @return <code>true</code> if the SP is a query hint.
+     * 
+     * @see <a href="http://sourceforge.net/apps/trac/bigdata/ticket/791" >
+     *      Clean up query hints </a>
      */
     private boolean isQueryHint(final StatementPatternNode sp) {
         
@@ -459,7 +514,16 @@ public class ASTQueryHintOptimizer implements IASTOptimizer {
         
         final BigdataURI u = (BigdataURI) p;
         
-        return u.stringValue().startsWith(QueryHints.NAMESPACE);
+        final String str = u.stringValue();
+        
+        if (str.startsWith(QueryHints.NAMESPACE)) {
+            
+            // A possible query hint.
+            return true;
+            
+        }
+
+        return false;
 
     }
     
@@ -523,52 +587,6 @@ public class ASTQueryHintOptimizer implements IASTOptimizer {
         
     }
     
-//    /**
-//     * Validates the query hint.
-//     * 
-//     * @param name
-//     *            The name of the query hint.
-//     * @param value
-//     *            The value for the query hint.
-//     * 
-//     * @throws RuntimeException
-//     *             if the query hint could not be validated.
-//     */
-//    private void validateQueryHint(final AST2BOpContext context,
-//            //final QueryRoot queryRoot, final QueryBase queryBase,final ASTBase node, 
-//            final String name, final String value) {
-//
-////        final int pos = name.lastIndexOf('.');
-////
-////        if (pos == -1)
-////            throw new RuntimeException("Badly formed query hint name: " + name);
-////
-////        // The name of the class or interface which declares that query hint.
-////        final String className = name
-////                .substring(0/* beginIndex */, pos/* endIndex */);
-////
-////        // The name of the field on the class or interface for the query hint.
-////        final String fieldName = name.substring(pos + 1);
-////
-////        final Class<?> cls;
-////        try {
-////            cls = Class.forName(className);
-////        } catch (ClassNotFoundException e) {
-////            log.error(e);
-////            return;
-////        }
-////
-////        final Field f;
-////        try {
-////            f = cls.getField(fieldName);
-////        } catch (SecurityException e) {
-////            log.error(e);
-////        } catch (NoSuchFieldException e) {
-////            log.error(e);
-////        }
-//        
-//    }
-
     /**
      * Return the value for the query hint.
      * 
@@ -626,6 +644,9 @@ public class ASTQueryHintOptimizer implements IASTOptimizer {
 
         final String value = getValue(hint.o());
 
+        if (log.isInfoEnabled())
+            log.info("name=" + name + ", scope=" + scope + ", value=" + value);
+        
 //        validateQueryHint(context, name, value);
 
         switch (scope) {
@@ -706,10 +727,20 @@ public class ASTQueryHintOptimizer implements IASTOptimizer {
             final QueryHintScope scope, final QueryRoot queryRoot,
             final String name, final String value) {
 
-        if (context.queryHints != null) {
-            /*
+        if (false && context.queryHints != null) {
+            /**
              * Also stuff the query hint on the global context for things which
              * look there.
+             * 
+             * Note: HINTS: This was putting the literal given name and value of
+             * the query hint. This is basically backwards. The query hints in
+             * the global scope provide a default. Explicitly given query hints
+             * in the query are delegated to IQueryHint implementations and then
+             * applied to the appropriate AST nodes.
+             * 
+             * @see <a
+             *      href="http://sourceforge.net/apps/trac/bigdata/ticket/791" >
+             *      Clean up query hints </a>
              */
             context.queryHints.setProperty(name, value);
         }

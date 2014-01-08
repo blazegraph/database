@@ -67,12 +67,4 @@ public enum QueryOptimizerEnum {
      */
     Runtime;
 
-//    /**
-//     * @deprecated This is only used by a few unit tests. Port those unit tests
-//     *             to the SPARQL level.
-//     */
-//    public static String queryHint(final QueryOptimizerEnum val) {
-//    	return "prefix "+QueryHints.PREFIX+": <"+QueryHints.NAMESPACE+QueryHints.OPTIMIZER+"="+val+"> ";
-//    }
-    
 }

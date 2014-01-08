@@ -60,19 +60,21 @@ public class NT implements Serializable {
 
     }
 
+    @Override
     public int hashCode() {
 
         return hashCode;
 
     }
 
-    public boolean equals(Object o) {
+    @Override
+    public boolean equals(final Object o) {
 
         return equals((NT) o);
 
     }
 
-    public boolean equals(NT o) {
+    public boolean equals(final NT o) {
 
         if (o == null) {
 
@@ -99,6 +101,7 @@ public class NT implements Serializable {
 
     }
 
+    @Override
     public String toString() {
 
         return "NT{name=" + name + ",timestamp=" + timestamp + "}";

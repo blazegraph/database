@@ -36,7 +36,8 @@ import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 /**
  * The query hint governing the choice of the join order optimizer.
  */
-final class OptimizerQueryHint extends AbstractQueryHint<QueryOptimizerEnum> {
+public final class OptimizerQueryHint extends
+        AbstractQueryHint<QueryOptimizerEnum> {
 
     public OptimizerQueryHint() {
         super(QueryHints.OPTIMIZER, QueryOptimizerEnum.Static);
@@ -54,9 +55,14 @@ final class OptimizerQueryHint extends AbstractQueryHint<QueryOptimizerEnum> {
             final ASTBase op, final QueryOptimizerEnum value) {
 
         switch (scope) {
+        case Query:
+//            /*
+//             * Also stuff the query hint on the global context for things which
+//             * look there.
+//             */
+//            conditionalSetGlobalProperty(ctx, getName(), value);
         case Group:
         case GroupAndSubGroups:
-        case Query:
         case SubQuery:
             if (op instanceof JoinGroupNode) {
                 _setAnnotation(ctx, scope, op, getName(), value);

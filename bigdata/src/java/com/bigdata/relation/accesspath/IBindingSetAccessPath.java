@@ -58,12 +58,9 @@ public interface IBindingSetAccessPath<R> extends IAbstractAccessPath<R> {
      * 
      * @return The iterator.
      * 
-     *         TODO Should this be visiting IBindingSet[]s or be an
-     *         IChunkedIterator<IBindingSet>?
-     * 
      * @see https://sourceforge.net/apps/trac/bigdata/ticket/209 (Access path
      *      should visit solutions for high level query).
      */
-    ICloseableIterator<IBindingSet> solutions(long limit, BaseJoinStats stats);
+    ICloseableIterator<IBindingSet[]> solutions(long limit, BaseJoinStats stats);
     
 }

@@ -103,26 +103,32 @@ public class NIOChunkMessage<E> implements IChunkMessage<E>, Serializable {
      */
     final private InetSocketAddress addr;
 
+    @Override
     public IQueryClient getQueryController() {
         return queryController;
     }
 
+    @Override
     public UUID getQueryControllerId() {
         return queryControllerId;
     }
     
+    @Override
     public UUID getQueryId() {
         return queryId;
     }
 
+    @Override
     public int getBOpId() {
         return bopId;
     }
 
+    @Override
     public int getPartitionId() {
         return partitionId;
     }
 
+    @Override
     public boolean isLastInvocation() {
         return false; // Never.
     }
@@ -132,6 +138,7 @@ public class NIOChunkMessage<E> implements IChunkMessage<E>, Serializable {
      * 
      * @todo we could track this in total and in {@link A} on a per-slice basis.
      */
+    @Override
     public int getSolutionCount() {
         return solutionCount;
     }
@@ -149,6 +156,7 @@ public class NIOChunkMessage<E> implements IChunkMessage<E>, Serializable {
         return addr;
     }
 
+    @Override
     public String toString() {
 
         return getClass().getName() + "{queryId=" + queryId + ",bopId=" + bopId
@@ -327,6 +335,7 @@ public class NIOChunkMessage<E> implements IChunkMessage<E>, Serializable {
         
     }
     
+    @Override
     public boolean isMaterialized() {
 
         return materialized != null;
@@ -335,6 +344,7 @@ public class NIOChunkMessage<E> implements IChunkMessage<E>, Serializable {
     
     private volatile List<IAllocation> materialized = null;
 
+    @Override
     public void materialize(final FederatedRunningQuery runningQuery) {
 
         final AllocationContextKey key = new ShardContext(queryId, bopId,
@@ -353,6 +363,7 @@ public class NIOChunkMessage<E> implements IChunkMessage<E>, Serializable {
     /**
      * Discard the materialized data.
      */
+    @Override
     public void release() {
 
         if (chunkAccessor != null) {
@@ -441,6 +452,7 @@ public class NIOChunkMessage<E> implements IChunkMessage<E>, Serializable {
 
     }
 
+    @Override
     public IChunkAccessor<E> getChunkAccessor() {
 
         if (chunkAccessor == null) {
@@ -511,6 +523,7 @@ public class NIOChunkMessage<E> implements IChunkMessage<E>, Serializable {
             
         }
 
+        @Override
         public void close() {
         
             if(open) {
@@ -523,6 +536,7 @@ public class NIOChunkMessage<E> implements IChunkMessage<E>, Serializable {
             
         }
 
+        @Override
         public boolean hasNext() {
 
             if(open && src.hasNext())
@@ -534,6 +548,7 @@ public class NIOChunkMessage<E> implements IChunkMessage<E>, Serializable {
             
         }
 
+        @Override
         @SuppressWarnings("unchecked")
         public E[] next() {
 
@@ -556,6 +571,7 @@ public class NIOChunkMessage<E> implements IChunkMessage<E>, Serializable {
             
         }
 
+        @Override
         public void remove() {
             
             throw new UnsupportedOperationException();

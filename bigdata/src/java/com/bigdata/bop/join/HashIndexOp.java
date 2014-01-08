@@ -217,6 +217,7 @@ abstract public class HashIndexOp extends PipelineOp {
             final JoinTypeEnum joinType//
             );
 
+    @Override
     public FutureTask<Void> eval(final BOpContext<IBindingSet> context) {
 
         return new FutureTask<Void>(new ChunkTask(this, context));
@@ -319,6 +320,7 @@ abstract public class HashIndexOp extends PipelineOp {
         /**
          * Evaluate.
          */
+        @Override
         public Void call() throws Exception {
 
             try {

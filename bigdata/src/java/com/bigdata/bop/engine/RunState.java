@@ -329,7 +329,8 @@ class RunState {
          * @see #startOp(IStartOpMessage, boolean)
          */
         final Set<Integer/* bopId */> lastPassRequested = new LinkedHashSet<Integer>();
-        
+
+        @Override
         public String toString() {
 
             return toString(new StringBuilder()).toString();

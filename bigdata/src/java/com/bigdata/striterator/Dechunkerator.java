@@ -31,6 +31,7 @@ import java.util.Arrays;
 import java.util.Iterator;
 
 import cutthecrap.utils.striterators.Expander;
+import cutthecrap.utils.striterators.ICloseable;
 import cutthecrap.utils.striterators.ICloseableIterator;
 import cutthecrap.utils.striterators.Striterator;
 
@@ -43,6 +44,8 @@ import cutthecrap.utils.striterators.Striterator;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @see CloseableChunkedIteratorWrapperConverter
  */
 public class Dechunkerator<E> implements ICloseableIterator<E> {
 
@@ -73,36 +76,43 @@ public class Dechunkerator<E> implements ICloseableIterator<E> {
             private static final long serialVersionUID = 1L;
 
             @Override
-            protected Iterator expand(Object arg0) {
-                return Arrays.asList((E[]) arg0).iterator();
+            protected Iterator<E> expand(final Object e) {
+             
+                return Arrays.asList((E[]) e).iterator();
+                
             }
+
         });
 
     }
 
+    @Override
     public boolean hasNext() {
 
         return itr.hasNext();
         
     }
 
+    @Override
     public E next() {
      
         return itr.next();
         
     }
 
+    @Override
     public void remove() {
 
         throw new UnsupportedOperationException();
 
     }
 
+    @Override
     public void close() {
 
-        if (src instanceof ICloseableIterator<?>) {
+        if (src instanceof ICloseable) {
 
-            ((ICloseableIterator<?>) src).close();
+            ((ICloseable) src).close();
 
         }
 

@@ -509,6 +509,14 @@ abstract public class QueryBase extends QueryNodeBase implements
 
         }
 
+        if (getQueryHints() != null && !getQueryHints().isEmpty()) {
+            sb.append("\n");
+            sb.append(indent(indent));
+            sb.append(Annotations.QUERY_HINTS);
+            sb.append("=");
+            sb.append(getQueryHints().toString());
+        }
+
         return sb.toString();
 
     }

@@ -49,14 +49,14 @@ public class JoinVariableNotBoundException extends Exception {
     /**
      * @param message
      */
-    public JoinVariableNotBoundException(String message) {
+    public JoinVariableNotBoundException(final String message) {
         super(message);
     }
 
     /**
      * @param cause
      */
-    public JoinVariableNotBoundException(Throwable cause) {
+    public JoinVariableNotBoundException(final Throwable cause) {
         super(cause);
     }
 
@@ -64,7 +64,8 @@ public class JoinVariableNotBoundException extends Exception {
      * @param message
      * @param cause
      */
-    public JoinVariableNotBoundException(String message, Throwable cause) {
+    public JoinVariableNotBoundException(final String message,
+            final Throwable cause) {
         super(message, cause);
     }
 

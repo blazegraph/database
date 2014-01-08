@@ -32,6 +32,7 @@ import java.util.NoSuchElementException;
 
 import com.bigdata.relation.accesspath.IElementFilter;
 
+import cutthecrap.utils.striterators.ICloseable;
 import cutthecrap.utils.striterators.ICloseableIterator;
 
 /**
@@ -107,8 +108,8 @@ public class Chunkerator<E> implements ICloseableIterator<E[]> {
     public void close() {
         if (open) {
             open = false;
-            if (src instanceof ICloseableIterator<?>) {
-                ((ICloseableIterator<?>) src).close();
+            if (src instanceof ICloseable) {
+                ((ICloseable) src).close();
             }
         }
     }

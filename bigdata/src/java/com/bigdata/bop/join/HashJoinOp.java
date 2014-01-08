@@ -144,6 +144,7 @@ abstract public class HashJoinOp<E> extends PipelineOp implements
      * 
      * @see Annotations#PREDICATE
      */
+    @Override
     @SuppressWarnings("unchecked")
     public IPredicate<E> getPredicate() {
 
@@ -163,6 +164,7 @@ abstract public class HashJoinOp<E> extends PipelineOp implements
         
     }
     
+    @Override
     public BaseJoinStats newStats() {
 
         return new BaseJoinStats();
@@ -190,11 +192,13 @@ abstract public class HashJoinOp<E> extends PipelineOp implements
             );
 
     /**
-     * Return <code>true</code> if doHashJoin() should be executed in a 
-     * given operator chunk task. 
-     * @param context 
+     * Return <code>true</code> if {@link ChunkTask#doHashJoin()} should be
+     * executed in a given operator {@link ChunkTask} invocation.
+     * 
+     * @param context
+     *            The operator evaluation context.
      * @param state
-     * @return
+     *            The {@link IHashJoinUtility} instance.
      */
     abstract protected boolean runHashJoin(final BOpContext<?> context,
             final IHashJoinUtility state);
@@ -285,6 +289,7 @@ abstract public class HashJoinOp<E> extends PipelineOp implements
 
         }
 
+        @Override
         public Void call() throws Exception {
 
             boolean didRun = false;
@@ -379,11 +384,19 @@ abstract public class HashJoinOp<E> extends PipelineOp implements
                     IPredicate.Annotations.DEFAULT_CUTOFF_LIMIT);
 
             // Obtain the iterator for the current join dimension.
-            final ICloseableIterator<IBindingSet> itr = accessPath
+            final ICloseableIterator<IBindingSet[]> itr = accessPath
                     .solutions(cutoffLimit, stats);
 
+            /*
+             * Note: The [stats] are NOT passed in here since the chunksIn and
+             * unitsIn were updated when the pipeline solutions were accepted
+             * into the hash index. If we passed in stats here, they would be
+             * double counted when we executed the hash join against the access
+             * path.
+             */
             state.hashJoin(
                     itr,// left
+                    null, // stats
                     unsyncBuffer// out
                     );
 
