@@ -70,7 +70,8 @@ import com.bigdata.rdf.sparql.ast.IJoinNode;
 import com.bigdata.rdf.sparql.ast.StaticAnalysis;
 
 /**
- * Class handles the materialization pattern for filters.
+ * Class handles the materialization pattern for filters by adding a series of
+ * materialization steps to materialize terms needed downstream.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -85,69 +86,71 @@ public class AST2BOpFilters extends AST2BOpBase {
     protected AST2BOpFilters() {
     }
 
-    /**
-     * Adds a series of materialization steps to materialize terms needed
-     * downstream.
-     * 
-     * To materialize the variable ?term, the pipeline looks as follows:
-     * 
-     * <pre>
-     * left
-     * ->
-     * ConditionalRoutingOp1 (condition=!IsMaterialized(?term), alt=right)
-     * ->
-     * ConditionalRoutingOp2 (condition=IsInline(?term), alt=PipelineJoin)
-     * ->
-     * InlineMaterializeOp (predicate=LexPredicate(?term), sink=right)
-     * ->
-     * PipelineJoin (predicate=LexPredicate(?term))
-     * ->
-     * right
-     * </pre>
-     * 
-     * @param db
-     *            the database
-     * @param queryEngine
-     *            the query engine
-     * @param left
-     *            the left (upstream) operator that immediately proceeds the
-     *            materialization steps
-     * @param right
-     *            the right (downstream) operator that immediately follows the
-     *            materialization steps
-     * @param c
-     *            the constraint to run on the IsMaterialized op to see if the
-     *            materialization pipeline can be bypassed (bypass if true and
-     *            no {@link NotMaterializedException} is thrown).
-     * @param varsToMaterialize
-     *            the terms to materialize
-     * @param queryHints
-     *            the query hints
-     * @return the final bop added to the pipeline by this method
-     * 
-     * @see AST2BOpUtility#addMaterializationSteps(PipelineOp, int,
-     *      IValueExpression, Collection, AST2BOpContext)
+    /*
+     * Note: There was only one caller left for this method and it was from
+     * within this same class, so I rewrote the calling context very slightly
+     * and removed this method. The documentation on the general approach has
+     * been moved to the delegate method (immediate below). bbt.
      */
-    @SuppressWarnings({ "rawtypes", "unchecked" })
-    public static PipelineOp addMaterializationSteps(
-            final AST2BOpContext context,
-//            final AbstractTripleStore db,
-//            final QueryEngine queryEngine, 
-            PipelineOp left, final int right,
-            final IConstraint c,
-            final Collection<IVariable<IV>> varsToMaterialize,
-//            final AtomicInteger idFactory, 
-            final Properties queryHints) {
-
-//        final AST2BOpContext context = new AST2BOpContext(
-//                null/* astContainer */, idFactory, db, queryEngine, queryHints);
-
-        final IValueExpression<IV> ve = (IValueExpression) c.get(0);
-
-        return addMaterializationSteps(left, right, ve, varsToMaterialize,
-                context);
-
-    }
+//    /**
+//     * Adds a series of materialization steps to materialize terms needed
+//     * downstream.
+//     * 
+//     * To materialize the variable ?term, the pipeline looks as follows:
+//     * 
+//     * <pre>
+//     * left
+//     * ->
+//     * ConditionalRoutingOp1 (condition=!IsMaterialized(?term), alt=right)
+//     * ->
+//     * ConditionalRoutingOp2 (condition=IsInline(?term), alt=PipelineJoin)
+//     * ->
+//     * InlineMaterializeOp (predicate=LexPredicate(?term), sink=right)
+//     * ->
+//     * PipelineJoin (predicate=LexPredicate(?term))
+//     * ->
+//     * right
+//     * </pre>
+//     * 
+//     * @param context
+//     * @param left
+//     *            the left (upstream) operator that immediately proceeds the
+//     *            materialization steps
+//     * @param right
+//     *            the right (downstream) operator that immediately follows the
+//     *            materialization steps
+//     * @param c
+//     *            the constraint to run on the IsMaterialized op to see if the
+//     *            materialization pipeline can be bypassed (bypass if true and
+//     *            no {@link NotMaterializedException} is thrown).
+//     * @param varsToMaterialize
+//     *            the terms to materialize
+//     * @param queryHints
+//     *            the query hints
+//     * @return the final bop added to the pipeline by this method
+//     * 
+//     * @see AST2BOpUtility#addMaterializationSteps(PipelineOp, int,
+//     *      IValueExpression, Collection, AST2BOpContext)
+//     */
+//    @SuppressWarnings({ "rawtypes", "unchecked" })
+//    protected static PipelineOp addMaterializationSteps(
+//            final AST2BOpContext context,//
+//            PipelineOp left, //
+//            final int right,//
+//            final IConstraint c,//
+//            final Collection<IVariable<IV>> varsToMaterialize,//
+////            final AtomicInteger idFactory, 
+//            final Properties queryHints) {
+//
+////        final AST2BOpContext context = new AST2BOpContext(
+////                null/* astContainer */, idFactory, db, queryEngine, queryHints);
+//
+//        final IValueExpression<IV> ve = (IValueExpression) c.get(0);
+//
+//        return addMaterializationSteps(left, right, ve, varsToMaterialize,
+//                context);
+//
+//    }
     
     /**
      * If the value expression that needs the materialized variables can run
@@ -159,12 +162,54 @@ public class AST2BOpFilters extends AST2BOpBase {
      * is {@link CompareBOp}, which can sometimes work on internal values and
      * sometimes can't.
      * 
+     * To materialize the variable <code>?term</code>, the pipeline looks as
+     * follows:
+     * 
+     * <pre>
+     * left
+     * ->
+     * ConditionalRoutingOp1 (condition=!IsMaterialized(?term), alt=rightId)
+     * ->
+     * ConditionalRoutingOp2 (condition=IsInline(?term), alt=PipelineJoin)
+     * ->
+     * InlineMaterializeOp (predicate=LexPredicate(?term), sink=rightId)
+     * ->
+     * PipelineJoin (predicate=LexPredicate(?term))
+     * ->
+     * rightId
+     * </pre>
+     * 
+     * @param left
+     *            The left (upstream) operator that immediately proceeds the
+     *            materialization steps.
+     * @param rightId
+     *            The id for the right (downstream) operator that immediately
+     *            follows the materialization steps. This needs to be
+     *            pre-reserved by the caller.
+     * @param ve
+     *            The {@link IValueExpression} for the {@link SPARQLConstraint}.
+     * @param varsToMaterialize
+     *            The variables to be materialize.
+     * @param queryHints
+     *            The query hints to be applied from the dominating operator
+     *            context.
+     * @param ctx
+     *            The evaluation context.
+     * 
+     * @return The final bop added to the pipeline by this method
+     * 
      * @see TryBeforeMaterializationConstraint
+     * @see AST2BOpUtility#addMaterializationSteps1(PipelineOp, int,
+     *      IValueExpression, Collection, AST2BOpContext)
      */
     @SuppressWarnings("rawtypes")
-    protected static PipelineOp addMaterializationSteps(PipelineOp left,
-            final int rightId, final IValueExpression<IV> ve,
-            final Collection<IVariable<IV>> vars, final AST2BOpContext ctx) {
+    protected static PipelineOp addMaterializationSteps1(//
+            PipelineOp left,//
+            final int rightId, //
+            final IValueExpression<IV> ve,//
+            final Collection<IVariable<IV>> vars, //
+            final Properties queryHints,
+            final AST2BOpContext ctx) {
 
         /*
          * If the constraint "c" can run without a NotMaterializedException then
@@ -177,9 +222,9 @@ public class AST2BOpFilters extends AST2BOpBase {
                 new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
                 new NV(ConditionalRoutingOp.Annotations.CONDITION, c2),//
                 new NV(PipelineOp.Annotations.ALT_SINK_REF, rightId)//
-                ), ctx.queryHints);
+                ), queryHints, ctx);
 
-        return addMaterializationSteps(left, rightId, vars, ctx);
+        return addMaterializationSteps2(left, rightId, vars, queryHints, ctx);
 
     }
 
@@ -200,35 +245,42 @@ public class AST2BOpFilters extends AST2BOpBase {
      * <pre>
      * left 
      * ->
-     * ConditionalRoutingOp1 (condition=!IsMaterialized(?term), alt=right)
+     * ConditionalRoutingOp1 (condition=!IsMaterialized(?term), alt=rightId)
      * ->
      * ConditionalRoutingOp2 (condition=IsInline(?term), alt=PipelineJoin)
      * ->
-     * InlineMaterializeOp (predicate=LexPredicate(?term), sink=right)
+     * InlineMaterializeOp (predicate=LexPredicate(?term), sink=rightId)
      * ->
      * PipelineJoin (predicate=LexPredicate(?term))
      * ->
-     * right
+     * rightId
      * </pre>
      * 
      * @param left
-     *            the left (upstream) operator that immediately proceeds the
-     *            materialization steps
+     *            The left (upstream) operator that immediately proceeds the
+     *            materialization steps.
      * @param rightId
-     *            the id of the right (downstream) operator that immediately
-     *            follows the materialization steps
+     *            The id of the right (downstream) operator that immediately
+     *            follows the materialization steps.
      * @param vars
-     *            the terms to materialize
+     *            The terms to materialize
+     * @param queryHints
+     *            The query hints from the dominating AST node.
+     * @param ctx
+     *            The evaluation context.
      * 
-     * @return the final bop added to the pipeline by this method
+     * @return The final bop added to the pipeline by this method
      * 
      * @see TryBeforeMaterializationConstraint
      * 
-     * TODO make [vars] a Set.
+     *      TODO make [vars] a Set.
      */
     @SuppressWarnings("rawtypes")
-    protected static PipelineOp addMaterializationSteps(PipelineOp left,
-            final int rightId, final Collection<IVariable<IV>> vars,
+    protected static PipelineOp addMaterializationSteps2(//
+            PipelineOp left,//
+            final int rightId, //
+            final Collection<IVariable<IV>> vars,//
+            final Properties queryHints, //
             final AST2BOpContext ctx) {
 
         final int nvars = vars.size();
@@ -251,13 +303,13 @@ public class AST2BOpFilters extends AST2BOpBase {
              * logic unless a performance advantage can be demonstrated either
              * on a Journal or a cluster.
              */
-            return (PipelineOp) new ChunkedMaterializationOp(leftOrEmpty(left),
+            return (PipelineOp) applyQueryHints(new ChunkedMaterializationOp(leftOrEmpty(left),
                     new NV(ChunkedMaterializationOp.Annotations.VARS, vars.toArray(new IVariable[nvars])),//
                     new NV(ChunkedMaterializationOp.Annotations.RELATION_NAME, new String[] { ns }), //
                     new NV(ChunkedMaterializationOp.Annotations.TIMESTAMP, timestamp), //
                     new NV(PipelineOp.Annotations.SHARED_STATE, !ctx.isCluster()),// live stats, but not on the cluster.
                     new NV(BOp.Annotations.BOP_ID, ctx.nextId())//
-                    );
+                    ), queryHints, ctx);
 //                    vars.toArray(new IVariable[nvars]), ns, timestamp)
 //                    .setProperty(BOp.Annotations.BOP_ID, ctx.nextId());
         }
@@ -308,7 +360,7 @@ public class AST2BOpFilters extends AST2BOpBase {
                                     c1),//
                             new NV(PipelineOp.Annotations.SINK_REF, condId2),//
                             new NV(PipelineOp.Annotations.ALT_SINK_REF, endId)//
-                    ), ctx.queryHints);
+                    ), queryHints, ctx);
 
             if (log.isDebugEnabled()) {
                 log.debug("adding 1st conditional routing op: " + condOp1);
@@ -326,7 +378,7 @@ public class AST2BOpFilters extends AST2BOpBase {
                                     inlineMaterializeId), //
                             new NV(PipelineOp.Annotations.ALT_SINK_REF,
                                     lexJoinId)//
-                    ), ctx.queryHints);
+                    ), queryHints, ctx);
 
             if (log.isDebugEnabled()) {
                 log.debug("adding 2nd conditional routing op: " + condOp2);
@@ -360,7 +412,7 @@ public class AST2BOpFilters extends AST2BOpBase {
                             new NV(InlineMaterializeOp.Annotations.PREDICATE,
                                     lexPred.clone()),//
                             new NV(PipelineOp.Annotations.SINK_REF, endId)//
-                    ), ctx.queryHints);
+                    ), queryHints, ctx);
 
             if (log.isDebugEnabled()) {
                 log.debug("adding inline materialization op: "
@@ -392,7 +444,7 @@ public class AST2BOpFilters extends AST2BOpBase {
                 final PipelineOp lexJoinOp = applyQueryHints(//
                         new PipelineJoin(leftOrEmpty(inlineMaterializeOp), //
                                 anns.toArray(new NV[anns.size()])),
-                        ctx.queryHints);
+                        queryHints, ctx);
 //                final PipelineOp lexJoinOp = newJoin(inlineMaterializeOp, anns,
 //                        ctx.queryHints);
 
@@ -443,20 +495,19 @@ public class AST2BOpFilters extends AST2BOpBase {
      * @param needsMaterialization
      *            A map of constraints and their variable materialization
      *            requirements.
-     * @param context
      * @param queryHints
+     *            Query hints from the dominating AST node.
+     * @param ctx
+     *            The evaluation context.
      */
     @SuppressWarnings("rawtypes")
-    protected static PipelineOp addMaterializationSteps(
-            final AST2BOpContext ctx,
-            PipelineOp left,
-            final Set<IVariable<?>> doneSet,
+    protected static PipelineOp addMaterializationSteps3(//
+            PipelineOp left,//
+            final Set<IVariable<?>> doneSet,//
             final Map<IConstraint, Set<IVariable<IV>>> needsMaterialization,
-//            final AbstractTripleStore db,//
-//            final QueryEngine queryEngine,//
-//            final AtomicInteger idFactory,//
-//            final BOpContextBase context,//
-            final Properties queryHints) {
+            final Properties queryHints,//
+            final AST2BOpContext ctx//
+            ) {
 
         if (!needsMaterialization.isEmpty()) {
 
@@ -472,10 +523,11 @@ public class AST2BOpFilters extends AST2BOpBase {
                 // remove any terms already materialized
                 terms.removeAll(alreadyMaterialized);
 
-                if (c instanceof INeedsMaterialization && ((INeedsMaterialization) c).getRequirement() == Requirement.ALWAYS) {
-                	
-	                // add any new terms to the list of already materialized
-	                alreadyMaterialized.addAll(terms);
+                if (c instanceof INeedsMaterialization
+                        && ((INeedsMaterialization) c).getRequirement() == Requirement.ALWAYS) {
+
+                    // add any new terms to the list of already materialized
+                    alreadyMaterialized.addAll(terms);
 	                
                 }
 
@@ -485,14 +537,27 @@ public class AST2BOpFilters extends AST2BOpBase {
                 if (!terms.isEmpty()) {
 
                     // Add materialization steps for remaining variables.
-                    left = addMaterializationSteps(
-                            ctx,
-//                            db, queryEngine, 
-                            left,
-                            condId, c, terms, 
-                            // idFactory, 
-                            queryHints
-                            );
+
+                    @SuppressWarnings("unchecked")
+                    final IValueExpression<IV> ve = (IValueExpression) c.get(0);
+
+                    left = addMaterializationSteps1(//
+                            left, //
+                            condId, // right
+                            ve, // value expression
+                            terms,// varsToMaterialize,
+                            queryHints,//
+                            ctx);
+                    
+//                    left = addMaterializationSteps(//
+//                            ctx,//
+//                            left,//
+//                            condId,// rightId
+//                            c, // eval c.get(0)
+//                            terms, // varsToMaterialize
+//                            // idFactory, 
+//                            queryHints//
+//                            );
 
                 }
 
@@ -500,7 +565,7 @@ public class AST2BOpFilters extends AST2BOpBase {
                     new ConditionalRoutingOp(leftOrEmpty(left),//
                         new NV(BOp.Annotations.BOP_ID, condId),//
                         new NV(ConditionalRoutingOp.Annotations.CONDITION,c)//
-                    ), queryHints);
+                    ), queryHints, ctx);
 
             }
 

@@ -118,7 +118,7 @@ public abstract class SampleBase {
     /**
      * Release the sampled solution set.
      * 
-     * TODO MEMORY MANAGER : release.
+     * FIXME RTO : MEMORY MANAGER : release.
      */
     void releaseSample() {
 
@@ -183,6 +183,7 @@ public abstract class SampleBase {
         // NOP
     }
 
+    @Override
     public String toString() {
         final StringBuilder sb = new StringBuilder();
         sb.append(getClass().getSimpleName());

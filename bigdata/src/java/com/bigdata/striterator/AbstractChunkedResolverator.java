@@ -55,7 +55,8 @@ import cutthecrap.utils.striterators.ICloseableIterator;
  */
 abstract public class AbstractChunkedResolverator<E,F,S> implements ICloseableIterator<F> {
 
-    final private static Logger log = Logger.getLogger(AbstractChunkedResolverator.class);
+    final private static Logger log = Logger
+            .getLogger(AbstractChunkedResolverator.class);
 
 //    /**
 //     * True iff the {@link #log} level is DEBUG or less.
@@ -204,6 +205,7 @@ abstract public class AbstractChunkedResolverator<E,F,S> implements ICloseableIt
          * 
          * @throws Exception
          */
+        @Override
         public Long call() throws Exception {
 
             try {
@@ -325,6 +327,7 @@ abstract public class AbstractChunkedResolverator<E,F,S> implements ICloseableIt
      * @throws IllegalStateException
      *             unless {@link #start(ExecutorService)} has been invoked.
      */
+    @Override
     public boolean hasNext() {
 
         if(open && _hasNext())
@@ -355,6 +358,7 @@ abstract public class AbstractChunkedResolverator<E,F,S> implements ICloseableIt
         
     }
 
+    @Override
     public F next() {
 
 //        final long begin = System.currentTimeMillis();
@@ -394,12 +398,14 @@ abstract public class AbstractChunkedResolverator<E,F,S> implements ICloseableIt
     /**
      * @throws UnsupportedOperationException
      */
+    @Override
     public void remove() {
 
         throw new UnsupportedOperationException();
 
     }
 
+    @Override
     public void close() {
 
         if (open) {

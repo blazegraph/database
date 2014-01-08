@@ -493,6 +493,7 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
         
     }
     
+    @Override
     final public Map<Integer, BOp> getBOpIndex() {
 
         return bopIndex;
@@ -824,18 +825,38 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
                 log.trace(msg.toString());
 
             // update per-operator statistics.
-            final BOpStats tmp = statsMap.putIfAbsent(msg.getBOpId(), msg.getStats());
+            {
+                // Data race on insert into CHM.
+                BOpStats tmp = statsMap.putIfAbsent(msg.getBOpId(),
+                        msg.getStats());
 
-			/*
-			 * Combine stats, but do not combine a stats object with itself.
-			 * 
-			 * @see https://sourceforge.net/apps/trac/bigdata/ticket/464 (Query
-			 * Statistics do not update correctly on cluster)
-			 */
-            if (tmp != null && tmp != msg.getStats()) {
-                tmp.add(msg.getStats());
+                /**
+                 * Combine stats, but do not combine a stats object with itself.
+                 * 
+                 * @see <a
+                 *      href="https://sourceforge.net/apps/trac/bigdata/ticket/464">
+                 *      Query Statistics do not update correctly on cluster</a>
+                 */
+                if (tmp == null) {
+                    // won the data race.
+                    tmp = msg.getStats();
+                } else {
+                    // lost the data race.
+                    if (tmp != msg.getStats()) {
+                        tmp.add(msg.getStats());
+                    }
+                }
+                /**
+                 * Post-increment now that we know who one the data race.
+                 * 
+                 * @see <a
+                 *      href="https://sourceforge.net/apps/trac/bigdata/ticket/793">
+                 *      Explain reports incorrect value for opCount</a>
+                 */
+                tmp.opCount.increment();
+                // log.warn("bop=" + getBOp(msg.getBOpId()).toShortString()
+                // + " : stats=" + tmp);
             }
-//			log.warn(msg.toString() + " : stats=" + tmp);
 
             switch (runState.haltOp(msg)) {
             case Running:

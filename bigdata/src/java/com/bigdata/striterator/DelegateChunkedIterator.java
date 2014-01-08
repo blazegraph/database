@@ -62,7 +62,7 @@ public class DelegateChunkedIterator<E> implements IChunkedOrderedIterator<E> {
      * @param src
      *            All methods will delegate to this iterator.
      */
-    public DelegateChunkedIterator(IChunkedOrderedIterator<E> src) {
+    public DelegateChunkedIterator(final IChunkedOrderedIterator<E> src) {
 
         if (src == null)
             throw new IllegalArgumentException();
@@ -71,41 +71,48 @@ public class DelegateChunkedIterator<E> implements IChunkedOrderedIterator<E> {
         
     }
 
+    @Override
     public void close() {
 
         src.close();
         
     }
 
+    @Override
     public E next() {
         
         return src.next();
         
     }
 
+    @Override
     public E[] nextChunk() {
         
         return src.nextChunk();
     }
 
+    @Override
     public void remove() {
 
         src.remove();
         
     }
 
+    @Override
     public boolean hasNext() {
 
         return src.hasNext();
         
     }
 
+    @Override
     public IKeyOrder<E> getKeyOrder() {
 
         return src.getKeyOrder();
         
     }
 
+    @Override
     public E[] nextChunk(IKeyOrder<E> keyOrder) {
         
         return src.nextChunk(keyOrder);

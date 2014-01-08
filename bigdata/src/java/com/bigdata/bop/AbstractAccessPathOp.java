@@ -76,25 +76,25 @@ abstract public class AbstractAccessPathOp<E> extends BOpBase {
         super(op);
     }
 
-    /**
-     * @see BufferAnnotations#CHUNK_CAPACITY
-     */
-    protected int getChunkCapacity() {
-        
-        return getProperty(Annotations.CHUNK_CAPACITY,
-                Annotations.DEFAULT_CHUNK_CAPACITY);
-
-    }
-
-    /**
-     * @see BufferAnnotations#CHUNK_OF_CHUNKS_CAPACITY
-     */
-    protected int getChunkOfChunksCapacity() {
-
-        return getProperty(Annotations.CHUNK_OF_CHUNKS_CAPACITY,
-                Annotations.DEFAULT_CHUNK_OF_CHUNKS_CAPACITY);
-
-    }
+//    /**
+//     * @see BufferAnnotations#CHUNK_CAPACITY
+//     */
+//    protected int getChunkCapacity() {
+//        
+//        return getProperty(Annotations.CHUNK_CAPACITY,
+//                Annotations.DEFAULT_CHUNK_CAPACITY);
+//
+//    }
+//
+//    /**
+//     * @see BufferAnnotations#CHUNK_OF_CHUNKS_CAPACITY
+//     */
+//    protected int getChunkOfChunksCapacity() {
+//
+//        return getProperty(Annotations.CHUNK_OF_CHUNKS_CAPACITY,
+//                Annotations.DEFAULT_CHUNK_OF_CHUNKS_CAPACITY);
+//
+//    }
 
 //    protected int getFullyBufferedReadThreshold() {
 //
@@ -103,14 +103,14 @@ abstract public class AbstractAccessPathOp<E> extends BOpBase {
 //
 //    }
 
-    /**
-     * @see BufferAnnotations#CHUNK_TIMEOUT
-     */
-    protected long getChunkTimeout() {
-        
-        return getProperty(Annotations.CHUNK_TIMEOUT,
-                Annotations.DEFAULT_CHUNK_TIMEOUT);
-        
-    }
+//    /**
+//     * @see BufferAnnotations#CHUNK_TIMEOUT
+//     */
+//    protected long getChunkTimeout() {
+//        
+//        return getProperty(Annotations.CHUNK_TIMEOUT,
+//                Annotations.DEFAULT_CHUNK_TIMEOUT);
+//        
+//    }
 
 }

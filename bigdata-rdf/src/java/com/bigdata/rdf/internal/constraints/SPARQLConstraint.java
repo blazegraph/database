@@ -68,7 +68,8 @@ public class SPARQLConstraint<X extends XSDBooleanIV> extends
 	 * The value expression will be automatically wrapped inside an
 	 * {@link EBVBOp} if it does not itself evaluate to a boolean.
 	 */
-	public SPARQLConstraint(final IValueExpression<? extends IV> x) {
+	@SuppressWarnings("rawtypes")
+    public SPARQLConstraint(final IValueExpression<? extends IV> x) {
 
 		this(new BOp[] { wrap(x) }, null/*annocations*/);
 		
@@ -77,38 +78,44 @@ public class SPARQLConstraint<X extends XSDBooleanIV> extends
     /**
      * Required shallow copy constructor.
      */
-    public SPARQLConstraint(final BOp[] args, 
-    		final Map<String, Object> anns) {
-    	
+    public SPARQLConstraint(final BOp[] args, final Map<String, Object> anns) {
+
         super(args, anns);
-        
+
         if (args.length != 1 || args[0] == null)
-        	throw new IllegalArgumentException();
+            throw new IllegalArgumentException();
         
     }
 
     /**
      * Constructor required for {@link com.bigdata.bop.BOpUtility#deepCopy(FilterNode)}.
      */
-    public SPARQLConstraint(final SPARQLConstraint op) {
+    public SPARQLConstraint(final SPARQLConstraint<X> op) {
+
         super(op);
+
     }
 
+    @SuppressWarnings({ "rawtypes", "unchecked" })
     @Override
     public IValueExpression<? extends XSDBooleanIV> get(final int i) {
-    	return (IValueExpression<? extends XSDBooleanIV>) super.get(i);
+
+        return (IValueExpression<? extends XSDBooleanIV>) super.get(i);
+        
     }
     
 //    public IValueExpression<X> getValueExpression() {
 //        return (IValueExpression<X>) get(0);
 //    }
     	
+    @Override
 	public boolean accept(final IBindingSet bs) {
 
 		try {
 
 			// evaluate the EBV operator
-			final XSDBooleanIV iv = get(0).get(bs);
+			@SuppressWarnings("rawtypes")
+            final XSDBooleanIV iv = get(0).get(bs);
 			
 			return iv.booleanValue();
 

@@ -274,6 +274,7 @@ public class AccessPath<R> implements IAccessPath<R>, IBindingSetAccessPath<R> {
         
     }
     
+    @Override
     final public IKeyOrder<R> getKeyOrder() {
         
         return keyOrder;
@@ -495,6 +496,14 @@ public class AccessPath<R> implements IAccessPath<R>, IBindingSetAccessPath<R> {
 
         this.ndx = ndx;
 
+        /**
+         * See AST2BOpUtility.toPredicate(). It is responsible for copying these
+         * annotations from the StatementPatternNode onto the Predicate so they
+         * can influence the behavior of the AccessPath.
+         * 
+         * @see <a href="http://sourceforge.net/apps/trac/bigdata/ticket/791" >
+         *      Clean up query hints </a>
+         */
         final int chunkOfChunksCapacity = predicate.getProperty(
                 BufferAnnotations.CHUNK_OF_CHUNKS_CAPACITY,
                 BufferAnnotations.DEFAULT_CHUNK_OF_CHUNKS_CAPACITY);
@@ -577,6 +586,7 @@ public class AccessPath<R> implements IAccessPath<R>, IBindingSetAccessPath<R> {
         
     }
     
+    @Override
     public String toString() {
 
         return getClass().getName()
@@ -660,12 +670,14 @@ public class AccessPath<R> implements IAccessPath<R>, IBindingSetAccessPath<R> {
         
     }
     
+    @Override
     public IPredicate<R> getPredicate() {
         
         return predicate;
         
     }
 
+    @Override
     public IIndex getIndex() {
         
         return ndx;
@@ -679,6 +691,7 @@ public class AccessPath<R> implements IAccessPath<R>, IBindingSetAccessPath<R> {
      *       invoke {@link #iterator()} shortly after {@link #isEmpty()} returns
      *       <code>false</code>.
      */
+    @Override
     public boolean isEmpty() {
 
         assertInitialized();
@@ -746,7 +759,8 @@ public class AccessPath<R> implements IAccessPath<R>, IBindingSetAccessPath<R> {
      * @see https://sourceforge.net/apps/trac/bigdata/ticket/209 (Access path
      *      should visit solutions for high level query).
      */
-    public ICloseableIterator<IBindingSet> solutions(final long limit,
+    @Override
+    public ICloseableIterator<IBindingSet[]> solutions(final long limit,
     		final BaseJoinStats stats) {
 
 //        final IVariable<?>[] vars = BOpUtility
@@ -758,6 +772,7 @@ public class AccessPath<R> implements IAccessPath<R>, IBindingSetAccessPath<R> {
 
     }
     
+    @Override
     final public IChunkedOrderedIterator<R> iterator() {
         
         return iterator(0L/* offset */, 0L/* limit */, 0);
@@ -804,6 +819,7 @@ public class AccessPath<R> implements IAccessPath<R>, IBindingSetAccessPath<R> {
      *             they will be correctly applied when {@link #isEmpty()} is
      *             implemented using the {@link #iterator()} to determine if any
      */
+    @Override
     @SuppressWarnings("unchecked")
     final public IChunkedOrderedIterator<R> iterator(final long offset,
             long limit, int capacity) {
@@ -1251,7 +1267,8 @@ public class AccessPath<R> implements IAccessPath<R>, IBindingSetAccessPath<R> {
             this.buffer = buffer;
 
         }
-            
+
+        @Override
         public Void call() throws Exception {
 
             /*
@@ -1306,6 +1323,7 @@ public class AccessPath<R> implements IAccessPath<R>, IBindingSetAccessPath<R> {
 
     }
 
+    @Override
     final public long rangeCount(final boolean exact) {
 
         assertInitialized();
@@ -1428,6 +1446,7 @@ public class AccessPath<R> implements IAccessPath<R>, IBindingSetAccessPath<R> {
      * Note: If you are maintaining multiple indices then you MUST override this
      * method to remove the data from each of those indices.
      */
+    @Override
     public long removeAll() {
 
         assertInitialized();
@@ -1730,6 +1749,7 @@ public class AccessPath<R> implements IAccessPath<R>, IBindingSetAccessPath<R> {
             this.toKey = toKey;
         }
 
+        @Override
         public Object apply(final IIndex ndx) {
             
             final ScanCostReport scanCostReport = AccessPath.estimateCost(
@@ -1739,6 +1759,7 @@ public class AccessPath<R> implements IAccessPath<R>, IBindingSetAccessPath<R> {
             
         }
 
+        @Override
         public boolean isReadOnly() {
             return true;
         }

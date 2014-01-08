@@ -1,3 +1,26 @@
+/**
+
+Copyright (C) SYSTAP, LLC 2006-2011.  All rights reserved.
+
+Contact:
+     SYSTAP, LLC
+     4501 Tower Road
+     Greensboro, NC 27410
+     licenses@bigdata.com
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; version 2 of the License.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+*/
 package com.bigdata.rdf.sparql.ast;
 
 import java.util.Collections;
@@ -18,12 +41,12 @@ import com.bigdata.rdf.sparql.ast.eval.AST2BOpBase;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpJoins;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpUtility;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTGraphGroupOptimizer;
+import com.bigdata.rdf.sparql.ast.optimizers.ASTRangeConstraintOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTSimpleOptionalOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.StaticOptimizer;
 import com.bigdata.rdf.spo.DistinctTermAdvancer;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPOAccessPath;
-import com.bigdata.rdf.store.ITripleStore;
 import com.bigdata.relation.rule.eval.ISolution;
 import com.bigdata.striterator.IKeyOrder;
 
@@ -384,6 +407,7 @@ public class StatementPatternNode extends
      * 
      * @see ASTSimpleOptionalOptimizer
      */
+    @Override
     final public boolean isOptional() {
 
         return getProperty(Annotations.OPTIONAL, Annotations.DEFAULT_OPTIONAL);
@@ -393,6 +417,7 @@ public class StatementPatternNode extends
     /**
      * Returns <code>false</code>.
      */
+    @Override
     final public boolean isMinus() {
      
         return false;
@@ -422,22 +447,24 @@ public class StatementPatternNode extends
     }
     
     /**
-     * Attach a {@link RangeNode} that describes a range for the statement 
+     * Attach a {@link RangeNode} that describes a range for the statement
      * pattern's O value.
+     * 
      * @param range
      */
     final public void setRange(final RangeNode range) {
     	
-    	setProperty(Annotations.RANGE, range);
+        setProperty(Annotations.RANGE, range);
     	
     }
     
     final public RangeNode getRange() {
     	
-    	return (RangeNode) getProperty(Annotations.RANGE);
+        return (RangeNode) getProperty(Annotations.RANGE);
     	
     }
 
+    @Override
     final public List<FilterNode> getAttachedJoinFilters() {
 
         @SuppressWarnings("unchecked")
@@ -453,6 +480,7 @@ public class StatementPatternNode extends
 
     }
 
+    @Override
     final public void setAttachedJoinFilters(final List<FilterNode> filters) {
 
         setProperty(Annotations.FILTERS, filters);
@@ -493,22 +521,6 @@ public class StatementPatternNode extends
         final TermNode o = o();
         final TermNode c = c();
 
-//        if (s instanceof VarNode) {
-//            producedBindings.add(((VarNode) s).getValueExpression());
-//        }
-//
-//        if (p instanceof VarNode) {
-//            producedBindings.add(((VarNode) p).getValueExpression());
-//        }
-//
-//        if (o instanceof VarNode) {
-//            producedBindings.add(((VarNode) o).getValueExpression());
-//        }
-//
-//        if (c != null && c instanceof VarNode) {
-//            producedBindings.add(((VarNode) c).getValueExpression());
-//        }
-
         addProducedBindings(s, producedBindings);
         addProducedBindings(p, producedBindings);
         addProducedBindings(o, producedBindings);
@@ -520,30 +532,32 @@ public class StatementPatternNode extends
     
     /**
      * This handles the special case where we've wrapped a Var with a Constant
-     * because we know it's bound, perhaps by the exogenous bindings.  If we
+     * because we know it's bound, perhaps by the exogenous bindings. If we
      * don't handle this case then we get the join vars wrong.
      * 
      * @see StaticAnalysis._getJoinVars
      */
-    private void addProducedBindings(final TermNode t, final Set<IVariable<?>> producedBindings) {
-    	
-    	if (t instanceof VarNode) {
-    		
+    private void addProducedBindings(final TermNode t,
+            final Set<IVariable<?>> producedBindings) {
+
+        if (t instanceof VarNode) {
+
             producedBindings.add(((VarNode) t).getValueExpression());
-            
-    	} else if (t instanceof ConstantNode) {
-    		
-    		final ConstantNode cNode = (ConstantNode) t;
-    		final Constant<?> c = (Constant<?>) cNode.getValueExpression();
-    		final IVariable<?> var = c.getVar();
-    		if (var != null) {
-    			producedBindings.add(var);
-    		}
-    		
-    	}
-    	
+
+        } else if (t instanceof ConstantNode) {
+
+            final ConstantNode cNode = (ConstantNode) t;
+            final Constant<?> c = (Constant<?>) cNode.getValueExpression();
+            final IVariable<?> var = c.getVar();
+            if (var != null) {
+                producedBindings.add(var);
+            }
+
+        }
+
     }
 
+    @Override
 	public String toString(final int indent) {
 		
 	    final StringBuilder sb = new StringBuilder();
@@ -651,7 +665,5 @@ public class StatementPatternNode extends
 		return getProperty(AST2BOpBase.Annotations.ESTIMATED_CARDINALITY, -1l);
         
 	}
-	
-	
 
 }

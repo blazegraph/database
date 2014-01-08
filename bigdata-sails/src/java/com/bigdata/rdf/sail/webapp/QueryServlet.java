@@ -1005,9 +1005,14 @@ public class QueryServlet extends BigdataRDFServlet {
                  * Note: This is writing on the Writer so it goes directly into
                  * the HTML document we are building for the client.
                  */
-
+                final boolean clusterStats = q.getFederation() != null;
+                // no mutation for query.
+                final boolean mutationStats = false;
                 QueryLog.getTableXHTML(queryStr, q, children, w,
-                        false/* summaryOnly */, 0/* maxBopLength */);
+                        false/* summaryOnly */, 0/* maxBopLength */,
+                        clusterStats,
+                        queryTask.explainDetails/* detailedStats */,
+                        mutationStats);
 
             }
 

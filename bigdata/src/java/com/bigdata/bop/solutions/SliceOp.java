@@ -107,7 +107,7 @@ public class SliceOp extends PipelineOp {
         
     }
 
-    public SliceOp(final BOp[] args, NV... annotations) {
+    public SliceOp(final BOp[] args, final NV... annotations) {
 
         this(args, NV.asMap(annotations));
         
@@ -241,6 +241,7 @@ public class SliceOp extends PipelineOp {
         
     }
     
+    @Override
     public FutureTask<Void> eval(final BOpContext<IBindingSet> context) {
 
         return new FutureTask<Void>(new SliceTask(this, context));
@@ -292,6 +293,7 @@ public class SliceOp extends PipelineOp {
 
         }
 
+        @Override
         public Void call() throws Exception {
 
             final ICloseableIterator<IBindingSet[]> source = context
@@ -461,6 +463,7 @@ public class SliceOp extends PipelineOp {
 
         }
 
+        @Override
         public String toString() {
 
             return super.toString() + "{offset=" + offset + ",limit="

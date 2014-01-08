@@ -45,8 +45,8 @@ public class GenericChunkedStriterator<E> extends
     /**
      * @param src
      */
-    @SuppressWarnings("unchecked")
-    public GenericChunkedStriterator(IChunkedIterator<E> src) {
+//    @SuppressWarnings("unchecked")
+    public GenericChunkedStriterator(final IChunkedIterator<E> src) {
 
         super(src);
 
@@ -55,8 +55,8 @@ public class GenericChunkedStriterator<E> extends
     /**
      * @param src
      */
-    @SuppressWarnings("unchecked")
-    public GenericChunkedStriterator(Iterator<E> src) {
+//    @SuppressWarnings("unchecked")
+    public GenericChunkedStriterator(final Iterator<E> src) {
 
         super(src);
 
@@ -66,8 +66,8 @@ public class GenericChunkedStriterator<E> extends
      * @param chunkSize
      * @param src
      */
-    @SuppressWarnings("unchecked")
-    public GenericChunkedStriterator(int chunkSize, Iterator<E> src) {
+//    @SuppressWarnings("unchecked")
+    public GenericChunkedStriterator(final int chunkSize, final Iterator<E> src) {
 
         super(chunkSize, src);
 

@@ -65,7 +65,6 @@ import com.bigdata.rdf.model.BigdataValueFactoryImpl;
 import com.bigdata.rdf.vocab.decls.FOAFVocabularyDecl;
 import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.striterator.Chunkerator;
-import com.bigdata.striterator.CloseableIteratorWrapper;
 
 import cutthecrap.utils.striterators.ICloseableIterator;
 
@@ -603,34 +602,40 @@ abstract public class AbstractHashJoinUtilityTestCase extends TestCase {
             /*
              * Run the hash join.
              */
+            {
 
-            final ICloseableIterator<IBindingSet> leftItr = new CloseableIteratorWrapper<IBindingSet>(
-                    left.iterator());
+//                final ICloseableIterator<IBindingSet> leftItr = new CloseableIteratorWrapper<IBindingSet>(
+//                        left.iterator());
 
-            // Buffer used to collect the solutions.
-            final TestBuffer<IBindingSet> outputBuffer = new TestBuffer<IBindingSet>();
+                final ICloseableIterator<IBindingSet[]> leftItr = new Chunkerator<IBindingSet>(
+                        left.iterator(), 100/*chunkSize*/, IBindingSet.class);
 
-            // Compute the "required" solutions.
-            state.hashJoin(leftItr, outputBuffer);//, true/* leftIsPipeline */);
+                // Buffer used to collect the solutions.
+                final TestBuffer<IBindingSet> outputBuffer = new TestBuffer<IBindingSet>();
+                
+                // Compute the "required" solutions.
+                state.hashJoin(leftItr, null/* stats */, outputBuffer);
 
-            switch (joinType) {
-            case Normal:
-                break;
-            case Optional:
-            case NotExists:
-                // Output the optional solutions.
-                state.outputOptionals(outputBuffer);
-                break;
-            case Exists:
-                // Output the join set.
-                state.outputJoinSet(outputBuffer);
-                break;
-            default:
-                throw new AssertionError();
+                switch (joinType) {
+                case Normal:
+                    break;
+                case Optional:
+                case NotExists:
+                    // Output the optional solutions.
+                    state.outputOptionals(outputBuffer);
+                    break;
+                case Exists:
+                    // Output the join set.
+                    state.outputJoinSet(outputBuffer);
+                    break;
+                default:
+                    throw new AssertionError();
+                }
+
+                // Verify the expected solutions.
+                assertSameSolutionsAnyOrder(expected, outputBuffer.iterator());
+                
             }
-
-            // Verify the expected solutions.
-            assertSameSolutionsAnyOrder(expected, outputBuffer.iterator());
 
         } finally {
 

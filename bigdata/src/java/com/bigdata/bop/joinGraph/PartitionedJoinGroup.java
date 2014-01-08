@@ -21,7 +21,6 @@ import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
-import com.bigdata.bop.bset.EndOp;
 import com.bigdata.bop.join.PipelineJoin;
 import com.bigdata.bop.joinGraph.rto.JoinGraph;
 import com.bigdata.bop.solutions.JVMDistinctBindingSetsOp;
@@ -1019,24 +1018,25 @@ public class PartitionedJoinGroup {
 		/*
 		 * Reserve ids used by the join graph or its constraints.
 		 */
-		{
-			for (IPredicate<?> p : preds) {
-				idFactory.reserve(p.getId());
-			}
-			if (constraints != null) {
-				for (IConstraint c : constraints) {
-					final Iterator<BOp> itr = BOpUtility
-							.preOrderIteratorWithAnnotations(c);
-					while (itr.hasNext()) {
-						final BOp y = itr.next();
-						final Integer anId = (Integer) y
-								.getProperty(BOp.Annotations.BOP_ID);
-						if (anId != null)
-							idFactory.reserve(anId.intValue());
-					}
-				}
-			}
-		}
+	    idFactory.reserveIds(preds, constraints);
+//		{
+//			for (IPredicate<?> p : preds) {
+//				idFactory.reserve(p.getId());
+//			}
+//			if (constraints != null) {
+//				for (IConstraint c : constraints) {
+//					final Iterator<BOp> itr = BOpUtility
+//							.preOrderIteratorWithAnnotations(c);
+//					while (itr.hasNext()) {
+//						final BOp y = itr.next();
+//						final Integer anId = (Integer) y
+//								.getProperty(BOp.Annotations.BOP_ID);
+//						if (anId != null)
+//							idFactory.reserve(anId.intValue());
+//					}
+//				}
+//			}
+//		}
 
         // figure out which constraints are attached to which predicates.
         final IConstraint[][] assignedConstraints = PartitionedJoinGroup
@@ -1133,24 +1133,6 @@ public class PartitionedJoinGroup {
 					})//
 			);
 		}
-
-        /*
-         * FIXME Why does wrapping with this slice appear to be
-         * necessary? (It is causing runtime errors when not wrapped).
-         * Is this a bopId collision which is not being detected?
-         * 
-         * @see https://sourceforge.net/apps/trac/bigdata/ticket/227
-         * 
-         * [This should perhaps be moved into the caller.]
-         */
-        lastOp = new EndOp(new BOp[] { lastOp }, NV
-                .asMap(new NV[] {
-                        new NV(JoinGraph.Annotations.BOP_ID, idFactory.nextId()), //
-                        new NV(JoinGraph.Annotations.EVALUATION_CONTEXT,
-                                BOpEvaluationContext.CONTROLLER)//
-//                        new NV(PipelineOp.Annotations.SHARED_STATE,true),//
-                        }) //
-        );
 
         return lastOp;
 

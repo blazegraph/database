@@ -71,6 +71,7 @@ public class MultiSourceSequentialCloseableIterator<E> implements
         current = src;
     }
     
+    @Override
     public void close() {
         lock.lock();
         try {
@@ -98,6 +99,7 @@ public class MultiSourceSequentialCloseableIterator<E> implements
         }
     }
 
+    @Override
     public boolean add(final ICloseableIterator<E> src) {
         if (src == null)
             throw new IllegalArgumentException();
@@ -164,6 +166,7 @@ public class MultiSourceSequentialCloseableIterator<E> implements
         }
     }
 
+    @Override
     public boolean hasNext() {
         while (true) {
             final ICloseableIterator<E> tmp = nextSource();
@@ -182,6 +185,7 @@ public class MultiSourceSequentialCloseableIterator<E> implements
      *       {@link #next()} to throw {@link NoSuchElementException} if the
      *       iterator has been concurrently closed.
      */
+    @Override
     public E next() {
         while (true) {
             final ICloseableIterator<E> tmp = nextSource();
@@ -192,6 +196,7 @@ public class MultiSourceSequentialCloseableIterator<E> implements
         }
     }
 
+    @Override
     public void remove() {
         throw new UnsupportedOperationException();
     }
