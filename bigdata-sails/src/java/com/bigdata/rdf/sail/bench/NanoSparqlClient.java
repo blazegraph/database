@@ -217,6 +217,7 @@ public class NanoSparqlClient {
 
 		}
 
+		@Override
 		public Void call() throws Exception {
 
 			// used to measure the total execution time.
@@ -454,11 +455,13 @@ public class NanoSparqlClient {
 	            parser
 	                    .setTupleQueryResultHandler(new TupleQueryResultHandlerBase() {
 	                        // Indicates the end of a sequence of solutions.
+	                        @Override
 	                        public void endQueryResult() {
 	                            // connection close is handled in finally{}
 	                        }
 
 	                        // Handles a solution.
+	                        @Override
 	                        public void handleSolution(final BindingSet bset) {
 	                            if (log.isDebugEnabled())
 	                                log.debug(bset.toString());
@@ -466,6 +469,7 @@ public class NanoSparqlClient {
 	                        }
 
 	                        // Indicates the start of a sequence of Solutions.
+	                        @Override
 	                        public void startQueryResult(List<String> bindingNames) {
 	                        }
 	                    });
@@ -731,12 +735,13 @@ public class NanoSparqlClient {
 		
 		final class Pair implements Comparable<Pair> {
 			public double r = rnd.nextDouble();
-			public int val;
+			final public int val;
 
-			public Pair(int val) {
+			public Pair(final int val) {
 				this.val = val;
 			}
 
+	        @Override
 			public int compareTo(final Pair other) {
 				if (this == other)
 					return 0;
@@ -856,6 +861,7 @@ public class NanoSparqlClient {
 
         }
         
+        @Override
         public QueryOptions clone() {
         	
         	try {
@@ -987,6 +993,7 @@ public class NanoSparqlClient {
 		/**
 		 * Order by increasing elapsed time (slowest queries are last).
 		 */
+        @Override
 		public int compareTo(final Score o) {
 			if (elapsedNanos < o.elapsedNanos)
 				return -1;
@@ -1123,6 +1130,7 @@ public class NanoSparqlClient {
 
 		}
 
+        @Override
 		public void run() {
 
 		    final long begin = System.nanoTime();
