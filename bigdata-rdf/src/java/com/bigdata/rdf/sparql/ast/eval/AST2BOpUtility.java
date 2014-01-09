@@ -2564,6 +2564,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
                         optional ? new LinkedHashSet<IVariable<?>>(doneSet)
                                 : doneSet,//
                         getJoinConstraints(sp), //
+                        null, // cutoffLimit
                         sp.getQueryHints(), //
                         ctx);
                 continue;

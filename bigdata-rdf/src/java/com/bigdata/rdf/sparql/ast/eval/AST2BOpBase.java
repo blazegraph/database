@@ -94,6 +94,16 @@ public class AST2BOpBase {
          */
         String SCOPE = AST2BOpBase.class.getName() + ".scope";
 
+        /**
+         * Boolean annotation indicates whether the generated JOIN is simple (a
+         * single JOIN operator with optional constraints but without any
+         * variable materialization requirements) or complex (a JOIN operator
+         * associated with at least one constraint which requires the
+         * materialization of variables that are not already known to be
+         * materialized).
+         */
+        String SIMPLE_JOIN = AST2BOpBase.class.getName() + ".simpleJoin";
+        
         /*
          * Query planner and cost estimates.
          */

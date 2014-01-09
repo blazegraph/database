@@ -30,7 +30,6 @@ package com.bigdata.rdf.sparql.ast.eval.rto;
 import java.util.Properties;
 
 import com.bigdata.rdf.axioms.NoAxioms;
-import com.bigdata.rdf.internal.NotMaterializedException;
 import com.bigdata.rdf.sail.BigdataSail;
 
 /**
@@ -82,9 +81,6 @@ import com.bigdata.rdf.sail.BigdataSail;
  *          will remain valid against larger data sets since BSBM only adds more
  *          data when generating a larger data set. Of course, the number of
  *          solutions for the queries may change.
- * 
- *          TODO Collect Q3, Q4 instance.
- * 
  */
 public class TestRTO_BSBM extends AbstractRTOTestCase {
 
@@ -134,7 +130,7 @@ public class TestRTO_BSBM extends AbstractRTOTestCase {
          * Verify that the runtime optimizer produced the expected join path.
          */
 
-        final int[] expected = new int[] { 3, 2, 4, 1, 5 };
+        final int[] expected = new int[] { 2, 4, 1, 3, 5 };
 
         assertSameJoinOrder(expected, helper);
         
@@ -349,136 +345,6 @@ public class TestRTO_BSBM extends AbstractRTOTestCase {
     
     /**
      * BSBM Q8 on the pc100 data set.
-     * 
-     * FIXME Fails with {@link NotMaterializedException}
-     * 
-     * <pre>
-     * java.lang.Exception: org.openrdf.query.QueryEvaluationException: java.lang.RuntimeException: java.util.concurrent.ExecutionException: java.lang.RuntimeException: java.util.concurrent.ExecutionException: java.lang.Exception: task=ChunkTask{query=187f9046-6779-48c4-a4cd-d339dc484ef7,bopId=13,partitionId=-1,sinkId=16,altSinkId=null}, cause=java.util.concurrent.ExecutionException: java.util.concurrent.ExecutionException: java.lang.RuntimeException: java.lang.Exception: task=ChunkTask{query=5f5f0a4e-1c35-4268-93d8-895e1927fb47,bopId=0,partitionId=-1,sinkId=null,altSinkId=null}, cause=java.util.concurrent.ExecutionException: java.lang.RuntimeException: java.lang.RuntimeException: java.lang.RuntimeException: java.lang.RuntimeException: com.bigdata.rdf.internal.NotMaterializedException
-     *     at com.bigdata.rdf.sail.webapp.BigdataRDFContext$AbstractQueryTask.call(BigdataRDFContext.java:1136)
-     *     at com.bigdata.rdf.sail.webapp.BigdataRDFContext$AbstractQueryTask.call(BigdataRDFContext.java:1)
-     *     at java.util.concurrent.FutureTask$Sync.innerRun(FutureTask.java:334)
-     *     at java.util.concurrent.FutureTask.run(FutureTask.java:166)
-     *     at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1110)
-     *     at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:603)
-     *     at java.lang.Thread.run(Thread.java:722)
-     * Caused by: org.openrdf.query.QueryEvaluationException: java.lang.RuntimeException: java.util.concurrent.ExecutionException: java.lang.RuntimeException: java.util.concurrent.ExecutionException: java.lang.Exception: task=ChunkTask{query=187f9046-6779-48c4-a4cd-d339dc484ef7,bopId=13,partitionId=-1,sinkId=16,altSinkId=null}, cause=java.util.concurrent.ExecutionException: java.util.concurrent.ExecutionException: java.lang.RuntimeException: java.lang.Exception: task=ChunkTask{query=5f5f0a4e-1c35-4268-93d8-895e1927fb47,bopId=0,partitionId=-1,sinkId=null,altSinkId=null}, cause=java.util.concurrent.ExecutionException: java.lang.RuntimeException: java.lang.RuntimeException: java.lang.RuntimeException: java.lang.RuntimeException: com.bigdata.rdf.internal.NotMaterializedException
-     *     at com.bigdata.rdf.sail.Bigdata2Sesame2BindingSetIterator.hasNext(Bigdata2Sesame2BindingSetIterator.java:188)
-     *     at org.openrdf.query.impl.TupleQueryResultImpl.hasNext(TupleQueryResultImpl.java:90)
-     *     at org.openrdf.query.QueryResultUtil.report(QueryResultUtil.java:52)
-     *     at org.openrdf.repository.sail.SailTupleQuery.evaluate(SailTupleQuery.java:63)
-     *     at com.bigdata.rdf.sail.webapp.BigdataRDFContext$TupleQueryTask.doQuery(BigdataRDFContext.java:1255)
-     *     at com.bigdata.rdf.sail.webapp.BigdataRDFContext$AbstractQueryTask.call(BigdataRDFContext.java:1107)
-     *     ... 6 more
-     * Caused by: java.lang.RuntimeException: java.util.concurrent.ExecutionException: java.lang.RuntimeException: java.util.concurrent.ExecutionException: java.lang.Exception: task=ChunkTask{query=187f9046-6779-48c4-a4cd-d339dc484ef7,bopId=13,partitionId=-1,sinkId=16,altSinkId=null}, cause=java.util.concurrent.ExecutionException: java.util.concurrent.ExecutionException: java.lang.RuntimeException: java.lang.Exception: task=ChunkTask{query=5f5f0a4e-1c35-4268-93d8-895e1927fb47,bopId=0,partitionId=-1,sinkId=null,altSinkId=null}, cause=java.util.concurrent.ExecutionException: java.lang.RuntimeException: java.lang.RuntimeException: java.lang.RuntimeException: java.lang.RuntimeException: com.bigdata.rdf.internal.NotMaterializedException
-     *     at com.bigdata.relation.accesspath.BlockingBuffer$BlockingIterator.checkFuture(BlockingBuffer.java:1523)
-     *     at com.bigdata.relation.accesspath.BlockingBuffer$BlockingIterator._hasNext(BlockingBuffer.java:1710)
-     *     at com.bigdata.relation.accesspath.BlockingBuffer$BlockingIterator.hasNext(BlockingBuffer.java:1563)
-     *     at com.bigdata.striterator.AbstractChunkedResolverator._hasNext(AbstractChunkedResolverator.java:357)
-     *     at com.bigdata.striterator.AbstractChunkedResolverator.hasNext(AbstractChunkedResolverator.java:333)
-     *     at com.bigdata.rdf.sail.Bigdata2Sesame2BindingSetIterator.hasNext(Bigdata2Sesame2BindingSetIterator.java:134)
-     *     ... 11 more
-     * Caused by: java.util.concurrent.ExecutionException: java.lang.RuntimeException: java.util.concurrent.ExecutionException: java.lang.Exception: task=ChunkTask{query=187f9046-6779-48c4-a4cd-d339dc484ef7,bopId=13,partitionId=-1,sinkId=16,altSinkId=null}, cause=java.util.concurrent.ExecutionException: java.util.concurrent.ExecutionException: java.lang.RuntimeException: java.lang.Exception: task=ChunkTask{query=5f5f0a4e-1c35-4268-93d8-895e1927fb47,bopId=0,partitionId=-1,sinkId=null,altSinkId=null}, cause=java.util.concurrent.ExecutionException: java.lang.RuntimeException: java.lang.RuntimeException: java.lang.RuntimeException: java.lang.RuntimeException: com.bigdata.rdf.internal.NotMaterializedException
-     *     at java.util.concurrent.FutureTask$Sync.innerGet(FutureTask.java:252)
-     *     at java.util.concurrent.FutureTask.get(FutureTask.java:111)
-     *     at com.bigdata.relation.accesspath.BlockingBuffer$BlockingIterator.checkFuture(BlockingBuffer.java:1454)
-     *     ... 16 more
-     * Caused by: java.lang.RuntimeException: java.util.concurrent.ExecutionException: java.lang.Exception: task=ChunkTask{query=187f9046-6779-48c4-a4cd-d339dc484ef7,bopId=13,partitionId=-1,sinkId=16,altSinkId=null}, cause=java.util.concurrent.ExecutionException: java.util.concurrent.ExecutionException: java.lang.RuntimeException: java.lang.Exception: task=ChunkTask{query=5f5f0a4e-1c35-4268-93d8-895e1927fb47,bopId=0,partitionId=-1,sinkId=null,altSinkId=null}, cause=java.util.concurrent.ExecutionException: java.lang.RuntimeException: java.lang.RuntimeException: java.lang.RuntimeException: java.lang.RuntimeException: com.bigdata.rdf.internal.NotMaterializedException
-     *     at com.bigdata.rdf.sail.RunningQueryCloseableIterator.checkFuture(RunningQueryCloseableIterator.java:59)
-     *     at com.bigdata.rdf.sail.RunningQueryCloseableIterator.close(RunningQueryCloseableIterator.java:73)
-     *     at com.bigdata.rdf.sail.RunningQueryCloseableIterator.hasNext(RunningQueryCloseableIterator.java:82)
-     *     at com.bigdata.striterator.ChunkedWrappedIterator.hasNext(ChunkedWrappedIterator.java:197)
-     *     at com.bigdata.striterator.AbstractChunkedResolverator$ChunkConsumerTask.call(AbstractChunkedResolverator.java:222)
-     *     at com.bigdata.striterator.AbstractChunkedResolverator$ChunkConsumerTask.call(AbstractChunkedResolverator.java:1)
-     *     ... 5 more
-     * Caused by: java.util.concurrent.ExecutionException: java.lang.Exception: task=ChunkTask{query=187f9046-6779-48c4-a4cd-d339dc484ef7,bopId=13,partitionId=-1,sinkId=16,altSinkId=null}, cause=java.util.concurrent.ExecutionException: java.util.concurrent.ExecutionException: java.lang.RuntimeException: java.lang.Exception: task=ChunkTask{query=5f5f0a4e-1c35-4268-93d8-895e1927fb47,bopId=0,partitionId=-1,sinkId=null,altSinkId=null}, cause=java.util.concurrent.ExecutionException: java.lang.RuntimeException: java.lang.RuntimeException: java.lang.RuntimeException: java.lang.RuntimeException: com.bigdata.rdf.internal.NotMaterializedException
-     *     at com.bigdata.util.concurrent.Haltable.get(Haltable.java:273)
-     *     at com.bigdata.bop.engine.AbstractRunningQuery.get(AbstractRunningQuery.java:1474)
-     *     at com.bigdata.bop.engine.AbstractRunningQuery.get(AbstractRunningQuery.java:1)
-     *     at com.bigdata.rdf.sail.RunningQueryCloseableIterator.checkFuture(RunningQueryCloseableIterator.java:46)
-     *     ... 10 more
-     * Caused by: java.lang.Exception: task=ChunkTask{query=187f9046-6779-48c4-a4cd-d339dc484ef7,bopId=13,partitionId=-1,sinkId=16,altSinkId=null}, cause=java.util.concurrent.ExecutionException: java.util.concurrent.ExecutionException: java.lang.RuntimeException: java.lang.Exception: task=ChunkTask{query=5f5f0a4e-1c35-4268-93d8-895e1927fb47,bopId=0,partitionId=-1,sinkId=null,altSinkId=null}, cause=java.util.concurrent.ExecutionException: java.lang.RuntimeException: java.lang.RuntimeException: java.lang.RuntimeException: java.lang.RuntimeException: com.bigdata.rdf.internal.NotMaterializedException
-     *     at com.bigdata.bop.engine.ChunkedRunningQuery$ChunkTask.call(ChunkedRunningQuery.java:1322)
-     *     at com.bigdata.bop.engine.ChunkedRunningQuery$ChunkTaskWrapper.run(ChunkedRunningQuery.java:856)
-     *     at java.util.concurrent.Executors$RunnableAdapter.call(Executors.java:471)
-     *     at java.util.concurrent.FutureTask$Sync.innerRun(FutureTask.java:334)
-     *     at java.util.concurrent.FutureTask.run(FutureTask.java:166)
-     *     at com.bigdata.concurrent.FutureTaskMon.run(FutureTaskMon.java:63)
-     *     at com.bigdata.bop.engine.ChunkedRunningQuery$ChunkFutureTask.run(ChunkedRunningQuery.java:751)
-     *     ... 3 more
-     * Caused by: java.util.concurrent.ExecutionException: java.util.concurrent.ExecutionException: java.lang.RuntimeException: java.lang.Exception: task=ChunkTask{query=5f5f0a4e-1c35-4268-93d8-895e1927fb47,bopId=0,partitionId=-1,sinkId=null,altSinkId=null}, cause=java.util.concurrent.ExecutionException: java.lang.RuntimeException: java.lang.RuntimeException: java.lang.RuntimeException: java.lang.RuntimeException: com.bigdata.rdf.internal.NotMaterializedException
-     *     at java.util.concurrent.FutureTask$Sync.innerGet(FutureTask.java:252)
-     *     at java.util.concurrent.FutureTask.get(FutureTask.java:111)
-     *     at com.bigdata.bop.engine.ChunkedRunningQuery$ChunkTask.call(ChunkedRunningQuery.java:1302)
-     *     ... 9 more
-     * Caused by: java.util.concurrent.ExecutionException: java.lang.RuntimeException: java.lang.Exception: task=ChunkTask{query=5f5f0a4e-1c35-4268-93d8-895e1927fb47,bopId=0,partitionId=-1,sinkId=null,altSinkId=null}, cause=java.util.concurrent.ExecutionException: java.lang.RuntimeException: java.lang.RuntimeException: java.lang.RuntimeException: java.lang.RuntimeException: com.bigdata.rdf.internal.NotMaterializedException
-     *     at java.util.concurrent.FutureTask$Sync.innerGet(FutureTask.java:252)
-     *     at java.util.concurrent.FutureTask.get(FutureTask.java:111)
-     *     at com.bigdata.bop.joinGraph.rto.JGraph.estimateInitialEdgeWeights(JGraph.java:1606)
-     *     at com.bigdata.bop.joinGraph.rto.JGraph.round0(JGraph.java:670)
-     *     at com.bigdata.bop.joinGraph.rto.JGraph.runtimeOptimizer(JGraph.java:460)
-     *     at com.bigdata.bop.joinGraph.rto.JoinGraph$JoinGraphTask.call(JoinGraph.java:500)
-     *     at com.bigdata.bop.joinGraph.rto.JoinGraph$JoinGraphTask.call(JoinGraph.java:1)
-     *     at java.util.concurrent.FutureTask$Sync.innerRun(FutureTask.java:334)
-     *     at java.util.concurrent.FutureTask.run(FutureTask.java:166)
-     *     at com.bigdata.bop.engine.ChunkedRunningQuery$ChunkTask.call(ChunkedRunningQuery.java:1301)
-     *     ... 9 more
-     * Caused by: java.lang.RuntimeException: java.lang.Exception: task=ChunkTask{query=5f5f0a4e-1c35-4268-93d8-895e1927fb47,bopId=0,partitionId=-1,sinkId=null,altSinkId=null}, cause=java.util.concurrent.ExecutionException: java.lang.RuntimeException: java.lang.RuntimeException: java.lang.RuntimeException: java.lang.RuntimeException: com.bigdata.rdf.internal.NotMaterializedException
-     *     at com.bigdata.bop.joinGraph.rto.Path.cutoffJoin(Path.java:895)
-     *     at com.bigdata.bop.joinGraph.rto.JGraph$CutoffJoinTask.call(JGraph.java:1643)
-     *     at com.bigdata.bop.joinGraph.rto.JGraph$CutoffJoinTask.call(JGraph.java:1)
-     *     at java.util.concurrent.FutureTask$Sync.innerRun(FutureTask.java:334)
-     *     at java.util.concurrent.FutureTask.run(FutureTask.java:166)
-     *     ... 3 more
-     * Caused by: java.lang.Exception: task=ChunkTask{query=5f5f0a4e-1c35-4268-93d8-895e1927fb47,bopId=0,partitionId=-1,sinkId=null,altSinkId=null}, cause=java.util.concurrent.ExecutionException: java.lang.RuntimeException: java.lang.RuntimeException: java.lang.RuntimeException: java.lang.RuntimeException: com.bigdata.rdf.internal.NotMaterializedException
-     *     at com.bigdata.bop.engine.ChunkedRunningQuery$ChunkTask.call(ChunkedRunningQuery.java:1322)
-     *     at com.bigdata.bop.engine.ChunkedRunningQuery$ChunkTaskWrapper.run(ChunkedRunningQuery.java:856)
-     *     at java.util.concurrent.Executors$RunnableAdapter.call(Executors.java:471)
-     *     at java.util.concurrent.FutureTask$Sync.innerRun(FutureTask.java:334)
-     *     at java.util.concurrent.FutureTask.run(FutureTask.java:166)
-     *     at com.bigdata.concurrent.FutureTaskMon.run(FutureTaskMon.java:63)
-     *     at com.bigdata.bop.engine.ChunkedRunningQuery$ChunkFutureTask.run(ChunkedRunningQuery.java:751)
-     *     ... 3 more
-     * Caused by: java.util.concurrent.ExecutionException: java.lang.RuntimeException: java.lang.RuntimeException: java.lang.RuntimeException: java.lang.RuntimeException: com.bigdata.rdf.internal.NotMaterializedException
-     *     at java.util.concurrent.FutureTask$Sync.innerGet(FutureTask.java:252)
-     *     at java.util.concurrent.FutureTask.get(FutureTask.java:111)
-     *     at com.bigdata.bop.engine.ChunkedRunningQuery$ChunkTask.call(ChunkedRunningQuery.java:1302)
-     *     ... 9 more
-     * Caused by: java.lang.RuntimeException: java.lang.RuntimeException: java.lang.RuntimeException: java.lang.RuntimeException: com.bigdata.rdf.internal.NotMaterializedException
-     *     at com.bigdata.bop.join.PipelineJoin$JoinTask.call(PipelineJoin.java:621)
-     *     at com.bigdata.bop.join.PipelineJoin$JoinTask.call(PipelineJoin.java:1)
-     *     at java.util.concurrent.FutureTask$Sync.innerRun(FutureTask.java:334)
-     *     at java.util.concurrent.FutureTask.run(FutureTask.java:166)
-     *     at com.bigdata.concurrent.FutureTaskMon.run(FutureTaskMon.java:63)
-     *     at com.bigdata.bop.engine.ChunkedRunningQuery$ChunkTask.call(ChunkedRunningQuery.java:1301)
-     *     ... 9 more
-     * Caused by: java.lang.RuntimeException: java.lang.RuntimeException: java.lang.RuntimeException: com.bigdata.rdf.internal.NotMaterializedException
-     *     at com.bigdata.bop.join.PipelineJoin$JoinTask$BindingSetConsumerTask.call(PipelineJoin.java:965)
-     *     at com.bigdata.bop.join.PipelineJoin$JoinTask.consumeSource(PipelineJoin.java:678)
-     *     at com.bigdata.bop.join.PipelineJoin$JoinTask.call(PipelineJoin.java:562)
-     *     ... 14 more
-     * Caused by: java.lang.RuntimeException: java.lang.RuntimeException: com.bigdata.rdf.internal.NotMaterializedException
-     *     at com.bigdata.bop.join.PipelineJoin$JoinTask$AccessPathTask.handleJoin2(PipelineJoin.java:1839)
-     *     at com.bigdata.bop.join.PipelineJoin$JoinTask$AccessPathTask.call(PipelineJoin.java:1562)
-     *     at com.bigdata.bop.join.PipelineJoin$JoinTask$BindingSetConsumerTask.executeTasks(PipelineJoin.java:1270)
-     *     at com.bigdata.bop.join.PipelineJoin$JoinTask$BindingSetConsumerTask.call(PipelineJoin.java:954)
-     *     ... 16 more
-     * Caused by: java.lang.RuntimeException: com.bigdata.rdf.internal.NotMaterializedException
-     *     at com.bigdata.rdf.internal.constraints.SPARQLConstraint.accept(SPARQLConstraint.java:135)
-     *     at com.bigdata.bop.BOpUtility.isConsistent(BOpUtility.java:1196)
-     *     at com.bigdata.bop.BOpContext.bind(BOpContext.java:1021)
-     *     at com.bigdata.bop.join.PipelineJoin$JoinTask$AccessPathTask.handleJoin2(PipelineJoin.java:1727)
-     *     ... 19 more
-     * Caused by: com.bigdata.rdf.internal.NotMaterializedException
-     *     at com.bigdata.rdf.internal.constraints.IVValueExpression.getAndCheckLiteral(IVValueExpression.java:481)
-     *     at com.bigdata.rdf.internal.constraints.IVValueExpression.getAndCheckLiteralValue(IVValueExpression.java:523)
-     *     at com.bigdata.rdf.internal.constraints.LangBOp.get(LangBOp.java:81)
-     *     at com.bigdata.rdf.internal.constraints.LangBOp.get(LangBOp.java:1)
-     *     at com.bigdata.rdf.internal.constraints.LangMatchesBOp.accept(LangMatchesBOp.java:80)
-     *     at com.bigdata.rdf.internal.constraints.XSDBooleanIVValueExpression.get(XSDBooleanIVValueExpression.java:99)
-     *     at com.bigdata.rdf.internal.constraints.XSDBooleanIVValueExpression.get(XSDBooleanIVValueExpression.java:1)
-     *     at com.bigdata.rdf.internal.constraints.SPARQLConstraint.accept(SPARQLConstraint.java:118)
-     *     ... 22 more
-     * </pre>
      */
     public void test_BSBM_Q8_pc100() throws Exception {
         
@@ -493,7 +359,7 @@ public class TestRTO_BSBM extends AbstractRTOTestCase {
          * Verify that the runtime optimizer produced the expected join path.
          */
 
-        final int[] expected = new int[] { 1, 3, 2, 5, 4, 7, 6 };
+        final int[] expected = new int[] { 1, 3, 2, 4, 5, 6 };
 
         assertSameJoinOrder(expected, helper);
         

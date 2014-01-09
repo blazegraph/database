@@ -593,10 +593,13 @@ public class AST2BOpFilters extends AST2BOpBase {
      * @param needsMaterialization
      *            A map providing for each constraint the set of variables which
      *            must be materialized before that constraint can be evaluated.
-     *            This map is populated as a side-effect.
+     *            This map is populated as a side-effect. It will be empty iff
+     *            there are no constraints that might or must require variable
+     *            materialization.
      * 
      * @return Constraints which can (or might) be able to run attached to that
-     *         join.
+     *         join -or- <code>null</code> iff there are no constraints that can
+     *         be attached to the join.
      */
     static protected IConstraint[] getJoinConstraints(
             final Collection<IConstraint> constraints,

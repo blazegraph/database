@@ -53,6 +53,7 @@ import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.joinGraph.NoSolutionsException;
 import com.bigdata.bop.joinGraph.PartitionedJoinGroup;
 import com.bigdata.bop.rdf.join.DataSetJoin;
+import com.bigdata.rdf.sparql.ast.eval.AST2BOpRTO;
 import com.bigdata.util.concurrent.ExecutionExceptions;
 
 /**
@@ -223,6 +224,14 @@ public class JGraph {
 	private static final transient Logger log = Logger.getLogger(JGraph.class);
 
     /**
+     * The pipeline operator for executing the RTO. This provides additional
+     * context from the AST model that is necessary to handle some kinds of
+     * FILTERs (e.g., those which require conditional routing patterns for
+     * chunked materialization).
+     */
+    private final JoinGraph joinGraph;
+	
+    /**
      * Vertices of the join graph.
      */
     private final Vertex[] V;
@@ -258,39 +267,48 @@ public class JGraph {
         return sb.toString();
     }
 
-	/**
-	 * 
-	 * @param v
-	 *            The vertices of the join graph. These are {@link IPredicate}s
-	 *            associated with required joins.
-	 * @param constraints
-	 *            The constraints of the join graph (optional). Since all joins
-	 *            in the join graph are required, constraints are dynamically
-	 *            attached to the first join in which all of their variables are
-	 *            bound.
-	 * 
-	 * @throws IllegalArgumentException
-	 *             if the vertices is <code>null</code>.
-	 * @throws IllegalArgumentException
-	 *             if the vertices is an empty array.
-	 * @throws IllegalArgumentException
-	 *             if any element of the vertices is <code>null</code>.
-	 * @throws IllegalArgumentException
-	 *             if any constraint uses a variable which is never bound by the
-	 *             given predicates.
-	 * @throws IllegalArgumentException
-	 *             if <i>sampleType</i> is <code>null</code>.
-	 * 
-	 * @todo unit test for a constraint using a variable which is never bound.
-	 *       the constraint should be attached at the last vertex in the join
-	 *       path. this will cause the query to fail unless the variable was
-	 *       already bound, e.g., by a parent query or in the solutions pumped
-	 *       into the {@link JoinGraph} operator.
-	 * 
-	 * @todo unit test when the join graph has a single vertex.
-	 */
-    public JGraph(final IPredicate<?>[] v, final IConstraint[] constraints,
-                final SampleType sampleType) {
+    /**
+     * @param joinGraph
+     *            The pipeline operator that is executing the RTO. This defines
+     *            the join graph (vertices, edges, and constraints) and also
+     *            provides access to the AST and related metadata required to
+     *            execute the join graph.
+     * 
+     * @throws IllegalArgumentException
+     *             if the joinGraph is <code>null</code>.
+     * @throws IllegalArgumentException
+     *             if the {@link JoinGraph#getVertices()} is <code>null</code>.
+     * @throws IllegalArgumentException
+     *             if the {@link JoinGraph#getVertices()} is an empty array.
+     * @throws IllegalArgumentException
+     *             if any element of the {@link JoinGraph#getVertices()}is
+     *             <code>null</code>.
+     * @throws IllegalArgumentException
+     *             if any constraint uses a variable which is never bound by the
+     *             given predicates.
+     * @throws IllegalArgumentException
+     *             if <i>sampleType</i> is <code>null</code>.
+     * 
+     * @todo unit test for a constraint using a variable which is never bound.
+     *       the constraint should be attached at the last vertex in the join
+     *       path. this will cause the query to fail unless the variable was
+     *       already bound, e.g., by a parent query or in the solutions pumped
+     *       into the {@link JoinGraph} operator.
+     * 
+     * @todo unit test when the join graph has a single vertex (we never invoke
+     *       the RTO for less than 3 vertices since with one vertex you just run
+     *       it and with two vertices you run the lower cardinality vertex first
+     *       (though there might be cases where filters require materialization
+     *       where running for two vertices could make sense)).
+     */
+    public JGraph(final JoinGraph joinGraph) {
+
+        if (joinGraph == null)
+            throw new IllegalArgumentException();
+
+        this.joinGraph = joinGraph;
+        
+        final IPredicate<?>[] v = joinGraph.getVertices();
 
         if (v == null)
             throw new IllegalArgumentException();
@@ -309,6 +327,8 @@ public class JGraph {
 
         }
 
+        final IConstraint[] constraints = joinGraph.getConstraints();
+        
         if (constraints != null) {
             C = new IConstraint[constraints.length];
             for (int i = 0; i < constraints.length; i++) {
@@ -320,6 +340,8 @@ public class JGraph {
             // No constraints.
             C = null;
         }
+
+        final SampleType sampleType = joinGraph.getSampleType();
 
         if (sampleType == null)
             throw new IllegalArgumentException();
@@ -519,9 +541,9 @@ public class JGraph {
         }
         
 		// Should be one winner.
-		if (paths.length != 1) {
-			throw new AssertionError("Expected one path but have "
-					+ paths.length + " paths.");
+        if (paths.length != 1) {
+            throw new AssertionError("Expected one path but have "
+                    + paths.length + " paths.");
         }
 
         if (log.isInfoEnabled()) {
@@ -651,18 +673,19 @@ public class JGraph {
          */
         sampleAllVertices(queryEngine, limit);
 
-		if (log.isInfoEnabled()) {
-			final StringBuilder sb = new StringBuilder();
-			sb.append("Sampled vertices:\n");
-			for (Vertex v : V) {
-				if (v.sample != null) {
-					sb.append("id="+v.pred.getId()+" : ");
-					sb.append(v.sample.toString());
-					sb.append("\n");
-				}
-			}
-			log.info(sb.toString());
-		}
+        if (log.isInfoEnabled()) {
+            final StringBuilder sb = new StringBuilder();
+            sb.append("limit=" + limit + ", nedges=" + nedges);
+            sb.append(", sampled vertices::\n");
+            for (Vertex v : V) {
+                if (v.sample != null) {
+                    sb.append("id=" + v.pred.getId() + " : ");
+                    sb.append(v.sample.toString());
+                    sb.append("\n");
+                }
+            }
+            log.info(sb.toString());
+        }
 
         /*
          * Estimate the cardinality for each edge.
@@ -940,8 +963,10 @@ public class JGraph {
                          * cardinality vertex.
                          */
 
-                        edgeSample = Path.cutoffJoin(//
-                                queryEngine, limit,//
+                        edgeSample = AST2BOpRTO.cutoffJoin(//
+                                queryEngine, //
+                                joinGraph, //
+                                limit,//
                                 x.getPathSegment(2),// 1st edge.
                                 C,// constraints
                                 V.length == 2,// pathIsComplete
@@ -978,7 +1003,9 @@ public class JGraph {
                          * edge of the path.
                          */
 
-                        edgeSample = Path.cutoffJoin(queryEngine,//
+                        edgeSample = AST2BOpRTO.cutoffJoin(//
+                                queryEngine,//
+                                joinGraph,//
                                 limit,//
                                 x.getPathSegment(ids.length()),//
                                 C, // constraints
@@ -1245,9 +1272,14 @@ public class JGraph {
                 used.add(tVertex);
 
                 // Extend the path to the new vertex.
-                final Path p = x
-                        .addEdge(queryEngine, limit, tVertex, /* dynamicEdge, */
-                                C, x.getVertexCount() + 1 == V.length/* pathIsComplete */);
+                final Path p = x.addEdge(//
+                        queryEngine, //
+                        joinGraph, //
+                        limit,//
+                        tVertex,//
+                        C, //
+                        x.getVertexCount() + 1 == V.length// pathIsComplete
+                        );
 
                 // Add to the set of paths for this round.
                 tmp.add(p);
@@ -1284,9 +1316,14 @@ public class JGraph {
                 final Vertex tVertex = nothingShared.iterator().next();
                 
                 // Extend the path to the new vertex.
-                final Path p = x
-                        .addEdge(queryEngine, limit, tVertex,/* dynamicEdge */
-                                C, x.getVertexCount() + 1 == V.length/* pathIsComplete */);
+                final Path p = x.addEdge(//
+                        queryEngine, //
+                        joinGraph,//
+                        limit, //
+                        tVertex, //
+                        C,//
+                        x.getVertexCount() + 1 == V.length// pathIsComplete
+                        );
 
                 // Add to the set of paths for this round.
                 tmp.add(p);
@@ -1640,7 +1677,9 @@ public class JGraph {
             final IPredicate<?>[] preds = new IPredicate[] { v.pred, vp.pred };
 
             // cutoff join of the edge (v,vp)
-            final EdgeSample edgeSample = Path.cutoffJoin(queryEngine,// 
+            final EdgeSample edgeSample = AST2BOpRTO.cutoffJoin(//
+                    queryEngine,// 
+                    joinGraph,//
                     limit, // sample limit
                     preds, // ordered path segment.
                     C, // constraints

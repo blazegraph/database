@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sparql.ast.eval;
 
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -34,33 +35,51 @@ import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
+
+import junit.framework.AssertionFailedError;
+
+import org.apache.log4j.Logger;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpEvaluationContext;
 import com.bigdata.bop.BOpIdFactory;
+import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.BadBOpIdTypeException;
+import com.bigdata.bop.Constant;
 import com.bigdata.bop.DuplicateBOpIdException;
+import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IPredicate;
-import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.NoBOpIdException;
 import com.bigdata.bop.PipelineOp;
+import com.bigdata.bop.Var;
 import com.bigdata.bop.ap.Predicate;
 import com.bigdata.bop.ap.SampleIndex.SampleType;
+import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
+import com.bigdata.bop.join.JoinAnnotations;
+import com.bigdata.bop.join.PipelineJoin;
+import com.bigdata.bop.join.PipelineJoinStats;
 import com.bigdata.bop.joinGraph.PartitionedJoinGroup;
+import com.bigdata.bop.joinGraph.rto.EdgeSample;
+import com.bigdata.bop.joinGraph.rto.EstimateEnum;
 import com.bigdata.bop.joinGraph.rto.JGraph;
 import com.bigdata.bop.joinGraph.rto.JoinGraph;
 import com.bigdata.bop.joinGraph.rto.Path;
+import com.bigdata.bop.joinGraph.rto.SampleBase;
+import com.bigdata.bop.joinGraph.rto.VertexSample;
+import com.bigdata.bop.rdf.join.ChunkedMaterializationOp;
+import com.bigdata.bop.solutions.MemorySortOp;
 import com.bigdata.bop.solutions.ProjectionOp;
+import com.bigdata.bop.solutions.SliceOp;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.constraints.INeedsMaterialization;
-import com.bigdata.rdf.sparql.ast.ASTBase;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.IBindingProducerNode;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
@@ -68,27 +87,15 @@ import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.striterator.Dechunkerator;
 import com.bigdata.util.NT;
 
 /**
  * Integration with the Runtime Optimizer (RTO).
  * 
- * TODO The initial integration aims to run only queries that are simple join
- * groups with filters. Once we have this integrated so that it can be enabled
- * with a query hint, then we can look into handling subgroups, materialization,
- * etc. Even handling filters will be somewhat tricky due to the requirement for
- * conditional materialization of variable bindings in advance of certain
- * {@link IValueExpression} depending on the {@link INeedsMaterialization}
- * interface. Therefore, the place to start is with simple join groups and
- * filters whose {@link IValueExpression}s do not require materialization.
- * 
- * TODO We need a way to inspect the RTO behavior. It will get logged, but it
- * would be nice to attach it to the query plan. Likewise, it would be nice to
- * surface this to the caller so the RTO can be used to guide query construction
- * UIs.
- * 
  * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/64">Runtime
  *      Query Optimization</a>
+ * 
  * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/258">Integrate
  *      RTO into SAIL</a>
  * @see <a
@@ -98,8 +105,16 @@ import com.bigdata.util.NT;
  * @see JGraph
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * 
+ *         TODO Can the RTO give us information about the locality of joins that
+ *         we could use to decide on vectoring (chunkSize) for those joins or to
+ *         decide when to use a hash join against an access path as opposed to a
+ *         nested index join?
  */
 public class AST2BOpRTO extends AST2BOpJoins {
+
+    public static final transient Logger log = Logger
+            .getLogger(AST2BOpRTO.class);
 
     public interface Annotations extends AST2BOpJoins.Annotations {
         
@@ -115,14 +130,29 @@ public class AST2BOpRTO extends AST2BOpJoins {
     }
     
     /**
+     * The RTO is most useful for queries with high latency and a large number
+     * of joins. You do not need to apply the RTO if there is only a single
+     * triple pattern since there are no joins. You do not need to apply the RTO
+     * if there are two triple patterns since we will run the most selective one
+     * first. The RTO only starts to be useful when there are at least three
+     * triple patterns - that gives you three vertices and two joins.
+     * 
+     * TODO For incremental query construction UIs, it would be useful to run
+     * just the RTO and to run it with even a single join. This will give us
+     * sample values as well as estimates cardinalities. If the UI has triple
+     * patterns that do not join (yet), then those should be grouped. This could
+     * be done if we provided a simple SPARQL query with a query hint to run the
+     * RTO, trapped the {@link IRunningQuery} to get the detailed RTO results,
+     * and specified the minimum threashold for running the RTO for that query
+     * as TWO joins, basically just overriding this field.
+     */
+    static private final int RTO_MIN_JOINS = 3;
+    
+    /**
      * When <code>true</code>, the RTO will only accept simple joins into the
      * join graph. Simple joins includes triples-mode joins and filters that do
      * not have materialization requirements. Non-simple joins includes
      * quads-mode joins and filters that have materialization contexts.
-     * 
-     * TODO Eventually we can drop this. It is being used while we refactor the
-     * RTO to support more complex joins and variable materialization for
-     * filters.
      */
     static private final boolean onlySimpleJoins = false;
     
@@ -136,8 +166,8 @@ public class AST2BOpRTO extends AST2BOpJoins {
      * This is very much the same as ordering required joins, but the OPTIONAL
      * joins need to be handled AFTER the required joins.
      * 
-     * TODO RTO OPTIONALS: Handle optional SPs in joinGraph by ordering them in
-     * the tail so as to minimize the cost function. Once implemented, we can
+     * FIXME RTO: OPTIONALS: Handle optional SPs in joinGraph by ordering them
+     * in the tail so as to minimize the cost function. Once implemented, we can
      * drop this field.
      */
     static private final boolean onlyRequiredJoins = true;
@@ -146,8 +176,6 @@ public class AST2BOpRTO extends AST2BOpJoins {
      * When <code>true</code>, the RTO will only accept statement patterns into
      * the join graph. When <code>false</code>, it will attempt to handle non-SP
      * joins, e.g., sub-query, exists, property paths, etc.
-     * 
-     * TODO Eventually we can drop this.
      */
     static private final boolean onlySPs = true;
     
@@ -177,6 +205,37 @@ public class AST2BOpRTO extends AST2BOpJoins {
      * upstream operator.
      */
     static private final boolean bottomUp = true;
+
+    /**
+     * When <code>true</code>, even simple JOINs will run through the code path
+     * for the evaluation of complex joins.
+     * <p>
+     * Note: The complex join evaluation code is written to also allow
+     * evaluation of a simple JOIN. This makes it easier to test this code path
+     * by testing it against a single {@link PipelineJoin} and comparing with
+     * the historical behavior for cutoff evaluation of the {@link PipelineJoin}
+     * . However, that only works if you also disable the reordering of access
+     * paths in the JOIN.
+     * <p>
+     * Note: access path reordering is allowed for simple JOINS when we use
+     * {@link #runSimpleJoin(QueryEngine, SampleBase, int, PipelineJoin)}.
+     * 
+     * @see PipelineJoin.Annotations#REORDER_ACCESS_PATHS
+     * @see AST2BOpJoins
+     * @see #runSimpleJoin(QueryEngine, SampleBase, int, PipelineJoin)
+     * @see #runComplexJoin(QueryEngine, SampleBase, int, PipelineOp)
+     * 
+     *      FIXME RTO: Measure performance when using the complex join code path
+     *      as opposed to the simple join code path. If there is a performance
+     *      win for the simple join code path, then set this to false in
+     *      committed code. If not, then we might as well run everything in the
+     *      same fashion.
+     *      <p>
+     *      Note: The simple and complex cutoff join code do currently differ
+     *      somewhat in the end result that they produce. This can be observed
+     *      in BSBM Q1 on the pc100 data set and the BAR query.
+     */
+    static final boolean runAllJoinsAsComplexJoins = false; 
     
     /**
      * Inspect the remainder of the join group. If we can isolate a join graph
@@ -219,15 +278,15 @@ public class AST2BOpRTO extends AST2BOpJoins {
          * ordering of the joins generated by the static query optimizer is
          * known to be good.
          * 
-         * TODO The static optimizer could simply annotation join groups for
-         * which it recognizes that it could have a bad join plan.
+         * TODO The static optimizer could simply annotate join groups for which
+         * it recognizes that it could have a bad join plan.
          */
         final int arity = joinGroup.arity();
 
         /*
          * Create a JoinGroup just for the pieces that the RTO will handle.
          * 
-         * FIXME These joins are CLONED right now since they also exist in the
+         * TODO These joins are CLONED right now since they also exist in the
          * caller's joinGroup. Eventually, this code should be moved into an AST
          * rewrite and we can then destructively move the children from the
          * original JoinGroupNode into a JoinGraphNode that will be the AST side
@@ -265,10 +324,7 @@ public class AST2BOpRTO extends AST2BOpJoins {
                     StatementPatternNode sp = (StatementPatternNode) child;
                     final boolean optional = sp.isOptional();
                     if (onlyRequiredJoins && optional) {
-                        /*
-                         * TODO The RTO does not order optional joins yet so we
-                         * can not accept this join into the join graph.
-                         */
+                        /* Do not include the OPTTIONAL join in the join graph. */
                         break;
                     }
                     
@@ -283,50 +339,16 @@ public class AST2BOpRTO extends AST2BOpJoins {
                     if (onlySimpleJoins && !needsMaterialization.isEmpty()) {
                         /*
                          * At least one variable requires (or might require)
-                         * materialization. This is not currently handled by the RTO
-                         * so we break out of the loop.
-                         * 
-                         * TODO Handle materialization patterns within the RTO, in
-                         * which case we need to collect up the doneSet here, but
-                         * only conditionally since we might not actually execute the
-                         * RTO depending on the number of SPs that we find.
+                         * materialization.
                          */
                         break;
                     }
-                    
-    //                // Add constraints to the join for that predicate.
-    //                anns.add(new NV(JoinAnnotations.CONSTRAINTS, getJoinConstraints(
-    //                        constraints, needsMaterialization)));
-    
-    //                /*
-    //                 * Pull off annotations before we clear them from the predicate.
-    //                 */
-    //                final Scope scope = (Scope) pred.getProperty(Annotations.SCOPE);
-    //
-    //                // true iff this is a quads access path.
-    //                final boolean quads = pred.getProperty(Annotations.QUADS,
-    //                        Annotations.DEFAULT_QUADS);
-    //
-    //                // pull of the Sesame dataset before we strip the annotations.
-    //                final DatasetNode dataset = (DatasetNode) pred
-    //                        .getProperty(Annotations.DATASET);
-    
+
                     // Something the RTO can handle.
                     sp = (StatementPatternNode) sp.clone();// TODO Use destructive move.
                     rtoJoinGroup.addChild(sp); // add to group.
                     naccepted++;
                     /*
-                     * FIXME RTO: Handle Triples vs Quads, Default vs Named
-                     * Graph, and DataSet. This probably means pushing more
-                     * logic down into the RTO from AST2BOpJoins.
-                     * Path.cutoffJoin() will need to be call through to logic
-                     * on this class that does the right thing with named graph
-                     * joins, default graph joins, triples mode joins, remote AP
-                     * joins, etc. This is the same code that we call through to
-                     * when we take the selected join path from the RTO and
-                     * compile it into a query plan to fully execute the join
-                     * group.
-                     * 
                      * Note: This assigns ids to the predicates as a
                      * side-effect. Those ids are assigned by the
                      * AST2BOpContext's BOpIdFactory. You can not rely on
@@ -362,17 +384,9 @@ public class AST2BOpRTO extends AST2BOpJoins {
     
             }
 
-            if (naccepted < 3) {
+            if (naccepted < RTO_MIN_JOINS) {
 
-                /*
-                 * There are not enough joins for the RTO.
-                 * 
-                 * TODO For incremental query construction UIs, it would be
-                 * useful to run just the RTO and to run it with even a single
-                 * join. This will give us sample values as well as estimates
-                 * cardinalities. If the UI has triple patterns that do not join
-                 * (yet), then those should be grouped.
-                 */
+                // There are not enough joins for the RTO.
                 return left;
 
             }
@@ -409,11 +423,12 @@ public class AST2BOpRTO extends AST2BOpJoins {
         }
         
         /*
-         * FIXME RTO: When running the RTO as anything other than the top-level join
-         * group in the query plan and for the *FIRST* joins in the query plan,
-         * we need to flow in any solutions that are already in the pipeline
-         * (unless we are going to run the RTO "bottom up") and build a hash
-         * index. When the hash index is ready, we can execute the join group.
+         * FIXME RTO: Sub-Groups: When running the RTO as anything other than
+         * the top-level join group in the query plan and for the *FIRST* joins
+         * in the query plan, we need to flow in any solutions that are already
+         * in the pipeline (unless we are going to run the RTO "bottom up") and
+         * build a hash index. When the hash index is ready, we can execute the
+         * join group.
          */
 
         final SampleType sampleType = joinGroup.getProperty(
@@ -486,24 +501,24 @@ public class AST2BOpRTO extends AST2BOpJoins {
 
         final IConstraint[] constraints = joinGraph.getConstraints();
         
-        if (onlySimpleJoins) {
-
-            /*
-             * This is the old code. It does not handle variable materialization
-             * for filters.
-             */
-
-            // Factory avoids reuse of bopIds assigned to the predicates.
-            final BOpIdFactory idFactory = new BOpIdFactory();
-
-            return PartitionedJoinGroup.getQuery(idFactory,
-                    false/* distinct */, selected, predicates, constraints);
-
-        }
+//        if (onlySimpleJoins) {
+//
+//            /*
+//             * This is the old code. It does not handle variable materialization
+//             * for filters.
+//             */
+//
+//            // Factory avoids reuse of bopIds assigned to the predicates.
+//            final BOpIdFactory idFactory = new BOpIdFactory();
+//
+//            return PartitionedJoinGroup.getQuery(idFactory,
+//                    false/* distinct */, selected, predicates, constraints);
+//
+//        }
 
         /*
-         * TODO The RTO is ignoring the doneSet so it always runs all
-         * materialization steps even if some variable is known to be
+         * FIXME RTO: doneSet: The RTO is ignoring the doneSet so it always runs
+         * all materialization steps even if some variable is known to be
          * materialized on entry.
          */
         final Set<IVariable<?>> doneSet = joinGraph.getDoneSet();
@@ -521,10 +536,11 @@ public class AST2BOpRTO extends AST2BOpJoins {
         // Factory avoids reuse of bopIds assigned to the predicates.
         final BOpIdFactory idFactory = new BOpIdFactory();
 
-        /*
-         * Reserve ids used by the join graph or its constraints.
-         */
-        idFactory.reserveIds(predicates, constraints);
+        // Reserve ids used by the vertices of the join graph.
+        idFactory.reserveIds(predicates);
+
+        // Reserve ids used by the constraints on the join graph.
+        idFactory.reserveIds(constraints);
 
         /*
          * Figure out which constraints are attached to which predicates.
@@ -533,7 +549,7 @@ public class AST2BOpRTO extends AST2BOpJoins {
          * AST2BOpFilter? If so, then we can get rid of the
          * PartitionedJoinGroup.
          */
-        final IConstraint[][] assignedConstraints = PartitionedJoinGroup
+        final IConstraint[][] constraintAttachmentArray = PartitionedJoinGroup
                 .getJoinGraphConstraints(predicates, constraints,
                         null/* knownBound */, true/* pathIsComplete */);
 
@@ -549,7 +565,7 @@ public class AST2BOpRTO extends AST2BOpJoins {
 
             final Predicate<?> pred = (Predicate<?>) predicates[i];
 
-            final IConstraint[] attachedJoinConstraints = assignedConstraints[i];
+            final IConstraint[] attachedJoinConstraints = constraintAttachmentArray[i];
 
             final boolean optional = pred.isOptional();
 
@@ -562,6 +578,7 @@ public class AST2BOpRTO extends AST2BOpJoins {
                             : doneSet, //
                     attachedJoinConstraints == null ? null : Arrays
                             .asList(attachedJoinConstraints),//
+                    null, // cutoff join limit
                     sp.getQueryHints(),//
                     ctx);
 
@@ -675,6 +692,747 @@ public class AST2BOpRTO extends AST2BOpJoins {
         }
         // wrap to ensure immutable and thread-safe.
         return Collections.unmodifiableMap(map);
+    }
+
+    /**
+     * Cutoff join of the last vertex in the join path.
+     * <p>
+     * <strong>The caller is responsible for protecting against needless
+     * re-sampling.</strong> This includes cases where a sample already exists
+     * at the desired sample limit and cases where the sample is already exact.
+     * 
+     * @param queryEngine
+     *            The query engine.
+     * @param joinGraph
+     *            The pipeline operator that is executing the RTO. This defines
+     *            the join graph (vertices, edges, and constraints) and also
+     *            provides access to the AST and related metadata required to
+     *            execute the join graph.
+     * @param limit
+     *            The limit for the cutoff join.
+     * @param predicates
+     *            The path segment, which must include the target vertex as the
+     *            last component of the path segment.
+     * @param constraints
+     *            The constraints declared for the join graph (if any). The
+     *            appropriate constraints will be applied based on the variables
+     *            which are known to be bound as of the cutoff join for the last
+     *            vertex in the path segment.
+     * @param pathIsComplete
+     *            <code>true</code> iff all vertices in the join graph are
+     *            incorporated into this path.
+     * @param sourceSample
+     *            The input sample for the cutoff join. When this is a one-step
+     *            estimation of the cardinality of the edge, then this sample is
+     *            taken from the {@link VertexSample}. When the edge (vSource,
+     *            vTarget) extends some {@link Path}, then this is taken from
+     *            the {@link EdgeSample} for that {@link Path}.
+     * 
+     * @return The result of sampling that edge.
+     * 
+     *         TODO TESTS: Provide test coverage for running queries with
+     *         complex FILTERs (triples mode is Ok).
+     * 
+     *         TODO TESTS: Test with FILTERs that can not run until after all
+     *         joins. Such filters are only attached when the [pathIsComplete]
+     *         flag is set. This might only occur when we have FILTERs that
+     *         depend on variables that are only "maybe" bound by an OPTIONAL
+     *         join.
+     * 
+     *         TODO TESTS: Quads mode tests. We need to look in depth at how the
+     *         quads mode access paths are evaluated. There are several
+     *         different conditions. We need to look at each condition and at
+     *         whether and how it can be made compatible with cutoff evaluation.
+     *         (This is somewhat similar to the old scan+filter versus nested
+     *         query debate on quads mode joins.)
+     * 
+     *         TODO TESTS: Scale-out tests. For scale-out, we need to either
+     *         mark the join's evaluation context based on whether or not the
+     *         access path is local or remote (and whether the index is
+     *         key-range distributed or hash partitioned).
+     */
+    static public EdgeSample cutoffJoin(//
+            final QueryEngine queryEngine,//
+            final JoinGraph joinGraph,//
+            final int limit,//
+            final IPredicate<?>[] predicates,//
+            final IConstraint[] constraints,//
+            final boolean pathIsComplete,//
+            final SampleBase sourceSample//
+    ) throws Exception {
+
+        if (predicates == null)
+            throw new IllegalArgumentException();
+
+        if (limit <= 0)
+            throw new IllegalArgumentException();
+
+        // The access path on which the cutoff join will read.
+        final IPredicate<?> pred = predicates[predicates.length - 1];
+
+        if (pred == null)
+            throw new IllegalArgumentException();
+
+        if (sourceSample == null)
+            throw new IllegalArgumentException();
+
+        if (sourceSample.getSample() == null)
+            throw new IllegalArgumentException();
+
+        /*
+         * Generate the query plan for cutoff evaluation of that JOIN. The
+         * complexity of the query plan depends on whether or not there are
+         * FILTERs "attached" to the join that have variable materialization
+         * requirements.
+         */
+        final PipelineOp query = getCutoffJoinQuery(queryEngine, joinGraph,
+                limit, predicates, constraints, pathIsComplete, sourceSample);
+
+        if (!runAllJoinsAsComplexJoins && (query instanceof PipelineJoin)
+                && query.arity() == 0) {
+            
+            /*
+             * Simple JOIN.
+             * 
+             * Old logic for query plan generation. This is deprecated and will
+             * disappear soon. We will still generate simple query plans and
+             * execute them in the simple manner, but all of the code will go
+             * through AST2BOPJoins#join().
+             */
+            return runSimpleJoin(queryEngine, sourceSample, limit,
+                    (PipelineJoin<?>) query);
+
+        } else {
+
+            /*
+             * Complex JOIN involving variable materialization, conditional
+             * routing operators, filters, and a SLICE to limit the output.
+             */
+            
+            return runComplexJoin(queryEngine, sourceSample, limit, query);
+
+        }
+
+    }
+
+    /**
+     * Implementation handles the general case. The general case can result in a
+     * physical query plan consisting of multiple operators, including variable
+     * materialization requirements, JOINs with remote access paths, etc. The
+     * logic for complex joins is handled by {@link AST2BOpJoins} and
+     * {@link AST2BOpFilters}s.
+     * <p>
+     * In the general case, the generated physical query plan has multiple
+     * operators and needs to be submitted to the {@link QueryEngine} for
+     * evaluation. In order to respect the semantics of cutoff evaluation, the
+     * first operator must use an index, e.g., a {@link PipelineJoin}. The
+     * remaining operators should not increase the cardinality, e.g., a FILTER
+     * never increases the cardinality of the JOIN to which it is attached, but
+     * there can be hidden JOINs, notably the {@link ChunkedMaterializationOp}
+     * which is basically a JOIN against the dictionary indices.
+     * 
+     * @see AST2BOpJoins#join(PipelineOp, Predicate, Set, Collection,
+     *      Properties, AST2BOpContext)
+     */
+    private static PipelineOp getCutoffJoinQuery(//
+            final QueryEngine queryEngine,//
+            final JoinGraph joinGraph,//
+            final int limit,//
+            final IPredicate<?>[] predicates,//
+            final IConstraint[] constraints,//
+            final boolean pathIsComplete,//
+            final SampleBase sourceSample//
+    ) throws Exception {
+
+        // Note: Arguments are checked by caller : cutoffJoin().
+        
+        /*
+         * Create an execution context for the query.
+         */
+        final AST2BOpContext ctx = getExecutionContext(queryEngine,
+                // Identifies the KB instance (namespace and timestamp).
+                (NT) joinGraph.getRequiredProperty(JoinGraph.Annotations.NT));
+
+        // Figure out which constraints attach to each predicate.
+        // TODO RTO: Replace with StaticAnalysis.
+        final IConstraint[][] constraintAttachmentArray = PartitionedJoinGroup
+                .getJoinGraphConstraints(predicates, constraints,
+                        null/* knownBound */, pathIsComplete);
+
+        // The constraint(s) (if any) for this join.
+        final IConstraint[] c = constraintAttachmentArray[predicates.length - 1];
+
+        // The access path on which the cutoff join will read.
+        @SuppressWarnings("rawtypes")
+        final Predicate pred = (Predicate) predicates[predicates.length - 1];
+
+        // The constraints attached to that join.
+        final IConstraint[] attachedJoinConstraints = constraintAttachmentArray[predicates.length - 1];
+
+        /*
+         * The AST JoinGroupNode for the joins and filters that we are running
+         * through the RTO.
+         */
+        final JoinGroupNode rtoJoinGroup = (JoinGroupNode) joinGraph
+                .getRequiredProperty(JoinGraph.Annotations.JOIN_GROUP);
+
+        // Build an index over the bopIds in that JoinGroupNode.
+        final Map<Integer, StatementPatternNode> index = getIndex(rtoJoinGroup);
+        
+        // Lookup the AST node for that predicate.
+        final StatementPatternNode sp = index.get(pred.getId());
+
+        /*
+         * Setup factory for bopIds with reservations for ones already in use.
+         */
+        final BOpIdFactory idFactory = new BOpIdFactory();
+
+        // Reservation for the bopId used by the predicate.
+        idFactory.reserve(pred.getId());
+
+        // Reservations for the bopIds used by the constraints.
+        idFactory.reserveIds(c);
+
+        final boolean optional = pred.isOptional();
+
+        /*
+         * FIXME RTO: doneSet: We should also include in the doneSet anything
+         * that is known to have been materialized based on an analysis of the
+         * join path (as executed) up to this point in the path. This will let
+         * us potentially do less work. This will require tracking the doneSet
+         * in the Path and passing the Path into cutoffJoin().
+         */
+        final Set<IVariable<?>> doneSet = new LinkedHashSet<IVariable<?>>(
+                joinGraph.getDoneSet());
+
+        // Start with an empty plan.
+        PipelineOp left = null;
+
+        /*
+         * Add the JOIN to the query plan.
+         * 
+         * Note: The generated query plan will potentially include variable
+         * materialization to support constraints that can not be evaluated
+         * directly by the JOIN (because they depend on variable bindings that
+         * are not known to be materialized.)
+         */
+        left = join(left, //
+                pred, //
+                optional ? new LinkedHashSet<IVariable<?>>(doneSet)
+                        : doneSet, //
+                attachedJoinConstraints == null ? null : Arrays
+                        .asList(attachedJoinConstraints),//
+                Long.valueOf(limit),// cutoff join limit.
+                sp.getQueryHints(),//
+                ctx);
+
+        /*
+         * [left] is now the last operator in the query plan.
+         */
+
+        if (!(left instanceof PipelineJoin) && left.arity() == 0) {
+
+            /*
+             * The query plan contains multiple operators.
+             */
+
+            /*
+             * Add a SLICE to terminate the query when we have [limit] solution
+             * out.
+             */
+            left = applyQueryHints(new SliceOp(leftOrEmpty(left),//
+                    new NV(SliceOp.Annotations.BOP_ID, ctx.nextId()),//
+                    new NV(SliceOp.Annotations.OFFSET, "0"),//
+                    new NV(SliceOp.Annotations.LIMIT, Integer.toString(limit)),//
+                    new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
+                            BOpEvaluationContext.CONTROLLER),//
+                    new NV(SliceOp.Annotations.PIPELINED, true),//
+                    new NV(SliceOp.Annotations.MAX_PARALLEL, 1),//
+                    new NV(MemorySortOp.Annotations.SHARED_STATE, true)//
+                    ), rtoJoinGroup, ctx);
+
+        }
+
+        if (log.isDebugEnabled())
+            log.debug("RTO cutoff join query::\n" + BOpUtility.toString(left)
+                    + "\npred::" + pred);
+
+        return left;
+        
+    }
+
+    /**
+     * Run a simple cutoff join on the {@link QueryEngine}.
+     * 
+     * @param queryEngine
+     *            The {@link QueryEngine}.
+     * @param sourceSample
+     *            The source sample (from the upstream vertex).
+     * @param limit
+     *            The cuttoff join limit.
+     * @param joinOp
+     *            A query plan consisting of exactly one join. The join must
+     *            support cutoff evaluation, e.g., a {@link PipelineJoin}. The
+     *            join MUST be marked with the {@link JoinAnnotations#LIMIT}.
+     * 
+     * @return The sample from the cutoff join of that edge.
+     */
+    private static EdgeSample runSimpleJoin(//
+            final QueryEngine queryEngine,//
+            final SampleBase sourceSample,//
+            final int limit,//
+            final PipelineJoin<?> joinOp) throws Exception {
+
+        if (log.isInfoEnabled())
+            log.info("limit=" + limit + ", sourceSample=" + sourceSample
+                    + ", query=" + joinOp.toShortString());
+        
+        // The cutoff limit. This annotation MUST exist on the JOIN.
+        if (limit != ((Long) joinOp.getRequiredProperty(JoinAnnotations.LIMIT))
+                .intValue())
+            throw new AssertionFailedError();
+        
+        final int joinId = joinOp.getId();
+                
+        final PipelineOp queryOp = joinOp;
+        
+        // run the cutoff sampling of the edge.
+        final UUID queryId = UUID.randomUUID();
+        final IRunningQuery runningQuery = queryEngine.eval(//
+                queryId,//
+                queryOp,//
+                null,// attributes
+//                new LocalChunkMessage(queryEngine, queryId,
+//                        joinOp.getId()/* startId */, -1 /* partitionId */,
+//                        sourceSample.getSample())
+                sourceSample.getSample()
+                );
+
+        final List<IBindingSet> result = new LinkedList<IBindingSet>();
+        try {
+            int nresults = 0;
+            try {
+                IBindingSet bset = null;
+                // Figure out the #of source samples consumed.
+                final Iterator<IBindingSet> itr = new Dechunkerator<IBindingSet>(
+                        runningQuery.iterator());
+                while (itr.hasNext()) {
+                    bset = itr.next();
+                    result.add(bset);
+                    if (nresults++ >= limit) {
+                        // Break out if cutoff join over produces!
+                        break;
+                    }
+                }
+            } finally {
+                // ensure terminated regardless.
+                runningQuery.cancel(true/* mayInterruptIfRunning */);
+            }
+        } finally {
+            // verify no problems.
+            if (runningQuery.getCause() != null) {
+                // wrap throwable from abnormal termination.
+                throw new RuntimeException(runningQuery.getCause());
+            }
+        }
+
+        // The join hit ratio can be computed directly from these stats.
+        final PipelineJoinStats joinStats = (PipelineJoinStats) runningQuery
+                .getStats().get(joinId);
+
+        if (log.isTraceEnabled())
+            log.trace(//Arrays.toString(BOpUtility.getPredIds(predicates)) + ": "+
+                     joinStats.toString());
+
+        // #of solutions in.
+        final int inputCount = (int) joinStats.inputSolutions.get();
+
+        // #of solutions out.
+        final long outputCount = joinStats.outputSolutions.get();
+
+        // cumulative range count of the sampled access paths.
+        final long sumRangeCount = joinStats.accessPathRangeCount.get();
+
+        /*
+         * The #of tuples read from the sampled access paths. This is part of
+         * the cost of the join path, even though it is not part of the expected
+         * cardinality of the cutoff join.
+         * 
+         * Note: While IOs is a better predictor of latency, it is possible to
+         * choose a pipelined join versus a hash join once the query plan has
+         * been decided. Their IO profiles are both correlated to the #of tuples
+         * read.
+         */
+        final long tuplesRead = joinStats.accessPathUnitsIn.get();
+
+        return newEdgeSample(limit, inputCount, outputCount, sumRangeCount,
+                tuplesRead, sourceSample, result);
+
+    }
+
+    /**
+     * Run a complex cutoff join on the {@link QueryEngine}. This approach is
+     * suitable for complex query plans. It tracks each solution in by assigning
+     * a row identifier to the source solutions. It then observes the solutions
+     * out and figures out how many source solutions were required in order to
+     * produce the solutions out.
+     * <p>
+     * Note: This approach relies on the query plan NOT reordering the source
+     * solutions.
+     * 
+     * @param queryEngine
+     *            The {@link QueryEngine}.
+     * @param sourceSample
+     *            The source sample (from the upstream vertex).
+     * @param limit
+     *            The cuttoff join limit.
+     * @param query
+     *            The query plan for cutoff evaluation of a JOIN with optional
+     *            variable materialization requirements and FILTERs.
+     * 
+     * @return The sample from the cutoff join of that edge.
+     * 
+     * @throws OutOfOrderEvaluationException
+     *             This exception is thrown if reordering of the source
+     *             solutions can be observed. This is detected if we observe a
+     *             row identifier in the output solutions that is LT a
+     *             previously observed row identifier in the output solutions.
+     *             If this problem is observed, then you must carefully review
+     *             the manner in which the query plan is constructed and the
+     *             parallelism in the query plan. Any parallelism or reordering
+     *             will trip this error.
+     */
+    private static EdgeSample runComplexJoin(//
+            final QueryEngine queryEngine,//
+            final SampleBase sourceSample,//
+            final int limit,//
+            final PipelineOp query) throws Exception {
+        
+        if (log.isInfoEnabled())
+            log.info("limit=" + limit + ", sourceSample=" + sourceSample
+                    + ", query=" + query.toShortString());
+
+        // Anonymous variable used for the injected column.
+        final IVariable<?> rtoVar = Var.var();
+        
+        // Inject column of values [1:NSAMPLES].
+        final IBindingSet[] in = injectRowIdColumn(rtoVar, 1/* start */,
+                sourceSample.getSample());
+        
+        // run the cutoff sampling of the edge.
+        final UUID queryId = UUID.randomUUID();
+        final IRunningQuery runningQuery = queryEngine.eval(//
+                queryId,//
+                query,//
+                null,// attributes
+                in// bindingSet[]
+//                new LocalChunkMessage(queryEngine, queryId,
+//                        joinOp.getId()/* startId */, -1 /* partitionId */,
+//                        sourceSample.getSample())
+                );
+
+        /*
+         * The assumption is that solutions in are converted into solutions out
+         * in an ordered preserving manner. This requires that there is no
+         * reordering of the solutions in. If this assumption holds, then we can
+         * scan the solutions *out*, counting the #of solutions produced until
+         * we reach the limit and tracking the number of solutions *in* required
+         * to achieve the limit. The SLICE will cutoff the query once the limit
+         * is reached.
+         * 
+         * Note: we check for both overproduction and out of order evaluation
+         * for sanity. If either of those assumptions is violated, then that
+         * breaks the foundations on which we are attempting to perform the
+         * cutoff evaluation of the JOIN.
+         */
+        final List<IBindingSet> result = new LinkedList<IBindingSet>();
+        final int inputCount; // #of solutions in.
+        final long outputCount; // #of solutions out.
+        try {
+            long nout = 0; // #of solutions out.
+            try {
+                IBindingSet bset = null;
+                // Figure out the #of source samples consumed.
+                final Iterator<IBindingSet> itr = new Dechunkerator<IBindingSet>(
+                        runningQuery.iterator());
+                /*
+                 * Injected row id variable.
+                 * 
+                 * Note: Starts at ZERO in case NO solutions out.
+                 */
+                int lastRowId = 0; 
+                while (itr.hasNext()) {
+                    bset = itr.next();
+//System.err.println(bset.toString());
+                    final int rowid = ((Integer) bset.get(rtoVar).get())
+                            .intValue();
+                    if (rowid < lastRowId) {
+                        /*
+                         * Out of order evaluation makes it impossible to
+                         * determine the estimated cardinality of the join since
+                         * we can not compute the join hit ratio without knowing
+                         * the #of solutions in required to produce a given #of
+                         * solutions out.
+                         */
+                        throw new OutOfOrderEvaluationException(
+                                BOpUtility.toString(query));
+                    }
+                    lastRowId = rowid;
+                    bset.clear(rtoVar); // drop injected variable.
+                    result.add(bset); // accumulate results.
+                    if (nout++ >= limit) {
+                        // limit is satisfied.
+                        break;
+                    }
+                }
+                inputCount = lastRowId;
+                outputCount = nout;
+            } finally {
+                // ensure terminated regardless.
+                runningQuery.cancel(true/* mayInterruptIfRunning */);
+            }
+        } finally {
+            // verify no problems.
+            if (runningQuery.getCause() != null) {
+                // wrap throwable from abnormal termination.
+                throw new RuntimeException(runningQuery.getCause());
+            }
+        }
+
+        // There should be a single JOIN.
+        final PipelineJoin<?> joinOp = BOpUtility.getOnly(query,
+                PipelineJoin.class);
+
+        /*
+         * We need to work with the correlation between the input solutions and
+         * the output solutions that flow through the query.
+         */
+
+        // Stats for the JOIN.
+        final PipelineJoinStats joinStats = (PipelineJoinStats) runningQuery
+                .getStats().get(joinOp.getId());
+
+        /*
+         * TODO It would be interesting to see the stats on each operator in the
+         * plan for each join sampled. We would be able to observe that in the
+         * EXPLAIN view if we attached the IRunningQuery for the cutoff
+         * evaluation to the parent query. However, this should only be enabled
+         * in a mode for gruesome detail since we evaluate a LOT of cutoff joins
+         * when running the RTO on a single join graph.
+         */
+        if (log.isTraceEnabled())
+            log.trace(//Arrays.toString(BOpUtility.getPredIds(predicates)) + ": "+
+            "join::" + joinStats);
+
+        // cumulative range count of the sampled access paths.
+        final long sumRangeCount = joinStats.accessPathRangeCount.get();
+
+        /*
+         * The #of tuples read from the sampled access paths. This is part of
+         * the cost of the join path, even though it is not part of the expected
+         * cardinality of the cutoff join.
+         * 
+         * Note: While IOs is a better predictor of latency, it is possible to
+         * choose a pipelined join versus a hash join once the query plan has
+         * been decided. Their IO profiles are both correlated to the #of tuples
+         * read.
+         * 
+         * TODO Include tuples read for ChunkedMaterializationOp? This does not
+         * currently override the newStats() nor track the tuples read. It will
+         * need to be modified to do that. This gives us a better measure of the
+         * IO cost associated with a JOIN requiring materialization of variable
+         * bindings. However, it is only important to make this visible if it is
+         * a factor in the relative cost of two path segments or deciding
+         * between an index nested joina and a hash join against an access path.
+         */
+        final long tuplesRead = joinStats.accessPathUnitsIn.get();
+
+        return newEdgeSample(limit, inputCount, outputCount, sumRangeCount,
+                tuplesRead, sourceSample, result);
+
+    }
+
+    /**
+     * Create a new {@link EdgeSample} from the cutoff evaluation of some join.
+     * 
+     * @param limit
+     *            The cutoff evaluation limit.
+     * @param inputCount
+     *            The number of input solutions consumed to produce the observed
+     *            number of solutions out.
+     * @param outputCount
+     *            The observed number of solutions out.
+     * @param sumRangeCount
+     *            The sum of the fast range counts for the as-bound invocations
+     *            of the JOIN.
+     * @param tuplesRead
+     *            The #of tuples read from the indices for the JOIN and for any
+     *            variable materialization operator(s).
+     * @param sourceSample
+     *            The input sample to the cutoff join.
+     * @param result
+     *            The solutions produced by cutoff evaluation of that join.
+     *            
+     * @return The new {@link EdgeSample}.
+     */
+    private static EdgeSample newEdgeSample(final int limit,
+            final int inputCount, final long outputCount,
+            final long sumRangeCount, final long tuplesRead,
+            final SampleBase sourceSample,
+            final List<IBindingSet> result) {
+
+        if (log.isInfoEnabled())
+            log.info("inputCount=" + inputCount + ", outputCount="
+                    + outputCount + ", sumRangeCount=" + sumRangeCount
+                    + ", tuplesRead=" + tuplesRead + ", sourceSample="
+                    + sourceSample);
+
+        // #of solutions out as adjusted for various edge conditions.
+        final long adjustedCard;
+        
+        final EstimateEnum estimateEnum;
+        if (sourceSample.estimateEnum == EstimateEnum.Exact
+                && outputCount < limit) {
+            /*
+             * Note: If the entire source vertex is being fed into the cutoff
+             * join and the cutoff join outputCount is LT the limit, then the
+             * sample is the actual result of the join. That is, feeding all
+             * source solutions into the join gives fewer than the desired
+             * number of output solutions.
+             */
+            estimateEnum = EstimateEnum.Exact;
+            adjustedCard = outputCount;
+        } else if (inputCount == 1 && outputCount == limit) {
+            /*
+             * If the inputCount is ONE (1) and the outputCount is the limit,
+             * then the estimated cardinality is a lower bound as more than
+             * outputCount solutions might be produced by the join when
+             * presented with a single input solution.
+             * 
+             * However, this condition suggests that the sum of the sampled
+             * range counts is a much better estimate of the cardinality of this
+             * join.
+             * 
+             * For example, consider a join feeding a rangeCount of 16 into a
+             * rangeCount of 175000. With a limit of 100, we estimated the
+             * cardinality at 1600L (lower bound). In fact, the cardinality is
+             * 16*175000. This falsely low estimate can cause solutions which
+             * are really better to be dropped.
+             */
+            // replace outputCount with the sum of the sampled range counts.
+            adjustedCard = sumRangeCount;
+            estimateEnum = EstimateEnum.LowerBound;
+        } else if ((sourceSample.estimateEnum != EstimateEnum.Exact)
+        /*
+         * && inputCount == Math.min(sourceSample.limit,
+         * sourceSample.estimatedCardinality)
+         */&& outputCount == 0) {
+            /*
+             * When the source sample was not exact, the inputCount is EQ to the
+             * lesser of the source range count and the source sample limit, and
+             * the outputCount is ZERO (0), then feeding in all source solutions
+             * is not sufficient to generate any output solutions. In this case,
+             * the estimated join hit ratio appears to be zero. However, the
+             * estimation of the join hit ratio actually underflowed and the
+             * real join hit ratio might be a small non-negative value. A real
+             * zero can only be identified by executing the full join.
+             * 
+             * Note: An apparent join hit ratio of zero does NOT imply that the
+             * join will be empty (unless the source vertex sample is actually
+             * the fully materialized access path - this case is covered above).
+             * 
+             * path sourceCard * f ( in read out limit adjCard) = estCard :
+             * sumEstCard joinPath 15 4800L * 0.00 ( 200 200 0 300 0) = 0 : 3633
+             * [ 3 1 6 5 ]
+             */
+            estimateEnum = EstimateEnum.Underflow;
+            adjustedCard = outputCount;
+        } else {
+            estimateEnum = EstimateEnum.Normal;
+            adjustedCard = outputCount;
+        }
+
+        /*
+         * Compute the hit-join ratio based on the adjusted cardinality
+         * estimate.
+         */
+        final double f = adjustedCard == 0 ? 0
+                : (adjustedCard / (double) inputCount);
+        // final double f = outputCount == 0 ? 0
+        // : (outputCount / (double) inputCount);
+
+        // estimated output cardinality of fully executed operator.
+        final long estCard = (long) (sourceSample.estCard * f);
+
+        /*
+         * estimated tuples read for fully executed operator
+         * 
+         * TODO RTO: estRead: The actual IOs depend on the join type (hash join
+         * versus pipeline join) and whether or not the file has index order
+         * (segment versus journal). A hash join will read once on the AP. A
+         * pipeline join will read once per input solution. A key-range read on
+         * a segment uses multi-block IO while a key-range read on a journal
+         * uses random IO. Also, remote access path reads are more expensive
+         * than sharded or hash partitioned access path reads in scale-out.
+         */
+        final long estRead = (long) (sumRangeCount * f);
+
+        final EdgeSample edgeSample = new EdgeSample(//
+                sourceSample,//
+                inputCount,//
+                tuplesRead,//
+                sumRangeCount,//
+                outputCount, //
+                adjustedCard,//
+                f, //
+                // args to SampleBase
+                estCard, // estimated output cardinality if fully executed.
+                estRead, // estimated tuples read if fully executed.
+                limit, //
+                estimateEnum,//
+                result.toArray(new IBindingSet[result.size()]));
+
+        if (log.isDebugEnabled())
+            log.debug(//Arrays.toString(BOpUtility.getPredIds(predicates))
+                    "newSample=" + edgeSample);
+
+        return edgeSample;
+    
+    }
+    
+    /**
+     * Inject (or replace) an {@link Integer} "rowId" column. This does not have
+     * a side-effect on the source {@link IBindingSet}s.
+     * 
+     * @param var
+     *            The name of the column.
+     * @param start
+     *            The starting value for the identifier.
+     * @param in
+     *            The source {@link IBindingSet}s.
+     * 
+     * @return The modified {@link IBindingSet}s.
+     */
+    private static IBindingSet[] injectRowIdColumn(final IVariable<?> var,
+            final int start, final IBindingSet[] in) {
+
+        if (in == null)
+            throw new IllegalArgumentException();
+
+        final IBindingSet[] out = new IBindingSet[in.length];
+
+        for (int i = 0; i < out.length; i++) {
+
+            final IBindingSet bset = in[i].clone();
+
+            bset.set(var, new Constant<Integer>(Integer.valueOf(start + i)));
+
+            out[i] = bset;
+
+        }
+
+        return out;
+
     }
 
 }
