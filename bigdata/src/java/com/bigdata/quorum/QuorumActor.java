@@ -219,6 +219,9 @@ public interface QuorumActor<S extends Remote, C extends QuorumClient<S>> {
      * 
      * @param serviceId
      *            The UUID of the service to be removed.
+     *            
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/724" > HA
+     *      wire pulling and sure kill testing </a>
      */
     public void forceRemoveService(UUID serviceId);
 

@@ -21,45 +21,34 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
-/*
- * Created on Jun 7, 2013.
- */
 package com.bigdata.ha.pipeline;
 
-import java.util.concurrent.CancellationException;
-
-import com.bigdata.ha.QuorumPipelineImpl;
+import com.bigdata.quorum.QuorumException;
 
 /**
- * Exception thrown when the upstream service is changed by a pipeline
- * reconfiguration. This exception was introduced so retrySend() in
- * {@link QuorumPipelineImpl} could differentiate between normal termination of
- * a service (which will interrupt the {@link HAReceiveService} and thus
- * propagate a {@link CancellationException} to the upstream service) and a
- * pipeline change which requires retrySend() to retransmit the message and
- * payload from the leader along the reconfigured write pipeline.
+ * A quorum related exception dealing with the write replication pipeline.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
-public class PipelineUpstreamChange extends AbstractPipelineChangeException {
+abstract public class AbstractPipelineException extends QuorumException {
 
     /**
      * 
      */
     private static final long serialVersionUID = 1L;
 
-    public PipelineUpstreamChange() {
+    public AbstractPipelineException() {
     }
 
-    public PipelineUpstreamChange(String message) {
+    public AbstractPipelineException(String message) {
         super(message);
     }
 
-    public PipelineUpstreamChange(Throwable cause) {
+    public AbstractPipelineException(Throwable cause) {
         super(cause);
     }
 
-    public PipelineUpstreamChange(String message, Throwable cause) {
+    public AbstractPipelineException(String message, Throwable cause) {
         super(message, cause);
     }
 

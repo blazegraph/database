@@ -49,12 +49,15 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.ha.HAGlueBase;
 import com.bigdata.ha.HAPipelineGlue;
+import com.bigdata.ha.IHAPipelineResetRequest;
+import com.bigdata.ha.IHAPipelineResetResponse;
 import com.bigdata.ha.QuorumPipeline;
 import com.bigdata.ha.QuorumPipelineImpl;
 import com.bigdata.ha.msg.IHALogRequest;
 import com.bigdata.ha.msg.IHALogRootBlocksRequest;
 import com.bigdata.ha.msg.IHALogRootBlocksResponse;
 import com.bigdata.ha.msg.IHARebuildRequest;
+import com.bigdata.ha.msg.IHASendState;
 import com.bigdata.ha.msg.IHASendStoreResponse;
 import com.bigdata.ha.msg.IHASyncRequest;
 import com.bigdata.ha.msg.IHAWriteMessage;
@@ -189,11 +192,12 @@ public class TestWORMWriteCacheService extends TestCase3 {
 
         @Override
         public Future<Void> receiveAndReplicate(final IHASyncRequest req,
-                final IHAWriteMessage msg) throws IOException {
+                final IHASendState snd, final IHAWriteMessage msg)
+                throws IOException {
 
             return ((QuorumPipeline<HAPipelineGlue>) member)
-                    .receiveAndReplicate(req, msg);
-            
+                    .receiveAndReplicate(req, snd, msg);
+
         }
 
         /**
@@ -269,6 +273,12 @@ public class TestWORMWriteCacheService extends TestCase3 {
             throw new UnsupportedOperationException();
         }
 
+        @Override
+        public Future<IHAPipelineResetResponse> resetPipeline(
+                final IHAPipelineResetRequest req) throws IOException {
+            throw new UnsupportedOperationException();
+        }
+
     } // class MockHAPipelineGlue
 
     /**
@@ -303,6 +313,7 @@ public class TestWORMWriteCacheService extends TestCase3 {
 
             addListener(this.pipelineImpl = new QuorumPipelineImpl<S>(this){
 
+                @Override
                 protected void handleReplicatedWrite(final IHASyncRequest req,
                         final IHAWriteMessage msg, final ByteBuffer data)
                         throws Exception {
@@ -338,6 +349,13 @@ public class TestWORMWriteCacheService extends TestCase3 {
 
                 }
 
+                @Override
+                protected void incReceive(final IHASyncRequest req,
+                        final IHAWriteMessage msg, final int nreads,
+                        final int rdlen, final int rem) throws Exception {
+                    // NOP
+                }
+                
                 @Override
                 public UUID getStoreUUID() {
                     return MyMockQuorumMember.this.getStoreUUID();
@@ -380,7 +398,7 @@ public class TestWORMWriteCacheService extends TestCase3 {
                     MyMockQuorumMember.this.purgeHALogs(token);
                     
                 }
-                
+
             });
 
         }
@@ -422,9 +440,10 @@ public class TestWORMWriteCacheService extends TestCase3 {
 
         @Override
         public Future<Void> receiveAndReplicate(final IHASyncRequest req,
-                final IHAWriteMessage msg) throws IOException {
+                final IHASendState snd, final IHAWriteMessage msg)
+                throws IOException {
 
-            return pipelineImpl.receiveAndReplicate(req, msg);
+            return pipelineImpl.receiveAndReplicate(req, snd, msg);
 
         }
 
@@ -481,6 +500,12 @@ public class TestWORMWriteCacheService extends TestCase3 {
             
             // NOP
             
+        }
+
+        @Override
+        public Future<IHAPipelineResetResponse> resetPipeline(
+                IHAPipelineResetRequest req) throws IOException {
+            throw new UnsupportedOperationException();
         }
         
     } // MockQuorumMemberImpl

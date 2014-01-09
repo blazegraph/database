@@ -33,14 +33,11 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
-import com.bigdata.ha.msg.HAWriteMessageBase;
-import com.bigdata.ha.msg.IHAWriteMessageBase;
+import com.bigdata.ha.msg.HAMessageWrapper;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.IBufferAccess;
-import com.bigdata.io.TestCase3;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.util.ChecksumError;
-import com.bigdata.util.ChecksumUtility;
 import com.bigdata.util.InnerCause;
 
 /**
@@ -49,9 +46,8 @@ import com.bigdata.util.InnerCause;
  * 
  * @author martyn Cutcher
  */
-public class TestHASendAndReceive3Nodes extends TestCase3 {
-
-	private ChecksumUtility chk;
+public class TestHASendAndReceive3Nodes extends
+        AbstractHASendAndReceiveTestCase {
 
 	public TestHASendAndReceive3Nodes() {
 
@@ -67,10 +63,10 @@ public class TestHASendAndReceive3Nodes extends TestCase3 {
 	private HASendService sendServiceA;
 	
 	/** The first follower. */
-	private HAReceiveService<IHAWriteMessageBase> receiveServiceB;
+	private HAReceiveService<HAMessageWrapper> receiveServiceB;
 
 	/** The second follower (and the end of the pipeline). */
-	private HAReceiveService<IHAWriteMessageBase> receiveServiceC;
+	private HAReceiveService<HAMessageWrapper> receiveServiceC;
 
     /**
      * {@inheritDoc}
@@ -81,8 +77,6 @@ public class TestHASendAndReceive3Nodes extends TestCase3 {
 	protected void setUp() throws Exception {
 
         super.setUp();
-        
-        chk = new ChecksumUtility();
 
         /*
          * Setup C at the end of the pipeline.
@@ -92,7 +86,7 @@ public class TestHASendAndReceive3Nodes extends TestCase3 {
             final InetSocketAddress receiveAddrC = new InetSocketAddress(
                     getPort(0));
 
-            receiveServiceC = new HAReceiveService<IHAWriteMessageBase>(
+            receiveServiceC = new HAReceiveService<HAMessageWrapper>(
                     receiveAddrC, null/* downstream */);
             
             receiveServiceC.start();
@@ -107,7 +101,7 @@ public class TestHASendAndReceive3Nodes extends TestCase3 {
 		    
 		    final InetSocketAddress receiveAddrB = new InetSocketAddress(getPort(0));
             
-		    receiveServiceB = new HAReceiveService<IHAWriteMessageBase>(
+		    receiveServiceB = new HAReceiveService<HAMessageWrapper>(
                     receiveAddrB, receiveServiceC.getAddrSelf());
             
 		    receiveServiceB.start();
@@ -162,22 +156,20 @@ public class TestHASendAndReceive3Nodes extends TestCase3 {
             sendServiceA = null;
 		}
 		
-		chk = null;
-		
 	}
 
     public void testSimpleExchange() throws InterruptedException,
-            ExecutionException, TimeoutException {
+            ExecutionException, TimeoutException, ImmediateDownstreamReplicationException {
 
         final long timeout = 5000; // ms
 		final ByteBuffer tst1 = getRandomData(50);
-		final IHAWriteMessageBase msg1 = new HAWriteMessageBase(50, chk.checksum(tst1));
+		final HAMessageWrapper msg1 = newHAWriteMessage(50, tst1);
 		final ByteBuffer rcv1 = ByteBuffer.allocate(2000);
 		final ByteBuffer rcv2 = ByteBuffer.allocate(2000);
 		// rcv.limit(50);
 		final Future<Void> futRec1 = receiveServiceB.receiveData(msg1, rcv1);
 		final Future<Void> futRec2 = receiveServiceC.receiveData(msg1, rcv2);
-		final Future<Void> futSnd = sendServiceA.send(tst1);
+		final Future<Void> futSnd = sendServiceA.send(tst1, msg1.getMarker());
 		futSnd.get(timeout,TimeUnit.MILLISECONDS);
 		futRec1.get(timeout,TimeUnit.MILLISECONDS);
 		futRec2.get(timeout,TimeUnit.MILLISECONDS);
@@ -185,17 +177,17 @@ public class TestHASendAndReceive3Nodes extends TestCase3 {
 		assertEquals(rcv1, rcv2);
 	}
 
-	public void testChecksumError() throws InterruptedException, ExecutionException
+	public void testChecksumError() throws InterruptedException, ExecutionException, ImmediateDownstreamReplicationException
 
 	{
 		final ByteBuffer tst1 = getRandomData(50);
-		final IHAWriteMessageBase msg1 = new HAWriteMessageBase(50, chk.checksum(tst1) + 1);
+		final HAMessageWrapper msg1 = newHAWriteMessage(50, chk.checksum(tst1) + 1);
 		final ByteBuffer rcv1 = ByteBuffer.allocate(2000);
 		final ByteBuffer rcv2 = ByteBuffer.allocate(2000);
 		// rcv.limit(50);
 		final Future<Void> futRec1 = receiveServiceB.receiveData(msg1, rcv1);
 		final Future<Void> futRec2 = receiveServiceC.receiveData(msg1, rcv2);
-		final Future<Void> futSnd = sendServiceA.send(tst1);
+		final Future<Void> futSnd = sendServiceA.send(tst1, msg1.getMarker());
 		while (!futSnd.isDone() && !futRec2.isDone()) {
 			try {
 				futSnd.get(10L, TimeUnit.MILLISECONDS);
@@ -278,13 +270,12 @@ public class TestHASendAndReceive3Nodes extends TestCase3 {
         if(true){
             log.info("Pipeline: [A,B,C]");
             final ByteBuffer tst1 = getRandomData(msgSize);
-            final IHAWriteMessageBase msg1 = new HAWriteMessageBase(msgSize,
-                    chk.checksum(tst1));
+            final HAMessageWrapper msg1 = newHAWriteMessage(msgSize, tst1);
             final Future<Void> futRec1 = receiveServiceB
                     .receiveData(msg1, rcv1);
             final Future<Void> futRec2 = receiveServiceC
                     .receiveData(msg1, rcv2);
-            final Future<Void> futSnd = sendServiceA.send(tst1);
+            final Future<Void> futSnd = sendServiceA.send(tst1, msg1.getMarker());
             futSnd.get(timeout,TimeUnit.MILLISECONDS);
             futRec1.get(timeout,TimeUnit.MILLISECONDS);
             futRec2.get(timeout,TimeUnit.MILLISECONDS);
@@ -311,13 +302,12 @@ public class TestHASendAndReceive3Nodes extends TestCase3 {
             receiveServiceC.changeUpStream(); // close upstream socket.
             
             final ByteBuffer tst1 = getRandomData(msgSize);
-            final IHAWriteMessageBase msg1 = new HAWriteMessageBase(msgSize,
-                    chk.checksum(tst1));
+            final HAMessageWrapper msg1 = newHAWriteMessage(msgSize, tst1);
             final Future<Void> futRec1 = receiveServiceB
                     .receiveData(msg1, rcv1);
 //            final Future<Void> futRec2 = receiveService2
 //                    .receiveData(msg1, rcv2);
-            final Future<Void> futSnd = sendServiceA.send(tst1.duplicate());
+            final Future<Void> futSnd = sendServiceA.send(tst1.duplicate(), msg1.getMarker());
             // Send will always succeed.
             futSnd.get(timeout, TimeUnit.MILLISECONDS);
             /*
@@ -415,13 +405,12 @@ public class TestHASendAndReceive3Nodes extends TestCase3 {
 //            }
 
             final ByteBuffer tst1 = getRandomData(msgSize);
-            final IHAWriteMessageBase msg1 = new HAWriteMessageBase(msgSize,
-                    chk.checksum(tst1));
+            final HAMessageWrapper msg1 = newHAWriteMessage(msgSize, tst1);
             final Future<Void> futRec1 = receiveServiceB
                     .receiveData(msg1, rcv1);
             final Future<Void> futRec2 = receiveServiceC
                     .receiveData(msg1, rcv2);
-            final Future<Void> futSnd = sendServiceA.send(tst1);
+            final Future<Void> futSnd = sendServiceA.send(tst1, msg1.getMarker());
             // Send will always succeed.
             futSnd.get(timeout, TimeUnit.MILLISECONDS);
             /*
@@ -492,13 +481,12 @@ public class TestHASendAndReceive3Nodes extends TestCase3 {
             receiveServiceC.changeUpStream();
             
             final ByteBuffer tst1 = getRandomData(msgSize);
-            final IHAWriteMessageBase msg1 = new HAWriteMessageBase(msgSize,
-                    chk.checksum(tst1));
+            final HAMessageWrapper msg1 = newHAWriteMessage(msgSize, tst1);
 //            final Future<Void> futRec1 = receiveService1
 //                    .receiveData(msg1, rcv1);
             final Future<Void> futRec2 = receiveServiceC
                     .receiveData(msg1, rcv2);
-            final Future<Void> futSnd = sendServiceA.send(tst1);
+            final Future<Void> futSnd = sendServiceA.send(tst1, msg1.getMarker());
             futSnd.get(timeout,TimeUnit.MILLISECONDS);
 //            futRec1.get();
             futRec2.get(timeout,TimeUnit.MILLISECONDS);
@@ -514,13 +502,12 @@ public class TestHASendAndReceive3Nodes extends TestCase3 {
             receiveServiceC.changeDownStream(receiveServiceB.getAddrSelf());
             
             final ByteBuffer tst1 = getRandomData(msgSize);
-            final IHAWriteMessageBase msg1 = new HAWriteMessageBase(msgSize,
-                    chk.checksum(tst1));
+            final HAMessageWrapper msg1 = newHAWriteMessage(msgSize, tst1);
             final Future<Void> futRec1 = receiveServiceB
                     .receiveData(msg1, rcv1);
             final Future<Void> futRec2 = receiveServiceC
                     .receiveData(msg1, rcv2);
-            final Future<Void> futSnd = sendServiceA.send(tst1);
+            final Future<Void> futSnd = sendServiceA.send(tst1, msg1.getMarker());
             futSnd.get(timeout,TimeUnit.MILLISECONDS);
             futRec1.get(timeout,TimeUnit.MILLISECONDS);
             futRec2.get(timeout,TimeUnit.MILLISECONDS);
@@ -533,7 +520,7 @@ public class TestHASendAndReceive3Nodes extends TestCase3 {
          * an HAReceiveService for (A).
          */
         HASendService sendServiceC = null;
-        HAReceiveService<IHAWriteMessageBase> receiveServiceA = null;
+        HAReceiveService<HAMessageWrapper> receiveServiceA = null;
         try {
             /*
              * Fail (A).
@@ -547,13 +534,13 @@ public class TestHASendAndReceive3Nodes extends TestCase3 {
                 receiveServiceB.changeUpStream();
 
                 final ByteBuffer tst1 = getRandomData(msgSize);
-                final IHAWriteMessageBase msg1 = new HAWriteMessageBase(
-                        msgSize, chk.checksum(tst1));
+                final HAMessageWrapper msg1 = newHAWriteMessage(msgSize,
+                        tst1);
                 final Future<Void> futRec1 = receiveServiceB.receiveData(msg1,
                         rcv1);
 //                final Future<Void> futRec2 = receiveServiceC.receiveData(msg1,
 //                        rcv2);
-                final Future<Void> futSnd = sendServiceC.send(tst1);
+                final Future<Void> futSnd = sendServiceC.send(tst1, msg1.getMarker());
                 futSnd.get(timeout, TimeUnit.MILLISECONDS);
                 futRec1.get(timeout, TimeUnit.MILLISECONDS);
 //                futRec2.get(timeout, TimeUnit.MILLISECONDS);
@@ -564,19 +551,19 @@ public class TestHASendAndReceive3Nodes extends TestCase3 {
                 log.info("Pipeline: [C,B,A] (A added)");
                 final InetSocketAddress receiveAddrA = new InetSocketAddress(
                         getPort(0));
-                receiveServiceA = new HAReceiveService<IHAWriteMessageBase>(
+                receiveServiceA = new HAReceiveService<HAMessageWrapper>(
                         receiveAddrA, null/* downstream */);
                 receiveServiceA.start();
                 receiveServiceB.changeDownStream(receiveServiceA.getAddrSelf());
 
                 final ByteBuffer tst1 = getRandomData(msgSize);
-                final IHAWriteMessageBase msg1 = new HAWriteMessageBase(
-                        msgSize, chk.checksum(tst1));
+                final HAMessageWrapper msg1 = newHAWriteMessage(msgSize,
+                        tst1);
                 final Future<Void> futRec1 = receiveServiceB.receiveData(msg1,
                         rcv1);
                 final Future<Void> futRec2 = receiveServiceA.receiveData(msg1,
                         rcv2);
-                final Future<Void> futSnd = sendServiceC.send(tst1);
+                final Future<Void> futSnd = sendServiceC.send(tst1, msg1.getMarker());
                 futSnd.get(timeout, TimeUnit.MILLISECONDS);
                 futRec1.get(timeout, TimeUnit.MILLISECONDS);
                 futRec2.get(timeout, TimeUnit.MILLISECONDS);
@@ -659,13 +646,13 @@ public class TestHASendAndReceive3Nodes extends TestCase3 {
 
 				sze = 1 + r.nextInt(tst.capacity());
 				getRandomData(tst, sze);
-				final IHAWriteMessageBase msg = new HAWriteMessageBase(sze, chk.checksum(tst));
+				final HAMessageWrapper msg = newHAWriteMessage(sze, tst);
 				assertEquals(0, tst.position());
 				assertEquals(sze, tst.limit());
 				// FutureTask return ensures remote ready for Socket data
 				final Future<Void> futRec1 = receiveServiceB.receiveData(msg, rcv1);
 				final Future<Void> futRec2 = receiveServiceC.receiveData(msg, rcv2);
-				final Future<Void> futSnd = sendServiceA.send(tst);
+				final Future<Void> futSnd = sendServiceA.send(tst, msg.getMarker());
 				while (!futSnd.isDone() && !futRec1.isDone() && !futRec2.isDone()) {
 					try {
 						futSnd.get(10L, TimeUnit.MILLISECONDS);

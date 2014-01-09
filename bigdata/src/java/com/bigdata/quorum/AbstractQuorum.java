@@ -2343,9 +2343,15 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
          * that will force them to fail rather than block forever. This will
          * then force the service into an error state if its QuorumActor can not
          * carry out the requested action within a specified timeout.
+         * 
+         * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/724" >
+         *      HA wire pulling and sure kill testing </a>
          */
         @Override
         final public void forceRemoveService(final UUID psid) {
+            if (log.isInfoEnabled())
+                log.info("Will force remove of service" + ": thisService="
+                        + serviceId + ", otherServiceId=" + psid);
             runActorTask(new ForceRemoveServiceTask(psid));
         }
 
@@ -2358,13 +2364,21 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
             protected void doAction() throws InterruptedException {
                 log.warn("Forcing remove of service" + ": thisService="
                         + serviceId + ", otherServiceId=" + psid);
-                doMemberRemove(psid);
+                /**
+                 * Note: The JOINED[] entry MUST be removed first in case the
+                 * service is not truely dead.
+                 * 
+                 * @see <a
+                 *      href="https://sourceforge.net/apps/trac/bigdata/ticket/724"
+                 *      > HA wire pulling and sure kill testing </a>
+                 */
+                doServiceLeave(psid);
                 doWithdrawVote(psid);
                 doPipelineRemove(psid);
-                doServiceLeave(psid);
+                doMemberRemove(psid);
             }
         }
-
+        
         /**
          * Invoked when our client will become the leader to (a) reorganize the
          * write pipeline such that our client is the first service in the write
