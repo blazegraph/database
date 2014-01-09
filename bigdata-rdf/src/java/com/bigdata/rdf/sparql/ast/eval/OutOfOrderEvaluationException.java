@@ -52,9 +52,9 @@ public class OutOfOrderEvaluationException extends RuntimeException {
         super(message, cause);
     }
 
-    public OutOfOrderEvaluationException(String message, Throwable cause,
-            boolean enableSuppression, boolean writableStackTrace) {
-        super(message, cause, enableSuppression, writableStackTrace);
-    }
+//    public OutOfOrderEvaluationException(String message, Throwable cause,
+//            boolean enableSuppression, boolean writableStackTrace) {
+//        super(message, cause, enableSuppression, writableStackTrace);
+//    }
 
 }
