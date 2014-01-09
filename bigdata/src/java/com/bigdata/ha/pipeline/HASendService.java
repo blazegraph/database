@@ -30,6 +30,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.nio.channels.WritableByteChannel;
 import java.util.concurrent.Callable;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -37,6 +38,10 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.log4j.Logger;
+
+import com.bigdata.ha.msg.HASendState;
+import com.bigdata.util.InnerCause;
+import com.bigdata.util.concurrent.Haltable;
 
 /**
  * A service for sending raw {@link ByteBuffer}s across a socket. This service
@@ -82,9 +87,6 @@ public class HASendService {
 	
     private static final Logger log = Logger.getLogger(HASendService.class);
 
-//    static final byte ACK = 1;
-//    static final byte NACK = 0;
-    
     /**
      * The Internet socket address of the receiving service.
      */
@@ -104,6 +106,7 @@ public class HASendService {
 	/*
 	 * Note: toString() must be thread-safe.
 	 */
+	@Override
     public String toString() {
 
         return super.toString() + "{addrNext=" + addrNext + "}";
@@ -131,9 +134,29 @@ public class HASendService {
      * @see #start(InetSocketAddress)
      */
     public HASendService() {
-        
-	}
 
+        this(true/* blocking */);
+
+    }
+
+    /**
+     * Note: This constructor is not exposed yet. We need to figure out whether
+     * to allow the configuration of the socket options and how to support that.
+     * 
+     * @param blocking
+     */
+    private HASendService(final boolean blocking) {
+
+        this.blocking = blocking;
+        
+    }
+
+    /**
+     * <code>true</code> iff the client socket will be setup in a blocking mode.
+     * This is the historical behavior until at least Dec 10, 2013.
+     */
+    private final boolean blocking;
+    
     /**
      * Extended to ensure that the private executor service is always
      * terminated.
@@ -225,8 +248,8 @@ public class HASendService {
      * {@link HAReceiveService}.
      */
     synchronized public void terminate() {
-        if (log.isDebugEnabled())
-            log.debug(toString() + " : stopping.");
+        if (log.isInfoEnabled())
+            log.info(toString() + " : stopping.");
         final ExecutorService tmp = executorRef.getAndSet(null);
         if (tmp == null) {
             // Not running.
@@ -235,16 +258,7 @@ public class HASendService {
             return;
         }
         try {
-            final SocketChannel socketChannel = this.socketChannel.get();
-            if (socketChannel != null) {
-                try {
-                    socketChannel.close();
-                } catch (IOException ex) {
-                    log.error("Ignoring exception during close: " + ex, ex);
-                } finally {
-                    this.socketChannel.set(null);
-                }
-            }
+            closeSocketChannelNoBlock();
         } finally {
             // shutdown executor.
             tmp.shutdownNow();
@@ -252,6 +266,33 @@ public class HASendService {
             addrNext.set(null);
             if (log.isInfoEnabled())
                 log.info(toString() + " : stopped.");
+        }
+    }
+
+//    /**
+//     * Close the {@link SocketChannel} to the downsteam service (blocking).
+//     */
+//    public void closeChannel() {
+//        synchronized (this.socketChannel) {
+//            closeSocketChannelNoBlock();
+//        }
+//    }
+
+    /**
+     * Close the {@link SocketChannel} to the downstream service (non-blocking).
+     */
+    private void closeSocketChannelNoBlock() {
+        final SocketChannel socketChannel = this.socketChannel.get();
+        if (socketChannel != null) {
+            try {
+                socketChannel.close();
+            } catch (IOException ex) {
+                log.error("Ignoring exception during close: " + ex, ex);
+            } finally {
+                this.socketChannel.set(null);
+            }
+            if (log.isInfoEnabled())
+                log.info("Closed socket channel");
         }
     }
 
@@ -267,9 +308,16 @@ public class HASendService {
      * 
      * @param buffer
      *            The buffer.
+     * @param marker
+     *            A marker that will be used to prefix the payload for the
+     *            message in the write replication socket stream. The marker is
+     *            used to ensure synchronization when reading on the stream.
      * 
      * @return The {@link Future} which can be used to await the outcome of this
      *         operation.
+     * 
+     * @throws InterruptedException
+     * @throws ImmediateDownstreamReplicationException
      * 
      * @throws IllegalArgumentException
      *             if the buffer is <code>null</code>.
@@ -281,8 +329,10 @@ public class HASendService {
      * @todo throws IOException if the {@link SocketChannel} was not open and
      *       could not be opened.
      */
-	public Future<Void> send(final ByteBuffer buffer) {
-     
+    public Future<Void> send(final ByteBuffer buffer, final byte[] marker)
+            throws ImmediateDownstreamReplicationException,
+            InterruptedException {
+
 	    if (buffer == null)
             throw new IllegalArgumentException();
 
@@ -300,15 +350,68 @@ public class HASendService {
 
 //        reopenChannel();
         
-        return tmp.submit(newIncSendTask(buffer.asReadOnlyBuffer()));
+        try {
+
+            return tmp
+                    .submit(newIncSendTask(buffer.asReadOnlyBuffer(), marker));
+
+        } catch (Throwable t) {
+
+            launderThrowable(t);
+            
+            // make the compiler happy.
+            throw new AssertionError();
+            
+        }
 
 	}
+	
+    /**
+     * Test the {@link Throwable} for its root cause and distinguish between a
+     * root cause with immediate downstream replication, normal termination
+     * through {@link InterruptedException}, {@link CancellationException}, and
+     * nested {@link AbstractPipelineException}s thrown by a downstream service.
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/724" > HA
+     *      wire pulling and sure kill testing </a>
+     */
+    private void launderThrowable(final Throwable t)
+            throws InterruptedException,
+            ImmediateDownstreamReplicationException {
 
+        if (Haltable.isTerminationByInterrupt(t)) {
+
+            // root cause is interrupt or cancellation exception.
+            throw new RuntimeException(t);
+
+        }
+
+        if (InnerCause.isInnerCause(t, AbstractPipelineException.class)) {
+
+            /*
+             * The root cause is NOT the inability to replicate to our immediate
+             * downstream service. Instead, some service (not us) has a problem
+             * with pipline replication.
+             */
+
+            throw new NestedPipelineException(t);
+
+        }
+
+        /*
+         * We have a problem with replication to our immediate downstream
+         * service.
+         */
+
+        throw new ImmediateDownstreamReplicationException(toString(), t);
+
+    }
+    
     /**
      * A series of timeouts used when we need to re-open the
      * {@link SocketChannel}.
      */
-    private final static long[] retryMillis = new long[] { 1, 5, 10, 50, 100, 250, 500 };
+    private final static long[] retryMillis = new long[] { 1, 5, 10, 50, 100, 250, 250, 250, 250 };
 
     /**
      * (Re-)open the {@link SocketChannel} if it is closed and this service is
@@ -362,13 +465,15 @@ public class HASendService {
 
                     socketChannel.set(sc = openChannel(addrNext.get()));
 
-                    if (log.isTraceEnabled())
-                    	log.trace("Opened channel on try: " + tryno);
+                    if (log.isInfoEnabled())
+                        log.info("Opened channel on try: " + tryno
+                                + ", addrNext=" + addrNext);
 
                 } catch (IOException e) {
 
                     if (log.isInfoEnabled())
-                    	log.info("Failed to open channel on try: " + tryno);
+                        log.info("Failed to open channel on try: " + tryno
+                                + ", addrNext=" + addrNext);
 
                     if (tryno < retryMillis.length) {
 
@@ -402,13 +507,17 @@ public class HASendService {
      * 
      * @param buffer
      *            The buffer whose data are to be sent.
+     * @param marker
+     *            A marker that will be used to prefix the payload for the
+     *            message in the write replication socket stream. The marker is
+     *            used to ensure synchronization when reading on the stream.
      *            
      * @return The task which will send the data to the configured
      *         {@link InetSocketAddress}.
      */
-    protected Callable<Void> newIncSendTask(final ByteBuffer buffer) {
+    protected Callable<Void> newIncSendTask(final ByteBuffer buffer, final byte[] marker) {
 
-        return new IncSendTask(buffer);
+        return new IncSendTask(buffer, marker);
          
     }
 
@@ -422,21 +531,28 @@ public class HASendService {
      * 
      * @throws IOException
      */
-    static private SocketChannel openChannel(final InetSocketAddress addr)
+    private SocketChannel openChannel(final InetSocketAddress addr)
             throws IOException {
 
         final SocketChannel socketChannel = SocketChannel.open();
 
         try {
 
-            socketChannel.configureBlocking(true);
+            socketChannel.configureBlocking(blocking);
 
             if (log.isTraceEnabled())
                 log.trace("Connecting to " + addr);
 
-            socketChannel.connect(addr);
-
-            socketChannel.finishConnect();
+            if (!socketChannel.connect(addr)) {
+                while (!socketChannel.finishConnect()) {
+                    try {
+                        Thread.sleep(10/* millis */);
+                    } catch (InterruptedException e) {
+                        // Propagate interrupt.
+                        Thread.currentThread().interrupt();
+                    }
+                }
+            }
 
         } catch (IOException ex) {
 
@@ -458,25 +574,59 @@ public class HASendService {
      */
     protected /*static*/ class IncSendTask implements Callable<Void> {
 
-//        private final SocketChannel socketChannel;
         private final ByteBuffer data;
+        private final byte[] marker;
 
-        public IncSendTask(/*final SocketChannel socketChannel, */final ByteBuffer data) {
-
-//            if (socketChannel == null)
-//                throw new IllegalArgumentException();
+        public IncSendTask(final ByteBuffer data, final byte[] marker) {
 
             if (data == null)
                 throw new IllegalArgumentException();
 
-//            this.socketChannel = socketChannel;
-            
             this.data = data;
+            this.marker = marker;
+        }
+
+        @Override
+        public Void call() throws Exception {
+
+            try {
+
+                return doInnerCall();
+
+            } catch (Throwable t) {
+
+                /*
+                 * Log anything thrown out of this task. We check the Future of
+                 * this task, but that does not tell us what exception is thrown
+                 * in the Thread executing the task when the Future is cancelled
+                 * and that thread is interrupted. In particular, we are looking
+                 * for the InterruptedException, ClosedByInterruptException,
+                 * etc.
+                 */
+
+                final SocketChannel sc = socketChannel.get();
+
+                log.error("socketChannel="
+                        + sc
+                        + (sc == null ? "" : ", sc.isOpen()=" + sc.isOpen()
+                                + ", sc.isConnected()=" + sc.isConnected())
+                        + ", marker=" + HASendState.decode(marker) + ", cause="
+                        + t, t);
+
+                if (t instanceof Exception)
+                    throw (Exception) t;
+
+                if (t instanceof RuntimeException)
+                    throw (RuntimeException) t;
+
+                throw new RuntimeException(t);
+
+            }
 
         }
 
-        public Void call() throws Exception {
-
+      private Void doInnerCall() throws Exception {
+          
             // defer until we actually run.
             final SocketChannel socketChannel = reopenChannel();
 
@@ -494,9 +644,21 @@ public class HASendService {
 
             try {
 
-                int nwritten = 0;
+                int nmarker = 0; // #of marker bytes written.
+                int nwritten = 0; // #of payload bytes written.
+
+                final ByteBuffer markerBB = marker != null ? ByteBuffer
+                        .wrap(marker) : null;
                 
                 while (nwritten < remaining) {
+                	
+                    if (marker != null && nmarker < marker.length) {
+                    
+                        nmarker += socketChannel.write(markerBB);
+
+                        continue;
+                        
+                    }
 
                     /*
                      * Write the data. Depending on the channel, will either
@@ -520,7 +682,7 @@ public class HASendService {
                      * socket buffer exchange and the send() Future will report
                      * success even through the application code on the receiver
                      * could fail once it gets control back from select(). This
-                     * twist can be a bit suprising. Therefore it is useful to
+                     * twist can be a bit surprising. Therefore it is useful to
                      * write tests with both small payloads (the data transfer
                      * will succeed at the socket level even if the application
                      * logic then fails the transfer) and for large payloads.
@@ -528,23 +690,39 @@ public class HASendService {
                      * buffer.
                      */
 
-                    final int nbytes = socketChannel.write(data);
+                    final int nbytes;
+                    if (false || log.isDebugEnabled()) {
+                        /*
+                         * Debug only code. This breaks down the payload into
+                         * small packets and adds some latency between them as
+                         * well. This models what is otherwise a less common,
+                         * but more stressful, pattern.
+                         */
+                        final int limit = data.limit();
+                        if (data.position() < (limit - 50000)) {
+                            data.limit(data.position() + 50000);
+                        }
+                        nbytes = socketChannel.write(data);
+                        data.limit(limit);
 
-                    nwritten += nbytes;
+                        nwritten += nbytes;
+                        log.debug("Written " + nwritten + " of total "
+                                + data.limit());
+
+                        if (nwritten < limit) {
+                            Thread.sleep(1);
+                        }
+                    } else {
+
+                        nbytes = socketChannel.write(data);
+                        nwritten += nbytes;
+                    }
 
                     if (log.isTraceEnabled())
                         log.trace("Sent " + nbytes + " bytes with " + nwritten
                                 + " of out " + remaining + " written so far");
 
                 }
-                
-                /*
-                 * The ACK by the receiver divides the HASend requests into
-                 * distinct operations. Without this handshaking, the next
-                 * available payload would be on the way as soon as the last
-                 * byte of the current payload was written.
-                 */
-//                awaitAck(socketChannel);
 
             } finally {
 
@@ -564,145 +742,6 @@ public class HASendService {
             return null;
 
         }
-
-//        /**
-//         * 
-//         * @param socketChannel
-//         * @throws IOException
-//         */
-//        private void awaitAck(final SocketChannel socketChannel)
-//                throws IOException {
-//
-//            log.debug("Awaiting (N)ACK");
-//
-//            // FIXME Optimize.
-//            final ByteBuffer b = ByteBuffer.wrap(new byte[] { -1 });
-//
-//            while (socketChannel.isOpen()) {
-//
-//                final int nread = socketChannel.read(b);
-//
-//                if (nread == 1) {
-//
-//                    final byte ret = b.array()[0];
-//
-//                    if (ret == ACK) {
-//
-//                        // Received ACK.
-//                        log.debug("ACK");
-//                        return;
-//
-//                    }
-//
-//                    log.error("NACK");
-//                    return;
-//
-//                }
-//
-//                throw new IOException("Expecting ACK, not " + nread + " bytes");
-//
-//            }
-//            
-//            // channel is closed.
-//            throw new AsynchronousCloseException();
-//            
-////            /*
-////             * We should now have parameters ready in the WriteMessage and can
-////             * begin transferring data from the stream to the writeCache.
-////             */
-////            final long begin = System.currentTimeMillis();
-////            long mark = begin;
-////
-////            // #of bytes remaining (to be received).
-////            int rem = b.remaining();
-////
-////            // End of stream flag.
-////            boolean EOS = false;
-////            
-////            // for debug retain number of low level reads
-////            int reads = 0;
-////            
-////            while (rem > 0 && !EOS) {
-////
-////                // block up to the timeout.
-////                final int nkeys = client.clientSelector.select(10000/* ms */);
-////            
-////                if (nkeys == 0) {
-////                
-////                    /*
-////                     * Nothing available.
-////                     */
-////                    
-////                    // time since last mark.
-////                    final long now = System.currentTimeMillis();
-////                    final long elapsed = now - mark;
-////                    
-////                    if (elapsed > 10000) {
-////                        // Issue warning if we have been blocked for a while.
-////                        log.warn("Blocked: awaiting " + rem + " out of "
-////                                + message.getSize() + " bytes.");
-////                        mark = now;// reset mark.
-////                    }
-////
-////                    if (!client.client.isOpen()
-////                            || !client.clientSelector.isOpen()) {
-////                        
-////                        /*
-////                         * The channel has been closed. The request must be
-////                         * failed. TODO Or set EOF:=true? 
-////                         * 
-////                         * Note: The [callback] is NOT notified. The service
-////                         * that issued the RMI request to this service to
-////                         * receive the payload over the HAReceivedService will
-////                         * see this exception thrown back across the RMI
-////                         * request.
-////                         * 
-////                         * @see HAReceiveService.receiveData().
-////                         */
-////                        
-////                        throw new AsynchronousCloseException();
-////                        
-////                    }
-////                    
-////                    // no keys. nothing to read.
-////                    continue;
-////                    
-////                }
-////
-////                final Set<SelectionKey> keys = client.clientSelector
-////                        .selectedKeys();
-////                
-////                final Iterator<SelectionKey> iter = keys.iterator();
-////                
-////                while (iter.hasNext()) {
-////                
-////                    iter.next();
-////                    iter.remove();
-////
-////                    final int rdlen = client.client.read(b);
-////
-////                    if (log.isTraceEnabled())
-////                        log.trace("Read " + rdlen + " bytes of "
-////                                + (rdlen > 0 ? rem - rdlen : rem)
-////                                + " bytes remaining.");
-////
-////                    if (rdlen > 0) {
-////                        reads++;
-////                    }
-////
-////                    if (rdlen == -1) {
-////                        // The stream is closed?
-////                        EOS = true;
-////                        break;
-////                    }
-////
-////                    rem -= rdlen;
-////
-////                }
-////
-////            } // while( rem > 0 )
-//
-//        }
 
     }
 

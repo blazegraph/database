@@ -31,6 +31,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.net.InetSocketAddress;
 import java.net.URL;
 import java.nio.ByteBuffer;
+import java.nio.channels.ClosedByInterruptException;
 import java.rmi.Remote;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -3416,6 +3417,42 @@ public class HAJournalServer extends AbstractServer {
         }
 
         @Override
+        protected void incReceive(final IHASyncRequest req,
+                final IHAWriteMessage msg, final int nreads,
+                final int rdlen, final int rem) throws Exception {
+
+//            if (log.isTraceEnabled())
+//                log.trace("HA INCREMENTAL PROGRESS: msg=" + msg + ", nreads="
+//                        + nreads + ", rdlen=" + rdlen + ", rem=" + rem);
+            
+            final IHAProgressListener l = progressListenerRef.get();
+            
+            if (l != null) {
+
+                l.incReceive(req, msg, nreads, rdlen, rem);
+                
+            }
+            
+        }
+
+        /**
+         * Interface for receiving notice of incremental write replication
+         * progress.
+         * 
+         * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+         */
+        public static interface IHAProgressListener {
+
+            void incReceive(final IHASyncRequest req,
+                    final IHAWriteMessage msg, final int nreads,
+                    final int rdlen, final int rem) throws Exception;
+            
+        }
+
+        // Note: Exposed to HAJournal's HAGlue implementation.
+        final AtomicReference<IHAProgressListener> progressListenerRef = new AtomicReference<IHAProgressListener>();
+
+        @Override
         protected void handleReplicatedWrite(final IHASyncRequest req,
                 final IHAWriteMessage msg, final ByteBuffer data)
                 throws Exception {
@@ -3592,6 +3629,16 @@ public class HAJournalServer extends AbstractServer {
                             // propagate interrupt
                             Thread.currentThread().interrupt();
                             return;
+                        }
+                        // Add check for ClosedByInterruptException - but is this sufficient if the channel is now closed?
+                        if (InnerCause.isInnerCause(t,
+                                ClosedByInterruptException.class)) {
+                            // propagate interrupt
+                            // Thread.currentThread().interrupt();
+                            
+                            // wrap and re-throw
+                            throw new RuntimeException(t);
+                            // return;
                         }
                         /*
                          * Error handler.

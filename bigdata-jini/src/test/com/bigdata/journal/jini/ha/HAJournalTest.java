@@ -43,6 +43,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 
 import net.jini.config.Configuration;
 import net.jini.config.ConfigurationException;
@@ -53,6 +54,8 @@ import com.bigdata.concurrent.FutureTaskMon;
 import com.bigdata.counters.PIDUtil;
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.HAStatusEnum;
+import com.bigdata.ha.IHAPipelineResetRequest;
+import com.bigdata.ha.IHAPipelineResetResponse;
 import com.bigdata.ha.QuorumService;
 import com.bigdata.ha.RunState;
 import com.bigdata.ha.msg.IHA2PhaseAbortMessage;
@@ -74,6 +77,7 @@ import com.bigdata.ha.msg.IHARebuildRequest;
 import com.bigdata.ha.msg.IHARemoteRebuildRequest;
 import com.bigdata.ha.msg.IHARootBlockRequest;
 import com.bigdata.ha.msg.IHARootBlockResponse;
+import com.bigdata.ha.msg.IHASendState;
 import com.bigdata.ha.msg.IHASendStoreResponse;
 import com.bigdata.ha.msg.IHASnapshotDigestRequest;
 import com.bigdata.ha.msg.IHASnapshotDigestResponse;
@@ -89,6 +93,7 @@ import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.StoreState;
 import com.bigdata.journal.jini.ha.HAJournalServer.HAQuorumService;
+import com.bigdata.journal.jini.ha.HAJournalServer.HAQuorumService.IHAProgressListener;
 import com.bigdata.journal.jini.ha.HAJournalServer.RunStateEnum;
 import com.bigdata.quorum.AsynchronousQuorumCloseException;
 import com.bigdata.quorum.Quorum;
@@ -123,6 +128,16 @@ public class HAJournalTest extends HAJournal {
 
         return new HAGlueTestImpl(serviceId);
 
+    }
+
+    /**
+     * The service implementation object that gets exported (not the proxy, but
+     * the thing that gets exported as the {@link HAGlueTest} proxy).
+     */
+    public HAGlueTestImpl getRemoteImpl() {
+        
+        return (HAGlueTestImpl) getHAJournalServer().getRemoteImpl();
+        
     }
     
     /**
@@ -230,7 +245,7 @@ public class HAJournalTest extends HAJournal {
 //        public Future<Void> reopenZookeeperConnection() throws IOException;
 
         /**
-         * Set a fail point on a future invocation of the specified methosuper. The
+         * Set a fail point on a future invocation of the specified method. The
          * method must be declared by the {@link HAGlue} interface or by one of
          * the interfaces which it extends. The method will throw a
          * {@link SpuriousTestException} when the failure criteria are
@@ -239,23 +254,23 @@ public class HAJournalTest extends HAJournal {
          * @param name
          *            The name method to fail.
          * @param parameterTypes
-         *            The parameter types for that methosuper.
+         *            The parameter types for that method.
          * @param nwait
-         *            The #of invocations to wait before failing the methosuper.
+         *            The #of invocations to wait before failing the method.
          * @param nfail
-         *            The #of times to fail the methosuper.
+         *            The #of times to fail the method.
          */
         public void failNext(final String name,
                 final Class<?>[] parameterTypes, final int nwait,
                 final int nfail) throws IOException;
 
         /**
-         * Clear any existing fail request for the specified methosuper.
+         * Clear any existing fail request for the specified method.
          * 
          * @param name
          *            The name method to fail.
          * @param parameterTypes
-         *            The parameter types for that methosuper.
+         *            The parameter types for that method.
          */
         public void clearFail(final String name, final Class<?>[] parameterTypes)
                 throws IOException;
@@ -275,7 +290,20 @@ public class HAJournalTest extends HAJournal {
          * @see IHA2PhaseCommitMessage#failCommit_beforeClosingHALog()
          */
         public void failCommit_beforeClosingHALog() throws IOException;
-        
+
+        /**
+         * Message may be used to force a write replication failure when the
+         * specified number of bytes have been received for the live or
+         * historical writes for the given commit point. Only one such trigger
+         * is honored at a time. This method sets the trigger. The trigger is
+         * not removed automatically but may take responsiblity for removing
+         * itself once it runs.
+         * 
+         * @see HAJournalServer.HAQuorumService#progressListenerRef
+         */
+        public void failWriteReplication(IHAProgressListener listener)
+                throws IOException;
+
         /**
          * Set the next value to be reported by {@link BasicHA#nextTimestamp()}.
          * <p>
@@ -314,7 +342,21 @@ public class HAJournalTest extends HAJournal {
          * Supports consistency checking between HA services
          */
         public StoreState getStoreState() throws IOException;
-        
+     
+        /**
+         * Gets and clears a root cause that was set on the remote service. This
+         * is used to inspect the root cause when an RMI method is interrupted
+         * in the local JVM. Since the RMI was interrupted, we can not observe
+         * the outcome or root cause of the associated failure on the remote
+         * service. However, test glue can explicitly set that root cause such
+         * that it can then be reported using this method.
+         */
+        public Throwable getAndClearLastRootCause() throws IOException;
+
+        /**
+         * Variant that does not clear out the last root cause.
+         */
+        public Throwable getLastRootCause() throws IOException;
     }
 
     /**
@@ -346,13 +388,13 @@ public class HAJournalTest extends HAJournal {
      * <p>
      * Note: Any method lookup failures are logged @ ERROR. All of the
      * {@link HAGlue} methods on {@link HAGlueTestImpl} are annotated with this
-     * methosuper. If any of them can not resolve itself, then the method will fail,
+     * method. If any of them can not resolve itself, then the method will fail,
      * which is why we log all such method resolution failures here.
      * 
      * @param name
-     *            The name of the methosuper.
+     *            The name of the method.
      * @param parameterTypes
-     *            The parameter types of the methosuper.
+     *            The parameter types of the method.
      * 
      * @return The {@link Method} and never <code>null</code>.
      * 
@@ -423,7 +465,7 @@ public class HAJournalTest extends HAJournal {
      * 
      * @see HAJournal.HAGlueService
      */
-    private class HAGlueTestImpl extends HAJournal.HAGlueService
+    class HAGlueTestImpl extends HAJournal.HAGlueService
             implements HAGlue, HAGlueTest, RemoteDestroyAdmin {
 
         /**
@@ -465,7 +507,7 @@ public class HAJournalTest extends HAJournal {
                 false);
 
         private final AtomicLong nextTimestamp = new AtomicLong(-1L);
-        
+
         private HAGlueTestImpl(final UUID serviceId) {
 
             super(serviceId);
@@ -504,8 +546,8 @@ public class HAJournalTest extends HAJournal {
             /*
              * Verify we can find the method in the map.
              * 
-             * Note: This is a cross check on Methosuper.hashCode() and
-             * Methosuper.equals(), not a data race check on the CHM.
+             * Note: This is a cross check on method.hashCode() and
+             * method.equals(), not a data race check on the CHM.
              */
             if (failSet.get(m) == null) {
 
@@ -555,9 +597,9 @@ public class HAJournalTest extends HAJournal {
          * {@link #failSet} and (b) it is due to fail on this invocation.
          * 
          * @param name
-         *            The name of the methosuper.
+         *            The name of the method.
          * @param parameterTypes
-         *            The parameter types for the methosuper.
+         *            The parameter types for the method.
          */
         protected void checkMethod(final String name,
                 final Class<?>[] parameterTypes) {
@@ -575,11 +617,11 @@ public class HAJournalTest extends HAJournal {
             // Determine whether method will fail on this invocation.
             final boolean willFail = n >= d.nwait && n < (d.nwait + d.nfail);
 
-            // Check conditions for failing the methosuper.
+            // Check conditions for failing the method.
             if (willFail) {
 
                 /*
-                 * Fail the methosuper.
+                 * Fail the method.
                  */
 
                 log.error("Will fail HAGlue method: m=" + m + ", n=" + n
@@ -594,7 +636,7 @@ public class HAJournalTest extends HAJournal {
         }
 
         // /**
-        // * Set a fail point on the next invocation of the specified methosuper.
+        // * Set a fail point on the next invocation of the specified method.
         // */
         // public void failNext(final Method m) {
         //
@@ -638,6 +680,7 @@ public class HAJournalTest extends HAJournal {
 
         private class EnterErrorStateTask implements Runnable {
 
+            @Override
             public void run() {
 
                 @SuppressWarnings("unchecked")
@@ -1071,13 +1114,24 @@ public class HAJournalTest extends HAJournal {
         }
 
         @Override
+        public Future<IHAPipelineResetResponse> resetPipeline(
+                final IHAPipelineResetRequest req) throws IOException {
+
+            checkMethod("resetPipeline", new Class[] {IHAPipelineResetRequest.class});
+
+            return super.resetPipeline(req);
+        }
+
+        @Override
         public Future<Void> receiveAndReplicate(final IHASyncRequest req,
-                final IHAWriteMessage msg) throws IOException {
+                final IHASendState snd, final IHAWriteMessage msg)
+                throws IOException {
 
             checkMethod("receiveAndReplicate", new Class[] {
-                    IHASyncRequest.class, IHAWriteMessage.class });
+                    IHASyncRequest.class, IHASendState.class,
+                    IHAWriteMessage.class });
 
-            return super.receiveAndReplicate(req, msg);
+            return super.receiveAndReplicate(req, snd, msg);
 
         }
 
@@ -1321,6 +1375,58 @@ public class HAJournalTest extends HAJournal {
             }
 
         }
+
+        @Override
+        public void failWriteReplication(final IHAProgressListener listener)
+                throws IOException {
+
+            final Quorum<HAGlue, QuorumService<HAGlue>> quorum = getQuorum();
+            
+            // Note: Throws IllegalStateException if quorum is not running.
+            final QuorumService<HAGlue> quorumService = quorum.getClient();
+            
+            ((HAQuorumService<?, ?>) quorumService).progressListenerRef
+                    .set(listener);
+
+        }
+
+        @Override
+        public Throwable getAndClearLastRootCause() throws IOException {
+
+            final Throwable t = lastRootCause.getAndSet(null/* newValue */);
+
+            if (t != null)
+                log.warn("lastRootCause: " + t, t);
+
+            return t;
+
+        }
+        
+        @Override
+        public Throwable getLastRootCause() throws IOException {
+
+            final Throwable t = lastRootCause.get();
+
+            if (t != null)
+                log.warn("lastRootCause: " + t, t);
+
+            return t;
+
+        }
+        public void setLastRootCause(final Throwable t) {
+
+            if (log.isInfoEnabled())
+                log.info("Setting lastRootCause: " + t);
+            
+            lastRootCause.set(t);
+            
+        }
+        
+        /**
+         * @see HAGlueTest#getAndClearLastRootCause()
+         */
+        private AtomicReference<Throwable> lastRootCause = new AtomicReference<Throwable>();
+        
         
     } // class HAGlueTestImpl
 
