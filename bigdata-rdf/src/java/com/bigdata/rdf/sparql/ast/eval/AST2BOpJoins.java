@@ -104,16 +104,20 @@ public class AST2BOpJoins extends AST2BOpFilters {
      *            The set of variables already known to be materialized.
      * @param constraints
      *            Constraints on that join (optional).
+     * @param cutoffLimit
+     *            When non-null, this is the limit for a cutoff join (RTO).
      * @param queryHints
      *            Query hints associated with that {@link StatementPatternNode}.
-     * @param ctx The evaluation context.
+     * @param ctx
+     *            The evaluation context.
      */
     @SuppressWarnings("rawtypes")
     public static PipelineOp join(//
             PipelineOp left,//
             Predicate pred,//
-            final Set<IVariable<?>> doneSet,// variables known to be materialized.
+            final Set<IVariable<?>> doneSet,// 
             final Collection<IConstraint> constraints,//
+            final Long cutoffLimit, //
             final Properties queryHints,//
             final AST2BOpContext ctx//
             ) {
@@ -125,12 +129,23 @@ public class AST2BOpJoins extends AST2BOpFilters {
 
         anns.add(new NV(BOp.Annotations.BOP_ID, joinId));
 
+        /*
+         * A map containing the materialization requirements for each constraint
+         * attached to this join. This is populated as a side-effect by
+         * getJoinConstraints() (immediately below). If this map is NOT empty
+         * then the JOIN operator will be followed by either manditory or
+         * conditional materialization of variable bindings in order to evaluate
+         * one or more constraints.
+         */
         final Map<IConstraint, Set<IVariable<IV>>> needsMaterialization =
                 new LinkedHashMap<IConstraint, Set<IVariable<IV>>>();
 
         // Add constraints to the join for that predicate.
         anns.add(new NV(JoinAnnotations.CONSTRAINTS, getJoinConstraints(
                 constraints, needsMaterialization)));
+
+        // true iff there are no constraints that require materialization.
+        anns.add(new NV(Annotations.SIMPLE_JOIN, needsMaterialization.isEmpty()));
         
         /*
          * Pull off annotations before we clear them from the predicate.
@@ -161,12 +176,12 @@ public class AST2BOpJoins extends AST2BOpFilters {
 
             switch (scope) {
             case NAMED_CONTEXTS:
-                left = namedGraphJoin(ctx, left, anns, pred, dataset,
-                        queryHints);
+                left = namedGraphJoin(left, anns, pred, dataset, cutoffLimit,
+                        queryHints, ctx);
                 break;
             case DEFAULT_CONTEXTS:
-                left = defaultGraphJoin(ctx, left, anns, pred, dataset,
-                        queryHints);
+                left = defaultGraphJoin(left, anns, pred, dataset, cutoffLimit,
+                        queryHints, ctx);
                 break;
             default:
                 throw new AssertionError();
@@ -178,7 +193,8 @@ public class AST2BOpJoins extends AST2BOpFilters {
              * Triples or provenance mode.
              */
 
-            left = triplesModeJoin(ctx, left, anns, pred, queryHints);
+            left = triplesModeJoin(left, anns, pred, cutoffLimit, queryHints,
+                    ctx);
 
         }
 
@@ -202,12 +218,17 @@ public class AST2BOpJoins extends AST2BOpFilters {
      * @param left
      * @param anns
      * @param pred
+     * @param queryHints
      * 
      * @return The join operator.
      */
-    private static PipelineOp triplesModeJoin(final AST2BOpContext ctx,
-            final PipelineOp left, final List<NV> anns, Predicate<?> pred,
-            final Properties queryHints) {
+    private static PipelineOp triplesModeJoin(//
+            final PipelineOp left, //
+            final List<NV> anns, //
+            Predicate<?> pred,//
+            final Long cutoffLimit,//
+            final Properties queryHints,//
+            final AST2BOpContext ctx) {
 
         final boolean scaleOut = ctx.isCluster();
 
@@ -233,7 +254,7 @@ public class AST2BOpJoins extends AST2BOpFilters {
         anns.add(new NV(PipelineJoin.Annotations.PREDICATE, pred));
 
         return newJoin(left, anns, false/* defaultGraphFilter */,
-                null/* summary */, queryHints, ctx);
+                null/* summary */, cutoffLimit, queryHints, ctx);
 
     }
 
@@ -256,9 +277,14 @@ public class AST2BOpJoins extends AST2BOpFilters {
      *       decision until we actually evaluate that access path. This is
      *       basically a special case of runtime query optimization.
      */
-    private static PipelineOp namedGraphJoin(final AST2BOpContext ctx,
-            PipelineOp left, final List<NV> anns, Predicate<?> pred,
-            final DatasetNode dataset, final Properties queryHints) {
+    private static PipelineOp namedGraphJoin(//
+            PipelineOp left, //
+            final List<NV> anns, //
+            Predicate<?> pred,//
+            final DatasetNode dataset, //
+            final Long cutoffLimit,//
+            final Properties queryHints,//
+            final AST2BOpContext ctx) {
 
         final boolean scaleOut = ctx.isCluster();
         if (scaleOut && !ctx.remoteAPs) {
@@ -284,7 +310,7 @@ public class AST2BOpJoins extends AST2BOpFilters {
             anns.add(new NV(PipelineJoin.Annotations.PREDICATE,pred));
 
             return newJoin(left, anns, false/* defaultGraphFilter */,
-                    null/* summary */, queryHints, ctx);
+                    null/* summary */, cutoffLimit, queryHints, ctx);
 
         }
 
@@ -297,7 +323,7 @@ public class AST2BOpJoins extends AST2BOpFilters {
             anns.add(new NV(PipelineJoin.Annotations.PREDICATE, pred));
 
             return newJoin(left, anns, false/* defaultGraphFilter */,
-                    null/* summary */, queryHints, ctx);
+                    null/* summary */, cutoffLimit, queryHints, ctx);
         }
 
         /*
@@ -325,7 +351,7 @@ public class AST2BOpJoins extends AST2BOpFilters {
             anns.add(new NV(PipelineJoin.Annotations.PREDICATE,pred));
 
             return newJoin(left, anns, false/* defaultGraphFilter */, summary,
-                    queryHints, ctx);
+                    cutoffLimit, queryHints, ctx);
 
         }
 
@@ -349,7 +375,7 @@ public class AST2BOpJoins extends AST2BOpFilters {
             anns.add(new NV(PipelineJoin.Annotations.PREDICATE,pred));
 
             return newJoin(left, anns, false/* defaultGraphFilter */, summary,
-                    queryHints, ctx);
+                    cutoffLimit, queryHints, ctx);
 
         }
 
@@ -425,7 +451,7 @@ public class AST2BOpJoins extends AST2BOpFilters {
             anns.add(new NV(PipelineJoin.Annotations.PREDICATE,pred));
 
             return newJoin(left, anns, false/* defaultGraphFilter */, summary,
-                    queryHints, ctx);
+                    cutoffLimit, queryHints, ctx);
 
         } else {
 
@@ -456,7 +482,7 @@ public class AST2BOpJoins extends AST2BOpFilters {
             anns.add(new NV(PipelineJoin.Annotations.PREDICATE,pred));
 
             return newJoin(left, anns, false/* defaultGraphFilter */, summary,
-                    queryHints, ctx);
+                    cutoffLimit, queryHints, ctx);
 
         }
 
@@ -478,10 +504,14 @@ public class AST2BOpJoins extends AST2BOpFilters {
      *       basically a special case of runtime query optimization.
      */
     @SuppressWarnings("rawtypes")
-    private static PipelineOp defaultGraphJoin(
-            final AST2BOpContext ctx,
-            PipelineOp left, final List<NV> anns, Predicate<?> pred,
-            final DatasetNode dataset, final Properties queryHints) {
+    private static PipelineOp defaultGraphJoin(//
+            PipelineOp left, //
+            final List<NV> anns, //
+            Predicate<?> pred,//
+            final DatasetNode dataset, //
+            final Long cutoffLimit,//
+            final Properties queryHints,//
+            final AST2BOpContext ctx) {
 
         final DataSetSummary summary = dataset == null ? null
                 : dataset.getDefaultGraphs();
@@ -495,8 +525,8 @@ public class AST2BOpJoins extends AST2BOpFilters {
             anns.add(new NV(PipelineJoin.Annotations.PREDICATE, pred));
 
             return newJoin(left, anns, true/* defaultGraphFilter */, summary,
-                    queryHints, ctx);
-        
+                    cutoffLimit, queryHints, ctx);
+
         }
 
         if (summary != null && summary.nknown == 0) {
@@ -514,7 +544,7 @@ public class AST2BOpJoins extends AST2BOpFilters {
             anns.add(new NV(PipelineJoin.Annotations.PREDICATE,pred));
 
             return newJoin(left, anns, false/* defaultGraphFilter */, summary,
-                    queryHints, ctx);
+                    cutoffLimit, queryHints, ctx);
 
         }
 
@@ -543,7 +573,7 @@ public class AST2BOpJoins extends AST2BOpFilters {
             anns.add(new NV(PipelineJoin.Annotations.PREDICATE, pred));
 
             return newJoin(left, anns, false/* defaultGraphFilter */, summary,
-                    queryHints, ctx);
+                    cutoffLimit, queryHints, ctx);
 
         }
 
@@ -755,7 +785,7 @@ public class AST2BOpJoins extends AST2BOpFilters {
             anns.add(new NV(PipelineJoin.Annotations.PREDICATE, pred));
 
             return newJoin(left, anns, true/* defaultGraphFilter */, summary,
-                    queryHints, ctx);
+                    cutoffLimit, queryHints, ctx);
 
         } else {
 
@@ -843,7 +873,7 @@ public class AST2BOpJoins extends AST2BOpFilters {
             anns.add(new NV(PipelineJoin.Annotations.PREDICATE,pred));
            
             return newJoin(left, anns, true/* defaultGraphFilter */, summary,
-                    queryHints, ctx);
+                    cutoffLimit, queryHints, ctx);
 
         }
 
@@ -954,9 +984,11 @@ public class AST2BOpJoins extends AST2BOpFilters {
             final List<NV> anns,//
             final boolean defaultGraphFilter,//
             final DataSetSummary summary,//
+            final Long cutoffLimit,//
             final Properties queryHints, //
             final AST2BOpContext ctx) {
 
+        // Convert join annotations to a map so we can lookup some stuff.
         final Map<String, Object> map = NV.asMap(anns.toArray(new NV[anns
                 .size()]));
 
@@ -964,15 +996,120 @@ public class AST2BOpJoins extends AST2BOpFilters {
         Predicate<?> pred = (Predicate<?>) map
                 .get(AccessPathJoinAnnotations.PREDICATE);
 
-        // MAX_LONG unless we are doing cutoff join evaluation.
-        final long limit = pred.getProperty(JoinAnnotations.LIMIT,
-                JoinAnnotations.DEFAULT_LIMIT);
-
         // True iff a hash join was requested for this predicate.
-        final boolean hashJoin = limit == JoinAnnotations.DEFAULT_LIMIT
+        final boolean hashJoin = cutoffLimit == null
                 && pred.getProperty(QueryHints.HASH_JOIN,
                         QueryHints.DEFAULT_HASH_JOIN);
-        
+
+        if (cutoffLimit != null) {
+            
+            /*
+             * Cutoff join (RTO).
+             */
+
+            /*
+             * true iff there are no variable materialization requirements for
+             * this join.
+             */
+            final boolean simpleJoin = ((Boolean) map
+                    .get(Annotations.SIMPLE_JOIN)).booleanValue()
+                    && !AST2BOpRTO.runAllJoinsAsComplexJoins;
+
+            // disallow parallel evaluation of tasks
+            map.put(PipelineOp.Annotations.MAX_PARALLEL, Integer.valueOf(1));
+
+            // disallow parallel evaluation of chunks.
+            map.put(PipelineJoin.Annotations.MAX_PARALLEL_CHUNKS,
+                    Integer.valueOf(0));
+
+            // disable access path coalescing
+            map.put(PipelineJoin.Annotations.COALESCE_DUPLICATE_ACCESS_PATHS,
+                    Boolean.FALSE);
+            
+            if (simpleJoin) {
+
+//                // disable access path coalescing
+//                map.put(PipelineJoin.Annotations.COALESCE_DUPLICATE_ACCESS_PATHS,
+//                        Boolean.FALSE);
+
+                /*
+                 * Note: We need to annotation the JOIN operator to eliminate
+                 * parallelism, eliminate access path coalescing, and limit the
+                 * output of the join.
+                 */
+
+                // cutoff join.
+                map.put(PipelineJoin.Annotations.LIMIT,
+                        Long.valueOf(cutoffLimit));
+
+                /*
+                 * Note: In order to have an accurate estimate of the join hit
+                 * ratio we need to make sure that the join operator runs using
+                 * a single PipelineJoinStats instance which will be visible to
+                 * us when the query is cutoff. In turn, this implies that the
+                 * join must be evaluated on the query controller.
+                 * 
+                 * FIXME RTO: This implies that sampling of scale-out joins must
+                 * be done using remote access paths. This assumption and
+                 * approach needs to be reviewed. This is probably NOT the case
+                 * if we are using a complex pipline (i.e., with chunked
+                 * materialization of some variables and/or conditional routing
+                 * operations). In fact, if the pipeline is complex, we do not
+                 * want to set LIMIT on the JOIN since that could cause the
+                 * pipeline to underproduce if the filters wind up eliminating
+                 * some solutions. This suggests that we either need to treat
+                 * all cutoff joins as the general and NOT put the LIMIT on the
+                 * JOIN -or- we need to pass in more information so newJoin()
+                 * understands whether it will be required to impose the
+                 * cutoffLimit or whether that limit will be imposed by a SLICE
+                 * and injecting a column to correlate input and output
+                 * solutions.
+                 */
+                map.put(PipelineJoin.Annotations.SHARED_STATE, Boolean.TRUE);//
+                map.put(PipelineJoin.Annotations.EVALUATION_CONTEXT,
+                        BOpEvaluationContext.CONTROLLER);//
+
+            } else {
+
+                /*
+                 * Complex join.
+                 * 
+                 * Note: Complex joins may include operators to materialize of
+                 * IVs as RDF Values and evaluate FILTERs that must (or might)
+                 * operate on RDF Values.
+                 * 
+                 * FIXME RTO: Are there additional predicate annotations that we
+                 * need to override if we are generating a complex query plan to
+                 * evaluate the cutoff JOIN?
+                 */
+                
+                /*
+                 * FIXME RTO: This appears to be necessary to get reliable
+                 * reporting for the sum of the fast range counters over the APs
+                 * and the #of tuples read. Why? If we need to use shared state
+                 * for reliable computation of cutoff joins then we must use
+                 * remote APs for scale-out.
+                 */
+                map.put(PipelineJoin.Annotations.SHARED_STATE, Boolean.TRUE);//
+
+                /*
+                 * Disable access path reordering.
+                 * 
+                 * Note: Reordering must be disabled for complex joins since we
+                 * will correlate the input solutions and output solutions using
+                 * a row identifier. If the solutions are reordered as they flow
+                 * through the pipeline, then it will break this correlation and
+                 * we will no longer have accurate information about the #of
+                 * input solutions required to produce a given number of output
+                 * solutions.
+                 */
+                map.put(PipelineJoin.Annotations.REORDER_ACCESS_PATHS,
+                        Boolean.FALSE);
+
+            }
+
+        } // cutoffJoin
+
         if (defaultGraphFilter) {
 
             /*

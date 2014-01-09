@@ -41,7 +41,6 @@ import com.bigdata.bop.fed.QueryEngineFactory;
 import com.bigdata.bop.joinGraph.rto.JGraph;
 import com.bigdata.bop.joinGraph.rto.JoinGraph;
 import com.bigdata.bop.joinGraph.rto.Path;
-import com.bigdata.bop.rdf.joinGraph.TestJoinGraphOnLubm;
 import com.bigdata.journal.IBTreeManager;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.QueryHints;
@@ -74,7 +73,7 @@ import com.bigdata.rdf.sparql.ast.optimizers.IASTOptimizer;
  *      This should be the subject of a test suite.
  * 
  *      TODO The RTO should be extended (together with test coverage) to handle
- *      more interesting kinds of join groups (optionls, sub-selects, property
+ *      more interesting kinds of join groups (optionals, sub-selects, property
  *      paths, SERVICE calls, etc).
  *      <p>
  *      Note: When handling sub-groups, etc., the RTO needs to flow solutions
@@ -86,7 +85,12 @@ import com.bigdata.rdf.sparql.ast.optimizers.IASTOptimizer;
  *      TODO Automate the larger data scale tests on these data sets as part of
  *      CI and provide automated reporting over time on those performance runs.
  *      Once this is done, there will be no more reason to keep the older
- *      {@link TestJoinGraphOnLubm} and related tests.
+ *      TestJoinGraphOnLubm and related tests (these are in <a
+ *      href="https://www.dropbox.com/sh/d3emvoj9oh8kblf/JXcEP4Ddtq"> dropbox
+ *      </a>).
+ * 
+ *      TODO Add some govtrack queries. Those queries use quads mode and have a
+ *      lot of interesting query constructions.
  */
 public class AbstractRTOTestCase extends AbstractDataDrivenSPARQLTestCase {
 

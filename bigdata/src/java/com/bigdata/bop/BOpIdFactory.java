@@ -82,51 +82,54 @@ public class BOpIdFactory implements IdFactory {
     }
 
     /**
-     * Reserve ids used by the predicates or constraints associated with some
-     * join graph.
+     * Reserve ids used by the predicates in some join graph.
      * 
      * @param preds
      *            The vertices of the join graph.
-     * @param constraints
-     *            The constraints of the join graph (optional).
      */
-    public void reserveIds(final IPredicate<?>[] preds,
-            final IConstraint[] constraints) {
+    public void reserveIds(final IPredicate<?>[] preds) {
 
         if (preds == null)
             throw new IllegalArgumentException();
 
-        final BOpIdFactory idFactory = this;
-        
         for (IPredicate<?> p : preds) {
-        
-            idFactory.reserve(p.getId());
-            
+
+            reserve(p.getId());
+
         }
 
-        if (constraints != null) {
-        
-            for (IConstraint c : constraints) {
-                
-                final Iterator<BOp> itr = BOpUtility
-                        .preOrderIteratorWithAnnotations(c);
+    }
 
-                while (itr.hasNext()) {
-                    
-                    final BOp y = itr.next();
-                    
-                    final Integer anId = (Integer) y
-                            .getProperty(BOp.Annotations.BOP_ID);
-                
-                    if (anId != null)
-                        idFactory.reserve(anId.intValue());
-            
-                }
-    
+    /**
+     * Reserve ids used by the constraints for some predicate or join graph.
+     * 
+     * @param constraints
+     *            The constraints that attach to some predicate (optional).
+     */
+    public void reserveIds(final IConstraint[] constraints) {
+
+        if (constraints == null)
+            return;
+
+        for (IConstraint c : constraints) {
+
+            final Iterator<BOp> itr = BOpUtility
+                    .preOrderIteratorWithAnnotations(c);
+
+            while (itr.hasNext()) {
+
+                final BOp y = itr.next();
+
+                final Integer anId = (Integer) y
+                        .getProperty(BOp.Annotations.BOP_ID);
+
+                if (anId != null)
+                    reserve(anId.intValue());
+
             }
 
         }
-    
+
     }
 
 }

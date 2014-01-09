@@ -32,6 +32,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.apache.log4j.Logger;
 
 import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.engine.IChunkMessage;
 import com.bigdata.rwstore.sector.IMemoryManager;
 
 /**
@@ -108,8 +109,11 @@ public abstract class SampleBase {
      * 
      * @return The sampled solution set -or- <code>null</code> if it has been
      *         released.
+     * 
+     *         TODO Wrap up as an {@link IChunkMessage} so we can store this on
+     *         the native heap?
      */
-    IBindingSet[] getSample() {
+    public IBindingSet[] getSample() {
         
         return sampleRef.get();
         

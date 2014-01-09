@@ -475,8 +475,7 @@ public class JoinGraph extends PipelineOp {
 	        final long begin = System.nanoTime();
 	        
             // Create the join graph.
-            final JGraph g = new JGraph(getVertices(), getConstraints(),
-                    getSampleType());
+            final JGraph g = new JGraph(JoinGraph.this);
 
             /*
              * This map is used to associate join path segments (expressed as an
