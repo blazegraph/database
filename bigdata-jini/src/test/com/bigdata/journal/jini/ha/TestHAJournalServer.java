@@ -40,7 +40,6 @@ import java.util.concurrent.atomic.AtomicReference;
 import net.jini.config.Configuration;
 import net.jini.core.lookup.ServiceID;
 
-import com.bigdata.BigdataStatics;
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.HAStatusEnum;
 import com.bigdata.ha.IndexManagerCallable;
@@ -373,18 +372,49 @@ public class TestHAJournalServer extends AbstractHA3JournalServerTestCase {
      * This unit test setups up a service and then issues an RMI that invokes a
      * {@link Thread#sleep(long)} method on the service. The thread that issues
      * the RMI is then interrupted during the sleep.
+     * <p>
+     * Note: The EXPECTED behavior is that the remote task is NOT interrupted!
+     * See these comments from the dev@river.apache.org mailing list:
+     * 
+     * <pre>
+     * Hi Bryan:
+     * 
+     * I would expect the remote task to complete and return, despite the caller being interrupted.  The JERI subsystem (I’m guessing the invocation layer, but it might be the transport layer) might log an exception when it tried to return, but there was nobody on the calling end.
+     * 
+     * That’s consistent with a worst-case failure, where the caller drops off the network.  How is the called service supposed to know what happened to the caller?
+     * 
+     * In the case of a typical short operation, I wouldn’t see that as a big issue, as the wasted computational effort on the service side won’t be consequential.
+     * 
+     * In the case of a long-running operation where it becomes more likely that the caller wants to stop or cancel an operation (in addition to the possibility of having it interrupted), I’d try to break it into a series of operations (chunks), or setup an ongoing notification or update protocol.  You probably want to do that anyway, because clients probably would like to see interim updates while a long operation is in process.
+     * 
+     * Unfortunately, I don’t think these kinds of things can be reasonably handled in a communication layer - the application almost always needs to be involved in the resolution of a problem when we have a service-oriented system.
+     * 
+     * Cheers,
+     * 
+     * Greg.
+     * </pre>
+     * 
+     * and
+     * 
+     * <pre>
+     * Hi Bryan,
+     * 
+     * A number of years ago Ann Wollrath (the inventor of RMI) wrote some example code
+     * related to RMI call cancellation; providing both a JRMP and a JERI
+     * configuration.
+     * Although the example is old and hasn't been maintained, it may provide
+     * the sort of
+     * guidance and patterns you're looking for.
+     * 
+     * You can find the source code and related collateral at the following link:
+     * 
+     * <https://java.net/projects/bodega/sources/svn/show/trunk/src/archive/starterkit-examples/src/com/sun/jini/example/cancellation?rev-219>
+     * 
+     * I hope this helps,
+     * Brian
+     * </pre>
      */
     public void test_interruptRMI() throws Exception {
-
-        if(!BigdataStatics.runKnownBadTests) {
-            /**
-             * FIXME TEST DISABLED. I have written to the river mailing list
-             * about this test. I am not observing the interrupt of the
-             * Thread.sleep() on the remote service. I need to figure out if
-             * that is the expected behavior or if this is an RMI bug.
-             */
-            return;
-        }
         
         // Start a service.
         final HAGlue serverA = startA();
@@ -458,8 +488,9 @@ public class TestHAJournalServer extends AbstractHA3JournalServerTestCase {
         }
 
         /*
-         * Verify the root cause as observed by A for the interrupt. It should
-         * also be an InterruptedException.
+         * Verify that A does NOT observe the interrupt. Instead, the
+         * Thread.sleep() should complete normally on A. See the comments at the
+         * head of this test method.
          * 
          * Note: Again, there is a data race.
          * 
@@ -476,10 +507,10 @@ public class TestHAJournalServer extends AbstractHA3JournalServerTestCase {
                     } catch (IOException e) {
                         throw new RuntimeException(e);
                     }
-                    assertNotNull(tmp);
-                    log.warn("Received non-null lastRootCause=" + tmp, tmp);
-                    assertTrue(InnerCause.isInnerCause(tmp,
-                            InterruptedException.class));
+                    assertNull(tmp);
+//                    log.warn("Received non-null lastRootCause=" + tmp, tmp);
+//                    assertTrue(InnerCause.isInnerCause(tmp,
+//                            InterruptedException.class));
                 }
             }, 10000/* timeout */, TimeUnit.MILLISECONDS);
         }
