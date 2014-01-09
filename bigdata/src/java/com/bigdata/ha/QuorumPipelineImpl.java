@@ -1951,17 +1951,6 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> /*extends
                          * continuously.  This does rather beg the question of
                          * whether we should only be checking futRec at this stage.
                          */
-
-                        /*
-                         * Await the Futures, but spend more time waiting on the
-                         * local Future and only check the remote Future every
-                         * second. Timeouts are ignored during this loop - they
-                         * are used to let us wait longer on the local Future
-                         * than on the remote Future. ExecutionExceptions are
-                         * also ignored. We want to continue this loop until
-                         * both Futures are done. Interrupts are not trapped, so
-                         * an interrupt will still exit the loop.
-                         */
                         while (!futSnd.isDone() || !futRec.isDone()) {
                             /*
                              * Make sure leader's quorum token remains valid for
@@ -1969,7 +1958,7 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> /*extends
                              */
                             member.assertLeader(token);
                             try {
-                                futSnd.get(10L, TimeUnit.MILLISECONDS);
+                                futSnd.get(500L, TimeUnit.MILLISECONDS);
                             } catch (TimeoutException ignore) {
                             } catch (ExecutionException ignore) {
                                 /*
@@ -1977,7 +1966,7 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> /*extends
                                  * if not done.
                                  */
                                 try {
-                                    futRec.get(1L, TimeUnit.SECONDS);
+                                    futRec.get(500L, TimeUnit.MILLISECONDS);
                                 } catch(TimeoutException ex) { // Ignore.
                                 } catch(ExecutionException ex) { // Ignore.
                                 } finally {
@@ -1988,7 +1977,7 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> /*extends
                                  */
                             }
                             try {
-                                futRec.get(10L, TimeUnit.MILLISECONDS);
+                                futRec.get(500L, TimeUnit.MILLISECONDS);
                             } catch (TimeoutException ignore) {
                             } catch (ExecutionException ignore) {
                                 /*
@@ -1996,7 +1985,7 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> /*extends
                                  * if not done.
                                  */
                                 try {
-                                    futSnd.get(10L, TimeUnit.MILLISECONDS);
+                                    futSnd.get(500L, TimeUnit.MILLISECONDS);
                                 } catch(TimeoutException ex) { // Ignore.
                                 } catch(ExecutionException ex) { // Ignore.
                                 } finally {
@@ -2582,7 +2571,7 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> /*extends
                              */
                             member.getQuorum().assertQuorum(token);
                             try {
-                                futRec.get(1L, TimeUnit.SECONDS);
+                                futRec.get(500L, TimeUnit.MILLISECONDS);
                             } catch (TimeoutException ignore) {
                             } catch (ExecutionException ignore) {
                                 /*
@@ -2590,7 +2579,7 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> /*extends
                                  * if not done.
                                  */
                                 try {
-                                	futRep.get(1L, TimeUnit.SECONDS);
+                                	futRep.get(500L, TimeUnit.MILLISECONDS);
                                 } catch(TimeoutException ex) { // Ignore.
                                 } catch(ExecutionException ex) { // Ignore.
                                 } finally {
@@ -2601,7 +2590,7 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> /*extends
                                  */
                             }
                             try {
-                                futRep.get(10L, TimeUnit.MILLISECONDS);
+                                futRep.get(500L, TimeUnit.MILLISECONDS);
                             } catch (TimeoutException ignore) {
                             } catch (ExecutionException ignore) {
                                 /*
@@ -2609,7 +2598,7 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> /*extends
                                  * if not done.
                                  */
                                 try {
-                                	futRec.get(1L, TimeUnit.SECONDS);
+                                	futRec.get(500L, TimeUnit.MILLISECONDS);
                                 } catch(TimeoutException ex) { // Ignore.
                                 } catch(ExecutionException ex) { // Ignore.
                                 } finally {
