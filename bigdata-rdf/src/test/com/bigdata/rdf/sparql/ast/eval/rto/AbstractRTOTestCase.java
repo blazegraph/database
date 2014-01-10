@@ -80,7 +80,9 @@ import com.bigdata.rdf.sparql.ast.optimizers.IASTOptimizer;
  *      already have a test for inside of UNION and OPTIONAL).
  * 
  *      TODO Test case to verify that we do not reorder inside of a SERVICE
- *      call.
+ *      call. Currently it won't since it is invoked from within
+ *      AST2BOpUtility#convertJoinGroup(), but this would be an issue if the RTO
+ *      was turned into an {@link IASTOptimizer}.
  * 
  *      TODO Test case to verify that exogenous bindings are visible to the RTO.
  *      Specifically, make sure that the exogenous bindings are applied when the
