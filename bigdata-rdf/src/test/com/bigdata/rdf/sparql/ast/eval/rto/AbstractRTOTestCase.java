@@ -91,6 +91,25 @@ import com.bigdata.rdf.sparql.ast.optimizers.IASTOptimizer;
  * 
  *      TODO Add some govtrack queries. Those queries use quads mode and have a
  *      lot of interesting query constructions.
+ * 
+ *      TODO TESTS: Provide test coverage for running queries with complex
+ *      FILTERs (triples mode is Ok).
+ * 
+ *      TODO TESTS: Test with FILTERs that can not run until after all joins.
+ *      Such filters are only attached when the [pathIsComplete] flag is set.
+ *      This might only occur when we have FILTERs that depend on variables that
+ *      are only "maybe" bound by an OPTIONAL join.
+ * 
+ *      TODO TESTS: Quads mode tests. We need to look in depth at how the quads
+ *      mode access paths are evaluated. There are several different conditions.
+ *      We need to look at each condition and at whether and how it can be made
+ *      compatible with cutoff evaluation. (This is somewhat similar to the old
+ *      scan+filter versus nested query debate on quads mode joins.)
+ * 
+ *      TODO TESTS: Scale-out tests. For scale-out, we need to either mark the
+ *      join's evaluation context based on whether or not the access path is
+ *      local or remote (and whether the index is key-range distributed or hash
+ *      partitioned).
  */
 public class AbstractRTOTestCase extends AbstractDataDrivenSPARQLTestCase {
 

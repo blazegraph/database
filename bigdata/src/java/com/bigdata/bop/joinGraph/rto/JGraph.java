@@ -1387,7 +1387,7 @@ public class JGraph {
      *            those get applied when we evaluate the cutoff joins from one
      *            vertex to another.
      */
-    public void sampleAllVertices(final QueryEngine queryEngine, final int limit) {
+    private void sampleAllVertices(final QueryEngine queryEngine, final int limit) {
 
         final Map<Vertex, AtomicInteger> vertexLimit = new LinkedHashMap<Vertex, AtomicInteger>();
         

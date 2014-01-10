@@ -27,8 +27,6 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
-import org.apache.log4j.Logger;
-
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IConstraint;
@@ -87,7 +85,7 @@ import com.bigdata.rdf.sparql.ast.eval.AST2BOpRTO;
  */
 public class Path {
 
-    private static final transient Logger log = Logger.getLogger(Path.class);
+//    private static final transient Logger log = Logger.getLogger(Path.class);
 
     /**
      * An ordered list of the vertices in the {@link Path}.
@@ -180,6 +178,13 @@ public class Path {
      *         the JGraph trace appropriately. [Refactor into an IPathCost
      *         interface. It should have visibility into the full path and also
      *         allow visibility into the vertex cost for generality.]
+     * 
+     *         TODO Add a cost function API, e.g., IPathCost. This gets passed
+     *         into Path to compute a score. We also compute a score for a
+     *         vertex. Add query hints for both so we can control the behavior.
+     *         The default should be estCard, but estRead or a weighted
+     *         combination of estCard and estRead are also possible cost
+     *         functions.
      */
     private static long getCost(final long sumEstRead, final long sumEstCard) {
 

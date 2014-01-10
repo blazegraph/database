@@ -32,9 +32,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.FutureTask;
-import java.util.concurrent.TimeUnit;
-
-import org.apache.log4j.Logger;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
@@ -50,14 +47,12 @@ import com.bigdata.bop.ap.SampleIndex;
 import com.bigdata.bop.ap.SampleIndex.SampleType;
 import com.bigdata.bop.controller.AbstractSubqueryOp;
 import com.bigdata.bop.engine.AbstractRunningQuery;
-import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
-import com.bigdata.rdf.sparql.ast.IJoinNode;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpRTO;
-import com.bigdata.rdf.sparql.ast.optimizers.IASTOptimizer;
+import com.bigdata.rdf.sparql.ast.eval.AST2BOpUtility;
 import com.bigdata.util.NT;
 import com.bigdata.util.concurrent.Haltable;
 
@@ -65,12 +60,32 @@ import cutthecrap.utils.striterators.ICloseableIterator;
 
 /**
  * A join graph with annotations for estimated cardinality and other details in
- * support of runtime query optimization. A join graph is a collection of
- * relations and joins which connect those relations. This boils down to a
- * collection of {@link IPredicate}s (selects on relations), shared variables
- * (which identify joins), and {@link IConstraint}s (which limit solutions).
- * Operators other than standard joins (including optional joins, sort, order
- * by, etc.) must be handled downstream from the join graph in a "tail plan".
+ * support of runtime query optimization. A join graph is a collection of access
+ * paths reading on relations (the vertices of the join graph) and joins which
+ * connect those relations (the edges of the join graph). This boils down to a
+ * collection of {@link IPredicate}s (access paths reading on on relations),
+ * shared variables (which identify joins), and {@link IConstraint}s (which may
+ * reject some solutions for those joins). Operators other than standard joins
+ * (including optional joins, sort, order by, etc.) must be handled downstream
+ * from the join graph in a "tail plan".
+ * <p>
+ * The {@link JoinGraph} operator works in two phases. On its first invocation,
+ * it constructs a {@link JGraph join graph} and identifies a join path having a
+ * low cost join ordering. This join path is converted into a query plan and set
+ * as the {@link Attributes#QUERY_PLAN} attribute on the {@link IRunningQuery}.
+ * The upstream solutions are then flooded into sub-query that executes the
+ * chosen query plan. The solutions from the sub-query are simply copied to the
+ * output sink of the {@link JoinGraph} operator. Once the query plan has been
+ * identified by the first invocation, subsequent invocations of this operator
+ * simply push more data into the sub-query using the pre-identified query plan.
+ * 
+ * TODO This approach amounts to bottom-up evaluation of the {@link JGraph}.
+ * Thus, the RTO is not using information from the upstream query when it
+ * decides on a query plan. Therefore, we could lift-out the RTO sections of the
+ * query into named subqueries, run them first in parallel, and then INCLUDE
+ * their results into the main query. This would require an AST optimizer to
+ * modify the AST. (Currently the RTO is integrated when the query plan is
+ * generated in {@link AST2BOpUtility} rather than as an AST optimizer.)
  * 
  * @see http://arxiv.org/PS_cache/arxiv/pdf/0810/0810.4809v1.pdf, XQuery Join
  *      Graph Isolation.
@@ -87,19 +102,19 @@ public class JoinGraph extends PipelineOp {
 
 	private static final long serialVersionUID = 1L;
 
-    private static final transient Logger log = Logger
-            .getLogger(JoinGraph.class);
+//    private static final transient Logger log = Logger
+//            .getLogger(JoinGraph.class);
 
     /**
 	 * Known annotations.
 	 */
 	public interface Annotations extends PipelineOp.Annotations {
 
-        /**
-         * The variables to be projected out of the join graph (optional). When
-         * <code>null</code>, all variables will be projected out.
-         */
-        String SELECTED = JoinGraph.class.getName() + ".selected";
+//        /**
+//         * The variables to be projected out of the join graph (optional). When
+//         * <code>null</code>, all variables will be projected out.
+//         */
+//        String SELECTED = JoinGraph.class.getName() + ".selected";
 		
         /**
          * The vertices of the join graph, expressed an an {@link IPredicate}[]
@@ -147,44 +162,12 @@ public class JoinGraph extends PipelineOp {
         /**
          * The set of variables that are known to have already been materialized
          * in the context in which the RTO was invoked.
-         * 
-         * FIXME In order to support left-to-right evaluation fully, the
-         * {@link JGraph} needs to accept this, track it as it binds variables,
-         * and pass it through when doing cutoff joins to avoid pipeline
-         * materialization steps for variables that are already known to be
-         * materialized. Otherwise the RTO will assume that it needs to
-         * materialize everything that needs to be materialized for a FILTER and
-         * thus do too much work (which is basically the assumption of bottom-up
-         * evaluation, or if you prefer that it is executing in its own little
-         * world).
          */
         String DONE_SET = JoinGraph.class.getName() + ".doneSet";
-
-//        /**
-//         * The query hints from the dominating AST node (if any). These query
-//         * hints will be passed through and made available when we compile the
-//         * query plan once the RTO has decided on the join ordering. While the
-//         * RTO is running, it needs to override many of the query hints for the
-//         * {@link IPredicate}s, {@link PipelineJoin}s, etc. in order to ensure
-//         * that the cutoff evaluation semantics are correctly applied while it
-//         * is exploring the plan state space for the join graph.
-//         */
-//        String AST_QUERY_HINTS = JoinGraph.class.getName() + ".astQueryHints";
 
         /**
          * The AST {@link JoinGroupNode} for the joins and filters that we are
          * running through the RTO (required).
-         * 
-         * FIXME This should be set by an ASTRTOOptimizer. That class should
-         * rewrite the original join group, replacing some set of joins with a
-         * JoinGraphNode which implements {@link IJoinNode} and gets hooked into
-         * AST2BOpUtility#convertJoinGroup() normally rather than through
-         * expectional processing. This will simplify the code and adhere to the
-         * general {@link IASTOptimizer} pattern and avoid problems with cloning
-         * children out of the {@link JoinGroupNode} when we set it up to run
-         * the RTO. [Eventually, we will need to pass this in rather than the
-         * {@link IPredicate}[] in order to handle JOINs that are not SPs, e.g.,
-         * sub-selects, etc.]
          */
         String JOIN_GROUP = JoinGraph.class.getName() + ".joinGroup";
 
@@ -207,9 +190,6 @@ public class JoinGraph extends PipelineOp {
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
      *         Thompson</a>
-     * 
-     *         TODO This could also be put on a {@link BOpStats} interface,
-     *         which is the other way for accessing shared state.
      */
     public interface Attributes {
 
@@ -236,14 +216,14 @@ public class JoinGraph extends PipelineOp {
      * JoinGraph operator annotations.
      */
     
-	/**
-	 * @see Annotations#SELECTED
-	 */
-	public IVariable<?>[] getSelected() {
-
-		return (IVariable[]) getRequiredProperty(Annotations.SELECTED);
-
-	}
+//	/**
+//	 * @see Annotations#SELECTED
+//	 */
+//	public IVariable<?>[] getSelected() {
+//
+//		return (IVariable[]) getRequiredProperty(Annotations.SELECTED);
+//
+//	}
 
 	/**
 	 * @see Annotations#VERTICES
@@ -462,72 +442,99 @@ public class JoinGraph extends PipelineOp {
 
 	    }
 
-        /**
-         * {@inheritDoc}
-         * 
-         * FIXME When run as sub-query, we need to fix point the upstream
-         * solutions and then flood them into the join graph. Samples of the
-         * known bound variables can be pulled from those initial solutions.
-         */
 	    @Override
 	    public Void call() throws Exception {
 	        
-	        final long begin = System.nanoTime();
+            if (getQueryPlan(context.getRunningQuery()) == null) {
+                
+                /*
+                 * Use the RTO to generate a query plan.
+                 * 
+                 * TODO Make sure that the JoinGraph can not be triggered
+                 * concurrently, e.g., that the CONTROLLER attribute prevents
+                 * concurrent evaluation, just like MAX_PARALLEL.
+                 */
+                
+                // final long begin = System.nanoTime();
+
+                // Create the join graph.
+                final JGraph g = new JGraph(JoinGraph.this);
+
+                /*
+                 * This map is used to associate join path segments (expressed
+                 * as an ordered array of bopIds) with edge sample to avoid
+                 * redundant effort.
+                 */
+                final Map<PathIds, EdgeSample> edgeSamples = new LinkedHashMap<PathIds, EdgeSample>();
+
+                // Find the best join path.
+                final Path path = g
+                        .runtimeOptimizer(context.getRunningQuery()
+                                .getQueryEngine(), getLimit(), getNEdges(),
+                                edgeSamples);
+
+                /*
+                 * Release samples.
+                 * 
+                 * TODO If we have fully sampled some vertices or edges, then we
+                 * could replace the JOIN with the sample. For this to work, we
+                 * would need to access path that could read the sample and we
+                 * would have to NOT release the samples until the RTO was done
+                 * executing sub-queries against the generated query plan. Since
+                 * we can flow multiple chunks into the sub-query, this amounts
+                 * to having a LAST_PASS annotation.
+                 */
+                
+                for (EdgeSample s : edgeSamples.values()) {
+
+                    s.releaseSample();
+                    
+                }
+ 
+                for (Vertex v : g.getVertices()) {
+
+                    if (v.sample != null) {
+                        v.sample.releaseSample();
+                    
+                    }
+                    
+                }
+                
+                // Set attribute for the join path result.
+                setPath(context.getRunningQuery(), path);
+
+                // Set attribute for the join path samples.
+                setSamples(context.getRunningQuery(), edgeSamples);
+
+                // final long mark = System.nanoTime();
+                //
+                // final long elapsed_queryOptimizer = mark - begin;
+
+                /*
+                 * Generate the query from the selected join path.
+                 */
+                final PipelineOp queryOp = AST2BOpRTO.compileJoinGraph(context
+                        .getRunningQuery().getQueryEngine(), JoinGraph.this,
+                        path);
+
+                // Set attribute for the join path samples.
+                setQueryPlan(context.getRunningQuery(), queryOp);
+
+            }
 	        
-            // Create the join graph.
-            final JGraph g = new JGraph(JoinGraph.this);
-
-            /*
-             * This map is used to associate join path segments (expressed as an
-             * ordered array of bopIds) with edge sample to avoid redundant effort.
-             * 
-             * FIXME RTO: HEAP MANAGMENT : This map holds references to the cutoff
-             * join samples. To ensure that the map has the minimum heap footprint,
-             * it must be scanned each time we prune the set of active paths and any
-             * entry which is not a prefix of an active path should be removed.
-             * 
-             * TODO RTO: MEMORY MANAGER : When an entry is cleared from this map,
-             * the corresponding allocation in the memory manager (if any) must be
-             * released. The life cycle of the map needs to be bracketed by a
-             * try/finally in order to ensure that all allocations associated with
-             * the map are released no later than when we leave the lexicon scope of
-             * that clause.
-             */
-            final Map<PathIds, EdgeSample> edgeSamples = new LinkedHashMap<PathIds, EdgeSample>();
-
-            // Find the best join path.
-            final Path path = g.runtimeOptimizer(context.getRunningQuery()
-                    .getQueryEngine(), getLimit(), getNEdges(), edgeSamples);
-
-            // Set attribute for the join path result.
-            setPath(context.getRunningQuery(), path);
-
-            // Set attribute for the join path samples.
-            setSamples(context.getRunningQuery(), edgeSamples);
-
-	        final long mark = System.nanoTime();
-	        
-	        final long elapsed_queryOptimizer = mark - begin;
-	        
-            /*
-             * Generate the query from the selected join path.
-             */
-            final PipelineOp queryOp = AST2BOpRTO.compileJoinGraph(context
-                    .getRunningQuery().getQueryEngine(), JoinGraph.this, path);
-
-            // Set attribute for the join path samples.
-            setQueryPlan(context.getRunningQuery(), queryOp);
-
+            // The query plan.
+            final PipelineOp queryOp = getQueryPlan(context.getRunningQuery());
+            
             // Run the query, blocking until it is done.
 	        JoinGraph.runSubquery(context, queryOp);
 
-	        final long elapsed_queryExecution = System.nanoTime() - mark;
-	        
-            if (log.isInfoEnabled())
-                log.info("RTO: queryOptimizer="
-                        + TimeUnit.NANOSECONDS.toMillis(elapsed_queryOptimizer)
-                        + ", queryExecution="
-                        + TimeUnit.NANOSECONDS.toMillis(elapsed_queryExecution));
+//	        final long elapsed_queryExecution = System.nanoTime() - mark;
+//	        
+//            if (log.isInfoEnabled())
+//                log.info("RTO: queryOptimizer="
+//                        + TimeUnit.NANOSECONDS.toMillis(elapsed_queryOptimizer)
+//                        + ", queryExecution="
+//                        + TimeUnit.NANOSECONDS.toMillis(elapsed_queryExecution));
 
 	        return null;
 
@@ -542,41 +549,47 @@ public class JoinGraph extends PipelineOp {
      * subquery. Therefore we have to take appropriate care to ensure that the
      * results are copied out of the subquery and into the parent query. See
      * {@link AbstractSubqueryOp} for how this is done.
-     * 
-     * @throws Exception
-     * 
-     * @todo When we execute the query, we should clear the references to the
-     *       samples (unless they are exact, in which case they can be used as
-     *       is) in order to release memory associated with those samples if the
-     *       query is long running. Samples must be held until we have
-     *       identified the final join path since each vertex will be used by
-     *       each maximum length join path and we use the samples from the
-     *       vertices to re-sample the surviving join paths in each round. [In
-     *       fact, the samples are not being provided to this evaluation context
-     *       right now.]
-     * 
-     * @todo If there are source binding sets then they need to be applied above
-     *       (when we are sampling) and below (when we evaluate the selected
-     *       join path).
      */
     static private void runSubquery(
             final BOpContext<IBindingSet> parentContext,
             final PipelineOp queryOp) throws Exception {
 
+        if(parentContext==null)
+            throw new IllegalArgumentException();
+        
+        if(queryOp==null)
+            throw new IllegalArgumentException();
+        
         final QueryEngine queryEngine = parentContext.getRunningQuery()
                 .getQueryEngine();
 
         /*
-         * Run the query.
-         * 
-         * TODO Pass in the source binding sets here and also when sampling the
-         * vertices? Otherwise it is as if we are doing bottom-up evaluation (in
-         * which case the doneSet should be empty on entry).
+         * Run the sub-query.
          */
 
         ICloseableIterator<IBindingSet[]> subquerySolutionItr = null;
 
-        final IRunningQuery runningSubquery = queryEngine.eval(queryOp);
+        // Fully materialize the upstream solutions.
+        final IBindingSet[] bindingSets = BOpUtility.toArray(
+                parentContext.getSource(), parentContext.getStats());
+
+        /*
+         * Run on all available upstream solutions.
+         * 
+         * Note: The subquery will run for each chunk of upstream solutions, so
+         * it could make sense to increase the vector size or to collect all
+         * upstream solutions into a SolutionSet and then flood them into the
+         * sub-query.
+         * 
+         * Note: We do not need to do a hash join with the output of the
+         * sub-query. This amounts to pipelined evaluation. Solutions flow into
+         * a subquery and then back out. The only reason for a hash join would
+         * be if we project in only a subset of the variables that were in scope
+         * in the parent context and then needed to pick up the correlated
+         * variables after running the query plan generated by the RTO.
+         */
+        final IRunningQuery runningSubquery = queryEngine.eval(queryOp,
+                bindingSets);
 
         try {
 
