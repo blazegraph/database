@@ -580,7 +580,7 @@ public class AST2BOpJoins extends AST2BOpFilters {
         /*
          * TODO This optimization COULD be decided statically if we marked the
          * predicate with the index would would be used when it was evaluated.
-         * That is known in advance EXCEPT except when some joins are optional,
+         * That is known in advance EXCEPT when some joins are optional,
          * in which case the actual index can not be known until runtime. The
          * code which attaches the "as-bound" index to the predicate MUST also
          * consider the exogenous variables (if any). This might be done in the
@@ -678,7 +678,7 @@ public class AST2BOpJoins extends AST2BOpFilters {
              * cases where the PARALLEL SUBQUERY plan is faster than the
              * SCAN+FILTER. The approach coded here does not make the correct
              * decisions for reasons which seem to have more to do with the data
-             * density / sparsity for the APS which would be used for
+             * density / sparsity for the APs which would be used for
              * SCAN+FILTER versus PARALLEL SUBQUERY. Therefore the PARALLEL
              * SUBQUERY path for default graph access paths is currently
              * disabled.
