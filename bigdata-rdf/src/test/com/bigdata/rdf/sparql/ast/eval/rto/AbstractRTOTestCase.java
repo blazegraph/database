@@ -231,6 +231,9 @@ public class AbstractRTOTestCase extends AbstractDataDrivenSPARQLTestCase {
         // The join path selected by the RTO.
         final Path path = joinGraph.getPath(l.getRunningQuery());
 
+        // Verify that a path was attached to the query.
+        assertNotNull(path);
+        
         if (log.isInfoEnabled())
             log.info("path=" + path);
 

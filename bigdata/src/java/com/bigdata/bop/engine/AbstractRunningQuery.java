@@ -684,25 +684,25 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
 		statsMap.put(bopId, stats);
 //		log.warn("bopId=" + bopId + ", stats=" + stats);
 
-        if (!op.getProperty(BOp.Annotations.CONTROLLER,
-                BOp.Annotations.DEFAULT_CONTROLLER)) {
-            /*
-             * Visit children, but not if this is a CONTROLLER operator since
-             * its children belong to a subquery.
-             */
-            final Iterator<BOp> itr = op.argIterator();
+        /*
+         * Visit children.
+         * 
+         * Note: The CONTROLLER concept has its subquery expressed through an
+         * annotation, not through its arguments. We always want to visit the
+         * child arguments of a pipeline operator. We just do not want to visit
+         * the operators in its sub-query plan.
+         */
+        final Iterator<BOp> itr = op.argIterator();
 
-            while(itr.hasNext()) {
-            
-                final BOp t = itr.next();
-            
-                // visit children (recursion)
-                populateStatsMap(t);
-                
-            }
-            
+        while (itr.hasNext()) {
+
+            final BOp t = itr.next();
+
+            // visit children (recursion)
+            populateStatsMap(t);
+
         }
-
+            
     }
 
     /**
