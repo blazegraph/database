@@ -75,13 +75,12 @@ import com.bigdata.bop.joinGraph.rto.Path;
 import com.bigdata.bop.joinGraph.rto.SampleBase;
 import com.bigdata.bop.joinGraph.rto.VertexSample;
 import com.bigdata.bop.rdf.join.ChunkedMaterializationOp;
+import com.bigdata.bop.rdf.join.DataSetJoin;
 import com.bigdata.bop.solutions.MemorySortOp;
-import com.bigdata.bop.solutions.ProjectionOp;
 import com.bigdata.bop.solutions.SliceOp;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
-import com.bigdata.rdf.sparql.ast.IBindingProducerNode;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.QueryHints;
@@ -92,6 +91,11 @@ import com.bigdata.util.NT;
 
 /**
  * Integration with the Runtime Optimizer (RTO).
+ * <p>
+ * Note: The RTO currently uses bottom-up evaluation to solve the join graph and
+ * generate a sub-query plan with an optimized join ordering. It uses
+ * left-to-right evaluation to pass pipeline solutions through the optimized
+ * subquery.
  * 
  * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/64">Runtime
  *      Query Optimization</a>
@@ -105,11 +109,6 @@ import com.bigdata.util.NT;
  * @see JGraph
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * 
- *         TODO Can the RTO give us information about the locality of joins that
- *         we could use to decide on vectoring (chunkSize) for those joins or to
- *         decide when to use a hash join against an access path as opposed to a
- *         nested index join?
  */
 public class AST2BOpRTO extends AST2BOpJoins {
 
@@ -180,33 +179,6 @@ public class AST2BOpRTO extends AST2BOpJoins {
     static private final boolean onlySPs = true;
     
     /**
-     * When <code>true</code>, the RTO will be applied as in we were doing
-     * bottom-up query optimization. In this case, it WILL NOT receive any
-     * solutions from the upstream operators in the pipeline when it performs
-     * its runtime sampling and it will ignore the <code>doneSet</code> for the
-     * context in which it is invoked. When run in this manner, the RTO *could*
-     * be run before the main query is executed. The only way to facilitate this
-     * at this time would be to lift out the joins on which the RTO would be run
-     * into a named subquery and then optimize that named subquery before the
-     * rest of the query.
-     * <p>
-     * When <code>false</code>, the RTO solutions from upstream operators will
-     * flow into the RTO.
-     * 
-     * TODO We could still pass in exogenous solutions for bottom up evaluation.
-     * This would help constraint the RTOs exploration.
-     * 
-     * TODO The RTO is not operating 100% in either an left-to-right or a
-     * bottom-up fashion, primarily because we are not passing in either
-     * exogenous bindings or meaningfully using the bindings from the upstream
-     * operator when exploring the join graph. In fact, the RTO could accept a
-     * new sample from the upstream operator in each iteration drawing from
-     * amoung those solutions which had already been materialized by the
-     * upstream operator.
-     */
-    static private final boolean bottomUp = true;
-
-    /**
      * When <code>true</code>, even simple JOINs will run through the code path
      * for the evaluation of complex joins.
      * <p>
@@ -225,7 +197,7 @@ public class AST2BOpRTO extends AST2BOpJoins {
      * @see #runSimpleJoin(QueryEngine, SampleBase, int, PipelineJoin)
      * @see #runComplexJoin(QueryEngine, SampleBase, int, PipelineOp)
      * 
-     *      FIXME RTO: Measure performance when using the complex join code path
+     *      TODO RTO: Measure performance when using the complex join code path
      *      as opposed to the simple join code path. If there is a performance
      *      win for the simple join code path, then set this to false in
      *      committed code. If not, then we might as well run everything in the
@@ -235,7 +207,7 @@ public class AST2BOpRTO extends AST2BOpJoins {
      *      somewhat in the end result that they produce. This can be observed
      *      in BSBM Q1 on the pc100 data set and the BAR query.
      */
-    static final boolean runAllJoinsAsComplexJoins = false; 
+    static final boolean runAllJoinsAsComplexJoins = false;
     
     /**
      * Inspect the remainder of the join group. If we can isolate a join graph
@@ -400,37 +372,6 @@ public class AST2BOpRTO extends AST2BOpJoins {
 
         }
         
-        /*
-         * Figure out which variables are projected out of the RTO.
-         * 
-         * TODO This should only include things that are not reused later in the
-         * query.
-         */
-        final Set<IVariable<?>> selectVars = new LinkedHashSet<IVariable<?>>();
-        {
-            
-            for (IGroupMemberNode child : rtoJoinGroup.getChildren()) {
-
-                if (!(child instanceof IBindingProducerNode))
-                    continue;
-
-                // Note: recursive only matters for complex nodes, not SPs.
-                ctx.sa.getDefinitelyProducedBindings(
-                        (IBindingProducerNode) child, selectVars, true/* recursive */);
-
-            }
-            
-        }
-        
-        /*
-         * FIXME RTO: Sub-Groups: When running the RTO as anything other than
-         * the top-level join group in the query plan and for the *FIRST* joins
-         * in the query plan, we need to flow in any solutions that are already
-         * in the pipeline (unless we are going to run the RTO "bottom up") and
-         * build a hash index. When the hash index is ready, we can execute the
-         * join group.
-         */
-
         final SampleType sampleType = joinGroup.getProperty(
                 QueryHints.RTO_SAMPLE_TYPE, QueryHints.DEFAULT_RTO_SAMPLE_TYPE);
         
@@ -447,8 +388,8 @@ public class AST2BOpRTO extends AST2BOpJoins {
                 new NV(BOp.Annotations.CONTROLLER, true),// Drop "CONTROLLER" annotation?
                 // new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
                 // new NV(PipelineOp.Annotations.LAST_PASS, true),// required
-                new NV(JoinGraph.Annotations.SELECTED, selectVars
-                        .toArray(new IVariable[selectVars.size()])),//
+//                new NV(JoinGraph.Annotations.SELECTED, selectVars
+//                        .toArray(new IVariable[selectVars.size()])),//
                 new NV(JoinGraph.Annotations.VERTICES,
                         preds.toArray(new Predicate[preds.size()])),//
                 new NV(JoinGraph.Annotations.CONSTRAINTS, constraints
@@ -495,32 +436,12 @@ public class AST2BOpRTO extends AST2BOpJoins {
         if (path == null)
             throw new IllegalArgumentException();
 
-        final IVariable<?>[] selected = joinGraph.getSelected();
+//        final IVariable<?>[] selected = joinGraph.getSelected();
 
         final IPredicate<?>[] predicates = path.getPredicates();
 
         final IConstraint[] constraints = joinGraph.getConstraints();
-        
-//        if (onlySimpleJoins) {
-//
-//            /*
-//             * This is the old code. It does not handle variable materialization
-//             * for filters.
-//             */
-//
-//            // Factory avoids reuse of bopIds assigned to the predicates.
-//            final BOpIdFactory idFactory = new BOpIdFactory();
-//
-//            return PartitionedJoinGroup.getQuery(idFactory,
-//                    false/* distinct */, selected, predicates, constraints);
-//
-//        }
 
-        /*
-         * FIXME RTO: doneSet: The RTO is ignoring the doneSet so it always runs
-         * all materialization steps even if some variable is known to be
-         * materialized on entry.
-         */
         final Set<IVariable<?>> doneSet = joinGraph.getDoneSet();
 
         /*
@@ -584,16 +505,16 @@ public class AST2BOpRTO extends AST2BOpJoins {
 
         }
 
-        if (selected != null && selected.length != 0) {
-
-            // Drop variables that are not projected out.
-            left = applyQueryHints(new ProjectionOp(//
-                    leftOrEmpty(left), //
-                    new NV(ProjectionOp.Annotations.BOP_ID, idFactory.nextId()),//
-                    new NV(ProjectionOp.Annotations.SELECT, selected)//
-                    ), rtoJoinGroup, ctx);
-
-        }
+//        if (selected != null && selected.length != 0) {
+//
+//            // Drop variables that are not projected out.
+//            left = applyQueryHints(new ProjectionOp(//
+//                    leftOrEmpty(left), //
+//                    new NV(ProjectionOp.Annotations.BOP_ID, idFactory.nextId()),//
+//                    new NV(ProjectionOp.Annotations.SELECT, selected)//
+//                    ), rtoJoinGroup, ctx);
+//
+//        }
         
         return left;
 
@@ -729,27 +650,6 @@ public class AST2BOpRTO extends AST2BOpJoins {
      *            the {@link EdgeSample} for that {@link Path}.
      * 
      * @return The result of sampling that edge.
-     * 
-     *         TODO TESTS: Provide test coverage for running queries with
-     *         complex FILTERs (triples mode is Ok).
-     * 
-     *         TODO TESTS: Test with FILTERs that can not run until after all
-     *         joins. Such filters are only attached when the [pathIsComplete]
-     *         flag is set. This might only occur when we have FILTERs that
-     *         depend on variables that are only "maybe" bound by an OPTIONAL
-     *         join.
-     * 
-     *         TODO TESTS: Quads mode tests. We need to look in depth at how the
-     *         quads mode access paths are evaluated. There are several
-     *         different conditions. We need to look at each condition and at
-     *         whether and how it can be made compatible with cutoff evaluation.
-     *         (This is somewhat similar to the old scan+filter versus nested
-     *         query debate on quads mode joins.)
-     * 
-     *         TODO TESTS: Scale-out tests. For scale-out, we need to either
-     *         mark the join's evaluation context based on whether or not the
-     *         access path is local or remote (and whether the index is
-     *         key-range distributed or hash partitioned).
      */
     static public EdgeSample cutoffJoin(//
             final QueryEngine queryEngine,//
@@ -900,7 +800,11 @@ public class AST2BOpRTO extends AST2BOpJoins {
          * that is known to have been materialized based on an analysis of the
          * join path (as executed) up to this point in the path. This will let
          * us potentially do less work. This will require tracking the doneSet
-         * in the Path and passing the Path into cutoffJoin().
+         * in the Path and passing the Path into cutoffJoin(). The simplest way
+         * to manage this is to just annotate the Path as we go, which means
+         * making the Path more AST aware - or at least doneSet aware. Or we can
+         * just apply the analysis to each step in the path to figure out what
+         * is done each time we setup cutoff evaluation of an operator.
          */
         final Set<IVariable<?>> doneSet = new LinkedHashSet<IVariable<?>>(
                 joinGraph.getDoneSet());
@@ -1101,6 +1005,19 @@ public class AST2BOpRTO extends AST2BOpJoins {
      *             the manner in which the query plan is constructed and the
      *             parallelism in the query plan. Any parallelism or reordering
      *             will trip this error.
+     * 
+     *             TODO If we hit the {@link OutOfOrderEvaluationException} for
+     *             some kinds of access paths quads mode access paths, then we
+     *             might need to look at the {@link DataSetJoin} in more depth
+     *             and the way in which named graph and default graph joins are
+     *             being executed for both local and scale-out deployments. One
+     *             fall back position is to feed the input solutions in one at a
+     *             time in different running queries. This will give us the
+     *             exact output cardinality for a given source solution while
+     *             preserving parallel evaluation over some chunk of source
+     *             solutions. However, this approach can do too much work and
+     *             will incur more overhead than injecting a rowid column into
+     *             the source solutions.
      */
     private static EdgeSample runComplexJoin(//
             final QueryEngine queryEngine,//
@@ -1212,14 +1129,6 @@ public class AST2BOpRTO extends AST2BOpJoins {
         final PipelineJoinStats joinStats = (PipelineJoinStats) runningQuery
                 .getStats().get(joinOp.getId());
 
-        /*
-         * TODO It would be interesting to see the stats on each operator in the
-         * plan for each join sampled. We would be able to observe that in the
-         * EXPLAIN view if we attached the IRunningQuery for the cutoff
-         * evaluation to the parent query. However, this should only be enabled
-         * in a mode for gruesome detail since we evaluate a LOT of cutoff joins
-         * when running the RTO on a single join graph.
-         */
         if (log.isTraceEnabled())
             log.trace(//Arrays.toString(BOpUtility.getPredIds(predicates)) + ": "+
             "join::" + joinStats);

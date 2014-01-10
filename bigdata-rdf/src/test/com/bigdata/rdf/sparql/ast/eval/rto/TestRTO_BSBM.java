@@ -180,9 +180,16 @@ public class TestRTO_BSBM extends AbstractRTOTestCase {
     
     /**
      * BSBM Q4 against pc100.
+     * <p>
+     * Note: This query has TWO join groups that are sufficiently complex to run
+     * the RTO. However, only one of the join groups is marked for RTO
+     * optimization in order to keep the test harness simple. The test harness
+     * assumes that there is a single JOIN group that is optimized by the RTO
+     * and then verifies the join ordering within that join group. The test
+     * harness breaks if there is more than one join group optimized by the RTO.
      */
     public void test_BSBM_Q4_pc100() throws Exception {
-
+       
         final TestHelper helper = new TestHelper(//
                 "rto/BSBM-Q4", // testURI,
                 "rto/BSBM-Q4.rq",// queryFileURL
@@ -193,15 +200,8 @@ public class TestRTO_BSBM extends AbstractRTOTestCase {
         /*
          * Verify that the runtime optimizer produced the expected join path.
          */
-        final int[] expected = new int[] { 3, 4, 5, 1, 2, 6, 7, 8, 9, 10, 11, 12 };
+        final int[] expected = new int[] { 9, 6, 7, 8, 10, 11 };
 
-        /*
-         * FIXME This fails because there are actually TWO JoinGraph instances
-         * and we are using getOnly() to extract just ONE. It looks like one of
-         * those instances might not even run based on conditional routing in
-         * the query plan. This is probably because the query is a UNION of two
-         * complex join groups and one of them is probably failing the FILTER.
-         */
         assertSameJoinOrder(expected, helper);
         
     }

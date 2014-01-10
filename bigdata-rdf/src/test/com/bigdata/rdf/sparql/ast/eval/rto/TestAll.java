@@ -64,11 +64,19 @@ public class TestAll extends TestCase {
         // LUBM test suite.
         suite.addTestSuite(TestRTO_LUBM.class);
 
-        // BSBM test suite.
+        // BSBM test suite: TODO Add BSBM BI tests.
         suite.addTestSuite(TestRTO_BSBM.class);
         
-        // 'barData' test suite.
+        // 'barData' test suite (quads mode).
         suite.addTestSuite(TestRTO_BAR.class);
+
+        /*
+         * FOAF test suite (quads mode).
+         * 
+         * TODO This test suite is disabled since queries are not complex enough
+         * to run the RTO (we need at least required joins).
+         */
+//        suite.addTestSuite(TestRTO_FOAF.class);
 
         return suite;
         

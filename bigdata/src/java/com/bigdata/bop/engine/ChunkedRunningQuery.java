@@ -42,6 +42,8 @@ import java.util.concurrent.FutureTask;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import junit.framework.AssertionFailedError;
+
 import org.apache.log4j.Logger;
 
 import com.bigdata.bop.BOp;
@@ -1169,7 +1171,9 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
                 stats = op.newStats();
 //        		log.warn("bopId=" + bopId + ", stats=" + stats);
             }
-            assert stats != null : "No stats: op=" + op;
+            if (stats == null) {
+                throw new AssertionError("No stats: op=" + op);
+            }
 
 //            // The groupId (if any) for this operator.
 //            final Integer fromGroupId = (Integer) op

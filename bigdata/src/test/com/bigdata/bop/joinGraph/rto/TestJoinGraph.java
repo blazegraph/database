@@ -76,7 +76,7 @@ public class TestJoinGraph extends TestCase2 {
             };
             final IConstraint[] constraints = null;
             final JoinGraph joinGraph = new JoinGraph(new BOp[0],//
-                    new NV(JoinGraph.Annotations.SELECTED, new IVariable[]{}),//
+//                    new NV(JoinGraph.Annotations.SELECTED, new IVariable[]{}),//
                     new NV(JoinGraph.Annotations.VERTICES, vertices),//
                     new NV(JoinGraph.Annotations.CONTROLLER, true), //
                     new NV(JoinGraph.Annotations.EVALUATION_CONTEXT,
