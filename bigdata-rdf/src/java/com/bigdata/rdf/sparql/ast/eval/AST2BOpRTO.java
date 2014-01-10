@@ -265,7 +265,10 @@ public class AST2BOpRTO extends AST2BOpJoins {
 
             /*
              * FIXME At least an OPTIONAL join group causes a "No stats"
-             * assertion error during query evaluation.
+             * assertion error during query evaluation. When this is fixed, take
+             * out this code block.
+             * 
+             * See TestRTO_BSBM.test_BSBM_Q7b_pc100().
              */
             return left;
             
