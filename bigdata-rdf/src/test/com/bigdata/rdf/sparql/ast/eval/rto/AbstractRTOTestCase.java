@@ -127,7 +127,7 @@ import com.bigdata.rdf.sparql.ast.optimizers.IASTOptimizer;
  */
 public class AbstractRTOTestCase extends AbstractDataDrivenSPARQLTestCase {
 
-    private final static Logger log = Logger.getLogger(AbstractRTOTestCase.class);
+    protected final static Logger log = Logger.getLogger(AbstractRTOTestCase.class);
     
     /**
      * 
