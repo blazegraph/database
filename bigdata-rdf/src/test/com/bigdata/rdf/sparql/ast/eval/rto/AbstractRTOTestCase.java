@@ -69,15 +69,25 @@ import com.bigdata.rdf.sparql.ast.optimizers.IASTOptimizer;
  *      TODO See the stubbed out test suite for the RTO for some examples of
  *      join groups that it should be handling.
  * 
- *      TODO The RTO also needs to handle FILTERs that require materialization.
- *      This should be the subject of a test suite.
- * 
  *      TODO The RTO should be extended (together with test coverage) to handle
  *      more interesting kinds of join groups (optionals, sub-selects, property
  *      paths, SERVICE calls, etc).
  *      <p>
  *      Note: When handling sub-groups, etc., the RTO needs to flow solutions
  *      into the sub-query.
+ * 
+ *      TODO Test case to verify that we can reorder inside of a MINUS (we
+ *      already have a test for inside of UNION and OPTIONAL).
+ * 
+ *      TODO Test case to verify that we do not reorder inside of a SERVICE
+ *      call.
+ * 
+ *      TODO Test case to verify that exogenous bindings are visible to the RTO.
+ *      Specifically, make sure that the exogenous bindings are applied when the
+ *      RTO does bottom-up evaluation to order the join group. It is Ok if we
+ *      just handle the case with a single exogenous solution for now since we
+ *      do not systematically optimize the case for multiple exogenous solutions
+ *      yet.
  * 
  *      TODO When adding an {@link IASTOptimizer} for the RTO, modify this class
  *      to test for the inclusion of the JoinGraphNode for the RTO.
