@@ -29,9 +29,12 @@ package com.bigdata.bop.engine;
 
 import java.nio.ByteBuffer;
 import java.nio.channels.ClosedByInterruptException;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -1642,7 +1645,8 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
 
     /**
      * Report a snapshot of the known (declared) child {@link IRunningQuery}s
-     * for this {@link IRunningQuery}.
+     * for this {@link IRunningQuery} and (recursively) for any children of this
+     * {@link IRunningQuery}.
      * 
      * @return An array providing a snapshot of the known child
      *         {@link IRunningQuery}s and never <code>null</code>.
@@ -1651,13 +1655,35 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
 
         synchronized (children) {
 
-            return children.values()
-                    .toArray(new IRunningQuery[children.size()]);
+            if (children.isEmpty()) {
+
+                // Fast path if no children.
+                return EMPTY_ARRAY;
+
+            }
+
+            // Add in all direct child queries.
+            final List<IRunningQuery> tmp = new LinkedList<IRunningQuery>(
+                    children.values());
+
+            // Note: Do not iterator over [tmp] to avoid concurrent modification.
+            for (IRunningQuery c : children.values()) {
+
+                // Recursive for each child.
+                tmp.addAll(Arrays.asList(((AbstractRunningQuery) c)
+                        .getChildren()));
+
+            }
+
+            // Convert to array.
+            return tmp.toArray(new IRunningQuery[tmp.size()]);
 
         }
-        
+
     }
-    
+
+    private static final IRunningQuery[] EMPTY_ARRAY = new IRunningQuery[0];
+
     /**
      * Attach a child query.
      * <p>
