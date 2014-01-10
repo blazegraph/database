@@ -29,15 +29,27 @@ package com.bigdata.rdf.sparql.ast.eval.rto;
 
 import java.util.Properties;
 
-import com.bigdata.bop.engine.IRunningQuery;
-import com.bigdata.bop.joinGraph.rto.Path;
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.sail.BigdataSail;
-import com.bigdata.rdf.sparql.ast.eval.OutOfOrderEvaluationException;
 
 /**
  * Data driven test suite for the Runtime Query Optimizer (RTO) using BSBM data
  * and queries based on BSBM.
+ * <p>
+ * Note: BSBM is parameterized. We can generate more queries against the pc100
+ * data set easily enough. In priciple, those queries might exhibit different
+ * correlations. However, the pc100 data set may be too small for any
+ * interesting correlations. In fact, it may be too small since the vertex
+ * estimates and cutoff joins may be exact before the RTO is run running. If so,
+ * then we need to go back and use a larger data set. However, the specific
+ * parameterized queries will remain valid against larger data sets since BSBM
+ * only adds more data when generating a larger data set. Of course, the number
+ * of solutions for the queries may change.
+ * <p>
+ * Note: BSBM uses a lot of filters, subgroups, and sub-selects. As we build up
+ * coverage for those constructions in the RTO, it will handle more of the
+ * query. As a result, the observed join orders (and even the #of joins that are
+ * considered) are likely to change.
  * <p>
  * Note: Q6 is no longer run in BSBM (the query was dropped).
  * <p>
@@ -68,22 +80,6 @@ import com.bigdata.rdf.sparql.ast.eval.OutOfOrderEvaluationException;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id: TestBasicQuery.java 6440 2012-08-14 17:57:33Z thompsonbry $
- * 
- *          TODO BSBM uses a lot of filters, subgroups, and sub-selects. As we
- *          build up coverage for those constructions in the RTO, it will handle
- *          more of the query. As a result, the observed join orders (and even
- *          the #of joins that are considered) are likely to change.
- * 
- *          TODO BSBM is parameterized. We can generate more queries against the
- *          pc100 data set easily enough. In priciple, those queries might
- *          exhibit different correlations. However, the pc100 data set may be
- *          too small for any interesting correlations. In fact, it may be too
- *          small since the vertex estimates and cutoff joins may be exact
- *          before the RTO is run running. If so, then we need to go back and
- *          use a larger data set. However, the specific parameterized queries
- *          will remain valid against larger data sets since BSBM only adds more
- *          data when generating a larger data set. Of course, the number of
- *          solutions for the queries may change.
  */
 public class TestRTO_BSBM extends AbstractRTOTestCase {
 
@@ -236,11 +232,6 @@ public class TestRTO_BSBM extends AbstractRTOTestCase {
 
     /**
      * BSBM Q7 on the pc100 data set.
-     * 
-     * FIXME This fails because the RTO is running in a named subquery. The test
-     * harness is looking in the wrong place (it is looking on the wrong
-     * {@link IRunningQuery}) and therefore it fails to find the {@link Path}
-     * computed by the RTO.
      */
     public void test_BSBM_Q7_pc100() throws Exception {
         
@@ -255,11 +246,10 @@ public class TestRTO_BSBM extends AbstractRTOTestCase {
          * Verify that the runtime optimizer produced the expected join path.
          */
 
-        // FIXME The join order is unknown. 
-        final int[] expected = new int[] { 1, 3, 2, 5, 4, 7, 6 };
+        final int[] expected = new int[] { 13, 12, 14, 10, 11, 15, 16 };
 
         assertSameJoinOrder(expected, helper);
-        
+
     }
     
     /**
