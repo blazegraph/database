@@ -28,6 +28,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sparql.ast.eval.rto;
 
 import java.util.Arrays;
+import java.util.LinkedHashSet;
+import java.util.Set;
 import java.util.UUID;
 
 import org.apache.log4j.Logger;
@@ -149,7 +151,7 @@ public class AbstractRTOTestCase extends AbstractDataDrivenSPARQLTestCase {
     protected static class MyQueryListener implements IRunningQueryListener {
 
         private final UUID queryId;
-        private volatile IRunningQuery q;
+        private final Set<IRunningQuery> queries = new LinkedHashSet<IRunningQuery>();
 
         public MyQueryListener(final UUID queryId) {
 
@@ -163,22 +165,23 @@ public class AbstractRTOTestCase extends AbstractDataDrivenSPARQLTestCase {
         @Override
         public void notify(final IRunningQuery q) {
 
-            if(q.getQueryId().equals(queryId)) {
+//            if(q.getQueryId().equals(queryId)) {
             
-                this.q = q;
+                queries.add(q);
                 
-            }
+//            }
 
         }
         
-        public IRunningQuery getRunningQuery() {
+        /**
+         * Return each {@link IRunningQuery} that was noticed by this listener.
+         */
+        public Set<IRunningQuery> getRunningQueries() {
 
-            final IRunningQuery q = this.q;
-
-            if (q == null)
+            if (queries.isEmpty())
                 fail("Not found.");
 
-            return q;
+            return queries;
             
         }
         
@@ -223,13 +226,37 @@ public class AbstractRTOTestCase extends AbstractDataDrivenSPARQLTestCase {
 
         final PipelineOp queryPlan = astContainer.getQueryPlan();
 
+        /*
+         * Note: Some queries may have more than one JoinGraph instance. They
+         * will throw an exception here. You can (a) turn off all but one of the
+         * places where the RTO is running; (b) modify the test harness to be
+         * more general and verify each of the RTO instances that actually ran;
+         * or (c) move that query into a part of the test suite that is only
+         * concerned with getting the right answer and not verifying that the
+         * join ordering remains consistent in CI runs.
+         */
         final JoinGraph joinGraph = BOpUtility.getOnly(queryPlan,
                 JoinGraph.class);
 
         assertNotNull(joinGraph);
 
-        // The join path selected by the RTO.
-        final Path path = joinGraph.getPath(l.getRunningQuery());
+        /*
+         * The join path selected by the RTO.
+         * 
+         * Note: The RTO might be running inside of a named subquery. If so,
+         * then the Path is not attached to the main query. This is why we have
+         * to check each query that was noticed by our listener.
+         */
+        final Path path;
+        {
+            Path tmp = null;
+            for (IRunningQuery q : l.getRunningQueries()) {
+                tmp = joinGraph.getPath(q);
+                if (tmp != null)
+                    break;
+            }
+            path = tmp;
+        }
 
         // Verify that a path was attached to the query.
         assertNotNull(path);
