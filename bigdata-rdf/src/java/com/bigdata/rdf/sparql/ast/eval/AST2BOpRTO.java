@@ -208,6 +208,18 @@ public class AST2BOpRTO extends AST2BOpJoins {
      *      in BSBM Q1 on the pc100 data set and the BAR query.
      */
     static final boolean runAllJoinsAsComplexJoins = false;
+
+    /**
+     * When <code>true</code>, out of order evaluation will cause the RTO to
+     * fail. When <code>false</code>, out of order evaluation is silently
+     * ignored.
+     * <p>
+     * Out of order evaluation makes it impossible to accurately determine the
+     * estimated cardinality of the join since we can not compute the join hit
+     * ratio without knowing the #of solutions in required to produce a given
+     * #of solutions out.
+     */
+    static final private boolean failOutOfOrderEvaluation = false;
     
     /**
      * Inspect the remainder of the join group. If we can isolate a join graph
@@ -1083,13 +1095,13 @@ public class AST2BOpRTO extends AST2BOpJoins {
 //System.err.println(bset.toString());
                     final int rowid = ((Integer) bset.get(rtoVar).get())
                             .intValue();
-                    if (rowid < lastRowId) {
+                    if (rowid < lastRowId && failOutOfOrderEvaluation) {
                         /*
                          * Out of order evaluation makes it impossible to
-                         * determine the estimated cardinality of the join since
-                         * we can not compute the join hit ratio without knowing
-                         * the #of solutions in required to produce a given #of
-                         * solutions out.
+                         * accurately determine the estimated cardinality of the
+                         * join since we can not compute the join hit ratio
+                         * without knowing the #of solutions in required to
+                         * produce a given #of solutions out.
                          */
                         throw new OutOfOrderEvaluationException(
                                 BOpUtility.toString(query));

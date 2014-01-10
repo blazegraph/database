@@ -31,6 +31,7 @@ import java.util.Properties;
 
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.sail.BigdataSail;
+import com.bigdata.rdf.sparql.ast.eval.OutOfOrderEvaluationException;
 
 /**
  * Data driven test suite for the Runtime Query Optimizer (RTO) using BSBM data
@@ -208,6 +209,9 @@ public class TestRTO_BSBM extends AbstractRTOTestCase {
     
     /**
      * BSBM Q5 on the pc100 data set.
+     * 
+     * FIXME FAILS if we disallow out of order evaluation when doing cutoff
+     * joins.
      */
     public void test_BSBM_Q5_pc100() throws Exception {
         
