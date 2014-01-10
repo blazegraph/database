@@ -260,6 +260,16 @@ public class AST2BOpRTO extends AST2BOpJoins {
             return left;
 
         }
+        
+        if (joinGroup.isMinus() || joinGroup.isOptional()) {
+
+            /*
+             * FIXME At least an OPTIONAL join group causes a "No stats"
+             * assertion error during query evaluation.
+             */
+            return left;
+            
+        }
 
         /*
          * Consider the join group. See if it is complex enough to warrant

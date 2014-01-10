@@ -348,6 +348,61 @@ public class TestRTO_BSBM extends AbstractRTOTestCase {
     }
     
     /**
+     * A modified version BSBM Q7 on pc100 which is the simplest form of the
+     * query that causes the RTO to fail with the "No stats" assertion error.
+     * This is basically just an OPTIONAL {} join group.
+     * 
+     * <pre>
+     * PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+     * PREFIX rev: <http://purl.org/stuff/rev#>
+     * PREFIX foaf: <http://xmlns.com/foaf/0.1/>
+     * PREFIX bsbm: <http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/vocabulary/>
+     * PREFIX dc: <http://purl.org/dc/elements/1.1/>
+     * 
+     * SELECT (COUNT(*) as ?count)
+     * WHERE { 
+     * 
+     *   # Control all RTO parameters for repeatable behavior.
+     *   hint:Query hint:RTO-sampleType "DENSE".
+     *   hint:Query hint:RTO-limit "100".
+     *   hint:Query hint:RTO-nedges "1".
+     * 
+     *    <http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/instances/dataFromProducer1/Product7> rdfs:label ?productLabel .
+     *     OPTIONAL {
+     *    
+     *    # Enable the RTO inside of the OPTIONAL join group.
+     *    hint:Group hint:optimizer "Runtime".
+     *    
+     *    ?review bsbm:reviewFor <http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/instances/dataFromProducer1/Product7> .
+     *    ?review rev:reviewer ?reviewer .
+     *    ?reviewer foaf:name ?revName .
+     *    ?review dc:title ?revTitle .
+     *    
+     *    }
+     * }
+     * </pre>
+     */
+    public void test_BSBM_Q7b_pc100() throws Exception {
+        
+        final TestHelper helper = new TestHelper(//
+                "rto/BSBM-Q7", // testURI,
+                "rto/BSBM-Q7.rq",// queryFileURL
+                "bigdata-rdf/src/resources/data/bsbm/dataset_pc100.nt",// dataFileURL
+                "rto/BSBM-Q7.srx"// resultFileURL
+        );
+        
+        /*
+         * Verify that the runtime optimizer produced the expected join path.
+         */
+
+        // FIXME The join order is unknown. This query does not run through the RTO yet.
+        final int[] expected = new int[] { 1, 3, 2, 5, 4, 7, 6 };
+
+        assertSameJoinOrder(expected, helper);
+        
+    }
+    
+    /**
      * BSBM Q8 on the pc100 data set.
      */
     public void test_BSBM_Q8_pc100() throws Exception {
