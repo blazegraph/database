@@ -29,6 +29,8 @@ package com.bigdata.rdf.sparql.ast.eval.rto;
 
 import java.util.Properties;
 
+import com.bigdata.bop.engine.IRunningQuery;
+import com.bigdata.bop.joinGraph.rto.Path;
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sparql.ast.eval.OutOfOrderEvaluationException;
@@ -235,97 +237,10 @@ public class TestRTO_BSBM extends AbstractRTOTestCase {
     /**
      * BSBM Q7 on the pc100 data set.
      * 
-     * FIXME This fails in the RTO:
-     * 
-     * <pre>
-     * org.openrdf.query.QueryEvaluationException: java.lang.RuntimeException: java.util.concurrent.ExecutionException: java.lang.RuntimeException: java.util.concurrent.ExecutionException: java.lang.RuntimeException: java.lang.RuntimeException: java.lang.AssertionError: No stats: op=com.bigdata.bop.join.JVMSolutionSetHashJoinOp[7]()[ com.bigdata.bop.BOp.bopId=7, com.bigdata.bop.BOp.evaluationContext=CONTROLLER, com.bigdata.bop.PipelineOp.sharedState=true, namedSetRef=NamedSolutionSetRef{localName=--nsr-1,queryId=6690c373-8ff2-44b7-826c-f80d8e24eec2,joinVars=[]}, com.bigdata.bop.join.JoinAnnotations.constraints=null, class com.bigdata.bop.join.SolutionSetHashJoinOp.release=false]
-     *     at com.bigdata.rdf.sail.Bigdata2Sesame2BindingSetIterator.hasNext(Bigdata2Sesame2BindingSetIterator.java:188)
-     *     at org.openrdf.query.impl.TupleQueryResultImpl.hasNext(TupleQueryResultImpl.java:90)
-     *     at info.aduna.iteration.Iterations.addAll(Iterations.java:71)
-     *     at org.openrdf.query.impl.MutableTupleQueryResult.<init>(MutableTupleQueryResult.java:86)
-     *     at org.openrdf.query.impl.MutableTupleQueryResult.<init>(MutableTupleQueryResult.java:92)
-     *     at com.bigdata.bop.engine.AbstractQueryEngineTestCase.compareTupleQueryResults(AbstractQueryEngineTestCase.java:738)
-     *     at com.bigdata.rdf.sparql.ast.eval.AbstractDataAndSPARQLTestCase$AbsHelper.compareTupleQueryResults(AbstractDataAndSPARQLTestCase.java:119)
-     *     at com.bigdata.rdf.sparql.ast.eval.AbstractDataDrivenSPARQLTestCase$TestHelper.compareTupleQueryResults(AbstractDataDrivenSPARQLTestCase.java:498)
-     *     at com.bigdata.rdf.sparql.ast.eval.AbstractDataDrivenSPARQLTestCase$TestHelper.runTest(AbstractDataDrivenSPARQLTestCase.java:320)
-     *     at com.bigdata.rdf.sparql.ast.eval.rto.AbstractRTOTestCase.assertSameJoinOrder(AbstractRTOTestCase.java:181)
-     *     at com.bigdata.rdf.sparql.ast.eval.rto.TestRTO_BSBM.test_BSBM_Q6_pc100(TestRTO_BSBM.java:198)
-     *     at sun.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
-     *     at sun.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:57)
-     *     at sun.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
-     *     at java.lang.reflect.Method.invoke(Method.java:601)
-     *     at junit.framework.TestCase.runTest(TestCase.java:154)
-     *     at junit.framework.TestCase.runBare(TestCase.java:127)
-     *     at junit.framework.TestResult$1.protect(TestResult.java:106)
-     *     at junit.framework.TestResult.runProtected(TestResult.java:124)
-     *     at junit.framework.TestResult.run(TestResult.java:109)
-     *     at junit.framework.TestCase.run(TestCase.java:118)
-     *     at org.eclipse.jdt.internal.junit.runner.junit3.JUnit3TestReference.run(JUnit3TestReference.java:130)
-     *     at org.eclipse.jdt.internal.junit.runner.TestExecution.run(TestExecution.java:38)
-     *     at org.eclipse.jdt.internal.junit.runner.RemoteTestRunner.runTests(RemoteTestRunner.java:467)
-     *     at org.eclipse.jdt.internal.junit.runner.RemoteTestRunner.runTests(RemoteTestRunner.java:683)
-     *     at org.eclipse.jdt.internal.junit.runner.RemoteTestRunner.run(RemoteTestRunner.java:390)
-     *     at org.eclipse.jdt.internal.junit.runner.RemoteTestRunner.main(RemoteTestRunner.java:197)
-     * Caused by: java.lang.RuntimeException: java.util.concurrent.ExecutionException: java.lang.RuntimeException: java.util.concurrent.ExecutionException: java.lang.RuntimeException: java.lang.RuntimeException: java.lang.AssertionError: No stats: op=com.bigdata.bop.join.JVMSolutionSetHashJoinOp[7]()[ com.bigdata.bop.BOp.bopId=7, com.bigdata.bop.BOp.evaluationContext=CONTROLLER, com.bigdata.bop.PipelineOp.sharedState=true, namedSetRef=NamedSolutionSetRef{localName=--nsr-1,queryId=6690c373-8ff2-44b7-826c-f80d8e24eec2,joinVars=[]}, com.bigdata.bop.join.JoinAnnotations.constraints=null, class com.bigdata.bop.join.SolutionSetHashJoinOp.release=false]
-     *     at com.bigdata.relation.accesspath.BlockingBuffer$BlockingIterator.checkFuture(BlockingBuffer.java:1523)
-     *     at com.bigdata.relation.accesspath.BlockingBuffer$BlockingIterator._hasNext(BlockingBuffer.java:1710)
-     *     at com.bigdata.relation.accesspath.BlockingBuffer$BlockingIterator.hasNext(BlockingBuffer.java:1563)
-     *     at com.bigdata.striterator.AbstractChunkedResolverator._hasNext(AbstractChunkedResolverator.java:357)
-     *     at com.bigdata.striterator.AbstractChunkedResolverator.hasNext(AbstractChunkedResolverator.java:333)
-     *     at com.bigdata.rdf.sail.Bigdata2Sesame2BindingSetIterator.hasNext(Bigdata2Sesame2BindingSetIterator.java:134)
-     *     ... 26 more
-     * Caused by: java.util.concurrent.ExecutionException: java.lang.RuntimeException: java.util.concurrent.ExecutionException: java.lang.RuntimeException: java.lang.RuntimeException: java.lang.AssertionError: No stats: op=com.bigdata.bop.join.JVMSolutionSetHashJoinOp[7]()[ com.bigdata.bop.BOp.bopId=7, com.bigdata.bop.BOp.evaluationContext=CONTROLLER, com.bigdata.bop.PipelineOp.sharedState=true, namedSetRef=NamedSolutionSetRef{localName=--nsr-1,queryId=6690c373-8ff2-44b7-826c-f80d8e24eec2,joinVars=[]}, com.bigdata.bop.join.JoinAnnotations.constraints=null, class com.bigdata.bop.join.SolutionSetHashJoinOp.release=false]
-     *     at java.util.concurrent.FutureTask$Sync.innerGet(FutureTask.java:252)
-     *     at java.util.concurrent.FutureTask.get(FutureTask.java:111)
-     *     at com.bigdata.relation.accesspath.BlockingBuffer$BlockingIterator.checkFuture(BlockingBuffer.java:1454)
-     *     ... 31 more
-     * Caused by: java.lang.RuntimeException: java.util.concurrent.ExecutionException: java.lang.RuntimeException: java.lang.RuntimeException: java.lang.AssertionError: No stats: op=com.bigdata.bop.join.JVMSolutionSetHashJoinOp[7]()[ com.bigdata.bop.BOp.bopId=7, com.bigdata.bop.BOp.evaluationContext=CONTROLLER, com.bigdata.bop.PipelineOp.sharedState=true, namedSetRef=NamedSolutionSetRef{localName=--nsr-1,queryId=6690c373-8ff2-44b7-826c-f80d8e24eec2,joinVars=[]}, com.bigdata.bop.join.JoinAnnotations.constraints=null, class com.bigdata.bop.join.SolutionSetHashJoinOp.release=false]
-     *     at com.bigdata.rdf.sail.RunningQueryCloseableIterator.checkFuture(RunningQueryCloseableIterator.java:59)
-     *     at com.bigdata.rdf.sail.RunningQueryCloseableIterator.close(RunningQueryCloseableIterator.java:73)
-     *     at com.bigdata.rdf.sail.RunningQueryCloseableIterator.hasNext(RunningQueryCloseableIterator.java:82)
-     *     at com.bigdata.striterator.ChunkedWrappedIterator.hasNext(ChunkedWrappedIterator.java:197)
-     *     at com.bigdata.striterator.AbstractChunkedResolverator$ChunkConsumerTask.call(AbstractChunkedResolverator.java:222)
-     *     at com.bigdata.striterator.AbstractChunkedResolverator$ChunkConsumerTask.call(AbstractChunkedResolverator.java:1)
-     *     at java.util.concurrent.FutureTask$Sync.innerRun(FutureTask.java:334)
-     *     at java.util.concurrent.FutureTask.run(FutureTask.java:166)
-     *     at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1110)
-     *     at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:603)
-     *     at java.lang.Thread.run(Thread.java:722)
-     * Caused by: java.util.concurrent.ExecutionException: java.lang.RuntimeException: java.lang.RuntimeException: java.lang.AssertionError: No stats: op=com.bigdata.bop.join.JVMSolutionSetHashJoinOp[7]()[ com.bigdata.bop.BOp.bopId=7, com.bigdata.bop.BOp.evaluationContext=CONTROLLER, com.bigdata.bop.PipelineOp.sharedState=true, namedSetRef=NamedSolutionSetRef{localName=--nsr-1,queryId=6690c373-8ff2-44b7-826c-f80d8e24eec2,joinVars=[]}, com.bigdata.bop.join.JoinAnnotations.constraints=null, class com.bigdata.bop.join.SolutionSetHashJoinOp.release=false]
-     *     at com.bigdata.util.concurrent.Haltable.get(Haltable.java:273)
-     *     at com.bigdata.bop.engine.AbstractRunningQuery.get(AbstractRunningQuery.java:1474)
-     *     at com.bigdata.bop.engine.AbstractRunningQuery.get(AbstractRunningQuery.java:1)
-     *     at com.bigdata.rdf.sail.RunningQueryCloseableIterator.checkFuture(RunningQueryCloseableIterator.java:46)
-     *     ... 10 more
-     * Caused by: java.lang.RuntimeException: java.lang.RuntimeException: java.lang.AssertionError: No stats: op=com.bigdata.bop.join.JVMSolutionSetHashJoinOp[7]()[ com.bigdata.bop.BOp.bopId=7, com.bigdata.bop.BOp.evaluationContext=CONTROLLER, com.bigdata.bop.PipelineOp.sharedState=true, namedSetRef=NamedSolutionSetRef{localName=--nsr-1,queryId=6690c373-8ff2-44b7-826c-f80d8e24eec2,joinVars=[]}, com.bigdata.bop.join.JoinAnnotations.constraints=null, class com.bigdata.bop.join.SolutionSetHashJoinOp.release=false]
-     *     at com.bigdata.bop.engine.ChunkedRunningQuery.scheduleNext(ChunkedRunningQuery.java:678)
-     *     at com.bigdata.bop.engine.ChunkedRunningQuery.acceptChunk(ChunkedRunningQuery.java:290)
-     *     at com.bigdata.bop.engine.QueryEngine.acceptChunk(QueryEngine.java:1031)
-     *     at com.bigdata.bop.engine.QueryEngine.startEval(QueryEngine.java:1697)
-     *     at com.bigdata.bop.engine.QueryEngine.eval(QueryEngine.java:1564)
-     *     at com.bigdata.bop.engine.QueryEngine.eval(QueryEngine.java:1470)
-     *     at com.bigdata.bop.engine.QueryEngine.eval(QueryEngine.java:1447)
-     *     at com.bigdata.bop.controller.JVMNamedSubqueryOp$ControllerTask$SubqueryTask.call(JVMNamedSubqueryOp.java:361)
-     *     at com.bigdata.bop.controller.JVMNamedSubqueryOp$ControllerTask.call(JVMNamedSubqueryOp.java:278)
-     *     at com.bigdata.bop.controller.JVMNamedSubqueryOp$ControllerTask.call(JVMNamedSubqueryOp.java:1)
-     *     at java.util.concurrent.FutureTask$Sync.innerRun(FutureTask.java:334)
-     *     at java.util.concurrent.FutureTask.run(FutureTask.java:166)
-     *     at com.bigdata.bop.engine.ChunkedRunningQuery$ChunkTask.call(ChunkedRunningQuery.java:1301)
-     *     at com.bigdata.bop.engine.ChunkedRunningQuery$ChunkTaskWrapper.run(ChunkedRunningQuery.java:856)
-     *     at java.util.concurrent.Executors$RunnableAdapter.call(Executors.java:471)
-     *     at java.util.concurrent.FutureTask$Sync.innerRun(FutureTask.java:334)
-     *     at java.util.concurrent.FutureTask.run(FutureTask.java:166)
-     *     at com.bigdata.concurrent.FutureTaskMon.run(FutureTaskMon.java:63)
-     *     at com.bigdata.bop.engine.ChunkedRunningQuery$ChunkFutureTask.run(ChunkedRunningQuery.java:751)
-     *     ... 3 more
-     * Caused by: java.lang.RuntimeException: java.lang.AssertionError: No stats: op=com.bigdata.bop.join.JVMSolutionSetHashJoinOp[7]()[ com.bigdata.bop.BOp.bopId=7, com.bigdata.bop.BOp.evaluationContext=CONTROLLER, com.bigdata.bop.PipelineOp.sharedState=true, namedSetRef=NamedSolutionSetRef{localName=--nsr-1,queryId=6690c373-8ff2-44b7-826c-f80d8e24eec2,joinVars=[]}, com.bigdata.bop.join.JoinAnnotations.constraints=null, class com.bigdata.bop.join.SolutionSetHashJoinOp.release=false]
-     *     at com.bigdata.bop.engine.ChunkedRunningQuery.scheduleNext(ChunkedRunningQuery.java:648)
-     *     ... 21 more
-     * Caused by: java.lang.AssertionError: No stats: op=com.bigdata.bop.join.JVMSolutionSetHashJoinOp[7]()[ com.bigdata.bop.BOp.bopId=7, com.bigdata.bop.BOp.evaluationContext=CONTROLLER, com.bigdata.bop.PipelineOp.sharedState=true, namedSetRef=NamedSolutionSetRef{localName=--nsr-1,queryId=6690c373-8ff2-44b7-826c-f80d8e24eec2,joinVars=[]}, com.bigdata.bop.join.JoinAnnotations.constraints=null, class com.bigdata.bop.join.SolutionSetHashJoinOp.release=false]
-     *     at com.bigdata.bop.engine.ChunkedRunningQuery$ChunkTask.<init>(ChunkedRunningQuery.java:1172)
-     *     at com.bigdata.bop.engine.ChunkedRunningQuery.scheduleNext(ChunkedRunningQuery.java:640)
-     *     ... 21 more
-     * </pre>
+     * FIXME This fails because the RTO is running in a named subquery. The test
+     * harness is looking in the wrong place (it is looking on the wrong
+     * {@link IRunningQuery}) and therefore it fails to find the {@link Path}
+     * computed by the RTO.
      */
     public void test_BSBM_Q7_pc100() throws Exception {
         
@@ -340,7 +255,7 @@ public class TestRTO_BSBM extends AbstractRTOTestCase {
          * Verify that the runtime optimizer produced the expected join path.
          */
 
-        // FIXME The join order is unknown. This query does not run through the RTO yet.
+        // FIXME The join order is unknown. 
         final int[] expected = new int[] { 1, 3, 2, 5, 4, 7, 6 };
 
         assertSameJoinOrder(expected, helper);
@@ -385,18 +300,17 @@ public class TestRTO_BSBM extends AbstractRTOTestCase {
     public void test_BSBM_Q7b_pc100() throws Exception {
         
         final TestHelper helper = new TestHelper(//
-                "rto/BSBM-Q7", // testURI,
-                "rto/BSBM-Q7.rq",// queryFileURL
+                "rto/BSBM-Q7b", // testURI,
+                "rto/BSBM-Q7b.rq",// queryFileURL
                 "bigdata-rdf/src/resources/data/bsbm/dataset_pc100.nt",// dataFileURL
-                "rto/BSBM-Q7.srx"// resultFileURL
+                "rto/BSBM-Q7b.srx"// resultFileURL
         );
         
         /*
          * Verify that the runtime optimizer produced the expected join path.
          */
 
-        // FIXME The join order is unknown. This query does not run through the RTO yet.
-        final int[] expected = new int[] { 1, 3, 2, 5, 4, 7, 6 };
+        final int[] expected = new int[] { 5, 6, 7, 8 };
 
         assertSameJoinOrder(expected, helper);
         
