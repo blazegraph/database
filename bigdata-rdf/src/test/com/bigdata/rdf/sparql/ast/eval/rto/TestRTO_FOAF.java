@@ -38,6 +38,9 @@ import com.bigdata.rdf.sail.BigdataSail;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id: TestBasicQuery.java 6440 2012-08-14 17:57:33Z thompsonbry $
+ * 
+ * @deprecated None of these test queries are complicated enough to trigger the
+ *             RTO. The class and its queries should just be dropped.
  */
 public class TestRTO_FOAF extends AbstractRTOTestCase {
 
