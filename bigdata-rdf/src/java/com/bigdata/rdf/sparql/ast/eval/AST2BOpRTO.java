@@ -61,6 +61,7 @@ import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.Var;
 import com.bigdata.bop.ap.Predicate;
 import com.bigdata.bop.ap.SampleIndex.SampleType;
+import com.bigdata.bop.bset.ConditionalRoutingOp;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.join.JoinAnnotations;
@@ -218,6 +219,15 @@ public class AST2BOpRTO extends AST2BOpJoins {
      * estimated cardinality of the join since we can not compute the join hit
      * ratio without knowing the #of solutions in required to produce a given
      * #of solutions out.
+     * 
+     * FIXME Make this <code>true</code>. There is a known problem where a
+     * {@link ConditionalRoutingOp} can cause out of order evaluation if some
+     * solutions flow along the default sink and some along the alt sink. I
+     * think that the fix for this is to make the materialization step
+     * non-conditional when performing cutoff evaluation of the join. I need to
+     * run this past MikeP, so this allows out-of-order evaluation for the
+     * moment. See BSBM Q5 for a query that currently fails if out of order
+     * evaluation is disallowed.
      */
     static final private boolean failOutOfOrderEvaluation = false;
     
