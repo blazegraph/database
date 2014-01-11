@@ -80,8 +80,10 @@ public class ConditionalRoutingOp extends PipelineOp {
      * 
      * @param op
      */
-    public ConditionalRoutingOp(ConditionalRoutingOp op) {
+    public ConditionalRoutingOp(final ConditionalRoutingOp op) {
+        
         super(op);
+        
     }
 
     /**
@@ -90,12 +92,17 @@ public class ConditionalRoutingOp extends PipelineOp {
      * @param args
      * @param annotations
      */
-    public ConditionalRoutingOp(BOp[] args, Map<String, Object> annotations) {
+    public ConditionalRoutingOp(final BOp[] args,
+            final Map<String, Object> annotations) {
+
         super(args, annotations);
+
     }
 
-    public ConditionalRoutingOp(BOp[] args, NV... anns) {
+    public ConditionalRoutingOp(final BOp[] args, final NV... anns) {
+
         this(args, NV.asMap(anns));
+
     }
 
     /**
@@ -107,6 +114,7 @@ public class ConditionalRoutingOp extends PipelineOp {
         
     }
     
+    @Override
     public FutureTask<Void> eval(final BOpContext<IBindingSet> context) {
 
         return new FutureTask<Void>(new ConditionalRouteTask(this, context));
@@ -153,6 +161,7 @@ public class ConditionalRoutingOp extends PipelineOp {
 
         }
 
+        @Override
         public Void call() throws Exception {
             try {
                 while (source.hasNext()) {
@@ -167,20 +176,20 @@ public class ConditionalRoutingOp extends PipelineOp {
                     
                     int ndef = 0, nalt = 0;
 
-                    for(int i=0; i<chunk.length; i++) {
+                    for (int i = 0; i < chunk.length; i++) {
 
                         final IBindingSet bset = chunk[i].clone();
 
                         if (condition.accept(bset)) {
 
                             def[ndef++] = bset;
-                            
+
                         } else {
-                            
+
                             alt[nalt++] = bset;
-                            
+
                         }
-                        
+
                     }
 
                     if (ndef > 0) {
@@ -217,8 +226,8 @@ public class ConditionalRoutingOp extends PipelineOp {
                 
             }
 
-        }
+        } // call()
 
-    }
+    } // ConditionalRoutingTask.
 
 }
