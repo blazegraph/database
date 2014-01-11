@@ -413,6 +413,20 @@ public class TestHAJournalServer extends AbstractHA3JournalServerTestCase {
      * I hope this helps,
      * Brian
      * </pre>
+     * <pre>
+     * This is one of the places where a lease could help. An extension of the
+     * existing JERI details could add a lease into the dispatcher layer so that
+     * a constant “I am here” message would come through to the service. If the
+     * client thread is interrupted it would no longer be pinging/notifying of
+     * it’s interest in the results. That would allow the service end, to take
+     * appropriate actions. I think that I’d want the export operation or
+     * exporter creation, to include the setup of a call back that would occur
+     * when an client wants something to stop. I would make the API include a
+     * “correlation-ID”, and I’d have that passed into the call to do work, and
+     * passed into the call back for cancellation.
+     * 
+     * Gregg
+     * </pre>
      */
     public void test_interruptRMI() throws Exception {
         
