@@ -458,7 +458,8 @@ public class AST2BOpRTO extends AST2BOpJoins {
      *         {@link JoinGraph.Annotations#JOIN_GROUP} into the ordering
      *         specified in the {@link Path} and make sure that
      *         convertJoinGroup() did not attempt to recursively reapply the
-     *         RTO.
+     *         RTO. This will get rid of one of the few remaining uses of
+     *         {@link PartitionedJoinGroup}.
      */
     public static PipelineOp compileJoinGraph(final QueryEngine queryEngine,
             final JoinGraph joinGraph, final Path path) {
@@ -502,10 +503,6 @@ public class AST2BOpRTO extends AST2BOpJoins {
 
         /*
          * Figure out which constraints are attached to which predicates.
-         * 
-         * TODO Can we reconcile this code with the filter assignment code in
-         * AST2BOpFilter? If so, then we can get rid of the
-         * PartitionedJoinGroup.
          */
         final IConstraint[][] constraintAttachmentArray = PartitionedJoinGroup
                 .getJoinGraphConstraints(predicates, constraints,
