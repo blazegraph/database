@@ -37,12 +37,11 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicInteger;
-
-import junit.framework.AssertionFailedError;
 
 import org.apache.log4j.Logger;
 
@@ -112,19 +111,34 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
      * are removed from the map.
      * <p>
      * The map is guarded by the {@link #lock}.
+     * <p>
+     * Note: Using a hash map here means that {@link #consumeChunks()} will draw
+     * from operator queues more or less at random. Using an ordered map will
+     * impose a bias, depending on the natural ordering of the map keys.
      * 
-     * FIXME Either this and/or {@link #operatorFutures} must be a weak value
-     * map in order to ensure that entries are eventually cleared in scale-out
-     * where the #of entries can potentially be very large since they are per
-     * (bopId,shardId). While these maps were initially declared as
-     * {@link ConcurrentHashMap} instances, if we remove entries once the
-     * map/queue entry is empty, this appears to open a concurrency hole which
-     * does not exist if we leave entries with empty map/queue values in the
-     * map. Changing to a weak value map should provide the necessary pruning of
-     * unused entries without opening up this concurrency hole.
+     * @see BSBundle#compareTo(BSBundle)
+     * 
+     *      FIXME Either this and/or {@link #operatorFutures} must be a weak
+     *      value map in order to ensure that entries are eventually cleared in
+     *      scale-out where the #of entries can potentially be very large since
+     *      they are per (bopId,shardId). While these maps were initially
+     *      declared as {@link ConcurrentHashMap} instances, if we remove
+     *      entries once the map/queue entry is empty, this appears to open a
+     *      concurrency hole which does not exist if we leave entries with empty
+     *      map/queue values in the map. Changing to a weak value map should
+     *      provide the necessary pruning of unused entries without opening up
+     *      this concurrency hole.
      */
     private final ConcurrentMap<BSBundle, BlockingQueue<IChunkMessage<IBindingSet>>> operatorQueues;
 
+    /**
+     * Set to <code>true</code> to make {@link #operatorQueues} and ordered map.
+     * When <code>true</code>, {@link #consumeChunk()} will have an ordered bias
+     * in how it schedules work. [The historical behavior is present when this
+     * is <code>false</code>.]
+     */
+    private static final boolean orderedOperatorQueueMap = false;
+    
     /**
      * FIXME It appears that this is Ok based on a single unit test known to
      * fail when {@link #removeMapOperatorQueueEntries} is <code>true</code>,
@@ -204,7 +218,15 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
 
         this.operatorFutures = new ConcurrentHashMap<BSBundle, ConcurrentHashMap<ChunkFutureTask, ChunkFutureTask>>();
 
-        this.operatorQueues = new ConcurrentHashMap<BSBundle, BlockingQueue<IChunkMessage<IBindingSet>>>();
+        if (orderedOperatorQueueMap) {
+
+            this.operatorQueues = new ConcurrentSkipListMap<BSBundle, BlockingQueue<IChunkMessage<IBindingSet>>>();
+            
+        } else {
+            
+            this.operatorQueues = new ConcurrentHashMap<BSBundle, BlockingQueue<IChunkMessage<IBindingSet>>>();
+
+        }
 
     }
 
@@ -250,12 +272,14 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
             if (queue == null) {
 
                 /*
-                 * If the target is a pipelined operator, then we impose a limit
-                 * on the #of messages which may be buffered for that operator.
-                 * If the operator is NOT pipelined, e.g., ORDER_BY, then we use
-                 * an unbounded queue.
+                 * There is no input queue for this operator, so we create one
+                 * now while we are holding the lock. If the target is a
+                 * pipelined operator, then we impose a limit on the #of
+                 * messages which may be buffered for that operator. If the
+                 * operator is NOT pipelined, e.g., ORDER_BY, then we use an
+                 * unbounded queue.
                  * 
-                 * TODO Unit/stress tests with capacity set to 1. 
+                 * TODO Unit/stress tests with capacity set to 1.
                  */
                 
                 // The target operator for this message.
@@ -265,12 +289,24 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
                         PipelineOp.Annotations.PIPELINE_QUEUE_CAPACITY,
                         PipelineOp.Annotations.DEFAULT_PIPELINE_QUEUE_CAPACITY)
                         : Integer.MAX_VALUE;
-                
+
+                // Create a new queue using [lock].
                 queue = new com.bigdata.jsr166.LinkedBlockingDeque<IChunkMessage<IBindingSet>>(//
                         capacity,
                         lock);
 
-                operatorQueues.put(bundle, queue);
+                // Add to the collection of operator input queues.
+                if (operatorQueues.put(bundle, queue) != null) {
+
+                    /*
+                     * There must not be an entry for this operator. We checked
+                     * for this above. Nobody else should be adding entries into
+                     * the [operatorQueues] map.
+                     */
+
+                    throw new AssertionError(bundle.toString());
+
+                }
              
             }
 
@@ -396,7 +432,7 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
                 if (nrunning == 0) {
                     // No tasks running for this operator.
                     if(removeMapOperatorFutureEntries)
-                        if(map!=operatorFutures.remove(bundle)) throw new AssertionError();
+                        if (map != operatorFutures.remove(bundle)) throw new AssertionError();
                 }
             }
             if (nrunning >= maxParallel) {
@@ -526,14 +562,14 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
             if (queue.isEmpty()) {
                 // No work, so remove work queue for (bopId,partitionId).
                 if(removeMapOperatorQueueEntries)
-                    if(queue!=operatorQueues.remove(bundle)) throw new AssertionError();
+                    if (queue != operatorQueues.remove(bundle)) throw new AssertionError();
                 return false;
             }
             /*
              * true iff operator requires at once evaluation and all solutions
              * are now available for that operator.
              */
-            boolean atOnceReady = false; 
+            boolean atOnceReady = false;
             if (!pipelined) {
                 if (!isAtOnceReady(bundle.bopId)) {
                     /*
