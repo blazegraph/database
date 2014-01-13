@@ -350,67 +350,51 @@ public class JGraph {
 
     }
 
-    /**
-     * Find a good join path in the data given the join graph. The join path is
-     * not guaranteed to be the best join path (the search performed by the
-     * runtime optimizer is not exhaustive) but it should always be a "good"
-     * join path and may often be the "best" join path.
-     * 
-     * @param queryEngine
-     *            The query engine.
-     * @param limit
-     *            The limit for sampling a vertex and the initial limit for
-     *            cutoff join evaluation.
-     * @param nedges
-     *            The edges in the join graph are sorted in order of increasing
-     *            cardinality and up to <i>nedges</i> of the edges having the
-     *            lowest cardinality are used to form the initial set of join
-     *            paths. For each edge selected to form a join path, the
-     *            starting vertex will be the vertex of that edge having the
-     *            lower cardinality.
-     * @param sampleType
-     *            Type safe enumeration indicating the algorithm which will be
-     *            used to sample the initial vertices.
-     * 
-     * @return The join path identified by the runtime query optimizer as the
-     *         best path given the join graph and the data.
-     * 
-     * @throws NoSolutionsException
-     *             If there are no solutions for the join graph in the data (the
-     *             query does not have any results).
-     * @throws IllegalArgumentException
-     *             if <i>queryEngine</i> is <code>null</code>.
-     * @throws IllegalArgumentException
-     *             if <i>limit</i> is non-positive.
-     * @throws IllegalArgumentException
-     *             if <i>nedges</i> is non-positive.
-     * @throws Exception
-     */
-    public Path runtimeOptimizer(final QueryEngine queryEngine,
-            final int limit, final int nedges) throws NoSolutionsException,
-            Exception {
-
-        /*
-         * This map is used to associate join path segments (expressed as an
-         * ordered array of bopIds) with edge sample to avoid redundant effort.
-         * 
-         * FIXME RTO: HEAP MANAGMENT : This map holds references to the cutoff
-         * join samples. To ensure that the map has the minimum heap footprint,
-         * it must be scanned each time we prune the set of active paths and any
-         * entry which is not a prefix of an active path should be removed.
-         * 
-         * TODO RTO: MEMORY MANAGER : When an entry is cleared from this map,
-         * the corresponding allocation in the memory manager (if any) must be
-         * released. The life cycle of the map needs to be bracketed by a
-         * try/finally in order to ensure that all allocations associated with
-         * the map are released no later than when we leave the lexicon scope of
-         * that clause.
-         */
-        final Map<PathIds, EdgeSample> edgeSamples = new LinkedHashMap<PathIds, EdgeSample>();
-
-        return runtimeOptimizer(queryEngine, limit, nedges, edgeSamples);
-
-    }
+//    /**
+//     * Find a good join path in the data given the join graph. The join path is
+//     * not guaranteed to be the best join path (the search performed by the
+//     * runtime optimizer is not exhaustive) but it should always be a "good"
+//     * join path and may often be the "best" join path.
+//     * 
+//     * @param queryEngine
+//     *            The query engine.
+//     * @param limit
+//     *            The limit for sampling a vertex and the initial limit for
+//     *            cutoff join evaluation.
+//     * @param nedges
+//     *            The edges in the join graph are sorted in order of increasing
+//     *            cardinality and up to <i>nedges</i> of the edges having the
+//     *            lowest cardinality are used to form the initial set of join
+//     *            paths. For each edge selected to form a join path, the
+//     *            starting vertex will be the vertex of that edge having the
+//     *            lower cardinality.
+//     * @param sampleType
+//     *            Type safe enumeration indicating the algorithm which will be
+//     *            used to sample the initial vertices.
+//     * 
+//     * @return The join path identified by the runtime query optimizer as the
+//     *         best path given the join graph and the data.
+//     * 
+//     * @throws NoSolutionsException
+//     *             If there are no solutions for the join graph in the data (the
+//     *             query does not have any results).
+//     * @throws IllegalArgumentException
+//     *             if <i>queryEngine</i> is <code>null</code>.
+//     * @throws IllegalArgumentException
+//     *             if <i>limit</i> is non-positive.
+//     * @throws IllegalArgumentException
+//     *             if <i>nedges</i> is non-positive.
+//     * @throws Exception
+//     */
+//    public Path runtimeOptimizer(final QueryEngine queryEngine,
+//            final int limit, final int nedges) throws NoSolutionsException,
+//            Exception {
+//
+//        final Map<PathIds, EdgeSample> edgeSamples = new LinkedHashMap<PathIds, EdgeSample>();
+//
+//        return runtimeOptimizer(queryEngine, limit, nedges, edgeSamples);
+//
+//    }
 
     /**
      * Find a good join path in the data given the join graph. The join path is
@@ -420,19 +404,6 @@ public class JGraph {
      * 
      * @param queryEngine
      *            The query engine.
-     * @param limit
-     *            The limit for sampling a vertex and the initial limit for
-     *            cutoff join evaluation.
-     * @param nedges
-     *            The edges in the join graph are sorted in order of increasing
-     *            cardinality and up to <i>nedges</i> of the edges having the
-     *            lowest cardinality are used to form the initial set of join
-     *            paths. For each edge selected to form a join path, the
-     *            starting vertex will be the vertex of that edge having the
-     *            lower cardinality.
-     * @param sampleType
-     *            Type safe enumeration indicating the algorithm which will be
-     *            used to sample the initial vertices.
      * @param edgeSamples
      *            A map that will be populated with the samples associated with
      *            each non-pruned join path. This map is used to associate join
@@ -463,18 +434,49 @@ public class JGraph {
      *             TODO We need to automatically increase the depth of search
      *             for queries where we have cardinality estimation underflows
      *             or punt to another method to decide the join order.
+     * 
+     *             TODO RTO: HEAP MANAGMENT : The edgeSamples map holds
+     *             references to the cutoff join samples. To ensure that the map
+     *             has the minimum heap footprint, it must be scanned each time
+     *             we prune the set of active paths and any entry which is not a
+     *             prefix of an active path should be removed.
+     * 
+     *             TODO RTO: MEMORY MANAGER : When an entry is cleared from this
+     *             map, the corresponding allocation in the memory manager (if
+     *             any) must be released. The life cycle of the map needs to be
+     *             bracketed by a try/finally in order to ensure that all
+     *             allocations associated with the map are released no later
+     *             than when we leave the lexicon scope of that clause.
      */
-    public Path runtimeOptimizer(final QueryEngine queryEngine,
-            final int limit, final int nedges,
-            final Map<PathIds, EdgeSample> edgeSamples)
-            throws Exception, NoSolutionsException {
+    public Path runtimeOptimizer(//
+            final QueryEngine queryEngine,//
+            final Map<PathIds, EdgeSample> edgeSamples//
+    ) throws Exception, NoSolutionsException {
 
         if (queryEngine == null)
             throw new IllegalArgumentException();
+        
+        /*
+         * The limit for sampling a vertex and the initial limit for cutoff join
+         * evaluation.
+         */
+        final int limit = joinGraph.getLimit();
+
         if (limit <= 0)
             throw new IllegalArgumentException();
+
+        /*
+         * The edges in the join graph are sorted in order of increasing
+         * cardinality and up to <i>nedges</i> of the edges having the lowest
+         * cardinality are used to form the initial set of join paths. For each
+         * edge selected to form a join path, the starting vertex will be the
+         * vertex of that edge having the lower cardinality.
+         */
+        final int nedges = joinGraph.getNEdges();
+        
         if (nedges <= 0)
             throw new IllegalArgumentException();
+
         if (edgeSamples == null)
             throw new IllegalArgumentException();
 
@@ -500,31 +502,57 @@ public class JGraph {
 
         while (paths.length > 0 && round < nvertices - 1) {
 
-			/*
-			 * Resample the paths.
-			 * 
-			 * Note: Since the vertex samples are random, it is possible for the
-			 * #of paths with cardinality estimate underflow to jump up and down
-			 * due to the sample which is making its way through each path in
-			 * each round.
-			 * 
-			 * TODO The RTO needs an escape hatch here. FOr example, if the sum
-			 * of the expected IOs for some path(s) strongly dominates all other
-			 * paths sharing the same vertices, then we should prune those paths
-			 * even if there is a cardinality estimate underflow in those paths.
-			 * This will allow us to focus our efforts on those paths having
-			 * less IO cost while we seek cardinality estimates which do not
-			 * underflow.
-			 */
-			int nunderflow;
+            /*
+             * Resample the paths.
+             * 
+             * Note: Since the vertex samples are random, it is possible for the
+             * #of paths with cardinality estimate underflow to jump up and down
+             * due to the sample which is making its way through each path in
+             * each round.
+             * 
+             * Note: The RTO needs an escape hatch here. Otherwise, it is
+             * possible for it to spin in a loop while resampling.
+             * 
+             * TODO For example, if the sum of the expected IOs for some path(s)
+             * strongly dominates all other paths sharing the same vertices,
+             * then we should prune those paths even if there is a cardinality
+             * estimate underflow in those paths. This will allow us to focus
+             * our efforts on those paths having less IO cost while we seek
+             * cardinality estimates which do not underflow.
+             * 
+             * TODO We should be examining the actual sampling limit that is
+             * currently in place on each vertex and for each path. This is
+             * available by inspection of the VertexSamples and EdgeSamples, but
+             * it is not passed back out of the resamplePaths() method as a
+             * side-effect. We should limit how much we are willing to raise the
+             * limit, e.g., by specifying a MAX_LIMIT annotation on the
+             * JoinGraph operator.
+             */
+            int nunderflow = 0;
 
-			while ((nunderflow = resamplePaths(queryEngine, limit, round,
-					paths, edgeSamples)) > 0) {
-			
-				log.warn("resampling in round=" + round + " : " + nunderflow
-						+ " paths have cardinality estimate underflow.");
-				
-			}
+            for (int i = 0; i < 3; i++) {
+
+                nunderflow = resamplePaths(queryEngine, limit, round, paths,
+                        edgeSamples);
+
+                if (nunderflow == 0) {
+
+                    // No paths have cardinality estimate underflow.
+                    break;
+
+                }
+
+                log.warn("Cardinality estimate underflow - resampling: round="
+                        + round + ", npaths=" + paths.length + ", nunderflow="
+                        + nunderflow + ", limit=" + limit);
+
+            }
+            
+            if (nunderflow > 0) {
+
+                log.warn("Continuing: some paths have cardinality underflow!");
+
+            }
 
             /*
              * Extend the paths by one vertex.
@@ -542,8 +570,10 @@ public class JGraph {
         
 		// Should be one winner.
         if (paths.length != 1) {
+
             throw new AssertionError("Expected one path but have "
                     + paths.length + " paths.");
+            
         }
 
         if (log.isInfoEnabled()) {
@@ -770,8 +800,8 @@ public class JGraph {
      * 
      * @throws Exception
      */
-    protected int resamplePaths(final QueryEngine queryEngine, int limitIn,
-            final int round, final Path[] a,
+    protected int resamplePaths(final QueryEngine queryEngine,
+            final int limitIn, final int round, final Path[] a,
             final Map<PathIds, EdgeSample> edgeSamples) throws Exception {
 
         if (queryEngine == null)

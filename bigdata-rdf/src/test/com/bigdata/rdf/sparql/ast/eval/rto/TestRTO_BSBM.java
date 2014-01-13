@@ -31,6 +31,7 @@ import java.util.Properties;
 
 import junit.framework.AssertionFailedError;
 
+import com.bigdata.bop.joinGraph.NoSolutionsException;
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.sail.BigdataSail;
 
@@ -113,6 +114,30 @@ public class TestRTO_BSBM extends AbstractRTOTestCase {
 
         return properties;
         
+    }
+
+    /**
+     * Test of BSBM Q1 against an empty data set. There are no solutions in the
+     * data. 
+     */
+    public void test_BSBM_Q1_noSolutions() throws Exception {
+
+        final TestHelper helper = new TestHelper(//
+                "rto/BSBM-Q1", // testURI,
+                "rto/BSBM-Q1.rq",// queryFileURL
+                new String[]{},// data files.
+                "rto/BSBM-Q1-noSolutions.srx"// resultFileURL
+        );
+        
+        /*
+         * TODO In fact, the RTO should not be running for a group of required
+         * joins in which some vertex has a zero cardinality or when any join
+         * can provably produce ZERO results when fed solutions from a fully
+         * materialized vertex.
+         */
+
+        assertSameJoinOrder(new int[] { 2, 1, 3, 4, 5 }, helper);
+      
     }
 
     /**
