@@ -468,10 +468,8 @@ public class JoinGraph extends PipelineOp {
                 final Map<PathIds, EdgeSample> edgeSamples = new LinkedHashMap<PathIds, EdgeSample>();
 
                 // Find the best join path.
-                final Path path = g
-                        .runtimeOptimizer(context.getRunningQuery()
-                                .getQueryEngine(), getLimit(), getNEdges(),
-                                edgeSamples);
+                final Path path = g.runtimeOptimizer(context.getRunningQuery()
+                        .getQueryEngine(), edgeSamples);
 
                 /*
                  * Release samples.
