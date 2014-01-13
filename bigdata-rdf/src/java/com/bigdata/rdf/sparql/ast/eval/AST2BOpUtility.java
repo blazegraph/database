@@ -534,7 +534,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
                     new NV(ProjectionOp.Annotations.SELECT, projectedVars)//
             ), queryBase, ctx);
             
-            if(materializeProjection) {
+            if (materializeProjection) {
                 
                 /*
                  * Note: Materialization done from within the query plan needs
@@ -3620,7 +3620,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
 
         if (projection.isWildcard())
             throw new AssertionError("Wildcard projection was not rewritten.");
-        
+
         final IVariable<?>[] vars = projection.getProjectionVars();
 
         final PipelineOp op;
@@ -3643,6 +3643,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
                  * BY + DISTINCT)
                  */
                 anns.add(new NV(PipelineOp.Annotations.MAX_PARALLEL, 1));
+                anns.add(new NV(SliceOp.Annotations.REORDER_SOLUTIONS, false));
             }
             op = new JVMDistinctBindingSetsOp(leftOrEmpty(left),//
                     anns.toArray(new NV[anns.size()])//
@@ -3959,6 +3960,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
                                         BOpEvaluationContext.CONTROLLER),//
                                 new NV(MemorySortOp.Annotations.PIPELINED, true),//
                                 new NV(MemorySortOp.Annotations.MAX_PARALLEL, 1),//
+                                new NV(MemorySortOp.Annotations.REORDER_SOLUTIONS, false),//
 //                                new NV(MemorySortOp.Annotations.SHARED_STATE,
 //                                        true),//
                                 new NV(MemorySortOp.Annotations.LAST_PASS, true),//
@@ -3985,7 +3987,8 @@ public class AST2BOpUtility extends AST2BOpRTO {
                         BOpEvaluationContext.CONTROLLER),//
                 new NV(SliceOp.Annotations.PIPELINED, true),//
                 new NV(SliceOp.Annotations.MAX_PARALLEL, 1),//
-                new NV(MemorySortOp.Annotations.SHARED_STATE, true)//
+                new NV(SliceOp.Annotations.REORDER_SOLUTIONS,false),//
+                new NV(SliceOp.Annotations.SHARED_STATE, true)//
                 ), queryBase, ctx);
 
         return left;

@@ -18,6 +18,7 @@ import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.IRunningQuery;
+import com.bigdata.bop.solutions.SliceOp.Annotations;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
@@ -102,6 +103,11 @@ public class MemorySortOp extends SortOp {
                     + "=" + isLastPassRequested());
         }
         
+        // ORDER_BY must preserve order.
+        if (isReorderSolutions())
+            throw new UnsupportedOperationException(
+                    Annotations.REORDER_SOLUTIONS + "=" + isReorderSolutions());
+
         // required parameter.
         getValueComparator();
         

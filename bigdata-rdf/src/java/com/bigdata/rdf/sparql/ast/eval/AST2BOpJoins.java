@@ -1050,6 +1050,9 @@ public class AST2BOpJoins extends AST2BOpFilters {
                     .get(Annotations.SIMPLE_JOIN)).booleanValue()
                     && !AST2BOpRTO.runAllJoinsAsComplexJoins;
 
+            // disallow reordering of solutions by the query engine.
+            map.put(PipelineJoin.Annotations.REORDER_SOLUTIONS, Boolean.FALSE);
+
             // disallow parallel evaluation of tasks
             map.put(PipelineOp.Annotations.MAX_PARALLEL, Integer.valueOf(1));
 
@@ -1060,7 +1063,7 @@ public class AST2BOpJoins extends AST2BOpFilters {
             // disable access path coalescing
             map.put(PipelineJoin.Annotations.COALESCE_DUPLICATE_ACCESS_PATHS,
                     Boolean.FALSE);
-            
+
             /*
              * Disable access path reordering.
              * 

@@ -521,6 +521,11 @@ public class AST2BOpFilters extends AST2BOpBase {
          * "no reordering" guarantee.
          */
 
+        // disable reordering of solutions for cutoff joins.
+        final boolean reorderSolutions = (cutoffLimit != null) ? false
+                : PipelineJoin.Annotations.DEFAULT_REORDER_SOLUTIONS;
+
+        // disable operator parallelism for cutoff joins.
         final int maxParallel = cutoffLimit != null ? 1
                 : PipelineOp.Annotations.DEFAULT_MAX_PARALLEL;
 
@@ -530,6 +535,7 @@ public class AST2BOpFilters extends AST2BOpBase {
             new NV(ChunkedMaterializationOp.Annotations.TIMESTAMP, timestamp), //
             new NV(ChunkedMaterializationOp.Annotations.MATERIALIZE_INLINE_IVS, materializeInlineIvs), //
             new NV(PipelineOp.Annotations.SHARED_STATE, !ctx.isCluster()),// live stats, but not on the cluster.
+            new NV(PipelineOp.Annotations.REORDER_SOLUTIONS,reorderSolutions),//
             new NV(PipelineOp.Annotations.MAX_PARALLEL,maxParallel),//
             new NV(BOp.Annotations.BOP_ID, ctx.nextId())//
             ), queryHints, ctx);
@@ -729,6 +735,8 @@ public class AST2BOpFilters extends AST2BOpBase {
                 new ConditionalRoutingOp(leftOrEmpty(left),//
                     new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
                     new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
+                    // disallow reordering of solutions by the query engine.
+                    new NV(PipelineJoin.Annotations.REORDER_SOLUTIONS, Boolean.FALSE),//
                     new NV(ConditionalRoutingOp.Annotations.CONDITION, c)//
                 ), queryHints, ctx);
         
