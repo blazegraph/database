@@ -89,40 +89,42 @@ public class TryBeforeMaterializationConstraint extends BOpBase implements
      * step in the pipeline to ensure that the solution gets routed around
      * the materialization steps.  See {@link IsMaterializedBOp}.
      */
+    @Override
     public boolean accept(final IBindingSet bs) {
 
-    	final IConstraint c = (IConstraint) get(0);
-    	
-    	try {
-    		
-    		if (log.isDebugEnabled()) {
-    			log.debug("about to attempt evaluation prior to materialization");
-    		}
-    		
-    		final boolean accept = c.accept(bs);
-    		
-    		if (log.isDebugEnabled()) {
-    			log.debug("successfully evaluated constraint without materialization");
-    		}
-    		
-    		return accept;
-    		
-    	} catch (Throwable t) {
+        final IConstraint c = (IConstraint) get(0);
 
-			if (InnerCause.isInnerCause(t, NotMaterializedException.class)) {
-    		
-	    		if (log.isDebugEnabled()) {
-	    			log.debug("could not evaluate constraint without materialization");
-	    		}
-	    		
-	    		// let the solution through for now, it will get tested again
-	    		// on the other side of the materialization pipeline
-	    		return true;
-    		
-			} else throw new RuntimeException(t);
-    		
-    	}
-    	
+        try {
+
+            if (log.isDebugEnabled()) {
+                log.debug("about to attempt evaluation prior to materialization");
+            }
+
+            final boolean accept = c.accept(bs);
+
+            if (log.isDebugEnabled()) {
+                log.debug("successfully evaluated constraint without materialization");
+            }
+
+            return accept;
+
+        } catch (Throwable t) {
+
+            if (InnerCause.isInnerCause(t, NotMaterializedException.class)) {
+
+                if (log.isDebugEnabled()) {
+                    log.debug("could not evaluate constraint without materialization");
+                }
+
+                // let the solution through for now, it will get tested again
+                // on the other side of the materialization pipeline
+                return true;
+
+            } else
+                throw new RuntimeException(t);
+
+        }
+
     }
 
 }

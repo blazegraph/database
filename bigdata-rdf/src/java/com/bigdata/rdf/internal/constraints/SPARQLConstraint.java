@@ -34,12 +34,14 @@ import com.bigdata.bop.IValueExpression;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.impl.literal.XSDBooleanIV;
+import com.bigdata.rdf.sparql.ast.FilterNode;
 import com.bigdata.util.InnerCause;
 
 /**
  * BOpConstraint that wraps a {@link EBVBOp}, which itself computes the 
- * effective boolean value of an IValueExpression.
+ * effective boolean value of an {@link IValueExpression}.
  */
+@SuppressWarnings("rawtypes")
 public class SPARQLConstraint<X extends XSDBooleanIV> extends
         com.bigdata.bop.constraint.Constraint<X> {
 
@@ -68,7 +70,6 @@ public class SPARQLConstraint<X extends XSDBooleanIV> extends
 	 * The value expression will be automatically wrapped inside an
 	 * {@link EBVBOp} if it does not itself evaluate to a boolean.
 	 */
-	@SuppressWarnings("rawtypes")
     public SPARQLConstraint(final IValueExpression<? extends IV> x) {
 
 		this(new BOp[] { wrap(x) }, null/*annocations*/);
@@ -96,7 +97,7 @@ public class SPARQLConstraint<X extends XSDBooleanIV> extends
 
     }
 
-    @SuppressWarnings({ "rawtypes", "unchecked" })
+    @SuppressWarnings("unchecked")
     @Override
     public IValueExpression<? extends XSDBooleanIV> get(final int i) {
 
@@ -114,7 +115,6 @@ public class SPARQLConstraint<X extends XSDBooleanIV> extends
 		try {
 
 			// evaluate the EBV operator
-			@SuppressWarnings("rawtypes")
             final XSDBooleanIV iv = get(0).get(bs);
 			
 			return iv.booleanValue();
@@ -137,5 +137,17 @@ public class SPARQLConstraint<X extends XSDBooleanIV> extends
 		}
 
 	}
+
+    /**
+     * Overridden to provide a little bit of information about the attached
+     * constraint.
+     */
+    @Override
+    public String toShortString() {
+
+        return super.toShortString() + "{condition="
+                + getValueExpression().toShortString() + "}";
+
+    }
 
 }
