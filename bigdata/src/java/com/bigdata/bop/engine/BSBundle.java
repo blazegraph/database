@@ -102,12 +102,12 @@ public class BSBundle implements Comparable<BSBundle> {
      */
     @Override
     public int compareTo(final BSBundle o) {
-        
-        int ret = -Integer.compare(bopId, o.bopId);
+
+        int ret = (bopId < o.bopId) ? 1 : ((bopId == o.bopId) ? 0 : -1);
 
         if (ret == 0) {
 
-            ret = -Integer.compare(shardId, o.shardId);
+            ret = (shardId < o.shardId) ? 1 : ((shardId == o.shardId) ? 0 : -1);
 
         }
 
