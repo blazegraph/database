@@ -232,6 +232,13 @@ public class AST2BOpRTO extends AST2BOpJoins {
     static final private boolean failOutOfOrderEvaluation = false;
     
     /**
+     * When <code>true</code>, the generated query plans for cutoff evaluation
+     * will be checked to verify that the query plans do not permit reordering
+     * of solutions.
+     */
+    static final private boolean checkQueryPlans = false;
+    
+    /**
      * Inspect the remainder of the join group. If we can isolate a join graph
      * and filters, then we will push them down into an RTO JoinGroup. Since the
      * joins have already been ordered by the static optimizer, we can accept
@@ -445,6 +452,13 @@ public class AST2BOpRTO extends AST2BOpJoins {
      *            based on deep sampling of the join graph.
      * 
      * @return The query plan to fully execute that join graph.
+     * 
+     *         FIXME RTO: Modify this to use AST2BOpUtility#convertJoinGroup().
+     *         We would have to reorder the joins in the
+     *         {@link JoinGraph.Annotations#JOIN_GROUP} into the ordering
+     *         specified in the {@link Path} and make sure that
+     *         convertJoinGroup() did not attempt to recursively reapply the
+     *         RTO.
      */
     public static PipelineOp compileJoinGraph(final QueryEngine queryEngine,
             final JoinGraph joinGraph, final Path path) {
@@ -464,7 +478,8 @@ public class AST2BOpRTO extends AST2BOpJoins {
 
         final IConstraint[] constraints = joinGraph.getConstraints();
 
-        final Set<IVariable<?>> doneSet = joinGraph.getDoneSet();
+        final Set<IVariable<?>> doneSet = new LinkedHashSet<IVariable<?>>(
+                joinGraph.getDoneSet());
 
         /*
          * The AST JoinGroupNode for the joins and filters that we are running
@@ -673,6 +688,7 @@ public class AST2BOpRTO extends AST2BOpJoins {
      * 
      * @return The result of sampling that edge.
      */
+    //synchronized// FIXME REMOVE synchronized. This forces single threading for debugging purposes when chasing out-of-order evaluation exceptions.
     static public EdgeSample cutoffJoin(//
             final QueryEngine queryEngine,//
             final JoinGraph joinGraph,//
@@ -701,37 +717,54 @@ public class AST2BOpRTO extends AST2BOpJoins {
         if (sourceSample.getSample() == null)
             throw new IllegalArgumentException();
 
-        /*
-         * Generate the query plan for cutoff evaluation of that JOIN. The
-         * complexity of the query plan depends on whether or not there are
-         * FILTERs "attached" to the join that have variable materialization
-         * requirements.
-         */
-        final PipelineOp query = getCutoffJoinQuery(queryEngine, joinGraph,
-                limit, predicates, constraints, pathIsComplete, sourceSample);
-
-        if (!runAllJoinsAsComplexJoins && (query instanceof PipelineJoin)
-                && query.arity() == 0) {
-            
-            /*
-             * Simple JOIN.
-             * 
-             * Old logic for query plan generation. This is deprecated and will
-             * disappear soon. We will still generate simple query plans and
-             * execute them in the simple manner, but all of the code will go
-             * through AST2BOPJoins#join().
-             */
-            return runSimpleJoin(queryEngine, sourceSample, limit,
-                    (PipelineJoin<?>) query);
-
-        } else {
+        PipelineOp query = null;
+        try {
 
             /*
-             * Complex JOIN involving variable materialization, conditional
-             * routing operators, filters, and a SLICE to limit the output.
+             * Generate the query plan for cutoff evaluation of that JOIN. The
+             * complexity of the query plan depends on whether or not there are
+             * FILTERs "attached" to the join that have variable materialization
+             * requirements.
              */
-            
-            return runComplexJoin(queryEngine, sourceSample, limit, query);
+            query = getCutoffJoinQuery(queryEngine, joinGraph,
+                    limit, predicates, constraints, pathIsComplete, sourceSample);
+
+            if (!runAllJoinsAsComplexJoins && (query instanceof PipelineJoin)
+                    && query.arity() == 0) {
+
+                /*
+                 * Simple JOIN.
+                 * 
+                 * Old logic for query execution. Relies on the ability of
+                 * the PipelineJoin
+                 */
+                return runSimpleJoin(queryEngine, sourceSample, limit,
+                        (PipelineJoin<?>) query);
+
+            } else {
+
+                /*
+                 * Complex JOIN involving variable materialization, conditional
+                 * routing operators, filters, and a SLICE to limit the output.
+                 */
+
+                return runComplexJoin(queryEngine, sourceSample, limit, query);
+
+            }
+        } catch (Throwable ex) {
+
+            /*
+             * Add some more information. This gives us the specific predicate.
+             * However, it does not tell us the constraints that were attached
+             * to that predicate. That information is only available when we are
+             * compiling the query plan. At this point, the constraints have
+             * been turned into query plan operators.
+             */
+
+            throw new RuntimeException("cause=" + ex + "\npred="
+                    + BOpUtility.toString(pred) + "\nconstraints="
+                    + Arrays.toString(constraints) + (query==null?"":"\nquery="
+                    + BOpUtility.toString(query)), ex);
 
         }
 
@@ -856,7 +889,7 @@ public class AST2BOpRTO extends AST2BOpJoins {
          * [left] is now the last operator in the query plan.
          */
 
-        if (!(left instanceof PipelineJoin) && left.arity() == 0) {
+        if (!((left instanceof PipelineJoin) && left.arity() == 0)) {
 
             /*
              * The query plan contains multiple operators.
@@ -883,12 +916,109 @@ public class AST2BOpRTO extends AST2BOpJoins {
             log.debug("RTO cutoff join query::\n" + BOpUtility.toString(left)
                     + "\npred::" + pred);
 
-        return left;
+        if (checkQueryPlans) {
+
+            checkQueryPlan(left);
+            
+        }
+
+       return left;
         
+    }
+    
+    /**
+     * Debug code checks the query plan for patterns that could cause
+     * {@link OutOfOrderEvaluationException}s.
+     * <p>
+     * <ul>
+     * <li>This looks for query plans that use the alternate sink. Operators
+     * that route some solutions to the default sink and some solutions to the
+     * alternate sink can cause out of order evaluation. Out of order evaluation
+     * is not compatible with cutoff JOIN evaluation.</li>
+     * <li>This looks for operators that do not restrict
+     * {@link PipelineOp.Annotations#MAX_PARALLEL} to ONE (1).</li>
+     * </ul>
+     * 
+     * TODO We probably need an interface to determine whether an operator (as
+     * configured) guarantee in order evaluation. Some operators can not be
+     * configured for in order evaluation. Others, including a hash join using a
+     * linked hash map for the buckets, can preserve order of the source
+     * solutions in their output. This would also be useful for creating query
+     * plans that are order preserving when an index order corresponds to the
+     * desired output order.
+     * 
+     * TODO Extend this to check the RTO plan for ordered evaluation and then
+     * use this in the test suite. The plan must be provable oredered. We could
+     * also use this for order preserving query plans for other purposes.
+     */
+    private static void checkQueryPlan(final PipelineOp left) {
+
+        final Iterator<PipelineOp> itr = BOpUtility.visitAll(left,
+                PipelineOp.class);
+
+        while (itr.hasNext()) {
+
+            final PipelineOp tmp = itr.next();
+
+            if (tmp.getProperty(PipelineOp.Annotations.ALT_SINK_REF) != null) {
+
+                // alternative sink is disallowed.
+                throw new RuntimeException("Query plan uses altSink: op="
+                        + tmp.toShortString());
+
+            }
+
+            if (tmp.getMaxParallel() != 1) {
+
+                // parallel execution of an operator is disallowed.
+                throw new RuntimeException("RTO "
+                        + PipelineOp.Annotations.MAX_PARALLEL
+                        + ": expected=1, actual=" + tmp.getMaxParallel()
+                        + ", op=" + tmp.toShortString());
+
+            }
+
+            if (tmp instanceof PipelineJoin) {
+
+                final PipelineJoin<?> t = (PipelineJoin<?>) tmp;
+
+                final int maxParallelChunks = t.getMaxParallelChunks();
+
+                if (maxParallelChunks != 0) {
+
+                    throw new RuntimeException("PipelineJoin: "
+                            + PipelineJoin.Annotations.MAX_PARALLEL_CHUNKS
+                            + "=" + maxParallelChunks
+                            + " but must be ZERO (0):: op=" + t.toShortString());
+
+                }
+
+                final boolean coalesceDuplicateAccessPaths = t
+                        .getProperty(
+                                PipelineJoin.Annotations.COALESCE_DUPLICATE_ACCESS_PATHS,
+                                PipelineJoin.Annotations.DEFAULT_COALESCE_DUPLICATE_ACCESS_PATHS);
+
+                if (coalesceDuplicateAccessPaths) {
+
+                    throw new RuntimeException(
+                            "PipelineJoin: "
+                                    + PipelineJoin.Annotations.COALESCE_DUPLICATE_ACCESS_PATHS
+                                    + "=" + coalesceDuplicateAccessPaths
+                                    + " but must be false:: op="
+                                    + t.toShortString());
+
+                }
+                
+            }
+            
+        }
+
     }
 
     /**
-     * Run a simple cutoff join on the {@link QueryEngine}.
+     * Run a simple cutoff join on the {@link QueryEngine}. This method relies
+     * on the ability to control the {@link PipelineJoin} such that it does not
+     * reorder the solutions.
      * 
      * @param queryEngine
      *            The {@link QueryEngine}.
@@ -1050,7 +1180,7 @@ public class AST2BOpRTO extends AST2BOpJoins {
         if (log.isInfoEnabled())
             log.info("limit=" + limit + ", sourceSample=" + sourceSample
                     + ", query=" + query.toShortString());
-
+        
         // Anonymous variable used for the injected column.
         final IVariable<?> rtoVar = Var.var();
         
@@ -1102,9 +1232,9 @@ public class AST2BOpRTO extends AST2BOpJoins {
                 int lastRowId = 0; 
                 while (itr.hasNext()) {
                     bset = itr.next();
-//System.err.println(bset.toString());
                     final int rowid = ((Integer) bset.get(rtoVar).get())
                             .intValue();
+//log.warn("rowId="+rowid+",lastRowId="+lastRowId+",bset="+bset);
                     if (rowid < lastRowId && failOutOfOrderEvaluation) {
                         /*
                          * Out of order evaluation makes it impossible to
@@ -1113,8 +1243,7 @@ public class AST2BOpRTO extends AST2BOpJoins {
                          * without knowing the #of solutions in required to
                          * produce a given #of solutions out.
                          */
-                        throw new OutOfOrderEvaluationException(
-                                BOpUtility.toString(query));
+                        throw new OutOfOrderEvaluationException();
                     }
                     lastRowId = rowid;
                     bset.clear(rtoVar); // drop injected variable.

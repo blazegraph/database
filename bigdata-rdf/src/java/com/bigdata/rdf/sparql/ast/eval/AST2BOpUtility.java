@@ -1,7 +1,6 @@
 package com.bigdata.rdf.sparql.ast.eval;
 
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -997,7 +996,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
 
                 // Add the materialization step.
                 left = addMaterializationSteps2(left, rightId,
-                        (Collection) vars, queryHints, ctx);
+                        (Set<IVariable<IV>>) (Set) vars, queryHints, ctx);
 
                 // These variables have now been materialized.
                 doneSet.addAll(vars);
