@@ -46,6 +46,7 @@ import com.bigdata.rdf.internal.constraints.INeedsMaterialization;
  * @version $Id: ComputedMaterializationRequirement.java 5179 2011-09-12
  *          20:13:25Z thompsonbry $
  */
+@SuppressWarnings("rawtypes")
 public class ComputedMaterializationRequirement implements
         INeedsMaterialization, Serializable {
 
@@ -58,6 +59,7 @@ public class ComputedMaterializationRequirement implements
 
     private final Set<IVariable<IV>> varsToMaterialize;
 
+    @Override
     public String toString() {
 
         return "{requirement=" + requirement + ", vars=" + Arrays.toString(varsToMaterialize.toArray())
@@ -81,6 +83,7 @@ public class ComputedMaterializationRequirement implements
 
     }
 
+    @Override
     public Requirement getRequirement() {
         
         return requirement;
@@ -93,6 +96,7 @@ public class ComputedMaterializationRequirement implements
 
     }
 
+    @Override
     public boolean equals(final Object o) {
         
         if (this == o)
