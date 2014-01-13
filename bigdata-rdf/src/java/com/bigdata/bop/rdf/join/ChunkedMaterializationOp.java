@@ -47,6 +47,7 @@ import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.ap.Predicate;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.IVCache;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.store.BigdataBindingSetResolverator;
@@ -270,7 +271,8 @@ public class ChunkedMaterializationOp extends PipelineOp {
      * {@link BigdataValue}s.
      * 
      * @param required
-     *            The variable(s) to be materialized.
+     *            The variable(s) to be materialized or <code>null</code> to
+     *            materialize all variable bindings.
      * @param lex
      *            The lexicon reference.
      * @param chunk
@@ -279,7 +281,7 @@ public class ChunkedMaterializationOp extends PipelineOp {
     static void resolveChunk(final IVariable<?>[] required,
             final LexiconRelation lex,//
             final IBindingSet[] chunk,//
-            final boolean materializeInlineIVs
+            final boolean materializeInlineIVs//
     ) {
 
         if (log.isInfoEnabled())
@@ -310,6 +312,7 @@ public class ChunkedMaterializationOp extends PipelineOp {
 
             if (required == null) {
 
+                // Materialize all variable bindings.
                 @SuppressWarnings("rawtypes")
                 final Iterator<Map.Entry<IVariable, IConstant>> itr = bindingSet
                         .iterator();
@@ -329,15 +332,16 @@ public class ChunkedMaterializationOp extends PipelineOp {
                     }
 
                     if (iv.needsMaterialization() || materializeInlineIVs) {
-                    	
-                    	ids.add(iv);
-                    
+
+                        ids.add(iv);
+
                     }
 
                 }
 
             } else {
 
+                // Materialize the specified variable bindings.
                 for (IVariable<?> v : required) {
 
                     final IConstant<?> c = bindingSet.get(v);
@@ -356,9 +360,9 @@ public class ChunkedMaterializationOp extends PipelineOp {
                     }
 
                     if (iv.needsMaterialization() || materializeInlineIVs) {
-                    	
-                    	ids.add(iv);
-                    	
+
+                        ids.add(iv);
+
                     }
 
                 }
@@ -382,7 +386,7 @@ public class ChunkedMaterializationOp extends PipelineOp {
          */
         for (IBindingSet e : chunk) {
 
-            getBindingSet(e, required, terms);
+            getBindingSet(required, e, terms);
 
         }
 
@@ -392,17 +396,24 @@ public class ChunkedMaterializationOp extends PipelineOp {
      * Resolve the term identifiers in the {@link IBindingSet} using the map
      * populated when we fetched the current chunk.
      * 
+     * @param required
+     *            The variables to be resolved -or- <code>null</code> if all
+     *            variables should have been resolved.
      * @param bindingSet
-     *            A solution whose {@link Long}s will be interpreted as term
-     *            identifiers and resolved to the corresponding
-     *            {@link BigdataValue}s.
+     *            A solution whose {@link IV}s will be resolved to the
+     *            corresponding {@link BigdataValue}s in the caller's
+     *            <code>terms</code> map. The {@link IVCache} associations are
+     *            set as a side-effect.
+     * @param terms
+     *            A map from {@link IV}s to {@link BigdataValue}s.
      * 
      * @throws IllegalStateException
      *             if the {@link IBindingSet} was not materialized with the
      *             {@link IBindingSet}.
      */
-    static private void getBindingSet(final IBindingSet bindingSet,
+    static private void getBindingSet(//
             final IVariable<?>[] required,
+            final IBindingSet bindingSet,
             final Map<IV<?, ?>, BigdataValue> terms) {
 
         if (bindingSet == null)
@@ -411,7 +422,7 @@ public class ChunkedMaterializationOp extends PipelineOp {
         if (terms == null)
             throw new IllegalArgumentException();
 
-        if(required != null) {
+        if (required != null) {
 
             /*
              * Only the specified variables.
@@ -420,10 +431,10 @@ public class ChunkedMaterializationOp extends PipelineOp {
             for (IVariable<?> var : required) {
 
                 @SuppressWarnings("unchecked")
-                final IConstant<IV<?,?>> c = bindingSet.get(var);
+                final IConstant<IV<?, ?>> c = bindingSet.get(var);
 
                 if (c == null) {
-
+                    // Variable is not bound in this solution.
                     continue;
 
                 }
@@ -435,7 +446,7 @@ public class ChunkedMaterializationOp extends PipelineOp {
                     continue;
 
                 }
-                
+
                 final BigdataValue value = terms.get(iv);
 
                 if (value == null && iv.needsMaterialization()) {
@@ -471,7 +482,7 @@ public class ChunkedMaterializationOp extends PipelineOp {
 
                 final Object boundValue = entry.getValue().get();
 
-                if (!(boundValue instanceof IV<?, ?>)) {
+                if (!(boundValue instanceof IV)) {
 
                     continue;
 
