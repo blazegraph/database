@@ -236,7 +236,7 @@ public class AST2BOpRTO extends AST2BOpJoins {
      * will be checked to verify that the query plans do not permit reordering
      * of solutions.
      */
-    static final private boolean checkQueryPlans = false;
+    static final private boolean checkQueryPlans = false; // Note: Make [false] in committed code!
     
     /**
      * Inspect the remainder of the join group. If we can isolate a join graph
