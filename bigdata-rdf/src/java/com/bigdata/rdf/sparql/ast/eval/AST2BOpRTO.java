@@ -61,7 +61,6 @@ import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.Var;
 import com.bigdata.bop.ap.Predicate;
 import com.bigdata.bop.ap.SampleIndex.SampleType;
-import com.bigdata.bop.bset.ConditionalRoutingOp;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.join.JoinAnnotations;
@@ -77,7 +76,6 @@ import com.bigdata.bop.joinGraph.rto.SampleBase;
 import com.bigdata.bop.joinGraph.rto.VertexSample;
 import com.bigdata.bop.rdf.join.ChunkedMaterializationOp;
 import com.bigdata.bop.rdf.join.DataSetJoin;
-import com.bigdata.bop.solutions.MemorySortOp;
 import com.bigdata.bop.solutions.SliceOp;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.rdf.internal.IV;
@@ -219,22 +217,23 @@ public class AST2BOpRTO extends AST2BOpJoins {
      * estimated cardinality of the join since we can not compute the join hit
      * ratio without knowing the #of solutions in required to produce a given
      * #of solutions out.
+     * <p>
+     * There are several possible root causes for out of order evaluation. One
+     * is reordering of access paths in the pipeline join. Another is reordering
+     * of solutions when they are output from an operator. Another is an
+     * operator which uses the altSink and thus does not always route solutions
+     * along a single path.
      * 
-     * FIXME Make this <code>true</code>. There is a known problem where a
-     * {@link ConditionalRoutingOp} can cause out of order evaluation if some
-     * solutions flow along the default sink and some along the alt sink. I
-     * think that the fix for this is to make the materialization step
-     * non-conditional when performing cutoff evaluation of the join. I need to
-     * run this past MikeP, so this allows out-of-order evaluation for the
-     * moment. See BSBM Q5 for a query that currently fails if out of order
-     * evaluation is disallowed.
+     * @see #checkQueryPlans
      */
-    static final private boolean failOutOfOrderEvaluation = false;
+    static final private boolean failOutOfOrderEvaluation = true;
     
     /**
      * When <code>true</code>, the generated query plans for cutoff evaluation
      * will be checked to verify that the query plans do not permit reordering
      * of solutions.
+     * 
+     * @see #failOutOfOrderEvaluation
      */
     static final private boolean checkQueryPlans = false; // Note: Make [false] in committed code!
     
@@ -904,7 +903,8 @@ public class AST2BOpRTO extends AST2BOpJoins {
                             BOpEvaluationContext.CONTROLLER),//
                     new NV(SliceOp.Annotations.PIPELINED, true),//
                     new NV(SliceOp.Annotations.MAX_PARALLEL, 1),//
-                    new NV(MemorySortOp.Annotations.SHARED_STATE, true)//
+                    new NV(SliceOp.Annotations.REORDER_SOLUTIONS,false),//
+                    new NV(SliceOp.Annotations.SHARED_STATE, true)//
                     ), rtoJoinGroup, ctx);
 
         }
@@ -972,6 +972,18 @@ public class AST2BOpRTO extends AST2BOpJoins {
                         + PipelineOp.Annotations.MAX_PARALLEL
                         + ": expected=1, actual=" + tmp.getMaxParallel()
                         + ", op=" + tmp.toShortString());
+
+            }
+
+
+            if (tmp.isReorderSolutions()) {
+
+                // reordering of solutions is disallowed.
+                throw new RuntimeException("RTO "
+                        + PipelineOp.Annotations.REORDER_SOLUTIONS
+                        + ": expected=false, actual="
+                        + tmp.isReorderSolutions() + ", op="
+                        + tmp.toShortString());
 
             }
 

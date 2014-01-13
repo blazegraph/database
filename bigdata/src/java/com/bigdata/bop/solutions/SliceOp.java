@@ -150,7 +150,12 @@ public class SliceOp extends PipelineOp {
 		if (!isSharedState())
 			throw new UnsupportedOperationException(Annotations.SHARED_STATE
 					+ "=" + isSharedState());
-                
+        
+		// SLICE must preserve order.
+        if (isReorderSolutions())
+            throw new UnsupportedOperationException(
+                    Annotations.REORDER_SOLUTIONS + "=" + isReorderSolutions());
+        
     }
 
     /**
