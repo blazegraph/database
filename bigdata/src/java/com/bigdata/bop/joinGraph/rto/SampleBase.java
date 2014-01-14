@@ -100,6 +100,20 @@ public abstract class SampleBase {
     }
 
     /**
+     * Return <code>true</code> iff this sample has cardinality underflow (the
+     * sample is empty). Cardinality underflow occurs when the sampling process
+     * was unable to find any solutions. Underflow is typically addressed by
+     * increasing the sample size, but sometimes underflow indicates that an
+     * access path (if it has filters) or a join may not have any solutions in
+     * the data.
+     */
+    public boolean isUnderflow() {
+
+        return estimateEnum == EstimateEnum.Underflow;
+
+    }
+
+    /**
      * Sample.
      */
     private final AtomicReference<IBindingSet[]> sampleRef = new AtomicReference<IBindingSet[]>();
