@@ -542,11 +542,27 @@ public class JGraph {
 
                 }
 
+                /*
+                 * Show information about the paths and the paths that are
+                 * experiencing cardinality underflow.
+                 */
+                
                 log.warn("Cardinality estimate underflow - resampling: round="
                         + round + ", npaths=" + paths.length + ", nunderflow="
                         + nunderflow + ", limit=" + limit + "\n"
                         + showTable(paths));
 
+                for(Path p : paths) {
+                    final EdgeSample edgeSample;
+                    synchronized(edgeSamples) {
+                        edgeSample = edgeSamples.get(p.getVertexIds());
+                    }
+                    if (edgeSample.isUnderflow()) {
+                        log.warn("Underflow on path::"
+                                + showPath(p, edgeSamples));
+                    }
+                }
+                
             }
             
             if (nunderflow > 0) {
