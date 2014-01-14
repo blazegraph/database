@@ -555,7 +555,7 @@ public class JGraph {
                 for(Path p : paths) {
                     final EdgeSample edgeSample;
                     synchronized(edgeSamples) {
-                        edgeSample = edgeSamples.get(p.getVertexIds());
+                        edgeSample = edgeSamples.get(new PathIds(p));
                     }
                     if (edgeSample.isUnderflow()) {
                         log.warn("Underflow on path::"

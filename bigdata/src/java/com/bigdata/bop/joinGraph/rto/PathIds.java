@@ -50,6 +50,25 @@ public class PathIds {
         
     }
     
+    /**
+     * Convenience constructor.
+     * 
+     * @param p
+     *            A path.
+     */
+    public PathIds(final Path p) {
+
+        this(p.getVertexIds());
+
+    }
+
+    /**
+     * Core constructor.
+     * 
+     * @param ids
+     *            The ordered set of vertex identifiers for some join path
+     *            segment.
+     */
     public PathIds(final int[] ids) {
 
         if (ids == null)
