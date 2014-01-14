@@ -1373,7 +1373,7 @@ public class CustomByteArrayFrontCodedList extends AbstractObjectList<byte[]>
 
 //        final int base = 0;
         
-        final BackingBuffer bb = this.bb;
+//        final BackingBuffer bb = this.bb;
 
         /*
          * We will test each entry having an index that is an even multiple of
@@ -1396,22 +1396,7 @@ public class CustomByteArrayFrontCodedList extends AbstractObjectList<byte[]>
             /*
              * Compare the probe with the full length byte[] at index [mid].
              */
-            final int tmp;
-            {
-
-                // The index into the backing buffer of index [mid].
-                int pos = p[mid];
-                
-                // The #of bytes in the full length byte[] at index [mid].
-                final int blen = bb.readInt(pos);
-                
-                // Skip the #of bytes required to code that length.
-                pos += count(blen);
-
-                // Compare key vs actual (in buffer).
-                tmp = compareBytes(key, 0, key.length, bb, pos, blen);
-
-            }
+            final int tmp = comparePos(mid, key);
 
             if (tmp > 0) {
 
@@ -1425,9 +1410,18 @@ public class CustomByteArrayFrontCodedList extends AbstractObjectList<byte[]>
 
             } else {
 
-                // Found: return offset.
+                // duplicate check to see if previous is also a match
+                if (mid > 0 && comparePos(mid - 1, key) == 0) {
 
-                return offset;
+                    // in which case set it as the highest
+                    high = mid - 1;
+
+                } else {
+
+                    // Found: return offset.
+                    return offset;
+
+                }
 
             }
 
@@ -1439,6 +1433,34 @@ public class CustomByteArrayFrontCodedList extends AbstractObjectList<byte[]>
 
         return -(offset + 1);
 
+    }
+    
+    /**
+     * Compares the caller's key to a full length key at a specific offset
+     * in the {@link BackingBuffer}.
+     * 
+     * @param index
+     *            The index into the full length keys.
+     * @param key
+     *            The probe key.
+     * 
+     * @return A value which indicates whether the key at that offset into the
+     *         backing buffer is LT, GT, or EQ to the caller's key.
+     */
+    private int comparePos(final int index, final byte[] key) {
+
+        // The index into the backing buffer of index [index].
+        int pos = p[index];
+        
+        // The #of bytes in the full length byte[] at index [index].
+        final int blen = bb.readInt(pos);
+        
+        // Skip the #of bytes required to code that length.
+        pos += count(blen);
+
+        // Compare key vs actual (in buffer).
+        return compareBytes(key, 0, key.length, bb, pos, blen);
+        
     }
 
     /**
