@@ -545,23 +545,12 @@ public class JGraph {
                  * Show information about the paths and the paths that are
                  * experiencing cardinality underflow.
                  */
-                
+
                 log.warn("Cardinality estimate underflow - resampling: round="
                         + round + ", npaths=" + paths.length + ", nunderflow="
                         + nunderflow + ", limit=" + limit + "\n"
-                        + showTable(paths));
+                        + showTable(paths, null/* pruned */, edgeSamples));
 
-                for(Path p : paths) {
-                    final EdgeSample edgeSample;
-                    synchronized(edgeSamples) {
-                        edgeSample = edgeSamples.get(new PathIds(p));
-                    }
-                    if (edgeSample.isUnderflow()) {
-                        log.warn("Underflow on path::\n"
-                                + showPath(p, edgeSamples));
-                    }
-                }
-                
             }
             
             if (nunderflow > 0) {
@@ -1474,6 +1463,11 @@ public class JGraph {
      * 
      *            TODO Only sample vertices with an index.
      * 
+     *            TODO If any required join has a vertex with a proven exact
+     *            cardinality of zero, then there are no solutions for the join
+     *            group. Throw a {@link NoSolutionsException} and have the
+     *            caller handle it?
+     * 
      *            TODO Consider other cases where we can avoid sampling a vertex
      *            or an initial edge.
      *            <p>
@@ -1486,21 +1480,16 @@ public class JGraph {
      *            not share a variable directly and hence will materialize the
      *            full cross product before filtering which is *really*
      *            expensive.
-     * 
-     *            FIXME We need attach any access path filters that are required
-     *            for named graphs or scale-out for the RTO to function in those
-     *            environments. We DO NOT need to attach SPARQL FILTERs here -
-     *            those get applied when we evaluate the cutoff joins from one
-     *            vertex to another.
      */
-    private void sampleAllVertices(final QueryEngine queryEngine, final int limit) {
+    private void sampleAllVertices(final QueryEngine queryEngine,
+            final int limit) {
 
         final Map<Vertex, AtomicInteger> vertexLimit = new LinkedHashMap<Vertex, AtomicInteger>();
-        
+
         for (Vertex v : V) {
 
-            vertexLimit.put(v,new AtomicInteger(limit));
-            
+            vertexLimit.put(v, new AtomicInteger(limit));
+
         }
 
         sampleVertices(queryEngine, vertexLimit);
