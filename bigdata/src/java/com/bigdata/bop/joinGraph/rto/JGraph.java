@@ -498,7 +498,8 @@ public class JGraph {
 
         final int nvertices = V.length;
 
-        int round = 1;
+        int round = 1; // #of rounds.
+        int nunderflow = 0; // #of paths with card. underflow (no solutions).
 
         while (paths.length > 0 && round < nvertices - 1) {
 
@@ -528,8 +529,6 @@ public class JGraph {
              * limit, e.g., by specifying a MAX_LIMIT annotation on the
              * JoinGraph operator.
              */
-            int nunderflow = 0;
-
             for (int i = 0; i < 3; i++) {
 
                 nunderflow = resamplePaths(queryEngine, limit, round, paths,
@@ -558,7 +557,7 @@ public class JGraph {
                         edgeSample = edgeSamples.get(new PathIds(p));
                     }
                     if (edgeSample.isUnderflow()) {
-                        log.warn("Underflow on path::"
+                        log.warn("Underflow on path::\n"
                                 + showPath(p, edgeSamples));
                     }
                 }
@@ -584,24 +583,84 @@ public class JGraph {
             throw new NoSolutionsException();
             
         }
+
+        /*
+         * In general, there should be one winner. However, if there are paths
+         * with cardinality estimate underflow (that is, paths that do not have
+         * any solutions when sampling the path) then there can be multiple
+         * solutions.
+         * 
+         * When this occurs we have a choice. We can either the path with the
+         * minimum cost (min sumEstCard) or we can take a path that does not
+         * have a cardinality estimate underflow because we actually have an
+         * estimate for that path. In principle, the path with the minimum
+         * estimated cost should be the better choice, but we do not have any
+         * information about the order of the joins beyond the point where the
+         * cardinality underflow begins on that path. If we take a path that
+         * does not have a cardinality estimate underflow, then at least we know
+         * that the join order has been optimized for the entire path.
+         */
+
+        final Path selectedPath;
         
-		// Should be one winner.
         if (paths.length != 1) {
 
-            throw new AssertionError("Expected one path but have "
-                    + paths.length + " paths.");
+            log.warn("Multiple paths exist: npaths=" + paths.length
+                    + ", nunderflow=" + nunderflow + "\n"
+                    + showTable(paths, null/* pruned */, edgeSamples));
+
+            Path t = null;
+            
+            for (Path p : paths) {
+            
+                if (p.edgeSample.isUnderflow()) {
+                
+                    /*
+                     * Skip paths with cardinality estimate underflow. They are
+                     * not fully tested in the data since no solutions have made
+                     * it through all of the joins.
+                     */
+                    
+                    continue;
+                    
+                }
+
+                if (t == null || p.sumEstCard < t.sumEstCard) {
+                
+                    // Accept path with the least cost.
+                    t = p;
+                    
+                }
+                
+            }
+            
+            if (t == null) {
+
+                /* Arbitrary choice if all paths underflow.
+                 * 
+                 * TODO Or throw out NoSolutionsException?
+                 */
+                t = paths[0];
+                
+            }
+            
+            selectedPath = t;
+
+        } else {
+            
+            selectedPath = paths[0];
             
         }
 
         if (log.isInfoEnabled()) {
 
             log.info("\n*** Selected join path: "
-                    + Arrays.toString(paths[0].getVertexIds()) + "\n"
-                    + showPath(paths[0], edgeSamples));
+                    + Arrays.toString(selectedPath.getVertexIds()) + "\n"
+                    + showPath(selectedPath, edgeSamples));
 
         }
         
-        return paths[0];
+        return selectedPath;
 
     }
 
@@ -1941,9 +2000,9 @@ public class JGraph {
     }
 
     /**
-     * Comma delimited table showing the estimated join hit ratio, the estimated
-     * cardinality, and the set of vertices for each of the specified join
-     * paths.
+     * Return a comma delimited table showing the estimated join hit ratio, the
+     * estimated cardinality, and the set of vertices for each of the specified
+     * join paths.
      * 
      * @param a
      *            A set of paths (typically those before pruning).
@@ -1954,8 +2013,35 @@ public class JGraph {
      * 
      * @return A table with that data.
      */
-    static public String showTable(final Path[] a,final Path[] pruned) {
-        final StringBuilder sb = new StringBuilder();
+    static public String showTable(final Path[] a, final Path[] pruned) {
+
+        return showTable(a, pruned, null/* edgeSamples */);
+
+    }
+
+    /**
+     * Return a comma delimited table showing the estimated join hit ratio, the
+     * estimated cardinality, and the set of vertices for each of the specified
+     * join paths.
+     * 
+     * @param a
+     *            A set of paths (typically those before pruning).
+     * @param pruned
+     *            The set of paths after pruning (those which were retained)
+     *            (optional). When given, the paths which were pruned are marked
+     *            in the table.
+     * @param edgeSamples
+     *            When non-<code>null</code>, the details will be shown (using
+     *            {@link #showPath(Path, Map)}) for each path that is
+     *            experiencing cardinality estimate underflow (no solutions in
+     *            the data).
+     * 
+     * @return A table with that data.
+     */
+    static public String showTable(final Path[] a, final Path[] pruned,
+            final Map<PathIds, EdgeSample> edgeSamples) {
+        final StringBuilder sb = new StringBuilder(128 * a.length);
+        final List<Path> underflowPaths = new LinkedList<Path>();
         final Formatter f = new Formatter(sb);
         f.format("%-4s %10s%1s * %10s (%8s %8s %8s %8s %8s %8s) = %10s %10s%1s : %10s %10s %10s %10s",
                 "path",//
@@ -2030,8 +2116,28 @@ public class JGraph {
             // sb.append(" (" + e.v1.pred.getId() + " " + e.v2.pred.getId()
             // + ")");
             sb.append("\n");
+            if(x.edgeSample.isUnderflow()) {
+                underflowPaths.add(x);
+            }
         }
+
+        if (edgeSamples != null && !underflowPaths.isEmpty()) {
+
+            // Show paths with cardinality estimate underflow.
+            sb.append("\nPaths with cardinality estimate underflow::\n");
+
+            for (Path p : underflowPaths) {
+
+                sb.append(showPath(p, edgeSamples));
+
+                sb.append("----\n");
+
+            }
+
+        }
+
         return sb.toString();
+
     }
 
     /**
@@ -2039,13 +2145,16 @@ public class JGraph {
      * join hit ratio for each step in the path.
      * 
      * @param p
-     *            The join path.
+     *            The join path (required).
      * @param edgeSamples
-     *            A map containing the samples utilized by the {@link Path}.
+     *            A map containing the samples utilized by the {@link Path}
+     *            (required).
      */
     static public String showPath(final Path x,
             final Map<PathIds, EdgeSample> edgeSamples) {
         if (x == null)
+            throw new IllegalArgumentException();
+        if (edgeSamples == null)
             throw new IllegalArgumentException();
         final StringBuilder sb = new StringBuilder();
         final Formatter f = new Formatter(sb);
