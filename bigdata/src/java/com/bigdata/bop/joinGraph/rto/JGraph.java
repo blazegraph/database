@@ -544,7 +544,8 @@ public class JGraph {
 
                 log.warn("Cardinality estimate underflow - resampling: round="
                         + round + ", npaths=" + paths.length + ", nunderflow="
-                        + nunderflow + ", limit=" + limit);
+                        + nunderflow + ", limit=" + limit + "\n"
+                        + showTable(paths));
 
             }
             
