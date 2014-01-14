@@ -85,6 +85,8 @@
 		<javac destdir="${build.dir}/classes" classpathref="build.classpath"
 		 debug="${javac.debug}" debuglevel="${javac.debuglevel}" verbose="${javac.verbose}"
 	     encoding="${javac.encoding}"
+         source="${javac.source}"
+           target="${javac.target}"
 	     	>
 			<!-- note: must also specify -bootclasspath and -extdirs when cross-compiling -->
 			<!-- target="${javac.target}" source="${javac.source}" -->
