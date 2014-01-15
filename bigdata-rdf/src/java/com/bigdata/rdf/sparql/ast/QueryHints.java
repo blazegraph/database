@@ -341,31 +341,36 @@ public interface QueryHints {
      * 
      * @see https://sourceforge.net/apps/trac/bigdata/ticket/283
      */
-    String QUERYID = "queryId";//QueryHints.class.getName() + ".queryId";
+    String QUERYID = "queryId";
 
     /**
      * This query hint may be applied to any {@link IJoinNode} and marks a
      * particular join to be run first among in a particular group. Only one
      * "run first" join is permitted in a given group. This query hint is not
-     * permitted on optional joins.
+     * permitted on optional joins. This hint must be used with
+     * {@link QueryHintScope#Prior}.
      */
-    String RUN_FIRST = "runFirst";//QueryHints.class.getName() + ".runFirst";
+    String RUN_FIRST = "runFirst";
 
     /**
      * This query hint may be applied to any {@link IJoinNode} and marks a
      * particular join to be run last among in a particular group. Only one
-     * "run last" join is permitted in a given group.
+     * "run last" join is permitted in a given group. This hint must be used
+     * with {@link QueryHintScope#Prior}.
      */
-    String RUN_LAST = "runLast";//QueryHints.class.getName() + ".runLast";
+    String RUN_LAST = "runLast";
 
     /**
      * Query hint indicating whether or not a Sub-Select should be transformed
      * into a <em>named subquery</em>, lifting its evaluation out of the main
-     * body of the query and replacing the subquery with an INCLUDE. This is
-     * similar to {@link #AT_ONCE 'at-once'} evaluation, but creates a different
-     * query plan by lifting out a named subquery. It is also only supported for
-     * a Sub-Select. The {@link #AT_ONCE} query hint can be applied to other
-     * things as well.
+     * body of the query and replacing the subquery with an INCLUDE. This hint
+     * must be used with {@link QueryHintScope#SubQuery}.
+     * <p>
+     * This is similar to {@link #AT_ONCE 'atOnce'} evaluation, but creates a
+     * different query plan by lifting out a named subquery. The
+     * {@link #RUN_ONCE} query hint is only supported for
+     * {@link QueryHintScope#SubQuery} while {@link #AT_ONCE} query hint can be
+     * applied to other things as well.
      * <p>
      * When <code>true</code>, the subquery will be lifted out. When
      * <code>false</code>, the subquery will not be lifted unless other
@@ -381,20 +386,23 @@ public interface QueryHints {
      * 
      * @see #AT_ONCE
      */
-    String RUN_ONCE = "runOnce";//QueryHints.class.getName() + ".runOnce";
+    String RUN_ONCE = "runOnce";
 
     /**
      * Query hint indicating whether or not a JOIN (including SERVICE,
-     * SUB-SELECT, etc) should be run as an "at-once" operator. All solutions
-     * for an "at-once" operator are materialized before the operator is
-     * evaluated. It is then evaluated against those materialized solutions
-     * exactly once.
+     * SUB-SELECT, etc) should be run as an "atOnce" operator. All solutions for
+     * an "atOnce" operator are materialized before the operator is evaluated.
+     * It is then evaluated against those materialized solutions exactly once.
      * <p>
-     * Note: "At-once" evaluation is a general property of the query engine.
-     * This query hint does not change the structure of the query plan, but
-     * simply serves as a directive to the query engine that it should buffer
-     * all source solutions before running the operator. This is more general
+     * Note: "atOnce" evaluation is a general property of the query engine. This
+     * query hint does not change the structure of the query plan, but simply
+     * serves as a directive to the query engine that it should buffer all
+     * source solutions before running the operator. This is more general
      * purpose than the {@link #RUN_ONCE} query hint.
+     * <p>
+     * This query hint is allowed in any scope. The hint is transferred as an
+     * annotation onto all query plan operators generated from the annotated
+     * scope.
      * 
      * @see #RUN_ONCE
      * 
@@ -409,11 +417,14 @@ public interface QueryHints {
     String AT_ONCE = "atOnce";
 
     /**
-     * The target chunk (aka vector size) for the operator.
+     * Sets the target chunk size (aka vector size) for the output buffer of the operator.
      * <p>
-     * Note: The vectored query engine will buffer multiple chunks for an
-     * operator before the producer(s) (the operator(s) feeding into the
-     * annotated operator) must block.
+     * This query hint does not change the structure of the query plan, but
+     * simply serves as a directive to the query engine that it should allocate
+     * an output buffer for the operator that will emit chunks of the indicated
+     * target capacity. This query hint is allowed in any scope, but is
+     * generally used to effect the behavior of a join group, a subquery, or the
+     * entire query.
      * 
      * @see BufferAnnotations#CHUNK_CAPACITY
      */
@@ -421,6 +432,14 @@ public interface QueryHints {
     
     /**
      * The maximum parallelism for the operator within the query.
+     * <p>
+     * Note: "maxParallel" evaluation is a general property of the query engine.
+     * This query hint does not change the structure of the query plan, but
+     * simply serves as a directive to the query engine that it should not allow
+     * more than the indicated number of parallel instances of the operator to
+     * execute concurrently. This query hint is allowed in any scope. The hint is
+     * transferred as an annotation onto all query plan operators generated from
+     * the annotated scope.
      * 
      * @see PipelineOp.Annotations#MAX_PARALLEL
      */
@@ -528,7 +547,7 @@ public interface QueryHints {
      * elements (maximum) should be read from its access path.  This
      * effectively limits the input into the join.
      * 
-     * @see {@link Annotations#CUTOFF_LIMIT}.
+     * @see Annotations#CUTOFF_LIMIT
      */
     String CUTOFF_LIMIT = "cutoffLimit";
         

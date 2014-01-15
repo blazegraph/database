@@ -36,6 +36,14 @@ import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 /**
  * Sets the maximum #of operator evaluation tasks which can execute
  * concurrently.
+ * <p>
+ * Note: "maxParallel" is a general property of the query engine. This query
+ * hint does not change the structure of the query plan, but simply serves as a
+ * directive to the query engine that it should not allow more than the
+ * indicated number of parallel instances of the operator to execute
+ * concurrently. This query hint is allowed in any scope. The hint is
+ * transferred as an annotation onto all query plan operators generated from the
+ * annotated scope.
  * 
  * @see PipelineOp.Annotations#MAX_PARALLEL
  */

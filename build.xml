@@ -385,6 +385,10 @@ public class BuildInfo {
 			    overview="${bigdata.dir}/overview.html"
 			 windowtitle="bigdata&#174; v${build.ver}"
 			classpathref="build.classpath"
+			package="true"
+			protected="true"
+			public="true"
+			private="false"
 			>
 			<arg value="-J-Xmx1000m" />
          <arg value="-quiet" />
@@ -401,7 +405,7 @@ public class BuildInfo {
 			<doctitle>
 				<![CDATA[<h1>bigdata&#174; v${build.ver}</h1>]]></doctitle>
 		<bottom>
-			<![CDATA[<i>Copyright &#169; 2006-2012 SYSTAP, LLC. All Rights Reserved.</i>]]></bottom>
+			<![CDATA[<i>Copyright &#169; 2006-2014 SYSTAP, LLC. All Rights Reserved.</i>]]></bottom>
 	<tag name="todo" scope="all" description="TODO:" />
 	<tag name="issue" scope="all" description="ISSUE:" />
 	<!--tag name="FIXME" scope="all" description="FIXME:"/-->

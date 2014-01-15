@@ -35,14 +35,16 @@ import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 
 /**
- * Query hint marks the operator as requiring "at-once" evaluation. All
- * solutions will be buffered by the {@link QueryEngine} before the operator is
- * evaluated. When it is evaluated, it will receive all solutions in a single
- * invocation of that operator. However, the solutions MAY appear in multiple
- * chunks since the {@link QueryEngine} does not guarantee that the chunk will
- * be merged before the operator is invoked.
+ * Query hint marks the operator as requiring "atOnce" evaluation. All solutions
+ * will be buffered by the {@link QueryEngine} before the operator is evaluated.
+ * When it is evaluated, it will receive all solutions in a single invocation of
+ * that operator. However, the solutions MAY appear in multiple chunks since the
+ * {@link QueryEngine} does not guarantee that the chunk will be merged before
+ * the operator is invoked. This query hint is allowed in any scope. The hint is
+ * transferred as an annotation onto all query plan operators generated from the
+ * annotated scope.
  * <p>
- * Note: The "at-once" hint is basically turned into <code>NOT(PIPELINED)</code>.
+ * Note: The "atOnce" hint is basically turned into <code>NOT(PIPELINED)</code>.
  * 
  * @see PipelineOp.Annotations#PIPELINED
  */
