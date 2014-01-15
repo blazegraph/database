@@ -138,6 +138,7 @@ public class SubqueryRoot extends SubqueryBase implements IJoinNode {
     /**
      * Returns <code>false</code>.
      */
+    @Override
     final public boolean isOptional() {
 
         return false;
@@ -147,12 +148,14 @@ public class SubqueryRoot extends SubqueryBase implements IJoinNode {
     /**
      * Returns <code>false</code>.
      */
+    @Override
     final public boolean isMinus() {
      
         return false;
         
     }
-    
+
+    @Override
     final public List<FilterNode> getAttachedJoinFilters() {
 
         @SuppressWarnings("unchecked")
@@ -168,6 +171,7 @@ public class SubqueryRoot extends SubqueryBase implements IJoinNode {
 
     }
 
+    @Override
     final public void setAttachedJoinFilters(final List<FilterNode> filters) {
 
         setProperty(Annotations.FILTERS, filters);
