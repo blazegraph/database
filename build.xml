@@ -2313,13 +2313,18 @@ ${postInstallMessage}</echo>
 
     </target>
 
-<target name="clean-sparql-test-suite" description="delete the files unpacked by the Sesame SPARQL test suite.">
-<echo>"clearing: ${java.io.tmpdir}/sparql-*"</echo>
-<delete verbose="true">
-	<dirset dir="${java.io.tmpdir}" includes="sparql-*" />
-</delete>
-</target>
-
+   <target name="clean-sparql-test-suite"
+           description="Delete the files unpacked by the Sesame SPARQL test suite.">
+     <echo>"clearing: ${java.io.tmpdir}/sparql-*"</echo>
+     <delete verbose="true" includeemptydirs="true">
+       <fileset dir="${java.io.tmpdir}">
+         <patternset>
+           <include name="sparql-*/**"/>
+         </patternset>
+       </fileset>
+     </delete>
+   </target>
+	
 <!--                                                                   -->
 <!--                    SESAME SERVER TARGETS                          -->
 <!--                                                                   -->
