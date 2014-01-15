@@ -343,6 +343,15 @@ public class ASTSparql11SubqueryOptimizer implements IASTOptimizer {
         include.setQueryHints((Properties) parent
                 .getProperty(ASTBase.Annotations.QUERY_HINTS));
 
+        /**
+         * Copy across attached join filters.
+         * 
+         * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/796"
+         *      >Filter assigned to sub-query by query generator is dropped from
+         *      evaluation</a>
+         */
+        include.setAttachedJoinFilters(subqueryRoot.getAttachedJoinFilters());
+
         /*
          * Note: A SubqueryRoot normally starts out as the sole child of a
          * JoinGroupNode. However, other rewrites may have written out that

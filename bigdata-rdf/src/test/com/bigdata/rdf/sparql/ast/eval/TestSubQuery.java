@@ -27,6 +27,11 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.eval;
 
+import org.openrdf.model.Value;
+
+import com.bigdata.bop.BOpUtility;
+import com.bigdata.rdf.sparql.ast.NamedSubqueryRoot;
+import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTSparql11SubqueryOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.TestASTSparql11SubqueryOptimizer;
 
@@ -47,7 +52,7 @@ public class TestSubQuery extends AbstractDataDrivenSPARQLTestCase {
     /**
      * @param name
      */
-    public TestSubQuery(String name) {
+    public TestSubQuery(final String name) {
         super(name);
     }
 
@@ -198,6 +203,99 @@ public class TestSubQuery extends AbstractDataDrivenSPARQLTestCase {
 
         new TestHelper("sparql11-subquery-scope").runTest();
 
+    }
+
+    /**
+     * In this test variant, the FILTER winds up attached to a
+     * {@link NamedSubqueryRoot} (there are no shared variables projected out of
+     * the sub-select) and does not require RDF {@link Value} materialization.
+     * <p>
+     * Note: The sub-select explicitly annotated using
+     * {@link QueryHints#RUN_ONCE} to ensure that it gets lifted out as a
+     * {@link NamedSubqueryRoot}, but this query does not have any shared
+     * variables so the sub-select would be lifted out anyway.
+     * 
+     * <pre>
+     * select distinct ?s 
+     * where
+     * {
+     *         ?s ?p ?o.
+     *         {
+     *                 SELECT ?ps WHERE
+     *                 { 
+     *                         hint:SubQuery hint:runOnce true.
+     *                         ?ps a <http://www.example.org/schema/Person> .
+     *                 }
+     *                 limit 1
+     *         }
+     *         filter (?s = ?ps)
+     * }
+     * </pre>
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/796"
+     *      >Filter assigned to sub-query by query generator is dropped from
+     *      evaluation</a>
+     */
+    public void test_sparql11_subquery_filter_01()
+            throws Exception {
+
+        final TestHelper h = new TestHelper(
+                "sparql11-subselect-filter-01", // testURI,
+                "sparql11-subselect-filter-01.rq",// queryFileURL
+                "sparql11-subselect-filter-01.nt",// dataFileURL
+                "sparql11-subselect-filter-01.srx"// resultFileURL
+                );
+
+        // Run test.
+        h.runTest();
+        
+        // Make sure that this query used a NamedSubqueryRoot.
+        assertTrue(BOpUtility.visitAll(h.getASTContainer().getOptimizedAST(),
+                NamedSubqueryRoot.class).hasNext());
+        
+    }
+
+    /**
+     * Variant where the FILTER requires RDF Value materialization and the
+     * sub-select is lifted out as a named subquery.
+     * 
+     * <pre>
+     * select distinct ?s 
+     * where
+     * {
+     *         ?s ?p ?o.
+     *         {
+     *                 SELECT ?ps WHERE
+     *                 { 
+     *                         ?ps a <http://www.example.org/schema/Person> .
+     *                 }
+     *                 limit 1
+     *         }
+     *         filter (str(?s) = str(?ps))
+     * }
+     * </pre>
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/796"
+     *      >Filter assigned to sub-query by query generator is dropped from
+     *      evaluation</a>
+     */
+    public void test_sparql11_subquery_filter_01b()
+            throws Exception {
+
+        final TestHelper h = new TestHelper(
+                "sparql11-subselect-filter-01b", // testURI,
+                "sparql11-subselect-filter-01b.rq",// queryFileURL
+                "sparql11-subselect-filter-01.nt",// dataFileURL
+                "sparql11-subselect-filter-01.srx"// resultFileURL
+                );
+
+        // Run test.
+        h.runTest();
+
+        // Make sure that this query used a NamedSubqueryRoot.
+        assertTrue(BOpUtility.visitAll(h.getASTContainer().getOptimizedAST(),
+                NamedSubqueryRoot.class).hasNext());
+        
     }
 
 }
