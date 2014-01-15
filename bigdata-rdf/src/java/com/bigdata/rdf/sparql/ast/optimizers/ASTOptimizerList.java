@@ -55,12 +55,19 @@ public class ASTOptimizerList extends LinkedList<IASTOptimizer> implements
      */
     private static final long serialVersionUID = 1L;
 
-    public ASTOptimizerList(Collection<IASTOptimizer> c) {
-    	super(c);
+    public ASTOptimizerList(final Collection<IASTOptimizer> c) {
+
+        super(c);
+        
     }
-    public ASTOptimizerList(IASTOptimizer ... optimizers) {
-    	this(Arrays.asList(optimizers));
+
+    public ASTOptimizerList(final IASTOptimizer... optimizers) {
+
+        this(Arrays.asList(optimizers));
+        
     }
+    
+    @Override
     public boolean add(final IASTOptimizer opt) {
         
         if(opt == null)
@@ -79,6 +86,7 @@ public class ASTOptimizerList extends LinkedList<IASTOptimizer> implements
      * Note: This makes a deep copy of the AST before applying destructive
      * modifications.
      */
+    @Override
     public IQueryNode optimize(final AST2BOpContext context,
             IQueryNode queryNode, final IBindingSet[] bindingSets) {
 
@@ -95,7 +103,8 @@ public class ASTOptimizerList extends LinkedList<IASTOptimizer> implements
 
             queryNode = opt.optimize(context, queryNode, bindingSets);
 
-            assert queryNode != null : "Optimized discarded query: " + opt;
+            if (queryNode == null)
+                throw new AssertionError("Optimized discarded query: " + opt);
 
             if (log.isDebugEnabled())
                 log.debug("Rewritten AST:\n" + queryNode);
