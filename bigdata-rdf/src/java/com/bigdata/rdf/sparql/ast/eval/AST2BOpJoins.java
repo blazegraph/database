@@ -698,7 +698,6 @@ public class AST2BOpJoins extends AST2BOpFilters {
         final int accessPathSampleLimit = pred.getProperty(
                 QueryHints.ACCESS_PATH_SAMPLE_LIMIT, ctx.accessPathSampleLimit);
         final boolean estimateCosts = accessPathSampleLimit >= 0;
-        final IRelation r = ctx.context.getRelation(pred);
         final ScanCostReport scanCostReport;
         final SubqueryCostReport subqueryCostReport;
         final boolean scanAndFilter;
@@ -736,6 +735,7 @@ public class AST2BOpJoins extends AST2BOpFilters {
                  * the cost of the scan regardless of whether the query runs with
                  * partitioned or global index views when it is evaluated.
                  */
+                final IRelation r = ctx.context.getRelation(pred);
                 scanCostReport = ((AccessPath) ctx.context.getAccessPath(r,
                         (Predicate<?>) pred.setProperty(
                                 IPredicate.Annotations.REMOTE_ACCESS_PATH, true)))
