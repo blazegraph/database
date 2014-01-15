@@ -516,9 +516,9 @@ public class AST2BOpFilters extends AST2BOpBase {
          * If we are doing cutoff join evaluation, then limit the parallelism of
          * this operator to prevent reordering of solutions.
          * 
-         * TODO If query hints are allowed to override MAX_PARALLEL and this is
-         * being invoked for cutoff join evaluation, then that will break the
-         * "no reordering" guarantee.
+         * TODO RTO: If query hints are allowed to override MAX_PARALLEL and
+         * this is being invoked for cutoff join evaluation, then that will
+         * break the "no reordering" guarantee.
          */
 
         // disable reordering of solutions for cutoff joins.
