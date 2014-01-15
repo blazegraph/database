@@ -24,6 +24,7 @@ import com.bigdata.rdf.model.BigdataURI;
  * 
  * @see InGraphHashSetFilter
  */
+@SuppressWarnings("rawtypes")
 public final class InGraphBinarySearchFilter<E extends ISPO> extends SPOFilter<E>
         implements Externalizable {
 
@@ -76,7 +77,8 @@ public final class InGraphBinarySearchFilter<E extends ISPO> extends SPOFilter<E
         
     }
 
-    public boolean isValid(Object o) {
+    @Override
+    public boolean isValid(final Object o) {
         
         if (!canAccept(o)) {
             
@@ -96,7 +98,14 @@ public final class InGraphBinarySearchFilter<E extends ISPO> extends SPOFilter<E
         
     }
 
-    /**
+    @Override
+    public String toString() {
+
+        return getClass().getName() + "{size=" + a.length + "}";
+        
+    }
+
+   /**
      * The initial version.
      */
     private static final transient short VERSION0 = 0;
@@ -106,6 +115,7 @@ public final class InGraphBinarySearchFilter<E extends ISPO> extends SPOFilter<E
      */
     private static final transient short VERSION = VERSION0;
 
+    @Override
     public void readExternal(final ObjectInput in) throws IOException,
             ClassNotFoundException {
 
@@ -131,6 +141,7 @@ public final class InGraphBinarySearchFilter<E extends ISPO> extends SPOFilter<E
         
     }
 
+    @Override
     public void writeExternal(final ObjectOutput out) throws IOException {
 
         out.writeShort(VERSION);
