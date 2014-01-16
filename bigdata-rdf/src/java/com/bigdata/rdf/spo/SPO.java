@@ -78,15 +78,18 @@ public class SPO implements ISPO, java.io.Serializable {
     @SuppressWarnings("rawtypes")
     public final IV o;
 
+    /** The internal value for the context position. */
+    @SuppressWarnings("rawtypes")
+    private final IV c;
+    
     /**
-     * The context position or statement identifier (optional).
+     * The statement identifier (optional).
      * <p>
-     * Note: this is not final since, for SIDs mode, we have to set it lazily
-     * when adding an {@link SPO} to the database.
+     * Note: this is not final since we create it only on demand.
      */
     @SuppressWarnings("rawtypes")
-    private IV c = null;
-
+    private IV sid = null;
+    
 //    /**
 //     * Statement type (inferred, explicit, or axiom).
 //     */
@@ -154,7 +157,7 @@ public class SPO implements ISPO, java.io.Serializable {
         case 0: return s;
         case 1: return p;
         case 2: return o;
-        case 3: return c();
+        case 3: return c;
         default: throw new IllegalArgumentException();
         }
     }
@@ -180,13 +183,18 @@ public class SPO implements ISPO, java.io.Serializable {
     @Override
     @SuppressWarnings("rawtypes")
     final public IV c() {
+        return c;
+    }
+
+    @SuppressWarnings("rawtypes")
+    final public IV sid() {
     	
     	// lazy instantiate the sid if necessary
-    	if (c == null && sidable()) {
-    		c = new SidIV(this);
+    	if (sid == null && sidable()) {
+    		sid = new SidIV(this);
     	}
     	
-        return c;
+        return sid;
         
     }
 
@@ -203,7 +211,7 @@ public class SPO implements ISPO, java.io.Serializable {
         sidable(sid);
 
         // clear the current value for c
-        this.c = null;
+        this.sid = null;
 
     }
 
@@ -215,7 +223,7 @@ public class SPO implements ISPO, java.io.Serializable {
                     + toString());
 
     	// will lazy instantiate the sid
-        return c();
+        return sid();
 
     }
 
@@ -253,6 +261,7 @@ public class SPO implements ISPO, java.io.Serializable {
         this.s = s;
         this.p = p;
         this.o = o;
+        this.c = null;
         type(null);
         
     }
@@ -295,6 +304,7 @@ public class SPO implements ISPO, java.io.Serializable {
         this.s = s;
         this.p = p;
         this.o = o;
+        this.c = null;
         type(type);
         
     }
