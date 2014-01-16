@@ -27,11 +27,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.rio;
 
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
-import java.util.LinkedList;
 import java.util.Map;
 import java.util.Set;
 
@@ -41,7 +39,7 @@ import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
-import org.semanticweb.yars.nx.namespace.RDF;
+import org.openrdf.model.vocabulary.RDF;
 
 import com.bigdata.rdf.changesets.ChangeAction;
 import com.bigdata.rdf.changesets.ChangeRecord;
@@ -217,6 +215,15 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
     }
 
     protected final BigdataValueFactory valueFactory;
+
+    /**
+     * Reification vocabulary.
+     */
+    private final BigdataURI RDF_SUBJECT;
+    private final BigdataURI RDF_PREDICATE;
+    private final BigdataURI RDF_OBJECT;
+    private final BigdataURI RDF_STATEMENT;
+    private final BigdataURI RDF_TYPE;
     
     /**
      * The maximum #of Statements, URIs, Literals, or BNodes that the buffer can
@@ -372,6 +379,25 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
                     + ", statementStore=" + statementStore + ", database="
                     + database + ", arity=" + arity);
             
+        }
+        
+        this.RDF_SUBJECT = valueFactory.asValue(RDF.SUBJECT);
+        this.RDF_PREDICATE = valueFactory.asValue(RDF.PREDICATE);
+        this.RDF_OBJECT = valueFactory.asValue(RDF.OBJECT);
+        this.RDF_STATEMENT = valueFactory.asValue(RDF.STATEMENT);
+        this.RDF_TYPE = valueFactory.asValue(RDF.TYPE);
+        
+        if (distinct) {
+        	
+        	/*
+        	 * Get the reification vocabulary into the distinct term map.
+        	 */
+        	getDistinctTerm(RDF_SUBJECT);
+        	getDistinctTerm(RDF_PREDICATE);
+        	getDistinctTerm(RDF_OBJECT);
+        	getDistinctTerm(RDF_STATEMENT);
+        	getDistinctTerm(RDF_TYPE);
+        	
         }
         
     }
@@ -1270,21 +1296,21 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
         if (distinct) {
             {
                 final BigdataValue tmp = getDistinctTerm((BigdataValue) s);
-                if (tmp != s) {
+                if (tmp != s && !equals(tmp, RDF_SUBJECT, RDF_PREDICATE, RDF_OBJECT, RDF_TYPE, RDF_STATEMENT)) {
                     duplicateS = true;
                 }
                 s = (Resource) tmp;
             }
             {
                 final BigdataValue tmp = getDistinctTerm((BigdataValue) p);
-                if (tmp != p) {
+                if (tmp != p && !equals(tmp, RDF_SUBJECT, RDF_PREDICATE, RDF_OBJECT, RDF_TYPE)) {
                     duplicateP = true;
                 }
                 p = (URI) tmp;
             }
             {
                 final BigdataValue tmp = getDistinctTerm((BigdataValue) o);
-                if (tmp != o) {
+                if (tmp != o && !equals(tmp, RDF_SUBJECT, RDF_PREDICATE, RDF_OBJECT, RDF_TYPE, RDF_STATEMENT)) {
                     duplicateO = true;
                 }
                 o = (Value) tmp;
@@ -1323,11 +1349,8 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
                 
             	log.info(stmt);
             	
-            	if (s instanceof BNode && 
-            			(RDF.SUBJECT.toString().equals(p.toString()) || RDF.PREDICATE.toString().equals(p.toString()) || RDF.OBJECT.toString().equals(p.toString())) || 
-            			(RDF.STATEMENT.toString().equals(o.toString()) && RDF.TYPE.toString().equals(p.toString()))) {
-            		
-            		if (!(RDF.STATEMENT.toString().equals(o.toString()) && RDF.TYPE.toString().equals(p.toString()))) {
+            	if (s instanceof BNode &&
+        			equals((BigdataValue)p, RDF_SUBJECT, RDF_PREDICATE, RDF_OBJECT)) {
             			
             		final BigdataBNodeImpl sid = (BigdataBNodeImpl) s;
             		
@@ -1354,10 +1377,13 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
             		
 	                if (log.isDebugEnabled()) 
 	                    log.debug("reified piece: "+stmt);
-	                
-            		}
 
-            	} else {
+	        	} else if (s instanceof BNode && 
+	     			   equals((BigdataValue)o, RDF_STATEMENT) && equals((BigdataValue)p, RDF_TYPE)) {
+		
+		     		// ignore this statement
+		     		
+	        	} else {
             	
 	                if (deferredStmts == null) {
 	
@@ -1490,6 +1516,41 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
             
         }
 
+    }
+    
+    private boolean equals(final BigdataValue v1, final BigdataValue... v2) {
+    	
+		if (v2.length == 1) {
+			
+			return _equals(v1, v2[0]);
+			
+		} else {
+			
+			for (BigdataValue v : v2) {
+				
+				if (_equals(v1, v))
+					return true;
+				
+			}
+			
+			return false;
+			
+		}
+
+    }
+    
+    private boolean _equals(final BigdataValue v1, final BigdataValue v2) {
+		
+    	if (distinct) {
+
+    		return v1 == v2;
+
+    	} else {
+    		
+    		return v1.equals(v2);
+    		
+    	}
+    	
     }
     
     private static class ReifiedStmt implements Statement {
