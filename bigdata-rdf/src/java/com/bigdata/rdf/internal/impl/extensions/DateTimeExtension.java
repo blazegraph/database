@@ -241,6 +241,9 @@ public class DateTimeExtension<V extends BigdataValue> implements IExtension<V> 
 
     /**
      * Singleton caching pattern for the Datatype factory reference.
+     * 
+     * @see <a href="http://sourceforge.net/apps/trac/bigdata/ticket/802">
+     *      Optimize DatatypeFactory instantiation in DateTimeExtension </a>
      */
     static {
 
