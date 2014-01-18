@@ -103,8 +103,8 @@ public interface BDS {
      * 
      * select ?s ?relevance
      * where {
-     *   ?s bd:search &quot;scale-out RDF triplestore&quot; .
-     *   ?s bd:relevance ?relevance .
+     *   ?s bds:search &quot;scale-out RDF triplestore&quot; .
+     *   ?s bds:relevance ?relevance .
      * }
      * 
      * </pre>
@@ -131,8 +131,8 @@ public interface BDS {
      * 
      * select ?s ?rank
      * where {
-     *   ?s bd:search &quot;scale-out RDF triplestore&quot; .
-     *   ?s bd:rank ?rank .
+     *   ?s bds:search &quot;scale-out RDF triplestore&quot; .
+     *   ?s bds:rank ?rank .
      * }
      * 
      * </pre>
@@ -152,8 +152,8 @@ public interface BDS {
      * 
      * select ?s
      * where {
-     *   ?s bd:search &quot;scale-out RDF triplestore&quot; .
-     *   ?s bd:maxRank "5"^^xsd:int .
+     *   ?s bds:search &quot;scale-out RDF triplestore&quot; .
+     *   ?s bds:maxRank "5"^^xsd:int .
      * }
      * 
      * </pre>
@@ -183,8 +183,8 @@ public interface BDS {
      * 
      * select ?s
      * where {
-     *   ?s bd:search &quot;scale-out RDF triplestore&quot; .
-     *   ?s bd:minRank "5"^^xsd:int .
+     *   ?s bds:search &quot;scale-out RDF triplestore&quot; .
+     *   ?s bds:minRank "5"^^xsd:int .
      * }
      * 
      * </pre>
@@ -208,8 +208,8 @@ public interface BDS {
      * 
      * select ?s
      * where {
-     *   ?s bd:search &quot;scale-out RDF triplestore&quot; .
-     *   ?s bd:minRelevance "0.5"^^xsd:double .
+     *   ?s bds:search &quot;scale-out RDF triplestore&quot; .
+     *   ?s bds:minRelevance "0.5"^^xsd:double .
      * }
      * 
      * </pre>
@@ -232,8 +232,8 @@ public interface BDS {
      * 
      * select ?s
      * where {
-     *   ?s bd:search &quot;scale-out RDF triplestore&quot; .
-     *   ?s bd:maxRelevance "0.9"^^xsd:double .
+     *   ?s bds:search &quot;scale-out RDF triplestore&quot; .
+     *   ?s bds:maxRelevance "0.9"^^xsd:double .
      * }
      * 
      * </pre>
@@ -263,8 +263,8 @@ public interface BDS {
      * 
      * select ?s
      * where {
-     *   ?s bd:search &quot;scale-out RDF triplestore&quot; .
-     *   ?s bd:matchAllTerms "true" .
+     *   ?s bds:search &quot;scale-out RDF triplestore&quot; .
+     *   ?s bds:matchAllTerms "true" .
      * }
      * 
      * </pre>
@@ -283,8 +283,8 @@ public interface BDS {
      * 
      * select ?s
      * where {
-     *   ?s bd:search &quot;scale-out RDF triplestore&quot; .
-     *   ?s bd:matchExact "true" .
+     *   ?s bds:search &quot;scale-out RDF triplestore&quot; .
+     *   ?s bds:matchExact "true" .
      * }
      * 
      * </pre>
@@ -306,8 +306,8 @@ public interface BDS {
      * 
      * select ?s
      * where {
-     *   ?s bd:search &quot;scale-out RDF triplestore&quot; .
-     *   ?s bd:matchRegex &quot;regex to apply to ?s bindings&quot; .
+     *   ?s bds:search &quot;scale-out RDF triplestore&quot; .
+     *   ?s bds:matchRegex &quot;regex to apply to ?s bindings&quot; .
      * }
      * 
      * </pre>
@@ -320,6 +320,22 @@ public interface BDS {
     final String DEFAULT_MATCH_REGEX = null;
     
     /**
+     * 
+     * <strong>Prefix matching is now indicated using a wildcard</strong>
+     * 
+     * <pre>
+     * PREFIX bds: <http://www.bigdata.com/rdf/search#>
+     * 
+     * SELECT ?subj ?label 
+     * WHERE {
+     *       ?label bds:search "mi*" .
+     *       ?label bds:relevance ?cosine .
+     *       ?subj ?p ?label .
+     * }
+     * </pre>
+     * 
+     * <strong>The following approach is no longer supported. </strong>
+     * 
      * Magic predicate used to query for free text search metadata to turn on
      * prefix matching. Prefix matching will match all full text index tokens
      * that begin with the specified token(s) (default
@@ -331,16 +347,25 @@ public interface BDS {
      * 
      * select ?s
      * where {
-     *   ?s bd:search &quot;scale-out RDF triplestore&quot; .
-     *   ?s bd:prefixMatch &quot;true&quot; .
+     *   ?s bds:search &quot;scale-out RDF triplestore&quot; .
+     *   ?s bds:prefixMatch &quot;true&quot; .
      * }
      * 
      * </pre>
      * <p>
      * This will turn on prefix matching.
+     * 
+     * @deprecated Prefix matching is now invoked using a wildcard.
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/803" >
+     *      prefixMatch does not work in full text search </a>
      */
+    @Deprecated
     final URI PREFIX_MATCH = new URIImpl(NAMESPACE + "prefixMatch");
-    
+
+    /**
+     * @deprecated This option is now invoked using a wildcard.
+     */
     final boolean DEFAULT_PREFIX_MATCH = false;
     
     /**
@@ -351,8 +376,8 @@ public interface BDS {
      * 
      * select ?s
      * where {
-     *   ?s bd:search &quot;scale-out RDF triplestore&quot; .
-     *   ?s bd:subjectSearch "true" .
+     *   ?s bds:search &quot;scale-out RDF triplestore&quot; .
+     *   ?s bds:subjectSearch "true" .
      * }
      * 
      * </pre>
@@ -381,8 +406,8 @@ public interface BDS {
      * 
      * select ?s
      * where {
-     *   ?s bd:search &quot;scale-out RDF triplestore&quot; .
-     *   ?s bd:searchTimeout "5000" .
+     *   ?s bds:search &quot;scale-out RDF triplestore&quot; .
+     *   ?s bds:searchTimeout "5000" .
      * }
      * 
      * </pre>
