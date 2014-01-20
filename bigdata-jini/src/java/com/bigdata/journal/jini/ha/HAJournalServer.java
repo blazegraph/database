@@ -347,6 +347,27 @@ public class HAJournalServer extends AbstractServer {
         String DEFAULT_HA_LOG_DIR = "HALog";
 
         /**
+         * The maximum amount of time in milliseconds to await the synchronous
+         * release of older HALog files during a 2-phase commit (default
+         * {@value #DEFAULT_HA_LOG_PURGE_TIMEOUT}). This MAY be ZERO to not
+         * wait. Large timeouts can cause significant latency during a 2-phase
+         * commit if a large number of HALog files should be released
+         * accordinging to the {@link IRestorePolicy}.
+         * 
+         * @see <a href="http://sourceforge.net/apps/trac/bigdata/ticket/780"
+         *      >Incremental or asynchronous purge of HALog files</a>
+         */
+        String HA_LOG_PURGE_TIMEOUT = "HALogPurgeTimeout";
+
+        /**
+         * The default is ZERO (0L) milliseconds, which is probably what we
+         * always want. However, the existence of this option allows us to
+         * revert to the old behavior using a configuration change or by
+         * changing the default.
+         */
+        long DEFAULT_HA_LOG_PURGE_TIMEOUT = 0L; // milliseconds
+
+        /**
          * The name of the directory in which periodic snapshots of the journal
          * will be written. Each snapshot is a full copy of the journal.
          * Snapshots are compressed and therefore may be much more compact than
