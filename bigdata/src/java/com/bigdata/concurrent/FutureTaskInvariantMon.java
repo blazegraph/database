@@ -193,7 +193,7 @@ public abstract class FutureTaskInvariantMon<T> extends FutureTaskMon<T>
 
     /**
      * Establish an invariant that the quorum is met and remains met on the same
-     * token.
+     * token (the one specified to the constructor).
      */
     public void assertQuorumMet() {
         m_triggers.add(new QuorumEventInvariant(QuorumEventEnum.QUORUM_BROKE,
