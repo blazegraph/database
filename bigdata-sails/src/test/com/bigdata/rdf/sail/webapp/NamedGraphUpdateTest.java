@@ -36,13 +36,14 @@ import junit.framework.Test;
  */
 public class NamedGraphUpdateTest extends AbstractProtocolTest {
 
+
 	public NamedGraphUpdateTest(String name)  {
 		super(name);
 	}
 	
 	
 	private String atomicMoveNamedGraph(boolean useHint) {
-		// Atomic update of uploaded graph
+		// Atomic update of uploaded graph - moving eg:tmp to eg:a (deleting old contents of eg:a)
 		return 
 		"DELETE {\n" +   
 	    "  GRAPH <eg:a> {\n" +
@@ -87,19 +88,32 @@ public class NamedGraphUpdateTest extends AbstractProtocolTest {
 				    " }\n" +
 				    "}\n";
 	
-	private String ask = "ASK { GRAPH <eg:tmp> { ?s ?p ?o } }";
+	
+	private void makeUpdate(String update) throws IOException {
+		setMethodisPostUrlEncodedData();
+		serviceRequest("update", update);
+	}
+	
+	private void assertQuad(String graph, String triple) throws IOException {
+		assertQuad("true", graph, triple);
+	}
+
+	private void assertNotQuad(String graph, String triple) throws IOException {
+		assertQuad("false", graph, triple);
+	}
+
+	void assertQuad(String expected, String graph, String triple) throws IOException {
+		String result = serviceRequest("query", "ASK { GRAPH " + graph + " { " + triple + "} }" );
+		assertTrue(result.contains(expected));
+	}
 	
 	private void updateAFewTimes(boolean useHint, int numberOfTimes, int numberOfUpdatesPerTime) throws IOException {
 		for (int i=0; i<numberOfTimes; i++) {
 			for (int j=0; j<numberOfUpdatesPerTime;j++) {
-				setMethodisPostUrlEncodedData();
-				serviceRequest("update", insertData);
+				makeUpdate(insertData);
 			}
-			setMethodisPostUrlEncodedData();
-			serviceRequest("update", atomicMoveNamedGraph(useHint) );
-			if (!serviceRequest("query", ask ).contains("false")) {
-				fail("On loop "+i+" (number of updates = "+numberOfUpdatesPerTime+")");
-			}
+			makeUpdate( atomicMoveNamedGraph(useHint) );
+			assertNotQuad("<eg:tmp>", " ?s ?p ?o ");
 		}
 	}
 
@@ -126,6 +140,122 @@ public class NamedGraphUpdateTest extends AbstractProtocolTest {
 	}
 	public void test_f_20_5() throws  IOException {
 		updateAFewTimes(false, 20, 5);
+	}
+	public void test_double_triple_delete() throws  IOException {
+		setMethodisPostUrlEncodedData();
+		makeUpdate("prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#>\n" +
+			    "INSERT DATA\n" +
+			    "{ \n" +
+			    " GRAPH <eg:a> {\n" +
+			    "   <eg:b> rdf:type <eg:c> \n" +
+			    " }\n" +
+			    " GRAPH <eg:tmp> {\n" +
+			    "   <eg:b> rdf:type <eg:c> \n" +
+			    " }\n" +
+			    "}\n");
+		makeUpdate( "DELETE {\n" +   
+			    "  GRAPH <eg:a> {\n" +
+			    "    ?olds ?oldp ?oldo\n" +
+			    "  }\n" +       
+			    "  GRAPH <eg:tmp> {\n" +
+			    "    ?olds ?oldp ?oldo\n" +
+			    "  }\n" +       
+			    "}\n" +   
+			    "WHERE {\n" +
+			    "    GRAPH <eg:a> {\n" +
+			    "      ?olds ?oldp ?oldo\n" +
+			    "    }\n" +     
+			    "}");
+		assertNotQuad("?g","?s ?p ?o");
+		
+	}
+
+	public void test_double_triple_insert() throws  IOException {
+		makeUpdate( "prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#>\n" +
+			    "INSERT DATA\n" +
+			    "{ \n" +
+			    " GRAPH <eg:tmp> {\n" +
+			    "   <eg:b> rdf:type <eg:c> .\n" +
+			    "   <eg:x> rdf:type _:foo \n" +
+			    " }\n" +
+			    "}\n");
+		makeUpdate( "INSERT {\n" +   
+			    "  GRAPH <eg:A> {\n" +
+			    "    ?olds ?oldp ?oldo\n" +
+			    "  }\n" +       
+			    "  GRAPH <eg:B> {\n" +
+			    "    ?olds ?oldp ?oldo\n" +
+			    "  }\n" +       
+			    "}\n" +   
+			    "WHERE {\n" +
+			    "    GRAPH <eg:tmp> {\n" +
+			    "      ?olds ?oldp ?oldo\n" +
+			    "    }\n" +     
+			    "}");
+		assertQuad("<eg:A>","<eg:b> rdf:type <eg:c> ");
+		assertQuad("<eg:B>","<eg:b> rdf:type <eg:c> ");
+		assertQuad("<eg:A>","<eg:x> rdf:type ?x");
+		assertQuad("<eg:B>","<eg:x> rdf:type ?x ");
+	}
+	public void test_double_triple_delete_insert() throws  IOException {
+		makeUpdate( "prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#>\n" +
+			    "INSERT DATA\n" +
+			    "{ \n" +
+			    " GRAPH <eg:tmp> {\n" +
+			    "   <eg:A> <eg:moveTo> <eg:AA> .\n" +
+			    "   <eg:B> <eg:moveTo> <eg:BB> \n" +
+			    " }\n" +
+			    "}\n");
+		makeUpdate( "INSERT {\n" +   
+			    "  GRAPH <eg:A> {\n" +
+			    "    ?olds ?oldp ?oldo\n" +
+			    "  }\n" +      
+			    "}\n" +   
+			    "WHERE {\n" +
+			    "    GRAPH <eg:tmp> {\n" +
+			    "      ?olds ?oldp ?oldo\n" +
+			    "    }\n" +     
+			    "}");
+		makeUpdate( "INSERT {\n" +  
+			    "  GRAPH <eg:B> {\n" +
+			    "    ?olds ?oldp ?oldo\n" +
+			    "  }\n" +       
+			    "}\n" +   
+			    "WHERE {\n" +
+			    "    GRAPH <eg:tmp> {\n" +
+			    "      ?olds ?oldp ?oldo\n" +
+			    "    }\n" +     
+			    "}");
+		assertQuad("<eg:A>","<eg:A> <eg:moveTo> <eg:AA> ");
+		assertQuad("<eg:B>","<eg:A> <eg:moveTo> <eg:AA> ");
+		assertQuad("<eg:A>","<eg:B> <eg:moveTo> <eg:BB>");
+		assertQuad("<eg:B>","<eg:B> <eg:moveTo> <eg:BB> ");
+		makeUpdate( "DELETE {\n" + 
+			    "  GRAPH ?oldg {\n" +
+			    "    ?olds ?oldp ?oldo\n" +
+			    "  }\n" +       
+			    "}\n" +   
+				"INSERT {\n" +  
+			    "  GRAPH ?newg {\n" +
+			    "    ?olds ?oldp ?oldo\n" +
+			    "  }\n" +       
+			    "}\n" +   
+			    "WHERE {\n" +
+			    "    GRAPH <eg:tmp> {\n" +
+			    "      ?oldg <eg:moveTo> ?newg\n" +
+			    "    }\n" +     
+			    "    GRAPH ?oldg {\n" +
+			    "       ?olds ?oldp ?oldo\n" +
+			    "    }\n" +     
+			    "}");
+		assertNotQuad("<eg:A>","<eg:A> <eg:moveTo> <eg:AA> ");
+		assertNotQuad("<eg:B>","<eg:A> <eg:moveTo> <eg:AA> ");
+		assertNotQuad("<eg:A>","<eg:B> <eg:moveTo> <eg:BB>");
+		assertNotQuad("<eg:B>","<eg:B> <eg:moveTo> <eg:BB> ");
+		assertQuad("<eg:AA>","<eg:A> <eg:moveTo> <eg:AA> ");
+		assertQuad("<eg:BB>","<eg:A> <eg:moveTo> <eg:AA> ");
+		assertQuad("<eg:AA>","<eg:B> <eg:moveTo> <eg:BB>");
+		assertQuad("<eg:BB>","<eg:B> <eg:moveTo> <eg:BB> ");
 	}
 	static public Test suite() {
 		return ProxySuiteHelper.suiteWhenStandalone(NamedGraphUpdateTest.class,"test.*", TestMode.quads);
