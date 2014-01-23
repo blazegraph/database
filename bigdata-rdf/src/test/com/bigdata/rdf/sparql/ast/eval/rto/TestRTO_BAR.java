@@ -29,11 +29,14 @@ package com.bigdata.rdf.sparql.ast.eval.rto;
 
 import java.util.Properties;
 
+import com.bigdata.bop.rdf.joinGraph.GenerateBarData;
 import com.bigdata.rdf.sail.BigdataSail;
 
 /**
- * Data driven test suite for the Runtime Query Optimizer (RTO) using LUBM data
- * and queries based on LUBM.
+ * Data driven test suite for the Runtime Query Optimizer (RTO) using BAR data
+ * and queries.
+ * 
+ * @see GenerateBarData
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id: TestBasicQuery.java 6440 2012-08-14 17:57:33Z thompsonbry $
@@ -51,7 +54,7 @@ public class TestRTO_BAR extends AbstractRTOTestCase {
     /**
      * @param name
      */
-    public TestRTO_BAR(String name) {
+    public TestRTO_BAR(final String name) {
         super(name);
     }
 
