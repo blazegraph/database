@@ -54,6 +54,7 @@ import com.bigdata.bop.ap.filter.DistinctFilter;
 import com.bigdata.bop.rdf.filter.NativeDistinctFilter;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataBNode;
+import com.bigdata.rdf.model.BigdataQuadWrapper;
 import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
@@ -278,7 +279,13 @@ public class ASTConstructIterator implements
 
         this.src = src;
 
-        /*
+        filter = createDistinctFilter(tripleStore, construct, whereClause);
+        
+    }
+
+	IFilterTest createDistinctFilter(final AbstractTripleStore tripleStore, final ConstructNode construct,
+			final GraphPatternGroup<?> whereClause) {
+		/*
          * Setup the DISTINCT SPO filter.
          * 
          * Note: CONSTRUCT is sometimes used to materialize all triples for some
@@ -289,79 +296,124 @@ public class ASTConstructIterator implements
          * graph is large.
          */
 
-        final boolean isObviouslyDistinct = isObviouslyDistinct(
-                tripleStore.isQuads(), templates, whereClause);
-        
-        if (isObviouslyDistinct) {
+        final boolean isObviouslyDistinct = isObviouslyDistinct(tripleStore.isQuads(), templates, whereClause);
+
+		if (isObviouslyDistinct) {
 
             // Do not impose a DISTINCT filter.
             
-            filter = null;
+            return null;
             
-        } else {
-            
-            final boolean nativeDistinct = construct.isNativeDistinct();
-            
-            if (nativeDistinct) {
+        }
+		
 
-                /*
-                 * Construct a predicate for the first triple template. We will
-                 * use that as the bias for the scalable DISTINCT SPO filter.
-                 */
+		
+		final boolean distinctQuads = construct.isDistinctQuads() && tripleStore.isQuads() && hasMixedQuadData(templates);
+		
+		if (distinctQuads) {
+			
+			return createDistinctQuadsFilter(construct);
+		}
+		
+        return createDistinctTriplesFilter(construct);
+        
+	}
+
+	@SuppressWarnings("serial")
+	private IFilterTest createDistinctQuadsFilter(final ConstructNode construct) {
+        return new DistinctFilter.DistinctFilterImpl(construct){
+        	@Override
+        	public boolean isValid(Object o){
+        		return super.isValid(new BigdataQuadWrapper((BigdataStatement)o));
+        	}
+        };
+	}
+
+	private boolean hasMixedQuadData(List<StatementPatternNode> templates) {
+		if (templates.size() == 0) {
+			return false;
+		}
+		TermNode singleValue = templates.get(0).c();
+		if (singleValue instanceof VarNode) {
+			return true;
+		}
+		for (StatementPatternNode spn:templates) {
+			TermNode tn = spn.c();
+			if (!equals(singleValue ,tn )) {
+				// this is a little too strong, but it is merely inefficient not incorrect
+				// to return true when false would be correct.
+				return true;
+			}
+		}
+		return false;
+	}
+
+	private boolean equals(TermNode a, TermNode b) {
+		return a == b || ( a != null && a.equals(b));
+	}
+
+	IFilterTest createDistinctTriplesFilter(final ConstructNode construct) {
+		
+        final boolean nativeDistinct = construct.isNativeDistinct();
+
+        if (nativeDistinct) {
+
+            /*
+             * Construct a predicate for the first triple template. We will
+             * use that as the bias for the scalable DISTINCT SPO filter.
+             */
+            @SuppressWarnings("rawtypes")
+            final IPredicate pred;
+            {
+
+                final StatementPatternNode sp = templates.get(0/* index */);
+
                 @SuppressWarnings("rawtypes")
-                final IPredicate pred;
-                {
+                final IVariableOrConstant<IV> s = sp.s()
+                        .getValueExpression();
 
-                    final StatementPatternNode sp = templates.get(0/* index */);
+                @SuppressWarnings("rawtypes")
+                final IVariableOrConstant<IV> p = sp.p()
+                        .getValueExpression();
+                
+                @SuppressWarnings("rawtypes")
+                final IVariableOrConstant<IV> o = sp.o()
+                        .getValueExpression();
 
-                    @SuppressWarnings("rawtypes")
-                    final IVariableOrConstant<IV> s = sp.s()
-                            .getValueExpression();
+                // // The graph term/variable iff specified by the query.
+                // final TermNode cvar = sp.c();
+                // final IVariableOrConstant<IV> c = cvar == null ? null :
+                // cvar
+                // .getValueExpression();
 
-                    @SuppressWarnings("rawtypes")
-                    final IVariableOrConstant<IV> p = sp.p()
-                            .getValueExpression();
-                    
-                    @SuppressWarnings("rawtypes")
-                    final IVariableOrConstant<IV> o = sp.o()
-                            .getValueExpression();
+                final BOp[] vars = new BOp[] { s, p, o /* , c */};
 
-                    // // The graph term/variable iff specified by the query.
-                    // final TermNode cvar = sp.c();
-                    // final IVariableOrConstant<IV> c = cvar == null ? null :
-                    // cvar
-                    // .getValueExpression();
-
-                    final BOp[] vars = new BOp[] { s, p, o /* , c */};
-
-                    pred = new SPOPredicate(vars, BOp.NOANNS);
-
-                }
-
-                /*
-                 * The index that will be used to read on the B+Tree access
-                 * path.
-                 */
-                @SuppressWarnings({ "unchecked", "rawtypes" })
-                final SPOKeyOrder indexKeyOrder = SPOKeyOrder.getKeyOrder(
-                        (IPredicate) pred, 3/* keyArity */);
-
-                construct.setProperty(
-                        NativeDistinctFilter.Annotations.KEY_ORDER,
-                        indexKeyOrder);
-
-                // Native memory based DISTINCT filter.
-                filter = new NativeDistinctFilter.DistinctFilterImpl(construct);
-
-            } else {
-
-                // JVM Based DISTINCT filter.
-                filter = new DistinctFilter.DistinctFilterImpl(construct);
+                pred = new SPOPredicate(vars, BOp.NOANNS);
 
             }
+
+            /*
+             * The index that will be used to read on the B+Tree access
+             * path.
+             */
+            @SuppressWarnings({ "unchecked", "rawtypes" })
+            final SPOKeyOrder indexKeyOrder = SPOKeyOrder.getKeyOrder(
+                    (IPredicate) pred, 3/* keyArity */);
+
+            construct.setProperty(
+                    NativeDistinctFilter.Annotations.KEY_ORDER,
+                    indexKeyOrder);
+
+            // Native memory based DISTINCT filter.
+            return new NativeDistinctFilter.DistinctFilterImpl(construct);
+
+        } else {
+
+            // JVM Based DISTINCT filter.
+            return new DistinctFilter.DistinctFilterImpl(construct);
+
         }
-        
-    }
+	}
     
     /**
      * Return <code>true</code> iff this CONSTRUCT template will obviously

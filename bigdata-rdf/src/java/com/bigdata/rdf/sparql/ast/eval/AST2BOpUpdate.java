@@ -743,6 +743,8 @@ public class AST2BOpUpdate extends AST2BOpUtility {
 							
 							final ConstructNode template = op.getDeleteClause()
 									.getQuadData().flatten(new ConstructNode(context));
+							
+							template.setDistinctQuads(true);
 
                             final ASTConstructIterator itr = new ASTConstructIterator(
                                     context.conn.getTripleStore(), template,
@@ -812,6 +814,8 @@ public class AST2BOpUpdate extends AST2BOpUtility {
 							
 							final ConstructNode template = op.getInsertClause()
 									.getQuadData().flatten(new ConstructNode(context));
+
+							template.setDistinctQuads(true);
 
                             final ASTConstructIterator itr = new ASTConstructIterator(
                                     context.conn.getTripleStore(), template,
@@ -922,6 +926,8 @@ public class AST2BOpUpdate extends AST2BOpUtility {
                     // template.
                     final ConstructNode template = quadData
                             .flatten(new ConstructNode(context));
+
+					template.setDistinctQuads(true);
 
                     // Set the CONSTRUCT template (quads patterns).
                     queryRoot.setConstruct(template);

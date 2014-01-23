@@ -107,7 +107,8 @@ public class NamedGraphUpdateTest extends AbstractProtocolTest {
 		assertTrue(result.contains(expected));
 	}
 	
-	private void updateAFewTimes(boolean useHint, int numberOfTimes, int numberOfUpdatesPerTime) throws IOException {
+	private void updateAFewTimes(boolean useHint, int numberOfUpdatesPerTime) throws IOException {
+		final int numberOfTimes = 5;
 		for (int i=0; i<numberOfTimes; i++) {
 			for (int j=0; j<numberOfUpdatesPerTime;j++) {
 				makeUpdate(insertData);
@@ -117,29 +118,29 @@ public class NamedGraphUpdateTest extends AbstractProtocolTest {
 		}
 	}
 
-	public void test_t_20_1() throws  IOException {
-		updateAFewTimes(true, 20, 1);
+	public void test_t_1() throws  IOException {
+		updateAFewTimes(true, 1);
 	}
-	public void test_t_20_2() throws  IOException {
-		updateAFewTimes(true, 20, 2);
+	public void test_t_2() throws  IOException {
+		updateAFewTimes(true, 2);
 	}
-	public void test_t_20_3() throws  IOException {
-		updateAFewTimes(true, 20, 3);
+	public void test_t_3() throws  IOException {
+		updateAFewTimes(true, 3);
 	}
-	public void test_t_20_5() throws  IOException {
-		updateAFewTimes(true, 20, 5);
+	public void test_t_5() throws  IOException {
+		updateAFewTimes(true, 5);
 	}
-	public void test_f_20_1() throws  IOException {
-		updateAFewTimes(false, 20, 1);
+	public void test_f_1() throws  IOException {
+		updateAFewTimes(false, 1);
 	}
-	public void test_f_20_2() throws  IOException {
-		updateAFewTimes(false, 20, 2);
+	public void test_f_2() throws  IOException {
+		updateAFewTimes(false, 2);
 	}
-	public void test_f_20_3() throws  IOException {
-		updateAFewTimes(false, 20, 3);
+	public void test_f_3() throws  IOException {
+		updateAFewTimes(false, 3);
 	}
-	public void test_f_20_5() throws  IOException {
-		updateAFewTimes(false, 20, 5);
+	public void test_f_5() throws  IOException {
+		updateAFewTimes(false, 5);
 	}
 	public void test_double_triple_delete() throws  IOException {
 		setMethodisPostUrlEncodedData();
