@@ -29,9 +29,11 @@ package com.bigdata.rdf.sparql.ast.eval;
 
 import org.openrdf.model.Value;
 
+import com.bigdata.BigdataStatics;
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.rdf.sparql.ast.NamedSubqueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryHints;
+import com.bigdata.rdf.sparql.ast.optimizers.ASTComplexOptionalOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTSparql11SubqueryOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.TestASTSparql11SubqueryOptimizer;
 
@@ -296,6 +298,115 @@ public class TestSubQuery extends AbstractDataDrivenSPARQLTestCase {
         assertTrue(BOpUtility.visitAll(h.getASTContainer().getOptimizedAST(),
                 NamedSubqueryRoot.class).hasNext());
         
+    }
+
+    /**
+     * This ticket is for a bug when the {@link ASTComplexOptionalOptimizer}
+     * runs. If that optimizer is disabled, then the query is fine. There are
+     * two versions for this method. One in which one of the OPTIONALs is turned
+     * into a required join. In this case, the problem is not demonstrated since
+     * the {@link ASTComplexOptionalOptimizer} does not run. In the other case,
+     * the join group is OPTIONAL rather than required and the problem is
+     * demonstrated.
+     * 
+     * <pre>
+     * select ?name 
+     * {
+     *         {
+     *                 select ?p  
+     *                 {
+     *                         ?p a <http://www.example.org/schema/Person> . 
+     *                         optional{?p <http://www.example.org/schema/age> ?age.}
+     *                 } 
+     *                 LIMIT 1
+     *         }
+     *                 
+     *         {?p <http://www.example.org/schema/name> ?name.}
+     *         
+     *         #OPTIONAL
+     *         {       ?post a <http://www.example.org/schema/Post> . 
+     *                 ?post <http://www.example.org/schema/postedBy> ?p.
+     *                 ?post <http://www.example.org/schema/content> ?postContent.
+     *         }
+     *         OPTIONAL{      
+     *                 ?comment a <http://www.example.org/schema/Comment> .
+     *                 ?comment <http://www.example.org/schema/parentPost> ?post.
+     *                 ?cperson a <http://www.example.org/schema/Person> .
+     *                 ?comment <http://www.example.org/schema/postedBy> ?cperson .
+     *         }
+     * }     
+     * </pre>
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/801" >
+     *      Adding OPTIONAL removes solutions</a>
+     */
+    public void test_ticket_801a_complex_optionals() throws Exception {
+
+        final TestHelper h = new TestHelper(
+                "test_ticket_801a_complex_optionals", // testURI,
+                "test_ticket_801a_complex_optionals.rq",// queryFileURL
+                "test_ticket_801_complex_optionals.nt",// dataFileURL
+                "test_ticket_801_complex_optionals.srx"// resultFileURL
+        );
+
+        // Run test.
+        h.runTest();
+
+    }
+
+    /**
+     * In this variant, one of the child join groups is OPTIONAL rather than
+     * required. This shows the problem reported in the ticket where adding an
+     * OPTIONAL join group reduces the number of solutions.
+     * 
+     * <pre>
+     * select ?name 
+     * {
+     *         {
+     *                 select ?p  
+     *                 {
+     *                         ?p a <http://www.example.org/schema/Person> . 
+     *                         optional{?p <http://www.example.org/schema/age> ?age.}
+     *                 } 
+     *                 LIMIT 1
+     *         }
+     *                 
+     *         {?p <http://www.example.org/schema/name> ?name.}
+     *         
+     *         OPTIONAL
+     *         {       ?post a <http://www.example.org/schema/Post> . 
+     *                 ?post <http://www.example.org/schema/postedBy> ?p.
+     *                 ?post <http://www.example.org/schema/content> ?postContent.
+     *         }
+     *         OPTIONAL{      
+     *                 ?comment a <http://www.example.org/schema/Comment> .
+     *                 ?comment <http://www.example.org/schema/parentPost> ?post.
+     *                 ?cperson a <http://www.example.org/schema/Person> .
+     *                 ?comment <http://www.example.org/schema/postedBy> ?cperson .
+     *         }
+     * }
+     * </pre>
+     */
+    public void test_ticket_801b_complex_optionals() throws Exception {
+        
+        if (!BigdataStatics.runKnownBadTests) {
+            /*
+             * FIXME Add this test to CI once we make some more progress
+             * against the underlying issue.  
+             */
+            return;
+        }
+
+        final TestHelper h = new TestHelper(
+                "test_ticket_801b_complex_optionals", // testURI,
+                "test_ticket_801b_complex_optionals.rq",// queryFileURL
+                "test_ticket_801_complex_optionals.nt",// dataFileURL
+                "test_ticket_801_complex_optionals.srx"// resultFileURL
+        );
+
+        // Run test.
+        h.runTest();
+
     }
 
 }
