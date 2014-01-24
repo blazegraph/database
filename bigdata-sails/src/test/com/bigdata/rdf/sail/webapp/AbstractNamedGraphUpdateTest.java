@@ -25,7 +25,8 @@ package com.bigdata.rdf.sail.webapp;
 
 import java.io.IOException;
 
-import junit.framework.Test;
+import com.bigdata.rdf.sparql.ast.eval.ASTConstructIterator;
+
 
 
 /**
@@ -34,15 +35,21 @@ import junit.framework.Test;
  * @author jeremycarroll
  *
  */
-public class NamedGraphUpdateTest extends AbstractProtocolTest {
+public class AbstractNamedGraphUpdateTest extends AbstractProtocolTest {
+	
+	private static String distinctHintFalse = "    hint:Query hint:nativeDistinctSPO false . \n";
+	private static String distinctHintTrue = "    hint:Query hint:nativeDistinctSPO true . \n";
+	private final boolean nativeDistinct;
+	
 
 
-	public NamedGraphUpdateTest(String name)  {
+	public AbstractNamedGraphUpdateTest(boolean nativeDistinct, String name)  {
 		super(name);
+		this.nativeDistinct = nativeDistinct;
 	}
 	
 	
-	private String atomicMoveNamedGraph(boolean useHint) {
+	private String atomicMoveNamedGraph() {
 		// Atomic update of uploaded graph - moving eg:tmp to eg:a (deleting old contents of eg:a)
 		return 
 		"DELETE {\n" +   
@@ -59,7 +66,7 @@ public class NamedGraphUpdateTest extends AbstractProtocolTest {
 	    "  }\n" +       
 	    "}\n" +     
 	    "WHERE {\n" +
-	    (useHint?"  hint:Query hint:chunkSize 2 .\n":"") +
+	    distinctHintFalse +
 	    "  {\n" +       
 	    "    GRAPH <eg:a> {\n" +
 	    "      ?olds ?oldp ?oldo\n" +
@@ -90,8 +97,18 @@ public class NamedGraphUpdateTest extends AbstractProtocolTest {
 	
 	
 	private void makeUpdate(String update) throws IOException {
+		boolean hasHint = update.contains(distinctHintFalse);
+		if (hasHint) {
+			ASTConstructIterator.flagToCheckNativeDistinctQuadsInvocationForJUnitTesting = false;
+			if (nativeDistinct) {
+				update = update.replace(distinctHintFalse, distinctHintTrue);
+			}
+		}
 		setMethodisPostUrlEncodedData();
 		serviceRequest("update", update);
+		if (hasHint) {
+			assertEquals(nativeDistinct, ASTConstructIterator.flagToCheckNativeDistinctQuadsInvocationForJUnitTesting );
+		}
 	}
 	
 	private void assertQuad(String graph, String triple) throws IOException {
@@ -107,40 +124,28 @@ public class NamedGraphUpdateTest extends AbstractProtocolTest {
 		assertTrue(result.contains(expected));
 	}
 	
-	private void updateAFewTimes(boolean useHint, int numberOfUpdatesPerTime) throws IOException {
+	private void updateAFewTimes(int numberOfUpdatesPerTime) throws IOException {
 		final int numberOfTimes = 5;
 		for (int i=0; i<numberOfTimes; i++) {
 			for (int j=0; j<numberOfUpdatesPerTime;j++) {
 				makeUpdate(insertData);
 			}
-			makeUpdate( atomicMoveNamedGraph(useHint) );
+			makeUpdate( atomicMoveNamedGraph() );
 			assertNotQuad("<eg:tmp>", " ?s ?p ?o ");
 		}
 	}
 
 	public void test_t_1() throws  IOException {
-		updateAFewTimes(true, 1);
+		updateAFewTimes(1);
 	}
 	public void test_t_2() throws  IOException {
-		updateAFewTimes(true, 2);
+		updateAFewTimes(2);
 	}
 	public void test_t_3() throws  IOException {
-		updateAFewTimes(true, 3);
+		updateAFewTimes(3);
 	}
 	public void test_t_5() throws  IOException {
-		updateAFewTimes(true, 5);
-	}
-	public void test_f_1() throws  IOException {
-		updateAFewTimes(false, 1);
-	}
-	public void test_f_2() throws  IOException {
-		updateAFewTimes(false, 2);
-	}
-	public void test_f_3() throws  IOException {
-		updateAFewTimes(false, 3);
-	}
-	public void test_f_5() throws  IOException {
-		updateAFewTimes(false, 5);
+		updateAFewTimes(5);
 	}
 	public void test_double_triple_delete() throws  IOException {
 		setMethodisPostUrlEncodedData();
@@ -163,6 +168,7 @@ public class NamedGraphUpdateTest extends AbstractProtocolTest {
 			    "  }\n" +       
 			    "}\n" +   
 			    "WHERE {\n" +
+			    distinctHintFalse +
 			    "    GRAPH <eg:a> {\n" +
 			    "      ?olds ?oldp ?oldo\n" +
 			    "    }\n" +     
@@ -189,6 +195,7 @@ public class NamedGraphUpdateTest extends AbstractProtocolTest {
 			    "  }\n" +       
 			    "}\n" +   
 			    "WHERE {\n" +
+			    distinctHintFalse +
 			    "    GRAPH <eg:tmp> {\n" +
 			    "      ?olds ?oldp ?oldo\n" +
 			    "    }\n" +     
@@ -231,8 +238,9 @@ public class NamedGraphUpdateTest extends AbstractProtocolTest {
 		assertQuad("<eg:B>","<eg:A> <eg:moveTo> <eg:AA> ");
 		assertQuad("<eg:A>","<eg:B> <eg:moveTo> <eg:BB>");
 		assertQuad("<eg:B>","<eg:B> <eg:moveTo> <eg:BB> ");
-		makeUpdate( "DELETE {\n" + 
-			    "  GRAPH ?oldg {\n" +
+		makeUpdate(
+				"DELETE {\n" + 
+			    "    GRAPH ?oldg {\n" +
 			    "    ?olds ?oldp ?oldo\n" +
 			    "  }\n" +       
 			    "}\n" +   
@@ -242,6 +250,7 @@ public class NamedGraphUpdateTest extends AbstractProtocolTest {
 			    "  }\n" +       
 			    "}\n" +   
 			    "WHERE {\n" +
+			    distinctHintFalse +
 			    "    GRAPH <eg:tmp> {\n" +
 			    "      ?oldg <eg:moveTo> ?newg\n" +
 			    "    }\n" +     
@@ -275,15 +284,13 @@ public class NamedGraphUpdateTest extends AbstractProtocolTest {
 			    "  }\n" +       
 			    "}\n" +   
 			    "WHERE {\n" +
+			    distinctHintFalse +
 			    "    GRAPH <eg:tmp> {\n" +
 			    "      ?olds ?oldp ?oldo\n" +
 			    "    }\n" +     
 			    "}");
 		assertQuad("<eg:A>","<eg:b> rdf:type <eg:c> ");
 		assertQuad("<eg:B>","<eg:b> rdf:type <eg:c> ");
-	}
-	static public Test suite() {
-		return ProxySuiteHelper.suiteWhenStandalone(NamedGraphUpdateTest.class,"test.*", TestMode.quads);
 	}
 
 }
