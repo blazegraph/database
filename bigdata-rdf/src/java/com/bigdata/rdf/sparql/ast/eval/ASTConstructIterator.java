@@ -188,12 +188,14 @@ public class ASTConstructIterator implements
     private boolean open = true;
 
     /**
-     * <code>true</code> until we get the first solution for the WHERE clause.
+     * <code>false</code> until we get the first solution for the WHERE clause.
      * We do not output ground triples in the template until we see that first
      * solution. It is Ok if it is empty, but we need to know that the WHERE
      * clause succeeded before we can output the ground triples.
      */
-    private boolean haveFirstSolution = false; 
+    private boolean haveFirstSolution = false;
+
+	public static boolean flagToCheckNativeDistinctQuadsInvocationForJUnitTesting = false;
 
     /**
      * 
@@ -283,7 +285,7 @@ public class ASTConstructIterator implements
         
     }
 
-	IFilterTest createDistinctFilter(final AbstractTripleStore tripleStore, final ConstructNode construct,
+	private IFilterTest createDistinctFilter(final AbstractTripleStore tripleStore, final ConstructNode construct,
 			final GraphPatternGroup<?> whereClause) {
 		/*
          * Setup the DISTINCT SPO filter.
@@ -296,6 +298,13 @@ public class ASTConstructIterator implements
          * graph is large.
          */
 
+		final boolean distinctQuads = construct.isDistinctQuads() && tripleStore.isQuads() && hasMixedQuadData(templates);
+		final boolean nativeDistinct = construct.isNativeDistinct();
+		
+		if (nativeDistinct && construct.isDistinctQuads()) {
+			flagToCheckNativeDistinctQuadsInvocationForJUnitTesting = true;
+		}
+		
         final boolean isObviouslyDistinct = isObviouslyDistinct(tripleStore.isQuads(), templates, whereClause);
 
 		if (isObviouslyDistinct) {
@@ -307,20 +316,33 @@ public class ASTConstructIterator implements
         }
 		
 
-		
-		final boolean distinctQuads = construct.isDistinctQuads() && tripleStore.isQuads() && hasMixedQuadData(templates);
-		
 		if (distinctQuads) {
 			
-			return createDistinctQuadsFilter(construct);
+			if (nativeDistinct) {
+				return createNativeDistinctQuadsFilter(construct);
+			} else {
+			    return createHashDistinctQuadsFilter(construct);
+			}
+			
+		} else {
+
+			if (nativeDistinct) {
+				return createNativeDistinctTripleFilter(construct);
+			} else {
+				// JVM Based DISTINCT filter.
+				return new DistinctFilter.DistinctFilterImpl(construct);
+			}
 		}
-		
-        return createDistinctTriplesFilter(construct);
         
 	}
 
+	private IFilterTest createNativeDistinctQuadsFilter(ConstructNode construct) {
+		// TODO This method needs to be written. It should scale, whereas the current implementation does not.
+		return createHashDistinctQuadsFilter(construct);
+	}
+
 	@SuppressWarnings("serial")
-	private IFilterTest createDistinctQuadsFilter(final ConstructNode construct) {
+	private IFilterTest createHashDistinctQuadsFilter(final ConstructNode construct) {
         return new DistinctFilter.DistinctFilterImpl(construct){
         	@Override
         	public boolean isValid(Object o){
@@ -352,67 +374,55 @@ public class ASTConstructIterator implements
 		return a == b || ( a != null && a.equals(b));
 	}
 
-	IFilterTest createDistinctTriplesFilter(final ConstructNode construct) {
-		
-        final boolean nativeDistinct = construct.isNativeDistinct();
+	private IFilterTest createNativeDistinctTripleFilter(final ConstructNode construct) {
+		/*
+		 * Construct a predicate for the first triple template. We will
+		 * use that as the bias for the scalable DISTINCT SPO filter.
+		 */
+		@SuppressWarnings("rawtypes")
+		final IPredicate pred;
+		{
 
-        if (nativeDistinct) {
+		    final StatementPatternNode sp = templates.get(0/* index */);
 
-            /*
-             * Construct a predicate for the first triple template. We will
-             * use that as the bias for the scalable DISTINCT SPO filter.
-             */
-            @SuppressWarnings("rawtypes")
-            final IPredicate pred;
-            {
+		    @SuppressWarnings("rawtypes")
+		    final IVariableOrConstant<IV> s = sp.s()
+		            .getValueExpression();
 
-                final StatementPatternNode sp = templates.get(0/* index */);
+		    @SuppressWarnings("rawtypes")
+		    final IVariableOrConstant<IV> p = sp.p()
+		            .getValueExpression();
+		    
+		    @SuppressWarnings("rawtypes")
+		    final IVariableOrConstant<IV> o = sp.o()
+		            .getValueExpression();
 
-                @SuppressWarnings("rawtypes")
-                final IVariableOrConstant<IV> s = sp.s()
-                        .getValueExpression();
+		    // // The graph term/variable iff specified by the query.
+		    // final TermNode cvar = sp.c();
+		    // final IVariableOrConstant<IV> c = cvar == null ? null :
+		    // cvar
+		    // .getValueExpression();
 
-                @SuppressWarnings("rawtypes")
-                final IVariableOrConstant<IV> p = sp.p()
-                        .getValueExpression();
-                
-                @SuppressWarnings("rawtypes")
-                final IVariableOrConstant<IV> o = sp.o()
-                        .getValueExpression();
+		    final BOp[] vars = new BOp[] { s, p, o /* , c */};
 
-                // // The graph term/variable iff specified by the query.
-                // final TermNode cvar = sp.c();
-                // final IVariableOrConstant<IV> c = cvar == null ? null :
-                // cvar
-                // .getValueExpression();
+		    pred = new SPOPredicate(vars, BOp.NOANNS);
 
-                final BOp[] vars = new BOp[] { s, p, o /* , c */};
+		}
 
-                pred = new SPOPredicate(vars, BOp.NOANNS);
+		/*
+		 * The index that will be used to read on the B+Tree access
+		 * path.
+		 */
+		@SuppressWarnings({ "unchecked", "rawtypes" })
+		final SPOKeyOrder indexKeyOrder = SPOKeyOrder.getKeyOrder(
+		        (IPredicate) pred, 3/* keyArity */);
 
-            }
+		construct.setProperty(
+		        NativeDistinctFilter.Annotations.KEY_ORDER,
+		        indexKeyOrder);
 
-            /*
-             * The index that will be used to read on the B+Tree access
-             * path.
-             */
-            @SuppressWarnings({ "unchecked", "rawtypes" })
-            final SPOKeyOrder indexKeyOrder = SPOKeyOrder.getKeyOrder(
-                    (IPredicate) pred, 3/* keyArity */);
-
-            construct.setProperty(
-                    NativeDistinctFilter.Annotations.KEY_ORDER,
-                    indexKeyOrder);
-
-            // Native memory based DISTINCT filter.
-            return new NativeDistinctFilter.DistinctFilterImpl(construct);
-
-        } else {
-
-            // JVM Based DISTINCT filter.
-            return new DistinctFilter.DistinctFilterImpl(construct);
-
-        }
+		// Native memory based DISTINCT filter.
+		return new NativeDistinctFilter.DistinctFilterImpl(construct);
 	}
     
     /**
