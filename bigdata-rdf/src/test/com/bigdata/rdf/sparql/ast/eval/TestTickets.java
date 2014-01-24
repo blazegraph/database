@@ -318,4 +318,21 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
         ).runTest();
 
     }
+
+    /**
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/806" >
+     *      Incorrect computation of shared variables when lifting out named
+     *      subqueries </a>
+     */
+    public void test_ticket_806() throws Exception {
+        
+        new TestHelper("ticket-806",// testURI,
+                "ticket-806.rq",// queryFileURL
+                "ticket-806.trig",// dataFileURL
+                "ticket-806.srx",// resultFileURL
+                false// checkOrder
+        ).runTest();
+        
+    }
+
 }
