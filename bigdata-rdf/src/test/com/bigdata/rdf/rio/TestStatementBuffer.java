@@ -90,11 +90,11 @@ public class TestStatementBuffer extends AbstractTripleStoreTestCase {
 					store, capacity);
 
             assertEquals(store, buffer.getDatabase());
-            assertTrue(buffer.distinct);
+//            assertTrue(buffer.distinct);
             assertEquals(capacity, buffer.capacity);
-            assertEquals(capacity * store.getSPOKeyArity(), buffer.values.length);
+            assertEquals(capacity * store.getSPOKeyArity() + 5, buffer.values.length);
             assertEquals(capacity, buffer.stmts.length);
-            assertEquals(0, buffer.numURIs);
+            assertEquals(5, buffer.numURIs);
             assertEquals(0, buffer.numLiterals);
             assertEquals(0, buffer.numBNodes);
             assertEquals(0, buffer.numStmts);
@@ -122,7 +122,7 @@ public class TestStatementBuffer extends AbstractTripleStoreTestCase {
 			final StatementBuffer<Statement> buffer = new StatementBuffer<Statement>(
 					store, capacity);
 
-            assertTrue(buffer.distinct);
+//            assertTrue(buffer.distinct);
 
             /*
              * add a statement.
@@ -135,7 +135,7 @@ public class TestStatementBuffer extends AbstractTripleStoreTestCase {
 
             buffer.handleStatement(s1, p1, o1, c1, StatementEnum.Explicit);
 
-            assertEquals(3, buffer.numURIs);
+            assertEquals(7, buffer.numURIs);
             assertEquals(0, buffer.numLiterals);
             assertEquals(0, buffer.numBNodes);
             assertEquals(1, buffer.numStmts);
@@ -151,7 +151,7 @@ public class TestStatementBuffer extends AbstractTripleStoreTestCase {
 
             buffer.handleStatement(s2, p2, o2, c2, StatementEnum.Explicit);
 
-            assertEquals(4, buffer.numURIs); // only 4 since one is duplicate.
+            assertEquals(8, buffer.numURIs); // only 4 since one is duplicate.
             assertEquals(1, buffer.numLiterals);
             assertEquals(0, buffer.numBNodes);
             assertEquals(2, buffer.numStmts);
@@ -167,7 +167,7 @@ public class TestStatementBuffer extends AbstractTripleStoreTestCase {
 
             buffer.handleStatement(s3, p3, o3, c3, StatementEnum.Explicit);
 
-            assertEquals(4, buffer.numURIs);
+            assertEquals(8, buffer.numURIs);
             assertEquals(1, buffer.numLiterals);
             assertEquals(0, buffer.numBNodes);
             assertEquals(3, buffer.numStmts);
@@ -178,7 +178,7 @@ public class TestStatementBuffer extends AbstractTripleStoreTestCase {
 
             buffer.handleStatement(s3, p3, o3, c3, StatementEnum.Explicit);
 
-            assertEquals(4, buffer.numURIs);
+            assertEquals(8, buffer.numURIs);
             assertEquals(1, buffer.numLiterals);
             assertEquals(0, buffer.numBNodes);
             assertEquals(4, buffer.numStmts);
@@ -516,10 +516,10 @@ public class TestStatementBuffer extends AbstractTripleStoreTestCase {
 			// metadata statements.
 			
 			final BigdataStatement mds1 = vf.createStatement(s1, dcSource,
-					newsSybase, vf.createBNode(), StatementEnum.Explicit);
+					newsSybase, null, StatementEnum.Explicit);
 
 			final BigdataStatement mds2 = vf.createStatement(s1, dcCreated,
-					createdDate, vf.createBNode(), StatementEnum.Explicit);
+					createdDate, null, StatementEnum.Explicit);
 
 			buffer.add(mds1);
 
@@ -554,8 +554,8 @@ public class TestStatementBuffer extends AbstractTripleStoreTestCase {
 			 * since it depends solely on the (s,p,o) components.
 			 */
 			
-			mds1.setStatementIdentifier(true);
-			mds2.setStatementIdentifier(true);
+//			mds1.setStatementIdentifier(true);
+//			mds2.setStatementIdentifier(true);
 			
 			assertTrue(mds1.hasStatementIdentifier());
 			assertTrue(mds2.hasStatementIdentifier());

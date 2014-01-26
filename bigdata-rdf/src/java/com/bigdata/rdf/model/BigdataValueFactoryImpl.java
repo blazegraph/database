@@ -36,6 +36,7 @@ import javax.xml.datatype.XMLGregorianCalendar;
 import org.openrdf.model.BNode;
 import org.openrdf.model.Literal;
 import org.openrdf.model.Resource;
+import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.model.datatypes.XMLDatatypeUtil;
@@ -232,6 +233,12 @@ public class BigdataValueFactoryImpl implements BigdataValueFactory {
     public BigdataBNodeImpl createBNode(final String id) {
 
         return new BigdataBNodeImpl(this, id);
+
+    }
+
+    public BigdataBNodeImpl createBNode(final BigdataStatement stmt) {
+
+        return new BigdataBNodeImpl(this, nextID(), stmt);
 
     }
 

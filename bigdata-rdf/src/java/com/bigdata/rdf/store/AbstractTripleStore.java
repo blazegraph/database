@@ -3904,19 +3904,19 @@ abstract public class AbstractTripleStore extends
 //                     */
 //                    lexiconRelation.addStatementIdentifiers(a, numStmts);
 
-                    /*
-                     * No more statement identifiers in the lexicon - they are
-                     * now inlined directly into the statement indices using
-                     * the SidIV class.
-                     * 
-                     * Mark explicit statements as "sidable". The actual sid
-                     * will be produced on-demand to reduce heap pressure.
-                     */
-                    for (ISPO spo : a) {
-                    	if (spo.isExplicit()) {
-                    		spo.setStatementIdentifier(true);
-                    	}
-                    }
+//                    /*
+//                     * No more statement identifiers in the lexicon - they are
+//                     * now inlined directly into the statement indices using
+//                     * the SidIV class.
+//                     * 
+//                     * Mark explicit statements as "sidable". The actual sid
+//                     * will be produced on-demand to reduce heap pressure.
+//                     */
+//                    for (ISPO spo : a) {
+//                    	if (spo.isExplicit()) {
+//                    		spo.setStatementIdentifier(true);
+//                    	}
+//                    }
 
                     statementIdentifierTime = System.currentTimeMillis()
                             - begin;
