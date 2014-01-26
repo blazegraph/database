@@ -144,10 +144,10 @@ public class SPO implements ISPO, java.io.Serializable {
 	 */
     private static int OVERRIDE_BIT = 5;
 
-    /**
-	 * Denotes which bit to find the sidable flag within the {@link #flags}.
-	 */
-    private static int SIDABLE_BIT = 6;
+//    /**
+//	 * Denotes which bit to find the sidable flag within the {@link #flags}.
+//	 */
+//    private static int SIDABLE_BIT = 6;
 	
 	
     @Override
@@ -186,51 +186,41 @@ public class SPO implements ISPO, java.io.Serializable {
         return c;
     }
 
-    @SuppressWarnings("rawtypes")
-    final public IV sid() {
-    	
-    	// lazy instantiate the sid if necessary
-    	if (sid == null && sidable()) {
-    		sid = new SidIV(this);
-    	}
-    	
-        return sid;
-        
-    }
-
-    @Override
-    public final void setStatementIdentifier(final boolean sid) {
-
-        if (sid && type() != StatementEnum.Explicit) {
-
-            // Only allowed for explicit statements.
-            throw new IllegalStateException();
-
-        }
-
-        sidable(sid);
-
-        // clear the current value for c
-        this.sid = null;
-
-    }
+//    @Override
+//    public final void setStatementIdentifier(final boolean sid) {
+//
+//        if (sid && type() != StatementEnum.Explicit) {
+//
+//            // Only allowed for explicit statements.
+//            throw new IllegalStateException();
+//
+//        }
+//
+//        sidable(sid);
+//
+//        // clear the current value for c
+//        this.sid = null;
+//
+//    }
 
     @SuppressWarnings("rawtypes")
     public final IV getStatementIdentifier() {
 
-    	if (!sidable())
-             throw new IllegalStateException("No statement identifier: "
-                    + toString());
-
-    	// will lazy instantiate the sid
-        return sid();
+    	// lazy instantiate the sid if necessary
+    	if (sid == null && type() == StatementEnum.Explicit) {
+    		
+    		sid = new SidIV(this);
+    		
+    	}
+    	
+        return sid;
 
     }
 
     @Override
     final public boolean hasStatementIdentifier() {
         
-        return sidable();
+        return type() == StatementEnum.Explicit;
         
     }
     
@@ -819,19 +809,19 @@ public class SPO implements ISPO, java.io.Serializable {
 		flags = Bits.set(flags, OVERRIDE_BIT, override);
 	}
 	
-	/**
-	 * Sidable is hiding in the 6 bit of the flags.
-	 */
-	private boolean sidable() {
-		return Bits.get(flags, SIDABLE_BIT);
-	}
-	
-	/**
-	 * Sidable is hiding in the 6 bit of the flags.
-	 */
-	private void sidable(final boolean sidable) {
-		flags = Bits.set(flags, SIDABLE_BIT, sidable);
-	}
+//	/**
+//	 * Sidable is hiding in the 6 bit of the flags.
+//	 */
+//	private boolean sidable() {
+//		return Bits.get(flags, SIDABLE_BIT);
+//	}
+//	
+//	/**
+//	 * Sidable is hiding in the 6 bit of the flags.
+//	 */
+//	private void sidable(final boolean sidable) {
+//		flags = Bits.set(flags, SIDABLE_BIT, sidable);
+//	}
 
     /**
      * {@inheritDoc}

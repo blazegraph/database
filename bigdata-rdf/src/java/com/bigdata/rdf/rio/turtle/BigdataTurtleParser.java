@@ -5,12 +5,22 @@
  */
 package com.bigdata.rdf.rio.turtle;
 
+import info.aduna.text.ASCIIUtil;
+
 import java.io.IOException;
 
 import org.openrdf.model.BNode;
+import org.openrdf.model.Resource;
+import org.openrdf.model.URI;
+import org.openrdf.model.Value;
+import org.openrdf.model.ValueFactory;
+import org.openrdf.model.impl.ValueFactoryImpl;
+import org.openrdf.rio.RDFHandlerException;
 import org.openrdf.rio.RDFParseException;
 import org.openrdf.rio.turtle.TurtleParser;
 import org.openrdf.rio.turtle.TurtleUtil;
+
+import com.bigdata.rdf.model.BigdataValueFactory;
 
 /**
  * RDF parser for <a href="http://www.dajobe.org/2004/01/turtle/">Turtle</a>
@@ -57,9 +67,11 @@ public class BigdataTurtleParser extends TurtleParser {
 //	 * create RDF model objects.
 //	 */
 //	public BigdataTurtleParser() {
-//		super();
+//		this(null);
 //	}
-//
+
+	private BigdataValueFactory valueFactory;
+	
 //	/**
 //	 * Creates a new TurtleParser that will use the supplied ValueFactory to
 //	 * create RDF model objects.
@@ -69,7 +81,22 @@ public class BigdataTurtleParser extends TurtleParser {
 //	 */
 //	public BigdataTurtleParser(ValueFactory valueFactory) {
 //		super(valueFactory);
+//		
+//		if (valueFactory instanceof BigdataValueFactory) 
+//			this.valueFactory = (BigdataValueFactory) valueFactory;
+//		else
+//			this.valueFactory = null;
 //	}
+	
+	@Override
+	public void setValueFactory(ValueFactory valueFactory) {
+		super.setValueFactory(valueFactory);
+		
+		if (valueFactory instanceof BigdataValueFactory) 
+			this.valueFactory = (BigdataValueFactory) valueFactory;
+		else
+			this.valueFactory = null;
+	}
 //
 //	/*---------*
 //	 * Methods *
@@ -492,44 +519,46 @@ public class BigdataTurtleParser extends TurtleParser {
 //		return bNode;
 //	}
 //
-//	/**
-//	 * Parses an RDF value. This method parses uriref, qname, node ID, quoted
-//	 * literal, integer, double and boolean.
-//	 */
-//	protected Value parseValue()
-//		throws IOException, RDFParseException
-//	{
-//		int c = peek();
-//
-//		if (c == '<') {
-//			// uriref, e.g. <foo://bar>
-//			return parseURI();
-//		}
-//		else if (c == ':' || TurtleUtil.isPrefixStartChar(c)) {
-//			// qname or boolean
-//			return parseQNameOrBoolean();
-//		}
-//		else if (c == '_') {
-//			// node ID, e.g. _:n1
-//			return parseNodeID();
-//		}
-//		else if (c == '"') {
-//			// quoted literal, e.g. "foo" or """foo"""
-//			return parseQuotedLiteral();
-//		}
-//		else if (ASCIIUtil.isNumber(c) || c == '.' || c == '+' || c == '-') {
-//			// integer or double, e.g. 123 or 1.2e3
-//			return parseNumber();
-//		}
-//		else if (c == -1) {
-//			throwEOFException();
-//			return null;
-//		}
-//		else {
-//			reportFatalError("Expected an RDF value here, found '" + (char)c + "'");
-//			return null;
-//		}
-//	}
+	/**
+	 * Parses an RDF value. This method parses uriref, qname, node ID, quoted
+	 * literal, integer, double and boolean.
+	 */
+	protected Value parseValue()
+		throws IOException, RDFParseException
+	{
+		int c = peek();
+		
+		if (c == '<') {
+			// uriref, e.g. <foo://bar> or sidref <<a> <b> <c>>
+			return parseURIOrSid();
+		}
+		else if (c == ':' || TurtleUtil.isPrefixStartChar(c)) {
+			// qname or boolean
+			return parseQNameOrBoolean();
+		}
+		else if (c == '_') {
+			// node ID, e.g. _:n1
+			return parseNodeID();
+		}
+		else if (c == '"') {
+			// quoted literal, e.g. "foo" or """foo"""
+			return parseQuotedLiteral();
+		}
+		else if (ASCIIUtil.isNumber(c) || c == '.' || c == '+' || c == '-') {
+			// integer or double, e.g. 123 or 1.2e3
+			return parseNumber();
+		}
+		else if (c == -1) {
+			throwEOFException();
+			return null;
+		}
+		else {
+			Thread.dumpStack();
+			while (c != -1) System.err.print((char) (c = read()));
+			reportFatalError("Expected an RDF value here, found '" + (char)c + "'");
+			return null;
+		}
+	}
 //
 //	/**
 //	 * Parses a quoted string, optionally followed by a language tag or datatype.
@@ -791,8 +820,53 @@ public class BigdataTurtleParser extends TurtleParser {
 //		return createLiteral(value.toString(), null, datatype);
 //	}
 //
+	protected Value parseURIOrSid()
+		throws IOException, RDFParseException
+	{
+		// First character should be '<'
+		int c = read();
+		verifyCharacter(c, "<");
+		
+		int n = peek();
+		if (n == '<') {
+			read();
+			if (this.valueFactory == null) {
+				reportError("must use a BigdataValueFactory to use the RDR syntax");
+			}
+			return parseSid();
+		} else {
+			unread(c);
+			return parseURI();
+		}
+	}
+	
+	protected Value parseSid()
+			throws IOException, RDFParseException
+	{
+		Resource s = (Resource) parseValue();
+		
+		skipWS();
+		URI p = (URI) parseValue();
+		
+		skipWS();
+		Value o = parseValue();
+
+		int i = read();
+		while (TurtleUtil.isWhitespace(i)) {
+			i = read();
+		}
+		
+		if (i == '>' && read() == '>') {
+			return valueFactory.createBNode(valueFactory.createStatement(s, p, o));
+		} else {
+			reportError("expecting >> to close statement identifier");
+			throw new IOException();
+		}
+		
+	}
+//
 //	protected URI parseURI()
-//		throws IOException, RDFParseException
+//			throws IOException, RDFParseException
 //	{
 //		StringBuilder uriBuf = new StringBuilder(100);
 //
@@ -981,31 +1055,27 @@ public class BigdataTurtleParser extends TurtleParser {
 //		}
 //	}
 //
-//	/**
-//	 * Consumes any white space characters (space, tab, line feed, newline) and
-//	 * comments (#-style) from <tt>reader</tt>. After this method has been
-//	 * called, the first character that is returned by <tt>reader</tt> is either
-//	 * a non-ignorable character, or EOF. For convenience, this character is also
-//	 * returned by this method.
-//	 * 
-//	 * @return The next character that will be returned by <tt>reader</tt>.
-//	 */
-//	protected int skipWSC()
-//		throws IOException, RDFHandlerException
-//	{
-//		int c = read();
-//		while (TurtleUtil.isWhitespace(c) || c == '#') {
-//			if (c == '#') {
-//				processComment();
-//			}
-//
-//			c = read();
-//		}
-//
-//		unread(c);
-//
-//		return c;
-//	}
+	/**
+	 * Consumes any white space characters (space, tab, line feed, newline) and
+	 * comments (#-style) from <tt>reader</tt>. After this method has been
+	 * called, the first character that is returned by <tt>reader</tt> is either
+	 * a non-ignorable character, or EOF. For convenience, this character is also
+	 * returned by this method.
+	 * 
+	 * @return The next character that will be returned by <tt>reader</tt>.
+	 */
+	protected int skipWS()
+		throws IOException
+	{
+		int c = read();
+		while (TurtleUtil.isWhitespace(c)) {
+			c = read();
+		}
+
+		unread(c);
+
+		return c;
+	}
 //
 //	/**
 //	 * Consumes characters from reader until the first EOL has been read. This

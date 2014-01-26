@@ -49,7 +49,10 @@ package com.bigdata.rdf.model;
 
 import org.openrdf.model.BNode;
 
+import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.impl.bnode.SidIV;
 import com.bigdata.rdf.rio.StatementBuffer;
+import com.bigdata.rdf.rio.UnificationException;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
 
@@ -76,7 +79,7 @@ public class BigdataBNodeImpl extends BigdataResourceImpl implements
     private static final long serialVersionUID = 2675602437833048872L;
     
     private final String id;
-
+    
     /**
      * Boolean flag is set during conversion from an RDF interchange syntax
      * into the internal {@link SPO} model if the blank node is a statement
@@ -95,13 +98,44 @@ public class BigdataBNodeImpl extends BigdataResourceImpl implements
      */
     BigdataBNodeImpl(final BigdataValueFactory valueFactory, final String id) {
 
+        this(valueFactory, id, null);
+
+    }
+    
+    BigdataBNodeImpl(final BigdataValueFactory valueFactory, final String id, 
+    		final BigdataStatement stmt) {
+
         super(valueFactory, null);
 
         if (id == null)
             throw new IllegalArgumentException();
 
         this.id = id;
+        
+        this.sid = stmt;
+        if (stmt != null) {
+        	this.statementIdentifier = true;
+        }
 
+    }
+    
+    @Override
+    public IV getIV() {
+    	
+    	if (super.iv == null && sid != null) {
+    		
+    		if (sid.getSubject() == this || sid.getObject() == this)
+    			throw new UnificationException("illegal self-referential sid");
+    		
+    		final IV s = sid.s();
+    		final IV p = sid.p();
+    		final IV o = sid.o();
+    		if (s != null && p != null && o != null) {
+    			setIV(new SidIV(new SPO(s, p, o)));
+    		}
+    	}
+    	
+    	return super.iv;
     }
 
     public String toString() {
@@ -179,7 +213,7 @@ public class BigdataBNodeImpl extends BigdataResourceImpl implements
 	/**
 	 * Marks this as a blank node which models the specified statement.
 	 * 
-	 * @param stmt
+	 * @param sid
 	 *            The statement.
 	 */
 	final public void setStatement(final BigdataStatement sid) {

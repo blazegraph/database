@@ -23,6 +23,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.rdf.graph.impl.bd;
 
+import org.apache.http.util.ExceptionUtils;
+
 import com.bigdata.rdf.graph.IGASContext;
 import com.bigdata.rdf.graph.IGASEngine;
 import com.bigdata.rdf.graph.IGASState;
@@ -48,6 +50,8 @@ public class TestBFS extends AbstractBigdataGraphTestCase {
 
     public void testBFS() throws Exception {
 
+    	try {
+    	
         final SmallGraphProblem p = setupSmallGraphProblem();
 
         final IGASEngine gasEngine = getGraphFixture()
@@ -83,6 +87,14 @@ public class TestBFS extends AbstractBigdataGraphTestCase {
             gasEngine.shutdownNow();
 
         }
+        
+    	} catch (Exception ex) {
+    		
+    		ex.getCause().printStackTrace();
+    		
+    		throw ex;
+    		
+    	}
     }
 
 }

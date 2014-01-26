@@ -36,6 +36,7 @@ import org.xml.sax.SAXException;
 import org.xml.sax.SAXParseException;
 import org.xml.sax.XMLReader;
 
+import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.store.AbstractTripleStore.Options;

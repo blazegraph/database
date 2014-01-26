@@ -229,7 +229,7 @@ public class HistoryIndexTupleSerializer extends
 
                     if (spo.isExplicit()) {
 
-                        spo.setStatementIdentifier(true);
+//                        spo.setStatementIdentifier(true);
 
                     }
 

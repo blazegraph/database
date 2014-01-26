@@ -778,9 +778,9 @@ public class TestStatementIdentifiers extends AbstractTripleStoreTestCase {
 
                     buf.flush();
 
-                    fail("Expecting: " + StatementCyclesException.class);
+                    fail("Expecting: " + UnificationException.class);
 
-                } catch (StatementCyclesException ex) {
+                } catch (UnificationException ex) {
 
                     System.err.println("Ignoring expected exception: " + ex);
 
@@ -842,9 +842,9 @@ public class TestStatementIdentifiers extends AbstractTripleStoreTestCase {
 
                     buf.flush();
 
-                    fail("Expecting: "+StatementCyclesException.class);
+                    fail("Expecting: "+UnificationException.class);
                     
-                } catch(StatementCyclesException ex) {
+                } catch(UnificationException ex) {
                     
                     System.err.println("Ignoring expected exception: "+ex);
                     

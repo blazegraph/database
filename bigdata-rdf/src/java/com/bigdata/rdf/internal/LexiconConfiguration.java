@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.internal;
 
 import java.math.BigInteger;
+import java.net.UnknownHostException;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.TimeZone;
@@ -58,6 +59,7 @@ import com.bigdata.rdf.internal.impl.literal.XSDUnsignedIntIV;
 import com.bigdata.rdf.internal.impl.literal.XSDUnsignedLongIV;
 import com.bigdata.rdf.internal.impl.literal.XSDUnsignedShortIV;
 import com.bigdata.rdf.internal.impl.uri.FullyInlineURIIV;
+import com.bigdata.rdf.internal.impl.uri.IPAddrIV;
 import com.bigdata.rdf.internal.impl.uri.URIExtensionIV;
 import com.bigdata.rdf.lexicon.LexiconKeyOrder;
 import com.bigdata.rdf.model.BigdataBNode;
@@ -435,6 +437,22 @@ public class LexiconConfiguration<V extends BigdataValue>
 	 */
     private IV<BigdataURI, ?> createInlineURIIV(final URI value) {
 
+    	try {
+    		
+    		final String s = value.stringValue();
+    		
+	    	if (s.startsWith(IPAddrIV.NAMESPACE)) {
+	    		
+	    		return new IPAddrIV(s.substring(IPAddrIV.NAMESPACE_LEN));
+	    		
+	    	}
+	    	
+    	} catch (UnknownHostException ex) { 
+    		
+    		log.warn("unknown host exception, will not inline: " + value);
+    		
+    	}
+    	
         if (maxInlineTextLength == 0) {
             
             return null;

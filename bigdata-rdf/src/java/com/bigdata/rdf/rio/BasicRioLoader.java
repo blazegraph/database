@@ -153,6 +153,8 @@ public class BasicRioLoader implements IRioLoader {
 
         final RDFParser parser = Rio.createParser(rdfFormat, valueFactory);
         
+        parser.setValueFactory(valueFactory);
+        
         return parser;
 
     }

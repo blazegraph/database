@@ -63,6 +63,7 @@ public class BigdataStatementImpl implements BigdataStatement {
     protected final BigdataURI p;
     protected final BigdataValue o;
     protected final BigdataResource c;
+    protected IV sid = null;
     private StatementEnum type;
     private boolean userFlag;
     private transient boolean override = false;
@@ -282,39 +283,51 @@ public class BigdataStatementImpl implements BigdataStatement {
 
     }
 
-    public final void setStatementIdentifier(final boolean sidable) {
-
-        if (sidable && type != StatementEnum.Explicit) {
-
-            // Only allowed for explicit statements.
-            throw new IllegalStateException();
-
-        }
-
-        if (c == null) {
-        	
-        	// this SHOULD not ever happen
-        	throw new IllegalStateException();
-        	
-        }
-        
-        c.setIV(new SidIV(this));
-
-    }
+//    public final void setStatementIdentifier(final boolean sidable) {
+//
+//        if (sidable && type != StatementEnum.Explicit) {
+//
+//            // Only allowed for explicit statements.
+//            throw new IllegalStateException();
+//
+//        }
+//
+////        if (c == null) {
+////        	
+////        	// this SHOULD not ever happen
+////        	throw new IllegalStateException();
+////        	
+////        }
+////        
+////        c.setIV(new SidIV(this));
+//        
+//        this.sid = new SidIV(this);
+//
+//    }
 
     public final IV getStatementIdentifier() {
 
-        if (!hasStatementIdentifier())
-            throw new IllegalStateException("No statement identifier: "
-                    + toString());
+//        if (!hasStatementIdentifier())
+//            throw new IllegalStateException("No statement identifier: "
+//                    + toString());
+//
+//        return c.getIV();
 
-        return c.getIV();
+    	if (sid == null && type == StatementEnum.Explicit) {
+    		
+    		sid = new SidIV(this);
+    		
+    	}
+    	
+        return sid;
 
     }
     
     final public boolean hasStatementIdentifier() {
         
-        return c != null && c.getIV().isStatement();
+//        return c != null && c.getIV().isStatement();
+    	
+    	return type == StatementEnum.Explicit;
         
     }
 
