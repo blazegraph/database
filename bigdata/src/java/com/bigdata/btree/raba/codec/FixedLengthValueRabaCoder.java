@@ -76,6 +76,16 @@ import com.bigdata.rawstore.Bytes;
  */
 public class FixedLengthValueRabaCoder implements IRabaCoder, Externalizable {
 
+    /**
+     * This is the historical implicit value. It has been made into an explicit
+     * value since the {@link IRabaCoder} API change to support duplicate keys
+     * for the HTree caused a change in the implict computed value.
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/763" >
+     *      Stochastic Results With Analytic Query Mode </a>
+     */
+    private static final long serialVersionUID = 5549200745262968226L;
+
     private static final byte VERSION0 = 0x00;
 
     /**
