@@ -59,6 +59,7 @@ import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.keys.ASCIIKeyBuilderFactory;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.raba.codec.FrontCodedRabaCoder;
+import com.bigdata.btree.raba.codec.FrontCodedRabaCoderDupKeys;
 import com.bigdata.btree.raba.codec.SimpleRabaCoder;
 import com.bigdata.counters.CAT;
 import com.bigdata.htree.HTree;
@@ -486,7 +487,8 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
         @SuppressWarnings("rawtypes")
         final ITupleSerializer<?, ?> tupleSer = new DefaultTupleSerializer(
                 new ASCIIKeyBuilderFactory(Bytes.SIZEOF_INT),
-                new FrontCodedRabaCoder(ratio),// keys : TODO Optimize for int32!
+                // new FrontCodedRabaCoder(ratio),// keys : TODO Optimize for int32!
+                new FrontCodedRabaCoderDupKeys(ratio),// keys : TODO Optimize for int32!
                 new SimpleRabaCoder() // vals
         );
 

@@ -76,20 +76,24 @@ public abstract class AbstractKeyBuffer implements IRaba {
      */
     abstract protected int _binarySearch(final int searchKeyOffset, final byte[] searchKey);
 
+    @Override
     public Iterator<byte[]> iterator() {
 
         return new Iterator<byte[]>() {
 
             int i = 0;
             
+            @Override
             public boolean hasNext() {
                 return i < size();
             }
 
+            @Override
             public byte[] next() {
                 return get(i++);
             }
 
+            @Override
             public void remove() {
                 throw new UnsupportedOperationException();
             }
@@ -107,5 +111,5 @@ public abstract class AbstractKeyBuffer implements IRaba {
      * The length of the leading prefix shared by all keys.
      */
     abstract public int getPrefixLength();
-    
+
 }

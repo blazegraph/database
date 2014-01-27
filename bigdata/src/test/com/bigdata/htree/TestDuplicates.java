@@ -30,12 +30,10 @@ import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
 
 /**
- * Test {@link HTree} with duplicate Keys.
+ * Test {@link HTree} with duplicate keys.
  * 
  * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/763" >
  *      Stochastic Results With Analytic Query Mode </a>
- * 
- * @author Martyn Cutcher
  */
 public class TestDuplicates extends AbstractHTreeTestCase {
 
@@ -85,9 +83,6 @@ public class TestDuplicates extends AbstractHTreeTestCase {
 
 			assertNull(htree.insert(k1, v3));
 
-			// test before checkpoint.
-            assertEquals(2, getCount(htree, k1));
-
 			final long addrCheckpoint1 = htree.writeCheckpoint();
 
 			htree = HTree.load(store, addrCheckpoint1, true/* readOnly */);
@@ -95,8 +90,14 @@ public class TestDuplicates extends AbstractHTreeTestCase {
 			assertEquals(htree.lookupFirst(k1), v3);
 			assertTrue(htree.contains(k1));
 			
-            // test after checkpoint.
-            assertEquals(2, getCount(htree, k1));
+			final ITupleIterator<?> iter = htree.lookupAll(k1);
+			int count = 0;
+			while (iter.hasNext()) {
+				iter.next();
+				count++;
+			}
+			
+			assertEquals(2, count);
 
 		} finally {
 
@@ -151,55 +152,67 @@ public class TestDuplicates extends AbstractHTreeTestCase {
      *            The #of address bits.
      * @param ndups
      *            The #of duplicate entries for a given key.
-     * 
-     *            FIXME If the addressBits is 10 then this test can fail for
-     *            specific dups values - eg 500 or 2000. This appears to be an
-     *            independent failure at the {@link HTree} layer rather than in
-     *            the key buffer search layer.
      */
     private void doTest(final int addressBits, final int ndups) {
 
 		final IRawStore store = new SimpleMemoryRawStore();
 		// final IRawStore store = getRWStore();
 
-        try {
-            HTree htree = getHTree(store, addressBits, false/* rawRecords */,
+		try {
+
+		    HTree htree = getHTree(store, addressBits, false/* rawRecords */,
                     true/* persistent */);
+			
+			final byte[] k1 = new byte[] { 1,2,3,4 };
+			final byte[] k2 = new byte[] { 3,6,4 };
+			final byte[] k3 = new byte[] { 7,8,5,6 };
+			final byte[] v1 = new byte[] { 1 };
+			final byte[] v2 = new byte[] { 2 };
+			final byte[] v3 = new byte[] { 3 };
 
-            final byte[] k1 = new byte[] { 1, 2, 3, 4 };
-            final byte[] k2 = new byte[] { 2, 3, 4 };
-            final byte[] k3 = new byte[] { 3, 4 };
-            final byte[] v1 = new byte[] { 1 };
-            final byte[] v2 = new byte[] { 2 };
-            final byte[] v3 = new byte[] { 3 };
+			try {
+				for (int i = 0; i < ndups; i++) {
+					assertNull(htree.insert(k1, v1));
+					assertNull(htree.insert(k2, v2));
+					assertNull(htree.insert(k3, v3));
+					
+					// This checks boundary insert conditions on the mutable buffers
+					final String failure = "After inserting: " + (i+1);
+					assertTrue(failure, htree.contains(k1)); // 2000 dups fails here with 10 bit depth, 70 dups with 6 bit
+					assertTrue(failure, htree.contains(k2));
+					assertTrue(failure, htree.contains(k3));
+				}
+			} finally {
+				// htree.dump(Level.DEBUG, System.out, true/* materialize */);				
+			}
 
-            for (int i = 0; i < ndups; i++) {
-                assertNull(htree.insert(k1, v1));
-                assertNull(htree.insert(k2, v2));
-                assertNull(htree.insert(k3, v3));
-            }
-
-			assertTrue(htree.contains(k1)); // 2000 dups fails here with 10 bit depth
+			
+			assertTrue(htree.contains(k1)); // 2000 dups fails here with 10 bit depth, 70 dups with 6 bit
 			assertTrue(htree.contains(k2));
 			assertTrue(htree.contains(k3));
 
 			// Check first with MutableBuckets
-			assertEquals(ndups, getCount(htree, k1));
-			assertEquals(ndups, getCount(htree, k2));
-			assertEquals(ndups, getCount(htree, k3));
+			assertTrue(getCount(htree, k1) == ndups);
+			assertTrue(getCount(htree, k2) == ndups);
+			assertTrue(getCount(htree, k3) == ndups);
 
 			final long addrCheckpoint1 = htree.writeCheckpoint();
-
+			
 			htree = HTree.load(store, addrCheckpoint1, true/* readOnly */);
 
-			assertTrue(htree.contains(k1));
-			assertTrue(htree.contains(k2));
-			assertTrue(htree.contains(k3));
+			final String failString1 = "addressBits: " + addressBits + ", dups: " + ndups;
 
-			// Test after checkpoint.
-            assertEquals(ndups, getCount(htree, k1));
-            assertEquals(ndups, getCount(htree, k2));
-            assertEquals(ndups, getCount(htree, k3));// 500 dups fails here with 10bit depth
+			assertTrue(failString1, htree.contains(k1));
+			assertTrue(failString1, htree.contains(k2));
+			assertTrue(failString1, htree.contains(k3));
+			
+			// htree.dump(Level.DEBUG, System.out, true/* materialize */);
+			
+			final String failString = failString1 + " != ";
+
+			assertTrue(failString + getCount(htree, k1), getCount(htree, k1) == ndups);
+			assertTrue(failString + getCount(htree, k2), getCount(htree, k2) == ndups); // 50 dups fails with 8bit depth, 5 dups with 6 bit depth
+			assertTrue(failString + getCount(htree, k3), getCount(htree, k3) == ndups); // 500 dups fails here with 10bit depth
 
 		} finally {
 
@@ -234,7 +247,7 @@ public class TestDuplicates extends AbstractHTreeTestCase {
      *            The key.
      * @return
      */
-    private int getCount(final HTree htree, final byte[] k1) {
+	private int getCount(final HTree htree, final byte[] k1) {
 		final ITupleIterator<?> iter = htree.lookupAll(k1);
 		int count = 0;
 		while (iter.hasNext()) {
@@ -272,7 +285,7 @@ public class TestDuplicates extends AbstractHTreeTestCase {
 			assertTrue(htree.contains(k1));
 
 			assertNull(htree.insert(k1, v2));
-			
+
 			// before checkpoint.
             assertEquals(2, getCount(htree, k1));
 
@@ -282,7 +295,7 @@ public class TestDuplicates extends AbstractHTreeTestCase {
 
 			assertEquals(htree.lookupFirst(k1), v2);
 			assertTrue(htree.contains(k1));
-
+			
 			// after checkpoint.
             assertEquals(2, getCount(htree, k1));
 
@@ -293,5 +306,4 @@ public class TestDuplicates extends AbstractHTreeTestCase {
 		}
 
 	}
-
 }

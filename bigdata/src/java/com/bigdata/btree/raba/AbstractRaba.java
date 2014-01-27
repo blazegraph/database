@@ -124,25 +124,29 @@ abstract public class AbstractRaba implements IRaba {
         this.a = a;
         
     }
-    
+
+    @Override
     final public int size() {
 
         return (toIndex - fromIndex);
         
     }
 
+    @Override
     final public boolean isEmpty() {
         
         return toIndex == fromIndex;
         
     }
     
+    @Override
     final public boolean isFull() {
 
         return size() == capacity();
         
     }
     
+    @Override
     final public int capacity() {
         
         return capacity;
@@ -163,6 +167,7 @@ abstract public class AbstractRaba implements IRaba {
 
     }
     
+    @Override
     final public byte[] get(final int index) {
 
         assert rangeCheck(index);
@@ -171,6 +176,7 @@ abstract public class AbstractRaba implements IRaba {
         
     }
 
+    @Override
     final public int length(final int index) {
 
         assert rangeCheck(index);
@@ -184,6 +190,7 @@ abstract public class AbstractRaba implements IRaba {
 
     }
 
+    @Override
     final public boolean isNull(final int index) {
 
         assert rangeCheck(index);
@@ -192,6 +199,7 @@ abstract public class AbstractRaba implements IRaba {
 
     }
     
+    @Override
     final public int copy(final int index, final OutputStream out) {
 
         assert rangeCheck(index);
@@ -215,18 +223,21 @@ abstract public class AbstractRaba implements IRaba {
         
     }
     
+    @Override
     final public Iterator<byte[]> iterator() {
 
         return new Iterator<byte[]>() {
 
             int i = fromIndex;
 
+            @Override
             public boolean hasNext() {
 
                 return i < toIndex;
 
             }
 
+            @Override
             public byte[] next() {
 
                 if (!hasNext())
@@ -236,6 +247,7 @@ abstract public class AbstractRaba implements IRaba {
 
             }
 
+            @Override
             public void remove() {
 
                 if (isReadOnly())
@@ -294,6 +306,7 @@ abstract public class AbstractRaba implements IRaba {
         
     }
     
+    @Override
     public void set(final int index, final byte[] key) {
         
         assertNotReadOnly();
@@ -306,6 +319,7 @@ abstract public class AbstractRaba implements IRaba {
         
     }
 
+    @Override
     public int add(final byte[] key) {
 
         assertNotReadOnly();
@@ -322,6 +336,7 @@ abstract public class AbstractRaba implements IRaba {
         
     }
     
+    @Override
     public int add(final byte[] key, final int off, final int len) {
 
         assertNotReadOnly();        
@@ -346,6 +361,7 @@ abstract public class AbstractRaba implements IRaba {
 
     }
     
+    @Override
     public int add(final DataInput in, final int len) throws IOException {
 
         assertNotReadOnly();
@@ -362,6 +378,7 @@ abstract public class AbstractRaba implements IRaba {
 
     }
 
+    @Override
     public int search(final byte[] searchKey) {
 
         if (!isKeys()) {
@@ -375,6 +392,7 @@ abstract public class AbstractRaba implements IRaba {
         
     }
     
+    @Override
     public String toString() {
 
         return toString(this);
