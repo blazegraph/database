@@ -35,6 +35,8 @@ public class FrontCodedRabaCoderDupKeys extends FrontCodedRabaCoder {
      */
     public static final transient FrontCodedRabaCoderDupKeys INSTANCE = new FrontCodedRabaCoderDupKeys();
 
+    private static final long serialVersionUID = 1L;
+
     protected transient static final int DEFAULT_RATIO = 8;
 
     public FrontCodedRabaCoderDupKeys(final int ratio) {
