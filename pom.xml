@@ -94,7 +94,7 @@ dependencies.
       <log4j.version>1.2.17</log4j.version>
       <fastutil.version>5.1.5</fastutil.version>
       <dsiutils.version>1.0.6-020610</dsiutils.version>
-      <lgplutils.version>1.0.7-140114</lgplutils.version>
+      <lgplutils.version>1.0.7-270114</lgplutils.version>
       <bigdata.ganglia.version>1.0.1</bigdata.ganglia.version>
     </properties>
     <!-- TODO Can we declare the versions of the dependencies here as
@@ -387,11 +387,11 @@ mvn deploy:deploy-file \
 mvn deploy:deploy-file \
    -DgroupId=com.bigdata \
    -DartifactId=lgpl-utils \
-   -Dversion=1.0.7-140114 \
+   -Dversion=1.0.7-270114 \
    -Dpackaging=jar \
    -DrepositoryId=bigdata.releases \
    -Durl=scpexe://www.systap.com/srv/www/htdocs/systap.com/maven/releases/ \
-   -Dfile=bigdata/lib/lgpl-utils-1.0.7-140114.jar
+   -Dfile=bigdata/lib/lgpl-utils-1.0.7-270114.jar
            -->
            <groupId>com.bigdata</groupId>
            <artifactId>lgpl-utils</artifactId>
