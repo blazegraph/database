@@ -67,14 +67,14 @@ public class TestAll extends TestCase {
          */
         suite.addTestSuite(TestLoadAndVerify.class);
 
-        /*
-         * Correctness tests when SIDs are enabled and for blank node handling
-         * using StatementBuffer and explicitly inserting specific triples (no
-         * parsing). The RDF/XML interchange tests serialize the hand loaded
-         * data and verify that it can be parsed and that the same graph is
-         * obtained.
-         */
-        suite.addTestSuite(TestRDFXMLInterchangeWithStatementIdentifiers.class);
+//        /*
+//         * Correctness tests when SIDs are enabled and for blank node handling
+//         * using StatementBuffer and explicitly inserting specific triples (no
+//         * parsing). The RDF/XML interchange tests serialize the hand loaded
+//         * data and verify that it can be parsed and that the same graph is
+//         * obtained.
+//         */
+//        suite.addTestSuite(TestRDFXMLInterchangeWithStatementIdentifiers.class);
         
         /*
 		 * Test suite for "SIDS" support for NTRIPLES data. This test targets a

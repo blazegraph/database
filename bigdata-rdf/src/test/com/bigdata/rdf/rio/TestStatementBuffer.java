@@ -135,7 +135,7 @@ public class TestStatementBuffer extends AbstractTripleStoreTestCase {
 
             buffer.handleStatement(s1, p1, o1, c1, StatementEnum.Explicit);
 
-            assertEquals(7, buffer.numURIs);
+            assertEquals(8, buffer.numURIs);
             assertEquals(0, buffer.numLiterals);
             assertEquals(0, buffer.numBNodes);
             assertEquals(1, buffer.numStmts);
@@ -151,7 +151,7 @@ public class TestStatementBuffer extends AbstractTripleStoreTestCase {
 
             buffer.handleStatement(s2, p2, o2, c2, StatementEnum.Explicit);
 
-            assertEquals(8, buffer.numURIs); // only 4 since one is duplicate.
+            assertEquals(9, buffer.numURIs); // only 4 since one is duplicate.
             assertEquals(1, buffer.numLiterals);
             assertEquals(0, buffer.numBNodes);
             assertEquals(2, buffer.numStmts);
@@ -167,7 +167,7 @@ public class TestStatementBuffer extends AbstractTripleStoreTestCase {
 
             buffer.handleStatement(s3, p3, o3, c3, StatementEnum.Explicit);
 
-            assertEquals(8, buffer.numURIs);
+            assertEquals(9, buffer.numURIs);
             assertEquals(1, buffer.numLiterals);
             assertEquals(0, buffer.numBNodes);
             assertEquals(3, buffer.numStmts);
@@ -178,7 +178,7 @@ public class TestStatementBuffer extends AbstractTripleStoreTestCase {
 
             buffer.handleStatement(s3, p3, o3, c3, StatementEnum.Explicit);
 
-            assertEquals(8, buffer.numURIs);
+            assertEquals(9, buffer.numURIs);
             assertEquals(1, buffer.numLiterals);
             assertEquals(0, buffer.numBNodes);
             assertEquals(4, buffer.numStmts);

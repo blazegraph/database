@@ -108,7 +108,7 @@ public class ServiceProviderHook {
 
             final RDFParserRegistry r = RDFParserRegistry.getInstance();
 
-            r.add(new BigdataRDFXMLParserFactory());
+//            r.add(new BigdataRDFXMLParserFactory());
 
 //            // Note: This ensures that the RDFFormat for NQuads is loaded.
 //            r.get(RDFFormat.NQUADS);
@@ -120,13 +120,13 @@ public class ServiceProviderHook {
             
         }
 
-        // Ditto, but for the writer.
-        {
-            final RDFWriterRegistry r = RDFWriterRegistry.getInstance();
-
-            r.add(new BigdataRDFXMLWriterFactory());
-
-        }
+//        // Ditto, but for the writer.
+//        {
+//            final RDFWriterRegistry r = RDFWriterRegistry.getInstance();
+//
+//            r.add(new BigdataRDFXMLWriterFactory());
+//
+//        }
 
 //        {
 //            final PropertiesParserRegistry r = PropertiesParserRegistry.getInstance();
