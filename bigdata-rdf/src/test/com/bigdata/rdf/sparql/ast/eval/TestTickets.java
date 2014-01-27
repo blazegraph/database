@@ -320,9 +320,8 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
     }
 
     /**
-     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/806" >
-     *      Incorrect computation of shared variables when lifting out named
-     *      subqueries </a>
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/806>
+     *      Incorrect AST generated for OPTIONAL { SELECT }</a>
      */
     public void test_ticket_806() throws Exception {
         
