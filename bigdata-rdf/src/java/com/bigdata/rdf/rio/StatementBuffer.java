@@ -249,6 +249,23 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
         return numStmts;
         
     }
+    
+    public String toString() {
+    	
+    	return "numURIs=" + numURIs
+    			+ ", numLiterals=" + numLiterals
+    			+ ", numBNodes=" + numBNodes
+    			+ ", numStmts=" + numStmts
+    			+ ", numValues=" + numValues
+    			+ ", numSids=" + numSIDs
+    			+ ", values.length=" + (values != null ? String.valueOf(values.length) : "null")
+    			+ ", stmts.length=" + (stmts != null ? String.valueOf(stmts.length) : "null")
+    			+ ", bnodes.size()=" + (bnodes != null ? String.valueOf(bnodes.size()) : "null")
+    			+ ", distinctTermMap.size()=" + (distinctTermMap != null ? String.valueOf(distinctTermMap.size()) : "null")
+    			+ ", reifiedStmts.size()=" + (reifiedStmts != null ? String.valueOf(reifiedStmts.size()) : "null")
+    			+ ", deferredStmts.size()=" + (deferredStmts != null ? String.valueOf(deferredStmts.size()) : "null");
+    	
+    }
 
     /**
      * When invoked, the {@link StatementBuffer} will resolve terms against the
@@ -1202,21 +1219,11 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
         	
             if (stmt != null) {
             	
-//            	/*
-//            	 * Assume for now that bnodes appearing inside the terse
-//            	 * syntax without a statement attached are real bnodes, not
-//            	 * sids. 
-//            	 */
-//            	final boolean tmp = this.statementIdentifiers;
-//            	this.statementIdentifiers = false;
-            	
             	bnode.setStatement(valueFactory.createStatement(
             			(BigdataResource) getDistinctTerm(stmt.getSubject(), true),
             			(BigdataURI) getDistinctTerm(stmt.getPredicate(), true),
             			(BigdataValue) getDistinctTerm(stmt.getObject(), true)
             			));
-            	
-//            	this.statementIdentifiers = tmp;
             	
             	/*
             	 * Do not "add if absent".  This is not a real term, just a
