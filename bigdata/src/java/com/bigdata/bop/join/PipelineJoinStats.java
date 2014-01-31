@@ -115,6 +115,7 @@ public class PipelineJoinStats extends BaseJoinStats {
         
     }
 
+    @Override
 	public void add(final BOpStats o) {
 
 		super.add(o);

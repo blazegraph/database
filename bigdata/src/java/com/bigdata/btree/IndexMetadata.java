@@ -48,6 +48,7 @@ import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.btree.raba.codec.CanonicalHuffmanRabaCoder;
 import com.bigdata.btree.raba.codec.FrontCodedRabaCoder;
 import com.bigdata.btree.raba.codec.FrontCodedRabaCoder.DefaultFrontCodedRabaCoder;
+import com.bigdata.btree.raba.codec.FrontCodedRabaCoderDupKeys;
 import com.bigdata.btree.raba.codec.IRabaCoder;
 import com.bigdata.btree.view.FusedView;
 import com.bigdata.config.Configuration;
@@ -2096,9 +2097,16 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
 //        this.addrSer = AddressSerializer.INSTANCE;
         
 //        this.nodeKeySer = PrefixSerializer.INSTANCE;
+        final Class keyRabaCoder;
+        if (this instanceof HTreeIndexMetadata) {
+        	keyRabaCoder = FrontCodedRabaCoderDupKeys.class;
+        } else {
+        	keyRabaCoder = DefaultFrontCodedRabaCoder.class;
+        }
+        
         this.nodeKeysCoder = newInstance(getProperty(indexManager, properties,
                 namespace, Options.NODE_KEYS_CODER,
-                DefaultFrontCodedRabaCoder.class.getName()), IRabaCoder.class);
+                keyRabaCoder.getName()), IRabaCoder.class);
 
         // this.tupleSer = DefaultTupleSerializer.newInstance();
         {
@@ -2116,7 +2124,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
 
             final IRabaCoder leafKeysCoder = newInstance(getProperty(
                     indexManager, properties, namespace,
-                    Options.LEAF_KEYS_CODER, DefaultFrontCodedRabaCoder.class
+                    Options.LEAF_KEYS_CODER, keyRabaCoder
                             .getName()), IRabaCoder.class);
 
             final IRabaCoder valuesCoder = newInstance(getProperty(

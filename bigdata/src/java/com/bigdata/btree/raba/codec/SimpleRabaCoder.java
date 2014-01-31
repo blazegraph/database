@@ -47,7 +47,6 @@ import com.bigdata.rawstore.Bytes;
  * and B+Tree values.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class SimpleRabaCoder implements IRabaCoder, Externalizable {
 
@@ -74,6 +73,7 @@ public class SimpleRabaCoder implements IRabaCoder, Externalizable {
     /**
      * Yes.
      */
+    @Override
     final public boolean isKeyCoder() {
         
         return true;
@@ -83,25 +83,35 @@ public class SimpleRabaCoder implements IRabaCoder, Externalizable {
     /**
      * Yes.
      */
+    @Override
     final public boolean isValueCoder() {
         
         return true;
         
     }
     
-    /**
+    @Override
+    public boolean isDuplicateKeys() {
+
+        return false;
+        
+    }
+
+   /**
      * De-serialization ctor. Use {@link #INSTANCE} otherwise.
      */
     public SimpleRabaCoder() {
         
     }
     
+    @Override
     public void writeExternal(ObjectOutput out) throws IOException {
 
         // NOP
 
     }
 
+    @Override
     public void readExternal(ObjectInput in) throws IOException,
             ClassNotFoundException {
 
@@ -136,6 +146,7 @@ public class SimpleRabaCoder implements IRabaCoder, Externalizable {
 		return O_SIZE + SIZEOF_SIZE + SIZEOF_CAPACITY;
     }
 
+    @Override
     public ICodedRaba encodeLive(final IRaba raba, final DataOutputBuffer buf) {
 
         if (raba == null)
@@ -244,6 +255,7 @@ public class SimpleRabaCoder implements IRabaCoder, Externalizable {
 
     }
 
+    @Override
     public AbstractFixedByteArrayBuffer encode(final IRaba raba,
             final DataOutputBuffer buf) {
 
@@ -256,6 +268,7 @@ public class SimpleRabaCoder implements IRabaCoder, Externalizable {
 
     }
     
+    @Override
     public ICodedRaba decode(final AbstractFixedByteArrayBuffer data) {
 
         return new CodedRabaImpl(data);
@@ -366,36 +379,42 @@ public class SimpleRabaCoder implements IRabaCoder, Externalizable {
          */
         private final int O_offsets;
         
+        @Override
         final public AbstractFixedByteArrayBuffer data() {
             
             return data;
             
         }
 
+        @Override
         public boolean isKeys() {
 
             return isKeys;
             
         }
 
+        @Override
         final public int capacity() {
             
             return capacity;
             
         }
 
+        @Override
         final public int size() {
             
             return size;
             
         }
 
+        @Override
         final public boolean isEmpty() {
             
             return size == 0;
             
         }
 
+        @Override
         final public boolean isFull() {
             
             return true;
@@ -409,6 +428,7 @@ public class SimpleRabaCoder implements IRabaCoder, Externalizable {
             
         }
         
+        @Override
         public boolean isNull(final int index) {
 
 			if (index >= size && index < capacity) {
@@ -425,6 +445,7 @@ public class SimpleRabaCoder implements IRabaCoder, Externalizable {
 
         }
 
+        @Override
         public int length(final int index) {
             
             if (isNull(index))
@@ -443,6 +464,7 @@ public class SimpleRabaCoder implements IRabaCoder, Externalizable {
             
         }
 
+        @Override
         public byte[] get(final int index) {
 
             if (isNull(index))
@@ -477,6 +499,7 @@ public class SimpleRabaCoder implements IRabaCoder, Externalizable {
 
         }
 
+        @Override
         public int copy(final int index, final OutputStream os) {
 
             if (isNull(index))
@@ -509,6 +532,7 @@ public class SimpleRabaCoder implements IRabaCoder, Externalizable {
          * Search
          */
         
+        @Override
         public int search(final byte[] key) {
 
             if (!isKeys())

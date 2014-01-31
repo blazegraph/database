@@ -42,6 +42,7 @@ public class MutableKeysRaba extends AbstractRaba implements IRaba {
     /**
      * No - this view is mutable.
      */
+    @Override
     public boolean isReadOnly() {
 
         return false;
@@ -51,12 +52,13 @@ public class MutableKeysRaba extends AbstractRaba implements IRaba {
     /**
      * Yes.
      */
+    @Override
     final public boolean isKeys() {
     
         return true;
         
     }
-    
+
     /**
      * Create a view of a byte[][]. All elements in the array are visible in the
      * view.
@@ -113,6 +115,7 @@ public class MutableKeysRaba extends AbstractRaba implements IRaba {
 
     }
 
+    @Override
     public MutableKeysRaba resize(final int n) {
 
         return (MutableKeysRaba) super.resize(n);

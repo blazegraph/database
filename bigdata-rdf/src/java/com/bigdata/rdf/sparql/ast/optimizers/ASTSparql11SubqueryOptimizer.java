@@ -30,6 +30,7 @@ package com.bigdata.rdf.sparql.ast.optimizers;
 import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Properties;
 import java.util.Set;
 
 import com.bigdata.bop.BOp;
@@ -327,11 +328,29 @@ public class ASTSparql11SubqueryOptimizer implements IASTOptimizer {
     private void liftSparql11Subquery(final AST2BOpContext context,
             final StaticAnalysis sa, final SubqueryRoot subqueryRoot) {
 
+        final IGroupNode<?> parent = subqueryRoot.getParent();
+
         final String newName = "-subSelect-" + context.nextId();
 
         final NamedSubqueryInclude include = new NamedSubqueryInclude(newName);
 
-        final IGroupNode<?> parent = subqueryRoot.getParent();
+        /**
+         * Set query hints from the parent join group.
+         * 
+         * @see <a href="http://sourceforge.net/apps/trac/bigdata/ticket/791" >
+         * Clean up query hints </a>
+         */
+        include.setQueryHints((Properties) parent
+                .getProperty(ASTBase.Annotations.QUERY_HINTS));
+
+        /**
+         * Copy across attached join filters.
+         * 
+         * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/796"
+         *      >Filter assigned to sub-query by query generator is dropped from
+         *      evaluation</a>
+         */
+        include.setAttachedJoinFilters(subqueryRoot.getAttachedJoinFilters());
 
         /*
          * Note: A SubqueryRoot normally starts out as the sole child of a
@@ -367,6 +386,14 @@ public class ASTSparql11SubqueryOptimizer implements IASTOptimizer {
 
         final NamedSubqueryRoot nsr = new NamedSubqueryRoot(
                 subqueryRoot.getQueryType(), newName);
+
+        /**
+         * Copy across query hints from the original subquery.
+         * 
+         * @see <a href="http://sourceforge.net/apps/trac/bigdata/ticket/791" >
+         *      Clean up query hints </a>
+         */
+        nsr.setQueryHints(subqueryRoot.getQueryHints());
 
         nsr.setConstruct(subqueryRoot.getConstruct());
         nsr.setGroupBy(subqueryRoot.getGroupBy());

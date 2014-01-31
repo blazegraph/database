@@ -1829,10 +1829,24 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
         // Run through another transaction
         simpleTransaction();
 
-        // all committed logs should be removed with only open log remaining
-        assertEquals(1L, recursiveCount(getHALogDirA(),IHALogReader.HALOG_FILTER));
-        assertEquals(1L, recursiveCount(getHALogDirB(),IHALogReader.HALOG_FILTER));
-        assertEquals(1L, recursiveCount(getHALogDirC(),IHALogReader.HALOG_FILTER));
+        /**
+         * All committed logs should be removed with only open log remaining.
+         * 
+         * Note: This condition is only eventually true now that we allow the
+         * asychronous release of the HALog files.
+         * 
+         * @see <a href="http://sourceforge.net/apps/trac/bigdata/ticket/780"
+         *      >Incremental or asynchronous purge of HALog files</a>
+         */
+        assertCondition(new Runnable() {
+
+            public void run() {
+                assertEquals(1L, recursiveCount(getHALogDirA(),IHALogReader.HALOG_FILTER));
+                assertEquals(1L, recursiveCount(getHALogDirB(),IHALogReader.HALOG_FILTER));
+                assertEquals(1L, recursiveCount(getHALogDirC(),IHALogReader.HALOG_FILTER));
+            }
+        });
+        
 	}
     
     /**

@@ -61,7 +61,8 @@ public class DropOp extends PipelineOp {
 
         /**
          * An {@link IVariable}[] identifying the variables to be DROPPED in the
-         * {@link IBindingSet}s written out by the operator.
+         * {@link IBindingSet}s written out by the operator (required, must be a
+         * non-empty array).
          */
         String DROP_VARS = DropOp.class.getName() + ".dropVars";
         
@@ -70,7 +71,7 @@ public class DropOp extends PipelineOp {
     /**
      * @param op
      */
-    public DropOp(DropOp op) {
+    public DropOp(final DropOp op) {
         super(op);
     }
 
@@ -78,35 +79,33 @@ public class DropOp extends PipelineOp {
      * @param args
      * @param annotations
      */
-    public DropOp(BOp[] args, Map<String, Object> annotations) {
+    public DropOp(final BOp[] args, final Map<String, Object> annotations) {
         
         super(args, annotations);
         
-        final IVariable<?>[] dropVars = (IVariable<?>[]) getRequiredProperty(Annotations.DROP_VARS);
-
-        if (dropVars == null)
-            throw new IllegalArgumentException();
+        final IVariable<?>[] dropVars = getDropVars();
 
         if (dropVars.length == 0)
             throw new IllegalArgumentException();
         
     }
 
-    public DropOp(final BOp[] args, NV... annotations) {
+    public DropOp(final BOp[] args, final NV... annotations) {
 
         this(args, NV.asMap(annotations));
         
     }
 
-//    /**
-//     * @see Annotations#DROP
-//     */
-//    public IVariable<?>[] getVariables() {
-//
-//        return (IVariable<?>[]) getRequiredProperty(Annotations.DROP);
-//        
-//    }
+    /**
+     * @see Annotations#DROP_VARS
+     */
+    public IVariable<?>[] getDropVars() {
 
+        return (IVariable<?>[]) getRequiredProperty(Annotations.DROP_VARS);
+        
+    }
+
+    @Override
     public FutureTask<Void> eval(final BOpContext<IBindingSet> context) {
 
         return new FutureTask<Void>(new ChunkTask(this, context));
@@ -129,11 +128,11 @@ public class DropOp extends PipelineOp {
 
             this.context = context;
 
-            this.vars = (IVariable<?>[]) op
-                    .getRequiredProperty(Annotations.DROP_VARS);
+            this.vars = op.getDropVars();
 
         }
 
+        @Override
         public Void call() throws Exception {
 
             final BOpStats stats = context.getStats();

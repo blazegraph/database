@@ -172,13 +172,25 @@ public interface IHashJoinUtility {
      * NotExists) or {@link #outputJoinSet(IBuffer)} (Exists).
      * 
      * @param leftItr
-     *            A stream of solutions to be joined against the hash index
-     *            (left).
+     *            A stream of chunks of solutions to be joined against the hash
+     *            index (left).
+     * @param stats
+     *            The statistics to be updated as solutions are drained from the
+     *            <i>leftItr</i> (optional). When <code>left</code> is the
+     *            pipeline, {@link BOpStats#chunksIn} and
+     *            {@link BOpStats#unitsIn} should be updated by passing in the
+     *            {@link BOpStats} object. When <code>left</code> is a hash
+     *            index (i.e., for a hash join against an access path), you
+     *            should pass <code>null</code> since the chunksIn and unitsIn
+     *            are updated as the {@link HashIndexOp} builds the hash index
+     *            rather than when it executes the join against the access
+     *            path).
      * @param outputBuffer
      *            Where to write the solutions which join.
      */
     void hashJoin(//
-            ICloseableIterator<IBindingSet> leftItr,//
+            ICloseableIterator<IBindingSet[]> leftItr,//
+            BOpStats stats,//
             IBuffer<IBindingSet> outputBuffer//
     );
 
@@ -194,8 +206,11 @@ public interface IHashJoinUtility {
      * NotExists) or {@link #outputJoinSet(IBuffer)} (Exists).
      * 
      * @param leftItr
-     *            A stream of solutions to be joined against the hash index
-     *            (left).
+     *            A stream of chunks of solutions to be joined against the hash
+     *            index (left).
+     * @param stats
+     *            The statistics to be updated as solutions are drained from the
+     *            <i>leftItr</i>.
      * @param outputBuffer
      *            Where to write the solutions which join.
      * @param constraints
@@ -204,7 +219,8 @@ public interface IHashJoinUtility {
      *            constructor.
      */
     void hashJoin2(//
-            ICloseableIterator<IBindingSet> leftItr,//
+            ICloseableIterator<IBindingSet[]> leftItr,//
+            BOpStats stats,//
             IBuffer<IBindingSet> outputBuffer,//
             IConstraint[] constraints//
     );

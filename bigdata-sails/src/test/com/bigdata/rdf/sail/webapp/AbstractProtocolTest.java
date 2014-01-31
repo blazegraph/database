@@ -114,6 +114,10 @@ public abstract class AbstractProtocolTest  extends AbstractTestNanoSparqlClient
 	};
 
 	private RequestFactory requestFactory = GET;
+	
+	protected RequestFactory getRequestFactory() {
+		return requestFactory;
+	}
 	@Override
 	public void setUp() throws Exception {
 		super.setUp();

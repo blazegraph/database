@@ -86,6 +86,9 @@ public class TestAll extends TestCase {
         // HA3 test suite focusing on changing the leader.
         suite.addTestSuite(TestHA3ChangeLeader.class);
 
+        // HA3 test suite focusing on sudden kills.
+        suite.addTestSuite(TestHA3JustKills.class);
+
         // HA3 snapshot policy test suite.
         suite.addTestSuite(TestHA3SnapshotPolicy.class);
         suite.addTestSuite(TestHA3SnapshotPolicy2.class);

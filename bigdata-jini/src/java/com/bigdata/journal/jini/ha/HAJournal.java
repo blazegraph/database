@@ -2154,12 +2154,13 @@ public class HAJournal extends Journal {
          * @return an object that implements whatever administration interfaces
          *         are appropriate for the particular service.
          */
+        @Override
         public Object getAdmin() throws RemoteException {
 
             if (log.isInfoEnabled())
                 log.info("serviceID=" + server.getServiceID());
 
-            return server.proxy;
+            return server.getProxy();
 
         }
                 

@@ -43,6 +43,7 @@ public class ParserStats extends BOpStats {
 
     public final CAT toldTriples = new CAT();
 
+    @Override
     public void add(final BOpStats o) {
 
         super.add(o);

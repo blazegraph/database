@@ -35,6 +35,7 @@ import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.Set;
 
 import org.apache.log4j.Logger;
@@ -53,6 +54,7 @@ import com.bigdata.striterator.CloseableIteratorWrapper;
 import cutthecrap.utils.striterators.EmptyIterator;
 import cutthecrap.utils.striterators.Expander;
 import cutthecrap.utils.striterators.Filter;
+import cutthecrap.utils.striterators.ICloseable;
 import cutthecrap.utils.striterators.ICloseableIterator;
 import cutthecrap.utils.striterators.SingleValueIterator;
 import cutthecrap.utils.striterators.Striterator;
@@ -72,7 +74,7 @@ public class BOpUtility {
      * Pre-order recursive visitation of the operator tree (arguments only, no
      * annotations).
      */
-    @SuppressWarnings("unchecked")
+    @SuppressWarnings({ "unchecked", "rawtypes" })
     public static Iterator<BOp> preOrderIterator(final BOp op) {
 
         return new Striterator(new SingleValueIterator(op))
@@ -466,6 +468,8 @@ public class BOpUtility {
      *            The type of the node to be extracted.
      * 
      * @return A list containing those references.
+     * 
+     * @see #visitAll(BOp, Class)
      */
     public static <C> List<C> toList(final BOp op, final Class<C> clas) {
         
@@ -483,6 +487,44 @@ public class BOpUtility {
         
     }
 
+    /**
+     * Return the sole instance of the specified class.
+     * 
+     * @param op
+     *            The root of the traversal.
+     * @param class1
+     *            The class to look for.
+     * @return The sole instance of that class.
+     * @throws NoSuchElementException
+     *             if there is no such instance.
+     * @throws RuntimeException
+     *             if there is more than one such instance.
+     */
+    public static <C> C getOnly(final BOp op, final Class<C> class1) {
+        final Iterator<C> it = visitAll(op, class1);
+        if (!it.hasNext())
+            throw new NoSuchElementException("No instance found: class="
+                    + class1);
+        final C ret = it.next();
+        if (it.hasNext())
+            throw new RuntimeException("More than one instance exists: class="
+                    + class1);
+        return ret;
+    }
+
+    /**
+     * Return an iterator visiting references to all nodes of the given type
+     * (recursive, including annotations).
+     * 
+     * @param op
+     *            The root of the operator tree.
+     * @param clas
+     *            The type of the node to be extracted.
+     * 
+     * @return A iterator visiting those references.
+     * 
+     * @see #toList(BOp, Class)
+     */
     @SuppressWarnings("unchecked")
 	public static <C> Iterator<C> visitAll(final BOp op, final Class<C> clas) {
     	
@@ -947,9 +989,9 @@ public class BOpUtility {
 
         } finally {
             
-            if (itr instanceof ICloseableIterator<?>) {
+            if (itr instanceof ICloseable) {
              
-                ((ICloseableIterator<?>) itr).close();
+                ((ICloseable) itr).close();
                 
             }
             

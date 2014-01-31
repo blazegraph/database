@@ -507,11 +507,12 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
 
     @Override
     public void hashJoin(//
-            final ICloseableIterator<IBindingSet> leftItr,//
+            final ICloseableIterator<IBindingSet[]> leftItr,//
+            final BOpStats stats,//
             final IBuffer<IBindingSet> outputBuffer//
             ) {
         
-        hashJoin2(leftItr, outputBuffer, constraints);
+        hashJoin2(leftItr, stats, outputBuffer, constraints);
         
     }
 
@@ -525,7 +526,8 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
      */
     @Override
     public void hashJoin2(//
-            final ICloseableIterator<IBindingSet> leftItr,//
+            final ICloseableIterator<IBindingSet[]> leftItr,//
+            final BOpStats stats,
             final IBuffer<IBindingSet> outputBuffer,//
             final IConstraint[] constraints//
             ) {
@@ -544,108 +546,116 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
 
             while (leftItr.hasNext()) {
 
-                final IBindingSet left = leftItr.next();
-
-                nleftConsidered.increment();
-                
-                if (log.isDebugEnabled())
-                    log.debug("Considering " + left);
-
-                final Bucket bucket = rightSolutions.getBucket(left);
-
-                if (bucket == null)
-                    continue;
-                
-                final Iterator<SolutionHit> ritr = bucket
-                        .iterator();
-
-                while (ritr.hasNext()) {
-
-                    final SolutionHit right = ritr.next();
-
-                    nrightConsidered.increment();
-                    
-                    if (log.isDebugEnabled())
-                        log.debug("Join with " + right);
-
-                    nJoinsConsidered.increment();
-
-                    if (noJoinVars
-                            && nJoinsConsidered.get() == noJoinVarsLimit) {
-
-                        if (nleftConsidered.get() > 1
-                                && nrightConsidered.get() > 1) {
-
-                            throw new UnconstrainedJoinException();
-
-                        }
-
-                    }
-
-                    // See if the solutions join. 
-                    final IBindingSet outSolution = BOpContext.bind(//
-                            right.solution,//
-                            left,//
-                            constraints,//
-                            selectVars//
-                            );
-
-                    switch(joinType) {
-                    case Normal: {
-                        if (outSolution != null) {
-                            // Output the solution.
-                            outputSolution(outputBuffer, outSolution);
-                        }
-                        break;
-                    }
-                    case Optional: {
-                        if (outSolution != null) {
-                            // Output the solution.
-                            outputSolution(outputBuffer, outSolution);
-                            // Increment counter so we know not to output the
-                            // rightSolution as an optional solution.
-                            right.nhits.increment();
-                        }
-                        break;
-                    }
-                    case Exists: {
-                        /*
-                         * The right solution is output iff there is at least
-                         * one left solution which joins with that right
-                         * solution. Each right solution is output at most one
-                         * time.
-                         */
-                        if (outSolution != null) {
-//                            if (right.nhits.get() == 0L) {
-//                                // Output the solution.
-//                                outputSolution(outputBuffer, right.solution);
-//                            }
-                            // Increment counter so we know this solution joins.
-                            right.nhits.increment();
-                        }
-                        break;
-                    }
-                    case NotExists: {
-                        /*
-                         * The right solution is output iff there does not exist
-                         * any left solution which joins with that right
-                         * solution. This basically an optional join where the
-                         * solutions which join are not output.
-                         */
-                        if (outSolution != null) {
-                            // Increment counter so we know not to output the
-                            // rightSolution as an optional solution.
-                            right.nhits.increment();
-                        }
-                        break;
-                    }
-                    default:
-                        throw new AssertionError();
-                    }
-
+                // Next chunk of solutions from left.
+                final IBindingSet[] leftChunk = leftItr.next();
+                if (stats != null) {
+                    stats.chunksIn.increment();
+                    stats.unitsIn.add(leftChunk.length);
                 }
 
-            }
+                for (IBindingSet left : leftChunk) {
+
+                    nleftConsidered.increment();
+
+                    if (log.isDebugEnabled())
+                        log.debug("Considering " + left);
+
+                    final Bucket bucket = rightSolutions.getBucket(left);
+
+                    if (bucket == null)
+                        continue;
+
+                    final Iterator<SolutionHit> ritr = bucket.iterator();
+
+                    while (ritr.hasNext()) {
+
+                        final SolutionHit right = ritr.next();
+
+                        nrightConsidered.increment();
+
+                        if (log.isDebugEnabled())
+                            log.debug("Join with " + right);
+
+                        nJoinsConsidered.increment();
+
+                        if (noJoinVars
+                                && nJoinsConsidered.get() == noJoinVarsLimit) {
+
+                            if (nleftConsidered.get() > 1
+                                    && nrightConsidered.get() > 1) {
+
+                                throw new UnconstrainedJoinException();
+
+                            }
+
+                        }
+
+                        // See if the solutions join.
+                        final IBindingSet outSolution = BOpContext.bind(//
+                                right.solution,//
+                                left,//
+                                constraints,//
+                                selectVars//
+                                );
+
+                        switch (joinType) {
+                        case Normal: {
+                            if (outSolution != null) {
+                                // Output the solution.
+                                outputSolution(outputBuffer, outSolution);
+                            }
+                            break;
+                        }
+                        case Optional: {
+                            if (outSolution != null) {
+                                // Output the solution.
+                                outputSolution(outputBuffer, outSolution);
+                                // Increment counter so we know not to output
+                                // the rightSolution as an optional solution.
+                                right.nhits.increment();
+                            }
+                            break;
+                        }
+                        case Exists: {
+                            /*
+                             * The right solution is output iff there is at
+                             * least one left solution which joins with that
+                             * right solution. Each right solution is output at
+                             * most one time.
+                             */
+                            if (outSolution != null) {
+                                // if (right.nhits.get() == 0L) {
+                                // // Output the solution.
+                                // outputSolution(outputBuffer, right.solution);
+                                // }
+                                // Increment counter so we know this solution joins.
+                                right.nhits.increment();
+                            }
+                            break;
+                        }
+                        case NotExists: {
+                            /*
+                             * The right solution is output iff there does not
+                             * exist any left solution which joins with that
+                             * right solution. This basically an optional join
+                             * where the solutions which join are not output.
+                             */
+                            if (outSolution != null) {
+                                // Increment counter so we know not to output
+                                // the rightSolution as an optional solution.
+                                right.nhits.increment();
+                            }
+                            break;
+                        }
+                        default:
+                            throw new AssertionError();
+                        }
+
+                    } // while(ritr.hasNext())
+
+                } // for(left : leftChunk)
+                
+            } // while(leftItr.hasNext())
 
         } catch(Throwable t) {
 

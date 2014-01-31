@@ -38,7 +38,6 @@ import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.Node;
-import com.bigdata.btree.PageStats;
 import com.bigdata.htree.AbstractHTree.ChildMemoizer;
 import com.bigdata.htree.AbstractHTree.LoadChildRequest;
 import com.bigdata.htree.data.IDirectoryData;
@@ -2057,6 +2056,23 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 	    
 	}
 	
+	/**
+	 * If this is an overflow directory then the depth-based hashCode is irrelevant
+	 * since it is used as a blob container for BucketPage references.
+	 */
+	public int getLocalHashCode(final byte[] key, final int prefixLength) {
+		if (isOverflowDirectory()) {
+			/*
+			 * Shouldn't need to check the key, this will be handled when
+			 * the BucketPage is checked for a precise match
+			 */
+			return 0;
+		}
+		
+		return super.getLocalHashCode(key,  prefixLength);
+
+	}
+
 	/**
 	 * This method is never called at present since DirectoryPages are
 	 * always created at maximum depth.  Whether there is any advantage

@@ -27,6 +27,13 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.eval;
 
+import org.openrdf.model.Value;
+
+import com.bigdata.BigdataStatics;
+import com.bigdata.bop.BOpUtility;
+import com.bigdata.rdf.sparql.ast.NamedSubqueryRoot;
+import com.bigdata.rdf.sparql.ast.QueryHints;
+import com.bigdata.rdf.sparql.ast.optimizers.ASTComplexOptionalOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTSparql11SubqueryOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.TestASTSparql11SubqueryOptimizer;
 
@@ -47,7 +54,7 @@ public class TestSubQuery extends AbstractDataDrivenSPARQLTestCase {
     /**
      * @param name
      */
-    public TestSubQuery(String name) {
+    public TestSubQuery(final String name) {
         super(name);
     }
 
@@ -197,6 +204,208 @@ public class TestSubQuery extends AbstractDataDrivenSPARQLTestCase {
     public void test_sparql11_subquery_scope() throws Exception {
 
         new TestHelper("sparql11-subquery-scope").runTest();
+
+    }
+
+    /**
+     * In this test variant, the FILTER winds up attached to a
+     * {@link NamedSubqueryRoot} (there are no shared variables projected out of
+     * the sub-select) and does not require RDF {@link Value} materialization.
+     * <p>
+     * Note: The sub-select explicitly annotated using
+     * {@link QueryHints#RUN_ONCE} to ensure that it gets lifted out as a
+     * {@link NamedSubqueryRoot}, but this query does not have any shared
+     * variables so the sub-select would be lifted out anyway.
+     * 
+     * <pre>
+     * select distinct ?s 
+     * where
+     * {
+     *         ?s ?p ?o.
+     *         {
+     *                 SELECT ?ps WHERE
+     *                 { 
+     *                         hint:SubQuery hint:runOnce true.
+     *                         ?ps a <http://www.example.org/schema/Person> .
+     *                 }
+     *                 limit 1
+     *         }
+     *         filter (?s = ?ps)
+     * }
+     * </pre>
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/796"
+     *      >Filter assigned to sub-query by query generator is dropped from
+     *      evaluation</a>
+     */
+    public void test_sparql11_subquery_filter_01()
+            throws Exception {
+
+        final TestHelper h = new TestHelper(
+                "sparql11-subselect-filter-01", // testURI,
+                "sparql11-subselect-filter-01.rq",// queryFileURL
+                "sparql11-subselect-filter-01.nt",// dataFileURL
+                "sparql11-subselect-filter-01.srx"// resultFileURL
+                );
+
+        // Run test.
+        h.runTest();
+        
+        // Make sure that this query used a NamedSubqueryRoot.
+        assertTrue(BOpUtility.visitAll(h.getASTContainer().getOptimizedAST(),
+                NamedSubqueryRoot.class).hasNext());
+        
+    }
+
+    /**
+     * Variant where the FILTER requires RDF Value materialization and the
+     * sub-select is lifted out as a named subquery.
+     * 
+     * <pre>
+     * select distinct ?s 
+     * where
+     * {
+     *         ?s ?p ?o.
+     *         {
+     *                 SELECT ?ps WHERE
+     *                 { 
+     *                         ?ps a <http://www.example.org/schema/Person> .
+     *                 }
+     *                 limit 1
+     *         }
+     *         filter (str(?s) = str(?ps))
+     * }
+     * </pre>
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/796"
+     *      >Filter assigned to sub-query by query generator is dropped from
+     *      evaluation</a>
+     */
+    public void test_sparql11_subquery_filter_01b()
+            throws Exception {
+
+        final TestHelper h = new TestHelper(
+                "sparql11-subselect-filter-01b", // testURI,
+                "sparql11-subselect-filter-01b.rq",// queryFileURL
+                "sparql11-subselect-filter-01.nt",// dataFileURL
+                "sparql11-subselect-filter-01.srx"// resultFileURL
+                );
+
+        // Run test.
+        h.runTest();
+
+        // Make sure that this query used a NamedSubqueryRoot.
+        assertTrue(BOpUtility.visitAll(h.getASTContainer().getOptimizedAST(),
+                NamedSubqueryRoot.class).hasNext());
+        
+    }
+
+    /**
+     * This ticket is for a bug when the {@link ASTComplexOptionalOptimizer}
+     * runs. If that optimizer is disabled, then the query is fine. There are
+     * two versions for this method. One in which one of the OPTIONALs is turned
+     * into a required join. In this case, the problem is not demonstrated since
+     * the {@link ASTComplexOptionalOptimizer} does not run. In the other case,
+     * the join group is OPTIONAL rather than required and the problem is
+     * demonstrated.
+     * 
+     * <pre>
+     * select ?name 
+     * {
+     *         {
+     *                 select ?p  
+     *                 {
+     *                         ?p a <http://www.example.org/schema/Person> . 
+     *                         optional{?p <http://www.example.org/schema/age> ?age.}
+     *                 } 
+     *                 LIMIT 1
+     *         }
+     *                 
+     *         {?p <http://www.example.org/schema/name> ?name.}
+     *         
+     *         #OPTIONAL
+     *         {       ?post a <http://www.example.org/schema/Post> . 
+     *                 ?post <http://www.example.org/schema/postedBy> ?p.
+     *                 ?post <http://www.example.org/schema/content> ?postContent.
+     *         }
+     *         OPTIONAL{      
+     *                 ?comment a <http://www.example.org/schema/Comment> .
+     *                 ?comment <http://www.example.org/schema/parentPost> ?post.
+     *                 ?cperson a <http://www.example.org/schema/Person> .
+     *                 ?comment <http://www.example.org/schema/postedBy> ?cperson .
+     *         }
+     * }     
+     * </pre>
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/801" >
+     *      Adding OPTIONAL removes solutions</a>
+     */
+    public void test_ticket_801a_complex_optionals() throws Exception {
+
+        final TestHelper h = new TestHelper(
+                "test_ticket_801a_complex_optionals", // testURI,
+                "test_ticket_801a_complex_optionals.rq",// queryFileURL
+                "test_ticket_801_complex_optionals.nt",// dataFileURL
+                "test_ticket_801_complex_optionals.srx"// resultFileURL
+        );
+
+        // Run test.
+        h.runTest();
+
+    }
+
+    /**
+     * In this variant, one of the child join groups is OPTIONAL rather than
+     * required. This shows the problem reported in the ticket where adding an
+     * OPTIONAL join group reduces the number of solutions.
+     * 
+     * <pre>
+     * select ?name 
+     * {
+     *         {
+     *                 select ?p  
+     *                 {
+     *                         ?p a <http://www.example.org/schema/Person> . 
+     *                         optional{?p <http://www.example.org/schema/age> ?age.}
+     *                 } 
+     *                 LIMIT 1
+     *         }
+     *                 
+     *         {?p <http://www.example.org/schema/name> ?name.}
+     *         
+     *         OPTIONAL
+     *         {       ?post a <http://www.example.org/schema/Post> . 
+     *                 ?post <http://www.example.org/schema/postedBy> ?p.
+     *                 ?post <http://www.example.org/schema/content> ?postContent.
+     *         }
+     *         OPTIONAL{      
+     *                 ?comment a <http://www.example.org/schema/Comment> .
+     *                 ?comment <http://www.example.org/schema/parentPost> ?post.
+     *                 ?cperson a <http://www.example.org/schema/Person> .
+     *                 ?comment <http://www.example.org/schema/postedBy> ?cperson .
+     *         }
+     * }
+     * </pre>
+     */
+    public void test_ticket_801b_complex_optionals() throws Exception {
+        
+        if (!BigdataStatics.runKnownBadTests) {
+            /*
+             * FIXME Add this test to CI once we make some more progress
+             * against the underlying issue.  
+             */
+            return;
+        }
+
+        final TestHelper h = new TestHelper(
+                "test_ticket_801b_complex_optionals", // testURI,
+                "test_ticket_801b_complex_optionals.rq",// queryFileURL
+                "test_ticket_801_complex_optionals.nt",// dataFileURL
+                "test_ticket_801_complex_optionals.srx"// resultFileURL
+        );
+
+        // Run test.
+        h.runTest();
 
     }
 

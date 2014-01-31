@@ -100,6 +100,8 @@ import com.bigdata.ha.CommitResponse;
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.HAStatusEnum;
 import com.bigdata.ha.HATXSGlue;
+import com.bigdata.ha.IHAPipelineResetRequest;
+import com.bigdata.ha.IHAPipelineResetResponse;
 import com.bigdata.ha.IIndexManagerCallable;
 import com.bigdata.ha.IJoinedAndNonJoinedServices;
 import com.bigdata.ha.JoinedAndNonJoinedServices;
@@ -132,6 +134,7 @@ import com.bigdata.ha.msg.IHARebuildRequest;
 import com.bigdata.ha.msg.IHARemoteRebuildRequest;
 import com.bigdata.ha.msg.IHARootBlockRequest;
 import com.bigdata.ha.msg.IHARootBlockResponse;
+import com.bigdata.ha.msg.IHASendState;
 import com.bigdata.ha.msg.IHASendStoreResponse;
 import com.bigdata.ha.msg.IHASnapshotDigestRequest;
 import com.bigdata.ha.msg.IHASnapshotDigestResponse;
@@ -7841,13 +7844,14 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
          */
         @Override
         public Future<Void> receiveAndReplicate(final IHASyncRequest req,
-                final IHAWriteMessage msg) throws IOException {
+                final IHASendState snd, final IHAWriteMessage msg)
+                throws IOException {
 
             if (haLog.isDebugEnabled())
                 haLog.debug("req=" + req + ", msg=" + msg);
 
             final Future<Void> ft = quorum.getClient().receiveAndReplicate(req,
-                    msg);
+                    snd, msg);
 
             return getProxy(ft);
 
@@ -8014,6 +8018,14 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
             }, null/* result */);
             getExecutorService().execute(ft);
             return getProxy(ft);
+        }
+
+        @Override
+        public Future<IHAPipelineResetResponse> resetPipeline(
+                final IHAPipelineResetRequest req) throws IOException {
+            final Future<IHAPipelineResetResponse> f = quorum.getClient()
+                    .resetPipeline(req);
+            return getProxy(f);
         }
 
         /*
@@ -8240,7 +8252,6 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
             return getProxy(ft, asyncFuture);
 
         }
-
 
 	};
 

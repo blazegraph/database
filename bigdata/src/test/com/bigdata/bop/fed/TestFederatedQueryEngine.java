@@ -337,6 +337,7 @@ public class TestFederatedQueryEngine extends
                         new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
                                 BOpEvaluationContext.CONTROLLER),//
                         new NV(PipelineOp.Annotations.SHARED_STATE,true),//
+                        new NV(PipelineOp.Annotations.REORDER_SOLUTIONS,false),//
                         new NV(FederatedQueryEngine.Annotations.CHUNK_HANDLER,
                                 FederationChunkHandler.TEST_INSTANCE),//
                         })//
@@ -455,6 +456,7 @@ public class TestFederatedQueryEngine extends
                         new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
                                 BOpEvaluationContext.CONTROLLER),//
                         new NV(PipelineOp.Annotations.SHARED_STATE,true),//
+                        new NV(PipelineOp.Annotations.REORDER_SOLUTIONS,false),//
                         new NV(FederatedQueryEngine.Annotations.CHUNK_HANDLER,
                                 FederationChunkHandler.TEST_INSTANCE),//
                         })//
@@ -624,6 +626,7 @@ public class TestFederatedQueryEngine extends
                         new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
                                 BOpEvaluationContext.CONTROLLER),//
                         new NV(PipelineOp.Annotations.SHARED_STATE,true),//
+                        new NV(PipelineOp.Annotations.REORDER_SOLUTIONS,false),//
                         new NV(FederatedQueryEngine.Annotations.CHUNK_HANDLER,
                                 FederationChunkHandler.TEST_INSTANCE),//
                         })//
@@ -770,6 +773,7 @@ public class TestFederatedQueryEngine extends
                         new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
                                 BOpEvaluationContext.CONTROLLER),//
                         new NV(PipelineOp.Annotations.SHARED_STATE,true),//
+                        new NV(PipelineOp.Annotations.REORDER_SOLUTIONS,false),//
                         new NV(FederatedQueryEngine.Annotations.CHUNK_HANDLER,
                                 FederationChunkHandler.TEST_INSTANCE),//
                         })//
@@ -916,6 +920,7 @@ public class TestFederatedQueryEngine extends
                         new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
                                 BOpEvaluationContext.CONTROLLER),//
                         new NV(PipelineOp.Annotations.SHARED_STATE,true),//
+                        new NV(PipelineOp.Annotations.REORDER_SOLUTIONS,false),//
                         new NV(FederatedQueryEngine.Annotations.CHUNK_HANDLER,
                                 FederationChunkHandler.TEST_INSTANCE),//
                         }));
@@ -1125,6 +1130,7 @@ public class TestFederatedQueryEngine extends
                         new NV(BOp.Annotations.EVALUATION_CONTEXT,
                                 BOpEvaluationContext.CONTROLLER),//
                         new NV(PipelineOp.Annotations.SHARED_STATE,true),//
+                        new NV(PipelineOp.Annotations.REORDER_SOLUTIONS,false),//
                         new NV(FederatedQueryEngine.Annotations.CHUNK_HANDLER,
                                 FederationChunkHandler.TEST_INSTANCE),//
                         }));

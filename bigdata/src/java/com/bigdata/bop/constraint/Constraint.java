@@ -34,7 +34,7 @@ import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IValueExpressionConstraint;
 
 /**
- * BOpConstraint that wraps a {@link BooleanValueExpression}.
+ * {@link Constraint} wraps a {@link BooleanValueExpression}.
  */
 public class Constraint<X> extends BOpBase implements
         IValueExpressionConstraint<X> {
@@ -66,9 +66,8 @@ public class Constraint<X> extends BOpBase implements
     /**
      * Required shallow copy constructor.
      */
-    public Constraint(final BOp[] args, 
-    		final Map<String, Object> anns) {
-    	
+    public Constraint(final BOp[] args, final Map<String, Object> anns) {
+
         super(args, anns);
         
         if (args.length != 1 || args[0] == null)
@@ -83,6 +82,7 @@ public class Constraint<X> extends BOpBase implements
         super(op);
     }
 
+    @Override
     @SuppressWarnings("unchecked")
     public IValueExpression<X> getValueExpression() {
      
@@ -90,6 +90,7 @@ public class Constraint<X> extends BOpBase implements
         
     }
 
+    @Override
     public boolean accept(final IBindingSet bs) {
     	
 //    	try {

@@ -26,7 +26,6 @@ package com.bigdata.rdf.internal.constraints;
 
 import java.util.Map;
 
-import org.apache.log4j.Logger;
 import org.openrdf.model.Literal;
 
 import com.bigdata.bop.BOp;
@@ -35,11 +34,13 @@ import com.bigdata.bop.IValueExpression;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
+import com.bigdata.rdf.sparql.ast.FilterNode;
 import com.bigdata.rdf.sparql.ast.GlobalAnnotations;
 
 /**
  * Return the language tag of the literal argument.
  */
+@SuppressWarnings("rawtypes")
 public class LangBOp extends IVValueExpression<IV> 
 		implements INeedsMaterialization {
 
@@ -48,10 +49,13 @@ public class LangBOp extends IVValueExpression<IV>
 	 */
 	private static final long serialVersionUID = 7391999162162545704L;
 	
-	private static final transient Logger log = Logger.getLogger(LangBOp.class);
+//	private static final transient Logger log = Logger.getLogger(LangBOp.class);
 
-    public LangBOp(final IValueExpression<? extends IV> x, final GlobalAnnotations globals) {
+    public LangBOp(final IValueExpression<? extends IV> x,
+            final GlobalAnnotations globals) {
+
         super(x, globals);
+
     }
     
     /**
@@ -59,44 +63,51 @@ public class LangBOp extends IVValueExpression<IV>
      */
     public LangBOp(final BOp[] args, final Map<String, Object> anns) {
 
-    	super(args, anns);
-    	
+        super(args, anns);
+
         if (args.length != 1 || args[0] == null)
             throw new IllegalArgumentException();
 
-		if (getProperty(Annotations.NAMESPACE) == null)
-			throw new IllegalArgumentException();
-		
+        if (getProperty(Annotations.NAMESPACE) == null)
+            throw new IllegalArgumentException();
+
     }
 
     /**
      * Constructor required for {@link com.bigdata.bop.BOpUtility#deepCopy(FilterNode)}.
      */
     public LangBOp(final LangBOp op) {
+     
         super(op);
+        
     }
 
+    @Override
     public IV get(final IBindingSet bs) {
-        
+
         final Literal literal = getAndCheckLiteralValue(0, bs);
-        
-		String langTag = literal.getLanguage();
-		if (langTag == null) {
-			langTag = "";
-		}
 
-        final BigdataValueFactory vf = getValueFactory(); 
+        String langTag = literal.getLanguage();
 
-		final BigdataValue lang = vf.createLiteral(langTag);
-		
-    	return super.asIV(lang, bs);
-    	
+        if (langTag == null) {
+
+            langTag = "";
+
+        }
+
+        final BigdataValueFactory vf = getValueFactory();
+
+        final BigdataValue lang = vf.createLiteral(langTag);
+
+        return super.asIV(lang, bs);
+
     }
 
     @Override
     public Requirement getRequirement() {
-    	return INeedsMaterialization.Requirement.SOMETIMES;
+
+        return INeedsMaterialization.Requirement.SOMETIMES;
+        
     }
-    
     
 }

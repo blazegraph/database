@@ -53,6 +53,7 @@ public class CloseableIteratorWrapper<E> implements ICloseableIterator<E> {
     }
 
     /** Delegate to the source iff the source implements {@link ICloseable}. */
+    @Override
     public void close() {
 
         if (src instanceof ICloseable) {
@@ -63,17 +64,19 @@ public class CloseableIteratorWrapper<E> implements ICloseableIterator<E> {
 
     }
 
+    @Override
     public boolean hasNext() {
         return src.hasNext();
     }
 
+    @Override
     public E next() {
         return src.next();
     }
 
+    @Override
     public void remove() {
         src.remove();
     }
     
 }
-

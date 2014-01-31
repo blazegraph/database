@@ -92,7 +92,12 @@ public class TestHA3ChangeLeader extends AbstractHA3JournalServerTestCase  {
     }
     
     public void testStartABC_KillLeader_RandomTrans() throws Exception {
-        if(BigdataStatics.runKnownBadTests)return;
+        if (!BigdataStatics.runKnownBadTests) {
+            /*
+             * FIXME Test disabled for the 1.3.0 release. 
+             */
+            return;
+        }
         fail("Test disabled pending reconcilation of socket ticket");
         final Random r = new Random();
         final int ntrans = r.nextInt(900);

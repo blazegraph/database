@@ -32,12 +32,9 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
-import com.bigdata.ha.msg.HAWriteMessageBase;
-import com.bigdata.ha.msg.IHAWriteMessageBase;
+import com.bigdata.ha.msg.HAMessageWrapper;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.IBufferAccess;
-import com.bigdata.io.TestCase3;
-import com.bigdata.util.ChecksumUtility;
 
 /**
  * Test the raw socket protocol implemented by {@link HASendService} and
@@ -45,7 +42,7 @@ import com.bigdata.util.ChecksumUtility;
  * 
  * @author martyn Cutcher
  */
-public class TestHASendAndReceive extends TestCase3 {
+public class TestHASendAndReceive extends AbstractHASendAndReceiveTestCase {
 
     public TestHASendAndReceive() {
 
@@ -58,15 +55,13 @@ public class TestHASendAndReceive extends TestCase3 {
     }
     
 	private HASendService sendService;
-	private HAReceiveService<IHAWriteMessageBase> receiveService;
-	private ChecksumUtility chk;
+	private HAReceiveService<HAMessageWrapper> receiveService;
 	
 	@Override
 	protected void setUp() throws Exception {
 
 	    super.setUp();
 	    r = new Random();
-	    chk = new ChecksumUtility();
 	    
         /*
          * Note: ZERO (0) indicates that a random free port will be selected. If
@@ -81,7 +76,7 @@ public class TestHASendAndReceive extends TestCase3 {
 
 	    final InetSocketAddress addr = new InetSocketAddress(port);
 		
-		receiveService = new HAReceiveService<IHAWriteMessageBase>(addr, null);
+		receiveService = new HAReceiveService<HAMessageWrapper>(addr, null);
 		receiveService.start();
 
         sendService = new HASendService();
@@ -105,8 +100,6 @@ public class TestHASendAndReceive extends TestCase3 {
             sendService = null;
         }
 	 
-        chk = null;
-        
 	}
 
     /**
@@ -121,16 +114,17 @@ public class TestHASendAndReceive extends TestCase3 {
      * @throws ExecutionException
      * @throws InterruptedException
      * @throws TimeoutException 
+     * @throws ImmediateDownstreamReplicationException 
      */
-    public void testSimpleExchange() throws InterruptedException, ExecutionException, TimeoutException {
+    public void testSimpleExchange() throws InterruptedException, ExecutionException, TimeoutException, ImmediateDownstreamReplicationException {
 
         final long timeout = 5000;// ms
         {
             final ByteBuffer tst1 = getRandomData(50);
-            final IHAWriteMessageBase msg1 = new HAWriteMessageBase(50, chk.checksum(tst1));
+            final HAMessageWrapper msg1 = newHAWriteMessage(50, tst1);
             final ByteBuffer rcv = ByteBuffer.allocate(2000);
             final Future<Void> futRec = receiveService.receiveData(msg1, rcv);
-            final Future<Void> futSnd = sendService.send(tst1);
+            final Future<Void> futSnd = sendService.send(tst1, msg1.getMarker());
             futSnd.get(timeout,TimeUnit.MILLISECONDS);
             futRec.get(timeout,TimeUnit.MILLISECONDS);
             assertEquals(tst1, rcv);
@@ -138,9 +132,9 @@ public class TestHASendAndReceive extends TestCase3 {
 
         {
             final ByteBuffer tst2 = getRandomData(100);
-            final IHAWriteMessageBase msg2 = new HAWriteMessageBase(100, chk.checksum(tst2));
+            final HAMessageWrapper msg2 = newHAWriteMessage(100, tst2);
             final ByteBuffer rcv2 = ByteBuffer.allocate(2000);
-            final Future<Void> futSnd = sendService.send(tst2);
+            final Future<Void> futSnd = sendService.send(tst2, msg2.getMarker());
             final Future<Void> futRec = receiveService.receiveData(msg2, rcv2);
             futSnd.get(timeout,TimeUnit.MILLISECONDS);
             futRec.get(timeout,TimeUnit.MILLISECONDS);
@@ -156,19 +150,20 @@ public class TestHASendAndReceive extends TestCase3 {
      * @throws TimeoutException
      * @throws ExecutionException
      * @throws InterruptedException
+     * @throws ImmediateDownstreamReplicationException 
      */
     public void testStress() throws TimeoutException, InterruptedException,
-            ExecutionException {
+            ExecutionException, ImmediateDownstreamReplicationException {
 
         final long timeout = 5000; // ms
         for (int i = 0; i < 100; i++) {
             final int sze = 10000 + r.nextInt(300000);
             final ByteBuffer tst = getRandomData(sze);
-            final IHAWriteMessageBase msg = new HAWriteMessageBase(sze,  chk.checksum(tst));
+            final HAMessageWrapper msg = newHAWriteMessage(sze,  tst);
             final ByteBuffer rcv = ByteBuffer.allocate(sze + r.nextInt(1024));
             // FutureTask return ensures remote ready for Socket data
             final Future<Void> futRec = receiveService.receiveData(msg, rcv);
-            final Future<Void> futSnd = sendService.send(tst);
+            final Future<Void> futSnd = sendService.send(tst, msg.getMarker());
             futSnd.get(timeout,TimeUnit.MILLISECONDS);
             futRec.get(timeout,TimeUnit.MILLISECONDS);
             assertEquals(tst, rcv); // make sure buffer has been transmitted
@@ -194,12 +189,12 @@ public class TestHASendAndReceive extends TestCase3 {
             for (i = 0; i < 1000; i++) {
                 sze = 1 + r.nextInt(tst.capacity());
                 getRandomData(tst, sze);
-                final IHAWriteMessageBase msg = new HAWriteMessageBase(sze, chk.checksum(tst));
+                final HAMessageWrapper msg = newHAWriteMessage(sze, tst);
                 assertEquals(0,tst.position());
                 assertEquals(sze,tst.limit());
                 // FutureTask return ensures remote ready for Socket data
                 final Future<Void> futRec = receiveService.receiveData(msg, rcv);
-                final Future<Void> futSnd = sendService.send(tst);
+                final Future<Void> futSnd = sendService.send(tst, msg.getMarker());
                 futSnd.get(timeout,TimeUnit.MILLISECONDS);
                 futRec.get(timeout,TimeUnit.MILLISECONDS);
                 // make sure buffer has been transmitted

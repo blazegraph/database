@@ -32,6 +32,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.apache.log4j.Logger;
 
 import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.engine.IChunkMessage;
 import com.bigdata.rwstore.sector.IMemoryManager;
 
 /**
@@ -99,6 +100,20 @@ public abstract class SampleBase {
     }
 
     /**
+     * Return <code>true</code> iff this sample has cardinality underflow (the
+     * sample is empty). Cardinality underflow occurs when the sampling process
+     * was unable to find any solutions. Underflow is typically addressed by
+     * increasing the sample size, but sometimes underflow indicates that an
+     * access path (if it has filters) or a join may not have any solutions in
+     * the data.
+     */
+    public boolean isUnderflow() {
+
+        return estimateEnum == EstimateEnum.Underflow;
+
+    }
+
+    /**
      * Sample.
      */
     private final AtomicReference<IBindingSet[]> sampleRef = new AtomicReference<IBindingSet[]>();
@@ -108,8 +123,11 @@ public abstract class SampleBase {
      * 
      * @return The sampled solution set -or- <code>null</code> if it has been
      *         released.
+     * 
+     *         TODO Wrap up as an {@link IChunkMessage} so we can store this on
+     *         the native heap?
      */
-    IBindingSet[] getSample() {
+    public IBindingSet[] getSample() {
         
         return sampleRef.get();
         
@@ -118,7 +136,7 @@ public abstract class SampleBase {
     /**
      * Release the sampled solution set.
      * 
-     * TODO MEMORY MANAGER : release.
+     * FIXME RTO : MEMORY MANAGER : release.
      */
     void releaseSample() {
 
@@ -183,6 +201,7 @@ public abstract class SampleBase {
         // NOP
     }
 
+    @Override
     public String toString() {
         final StringBuilder sb = new StringBuilder();
         sb.append(getClass().getSimpleName());
