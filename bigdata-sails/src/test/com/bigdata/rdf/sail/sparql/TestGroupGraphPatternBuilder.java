@@ -1298,4 +1298,53 @@ public class TestGroupGraphPatternBuilder extends
 
     }
 
+    /**
+     * A unit test for an OPTIONAL wrapping a SERVICE.
+     */
+    public void test_optional_SERVICE() throws MalformedQueryException,
+            TokenMgrError, ParseException {
+
+        final String serviceExpr = "service ?s { ?s ?p ?o  }";
+
+        final String sparql = "select ?s where { optional { " + serviceExpr
+                + " } }";
+
+        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
+        final ServiceNode service;
+        {
+
+            {
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                expected.setPrefixDecls(prefixDecls);
+            }
+
+            {
+                final ProjectionNode projection = new ProjectionNode();
+                projection.addProjectionVar(new VarNode("s"));
+                expected.setProjection(projection);
+
+                final JoinGroupNode whereClause = new JoinGroupNode();
+                expected.setWhereClause(whereClause);
+
+                final JoinGroupNode serviceGraph = new JoinGroupNode();
+                serviceGraph.addChild(new StatementPatternNode(
+                        new VarNode("s"), new VarNode("p"), new VarNode("o"),
+                        null/* c */, Scope.DEFAULT_CONTEXTS));
+
+                service = new ServiceNode(new VarNode("s"), serviceGraph);
+                service.setExprImage(serviceExpr);
+
+                final JoinGroupNode wrapperGroup = new JoinGroupNode(true/* optional */);
+                whereClause.addChild(wrapperGroup);
+                wrapperGroup.addChild(service);
+            }
+
+        }
+
+        final QueryRoot actual = parse(sparql, baseURI);
+
+        assertSameAST(sparql, expected, actual);
+
+    }
+
 }

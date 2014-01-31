@@ -77,7 +77,7 @@ public class ChunkedArrayIterator<E> implements IChunkedOrderedIterator<E> {
      */
     public ChunkedArrayIterator(final E[] a) {
     	
-    	this(a.length, a, null);
+        this(a.length, a, null);
     	
     }
     
@@ -109,6 +109,7 @@ public class ChunkedArrayIterator<E> implements IChunkedOrderedIterator<E> {
 
     }
 
+    @Override
     public boolean hasNext() {
 
         if(!open) return false;
@@ -125,6 +126,7 @@ public class ChunkedArrayIterator<E> implements IChunkedOrderedIterator<E> {
         
     }
 
+    @Override
     public E next() {
         
         if (!hasNext()) {
@@ -144,6 +146,7 @@ public class ChunkedArrayIterator<E> implements IChunkedOrderedIterator<E> {
     /**
      * @throws UnsupportedOperationException
      */
+    @Override
     public void remove() {
         
         throw new UnsupportedOperationException();
@@ -169,6 +172,7 @@ public class ChunkedArrayIterator<E> implements IChunkedOrderedIterator<E> {
      * @throws NoSuchElementException
      *             if {@link #hasNext()} returns false.
      */
+    @Override
     @SuppressWarnings("unchecked")
     public E[] nextChunk() {
        
@@ -224,13 +228,15 @@ public class ChunkedArrayIterator<E> implements IChunkedOrderedIterator<E> {
         
     }
     
+    @Override
     public IKeyOrder<E> getKeyOrder() {
         
         return keyOrder;
         
     }
     
-    public E[] nextChunk(IKeyOrder<E> keyOrder) {
+    @Override
+    public E[] nextChunk(final IKeyOrder<E> keyOrder) {
 
         if (keyOrder == null)
             throw new IllegalArgumentException();
@@ -253,6 +259,7 @@ public class ChunkedArrayIterator<E> implements IChunkedOrderedIterator<E> {
      * Note: Do NOT eagerly close the iterator since the makes it impossible to
      * implement {@link #remove()}.
      */
+    @Override
     public void close() {
 
         if (!open) {

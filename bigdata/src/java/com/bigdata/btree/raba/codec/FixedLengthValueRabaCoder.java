@@ -73,9 +73,18 @@ import com.bigdata.rawstore.Bytes;
  * </dl>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class FixedLengthValueRabaCoder implements IRabaCoder, Externalizable {
+
+    /**
+     * This is the historical implicit value. It has been made into an explicit
+     * value since the {@link IRabaCoder} API change to support duplicate keys
+     * for the HTree caused a change in the implict computed value.
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/763" >
+     *      Stochastic Results With Analytic Query Mode </a>
+     */
+    private static final long serialVersionUID = 5549200745262968226L;
 
     private static final byte VERSION0 = 0x00;
 
@@ -87,6 +96,7 @@ public class FixedLengthValueRabaCoder implements IRabaCoder, Externalizable {
     /**
      * No.
      */
+    @Override
     final public boolean isKeyCoder() {
         
         return false;
@@ -96,9 +106,17 @@ public class FixedLengthValueRabaCoder implements IRabaCoder, Externalizable {
     /**
      * Yes.
      */
+    @Override
     final public boolean isValueCoder() {
         
         return true;
+        
+    }
+
+    @Override
+    public boolean isDuplicateKeys() {
+
+        return false;
         
     }
 
@@ -132,12 +150,14 @@ public class FixedLengthValueRabaCoder implements IRabaCoder, Externalizable {
         
     }
 
+    @Override
     public void writeExternal(final ObjectOutput out) throws IOException {
 
         out.writeInt(len);
 
     }
 
+    @Override
     public void readExternal(final ObjectInput in) throws IOException,
             ClassNotFoundException {
 
@@ -168,6 +188,7 @@ public class FixedLengthValueRabaCoder implements IRabaCoder, Externalizable {
      *             if the {@link IRaba} has a non-<code>null</code> value with a
      *             length other than the length specified to the constructor.
      */
+    @Override
     public ICodedRaba encodeLive(final IRaba raba, final DataOutputBuffer buf) {
 
         if (raba == null)
@@ -262,6 +283,7 @@ public class FixedLengthValueRabaCoder implements IRabaCoder, Externalizable {
 
     }
 
+    @Override
     public AbstractFixedByteArrayBuffer encode(final IRaba raba,
             final DataOutputBuffer buf) {
 
@@ -269,6 +291,7 @@ public class FixedLengthValueRabaCoder implements IRabaCoder, Externalizable {
 
     }
     
+    @Override
     public ICodedRaba decode(final AbstractFixedByteArrayBuffer data) {
 
         return new CodedRabaImpl(len, data);
@@ -355,36 +378,42 @@ public class FixedLengthValueRabaCoder implements IRabaCoder, Externalizable {
          */
         private final int O_values;
         
+        @Override
         final public AbstractFixedByteArrayBuffer data() {
             
             return data;
             
         }
 
+        @Override
         public boolean isKeys() {
 
             return false;
             
         }
 
+        @Override
         final public int capacity() {
             
             return size;
             
         }
 
+        @Override
         final public int size() {
             
             return size;
             
         }
 
+        @Override
         final public boolean isEmpty() {
             
             return size == 0;
             
         }
 
+        @Override
         final public boolean isFull() {
             
             return true;
@@ -398,6 +427,7 @@ public class FixedLengthValueRabaCoder implements IRabaCoder, Externalizable {
             
         }
         
+        @Override        
         public boolean isNull(final int index) {
 
             rangeCheck(index);
@@ -406,6 +436,7 @@ public class FixedLengthValueRabaCoder implements IRabaCoder, Externalizable {
 
         }
 
+        @Override
         public int length(final int index) {
             
             if (isNull(index))
@@ -415,6 +446,7 @@ public class FixedLengthValueRabaCoder implements IRabaCoder, Externalizable {
             
         }
 
+        @Override
         public byte[] get(final int index) {
 
             if (isNull(index))
@@ -431,6 +463,7 @@ public class FixedLengthValueRabaCoder implements IRabaCoder, Externalizable {
 
         }
 
+        @Override
         public int copy(final int index, final OutputStream os) {
 
             if (isNull(index))
@@ -456,6 +489,7 @@ public class FixedLengthValueRabaCoder implements IRabaCoder, Externalizable {
          * Search
          */
         
+        @Override
         public int search(final byte[] key) {
 
             throw new UnsupportedOperationException();

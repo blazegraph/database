@@ -128,4 +128,44 @@ public abstract class AbstractQueryHint<T> implements IQueryHint<T> {
 
     }
 
+    /*
+     * I have taken this out (it was never committed with the code enabled). The
+     * AST2BOpContext.queryHints field is from the original query and gets
+     * applied onto AST nodes and then copied over onto PipelineOps. It should
+     * not be populated when a query hint is given with Scope:=Query. Instead,
+     * the query hint should be applied to all AST nodes in the query (at least
+     * those of the appropriate type).
+     */
+//    /**
+//     * Conditionally set the property in the global scope.
+//     * 
+//     * @param context
+//     *            The evaluation context.
+//     * @param key
+//     *            The property name.
+//     * @param val
+//     *            The property value.
+//     * 
+//     * @see <a href="http://sourceforge.net/apps/trac/bigdata/ticket/791" >
+//     *      Clean up query hints </a>
+//     */
+//    protected void conditionalSetGlobalProperty(final AST2BOpContext context,
+//            final String key, final T val) {
+//
+//        if (context.queryHints != null) {
+//
+//            /*
+//             * Note: conditional check avoids String conversion for every AST
+//             * node that we visit for a globally scoped query hint.
+//             */
+//            if (context.queryHints.getProperty(key) == null) {
+//
+//                context.queryHints.setProperty(key, val.toString());
+//
+//            }
+//
+//        }
+//
+//    }
+
 }

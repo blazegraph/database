@@ -29,7 +29,6 @@ package com.bigdata.rdf.sparql.ast.eval;
 
 import java.util.Map;
 
-import org.apache.log4j.Logger;
 import org.openrdf.model.Literal;
 
 import com.bigdata.bop.Constant;
@@ -54,26 +53,28 @@ import com.bigdata.search.Hiterator;
 import com.bigdata.search.IHit;
 
 /**
- * Converts a BDS.SEARCH_IN_SEARCH function call (inside a filter)
- * into an IN filter using the full text index to determine the IN
- * set.
+ * Converts a {@link BDS#SEARCH_IN_SEARCH} function call (inside a filter) into
+ * an IN filter using the full text index to determine the IN set.
  * 
  * Convert:
  * 
+ * <pre>
  * filter(<BDS.SEARCH_IN_SEARCH>(?o,"foo")) .
+ * </pre>
  * 
  * To:
  * 
+ * <pre>
  * filter(?o IN ("foo", "foo bar", "hello foo", ...)) .
+ * </pre>
  * 
- * This is a way of using the full text index to filter instead of
- * using regex.
+ * This is a way of using the full text index to filter instead of using regex.
  */
 public class ASTSearchInSearchOptimizer extends AbstractJoinGroupOptimizer {
 
-    private static final Logger log = Logger.getLogger(ASTSearchInSearchOptimizer.class);
+//    private static final Logger log = Logger.getLogger(ASTSearchInSearchOptimizer.class);
     
-    static long time = 0;
+//    static private long time = 0;
     
     /**
      * Optimize the join group.
@@ -81,7 +82,7 @@ public class ASTSearchInSearchOptimizer extends AbstractJoinGroupOptimizer {
 	protected void optimizeJoinGroup(final AST2BOpContext ctx, 
     		final StaticAnalysis sa, final IBindingSet[] bSets, final JoinGroupNode group) {
 
-		final long start = System.currentTimeMillis();
+//		final long start = System.currentTimeMillis();
 		
     	for (FilterNode node : group.getChildren(FilterNode.class)) {
     		
@@ -89,7 +90,7 @@ public class ASTSearchInSearchOptimizer extends AbstractJoinGroupOptimizer {
     		
     	}
     	
-    	time += (System.currentTimeMillis() - start);
+//    	time += (System.currentTimeMillis() - start);
     	
 //    	System.err.println(time);
     	

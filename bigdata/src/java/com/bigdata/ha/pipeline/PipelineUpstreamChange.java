@@ -29,7 +29,6 @@ package com.bigdata.ha.pipeline;
 import java.util.concurrent.CancellationException;
 
 import com.bigdata.ha.QuorumPipelineImpl;
-import com.bigdata.quorum.QuorumException;
 
 /**
  * Exception thrown when the upstream service is changed by a pipeline
@@ -42,7 +41,7 @@ import com.bigdata.quorum.QuorumException;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
-public class PipelineUpstreamChange extends QuorumException {
+public class PipelineUpstreamChange extends AbstractPipelineChangeException {
 
     /**
      * 

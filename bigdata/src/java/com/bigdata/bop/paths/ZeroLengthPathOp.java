@@ -46,7 +46,9 @@ import cutthecrap.utils.striterators.ICloseableIterator;
 /**
  * An attempt to solve the zero length path problem with its own operator.
  * 
- * @deprecated Does not work.  Leads to cardinality problems.
+ * @deprecated Does not work. Leads to cardinality problems and can be removed.
+ *             Zero Length Paths are integrated into the ALP node /
+ *             ArbitraryLengthPathOp now.
  */
 public class ZeroLengthPathOp extends PipelineOp {
 

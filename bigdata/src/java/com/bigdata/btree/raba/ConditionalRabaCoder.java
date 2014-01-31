@@ -74,16 +74,25 @@ public class ConditionalRabaCoder implements IRabaCoder, Externalizable {
         
     }
     
+    @Override
     final public boolean isKeyCoder() {
     
         return smallCoder.isKeyCoder() && bigCoder.isKeyCoder();
         
     }
 
+    @Override
     final public boolean isValueCoder() {
         
         return smallCoder.isValueCoder() && bigCoder.isValueCoder();
         
+    }
+    
+    @Override
+    public boolean isDuplicateKeys() {
+
+        return smallCoder.isDuplicateKeys() && bigCoder.isDuplicateKeys();
+
     }
     
     /**
@@ -123,6 +132,7 @@ public class ConditionalRabaCoder implements IRabaCoder, Externalizable {
         
     }
 
+    @Override
     public ICodedRaba decode(final AbstractFixedByteArrayBuffer data) {
 
         final boolean isSmall = data.getByte(0) == 1 ? true : false;
@@ -146,6 +156,7 @@ public class ConditionalRabaCoder implements IRabaCoder, Externalizable {
 
     }
 
+    @Override
     public ICodedRaba encodeLive(final IRaba raba, final DataOutputBuffer buf) {
 
         final int size = raba.size();
@@ -175,6 +186,7 @@ public class ConditionalRabaCoder implements IRabaCoder, Externalizable {
         
     }
 
+    @Override
     public AbstractFixedByteArrayBuffer encode(final IRaba raba,
             final DataOutputBuffer buf) {
 
@@ -201,6 +213,7 @@ public class ConditionalRabaCoder implements IRabaCoder, Externalizable {
         
     }
 
+    @Override
     public void readExternal(final ObjectInput in) throws IOException,
             ClassNotFoundException {
 
@@ -220,6 +233,7 @@ public class ConditionalRabaCoder implements IRabaCoder, Externalizable {
 
     }
 
+    @Override
     public void writeExternal(final ObjectOutput out) throws IOException {
         
         out.writeByte(VERSION0);
@@ -260,72 +274,89 @@ public class ConditionalRabaCoder implements IRabaCoder, Externalizable {
 
         }
 
+        @Override
         public AbstractFixedByteArrayBuffer data() {
             
             return data;
             
         }
         
+        @Override
         public int add(byte[] value, int off, int len) {
             return delegate.add(value, off, len);
         }
 
+        @Override
         public int add(byte[] a) {
             return delegate.add(a);
         }
 
+        @Override
         public int add(DataInput in, int len) throws IOException {
             return delegate.add(in, len);
         }
 
+        @Override
         public int capacity() {
             return delegate.capacity();
         }
 
-        public int copy(int index, OutputStream os) {
+        @Override
+        public int copy(final int index, final OutputStream os) {
             return delegate.copy(index, os);
         }
 
-        public byte[] get(int index) {
+        @Override
+        public byte[] get(final int index) {
             return delegate.get(index);
         }
 
+        @Override
         public boolean isEmpty() {
             return delegate.isEmpty();
         }
 
+        @Override
         public boolean isFull() {
             return delegate.isFull();
         }
 
+        @Override
         public boolean isKeys() {
             return delegate.isKeys();
         }
 
-        public boolean isNull(int index) {
+        @Override
+        public boolean isNull(final int index) {
             return delegate.isNull(index);
         }
 
+        @Override
         public boolean isReadOnly() {
             return delegate.isReadOnly();
         }
 
+        @Override
         public Iterator<byte[]> iterator() {
             return delegate.iterator();
         }
 
-        public int length(int index) {
+        @Override
+        public int length(final int index) {
             return delegate.length(index);
         }
 
-        public int search(byte[] searchKey) {
+        @Override
+        public int search(final byte[] searchKey) {
             return delegate.search(searchKey);
         }
 
-        public void set(int index, byte[] a) {
+        @Override
+        public void set(final int index, final byte[] a) {
             delegate.set(index, a);
         }
 
+        @Override
         public int size() {
             return delegate.size();
         }

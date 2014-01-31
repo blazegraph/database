@@ -93,6 +93,20 @@ abstract public class PipelineOp extends BOpBase {
 
 		boolean DEFAULT_SHARED_STATE = false;
 
+        /**
+         * When <code>true</code>, the {@link QueryEngine} MAY reorder the
+         * solutions as they flow through the query plan (this is done as a
+         * throughput optimization). When <code>false</code>, the
+         * {@link QueryEngine} MUST NOT reorder solutions.
+         * 
+         * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/798" >
+         *      Solution order not always preserved. </a>
+         */
+        String REORDER_SOLUTIONS = PipelineOp.class.getName()
+                + ".reorderSolutions";
+
+	    boolean DEFAULT_REORDER_SOLUTIONS = true;
+	    
 		/**
 		 * This option may be used to place an optional limit on the #of
 		 * concurrent tasks which may run for the same (bopId,shardId) for a
@@ -294,6 +308,16 @@ abstract public class PipelineOp extends BOpBase {
         
     }
 
+    /**
+     * @see Annotations#REORDER_SOLUTIONS
+     */
+    final public boolean isReorderSolutions() {
+
+        return getProperty(Annotations.REORDER_SOLUTIONS,
+                Annotations.DEFAULT_REORDER_SOLUTIONS);
+        
+    }
+    
     /**
      * The maximum amount of memory which may be used to buffered inputs for
      * this operator on the native heap. When ZERO (0), the inputs will be

@@ -182,6 +182,7 @@ public class MutableValueBuffer implements IRaba {
         
     }
 
+    @Override
     public String toString() {
 
         return AbstractRaba.toString(this);
@@ -191,12 +192,14 @@ public class MutableValueBuffer implements IRaba {
     /**
      * Returns a reference to the value at that index.
      */
+    @Override
     final public byte[] get(final int index) {
 
         return values[index];
 
     }
 
+    @Override
     final public int length(final int index) {
 
         final byte[] tmp = values[index];
@@ -208,6 +211,7 @@ public class MutableValueBuffer implements IRaba {
 
     }
     
+    @Override
     final public int copy(final int index, final OutputStream out) {
 
         final byte[] tmp = values[index];
@@ -231,12 +235,14 @@ public class MutableValueBuffer implements IRaba {
      * 
      * @return <code>true</code> iff the value at that index is <code>null</code>.
      */
+    @Override
     final public boolean isNull(final int index) {
         
         return values[index] == null;
                 
     }
     
+    @Override
     final public boolean isEmpty() {
         
         return nvalues == 0;
@@ -251,18 +257,21 @@ public class MutableValueBuffer implements IRaba {
      * MUST explicitly scan a buddy bucket to determine the #of values in a
      * buddy bucket on the page.
      */
+    @Override
     final public int size() {
 
         return nvalues;
 
     }
 
+    @Override
     final public int capacity() {
 
         return values.length;
         
     }
 
+    @Override
     final public boolean isFull() {
         
         return nvalues == values.length;
@@ -272,6 +281,7 @@ public class MutableValueBuffer implements IRaba {
     /**
      * Mutable.
      */
+    @Override
     final public boolean isReadOnly() {
         
         return false;
@@ -284,6 +294,7 @@ public class MutableValueBuffer implements IRaba {
      * 
      * @returns <code>false</code>
      */
+    @Override
     final public boolean isKeys() {
 
         return false;
@@ -296,20 +307,24 @@ public class MutableValueBuffer implements IRaba {
      * This iterator visits all values on the bucket page, including
      * <code>null</code>s.
      */
+    @Override
     public Iterator<byte[]> iterator() {
 
         return new Iterator<byte[]>() {
 
             int i = 0;
             
+            @Override
             public boolean hasNext() {
                 return i < size();
             }
 
+            @Override
             public byte[] next() {
                 return get(i++);
             }
 
+            @Override
             public void remove() {
                 throw new UnsupportedOperationException();
             }
@@ -322,6 +337,7 @@ public class MutableValueBuffer implements IRaba {
      * Mutation api. The contents of individual values are never modified. 
      */
     
+    @Override
     final public void set(final int index, final byte[] value) {
 
         assert value != null;
@@ -377,6 +393,7 @@ public class MutableValueBuffer implements IRaba {
      * 
      * @throws UnsupportedOperationException
      */
+    @Override
     final public int add(final byte[] value) {
 
         throw new UnsupportedOperationException();
@@ -390,6 +407,7 @@ public class MutableValueBuffer implements IRaba {
      * 
      * @throws UnsupportedOperationException
      */
+    @Override
     final public int add(byte[] value, int off, int len) {
 
         throw new UnsupportedOperationException();
@@ -403,6 +421,7 @@ public class MutableValueBuffer implements IRaba {
      * 
      * @throws UnsupportedOperationException
      */
+    @Override
     public int add(DataInput in, int len) throws IOException {
 
         throw new UnsupportedOperationException();
@@ -414,6 +433,7 @@ public class MutableValueBuffer implements IRaba {
      * 
      * @throws UnsupportedOperationException
      */
+    @Override
     public int search(byte[] searchKey) {
         
         throw new UnsupportedOperationException();

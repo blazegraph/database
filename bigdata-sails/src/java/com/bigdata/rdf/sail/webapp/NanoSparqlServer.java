@@ -132,7 +132,7 @@ public class NanoSparqlServer {
      *            <dd>Force a compacting merge of all shards on all data
      *            services in a bigdata federation (this option should only be
      *            used for benchmarking purposes).</dd>
-     *            <dt>readLock</dt>
+     *            <dt>-readLock</dt>
      *            <dd>The commit time against which the server will assert a
      *            read lock by holding open a read-only transaction against that
      *            commit point OR <code>-1</code> (MINUS ONE) to assert a read
@@ -141,11 +141,11 @@ public class NanoSparqlServer {
      *            will default to read against the most recent commit point on
      *            the database. Regardless, each query will be issued against a
      *            read-only transaction.</dt>
-     *            </dl>
-     *            <dt>servletContextListenerClass</dt>
+     *            <dt>-servletContextListenerClass</dt>
      *            <dd>The name of a class that extends
      *            {@link BigdataRDFServletContextListener}. This allows you to
      *            hook the {@link ServletContextListener} events.</dd>
+     *            </dl>
      *            </p>
      */
 //	 *            <dt>bufferCapacity [#bytes]</dt>

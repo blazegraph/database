@@ -204,7 +204,22 @@ public class PipelineJoin<E> extends PipelineOp implements
 		String COALESCE_DUPLICATE_ACCESS_PATHS = (PipelineJoin.class.getName()
 				+ ".coalesceDuplicateAccessPaths").intern();
 
-		boolean DEFAULT_COALESCE_DUPLICATE_ACCESS_PATHS = true;
+        boolean DEFAULT_COALESCE_DUPLICATE_ACCESS_PATHS = true;
+
+        /**
+         * When <code>true</code>, access paths will be reordered to maximize
+         * locality.
+         * <p>
+         * Note: This needs to be turned off when the RTO uses row identifiers
+         * to correlate the input and output solutions for complex joins (those
+         * which required materialization of RDF Values for FILTER evaluation).
+         * 
+         * @todo unit tests when (en|dis)abled.
+         */
+        String REORDER_ACCESS_PATHS = (PipelineJoin.class.getName() + ".reorderAccessPaths")
+                .intern();
+
+        boolean DEFAULT_REORDER_ACCESS_PATHS = true;
 
 	}
 
@@ -223,7 +238,7 @@ public class PipelineJoin<E> extends PipelineOp implements
 	 * @param args
 	 * @param annotations
 	 */
-	public PipelineJoin(final BOp[] args, NV... annotations) {
+	public PipelineJoin(final BOp[] args, final NV... annotations) {
 
 		this(args, NV.asMap(annotations));
 
@@ -239,6 +254,11 @@ public class PipelineJoin<E> extends PipelineOp implements
 
 		super(args, annotations);
 
+        /*
+         * TODO We should be checking this operator's required properties,
+         * especially when used for the RTO.
+         */
+		
 		// if (arity() != 1)
 		// throw new IllegalArgumentException();
 
@@ -246,15 +266,6 @@ public class PipelineJoin<E> extends PipelineOp implements
 		// throw new IllegalArgumentException();
 
 	}
-
-	// /**
-	// * The sole operand, which is the previous join in the pipeline join path.
-	// */
-	// public PipelineOp left() {
-	//
-	// return (PipelineOp) get(0);
-	//
-	// }
 
 	/**
 	 * {@inheritDoc}
@@ -420,7 +431,15 @@ public class PipelineJoin<E> extends PipelineOp implements
 		 * 
 		 * @see Annotations#COALESCE_DUPLICATE_ACCESS_PATHS
 		 */
-		final boolean coalesceAccessPaths;
+		final private boolean coalesceAccessPaths;
+
+        /**
+         * When <code>true</code>, access paths will be reordered to maximize
+         * locality.
+         * 
+         * @see Annotations#REORDER_ACCESS_PATHS
+         */
+		final private boolean reorderAccessPaths;
 
 		/**
 		 * Used to enforce the {@link Annotations#LIMIT} iff one is specified.
@@ -523,6 +542,9 @@ public class PipelineJoin<E> extends PipelineOp implements
 			this.coalesceAccessPaths = joinOp.getProperty(
 					Annotations.COALESCE_DUPLICATE_ACCESS_PATHS,
 					Annotations.DEFAULT_COALESCE_DUPLICATE_ACCESS_PATHS);
+            this.reorderAccessPaths = joinOp.getProperty(
+                    Annotations.REORDER_ACCESS_PATHS,
+                    Annotations.DEFAULT_REORDER_ACCESS_PATHS);
 
 			this.threadLocalBufferFactory = new TLBFactory(sink);
 
@@ -942,10 +964,11 @@ public class PipelineJoin<E> extends PipelineOp implements
 					 */
 					final AccessPathTask[] tasks = generateAccessPaths(chunk);
 
-					/*
-					 * Reorder those tasks for better index read performance.
-					 */
-					reorderTasks(tasks);
+                    /*
+                     * Reorder those tasks for better index read performance.
+                     */
+                    if (reorderAccessPaths)
+                        reorderTasks(tasks);
 
 					/*
 					 * Execute the tasks (either in the caller's thread or on
@@ -1410,6 +1433,7 @@ public class PipelineJoin<E> extends PipelineOp implements
 
 			}
 
+			@Override
 			public int hashCode() {
 				return super.hashCode();
 			}
@@ -1697,8 +1721,8 @@ public class PipelineJoin<E> extends PipelineOp implements
             			IPredicate.Annotations.DEFAULT_CUTOFF_LIMIT);
             	
                 // Obtain the iterator for the current join dimension.
-				final ICloseableIterator<IBindingSet> itr = ((IBindingSetAccessPath<?>) accessPath)
-						.solutions(cutoffLimit, stats);
+                final ICloseableIterator<IBindingSet[]> itr = ((IBindingSetAccessPath<?>) accessPath)
+                        .solutions(cutoffLimit, stats);
 
                 try {
 
@@ -1713,11 +1737,13 @@ public class PipelineJoin<E> extends PipelineOp implements
 
                         halted();
                         
-                        int bindex = 0;
                         int naccepted = 0;
                         
-                        final IBindingSet right = itr.next(); // access path solutions
+                        final IBindingSet[] rightChunk = itr.next(); // AP solution chunk.
                         
+                        for(IBindingSet right : rightChunk) { // next solution from AP.
+                        
+                        int bindex = 0; // index 1:1 with bindingSets[].
                         for (IBindingSet left : bindingSets) { // upstream pipeline solutions.
 
                             // join solutions.
@@ -1771,8 +1797,10 @@ public class PipelineJoin<E> extends PipelineOp implements
                                         + right);
                             }
 
-                    } // next chunk.
+                    } // next left (upstream) solution from leftChunk (aka bindingSets).
 
+                    } // next right (AP) solution from rightChunk
+                    
                     if (optional) {
 
                         /*

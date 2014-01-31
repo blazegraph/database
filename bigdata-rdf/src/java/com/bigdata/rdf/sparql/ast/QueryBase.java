@@ -178,6 +178,7 @@ abstract public class QueryBase extends QueryNodeBase implements
     public void setConstruct(final ConstructNode construct) {
 
         setProperty(Annotations.CONSTRUCT, construct);
+		setQueryType(QueryType.CONSTRUCT);
         
     }
     
@@ -507,6 +508,14 @@ abstract public class QueryBase extends QueryNodeBase implements
 
             sb.append(slice.toString(indent));
 
+        }
+
+        if (getQueryHints() != null && !getQueryHints().isEmpty()) {
+            sb.append("\n");
+            sb.append(indent(indent));
+            sb.append(Annotations.QUERY_HINTS);
+            sb.append("=");
+            sb.append(getQueryHints().toString());
         }
 
         return sb.toString();

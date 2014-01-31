@@ -92,7 +92,7 @@ public class DataSetJoin extends PipelineOp {
      * 
      * @param op
      */
-    public DataSetJoin(DataSetJoin op) {
+    public DataSetJoin(final DataSetJoin op) {
 
         super(op);
         
@@ -113,7 +113,7 @@ public class DataSetJoin extends PipelineOp {
 
     }
 
-    public DataSetJoin(final BOp[] args, NV... annotations) {
+    public DataSetJoin(final BOp[] args, final NV... annotations) {
 
         this(args, NV.asMap(annotations));
         
@@ -132,6 +132,7 @@ public class DataSetJoin extends PipelineOp {
 
     }
     
+    @Override
     public FutureTask<Void> eval(final BOpContext<IBindingSet> context) {
 
         return new FutureTask<Void>(new DataSetJoinTask(this,context));
@@ -165,6 +166,7 @@ public class DataSetJoin extends PipelineOp {
 
         }
 
+        @Override
         public Void call() throws Exception {
             
             final ICloseableIterator<IBindingSet[]> source = context

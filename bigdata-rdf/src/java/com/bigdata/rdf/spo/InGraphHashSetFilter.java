@@ -1,11 +1,23 @@
+/**
+   Copyright (C) SYSTAP, LLC 2006-2012.  All rights reserved.
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
 package com.bigdata.rdf.spo;
 
 import java.util.HashSet;
 
-import org.openrdf.model.URI;
-
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.model.BigdataURI;
 
 /**
  * "IN" filter for the context position based on a native long hash set
@@ -19,6 +31,7 @@ import com.bigdata.rdf.model.BigdataURI;
  * 
  * @see InGraphBinarySearchFilter
  */
+@SuppressWarnings("rawtypes")
 public final class InGraphHashSetFilter<E extends ISPO> extends SPOFilter<E> {
 
     /**
@@ -55,7 +68,8 @@ public final class InGraphHashSetFilter<E extends ISPO> extends SPOFilter<E> {
         
     }
 
-    public boolean isValid(Object o) {
+    @Override
+    public boolean isValid(final Object o) {
         
         if (!canAccept(o)) {
             
@@ -72,6 +86,13 @@ public final class InGraphHashSetFilter<E extends ISPO> extends SPOFilter<E> {
         final ISPO spo = (ISPO) o;
         
         return contextSet.contains(spo.c());
+        
+    }
+
+    @Override
+    public String toString() {
+
+        return getClass().getName() + "{size=" + contextSet.size() + "}";
         
     }
 

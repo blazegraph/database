@@ -37,7 +37,7 @@ public class AssignmentNode extends GroupMemberValueExpressionNodeBase
     /**
      * Constructor required for {@link com.bigdata.bop.BOpUtility#deepCopy(FilterNode)}.
      */
-    public AssignmentNode(AssignmentNode op) {
+    public AssignmentNode(final AssignmentNode op) {
 
         super(op);
         
@@ -46,7 +46,7 @@ public class AssignmentNode extends GroupMemberValueExpressionNodeBase
     /**
      * Required shallow copy constructor.
      */
-    public AssignmentNode(BOp[] args, Map<String, Object> anns) {
+    public AssignmentNode(final BOp[] args, final Map<String, Object> anns) {
 
         super(args, anns);
         assert args[0] instanceof VarNode;
@@ -90,13 +90,15 @@ public class AssignmentNode extends GroupMemberValueExpressionNodeBase
     	getValueExpressionNode().setValueExpression(ve);
     	
     }
-    
+
+    @Override
     public void invalidate() {
         
         getValueExpressionNode().invalidate();
         
     }
 
+    @Override
     public String toString(final int indent) {
 
         final StringBuilder sb = new StringBuilder(indent(indent));
@@ -135,7 +137,7 @@ public class AssignmentNode extends GroupMemberValueExpressionNodeBase
      * Orders {@link AssignmentNode}s by the variable names.
      */
     @Override
-    public int compareTo(AssignmentNode o) {
+    public int compareTo(final AssignmentNode o) {
 
         return getVar().getName().compareTo(o.getVar().getName());
         
@@ -144,23 +146,22 @@ public class AssignmentNode extends GroupMemberValueExpressionNodeBase
 
     @Override
     public int replaceAllWith(final BOp oldVal, final BOp newVal) {
-    	if (oldVal.equals(get(0)) && !(newVal instanceof VarNode)) {
-    		return 0;
-    	}
-    	return super.replaceAllWith(oldVal, newVal);
+        if (oldVal.equals(get(0)) && !(newVal instanceof VarNode)) {
+            return 0;
+        }
+        return super.replaceAllWith(oldVal, newVal);
     }
 
-
-	@Override
+    @Override
     public ModifiableBOpBase setArgs(final BOp[] args) {
-    	assert args[0] instanceof VarNode;
-    	return super.setArgs(args);
+        assert args[0] instanceof VarNode;
+        return super.setArgs(args);
     }
-    
 
     @Override
     public ModifiableBOpBase setArg(final int index, final BOp newArg) {
-    	assert index != 0 || newArg instanceof VarNode;
-    	return super.setArg(index, newArg);
+        assert index != 0 || newArg instanceof VarNode;
+        return super.setArg(index, newArg);
     }
+
 }

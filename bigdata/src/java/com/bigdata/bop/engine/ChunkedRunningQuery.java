@@ -37,6 +37,7 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.RejectedExecutionException;
@@ -110,19 +111,34 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
      * are removed from the map.
      * <p>
      * The map is guarded by the {@link #lock}.
+     * <p>
+     * Note: Using a hash map here means that {@link #consumeChunks()} will draw
+     * from operator queues more or less at random. Using an ordered map will
+     * impose a bias, depending on the natural ordering of the map keys.
      * 
-     * FIXME Either this and/or {@link #operatorFutures} must be a weak value
-     * map in order to ensure that entries are eventually cleared in scale-out
-     * where the #of entries can potentially be very large since they are per
-     * (bopId,shardId). While these maps were initially declared as
-     * {@link ConcurrentHashMap} instances, if we remove entries once the
-     * map/queue entry is empty, this appears to open a concurrency hole which
-     * does not exist if we leave entries with empty map/queue values in the
-     * map. Changing to a weak value map should provide the necessary pruning of
-     * unused entries without opening up this concurrency hole.
+     * @see BSBundle#compareTo(BSBundle)
+     * 
+     *      FIXME Either this and/or {@link #operatorFutures} must be a weak
+     *      value map in order to ensure that entries are eventually cleared in
+     *      scale-out where the #of entries can potentially be very large since
+     *      they are per (bopId,shardId). While these maps were initially
+     *      declared as {@link ConcurrentHashMap} instances, if we remove
+     *      entries once the map/queue entry is empty, this appears to open a
+     *      concurrency hole which does not exist if we leave entries with empty
+     *      map/queue values in the map. Changing to a weak value map should
+     *      provide the necessary pruning of unused entries without opening up
+     *      this concurrency hole.
      */
     private final ConcurrentMap<BSBundle, BlockingQueue<IChunkMessage<IBindingSet>>> operatorQueues;
 
+    /**
+     * Set to <code>true</code> to make {@link #operatorQueues} and ordered map.
+     * When <code>true</code>, {@link #consumeChunk()} will have an ordered bias
+     * in how it schedules work. [The historical behavior is present when this
+     * is <code>false</code>.]
+     */
+    private static final boolean orderedOperatorQueueMap = false;
+    
     /**
      * FIXME It appears that this is Ok based on a single unit test known to
      * fail when {@link #removeMapOperatorQueueEntries} is <code>true</code>,
@@ -202,7 +218,15 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
 
         this.operatorFutures = new ConcurrentHashMap<BSBundle, ConcurrentHashMap<ChunkFutureTask, ChunkFutureTask>>();
 
-        this.operatorQueues = new ConcurrentHashMap<BSBundle, BlockingQueue<IChunkMessage<IBindingSet>>>();
+        if (orderedOperatorQueueMap) {
+
+            this.operatorQueues = new ConcurrentSkipListMap<BSBundle, BlockingQueue<IChunkMessage<IBindingSet>>>();
+            
+        } else {
+            
+            this.operatorQueues = new ConcurrentHashMap<BSBundle, BlockingQueue<IChunkMessage<IBindingSet>>>();
+
+        }
 
     }
 
@@ -248,12 +272,14 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
             if (queue == null) {
 
                 /*
-                 * If the target is a pipelined operator, then we impose a limit
-                 * on the #of messages which may be buffered for that operator.
-                 * If the operator is NOT pipelined, e.g., ORDER_BY, then we use
-                 * an unbounded queue.
+                 * There is no input queue for this operator, so we create one
+                 * now while we are holding the lock. If the target is a
+                 * pipelined operator, then we impose a limit on the #of
+                 * messages which may be buffered for that operator. If the
+                 * operator is NOT pipelined, e.g., ORDER_BY, then we use an
+                 * unbounded queue.
                  * 
-                 * TODO Unit/stress tests with capacity set to 1. 
+                 * TODO Unit/stress tests with capacity set to 1.
                  */
                 
                 // The target operator for this message.
@@ -263,12 +289,24 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
                         PipelineOp.Annotations.PIPELINE_QUEUE_CAPACITY,
                         PipelineOp.Annotations.DEFAULT_PIPELINE_QUEUE_CAPACITY)
                         : Integer.MAX_VALUE;
-                
+
+                // Create a new queue using [lock].
                 queue = new com.bigdata.jsr166.LinkedBlockingDeque<IChunkMessage<IBindingSet>>(//
                         capacity,
                         lock);
 
-                operatorQueues.put(bundle, queue);
+                // Add to the collection of operator input queues.
+                if (operatorQueues.put(bundle, queue) != null) {
+
+                    /*
+                     * There must not be an entry for this operator. We checked
+                     * for this above. Nobody else should be adding entries into
+                     * the [operatorQueues] map.
+                     */
+
+                    throw new AssertionError(bundle.toString());
+
+                }
              
             }
 
@@ -394,7 +432,7 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
                 if (nrunning == 0) {
                     // No tasks running for this operator.
                     if(removeMapOperatorFutureEntries)
-                        if(map!=operatorFutures.remove(bundle)) throw new AssertionError();
+                        if (map != operatorFutures.remove(bundle)) throw new AssertionError();
                 }
             }
             if (nrunning >= maxParallel) {
@@ -521,27 +559,36 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
 //              }
 //
 //            }
-            if (!pipelined && !queue.isEmpty() && !isAtOnceReady(bundle.bopId)) {
-                /*
-                 * This operator is not pipelined, so we need to wait until all
-                 * of its input solutions have been materialized (no prior
-                 * operator in the pipeline is running or has inputs available
-                 * which could cause it to run).
-                 * 
-                 * TODO This is where we should examine MAX_MEMORY and the
-                 * buffered data to see whether or not to trigger an evaluation
-                 * pass for the operator based on the data already materialized
-                 * for that operator.
-                 */
-                if (log.isDebugEnabled())
-                    log.debug("Waiting on producer(s): bopId=" + bundle.bopId);
-                return false;
-            }
             if (queue.isEmpty()) {
                 // No work, so remove work queue for (bopId,partitionId).
                 if(removeMapOperatorQueueEntries)
-                    if(queue!=operatorQueues.remove(bundle)) throw new AssertionError();
+                    if (queue != operatorQueues.remove(bundle)) throw new AssertionError();
                 return false;
+            }
+            /*
+             * true iff operator requires at once evaluation and all solutions
+             * are now available for that operator.
+             */
+            boolean atOnceReady = false;
+            if (!pipelined) {
+                if (!isAtOnceReady(bundle.bopId)) {
+                    /*
+                     * This operator is not pipelined, so we need to wait until
+                     * all of its input solutions have been materialized (no
+                     * prior operator in the pipeline is running or has inputs
+                     * available which could cause it to run).
+                     * 
+                     * TODO This is where we should examine MAX_MEMORY and the
+                     * buffered data to see whether or not to trigger an
+                     * evaluation pass for the operator based on the data
+                     * already materialized for that operator.
+                     */
+                    if (log.isDebugEnabled())
+                        log.debug("Waiting on producer(s): bopId="
+                                + bundle.bopId);
+                    return false;
+                }
+                atOnceReady = true;
             }
             /*
              * Drain the work queue for that (bopId,partitionId).
@@ -553,104 +600,115 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
              */
             final List<IChunkMessage<IBindingSet>> accepted = new LinkedList<IChunkMessage<IBindingSet>>();
             try {
-            /*
-             * Note: Once we drain these messages from the work queue we are
-             * responsible for calling release() on them.
-             */
-            queue.drainTo(accepted, pipelined ? maxMessagesPerTask
-                    : Integer.MAX_VALUE);
-            // #of messages accepted from the work queue.
-            final int naccepted = accepted.size();
-            // #of messages remaining on the work queue.
-            final int nremaining = queue.size();
-            if(nremaining == 0) {
-                // Remove the work queue for that (bopId,partitionId).
-                if(removeMapOperatorQueueEntries)
-                    if(queue != operatorQueues.remove(bundle)) throw new AssertionError();
-            } else if(pipelined) {
                 /*
-                 * After removing the maximum amount from a pipelined operator,
-                 * the work queue is still not empty.
+                 * Note: Once we drain these messages from the work queue we are
+                 * responsible for calling release() on them.
+                 */
+                queue.drainTo(accepted, pipelined ? maxMessagesPerTask
+                        : Integer.MAX_VALUE);
+                // #of messages accepted from the work queue.
+                final int naccepted = accepted.size();
+                // #of messages remaining on the work queue.
+                final int nremaining = queue.size();
+                if (nremaining == 0) {
+                    // Remove the work queue for that (bopId,partitionId).
+                    if(removeMapOperatorQueueEntries)
+                        if(queue != operatorQueues.remove(bundle)) throw new AssertionError();
+                } else if (pipelined) {
+                    /*
+                     * After removing the maximum amount from a pipelined operator,
+                     * the work queue is still not empty.
+                     */
+                    if (log.isInfoEnabled())
+                        log.info("Work queue is over capacity: bundle=" + bundle
+                                + ", naccepted=" + naccepted + ", nremaining="
+                                + nremaining + ", maxMessagesPerTask="
+                                + maxMessagesPerTask + ", runState="
+                                + runStateString());
+                }
+                /*
+                 * Combine the messages into a single source to be consumed by a
+                 * task.
+                 */
+                int nassigned = 1;
+                final Iterator<IChunkMessage<IBindingSet>> mitr = accepted.iterator();
+                final IChunkMessage<IBindingSet> firstChunk = mitr.next();
+                // See BOpContext#isLastInvocation()
+                final boolean isLastInvocation = pipelined
+    //                    && nremaining == 0
+    //                    && maxParallel == 1
+    //                    && isOperatorDone(bundle.bopId)
+                        && firstChunk.isLastInvocation()
+                        ;
+                /*
+                 * Note: There is no longer any reliance on the IAsynchronous
+                 * Iterator API here. It is perfectly sufficient to only
+                 * implement ICloseableIterator. Query operator and chunk
+                 * message implementations should be revisited with this
+                 * simplifying assumption in mind.
+                 * 
+                 * @see https://sourceforge.net/apps/trac/bigdata/ticket/475
+                 */
+                final IMultiSourceCloseableIterator<IBindingSet[]> source = new MultiSourceSequentialCloseableIterator<IBindingSet[]>(//
+    //                  accepted.remove(0).getChunkAccessor().iterator()//
+                        firstChunk.getChunkAccessor().iterator()//
+                        );
+    //            for (IChunkMessage<IBindingSet> msg : accepted) {
+    //          source.add(msg.getChunkAccessor().iterator());
+                // #of solutions accepted across those chunk messages.
+                final long solutionsAccepted;
+                {
+                    long na = firstChunk.getSolutionCount();
+                    while (mitr.hasNext()) {
+                        final IChunkMessage<IBindingSet> msg = mitr.next();
+                        na += msg.getSolutionCount();
+                        source.add(msg.getChunkAccessor().iterator());
+                        nassigned++;
+                    }
+                    solutionsAccepted = na;
+                }
+                if (nassigned != naccepted)
+                    throw new AssertionError();
+                /*
+                 * Create task to consume that source.
+                 */
+                final ChunkFutureTask cft;
+                try {
+                    cft = new ChunkFutureTask(
+                            new ChunkTask(bundle.bopId, bundle.shardId,
+                                    naccepted, isLastInvocation, source));
+                } catch (Throwable t2) {
+                    // Ensure accepted messages are released();
+                    safeRelease(accepted);
+                    halt(t2); // ensure query halts.
+                    if (getCause() != null) {
+                        // Abnormal termination - wrap and rethrow.
+                        throw new RuntimeException(t2);
+                    }
+                    // normal termination - swallow the exception.
+                    return false;
+                }
+                /*
+                 * Save the Future for this task. Together with the logic above this
+                 * may be used to limit the #of concurrent tasks per (bopId,shardId)
+                 * to one for a given query.
+                 */
+                if (map == null) {
+                    map = new ConcurrentHashMap<ChunkFutureTask, ChunkFutureTask>();
+                    operatorFutures.put(bundle, map);
+                }
+                map.put(cft, cft);
+                /*
+                 * Submit task for execution (asynchronous).
                  */
                 if (log.isInfoEnabled())
-                    log.info("Work queue is over capacity: bundle=" + bundle
-                            + ", naccepted=" + naccepted + ", nremaining="
-                            + nremaining + ", maxMessagesPerTask="
-                            + maxMessagesPerTask + ", runState="
-                            + runStateString());
-            }
-            /*
-             * Combine the messages into a single source to be consumed by a
-             * task.
-             */
-            int nassigned = 1;
-            final Iterator<IChunkMessage<IBindingSet>> mitr = accepted.iterator();
-            final IChunkMessage<IBindingSet> firstChunk = mitr.next();
-            // See BOpContext#isLastInvocation()
-            final boolean isLastInvocation = pipelined
-//                    && nremaining == 0
-//                    && maxParallel == 1
-//                    && isOperatorDone(bundle.bopId)
-                    && firstChunk.isLastInvocation()
-                    ;
-            /*
-             * Note: There is no longer any reliance on the IAsynchronous
-             * Iterator API here. It is perfectly sufficient to only
-             * implement ICloseableIterator. Query operator and chunk
-             * message implementations should be revisited with this
-             * simplifying assumption in mind.
-             * 
-             * @see https://sourceforge.net/apps/trac/bigdata/ticket/475
-             */
-            final IMultiSourceCloseableIterator<IBindingSet[]> source = new MultiSourceSequentialCloseableIterator<IBindingSet[]>(//
-//                  accepted.remove(0).getChunkAccessor().iterator()//
-                    firstChunk.getChunkAccessor().iterator()//
-                    );
-//            for (IChunkMessage<IBindingSet> msg : accepted) {
-//          source.add(msg.getChunkAccessor().iterator());
-            while(mitr.hasNext()) {
-                source.add(mitr.next().getChunkAccessor().iterator());
-                nassigned++;
-            }
-            if (nassigned != naccepted)
-                throw new AssertionError();
-            /*
-             * Create task to consume that source.
-             */
-            final ChunkFutureTask cft;
-            try {
-                cft = new ChunkFutureTask(
-                        new ChunkTask(bundle.bopId, bundle.shardId,
-                                naccepted, isLastInvocation, source));
-            } catch (Throwable t2) {
-                // Ensure accepted messages are released();
-                safeRelease(accepted);
-                halt(t2); // ensure query halts.
-                if (getCause() != null) {
-                    // Abnormal termination - wrap and rethrow.
-                    throw new RuntimeException(t2);
-                }
-                // normal termination - swallow the exception.
-                return false;
-            }
-            /*
-             * Save the Future for this task. Together with the logic above this
-             * may be used to limit the #of concurrent tasks per (bopId,shardId)
-             * to one for a given query.
-             */
-            if (map == null) {
-                map = new ConcurrentHashMap<ChunkFutureTask, ChunkFutureTask>();
-                operatorFutures.put(bundle, map);
-            }
-            map.put(cft, cft);
-            /*
-             * Submit task for execution (asynchronous).
-             */
-            if (log.isDebugEnabled())
-                log.debug("Running task: bop=" + bundle.bopId + ", naccepted="
-                        + naccepted+", runState="+runStateString());
-            getQueryEngine().execute(cft);
-            return true;
+                    log.info("Running task: bop=" + bundle.bopId
+                            + (pipelined?"":", atOnceReady=" + atOnceReady) + ", bop="
+                            + bop.toShortString() + ", messages=" + naccepted
+                            + ", solutions=" + solutionsAccepted
+                            + (log.isDebugEnabled()?", runState=" + runStateString():""));
+                getQueryEngine().execute(cft);
+                return true;
             } catch(Throwable t) {
                 // Ensure accepted messages are released();
                 safeRelease(accepted);
@@ -1149,7 +1207,9 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
                 stats = op.newStats();
 //        		log.warn("bopId=" + bopId + ", stats=" + stats);
             }
-            assert stats != null;
+            if (stats == null) {
+                throw new AssertionError("No stats: op=" + op);
+            }
 
 //            // The groupId (if any) for this operator.
 //            final Integer fromGroupId = (Integer) op
@@ -1232,41 +1292,14 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
          *         target that sink.
          */
         private IBlockingBuffer<IBindingSet[]> newBuffer(final PipelineOp op,
-                final int sinkId,
-//                final SinkTransitionMetadata sinkTransitionMetadata,
-                final AtomicInteger sinkMessagesOut, final BOpStats stats) {
+                final int sinkId,//
+                final AtomicInteger sinkMessagesOut, //
+                final BOpStats stats//
+                ) {
 
-//            final MultiplexBlockingBuffer<IBindingSet[]> factory = inputBufferMap == null ? null
-//                    : inputBufferMap.get(sinkId);
-//
-//            if (factory != null) {
-//
-//                return factory.newInstance();
-//
-//            }
-
-//            return new HandleChunkBuffer(sinkId, sinkMessagesOut, op
-//                    .newBuffer(stats));
-
-            /*
-             * FIXME The buffer allocated here is useless unless we play games
-             * in HandleChunkBuffer to combine chunks or run a thread which
-             * drains chunks from all operator tasks (but the task can not
-             * complete until it is fully drained).
-             */
-//            final IBlockingBuffer<IBindingSet[]> b = new BlockingBuffer<IBindingSet[]>(
-//                    op.getChunkOfChunksCapacity(), op.getChunkCapacity(), op
-//                            .getChunkTimeout(),
-//                    BufferAnnotations.chunkTimeoutUnit);
-
-            return 
-//            new SinkTransitionBuffer(
-                    new HandleChunkBuffer(
-                    ChunkedRunningQuery.this, bopId, partitionId, sinkId, op
-                            .getChunkCapacity(), sinkMessagesOut, stats)
-//            ,
-//                    sinkTransitionMetadata)
-                    ;
+            return new HandleChunkBuffer(ChunkedRunningQuery.this, bopId,
+                    partitionId, sinkId, op.getChunkCapacity(),
+                    op.isReorderSolutions(), sinkMessagesOut, stats);
 
         }
 
@@ -1349,8 +1382,6 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
         public NoCloseBuffer(final UUID queryId, final BOp bop, final int bopId,
                 final int partitionId, final IBlockingBuffer<E> delegate) {
         
-//        public NoCloseBuffer(final IBlockingBuffer<E> delegate) {
-
             super(delegate);
             
             this.queryId = queryId;
@@ -1369,39 +1400,23 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
             }
         }
 
-        // public void add(E e) {
-//            log.error(Arrays.toString((Object[])e));
-//            super.add(e);
-//        }
-//
-//        public void reset() {
-//            log.error("");
-//            super.reset();
-//        }
-//
-//        public long flush() {
-//            log.error("");
-//            return super.flush();
-//        }
-
         @Override
         public void close() {
-            // NOP
-//            log.error("");
+            // NOP - This makes sure that the query buffer is not closed.
         }
 
-    }
+    } // class NoCloseBuffer
 
     /**
-     * Class traps {@link #add(IBindingSet[])} to handle the IBindingSet[]
-     * chunks as they are generated by the running operator task, invoking
-     * {@link ChunkedRunningQuery#handleOutputChunk(BOp, int, IBlockingBuffer)} for
-     * each generated chunk to synchronously emit {@link IChunkMessage}s.
+     * Class traps {@link #add(IBindingSet[])} to handle the {@link IBindingSet}
+     * [] chunks as they are generated by the running operator task, invoking
+     * {@link ChunkedRunningQuery#handleOutputChunk(BOp, int, IBlockingBuffer)}
+     * for each generated chunk to synchronously emit {@link IChunkMessage}s.
      * <p>
      * This use of this class significantly increases the parallelism and
-     * throughput of selective queries. If output chunks are not "handled"
-     * until the {@link ChunkTask} is complete then the total latency of
-     * selective queries is increased dramatically.
+     * throughput of selective queries. If output chunks are not "handled" until
+     * the {@link ChunkTask} is complete then the total latency of selective
+     * queries is increased dramatically.
      */
     static private class HandleChunkBuffer implements
             IBlockingBuffer<IBindingSet[]> {
@@ -1414,13 +1429,21 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
 
         private final int sinkId;
 
+//        /**
+//         * The desired chunk size. 
+//         */
+//        private final int chunkCapacity;
+
+        /** The minimum desired chunk size (50% of the {@link #chunkCapacity}). */
+        private final int minChunkSize;
+
+        /** The maximum desired chunk size (150% of the {@link #chunkCapacity}) */
+        private final int maxChunkSize;
         /**
-         * The target chunk size. When ZERO (0) chunks are output immediately as
-         * they are received (the internal buffer is not used).
+         * When <code>true</code>, the buffer MAY reorder solutions. When
+         * <code>false</code>, it MUST NOT.
          */
-        private final int chunkCapacity;
-        
-//        private final SinkTransitionMetadata sinkTransitionMetadata;
+        private final boolean reorderSolutions;
         
         private final AtomicInteger sinkMessagesOut;
 
@@ -1428,14 +1451,17 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
 
         private volatile boolean open = true;
 
-//        /**
-//         * An internal buffer which is used if chunkCapacity != ZERO.
-//         */
-//        private IBindingSet[] chunk = null;
+        /**
+         * A list of small chunks that will be combined into a single chunk. The
+         * solutions in this list are always evicted by {@link #flush()}.
+         */
         private List<IBindingSet[]> smallChunks = null;
         
         /**
-         * The #of elements in the internal {@link #chunk} buffer.
+         * The #of elements in the {@link #smallChunks} buffer. Each element is
+         * an {@link IBindingSet}, so this is the number of solutions that have
+         * not yet been flushed through because we have not yet made up a single
+         * decent sized chunk.
          */
         private int chunkSize = 0;
 
@@ -1445,22 +1471,28 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
          * @param bopId
          * @param sinkId
          * @param chunkCapacity
+         *            The target capacity for each chunk.
+         * @param reorderSolutions
+         *            When <code>true</code>, the buffer MAY reorder solutions.
+         *            When <code>false</code>, it MUST NOT.
          * @param sinkMessagesOut
          * @param stats
          */
         public HandleChunkBuffer(final ChunkedRunningQuery q, final int bopId,
                 final int partitionId,
                 final int sinkId, final int chunkCapacity,
-//                final SinkTransitionMetadata sinkTransitionMetadata,
+                final boolean reorderSolutions,
                 final AtomicInteger sinkMessagesOut, final BOpStats stats) {
             this.q = q;
             this.bopId = bopId;
             this.partitionId = partitionId;
             this.sinkId = sinkId;
-            this.chunkCapacity = chunkCapacity;
-//            this.sinkTransitionMetadata = sinkTransitionMetadata;
+//            this.chunkCapacity = chunkCapacity;
+            this.reorderSolutions = reorderSolutions;
             this.sinkMessagesOut = sinkMessagesOut;
             this.stats = stats;
+            this.minChunkSize = (chunkCapacity >> 1); // 50%
+            this.maxChunkSize = chunkCapacity + (chunkCapacity >> 1); // 150%
         }
 
         /**
@@ -1471,7 +1503,11 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
          * <p>
          * Note: This must be synchronized in case the caller is multi-threaded
          * since it has a possible side effect on the internal buffer.
+         * 
+         * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/798" >
+         *      Solution order not always preserved. </a>
          */
+        @Override
         public void add(final IBindingSet[] e) {
             
             if(!open)
@@ -1482,75 +1518,138 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
                         partitionId, (IBindingSet[]) e);
             }
 
-//            for (IBindingSet bset : e) {
-//                sinkTransitionMetadata.handleBindingSet(bset);
-//            }
-            
-//            if (chunkCapacity != 0 && e.length < (chunkCapacity >> 1)) {
-//                /*
-//                 * The caller's array is significantly smaller than the target
-//                 * chunk size. Append the caller's array to the internal buffer
-//                 * and return immediately. The internal buffer will be copied
-//                 * through either in a subsequent add() or in flush().
-//                 */
-//                synchronized (this) {
-//
-//                    if (chunk == null)
-//                        chunk = new IBindingSet[chunkCapacity];
-//
-//                    if (chunkSize + e.length > chunkCapacity) {
-//
-//                        // flush the buffer first.
-//                        outputBufferedChunk();
-//
-//                    }
-//
-//                    // copy the chunk into the buffer.
-//                    System.arraycopy(e/* src */, 0/* srcPos */,
-//                                    chunk/* dest */, chunkSize/* destPos */,
-//                                    e.length/* length */);
-//
-//                    chunkSize += e.length;
-//
-//                    return;
-//
-//                }
-//
-//            }
+            if (false) {
 
-            if (chunkCapacity != 0 && e.length < (chunkCapacity >> 1)) {
+                /*
+                 * Note: Do this INSTEAD if you want to complete disable both
+                 * reordering and chunk combination. This should ONLY be used
+                 * for debugging. Chunk combination is an important throughput
+                 * enhancer.
+                 */
+
+                // outputChunk(e);
+
+            } else {
+                
+                if (reorderSolutions) {
+
+                    // Solutions MAY be reordered.
+                    addReorderAllowed(e);
+
+                } else {
+
+                    // Solutions MUST NOT be reordered.
+                    addReorderNotAllowed(e);
+
+                }
+                
+            }
+            
+        } // add()
+
+        /**
+         * We are allowed to reorder the solutions.
+         * <p>
+         * This will reorder solutions by outputting the current chunk
+         * immediately if it is GTE 50% of the target chunkCapacity. This is
+         * also a non-blocking code path (no lock is taken in this method).
+         * <p>
+         * Otherwise, the chunk is added {@link #smallChunks} list. If the #of
+         * solutions on the {@link #smallChunks} reaches a threshold, then the
+         * {@link #smallChunks} list is converted into a single chunk an
+         * evicted. 
+         */
+        private void addReorderAllowed(final IBindingSet[] e) {
+            
+            if (e.length < minChunkSize) {
+
                 /*
                  * The caller's array is significantly smaller than the target
                  * chunk size. Append the caller's array to the internal list
                  * and return immediately. The buffered chunks will be copied
                  * through either in a subsequent add() or in flush().
                  */
+                
                 synchronized (this) {
 
-                    if (chunkSize + e.length > chunkCapacity) {
+                    if (chunkSize + e.length > maxChunkSize) {
 
                         // flush the buffer first.
                         outputBufferedChunk();
 
                     }
-                    
+
                     if (smallChunks == null)
                         smallChunks = new LinkedList<IBindingSet[]>();
 
+                    // Add to the buffer.
                     smallChunks.add(e);
-
                     chunkSize += e.length;
 
                     return;
 
                 }
+            
             }
 
             // output the caller's chunk immediately.
             outputChunk(e);
 
         }
+        
+        /**
+         * We are not allowed to reorder the solutions.
+         * <p>
+         * This always outputs solutions in the same order that they are added.
+         * In order to avoid pushing through small chunks, it allows the output
+         * chunk to be over the target capacity (by 50%).
+         * 
+         * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/798" >
+         *      Solution order not always preserved. </a>
+         */
+        private void addReorderNotAllowed(final IBindingSet[] e) {
 
+            synchronized (this) {
+
+                if (chunkSize + e.length > maxChunkSize) {
+
+                    /*
+                     * The combined chunk would be too large for the buffer.
+                     */
+
+                    // Flush the buffer.
+                    outputBufferedChunk();
+
+                    if (e.length > minChunkSize) {
+
+                        /*
+                         * The internal buffer is empty. The chunk is big
+                         * enough. Sent it through immediately.
+                         */
+                       
+                        outputChunk(e);
+                        
+                        return;
+                        
+                    }
+                    
+                }
+
+                /*
+                 * Add the chunk to the internal buffer.
+                 */
+
+                if (smallChunks == null)
+                    smallChunks = new LinkedList<IBindingSet[]>();
+
+                // Add to the buffer.
+                smallChunks.add(e);
+                chunkSize += e.length;
+
+            } // synchronized(this)
+
+        }
+        
         /**
          * Output a chunk, updating the counters.
          * 
@@ -1570,12 +1669,6 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
             
             sinkMessagesOut.addAndGet(messagesOut);
             
-//          try {
-//              q.outstandingMessageSemaphore.acquire();
-//          } catch (InterruptedException e1) {
-//              throw new RuntimeException(e1);
-//          }
-            
         }
         
         /**
@@ -1583,15 +1676,6 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
          */
         synchronized // Note: has side-effect on internal buffer. 
         private void outputBufferedChunk() {
-//            if (chunk == null || chunkSize == 0)
-//                return;
-//            if (chunkSize != chunk.length) {
-//                // truncate the array.
-//                chunk = Arrays.copyOf(chunk, chunkSize);
-//            }
-//            outputChunk(chunk);
-//            chunkSize = 0;
-//            chunk = null;
             if (smallChunks == null || chunkSize == 0) {
                 return;
             }

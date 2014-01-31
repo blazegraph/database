@@ -33,10 +33,11 @@ import java.util.NoSuchElementException;
 import cutthecrap.utils.striterators.ICloseableIterator;
 
 /**
- * Fully buffered iterator.
+ * An iterator that visits the elements in the given iterator of arrays.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id: ChunkedArrayIterator.java 2265 2009-10-26 12:51:06Z thompsonbry $
+ * @version $Id: ChunkedArrayIterator.java 2265 2009-10-26 12:51:06Z thompsonbry
+ *          $
  */
 public class ChunkedArraysIterator<E> implements IChunkedOrderedIterator<E> {
 
@@ -104,6 +105,7 @@ public class ChunkedArraysIterator<E> implements IChunkedOrderedIterator<E> {
 
     }
 
+    @Override
     public boolean hasNext() {
 
         if(!open) return false;
@@ -129,6 +131,7 @@ public class ChunkedArraysIterator<E> implements IChunkedOrderedIterator<E> {
         
     }
 
+    @Override
     public E next() {
         
         if (!hasNext()) {
@@ -164,6 +167,7 @@ public class ChunkedArraysIterator<E> implements IChunkedOrderedIterator<E> {
     /**
      * @throws UnsupportedOperationException
      */
+    @Override
     public void remove() {
         
         throw new UnsupportedOperationException();
@@ -189,6 +193,7 @@ public class ChunkedArraysIterator<E> implements IChunkedOrderedIterator<E> {
      * @throws NoSuchElementException
      *             if {@link #hasNext()} returns false.
      */
+    @Override
     @SuppressWarnings("unchecked")
     public E[] nextChunk() {
        
@@ -249,13 +254,15 @@ public class ChunkedArraysIterator<E> implements IChunkedOrderedIterator<E> {
         
     }
     
+    @Override
     public IKeyOrder<E> getKeyOrder() {
         
         return keyOrder;
         
     }
     
-    public E[] nextChunk(IKeyOrder<E> keyOrder) {
+    @Override
+    public E[] nextChunk(final IKeyOrder<E> keyOrder) {
 
         if (keyOrder == null)
             throw new IllegalArgumentException();
@@ -278,6 +285,7 @@ public class ChunkedArraysIterator<E> implements IChunkedOrderedIterator<E> {
      * Note: Do NOT eagerly close the iterator since the makes it impossible to
      * implement {@link #remove()}.
      */
+    @Override
     public void close() {
 
         if (!open) {

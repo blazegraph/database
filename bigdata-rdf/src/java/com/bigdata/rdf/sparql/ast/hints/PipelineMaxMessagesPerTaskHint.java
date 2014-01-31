@@ -60,6 +60,17 @@ final class PipelineMaxMessagesPerTaskHint extends AbstractIntQueryHint {
 
         }
 
+//        if (QueryHintScope.Query.equals(scope)) {
+//
+//            /*
+//             * Also stuff the query hint on the global context for things which
+//             * look there.
+//             */
+//
+//            conditionalSetGlobalProperty(context, getName(), value);
+//
+//        }
+
     }
 
 }

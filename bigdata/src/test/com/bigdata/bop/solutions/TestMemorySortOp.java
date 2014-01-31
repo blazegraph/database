@@ -42,6 +42,7 @@ import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IQueryContext;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
+import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.Var;
 import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.bop.engine.AbstractQueryEngineTestCase;
@@ -132,6 +133,7 @@ public class TestMemorySortOp extends TestCase2 {
 				new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
 						BOpEvaluationContext.CONTROLLER),//
                 new NV(MemorySortOp.Annotations.MAX_PARALLEL, 1),//
+                new NV(PipelineOp.Annotations.REORDER_SOLUTIONS,false),//
 //                new NV(MemorySortOp.Annotations.SHARED_STATE, true),//
                 new NV(MemorySortOp.Annotations.LAST_PASS, true),//
 		}));
@@ -244,6 +246,7 @@ public class TestMemorySortOp extends TestCase2 {
                 new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
                         BOpEvaluationContext.CONTROLLER),//
                 new NV(MemorySortOp.Annotations.MAX_PARALLEL, 1),//
+                new NV(PipelineOp.Annotations.REORDER_SOLUTIONS,false),//
 //                new NV(MemorySortOp.Annotations.SHARED_STATE, true),//
                 new NV(MemorySortOp.Annotations.LAST_PASS, true),//
         }));
@@ -360,6 +363,7 @@ public class TestMemorySortOp extends TestCase2 {
                 new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
                         BOpEvaluationContext.CONTROLLER),//
                 new NV(MemorySortOp.Annotations.MAX_PARALLEL, 1),//
+                new NV(PipelineOp.Annotations.REORDER_SOLUTIONS,false),//
 //                new NV(MemorySortOp.Annotations.SHARED_STATE, true),//
                 new NV(MemorySortOp.Annotations.LAST_PASS, true),//
         }));

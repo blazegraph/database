@@ -273,20 +273,41 @@ public class GroupGraphPatternBuilder extends TriplePatternExprBuilder {
         graphPattern = new GroupGraphPattern(parentGP);
 
         // visit the children.
-        super.visit(node, null);
+        final Object tmp = super.visit(node, null);
 
         final JoinGroupNode joinGroup = new JoinGroupNode();
 
         joinGroup.setOptional(true);
-        
-        @SuppressWarnings("rawtypes")
-        final GroupNodeBase group = graphPattern.buildGroup(joinGroup);
 
-        parentGP.add(group);
+        if (tmp instanceof SubqueryRoot) {
+            
+            /**
+             * Sub-Select
+             * 
+             * @see <a
+             * href="https://sourceforge.net/apps/trac/bigdata/ticket/806>
+             * Incorrect computation of shared variables when lifting out named
+             * subqueries </a>
+             */
+            joinGroup.addChild((SubqueryRoot) tmp);
+
+        } else {
+
+            // GraphPattern
+            
+            @SuppressWarnings("rawtypes")
+            final GroupNodeBase group = graphPattern.buildGroup(joinGroup);
+            
+            assert group == joinGroup;// should be the same reference.
+
+        }
+
+        parentGP.add(joinGroup);
 
         graphPattern = parentGP;
 
         return null;
+
     }
 
     /**

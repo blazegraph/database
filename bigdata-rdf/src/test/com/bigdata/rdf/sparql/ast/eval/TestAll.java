@@ -168,6 +168,11 @@ public class TestAll extends TestCase {
         suite.addTestSuite(TestCustomFunction.class);
 
         /*
+         * Runtime Query Optimizer (RTO).
+         */
+        suite.addTest(com.bigdata.rdf.sparql.ast.eval.rto.TestAll.suite());
+
+        /*
          * SPARQL 1.1 UPDATE
          */
         suite.addTest(com.bigdata.rdf.sparql.ast.eval.update.TestAll.suite());

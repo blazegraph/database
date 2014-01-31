@@ -40,6 +40,7 @@ import com.bigdata.rdf.sparql.ast.optimizers.ASTSparql11SubqueryOptimizer;
  * and replacing the subquery with an INCLUDE. When <code>true</code>, the
  * subquery will be lifted out. When <code>false</code>, the subquery will not
  * be lifted unless other semantics require that it be lifted out regardless.
+ * This hint must be used with {@link QueryHintScope#SubQuery}.
  * <p>
  * For example, the following may be used to lift out the sub-select in which it
  * appears into a {@link NamedSubqueryRoot}. The lifted expression will be

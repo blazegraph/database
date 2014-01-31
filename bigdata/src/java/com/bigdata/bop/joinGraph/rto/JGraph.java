@@ -37,6 +37,9 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.log4j.Logger;
@@ -50,6 +53,8 @@ import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.joinGraph.NoSolutionsException;
 import com.bigdata.bop.joinGraph.PartitionedJoinGroup;
 import com.bigdata.bop.rdf.join.DataSetJoin;
+import com.bigdata.rdf.sparql.ast.eval.AST2BOpRTO;
+import com.bigdata.util.concurrent.ExecutionExceptions;
 
 /**
  * A runtime optimizer for a join graph. The {@link JoinGraph} bears some
@@ -204,6 +209,10 @@ import com.bigdata.bop.rdf.join.DataSetJoin;
  *       will be no paths identified by the optimizer and the final path length
  *       becomes zero.
  * 
+ * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/64">Runtime
+ *      Query Optimization</a>
+ * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/258">Integrate
+ *      RTO into SAIL</a>
  * @see <a
  *      href="http://www-db.informatik.uni-tuebingen.de/files/research/pathfinder/publications/rox-demo.pdf">
  *      ROX </a>
@@ -214,6 +223,14 @@ public class JGraph {
 
 	private static final transient Logger log = Logger.getLogger(JGraph.class);
 
+    /**
+     * The pipeline operator for executing the RTO. This provides additional
+     * context from the AST model that is necessary to handle some kinds of
+     * FILTERs (e.g., those which require conditional routing patterns for
+     * chunked materialization).
+     */
+    private final JoinGraph joinGraph;
+	
     /**
      * Vertices of the join graph.
      */
@@ -234,6 +251,7 @@ public class JGraph {
         return Collections.unmodifiableList(Arrays.asList(V));
     }
 
+    @Override
     public String toString() {
         final StringBuilder sb = new StringBuilder();
         sb.append("JoinGraph");
@@ -249,39 +267,48 @@ public class JGraph {
         return sb.toString();
     }
 
-	/**
-	 * 
-	 * @param v
-	 *            The vertices of the join graph. These are {@link IPredicate}s
-	 *            associated with required joins.
-	 * @param constraints
-	 *            The constraints of the join graph (optional). Since all joins
-	 *            in the join graph are required, constraints are dynamically
-	 *            attached to the first join in which all of their variables are
-	 *            bound.
-	 * 
-	 * @throws IllegalArgumentException
-	 *             if the vertices is <code>null</code>.
-	 * @throws IllegalArgumentException
-	 *             if the vertices is an empty array.
-	 * @throws IllegalArgumentException
-	 *             if any element of the vertices is <code>null</code>.
-	 * @throws IllegalArgumentException
-	 *             if any constraint uses a variable which is never bound by the
-	 *             given predicates.
-	 * @throws IllegalArgumentException
-	 *             if <i>sampleType</i> is <code>null</code>.
-	 * 
-	 * @todo unit test for a constraint using a variable which is never bound.
-	 *       the constraint should be attached at the last vertex in the join
-	 *       path. this will cause the query to fail unless the variable was
-	 *       already bound, e.g., by a parent query or in the solutions pumped
-	 *       into the {@link JoinGraph} operator.
-	 * 
-	 * @todo unit test when the join graph has a single vertex.
-	 */
-    public JGraph(final IPredicate<?>[] v, final IConstraint[] constraints,
-            final SampleType sampleType) {
+    /**
+     * @param joinGraph
+     *            The pipeline operator that is executing the RTO. This defines
+     *            the join graph (vertices, edges, and constraints) and also
+     *            provides access to the AST and related metadata required to
+     *            execute the join graph.
+     * 
+     * @throws IllegalArgumentException
+     *             if the joinGraph is <code>null</code>.
+     * @throws IllegalArgumentException
+     *             if the {@link JoinGraph#getVertices()} is <code>null</code>.
+     * @throws IllegalArgumentException
+     *             if the {@link JoinGraph#getVertices()} is an empty array.
+     * @throws IllegalArgumentException
+     *             if any element of the {@link JoinGraph#getVertices()}is
+     *             <code>null</code>.
+     * @throws IllegalArgumentException
+     *             if any constraint uses a variable which is never bound by the
+     *             given predicates.
+     * @throws IllegalArgumentException
+     *             if <i>sampleType</i> is <code>null</code>.
+     * 
+     * @todo unit test for a constraint using a variable which is never bound.
+     *       the constraint should be attached at the last vertex in the join
+     *       path. this will cause the query to fail unless the variable was
+     *       already bound, e.g., by a parent query or in the solutions pumped
+     *       into the {@link JoinGraph} operator.
+     * 
+     * @todo unit test when the join graph has a single vertex (we never invoke
+     *       the RTO for less than 3 vertices since with one vertex you just run
+     *       it and with two vertices you run the lower cardinality vertex first
+     *       (though there might be cases where filters require materialization
+     *       where running for two vertices could make sense)).
+     */
+    public JGraph(final JoinGraph joinGraph) {
+
+        if (joinGraph == null)
+            throw new IllegalArgumentException();
+
+        this.joinGraph = joinGraph;
+        
+        final IPredicate<?>[] v = joinGraph.getVertices();
 
         if (v == null)
             throw new IllegalArgumentException();
@@ -300,6 +327,8 @@ public class JGraph {
 
         }
 
+        final IConstraint[] constraints = joinGraph.getConstraints();
+        
         if (constraints != null) {
             C = new IConstraint[constraints.length];
             for (int i = 0; i < constraints.length; i++) {
@@ -312,12 +341,60 @@ public class JGraph {
             C = null;
         }
 
+        final SampleType sampleType = joinGraph.getSampleType();
+
         if (sampleType == null)
             throw new IllegalArgumentException();
         
         this.sampleType = sampleType;
 
     }
+
+//    /**
+//     * Find a good join path in the data given the join graph. The join path is
+//     * not guaranteed to be the best join path (the search performed by the
+//     * runtime optimizer is not exhaustive) but it should always be a "good"
+//     * join path and may often be the "best" join path.
+//     * 
+//     * @param queryEngine
+//     *            The query engine.
+//     * @param limit
+//     *            The limit for sampling a vertex and the initial limit for
+//     *            cutoff join evaluation.
+//     * @param nedges
+//     *            The edges in the join graph are sorted in order of increasing
+//     *            cardinality and up to <i>nedges</i> of the edges having the
+//     *            lowest cardinality are used to form the initial set of join
+//     *            paths. For each edge selected to form a join path, the
+//     *            starting vertex will be the vertex of that edge having the
+//     *            lower cardinality.
+//     * @param sampleType
+//     *            Type safe enumeration indicating the algorithm which will be
+//     *            used to sample the initial vertices.
+//     * 
+//     * @return The join path identified by the runtime query optimizer as the
+//     *         best path given the join graph and the data.
+//     * 
+//     * @throws NoSolutionsException
+//     *             If there are no solutions for the join graph in the data (the
+//     *             query does not have any results).
+//     * @throws IllegalArgumentException
+//     *             if <i>queryEngine</i> is <code>null</code>.
+//     * @throws IllegalArgumentException
+//     *             if <i>limit</i> is non-positive.
+//     * @throws IllegalArgumentException
+//     *             if <i>nedges</i> is non-positive.
+//     * @throws Exception
+//     */
+//    public Path runtimeOptimizer(final QueryEngine queryEngine,
+//            final int limit, final int nedges) throws NoSolutionsException,
+//            Exception {
+//
+//        final Map<PathIds, EdgeSample> edgeSamples = new LinkedHashMap<PathIds, EdgeSample>();
+//
+//        return runtimeOptimizer(queryEngine, limit, nedges, edgeSamples);
+//
+//    }
 
     /**
      * Find a good join path in the data given the join graph. The join path is
@@ -327,19 +404,11 @@ public class JGraph {
      * 
      * @param queryEngine
      *            The query engine.
-     * @param limit
-     *            The limit for sampling a vertex and the initial limit for
-     *            cutoff join evaluation.
-     * @param nedges
-     *            The edges in the join graph are sorted in order of increasing
-     *            cardinality and up to <i>nedges</i> of the edges having the
-     *            lowest cardinality are used to form the initial set of join
-     *            paths. For each edge selected to form a join path, the
-     *            starting vertex will be the vertex of that edge having the
-     *            lower cardinality.
-     * @param sampleType
-     *            Type safe enumeration indicating the algorithm which will be
-     *            used to sample the initial vertices.
+     * @param edgeSamples
+     *            A map that will be populated with the samples associated with
+     *            each non-pruned join path. This map is used to associate join
+     *            path segments (expressed as an ordered array of bopIds) with
+     *            edge sample to avoid redundant effort.
      * 
      * @return The join path identified by the runtime query optimizer as the
      *         best path given the join graph and the data.
@@ -355,25 +424,60 @@ public class JGraph {
      *             if <i>nedges</i> is non-positive.
      * @throws Exception
      * 
-     * @todo It is possible that this could throw a {@link NoSolutionsException}
-     *       if the cutoff joins do not use a large enough sample to find a join
-     *       path which produces at least one solution (except that no solutions
-     *       for an optional join do not cause the total to fail, nor do no
-     *       solutions for some part of a UNION).
+     *             TODO It is possible that this could throw a
+     *             {@link NoSolutionsException} if the cutoff joins do not use a
+     *             large enough sample to find a join path which produces at
+     *             least one solution (except that no solutions for an optional
+     *             join do not cause the total to fail, nor do no solutions for
+     *             some part of a UNION).
      * 
-     *       TODO We need to automatically increase the depth of search for
-     *       queries where we have cardinality estimation underflows or punt to
-     *       another method to decide the join order.
+     *             TODO We need to automatically increase the depth of search
+     *             for queries where we have cardinality estimation underflows
+     *             or punt to another method to decide the join order.
+     * 
+     *             TODO RTO: HEAP MANAGMENT : The edgeSamples map holds
+     *             references to the cutoff join samples. To ensure that the map
+     *             has the minimum heap footprint, it must be scanned each time
+     *             we prune the set of active paths and any entry which is not a
+     *             prefix of an active path should be removed.
+     * 
+     *             TODO RTO: MEMORY MANAGER : When an entry is cleared from this
+     *             map, the corresponding allocation in the memory manager (if
+     *             any) must be released. The life cycle of the map needs to be
+     *             bracketed by a try/finally in order to ensure that all
+     *             allocations associated with the map are released no later
+     *             than when we leave the lexicon scope of that clause.
      */
-    public Path runtimeOptimizer(final QueryEngine queryEngine,
-            final int limit, final int nedges)
-            throws Exception, NoSolutionsException {
+    public Path runtimeOptimizer(//
+            final QueryEngine queryEngine,//
+            final Map<PathIds, EdgeSample> edgeSamples//
+    ) throws Exception, NoSolutionsException {
 
         if (queryEngine == null)
             throw new IllegalArgumentException();
+        
+        /*
+         * The limit for sampling a vertex and the initial limit for cutoff join
+         * evaluation.
+         */
+        final int limit = joinGraph.getLimit();
+
         if (limit <= 0)
             throw new IllegalArgumentException();
+
+        /*
+         * The edges in the join graph are sorted in order of increasing
+         * cardinality and up to <i>nedges</i> of the edges having the lowest
+         * cardinality are used to form the initial set of join paths. For each
+         * edge selected to form a join path, the starting vertex will be the
+         * vertex of that edge having the lower cardinality.
+         */
+        final int nedges = joinGraph.getNEdges();
+        
         if (nedges <= 0)
+            throw new IllegalArgumentException();
+
+        if (edgeSamples == null)
             throw new IllegalArgumentException();
 
         // Setup the join graph.
@@ -394,53 +498,66 @@ public class JGraph {
 
         final int nvertices = V.length;
 
-        int round = 1;
+        int round = 1; // #of rounds.
+        int nunderflow = 0; // #of paths with card. underflow (no solutions).
 
-        /*
-         * This map is used to associate join path segments (expressed as an
-         * ordered array of bopIds) with edge sample to avoid redundant effort.
-         * 
-         * FIXME HEAP MANAGMENT : This map holds references to the cutoff join
-         * samples. To ensure that the map has the minimum heap footprint, it
-         * must be scanned each time we prune the set of active paths and any
-         * entry which is not a prefix of an active path should be removed.
-         * 
-         * TODO MEMORY MANAGER : When an entry is cleared from this map, the
-         * corresponding allocation in the memory manager (if any) must be
-         * released. The life cycle of the map needs to be bracketed by a
-         * try/finally in order to ensure that all allocations associated with
-         * the map are released no later than when we leave the lexicon scope of
-         * that clause.
-         */
-        final Map<PathIds, EdgeSample> edgeSamples = new LinkedHashMap<PathIds, EdgeSample>();
-        
         while (paths.length > 0 && round < nvertices - 1) {
 
-			/*
-			 * Resample the paths.
-			 * 
-			 * Note: Since the vertex samples are random, it is possible for the
-			 * #of paths with cardinality estimate underflow to jump up and down
-			 * due to the sample which is making its way through each path in
-			 * each round.
-			 * 
-			 * TODO The RTO needs an escape hatch here. FOr example, if the sum
-			 * of the expected IOs for some path(s) strongly dominates all other
-			 * paths sharing the same vertices, then we should prune those paths
-			 * even if there is a cardinality estimate underflow in those paths.
-			 * This will allow us to focus our efforts on those paths having
-			 * less IO cost while we seek cardinality estimates which do not
-			 * underflow.
-			 */
-			int nunderflow;
+            /*
+             * Resample the paths.
+             * 
+             * Note: Since the vertex samples are random, it is possible for the
+             * #of paths with cardinality estimate underflow to jump up and down
+             * due to the sample which is making its way through each path in
+             * each round.
+             * 
+             * Note: The RTO needs an escape hatch here. Otherwise, it is
+             * possible for it to spin in a loop while resampling.
+             * 
+             * TODO For example, if the sum of the expected IOs for some path(s)
+             * strongly dominates all other paths sharing the same vertices,
+             * then we should prune those paths even if there is a cardinality
+             * estimate underflow in those paths. This will allow us to focus
+             * our efforts on those paths having less IO cost while we seek
+             * cardinality estimates which do not underflow.
+             * 
+             * TODO We should be examining the actual sampling limit that is
+             * currently in place on each vertex and for each path. This is
+             * available by inspection of the VertexSamples and EdgeSamples, but
+             * it is not passed back out of the resamplePaths() method as a
+             * side-effect. We should limit how much we are willing to raise the
+             * limit, e.g., by specifying a MAX_LIMIT annotation on the
+             * JoinGraph operator.
+             */
+            for (int i = 0; i < 3; i++) {
 
-			while ((nunderflow = resamplePaths(queryEngine, limit, round,
-					paths, edgeSamples)) > 0) {
-			
-				log.warn("resampling in round=" + round + " : " + nunderflow
-						+ " paths have cardinality estimate underflow.");
-				
-			}
+                nunderflow = resamplePaths(queryEngine, limit, round, paths,
+                        edgeSamples);
+
+                if (nunderflow == 0) {
+
+                    // No paths have cardinality estimate underflow.
+                    break;
+
+                }
+
+                /*
+                 * Show information about the paths and the paths that are
+                 * experiencing cardinality underflow.
+                 */
+
+                log.warn("Cardinality estimate underflow - resampling: round="
+                        + round + ", npaths=" + paths.length + ", nunderflow="
+                        + nunderflow + ", limit=" + limit + "\n"
+                        + showTable(paths, null/* pruned */, edgeSamples));
+
+            }
+            
+            if (nunderflow > 0) {
+
+                log.warn("Continuing: some paths have cardinality underflow!");
+
+            }
 
             /*
              * Extend the paths by one vertex.
@@ -455,22 +572,84 @@ public class JGraph {
             throw new NoSolutionsException();
             
         }
+
+        /*
+         * In general, there should be one winner. However, if there are paths
+         * with cardinality estimate underflow (that is, paths that do not have
+         * any solutions when sampling the path) then there can be multiple
+         * solutions.
+         * 
+         * When this occurs we have a choice. We can either the path with the
+         * minimum cost (min sumEstCard) or we can take a path that does not
+         * have a cardinality estimate underflow because we actually have an
+         * estimate for that path. In principle, the path with the minimum
+         * estimated cost should be the better choice, but we do not have any
+         * information about the order of the joins beyond the point where the
+         * cardinality underflow begins on that path. If we take a path that
+         * does not have a cardinality estimate underflow, then at least we know
+         * that the join order has been optimized for the entire path.
+         */
+
+        final Path selectedPath;
         
-		// Should be one winner.
-		if (paths.length != 1) {
-			throw new AssertionError("Expected one path but have "
-					+ paths.length + " paths.");
+        if (paths.length != 1) {
+
+            log.warn("Multiple paths exist: npaths=" + paths.length
+                    + ", nunderflow=" + nunderflow + "\n"
+                    + showTable(paths, null/* pruned */, edgeSamples));
+
+            Path t = null;
+            
+            for (Path p : paths) {
+            
+                if (p.edgeSample.isUnderflow()) {
+                
+                    /*
+                     * Skip paths with cardinality estimate underflow. They are
+                     * not fully tested in the data since no solutions have made
+                     * it through all of the joins.
+                     */
+                    
+                    continue;
+                    
+                }
+
+                if (t == null || p.sumEstCard < t.sumEstCard) {
+                
+                    // Accept path with the least cost.
+                    t = p;
+                    
+                }
+                
+            }
+            
+            if (t == null) {
+
+                /* Arbitrary choice if all paths underflow.
+                 * 
+                 * TODO Or throw out NoSolutionsException?
+                 */
+                t = paths[0];
+                
+            }
+            
+            selectedPath = t;
+
+        } else {
+            
+            selectedPath = paths[0];
+            
         }
 
         if (log.isInfoEnabled()) {
 
             log.info("\n*** Selected join path: "
-                    + Arrays.toString(paths[0].getVertexIds()) + "\n"
-                    + showPath(paths[0], edgeSamples));
+                    + Arrays.toString(selectedPath.getVertexIds()) + "\n"
+                    + showPath(selectedPath, edgeSamples));
 
         }
         
-        return paths[0];
+        return selectedPath;
 
     }
 
@@ -589,18 +768,19 @@ public class JGraph {
          */
         sampleAllVertices(queryEngine, limit);
 
-		if (log.isInfoEnabled()) {
-			final StringBuilder sb = new StringBuilder();
-			sb.append("Sampled vertices:\n");
-			for (Vertex v : V) {
-				if (v.sample != null) {
-					sb.append("id="+v.pred.getId()+" : ");
-					sb.append(v.sample.toString());
-					sb.append("\n");
-				}
-			}
-			log.info(sb.toString());
-		}
+        if (log.isInfoEnabled()) {
+            final StringBuilder sb = new StringBuilder();
+            sb.append("limit=" + limit + ", nedges=" + nedges);
+            sb.append(", sampled vertices::\n");
+            for (Vertex v : V) {
+                if (v.sample != null) {
+                    sb.append("id=" + v.pred.getId() + " : ");
+                    sb.append(v.sample.toString());
+                    sb.append("\n");
+                }
+            }
+            log.info(sb.toString());
+        }
 
         /*
          * Estimate the cardinality for each edge.
@@ -662,31 +842,31 @@ public class JGraph {
 
     }
 
-	/**
-	 * Resample the initial vertices for the specified join paths and then
-	 * resample the cutoff join for each given join path in path order.
-	 * 
-	 * @param queryEngine
-	 *            The query engine.
-	 * @param limitIn
-	 *            The original limit.
-	 * @param round
-	 *            The round number in [1:n].
-	 * @param a
-	 *            The set of paths from the previous round. For the first round,
-	 *            this is formed from the initial set of edges to consider.
-	 * @param edgeSamples
-	 *            A map used to associate join path segments (expressed as an
-	 *            ordered array of bopIds) with {@link EdgeSample}s to avoid
-	 *            redundant effort.
-	 * 
-	 * @return The number of join paths which are experiencing cardinality
-	 *         estimate underflow.
-	 * 
-	 * @throws Exception
-	 */
-    public int resamplePaths(final QueryEngine queryEngine, int limitIn,
-            final int round, final Path[] a,
+    /**
+     * Resample the initial vertices for the specified join paths and then
+     * resample the cutoff join for each given join path in path order.
+     * 
+     * @param queryEngine
+     *            The query engine.
+     * @param limitIn
+     *            The original limit.
+     * @param round
+     *            The round number in [1:n].
+     * @param a
+     *            The set of paths from the previous round. For the first round,
+     *            this is formed from the initial set of edges to consider.
+     * @param edgeSamples
+     *            A map used to associate join path segments (expressed as an
+     *            ordered array of bopIds) with {@link EdgeSample}s to avoid
+     *            redundant effort.
+     * 
+     * @return The number of join paths which are experiencing cardinality
+     *         estimate underflow.
+     * 
+     * @throws Exception
+     */
+    protected int resamplePaths(final QueryEngine queryEngine,
+            final int limitIn, final int round, final Path[] a,
             final Map<PathIds, EdgeSample> edgeSamples) throws Exception {
 
         if (queryEngine == null)
@@ -741,49 +921,102 @@ public class JGraph {
 
 			}
 
-			for (Path x : a) {
-
-				final Vertex v = x.vertices[0];
-
-				final int limit = vertexLimit.get(v).intValue();
-
-				v.sample(queryEngine, limit, sampleType);
-
-			}
+			// re-sample vertices (this is done in parallel).
+			sampleVertices(queryEngine, vertexLimit);
 
 		}
 
         /*
-         * Re-sample the cutoff join for each edge in each of the existing
-         * paths using the newly re-sampled vertices.
+         * Re-sample the cutoff join for each edge in each of the existing paths
+         * using the newly re-sampled vertices.
          * 
          * Note: The only way to increase the accuracy of our estimates for
-         * edges as we extend the join paths is to re-sample each edge in
-         * the join path in path order.
+         * edges as we extend the join paths is to re-sample each edge in the
+         * join path in path order.
          * 
-         * Note: An edge must be sampled for each distinct join path prefix
-         * in which it appears within each round. However, it is common for
-         * surviving paths to share a join path prefix, so do not re-sample
-         * a given path prefix more than once per round. 
+         * Note: An edge must be sampled for each distinct join path prefix in
+         * which it appears within each round. However, it is common for
+         * surviving paths to share a join path prefix, so do not re-sample a
+         * given path prefix more than once per round.
+         * 
+         * FIXME PARALLELIZE: Parallelize the re-sampling for the active paths.
+         * This step is responsible for deepening the samples on the non-pruned
+         * paths. There is a data race that can occur since the [edgeSamples]
+         * map can contain samples for the same sequence of edges in different
+         * paths. This is because two paths can shared a common prefix sequence
+         * of edges, e.g., [2, 4, 6, 7] and [2, 4, 6, 9] share the path prefix
+         * [2, 4, 6]. Therefore both inspection and update of the [edgeSamples]
+         * map MUST be synchronized. This code is single threaded since that
+         * synchronization mechanism has not yet been put into place. The
+         * obvious way to handle this is to use a memoization pattern for the
+         * [ids] key for the [edgeSamples] map. This will ensure that the
+         * threads that need to resample a given edge will coordinate with the
+         * first such thread doing the resampling and the other thread(s)
+         * blocking until the resampled edge is available.
          */
         if (log.isDebugEnabled())
             log.debug("Re-sampling in-use path segments.");
 
+        // #of paths with cardinality estimate underflow.
         int nunderflow = 0;
+        final List<Callable<Boolean>> tasks = new LinkedList<Callable<Boolean>>();
         for (Path x : a) {
 
-			/*
-			 * Get the new sample limit for the path.
-			 * 
-			 * TODO We only need to increase the sample limit starting at the
-			 * vertex where we have a cardinality underflow or variability in
-			 * the cardinality estimate. This is increasing the limit in each
-			 * round of expansion, which means that we are reading more data
-			 * than we really need to read.
-			 */
-			final int limit = x.getNewLimit(limitIn);
+            tasks.add(new ResamplePathTask(queryEngine, x, limitIn, edgeSamples));
 
-			// The cutoff join sample of the one step shorter path segment.
+        } // next Path [x].
+
+        // Execute in the caller's thread.
+        for (Callable<Boolean> task : tasks) {
+
+            if (task.call()) {
+
+                nunderflow++;
+
+            }
+
+        }
+
+        return nunderflow;
+
+    }
+
+    /**
+     * Resample the edges along a join path. Edges are resampled based on the
+     * desired cutoff limit and only as necessary.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+     *         Thompson</a>
+     */
+    private class ResamplePathTask implements Callable<Boolean> {
+        
+        private final QueryEngine queryEngine;
+        private final Path x;
+        private final int limitIn;
+        private final Map<PathIds, EdgeSample> edgeSamples;
+        
+        public ResamplePathTask(final QueryEngine queryEngine, final Path x,
+                final int limitIn, final Map<PathIds, EdgeSample> edgeSamples) {
+            this.queryEngine = queryEngine;
+            this.x = x;
+            this.limitIn = limitIn;
+            this.edgeSamples = edgeSamples;
+        }
+        
+        @Override
+        public Boolean call() throws Exception {    
+            /*
+             * Get the new sample limit for the path.
+             * 
+             * TODO We only need to increase the sample limit starting at the
+             * vertex where we have a cardinality underflow or variability in
+             * the cardinality estimate. This is increasing the limit in each
+             * round of expansion, which means that we are reading more data
+             * than we really need to read.
+             */
+            final int limit = x.getNewLimit(limitIn);
+
+            // The cutoff join sample of the one step shorter path segment.
             EdgeSample priorEdgeSample = null;
 
             for (int segmentLength = 2; segmentLength <= x.vertices.length; segmentLength++) {
@@ -825,11 +1058,13 @@ public class JGraph {
                          * cardinality vertex.
                          */
 
-                        edgeSample = Path.cutoffJoin(//
-                                queryEngine, limit,//
+                        edgeSample = AST2BOpRTO.cutoffJoin(//
+                                queryEngine, //
+                                joinGraph, //
+                                limit,//
                                 x.getPathSegment(2),// 1st edge.
                                 C,// constraints
-								V.length == 2,// pathIsComplete
+                                V.length == 2,// pathIsComplete
                                 x.vertices[0].sample// source sample.
                                 );
 
@@ -863,7 +1098,9 @@ public class JGraph {
                          * edge of the path.
                          */
 
-                        edgeSample = Path.cutoffJoin(queryEngine,//
+                        edgeSample = AST2BOpRTO.cutoffJoin(//
+                                queryEngine,//
+                                joinGraph,//
                                 limit,//
                                 x.getPathSegment(ids.length()),//
                                 C, // constraints
@@ -891,19 +1128,19 @@ public class JGraph {
 
             // Save the result on the path.
             x.edgeSample = priorEdgeSample;
-            
-			if (x.edgeSample.estimateEnum == EstimateEnum.Underflow) {
-				if (log.isDebugEnabled())
-					log.debug("Cardinality underflow: " + x);
-				nunderflow++;
+
+            final boolean underflow = x.edgeSample.estimateEnum == EstimateEnum.Underflow;
+            if (underflow) {
+                if (log.isDebugEnabled())
+                    log.debug("Cardinality underflow: " + x);
             }
 
-        } // next Path [x].
-
-        return nunderflow;
-
+            // Done.
+            return underflow;
+        }
+        
     }
-
+    
     /**
      * Do one breadth first expansion. In each breadth first expansion we extend
      * each of the active join paths by one vertex for each remaining vertex
@@ -946,7 +1183,7 @@ public class JGraph {
      */
     public Path[] expand(final QueryEngine queryEngine, int limitIn,
             final int round, final Path[] a,
-            final Map<PathIds, EdgeSample> edgeSamples) throws Exception {
+            Map<PathIds, EdgeSample> edgeSamples) throws Exception {
 
         if (queryEngine == null)
             throw new IllegalArgumentException();
@@ -958,7 +1195,14 @@ public class JGraph {
             throw new IllegalArgumentException();
         if (a.length == 0)
             throw new IllegalArgumentException();
-        
+
+        /*
+         * Ensure that we use a synchronized view of this collection since we
+         * will write on it from parallel threads when we expand the join paths
+         * in parallel.
+         */
+        edgeSamples = Collections.synchronizedMap(edgeSamples);
+
 //        // increment the limit by itself in each round.
 //        final int limit = (round + 1) * limitIn;
 
@@ -973,136 +1217,27 @@ public class JGraph {
         if (log.isDebugEnabled())
 			log.debug("Expanding paths: #paths(in)=" + a.length);
 
-        final List<Path> tmp = new LinkedList<Path>();
+        // The new set of paths to be explored.
+        final List<Path> tmpAll = new LinkedList<Path>();
 
+        // Setup tasks to expand the current join paths.
+        final List<Callable<List<Path>>> tasks = new LinkedList<Callable<List<Path>>>();
         for (Path x : a) {
 
-			/*
-			 * We already increased the sample limit for the path in the loop
-			 * above.
-			 */
-			final int limit = x.edgeSample.limit;
+            tasks.add(new ExpandPathTask(queryEngine, x, edgeSamples));
 
-			/*
-             * The set of vertices used to expand this path in this round.
-             */
-            final Set<Vertex> used = new LinkedHashSet<Vertex>();
+        }
 
-            {
+        // Expand paths in parallel.
+        final List<Future<List<Path>>> futures = queryEngine.getIndexManager().getExecutorService()
+                .invokeAll(tasks);
+        
+        // Check future, collecting new paths from each task.
+        for(Future<List<Path>> f : futures) {
 
-                /*
-                 * Any vertex which (a) does not appear in the path to be
-                 * extended; (b) has not already been used to extend the path;
-                 * and (c) does not share any variables indirectly via
-                 * constraints is added to this collection.
-                 * 
-                 * If we are not able to extend the path at least once using a
-                 * constrained join then we will use this collection as the
-                 * source of unconnected edges which need to be used to extend
-                 * the path.
-                 */
-                final Set<Vertex> nothingShared = new LinkedHashSet<Vertex>();
-                
-                // Consider all vertices.
-                for (Vertex tVertex : V) {
-
-                    // Figure out which vertices are already part of this path.
-                    final boolean vFound = x.contains(tVertex);
-
-                    if (vFound) {
-                        // Vertex is already part of this path.
-                        if (log.isTraceEnabled())
-                            log.trace("Vertex: " + tVertex
-                                    + " - already part of this path.");
-                        continue;
-                    }
-
-                    if (used.contains(tVertex)) {
-                        // Vertex already used to extend this path.
-                        if (log.isTraceEnabled())
-                            log
-                                    .trace("Vertex: "
-                                            + tVertex
-                                            + " - already used to extend this path.");
-                        continue;
-                    }
-
-                    if (!PartitionedJoinGroup.canJoinUsingConstraints(//
-                            x.getPredicates(),// path
-                            tVertex.pred,// vertex
-                            C// constraints
-                            )) {
-                        /*
-                         * Vertex does not share variables either directly
-                         * or indirectly.
-                         */
-                        if (log.isTraceEnabled())
-                            log
-                                    .trace("Vertex: "
-                                            + tVertex
-                                            + " - unconstrained join for this path.");
-                        nothingShared.add(tVertex);
-                        continue;
-                    }
-
-                    // add the new vertex to the set of used vertices.
-                    used.add(tVertex);
-
-					// Extend the path to the new vertex.
-					final Path p = x
-							.addEdge(queryEngine, limit, tVertex, /* dynamicEdge, */
-									C, x.getVertexCount() + 1 == V.length/* pathIsComplete */);
-
-                    // Add to the set of paths for this round.
-                    tmp.add(p);
-
-                    // Record the sample for the new path.
-                    if (edgeSamples.put(new PathIds(p.getVertexIds()),
-                            p.edgeSample) != null)
-                        throw new AssertionError();
-
-                    if (log.isTraceEnabled())
-                        log.trace("Extended path with dynamic edge: vnew="
-                                + tVertex.pred.getId() + ", new path=" + p);
-
-                } // next vertex.
-
-                if (tmp.isEmpty()) {
-
-                    /*
-                     * No constrained joins were identified so we must consider
-                     * edges which represent fully unconstrained joins.
-                     */
-
-                    assert !nothingShared.isEmpty();
-
-                    /*
-                     * Choose any vertex from the set of those which do
-                     * not share any variables with the join path. Since
-                     * all of these are fully unconstrained joins we do
-                     * not want to expand the join path along multiple
-                     * edges in this iterator, just along a single
-                     * unconstrained edge.
-                     */
-                    final Vertex tVertex = nothingShared.iterator().next();
-                    
-                    // Extend the path to the new vertex.
-					final Path p = x
-							.addEdge(queryEngine, limit, tVertex,/* dynamicEdge */
-									C, x.getVertexCount() + 1 == V.length/* pathIsComplete */);
-
-                    // Add to the set of paths for this round.
-                    tmp.add(p);
-
-                    if (log.isTraceEnabled())
-                        log.trace("Extended path with dynamic edge: vnew="
-                                + tVertex.pred.getId() + ", new path=" + p);
-
-                }
-
-            } 
-
-        } // next path
+            tmpAll.addAll(f.get());
+            
+        }
 
         /*
          * Now examine the set of generated and sampled join paths. If any paths
@@ -1110,7 +1245,7 @@ public class JGraph {
          * best alternative now and prune the other alternatives for those
          * vertices.
          */
-        final Path[] paths_tp1 = tmp.toArray(new Path[tmp.size()]);
+        final Path[] paths_tp1 = tmpAll.toArray(new Path[tmpAll.size()]);
 
         final Path[] paths_tp1_pruned = pruneJoinPaths(paths_tp1, edgeSamples);
 
@@ -1131,6 +1266,176 @@ public class JGraph {
     }
 
     /**
+     * Task expands a path by one edge into one or more new paths.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     */
+    private class ExpandPathTask implements Callable<List<Path>> {
+
+        private final QueryEngine queryEngine;
+        private final Path x;
+        /**
+         * Note: The collection provided by the caller MUST be thread-safe since
+         * this task will be run by parallel threads over the different join
+         * paths from the last round. There will not be any conflict over writes
+         * on this map since each {@link PathIds} instance resulting from the
+         * expansion will be unique, but we still need to use a thread-safe
+         * collection since there will be concurrent modifications to this map.
+         */
+        private final Map<PathIds, EdgeSample> edgeSamples;
+
+        public ExpandPathTask(final QueryEngine queryEngine, final Path x,
+                final Map<PathIds, EdgeSample> edgeSamples) {
+            this.queryEngine = queryEngine;
+            this.x = x;
+            this.edgeSamples = edgeSamples;
+        }
+        
+        @Override
+        public List<Path> call() throws Exception {
+            /*
+             * We already increased the sample limit for the path in the loop
+             * above.
+             */
+            final int limit = x.edgeSample.limit;
+
+            /*
+             * The set of vertices used to expand this path in this round.
+             */
+            final Set<Vertex> used = new LinkedHashSet<Vertex>();
+
+            /*
+             * Any vertex which (a) does not appear in the path to be
+             * extended; (b) has not already been used to extend the path;
+             * and (c) does not share any variables indirectly via
+             * constraints is added to this collection.
+             * 
+             * If we are not able to extend the path at least once using a
+             * constrained join then we will use this collection as the
+             * source of unconnected edges which need to be used to extend
+             * the path.
+             */
+            final Set<Vertex> nothingShared = new LinkedHashSet<Vertex>();
+            
+            // The new set of paths to be explored as extensions to this path.
+            final List<Path> tmp = new LinkedList<Path>();
+            
+            // Consider all vertices.
+            for (Vertex tVertex : V) {
+
+                // Figure out which vertices are already part of this path.
+                final boolean vFound = x.contains(tVertex);
+
+                if (vFound) {
+                    // Vertex is already part of this path.
+                    if (log.isTraceEnabled())
+                        log.trace("Vertex: " + tVertex
+                                + " - already part of this path.");
+                    continue;
+                }
+
+                if (used.contains(tVertex)) {
+                    // Vertex already used to extend this path.
+                    if (log.isTraceEnabled())
+                        log
+                                .trace("Vertex: "
+                                        + tVertex
+                                        + " - already used to extend this path.");
+                    continue;
+                }
+
+                // FIXME RTO: Replace with StaticAnalysis.
+                if (!PartitionedJoinGroup.canJoinUsingConstraints(//
+                        x.getPredicates(),// path
+                        tVertex.pred,// vertex
+                        C// constraints
+                        )) {
+                    /*
+                     * Vertex does not share variables either directly
+                     * or indirectly.
+                     */
+                    if (log.isTraceEnabled())
+                        log
+                                .trace("Vertex: "
+                                        + tVertex
+                                        + " - unconstrained join for this path.");
+                    nothingShared.add(tVertex);
+                    continue;
+                }
+
+                // add the new vertex to the set of used vertices.
+                used.add(tVertex);
+
+                // Extend the path to the new vertex.
+                final Path p = x.addEdge(//
+                        queryEngine, //
+                        joinGraph, //
+                        limit,//
+                        tVertex,//
+                        C, //
+                        x.getVertexCount() + 1 == V.length// pathIsComplete
+                        );
+
+                // Add to the set of paths for this round.
+                tmp.add(p);
+
+                // Record the sample for the new path.
+                if (edgeSamples.put(new PathIds(p.getVertexIds()),
+                        p.edgeSample) != null)
+                    throw new AssertionError();
+
+                if (log.isTraceEnabled())
+                    log.trace("Extended path with dynamic edge: vnew="
+                            + tVertex.pred.getId() + ", new path=" + p);
+
+            } // next target vertex.
+
+            if (tmp.isEmpty()) {
+
+                /*
+                 * No constrained joins were identified as extensions of this
+                 * join path, so we must consider edges which represent fully
+                 * unconstrained joins.
+                 */
+
+                assert !nothingShared.isEmpty();
+
+                /*
+                 * Choose any vertex from the set of those which do
+                 * not share any variables with the join path. Since
+                 * all of these are fully unconstrained joins we do
+                 * not want to expand the join path along multiple
+                 * edges in this iterator, just along a single
+                 * unconstrained edge.
+                 */
+                final Vertex tVertex = nothingShared.iterator().next();
+                
+                // Extend the path to the new vertex.
+                final Path p = x.addEdge(//
+                        queryEngine, //
+                        joinGraph,//
+                        limit, //
+                        tVertex, //
+                        C,//
+                        x.getVertexCount() + 1 == V.length// pathIsComplete
+                        );
+
+                // Add to the set of paths for this round.
+                tmp.add(p);
+
+                if (log.isTraceEnabled())
+                    log.trace("Extended path with dynamic edge: vnew="
+                            + tVertex.pred.getId() + ", new path=" + p);
+
+            } // if(tmp.isEmpty())
+
+            return tmp;
+
+        }
+        
+    }
+    
+    /**
      * Return the {@link Vertex} whose {@link IPredicate} is associated with
      * the given {@link BOp.Annotations#BOP_ID}.
      * 
@@ -1147,41 +1452,153 @@ public class JGraph {
         return null;
     }
 
-	/**
-	 * Obtain a sample and estimated cardinality (fast range count) for each
-	 * vertex.
-	 * 
-	 * @param queryEngine
-	 *            The query engine.
-	 * @param limit
-	 *            The sample size.
-	 * 
-	 *            TODO Only sample vertices with an index.
-	 * 
-	 *            TODO Consider other cases where we can avoid sampling a vertex
-	 *            or an initial edge.
-	 *            <p>
-	 *            Be careful about rejecting high cardinality vertices here as
-	 *            they can lead to good solutions (see the "bar" data set
-	 *            example).
-	 *            <p>
-	 *            BSBM Q5 provides a counter example where (unless we translate
-	 *            it into a key-range constraint on an index) some vertices do
-	 *            not share a variable directly and hence will materialize the
-	 *            full cross product before filtering which is *really*
-	 *            expensive.
-	 * 
-	 */
-    public void sampleAllVertices(final QueryEngine queryEngine, final int limit) {
+    /**
+     * Obtain a sample and estimated cardinality (fast range count) for each
+     * vertex.
+     * 
+     * @param queryEngine
+     *            The query engine.
+     * @param limit
+     *            The sample size.
+     * 
+     *            TODO Only sample vertices with an index.
+     * 
+     *            TODO If any required join has a vertex with a proven exact
+     *            cardinality of zero, then there are no solutions for the join
+     *            group. Throw a {@link NoSolutionsException} and have the
+     *            caller handle it?
+     * 
+     *            TODO Consider other cases where we can avoid sampling a vertex
+     *            or an initial edge.
+     *            <p>
+     *            Be careful about rejecting high cardinality vertices here as
+     *            they can lead to good solutions (see the "bar" data set
+     *            example).
+     *            <p>
+     *            BSBM Q5 provides a counter example where (unless we translate
+     *            it into a key-range constraint on an index) some vertices do
+     *            not share a variable directly and hence will materialize the
+     *            full cross product before filtering which is *really*
+     *            expensive.
+     */
+    private void sampleAllVertices(final QueryEngine queryEngine,
+            final int limit) {
+
+        final Map<Vertex, AtomicInteger> vertexLimit = new LinkedHashMap<Vertex, AtomicInteger>();
 
         for (Vertex v : V) {
 
-            v.sample(queryEngine, limit, sampleType);
+            vertexLimit.put(v, new AtomicInteger(limit));
 
+        }
+
+        sampleVertices(queryEngine, vertexLimit);
+        
+    }
+
+    /**
+     * (Re-)sample a set of vertices. Sampling is done in parallel.
+     * <p>
+     * Note: A request to re-sample a vertex is a NOP unless the limit has been
+     * increased since the last time the vertex was sampled. It is also a NOP if
+     * the vertex has been fully materialized.
+     * 
+     * @param queryEngine
+     * @param vertexLimit
+     *            A map whose keys are the {@link Vertex vertices} to be
+     *            (re-)samples and whose values are the <code>limit</code> to be
+     *            used when sampling the associated vertex. This map is
+     *            read-only so it only needs to be thread-safe for concurrent
+     *            readers.
+     */
+    private void sampleVertices(final QueryEngine queryEngine,
+            final Map<Vertex, AtomicInteger> vertexLimit) {
+
+        // Setup tasks to sample vertices.
+        final List<Callable<Void>> tasks = new LinkedList<Callable<Void>>();
+        for (Map.Entry<Vertex, AtomicInteger> e : vertexLimit.entrySet()) {
+
+            final Vertex v = e.getKey();
+            
+            final int limit = e.getValue().get();
+            
+            tasks.add(new SampleVertexTask(queryEngine, v, limit, sampleType));
+
+        }
+
+        // Sample vertices in parallel.
+        final List<Future<Void>> futures;
+        try {
+
+            futures = queryEngine.getIndexManager().getExecutorService()
+                    .invokeAll(tasks);
+
+        } catch (InterruptedException e) {
+            // propagate interrupt.
+            Thread.currentThread().interrupt();
+            return;
+        }
+
+        // Check futures for errors.
+        final List<Throwable> causes = new LinkedList<Throwable>();
+        for (Future<Void> f : futures) {
+            try {
+                f.get();
+            } catch (InterruptedException e) {
+                log.error(e);
+                causes.add(e);
+            } catch (ExecutionException e) {
+                log.error(e);
+                causes.add(e);
+            }
+        }
+
+        /*
+         * If there were any errors, then throw an exception listing them.
+         */
+        if (!causes.isEmpty()) {
+            // Throw exception back to the leader.
+            if (causes.size() == 1)
+                throw new RuntimeException(causes.get(0));
+            throw new RuntimeException("nerrors=" + causes.size(),
+                    new ExecutionExceptions(causes));
         }
 
     }
 
+    /**
+     * Task to sample a vertex.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+     *         Thompson</a>
+     */
+    static private class SampleVertexTask implements Callable<Void> {
+
+        private final QueryEngine queryEngine;
+        private final Vertex v;
+        private final int limit;
+        private final SampleType sampleType;
+        
+        public SampleVertexTask(final QueryEngine queryEngine, final Vertex v,
+                final int limit, final SampleType sampleType) {
+
+            this.queryEngine = queryEngine;
+            this.v = v;
+            this.limit = limit;
+            this.sampleType = sampleType;
+
+        }
+        
+        @Override
+        public Void call() throws Exception {
+
+            v.sample(queryEngine, limit, sampleType);
+
+            return null;
+        }
+        
+    }
+    
     /**
      * Estimate the cardinality of each edge. This is only invoked by
      * {@link #round0(QueryEngine, int, int)} when it is trying to select the
@@ -1208,7 +1625,7 @@ public class JGraph {
     private Path[] estimateInitialEdgeWeights(final QueryEngine queryEngine,
             final int limit) throws Exception {
 
-        final List<Path> paths = new LinkedList<Path>();
+        final List<Callable<Path>> tasks = new LinkedList<Callable<Path>>();
 
         /*
          * Examine all unordered vertex pairs (v1,v2) once. If any vertex has
@@ -1291,28 +1708,86 @@ public class JGraph {
                     
 				}
 
-				// The path segment
-				final IPredicate<?>[] preds = new IPredicate[] { v.pred, vp.pred };
+                tasks.add(new CutoffJoinTask(queryEngine, limit, v, vp,
+                        pathIsComplete));
 
-				// cutoff join of the edge (v,vp)
-				final EdgeSample edgeSample = Path.cutoffJoin(queryEngine,// 
-						limit, // sample limit
-						preds, // ordered path segment.
-						C, // constraints
-						pathIsComplete,//
-						v.sample // sourceSample
-						);
-
-				final Path p = new Path(v, vp, edgeSample);
-
-				paths.add(p);
-
-			}
+			} // next other vertex.
         
+        } // next vertex
+
+        /*
+         * Now sample those paths in parallel.
+         */
+
+        final List<Path> paths = new LinkedList<Path>();
+
+//        // Sample the paths in the caller's thread.
+//        for(Callable<Path> task : tasks) {
+//
+//            paths.add(task.call());
+//            
+//        }
+        
+        // Sample the paths in parallel.
+        final List<Future<Path>> futures = queryEngine.getIndexManager()
+                .getExecutorService().invokeAll(tasks);
+
+        // Check future, collecting new paths from each task.
+        for (Future<Path> f : futures) {
+
+            paths.add(f.get());
+
         }
-        
+
         return paths.toArray(new Path[paths.size()]);
 
+    }
+    
+    /**
+     * Cutoff sample an initial join path consisting of two vertices.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     */
+    private class CutoffJoinTask implements Callable<Path> {
+
+        private final QueryEngine queryEngine;
+        private final int limit;
+        private final Vertex v;
+        private final Vertex vp;
+        private final boolean pathIsComplete;
+
+        public CutoffJoinTask(final QueryEngine queryEngine, final int limit,
+                final Vertex v, final Vertex vp, final boolean pathIsComplete) {
+            this.queryEngine = queryEngine;
+            this.limit = limit;
+            this.v = v;
+            this.vp = vp;
+            this.pathIsComplete = pathIsComplete;
+        }
+        
+        @Override
+        public Path call() throws Exception {
+            
+            // The path segment
+            final IPredicate<?>[] preds = new IPredicate[] { v.pred, vp.pred };
+
+            // cutoff join of the edge (v,vp)
+            final EdgeSample edgeSample = AST2BOpRTO.cutoffJoin(//
+                    queryEngine,// 
+                    joinGraph,//
+                    limit, // sample limit
+                    preds, // ordered path segment.
+                    C, // constraints
+                    pathIsComplete,//
+                    v.sample // sourceSample
+                    );
+
+            final Path p = new Path(v, vp, edgeSample);
+            
+            return p;
+            
+        }
+        
     }
 
     /**
@@ -1338,7 +1813,7 @@ public class JGraph {
      */
     public Path[] pruneJoinPaths(final Path[] a,
             final Map<PathIds, EdgeSample> edgeSamples) {
-    	final boolean neverPruneUnderflow = true;
+        final boolean neverPruneUnderflow = true;
         /*
          * Find the length of the longest path(s). All shorter paths are
          * dropped in each round.
@@ -1379,10 +1854,10 @@ public class JGraph {
                 final Path Pj = a[j];
                 if (Pj.edgeSample == null)
                     throw new RuntimeException("Not sampled: " + Pj);
-    			if (pruned.contains(Pj)) {
-    				// already pruned.
+                if (pruned.contains(Pj)) {
+                    // already pruned.
                     continue;
-    			}
+                }
                 final boolean isPiSuperSet = Pi.isUnorderedVariant(Pj);
                 if (!isPiSuperSet) {
                     // Can not directly compare these join paths.
@@ -1514,9 +1989,9 @@ public class JGraph {
     }
 
     /**
-     * Comma delimited table showing the estimated join hit ratio, the estimated
-     * cardinality, and the set of vertices for each of the specified join
-     * paths.
+     * Return a comma delimited table showing the estimated join hit ratio, the
+     * estimated cardinality, and the set of vertices for each of the specified
+     * join paths.
      * 
      * @param a
      *            A set of paths (typically those before pruning).
@@ -1527,8 +2002,35 @@ public class JGraph {
      * 
      * @return A table with that data.
      */
-    static public String showTable(final Path[] a,final Path[] pruned) {
-        final StringBuilder sb = new StringBuilder();
+    static public String showTable(final Path[] a, final Path[] pruned) {
+
+        return showTable(a, pruned, null/* edgeSamples */);
+
+    }
+
+    /**
+     * Return a comma delimited table showing the estimated join hit ratio, the
+     * estimated cardinality, and the set of vertices for each of the specified
+     * join paths.
+     * 
+     * @param a
+     *            A set of paths (typically those before pruning).
+     * @param pruned
+     *            The set of paths after pruning (those which were retained)
+     *            (optional). When given, the paths which were pruned are marked
+     *            in the table.
+     * @param edgeSamples
+     *            When non-<code>null</code>, the details will be shown (using
+     *            {@link #showPath(Path, Map)}) for each path that is
+     *            experiencing cardinality estimate underflow (no solutions in
+     *            the data).
+     * 
+     * @return A table with that data.
+     */
+    static public String showTable(final Path[] a, final Path[] pruned,
+            final Map<PathIds, EdgeSample> edgeSamples) {
+        final StringBuilder sb = new StringBuilder(128 * a.length);
+        final List<Path> underflowPaths = new LinkedList<Path>();
         final Formatter f = new Formatter(sb);
         f.format("%-4s %10s%1s * %10s (%8s %8s %8s %8s %8s %8s) = %10s %10s%1s : %10s %10s %10s %10s",
                 "path",//
@@ -1603,8 +2105,28 @@ public class JGraph {
             // sb.append(" (" + e.v1.pred.getId() + " " + e.v2.pred.getId()
             // + ")");
             sb.append("\n");
+            if(x.edgeSample.isUnderflow()) {
+                underflowPaths.add(x);
+            }
         }
+
+        if (edgeSamples != null && !underflowPaths.isEmpty()) {
+
+            // Show paths with cardinality estimate underflow.
+            sb.append("\nPaths with cardinality estimate underflow::\n");
+
+            for (Path p : underflowPaths) {
+
+                sb.append(showPath(p, edgeSamples));
+
+                sb.append("----\n");
+
+            }
+
+        }
+
         return sb.toString();
+
     }
 
     /**
@@ -1612,12 +2134,16 @@ public class JGraph {
      * join hit ratio for each step in the path.
      * 
      * @param p
-     *            The join path.
+     *            The join path (required).
      * @param edgeSamples
-     *            A map containing the samples utilized by the {@link Path}.
+     *            A map containing the samples utilized by the {@link Path}
+     *            (required).
      */
-    static String showPath(final Path x, final Map<PathIds, EdgeSample> edgeSamples) {
+    static public String showPath(final Path x,
+            final Map<PathIds, EdgeSample> edgeSamples) {
         if (x == null)
+            throw new IllegalArgumentException();
+        if (edgeSamples == null)
             throw new IllegalArgumentException();
         final StringBuilder sb = new StringBuilder();
         final Formatter f = new Formatter(sb);
@@ -1672,20 +2198,20 @@ public class JGraph {
                             predId,//
                             NA, "", NA, NA, NA, NA, NA, NA, NA, NA, NA, "", NA, NA);//,NA,NA);
                 } else if(sample instanceof VertexSample) {
-					/*
-					 * Show the vertex sample for the initial vertex.
-					 * 
-					 * Note: we do not store all fields for a vertex sample
-					 * which are stored for an edge sample because so many of
-					 * the values are redundant for a vertex sample. Therefore,
-					 * this sets up local variables which are equivalent to the
-					 * various edge sample columns that we will display.
-					 */
-                	final long sumRangeCount = sample.estCard;
-                	final long estRead = sample.estCard;
-					final long tuplesRead = Math.min(sample.estCard, sample.limit);
-					final long outputCount = Math.min(sample.estCard, sample.limit);
-					final long adjCard = Math.min(sample.estCard, sample.limit);
+					                    /*
+                     * Show the vertex sample for the initial vertex.
+                     * 
+                     * Note: we do not store all fields for a vertex sample
+                     * which are stored for an edge sample because so many of
+                     * the values are redundant for a vertex sample. Therefore,
+                     * this sets up local variables which are equivalent to the
+                     * various edge sample columns that we will display.
+                     */
+                    final long sumRangeCount = sample.estCard;
+                    final long estRead = sample.estCard;
+                    final long tuplesRead = Math.min(sample.estCard, sample.limit);
+                    final long outputCount = Math.min(sample.estCard, sample.limit);
+                    final long adjCard = Math.min(sample.estCard, sample.limit);
                     f.format("% 4d %10s%1s * %10s (%8s %8s %8s %8s %8s %8s) = % 10d % 10d%1s : %10d %10d",// %10d %10s",//
                             predId,//
                             " ",//srcSample.estCard

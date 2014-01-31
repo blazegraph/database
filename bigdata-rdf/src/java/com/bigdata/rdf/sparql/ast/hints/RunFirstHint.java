@@ -35,7 +35,8 @@ import com.bigdata.rdf.sparql.ast.optimizers.ASTRunFirstRunLastOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTStaticJoinOptimizer;
 
 /**
- * Query hint to run a join first in a join group.
+ * Query hint to run a join first in a join group. This hint must be used
+ * with {@link QueryHintScope#Prior}.
  * <p>
  * Note: This sets an AST annotation which is interpreted by the
  * {@link ASTRunFirstRunLastOptimizer} and {@link ASTStaticJoinOptimizer}.

@@ -233,6 +233,8 @@ public class TestNanoSparqlServerWithProxyIndexManager<S extends IIndexManager>
         suite.addTestSuite(TestInsertFilterFalse727.class);
         suite.addTestSuite(TestCBD731.class);
         
+        suite.addTestSuite(TestService794.class);
+        
 
         // SPARQL UPDATE test suite.
         switch(testMode) {
@@ -245,6 +247,8 @@ public class TestNanoSparqlServerWithProxyIndexManager<S extends IIndexManager>
         case quads:
             // QUADS mode UPDATE test suite. 
             suite.addTestSuite(TestSparqlUpdate.class);
+            suite.addTestSuite( NativeDistinctNamedGraphUpdateTest.class );
+            suite.addTestSuite( HashDistinctNamedGraphUpdateTest.class );
             break;
         default: throw new UnsupportedOperationException();
         }

@@ -52,6 +52,7 @@ import com.bigdata.rdf.internal.impl.literal.XSDNumericIV;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
+import com.bigdata.util.InnerCause;
 
 /**
  * This implementation of {@link IExtension} implements inlining for literals
@@ -87,16 +88,17 @@ public class DateTimeExtension<V extends BigdataValue> implements IExtension<V> 
     }
     
     private void resolve(final IDatatypeURIResolver resolver, final URI uri) {
-    	
-    	if (log.isDebugEnabled()) {
-    		log.debug("resolving: " + uri);
-    	}
+
+        if (log.isDebugEnabled()) {
+            log.debug("resolving: " + uri);
+        }
     	
         final BigdataURI val = resolver.resolve(uri);
         datatypes.put(val.getIV(), val);
         
     }
-        
+
+    @Override
     public Set<BigdataURI> getDatatypes() {
         
         return new LinkedHashSet<BigdataURI>(datatypes.values());
@@ -182,8 +184,9 @@ public class DateTimeExtension<V extends BigdataValue> implements IExtension<V> 
             
             final BigdataURI dt = datatypes.get(iv.getExtensionIV());
             
-            final XMLGregorianCalendar xmlGC = 
-                DatatypeFactory.newInstance().newXMLGregorianCalendar(c);
+            final DatatypeFactory f = datatypeFactorySingleton;
+
+            final XMLGregorianCalendar xmlGC = f.newXMLGregorianCalendar(c);
 
             String s = xmlGC.toString();
             if (dt.equals(XSD.DATETIME)) {
@@ -219,12 +222,45 @@ public class DateTimeExtension<V extends BigdataValue> implements IExtension<V> 
             
             return (V) vf.createLiteral(s, dt);
 
-        } catch (DatatypeConfigurationException ex) {
+        } catch (RuntimeException ex) {
+
+            if (InnerCause.isInnerCause(ex, InterruptedException.class)) {
+
+                throw ex;
+
+            }
             
             throw new IllegalArgumentException("bad iv: " + iv, ex);
             
         }
+
+    }
+
+    /** Singleton. */
+    private static final DatatypeFactory datatypeFactorySingleton;
+
+    /**
+     * Singleton caching pattern for the Datatype factory reference.
+     * 
+     * @see <a href="http://sourceforge.net/apps/trac/bigdata/ticket/802">
+     *      Optimize DatatypeFactory instantiation in DateTimeExtension </a>
+     */
+    static {
+
+        DatatypeFactory f = null;
         
+        try {
+
+            f = DatatypeFactory.newInstance();
+
+        } catch (DatatypeConfigurationException ex) {
+
+            log.error("Could not configure DatatypeFactory: " + ex, ex);
+
+        }
+
+        datatypeFactorySingleton = f;
+
     }
 
     /**
@@ -234,5 +270,5 @@ public class DateTimeExtension<V extends BigdataValue> implements IExtension<V> 
      * @see http://sourceforge.net/apps/trac/bigdata/ticket/277
      */
     static private transient boolean BSBMHACK = Boolean.getBoolean("BSBM_HACK");
-    
+
 }

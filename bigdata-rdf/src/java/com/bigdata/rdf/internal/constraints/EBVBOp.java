@@ -33,13 +33,10 @@ import org.openrdf.query.algebra.evaluation.util.QueryEvaluationUtil;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IValueExpression;
-import com.bigdata.bop.NV;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.NotMaterializedException;
 import com.bigdata.rdf.internal.impl.literal.XSDBooleanIV;
-import com.bigdata.rdf.model.BigdataValue;
-import com.bigdata.rdf.sparql.ast.GlobalAnnotations;
+import com.bigdata.rdf.sparql.ast.FilterNode;
 
 /**
  * Calculates the "effective boolean value" of an IValueExpression.  See the
@@ -53,6 +50,7 @@ public class EBVBOp extends XSDBooleanIVValueExpression
 	 */
 	private static final long serialVersionUID = -5701967329003122236L;
 
+    @SuppressWarnings("rawtypes")
     public EBVBOp(final IValueExpression<? extends IV> x) { 
 
         this(new BOp[] { x }, BOp.NOANNS);
@@ -75,7 +73,9 @@ public class EBVBOp extends XSDBooleanIVValueExpression
      * Constructor required for {@link com.bigdata.bop.BOpUtility#deepCopy(FilterNode)}.
      */
     public EBVBOp(final EBVBOp op) {
+
         super(op);
+        
     }
 
 	/**
@@ -111,39 +111,41 @@ public class EBVBOp extends XSDBooleanIVValueExpression
 	 * as a typed literal with a datatype of xsd:boolean and a lexical value of
 	 * "false".
 	 */
+    @Override
+    @SuppressWarnings("rawtypes")
     public boolean accept(final IBindingSet bs) {
 
-    	final IV iv = getAndCheckBound(0, bs);
-    	
-    	if (iv instanceof XSDBooleanIV) {
-    		
-    		return ((XSDBooleanIV) iv).booleanValue();
-    		
-    	}
-    	
-    	final Value val = super.asValue(iv);
-    	
-    	try {
-    		
-    		return QueryEvaluationUtil.getEffectiveBooleanValue(val);
-    		
-    	} catch (ValueExprEvaluationException ex) {
-    		
-    		throw new SparqlTypeErrorException();
-    		
-    	}
-    	
-    }
-    
-    /**
-     * The EBVBOp only needs materialization if its internal value expression
-     * does not evaluate to an XSDBooleanIV.  
-     */
-    public Requirement getRequirement() {
-    	
-    	return INeedsMaterialization.Requirement.SOMETIMES;
-    	
+        final IV iv = getAndCheckBound(0, bs);
+
+        if (iv instanceof XSDBooleanIV) {
+
+            return ((XSDBooleanIV) iv).booleanValue();
+
+        }
+
+        final Value val = super.asValue(iv);
+
+        try {
+
+            return QueryEvaluationUtil.getEffectiveBooleanValue(val);
+
+        } catch (ValueExprEvaluationException ex) {
+
+            throw new SparqlTypeErrorException();
+
+        }
+
     }
 
+    /**
+     * The {@link EBVBOp} only needs materialization if its internal value
+     * expression does not evaluate to an {@link XSDBooleanIV}.
+     */
+    @Override
+    public Requirement getRequirement() {
+
+        return INeedsMaterialization.Requirement.SOMETIMES;
+
+    }
     
 }

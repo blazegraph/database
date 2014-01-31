@@ -187,6 +187,7 @@ public class MutableKeyBuffer implements IRaba {
         
     }
 
+    @Override
     public String toString() {
 
         return AbstractRaba.toString(this);
@@ -196,12 +197,14 @@ public class MutableKeyBuffer implements IRaba {
     /**
      * Returns a reference to the key at that index.
      */
+    @Override
     final public byte[] get(final int index) {
 
         return keys[index];
 
     }
 
+    @Override
     final public int length(final int index) {
 
         final byte[] tmp = keys[index];
@@ -213,6 +216,7 @@ public class MutableKeyBuffer implements IRaba {
 
     }
     
+    @Override
     final public int copy(final int index, final OutputStream out) {
 
         final byte[] tmp = keys[index];
@@ -236,12 +240,14 @@ public class MutableKeyBuffer implements IRaba {
      * 
      * @return <code>true</code> iff the key at that index is <code>null</code>.
      */
+    @Override
     final public boolean isNull(final int index) {
         
         return keys[index] == null;
                 
     }
     
+    @Override
     final public boolean isEmpty() {
         
         return nkeys == 0;
@@ -256,18 +262,21 @@ public class MutableKeyBuffer implements IRaba {
      * MUST explicitly scan a buddy bucket to determine the #of keys in a buddy
      * bucket on the page.
      */
+    @Override
     final public int size() {
 
         return nkeys;
 
     }
 
+    @Override
     final public int capacity() {
 
         return keys.length;
         
     }
 
+    @Override
     final public boolean isFull() {
         
         return nkeys == keys.length;
@@ -277,6 +286,7 @@ public class MutableKeyBuffer implements IRaba {
     /**
      * Mutable.
      */
+    @Override
     final public boolean isReadOnly() {
         
         return false;
@@ -284,11 +294,11 @@ public class MutableKeyBuffer implements IRaba {
     }
 
     /**
-     * Instances are NOT searchable. Duplicates and <code>null</code>s ARE
-     * permitted.
+     * Instances are searchable and support duplicate keys.
      * 
-     * @returns <code>false</code>
+     * @returns <code>true</code>
      */
+    @Override
     final public boolean isKeys() {
 
         return true;
@@ -301,20 +311,24 @@ public class MutableKeyBuffer implements IRaba {
      * This iterator visits all keys on the bucket page, including
      * <code>null</code>s.
      */
+    @Override
     public Iterator<byte[]> iterator() {
 
         return new Iterator<byte[]>() {
 
             int i = 0;
             
+            @Override
             public boolean hasNext() {
                 return i < size();
             }
 
+            @Override
             public byte[] next() {
                 return get(i++);
             }
 
+            @Override
             public void remove() {
                 throw new UnsupportedOperationException();
             }
@@ -327,6 +341,7 @@ public class MutableKeyBuffer implements IRaba {
      * Mutation api. The contents of individual keys are never modified. 
      */
     
+    @Override
     final public void set(final int index, final byte[] key) {
 
         assert key != null;
@@ -384,6 +399,7 @@ public class MutableKeyBuffer implements IRaba {
      * 
      * @throws UnsupportedOperationException
      */
+    @Override
     final public int add(final byte[] key) {
 
         throw new UnsupportedOperationException();
@@ -397,6 +413,7 @@ public class MutableKeyBuffer implements IRaba {
      * 
      * @throws UnsupportedOperationException
      */
+    @Override
     final public int add(byte[] key, int off, int len) {
 
         throw new UnsupportedOperationException();
@@ -410,6 +427,7 @@ public class MutableKeyBuffer implements IRaba {
      * 
      * @throws UnsupportedOperationException
      */
+    @Override
     public int add(DataInput in, int len) throws IOException {
 
         throw new UnsupportedOperationException();
@@ -426,6 +444,7 @@ public class MutableKeyBuffer implements IRaba {
      * Note that for duplicate keys the returned search index reflects the first
      * location in the array. 
      */
+    @Override
     public int search(final byte[] key) {
         
 		return search(key, keys, 0, capacity());
@@ -443,7 +462,8 @@ public class MutableKeyBuffer implements IRaba {
 	 * @param key
 	 * @return the insertion point
 	 */	
-	private int search(final byte[] key, final byte[][] keys, final int start, final int length) {
+    private int search(final byte[] key, final byte[][] keys, final int start,
+            final int length) {
 		if (length == 1) {
 			final byte[] tstkey = keys[start];
 			if (tstkey == null)

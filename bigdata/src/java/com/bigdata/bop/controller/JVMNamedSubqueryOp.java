@@ -73,7 +73,7 @@ import cutthecrap.utils.striterators.SingleValueIterator;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
-public class JVMNamedSubqueryOp extends PipelineOp {
+public class JVMNamedSubqueryOp extends PipelineOp implements INamedSubqueryOp {
 
     static private final transient Logger log = Logger
             .getLogger(JVMNamedSubqueryOp.class);
@@ -140,7 +140,7 @@ public class JVMNamedSubqueryOp extends PipelineOp {
 
     }
 
-    public JVMNamedSubqueryOp(final BOp[] args, NV... annotations) {
+    public JVMNamedSubqueryOp(final BOp[] args, final NV... annotations) {
 
         this(args, NV.asMap(annotations));
         
@@ -153,6 +153,7 @@ public class JVMNamedSubqueryOp extends PipelineOp {
 
     }
 
+    @Override
     public FutureTask<Void> eval(final BOpContext<IBindingSet> context) {
 
         return new FutureTask<Void>(new ControllerTask(this, context));
@@ -254,6 +255,7 @@ public class JVMNamedSubqueryOp extends PipelineOp {
         /**
          * Evaluate.
          */
+        @Override
         public Void call() throws Exception {
             
             try {
@@ -344,6 +346,7 @@ public class JVMNamedSubqueryOp extends PipelineOp {
 
             }
 
+            @Override
             public Void call() throws Exception {
 
             	// The subquery

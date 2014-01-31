@@ -463,6 +463,9 @@ public class CustomByteArrayFrontCodedList extends AbstractObjectList<byte[]>
 //    protected byte[] array;
     /** A view on the compressed arrays. */
     private BackingBuffer bb;
+    
+    /** <code>true</code>iff duplicate keys are allowed. */
+    private boolean hasDups;
 
     /** The pointers to entire arrays in the list. */
     transient protected int[] p;
@@ -484,7 +487,15 @@ public class CustomByteArrayFrontCodedList extends AbstractObjectList<byte[]>
      *            the desired ratio.
      */
 
-    public CustomByteArrayFrontCodedList(final Iterator<byte[]> arrays, final int ratio) {
+    public CustomByteArrayFrontCodedList(final Iterator<byte[]> arrays,
+            final int ratio) {
+
+        this(arrays, ratio, false/* hasDups */);
+
+    }
+    
+    public CustomByteArrayFrontCodedList(final Iterator<byte[]> arrays,
+            final int ratio, final boolean hasDups) {
 
         assertRatio(ratio);
 //        if (ratio < 1)
@@ -536,6 +547,7 @@ public class CustomByteArrayFrontCodedList extends AbstractObjectList<byte[]>
 //        this.bb = new BackingByteBuffer( ByteBuffer.wrap(ByteArrays.trim(array, curSize) ));
         this.p = IntArrays.trim(p, (n + ratio - 1) / ratio);
 
+        this.hasDups = hasDups;
     }
 
     /**
@@ -547,9 +559,29 @@ public class CustomByteArrayFrontCodedList extends AbstractObjectList<byte[]>
      * @param ratio
      *            the desired ratio.
      */
+    public CustomByteArrayFrontCodedList(final Collection<byte[]> c,
+            final int ratio) {
 
-    public CustomByteArrayFrontCodedList(final Collection<byte[]> c, final int ratio) {
         this(c.iterator(), ratio);
+        
+    }
+
+    /**
+     * Creates a new front-coded list containing the arrays in the given
+     * collection.
+     * 
+     * @param c
+     *            a collection containing arrays.
+     * @param ratio
+     *            the desired ratio.
+     * @param hasDups
+     *            <code>true</code> iff the list allows duplicate keys.
+     */
+    public CustomByteArrayFrontCodedList(final Collection<byte[]> c,
+            final int ratio, final boolean hasDups) {
+     
+        this(c.iterator(), ratio, hasDups);
+        
     }
 
 //    /**
@@ -1024,7 +1056,7 @@ public class CustomByteArrayFrontCodedList extends AbstractObjectList<byte[]>
     public CustomByteArrayFrontCodedList(final int n, final int ratio,
             final byte[] array) {
 
-        this(n, ratio, array, 0, array.length);
+        this(n, ratio, array, 0, array.length, false/* hasDups */);
     }
 
     /**
@@ -1037,9 +1069,12 @@ public class CustomByteArrayFrontCodedList extends AbstractObjectList<byte[]>
      *            The ratio of this front-coded list.
      * @param array
      *            The array containing the compressed arrays.
+     * @param hasDups
+     *            <code>true</code> iff the list allows duplicate keys.
      */
     public CustomByteArrayFrontCodedList(final int n, final int ratio,
-            final byte[] array, final int off, final int len) {
+            final byte[] array, final int off, final int len,
+            final boolean hasDups) {
 
         assertRatio(ratio);
 
@@ -1049,6 +1084,8 @@ public class CustomByteArrayFrontCodedList extends AbstractObjectList<byte[]>
 
 //        this.array = array;
         this.bb = new BackingByteArray(array, off, len);
+        
+        this.hasDups = hasDups;
 
         rebuildPointerArray();
 
@@ -1192,18 +1229,24 @@ public class CustomByteArrayFrontCodedList extends AbstractObjectList<byte[]>
          */
         final int pret = binarySearch(a);
 
-        if (pret >= 0) {
-
-            // An exact match on a full length entry in the backing buffer.
-            return pret * ratio;
-            
-        }
-        
+        if (pret == 0 || (pret > 0 && !hasDups)) { 			
+            /*
+             * An exact match on a full length entry in the backing buffer.
+             * 
+             * Note: If duplicates are allowed, and the probe key is not an
+             * exact match for a full length key (pred>=0), then we need to
+             * search the previous encoding run for a match within that run.
+             */
+			return pret * ratio;
+		}
+         
         if (pret == -1) {
 
             /*
              * The key would be inserted before the first entry in the
-             * front-coded array.
+             * front-coded array. (This is a fast path for the case where the
+             * probe key would be inserted at the head of the list and before
+             * any full length key. Other insertion points are handled below.)
              */
             return -1;
             
@@ -1222,7 +1265,30 @@ public class CustomByteArrayFrontCodedList extends AbstractObjectList<byte[]>
          * bucket before the insertion point since we are looking for a key
          * which might exist in that bucket.
          */
-        final int poffset = (-pret - 1) - 1;
+        final int poffset;
+        if (pret < 0) {
+            /*
+             * We have an insertion point, which is the first encoding run LT
+             * the probe key. We need to scan that encoding run and see if the
+             * probe key exists in that run. This code path applies equally to
+             * search whether or not duplicate keys are allowed.
+             */
+            poffset = (-pret - 1) - 1;
+        } else {
+            /*
+             * This case only arises if duplicates are allowed. When duplicate
+             * keys are not allowed and pret>=0, we already returned at the head
+             * of this method. For this case we have a hit on the first full
+             * length key for an encoding run. Now we need to scan the previous
+             * encoding run to see if the probe key exists in that encoding run.
+             * The outcome of this dups code path in which we search the
+             * previous run is handled by conditional logic at the bottom of
+             * this method.
+             */
+            assert hasDups; // code path iff dups allowed.
+            assert pret > 0; // code path iff exact match on full length key.
+            poffset = pret - 1; // pret is > 0. subtract 1 for the previous run.
+        }
 
         // The corresponding index into the list.
         final int offset = poffset * ratio;
@@ -1348,8 +1414,41 @@ public class CustomByteArrayFrontCodedList extends AbstractObjectList<byte[]>
             
         }
         
-        // The insert point into the list.
-        return (-(offset + delta + 1) - 1);
+        /*
+         * We did not find the probe key when scanning the encoding run.
+         */
+        if (pret >= 0) {
+            /*
+             * We had an exact match on the full length key when we did the
+             * binary search. This code path is only taken when duplicate keys
+             * are allowed, since we otherwise return immediately at the head of
+             * this method. If we had found an exact match for the probe key in
+             * the previous run, then we would have returned the insertion point
+             * during the scan of that encoding run above. Since we did not, we
+             * want to return the insertion on the encoding run boundary.
+             */
+            assert hasDups; // only when duplicate keys are allowed.
+            assert delta == limit; // We scanned the entire previous run.
+            /*
+             * An exact match on a full length entry in the backing buffer.
+             * Duplicate keys are allowed and we have proven that the probe does
+             * not exist in the previous encoding run.
+             */
+            return pret * ratio;
+        } else {
+            /*
+             * We did not have an exact match on a full length key when we did
+             * the binary search. We then scanned the encoding run for the
+             * insertion point. We did not find an exact match within the
+             * encoding run, but we worked out the correct insertion point into
+             * that encoding run.
+             * 
+             * Note: This can happen whether or not duplicate keys are allowed.
+             * 
+             * Return the insert point into the list.
+             */
+            return (-(offset + delta + 1) - 1);
+        }
         
     }
 
@@ -1373,7 +1472,7 @@ public class CustomByteArrayFrontCodedList extends AbstractObjectList<byte[]>
 
 //        final int base = 0;
         
-        final BackingBuffer bb = this.bb;
+//        final BackingBuffer bb = this.bb;
 
         /*
          * We will test each entry having an index that is an even multiple of
@@ -1396,22 +1495,7 @@ public class CustomByteArrayFrontCodedList extends AbstractObjectList<byte[]>
             /*
              * Compare the probe with the full length byte[] at index [mid].
              */
-            final int tmp;
-            {
-
-                // The index into the backing buffer of index [mid].
-                int pos = p[mid];
-                
-                // The #of bytes in the full length byte[] at index [mid].
-                final int blen = bb.readInt(pos);
-                
-                // Skip the #of bytes required to code that length.
-                pos += count(blen);
-
-                // Compare key vs actual (in buffer).
-                tmp = compareBytes(key, 0, key.length, bb, pos, blen);
-
-            }
+            final int tmp = comparePos(mid, key);
 
             if (tmp > 0) {
 
@@ -1425,9 +1509,18 @@ public class CustomByteArrayFrontCodedList extends AbstractObjectList<byte[]>
 
             } else {
 
-                // Found: return offset.
+                // duplicate check to see if previous is also a match
+                if (hasDups && mid > 0 && comparePos(mid - 1, key) == 0) {
 
-                return offset;
+                    // in which case set it as the highest
+                    high = mid - 1;
+
+                } else {
+
+                    // Found: return offset.
+                    return offset;
+
+                }
 
             }
 
@@ -1439,6 +1532,34 @@ public class CustomByteArrayFrontCodedList extends AbstractObjectList<byte[]>
 
         return -(offset + 1);
 
+    }
+    
+    /**
+     * Compares the caller's key to a full length key at a specific offset
+     * in the {@link BackingBuffer}.
+     * 
+     * @param index
+     *            The index into the full length keys.
+     * @param key
+     *            The probe key.
+     * 
+     * @return A value which indicates whether the key at that offset into the
+     *         backing buffer is LT, GT, or EQ to the caller's key.
+     */
+    private int comparePos(final int index, final byte[] key) {
+
+        // The index into the backing buffer of index [index].
+        int pos = p[index];
+        
+        // The #of bytes in the full length byte[] at index [index].
+        final int blen = bb.readInt(pos);
+        
+        // Skip the #of bytes required to code that length.
+        pos += count(blen);
+
+        // Compare key vs actual (in buffer).
+        return compareBytes(key, 0, key.length, bb, pos, blen);
+        
     }
 
     /**

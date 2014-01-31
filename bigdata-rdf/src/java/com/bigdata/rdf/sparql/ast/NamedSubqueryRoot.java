@@ -112,15 +112,17 @@ public class NamedSubqueryRoot extends SubqueryBase implements
 
     }
 
+    @Override
     public String getName() {
 
         return (String) getProperty(Annotations.NAMED_SET);
         
     }
 
+    @Override
     public void setName(final String name) {
 
-        if(name == null)
+        if (name == null)
             throw new IllegalArgumentException();
         
         setProperty(Annotations.NAMED_SET, name);

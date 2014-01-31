@@ -73,7 +73,7 @@ public class ASTBindingAssigner implements IASTOptimizer {
     public IQueryNode optimize(final AST2BOpContext context,
             final IQueryNode queryNode, final IBindingSet[] bindingSet) {
 
-        if (bindingSet == null || bindingSet.length > 1) {
+        if (bindingSet == null || bindingSet.length != 1) {
             /*
              * Used iff there is only one input solution.
              * 

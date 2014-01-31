@@ -38,6 +38,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -74,6 +75,7 @@ import com.bigdata.rdf.sail.webapp.client.DefaultClientConnectionManagerFactory;
 import com.bigdata.resources.IndexManager;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IDataService;
+import com.bigdata.util.InnerCause;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 import com.bigdata.util.concurrent.IHaltable;
 
@@ -1886,10 +1888,21 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
      */
     protected void halt(final AbstractRunningQuery q) {
 
+        boolean interrupted = false;
         lock.lock();
 
         try {
 
+            // notify listener(s)
+            try {
+                fireEvent(q);
+            } catch (Throwable t) {
+                if (InnerCause.isInnerCause(t, InterruptedException.class)) {
+                    // Defer impact until outside of this critical section.
+                    interrupted = true;
+                }
+            }
+            
             // insert/touch the LRU of recently finished queries.
             doneQueries.put(q.getQueryId(), q.getFuture());
 
@@ -1909,6 +1922,9 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
             
         }
 
+        if (interrupted)
+            Thread.currentThread().interrupt();
+        
     }
     
     /**
@@ -1923,7 +1939,8 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
      * @throws RuntimeException
      *             if the query halted with an error.
      */
-    private void handleDoneQuery(final UUID queryId,final Future<Void> doneQueryFuture) {
+    private void handleDoneQuery(final UUID queryId,
+            final Future<Void> doneQueryFuture) {
         try {
             // Check the Future.
             doneQueryFuture.get();
@@ -1943,6 +1960,90 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
              */
             throw new RuntimeException(e);
         }
+    }
+
+    /**
+     * Listener API for {@link IRunningQuery} life cycle events (start/halt).
+     * <p>
+     * Note: While this interface makes it possible to catch the start and halt
+     * of an {@link IRunningQuery}, it imposes an overhead on the query engine
+     * and the potential for significant latency and other problems depending on
+     * the behavior of the {@link IRunningQueryListener}. This interface was
+     * added to facilitate certain test suites which could not otherwise be
+     * written. It should not be used for protection code.
+     */
+    public interface IRunningQueryListener {
+        
+        void notify(IRunningQuery q);
+        
+    }
+    
+    /** Registered listeners. */
+    private final CopyOnWriteArraySet<IRunningQueryListener> listeners = new CopyOnWriteArraySet<IRunningQueryListener>();
+
+    /** Add a query listener. */
+    public void addListener(final IRunningQueryListener l) {
+
+        if (l == null)
+            throw new IllegalArgumentException();
+
+        listeners.add(l);
+
+    }
+
+    /** Remove a query listener. */
+    public void removeListener(final IRunningQueryListener l) {
+        
+        if (l == null)
+            throw new IllegalArgumentException();
+        
+        listeners.remove(l);
+        
+    }
+
+    /**
+     * Send an event to all registered listeners.
+     */
+    private void fireEvent(final IRunningQuery q) {
+        
+        if (q == null)
+            throw new IllegalArgumentException();
+        
+        if(listeners.isEmpty()) {
+         
+            // NOP
+            return;
+
+        }
+
+        final IRunningQueryListener[] a = listeners
+                .toArray(new IRunningQueryListener[0]);
+
+        for (IRunningQueryListener l : a) {
+
+            final IRunningQueryListener listener = l;
+
+            try {
+
+                // send event.
+                listener.notify(q);
+
+            } catch (Throwable t) {
+
+                if (InnerCause.isInnerCause(t, InterruptedException.class)) {
+
+                    // Propagate interrupt.
+                    throw new RuntimeException(t);
+
+                }
+
+                // Log and ignore.
+                log.error(t, t);
+
+            }
+
+        }
+
     }
 
     /*
