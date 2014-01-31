@@ -119,17 +119,33 @@ public class BigdataBNodeImpl extends BigdataResourceImpl implements
 
     }
     
+    /**
+     * Used to detect ungrounded sids (self-referential).
+     */
+    private transient boolean selfRef = false;
+    
     @Override
     public IV getIV() {
     	
     	if (super.iv == null && sid != null) {
-    		
-    		if (sid.getSubject() == this || sid.getObject() == this)
+
+//    		if (sid.getSubject() == this || sid.getObject() == this)
+//				throw new UnificationException("illegal self-referential sid");
+		
+    		if (selfRef) {
     			throw new UnificationException("illegal self-referential sid");
+    		}
+    
+    		// temporarily set it to true while we get the IVs on the sid
+    		selfRef = true;
     		
     		final IV s = sid.s();
     		final IV p = sid.p();
     		final IV o = sid.o();
+    		
+    		// if we make it to here then we have a fully grounded sid
+    		selfRef = false;
+    		
     		if (s != null && p != null && o != null) {
     			setIV(new SidIV(new SPO(s, p, o)));
     		}
@@ -137,7 +153,7 @@ public class BigdataBNodeImpl extends BigdataResourceImpl implements
     	
     	return super.iv;
     }
-
+    
     public String toString() {
 
         return "_:" + id;
@@ -220,7 +236,7 @@ public class BigdataBNodeImpl extends BigdataResourceImpl implements
 		this.statementIdentifier = true;
 		this.sid = sid;
 	}
-
+	
 	/**
 	 * Return the statement modeled by this blank node.
 	 */
