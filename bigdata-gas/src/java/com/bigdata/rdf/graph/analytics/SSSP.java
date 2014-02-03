@@ -44,7 +44,13 @@ import cutthecrap.utils.striterators.IStriterator;
  *         undirected scatter/gather. Add unit test for undirected.
  * 
  *         FIXME New SSSP (push style scatter abstraction with new test case
- *         based on graph example developed for this)
+ *         based on graph example developed for this). Note: The push style
+ *         scatter on the GPU is implemented by capturing each (src,edge) pair
+ *         as a distint entry in the frontier. This gives us all of the
+ *         necessary variety. We then reduce that variety, applying the binary
+ *         operator to combine the intermediate results. Finally, an APPLY()
+ *         phase is executed to update the state of the distinct vertices in the
+ *         frontier.
  * 
  *         TODO Add a reducer to report the actual minimum length paths. This is
  *         similar to a BFS tree, but the path lengths are not integer values so

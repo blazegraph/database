@@ -210,6 +210,13 @@ public class GASState<VS, ES, ST> implements IGASState<VS, ES, ST> {
     }
 
     @Override
+    public boolean isVisited(final Value v) {
+        
+        return vertexState.get(v) != null;
+        
+    }
+
+    @Override
     public ES getState(final Statement e) {
 
         if (edgeState == null)
