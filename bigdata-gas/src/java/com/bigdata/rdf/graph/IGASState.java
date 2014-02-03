@@ -92,7 +92,7 @@ public interface IGASState<VS,ES, ST> {
 
     /**
      * Get the state for the edge using the appropriate factory. If this is the
-     * first visit for that edge, then the state is initialized using the
+     * first visit for that vertex, then the state is initialized using the
      * factory. Otherwise the existing state is returned.
      * 
      * @param v
@@ -104,6 +104,18 @@ public interface IGASState<VS,ES, ST> {
      */
     ES getState(Statement e);
 
+    /**
+     * Return <code>true</code> iff the specified vertex has an associated
+     * vertex state object - this is interpreted as meaning that the vertex has
+     * been "visited".
+     * 
+     * @param v
+     *            The vertex.
+     * @return <code>true</code> iff there is vertex state associated with that
+     *         vertex.
+     */
+    boolean isVisited(Value v);
+    
     /**
      * The current frontier.
      */
@@ -243,5 +255,5 @@ public interface IGASState<VS,ES, ST> {
      *            Another vertex.
      */
     int compareTo(Value u, Value v);
-    
+
 }

@@ -260,7 +260,7 @@ public class BFS extends BaseGASProgram<BFS.VS, BFS.ES, Void> {
     }
 
     /**
-     * Reduce the active vertex stat, returning a histogram reporting the #of
+     * Reduce the active vertex state, returning a histogram reporting the #of
      * vertices at each distance from the starting vertex. There will always be
      * one vertex at depth zero - this is the starting vertex. For each
      * successive depth, the #of vertices that were labeled at that depth is
