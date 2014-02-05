@@ -40,8 +40,6 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import junit.framework.AssertionFailedError;
-
 import org.apache.log4j.Logger;
 
 import com.bigdata.bop.BOp;
@@ -1055,7 +1053,7 @@ public class AST2BOpRTO extends AST2BOpJoins {
         // The cutoff limit. This annotation MUST exist on the JOIN.
         if (limit != ((Long) joinOp.getRequiredProperty(JoinAnnotations.LIMIT))
                 .intValue())
-            throw new AssertionFailedError();
+            throw new AssertionError();
         
         final int joinId = joinOp.getId();
                 
