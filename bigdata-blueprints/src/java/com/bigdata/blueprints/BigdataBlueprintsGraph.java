@@ -20,10 +20,20 @@ public abstract class BigdataBlueprintsGraph implements BigdataEventTransactiona
 	private HashMap<String,BigdataVertex> addedVertices = new HashMap<String,BigdataVertex>();  
 	// elements that we will be adding to the store
 	private HashMap<String,BigdataEdge> addedEdges = new HashMap<String,BigdataEdge>();
+	private QueryManager qm = null;
 	
 	public BigdataBlueprintsGraph () {  }
 	
+	public BigdataBlueprintsGraph (QueryManager qm) { this.qm = qm; }
+	
+	public void setQueryManager(QueryManager qm) { this.qm = qm; }
+	public QueryManager getQueryManager() { return qm; }
+	
 	public void commit() {
+		// form and submit query
+		//
+		// 
+		//
 		throwUnimplemented( "commit" );
 	}
 	
