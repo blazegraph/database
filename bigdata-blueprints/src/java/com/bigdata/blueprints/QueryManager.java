@@ -11,9 +11,14 @@ public interface QueryManager {
 	public void setEndpoint( String endpointURL );
 	
 	/*
-	 * Set the Vertices and Edges to form queries from
+	 * Set the Vertices and Edges to form deletion queries from
 	 */
-	public void setElements( List<BigdataElement> elements );
+	public void setDeleteElements( List<BigdataElement> elements );
+
+	/*
+	 * Set the Vertices and Edges to form insertion queries from
+	 */
+	public void setInsertElements( List<BigdataElement> elements );
 	
 	/*
 	 * Resets private query variables to null.
