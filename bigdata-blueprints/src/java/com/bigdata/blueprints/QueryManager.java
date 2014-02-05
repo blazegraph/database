@@ -5,7 +5,9 @@ import java.util.List;
 
 public interface QueryManager {
 
-	/* Set the SPARQL endpoint to exchange with.
+	/* 
+	 * Set the SPARQL endpoint to exchange with.
+	 */
 	public void setEndpoint( String endpointURL );
 	
 	/*
