@@ -1,3 +1,9 @@
+function handleDragOver(e) {
+   e.stopPropagation();
+   e.preventDefault();
+   e.originalEvent.dataTransfer.dropEffect = 'copy';
+}
+
 function handleFile(e) {
    e.stopPropagation();
    e.preventDefault();
@@ -104,6 +110,7 @@ var rdf_types = {'nq': 'n-quads',
 var sparql_update_commands = ['INSERT', 'DELETE'];
 
 $('#mp-file').change(handleFile);
+$('#mp-box').on('dragover', handleDragOver);
 $('#mp-box').on('drop', handleFile);
 $('#mp-box').on('paste', handlePaste);
 $('#mp-type').change(handleTypeChange);
