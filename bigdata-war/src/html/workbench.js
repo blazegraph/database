@@ -27,18 +27,20 @@ function handleFile(e) {
       $('#mp-box').val('/path/to/' + f.name);
       setType('path');
       $('#mp-file').val('');
+      $('#large-file-message').hide();
       return;
    }
    
    // if file is small enough, populate the textarea with it
-   var holder;
    if(f.size < 10 * 1024) {
       holder = '#mp-box';
       $('#mp-hidden').val('');
+      $('#large-file-message').hide();
    } else {
       // store file contents in hidden input and clear textarea
       holder = '#mp-hidden';
       $('#mp-box').val('');
+      $('#large-file-message').show();
    }
    var fr = new FileReader();
    fr.onload = function(e2) {
@@ -59,24 +61,36 @@ function guessType(extension, content) {
       setType('rdf', rdf_types[extension]);
    } else {
       // extension is no help, see if we can find some SPARQL commands
-      content = content.toUpperCase();
-      for(var i=0, found=false; i<sparql_update_commands.length; i++) {
-         if(content.indexOf(sparql_update_commands[i]) != -1) {
-            setType('sparql');
-            found = true;
-            break;
-         }
-      }
-      if(!found) {
-         setType('rdf', '');
-      }
+      setType(identify(content));
    }
 }
 
-function handlePaste(e) {
-   alert('pasted!');
-   e.stopPropagation();
-   e.preventDefault();
+function identify(text, considerPath) {
+   text = text.toUpperCase();
+
+   if(considerPath) {
+      // match Unix or Windows paths
+      var re = /^(((\/[^\/]+)+)|([A-Z]:([\\\/][^\\\/]+)+))$/;
+      if(re.test(text.trim())) {
+         return 'path';
+      }
+   }
+   
+   for(var i=0; i<sparql_update_commands.length; i++) {
+      if(text.indexOf(sparql_update_commands[i]) != -1) {
+         return 'sparql';
+      }
+   }
+
+   return 'rdf';
+}
+
+function handlePaste(e) {   
+   // if the input is currently empty, try to identify the pasted content
+   var that = this;
+   if(this.value == '') {
+      setTimeout(function() { setType(identify(that.value, true)); }, 10);
+   } 
 }
 
 function handleTypeChange(e) {
@@ -106,8 +120,18 @@ var rdf_types = {'nq': 'n-quads',
                  'trix': 'trix',
                  //'xml': 'trix',
                  'ttl': 'turtle'};
+                 
+var rdf_content_types = {'n-quads': 'application/n-quads',
+                         'n-triples': 'text/plain',
+                         'n3': 'text/n3',
+                         'rdf/xml': 'application/rdf+xml',
+                         'trig': 'application/trig',
+                         'trix': 'application/trix',
+                         'turtle': 'text/turtle'};
 
 var sparql_update_commands = ['INSERT', 'DELETE'];
+// stores the id of the element that contains the data to be sent
+var holder = '#mp-box';
 
 $('#mp-file').change(handleFile);
 $('#mp-box').on('dragover', handleDragOver);
@@ -115,7 +139,45 @@ $('#mp-box').on('drop', handleFile);
 $('#mp-box').on('paste', handlePaste);
 $('#mp-type').change(handleTypeChange);
 
-$('#mp-form').submit(function() {
+$('#mp-send').click(function() {
    // determine action based on type
-   
+   var settings = {
+      type: 'POST',
+      data: $(holder).val(),
+      success: updateResponseXML,
+      error: updateResponseError
+   }
+   switch($('#mp-type').val()) {
+      case 'sparql':
+         settings.data = 'update=' + encodeURI(settings.data);
+         settings.success = updateResponseHTML;
+         break;
+      case 'rdf':
+         var type = $('#rdf-type').val();
+         if(!type) {
+            alert('Please select an RDF content type.');
+            return;
+         }
+         settings.contentType = rdf_content_types[type];
+         break;
+      case 'path':
+         settings.data = 'uri=file://' + encodeURI(settings.data);
+         break;
+   }
+
+   $.ajax('/sparql', settings); 
 });
+
+function updateResponseHTML(data, textStatus, jqXHR) {
+   $('#response').html(data);
+}
+
+function updateResponseXML(data, textStatus, jqXHR) {
+   var modified = data.childNodes[0].attributes['modified'].value;
+   var milliseconds = data.childNodes[0].attributes['milliseconds'].value;
+   $('#response').text('Modified: ' + modified + '\nMilliseconds: ' + milliseconds);
+}
+
+function updateResponseError(jqXHR, textStatus, errorThrown) {
+   $('#response').text('Error! ' + textStatus + ' ' + errorThrown);
+}
