@@ -145,10 +145,12 @@ prefix bds:  &lt;http:&#47;&#47;www.bigdata.com&#47;rdf&#47;search#&gt;
 -->
 
 <h2>Multi-purpose textarea</h2>
-<form method="post" id="mp-form" enctype="multipart/form-data">
 <input id="mp-file" type="file" name="file">
+<br>
 <input id="mp-hidden" type="hidden" name="large-file-contents">
-<textarea id="mp-box" name="textarea"></textarea>
+<p id="large-file-message" style="display: none;">Your file is too large to display here, but will be uploaded as normal.</p>
+<textarea id="mp-box" name="textarea" rows="10" cols="80"></textarea>
+<br>
 <select id="mp-type">
 <option value="sparql" selected="selected">SPARQL</option>
 <option value="rdf">RDF</option>
@@ -164,8 +166,13 @@ prefix bds:  &lt;http:&#47;&#47;www.bigdata.com&#47;rdf&#47;search#&gt;
 <option value="trix">TriX</option>
 <option value="turtle">Turtle</option>
 </select>
-<input type="submit">
-</form>
+<br>
+Tenant Namespace <input type="text" name="namespace" title="Tenant namespace."> (leave empty for default KB)
+<br>
+<button type="button" id="mp-send">Send</button>
+<br> 
+Response:
+<pre id="response"></pre>
 
 <script src="//ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
 <script>window.jQuery || document.write('<script src="/jquery.min.js"><\/script>')</script>
