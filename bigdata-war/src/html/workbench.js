@@ -1,3 +1,5 @@
+/* Multi purpose data entry */
+
 function handleDragOver(e) {
    e.stopPropagation();
    e.preventDefault();
@@ -181,3 +183,115 @@ function updateResponseXML(data, textStatus, jqXHR) {
 function updateResponseError(jqXHR, textStatus, errorThrown) {
    $('#response').text('Error! ' + textStatus + ' ' + errorThrown);
 }
+
+
+/* Navigator */
+
+$('#navigator').submit(function() {
+   // get URI
+   var uri = $('#navigator-uri').val();
+   if(uri) {
+      loadURI(uri);   
+   }
+   return false;
+});
+
+function loadURI(uri) {
+   // send query to server
+   var query = 'select * \
+                  where { \
+                     bind (<URI> as ?vertex) . \
+                     { \
+                        bind (<<?vertex ?p ?o>> as ?sid) . \
+                        optional \
+                        { \
+                           { \
+                              ?sid ?sidP ?sidO . \
+                           } union { \
+                              ?sidS ?sidP ?sid . \
+                           } \
+                        } \
+                     } union { \
+                        bind (<<?s ?p ?vertex>> as ?sid) . \
+                        optional \
+                        { \
+                           { \
+                              ?sid ?sidP ?sidO . \
+                           } union { \
+                              ?sidS ?sidP ?sid . \
+                           } \
+                        } \
+                     } \
+                  }';
+   
+   query = query.replace('URI', uri);
+   var settings = {
+      type: 'POST',
+      data: 'query=' + encodeURI(query),
+      dataType: 'json',
+      accepts: {'json': 'application/sparql-results+json'},
+      success: updateNavigationStart,
+      error: updateNavigationError
+   };
+   $.ajax('/sparql', settings); 
+}
+
+function updateNavigationStart(data, textStatus, jqXHR) {
+   var disp = $('#navigator-display');
+   disp.html('');
+   // see if we got any results
+   if(data.results.bindings.length == 0) {
+      disp.append('No vertex found!');
+      return;
+   }
+   
+   var vertex = data.results.bindings[0].vertex;
+   disp.append('<h3>' + vertex.value + '</h3>');
+   var outbound=[], inbound=[], attributes=[];
+   for(var i=0; i<data.results.bindings.length; i++) {
+      var binding = data.results.bindings[i];
+      // TODO: are attributes always on outbound relationships?
+      if('o' in binding) {
+         if(binding.o.type == 'uri') {
+            outbound.push(binding);
+         } else {
+            attributes.push(binding);
+         }      
+      } else {
+         inbound.push(binding);
+      }
+   }
+   
+   if(outbound.length) {
+      disp.append('<h4>Outbound links</h4>');
+      var table = $('<table>').appendTo(disp);
+      for(var i=0; i<outbound.length; i++) {
+         var linkAttributes = outbound[i].sidP.value + ': ' + outbound[i].sidO.value;  
+         table.append('<tr><td>' + outbound[i].p.value + '</td><td><a href="#">' + outbound[i].o.value + '</a></td><td>' + linkAttributes + '</td></tr>');
+      }
+   }
+
+   if(inbound.length) {
+      disp.append('<h4>Inbound links</h4>');
+      var table = $('<table>').appendTo(disp);
+      for(var i=0; i<inbound.length; i++) {
+         var linkAttributes = inbound[i].sidP.value + ': ' + inbound[i].sidO.value;  
+         table.append('<tr><td><a href="#">' + inbound[i].s.value + '</a></td><td>' + inbound[i].p.value + '</td><td>' + linkAttributes + '</td></tr>');
+      }
+   }
+
+   if(attributes.length) {
+      disp.append('<h4>Attributes</h4>');
+      var table = $('<table>').appendTo(disp);
+      for(var i=0; i<attributes.length; i++) {
+         table.append('<tr><td>' + attributes[i].p.value + '</td><td>' + attributes[i].o.value + '</td></tr>');
+      }
+   }
+   
+   disp.find('a').click(function() { loadURI(this.text); return false; });
+}
+
+function updateNavigationError(jqXHR, textStatus, errorThrown) {
+   $('#navigator-display').html('Error! ' + textStatus + ' ' + errorThrown);
+}
+
