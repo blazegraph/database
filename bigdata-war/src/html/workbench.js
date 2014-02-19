@@ -1,4 +1,25 @@
-/* Multi purpose data entry */
+$(function() {
+
+$('#tab-selector a').click(function() {
+   $('.tab').hide();
+   $('#' + $(this).data('target')).show();
+   $('#tab-selector a').removeClass();
+   $(this).addClass('active');
+});
+
+$('#tab-selector a:first').click();
+
+// TODO: set namespace initially
+
+/* Namespaces */
+
+function getNamespaces() {
+   $.get('/namespace', function(data) {
+
+   });
+}
+
+/* Load */
 
 function handleDragOver(e) {
    e.stopPropagation();
@@ -26,22 +47,22 @@ function handleFile(e) {
    // if file is too large, tell user to supply local path
    if(f.size > 100 * 1048576) {
       alert('File too large, enter local path to file');
-      $('#mp-box').val('/path/to/' + f.name);
+      $('#load-box').val('/path/to/' + f.name);
       setType('path');
-      $('#mp-file').val('');
+      $('#load-file').val('');
       $('#large-file-message').hide();
       return;
    }
    
    // if file is small enough, populate the textarea with it
    if(f.size < 10 * 1024) {
-      holder = '#mp-box';
-      $('#mp-hidden').val('');
+      holder = '#load-box';
+      $('#load-hidden').val('');
       $('#large-file-message').hide();
    } else {
       // store file contents in hidden input and clear textarea
-      holder = '#mp-hidden';
-      $('#mp-box').val('');
+      holder = '#load-hidden';
+      $('#load-box').val('');
       $('#large-file-message').show();
    }
    var fr = new FileReader();
@@ -50,7 +71,7 @@ function handleFile(e) {
       guessType(f.name.split('.').pop().toLowerCase(), e2.target.result);
    };
    fr.readAsText(f);
-   $('#mp-file').val('');
+   $('#load-file').val('');
 }
 
 function guessType(extension, content) {
@@ -100,7 +121,7 @@ function handleTypeChange(e) {
 }
 
 function setType(type, format) {
-   $('#mp-type').val(type);
+   $('#load-type').val(type);
    if(type == 'rdf') {
       $('#rdf-type').show();
       $('#rdf-type').val(format);
@@ -133,15 +154,15 @@ var rdf_content_types = {'n-quads': 'application/n-quads',
 
 var sparql_update_commands = ['INSERT', 'DELETE'];
 // stores the id of the element that contains the data to be sent
-var holder = '#mp-box';
+var holder = '#load-box';
 
-$('#mp-file').change(handleFile);
-$('#mp-box').on('dragover', handleDragOver);
-$('#mp-box').on('drop', handleFile);
-$('#mp-box').on('paste', handlePaste);
-$('#mp-type').change(handleTypeChange);
+$('#load-file').change(handleFile);
+$('#load-box').on('dragover', handleDragOver);
+$('#load-box').on('drop', handleFile);
+$('#load-box').on('paste', handlePaste);
+$('#load-type').change(handleTypeChange);
 
-$('#mp-send').click(function() {
+$('#load button').click(function() {
    // determine action based on type
    var settings = {
       type: 'POST',
@@ -149,7 +170,7 @@ $('#mp-send').click(function() {
       success: updateResponseXML,
       error: updateResponseError
    }
-   switch($('#mp-type').val()) {
+   switch($('#load-type').val()) {
       case 'sparql':
          settings.data = 'update=' + encodeURI(settings.data);
          settings.success = updateResponseHTML;
@@ -170,11 +191,11 @@ $('#mp-send').click(function() {
    $.ajax('/sparql', settings); 
 });
 
-function updateResponseHTML(data, textStatus, jqXHR) {
+function updateResponseHTML(data) {
    $('#response').html(data);
 }
 
-function updateResponseXML(data, textStatus, jqXHR) {
+function updateResponseXML(data) {
    var modified = data.childNodes[0].attributes['modified'].value;
    var milliseconds = data.childNodes[0].attributes['milliseconds'].value;
    $('#response').text('Modified: ' + modified + '\nMilliseconds: ' + milliseconds);
@@ -236,7 +257,7 @@ function loadURI(uri) {
    $.ajax('/sparql', settings); 
 }
 
-function updateNavigationStart(data, textStatus, jqXHR) {
+function updateNavigationStart(data) {
    var disp = $('#navigator-display');
    disp.html('');
    // see if we got any results
@@ -295,3 +316,4 @@ function updateNavigationError(jqXHR, textStatus, errorThrown) {
    $('#navigator-display').html('Error! ' + textStatus + ' ' + errorThrown);
 }
 
+});

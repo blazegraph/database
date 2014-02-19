@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>RedPoint Workbench</title>
+    <link rel="stylesheet" href="style.css">
+  </head>
+
+  <body>
+    <div id="tab-selector">
+      <a data-target="load" class="active">Load</a>
+      <a data-target="query">Query</a>
+      <a data-target="explore">Explore</a>
+      <a data-target="status">Status</a>
+      <a data-target="namespaces">Namespaces</a>
+    </div>
+
+    <div id="current-namespace">
+      Current namespace: <span>kb</span>
+    </div>
+
+    <div class="tab" id="load">
+      <input id="load-file" type="file" name="file">
+      <input id="load-hidden" type="hidden" name="large-file-contents">
+      <p id="large-file-message" style="display: none;">Your file is too large to display here, but will be uploaded as normal.</p>
+      <br>
+      <textarea id="load-box" name="textarea" rows="10" cols="80"></textarea>
+      <br>
+      Type: <select id="load-type">
+        <option value="sparql" selected="selected">SPARQL</option>
+        <option value="rdf">RDF</option>
+        <option value="path">File path</option>
+      </select>
+      <select id="rdf-type" style="display: none;">
+        <option value="">Select RDF format</option>
+        <option value="n-quads">N-Quads</option>
+        <option value="n-triples">N-Triples</option>
+        <option value="n3">Notation3</option>
+        <option value="rdf/xml">RDF/XML</option>
+        <option value="trig">TriG</option>
+        <option value="trix">TriX</option>
+        <option value="turtle">Turtle</option>
+      </select>
+      <br>
+      <button>Load</button>
+      <hr>
+      <p>Response:</p>
+      <pre id="response"></pre>
+
+    </div>
+
+    <div class="tab" id="query">query
+    </div>
+
+    <div class="tab" id="explore">explore
+    </div>
+
+    <div class="tab" id="status">status
+    </div>
+
+    <div class="tab" id="namespaces">namespaces
+    </div>
+
+    <!--[if IE]><script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script><![endif]-->
+    <script src="//ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
+    <script>window.jQuery || document.write('<script src="/jquery.min.js"><\/script>')</script>
+    <script src="workbench.js"></script>
+  </body>
+</html>
