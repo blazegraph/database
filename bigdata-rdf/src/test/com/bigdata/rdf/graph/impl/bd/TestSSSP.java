@@ -82,5 +82,49 @@ public class TestSSSP extends AbstractBigdataGraphTestCase {
         }
 
     }
+    
+    /**
+     * A unit test based on graph with link weights.
+     */
+    public void test_sssp_weightedGraph() throws Exception {
+        
+        final SmallWeightedGraphProblem p = setupSmallWeightedGraphProblem();
+
+        final IGASEngine gasEngine = getGraphFixture()
+                .newGASEngine(1/* nthreads */);
+
+        try {
+
+            final IGraphAccessor graphAccessor = getGraphFixture()
+                    .newGraphAccessor(null/* ignored */);
+
+            final IGASContext<SSSP.VS, SSSP.ES, Integer> gasContext = gasEngine
+                    .newGASContext(graphAccessor, new SSSP());
+
+            final IGASState<SSSP.VS, SSSP.ES, Integer> gasState = gasContext.getGASState();
+            
+            // Initialize the froniter.
+            gasState.setFrontier(gasContext, p.getV1());
+
+            // Converge.
+            gasContext.call();
+
+            assertEquals(0, gasState.getState(p.getV1()).dist());
+
+            assertEquals(100, gasState.getState(p.getV2()).dist());
+
+            assertEquals(100, gasState.getState(p.getV3()).dist());
+
+            assertEquals(125, gasState.getState(p.getV4()).dist());
+
+            assertEquals(125, gasState.getState(p.getV5()).dist());
+
+        } finally {
+
+            gasEngine.shutdownNow();
+
+        }
+
+    }
 
 }

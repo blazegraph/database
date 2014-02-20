@@ -1,0 +1,24 @@
+# A graph using the RDR syntax to express link weights.
+#
+@prefix bd: <http://www.bigdata.com/> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix foaf: <http://xmlns.com/foaf/0.1/> .
+
+  bd:1 foaf:knows bd:2 .
+<<bd:1 foaf:knows bd:2 >> bd:weight "100"^^xsd:int .
+
+  bd:1 foaf:knows bd:3 .
+<<bd:1 foaf:knows bd:3 >> bd:weight "100"^^xsd:int .
+
+  bd:2 foaf:knows bd:4 .
+<<bd:2 foaf:knows bd:4 >> bd:weight  "50"^^xsd:int .
+
+  bd:3 foaf:knows bd:4 .
+<<bd:3 foaf:knows bd:4 >> bd:weight "100"^^xsd:int .
+
+  bd:3 foaf:knows bd:5 .
+<<bd:3 foaf:knows bd:5 >> bd:weight "100"^^xsd:int .
+
+  bd:4 foaf:knows bd:5 .
+<<bd:4 foaf:knows bd:5 >> bd:weight  "25"^^xsd:int .

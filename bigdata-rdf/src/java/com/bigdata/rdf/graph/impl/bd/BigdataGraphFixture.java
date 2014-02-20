@@ -2,13 +2,16 @@ package com.bigdata.rdf.graph.impl.bd;
 
 import java.util.Properties;
 
+import org.openrdf.model.ValueFactory;
 import org.openrdf.sail.SailConnection;
 import org.openrdf.sail.SailException;
 
 import com.bigdata.rdf.graph.IGraphAccessor;
 import com.bigdata.rdf.graph.impl.bd.BigdataGASEngine.BigdataGraphAccessor;
 import com.bigdata.rdf.graph.util.AbstractGraphFixture;
+import com.bigdata.rdf.graph.util.SailGraphLoader;
 import com.bigdata.rdf.sail.BigdataSail;
+import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
 import com.bigdata.rdf.store.AbstractTripleStore;
 
 public class BigdataGraphFixture extends AbstractGraphFixture {
@@ -58,6 +61,13 @@ public class BigdataGraphFixture extends AbstractGraphFixture {
     }
 
     @Override
+    protected SailGraphLoader newSailGraphLoader(SailConnection cxn) {
+
+        return new BigdataSailGraphLoader(cxn);
+
+    }
+
+    @Override
     public BigdataGASEngine newGASEngine(final int nthreads) {
 
         return new BigdataGASEngine(sail, nthreads);
@@ -69,6 +79,29 @@ public class BigdataGraphFixture extends AbstractGraphFixture {
 
         return new BigdataGraphAccessor(sail.getDatabase()
                 .getIndexManager());
+
+    }
+    
+    public static class BigdataSailGraphLoader extends SailGraphLoader {
+
+        private final ValueFactory valueFactory;
+        
+        public BigdataSailGraphLoader(SailConnection cxn) {
+
+            super(cxn);
+            
+            // Note: Needed for RDR.
+            this.valueFactory = ((BigdataSailConnection) cxn).getBigdataSail()
+                    .getValueFactory();
+            
+        }
+
+        @Override
+        protected ValueFactory getValueFactory() {
+ 
+            return valueFactory;
+            
+        }
 
     }
 
