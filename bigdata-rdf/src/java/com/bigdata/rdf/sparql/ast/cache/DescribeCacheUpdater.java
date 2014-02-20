@@ -4,9 +4,9 @@ import info.aduna.iteration.CloseableIteration;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 
 import org.apache.log4j.Logger;
-import org.eclipse.jetty.util.ConcurrentHashSet;
 import org.openrdf.model.Graph;
 import org.openrdf.model.Resource;
 import org.openrdf.model.Value;
@@ -45,12 +45,12 @@ public class DescribeCacheUpdater implements
      * original DESCRIBE query. We will collect all statements having a
      * described resource as either a subject or an object.
      * <p>
-     * Note: This set is populated as the solutions are observed before they
-     * are fed into the {@link ASTConstructIterator}. It is a
-     * {@link ConcurrentHashSet} in order to ensure the visibility of the
-     * updates to this class.
+     * Note: This set is populated as the solutions are observed before they are
+     * fed into the {@link ASTConstructIterator}. It MUST be a thread-safe
+     * {@link Set} in order to ensure the visibility of the updates to this
+     * class. It should also support high concurrency.
      */
-    private final ConcurrentHashSet<BigdataValue> describedResources;
+    private final Set<BigdataValue> describedResources;
     
     /**
      * The source iterator visiting the statements that are the description
@@ -78,10 +78,11 @@ public class DescribeCacheUpdater implements
      * @param cache
      *            The cache to be updated.
      * @param describedResources
-     *            The {@link BigdataValue}s that become bound for the
-     *            projection of the original DESCRIBE query. We will collect
-     *            all statements having a described resource as either a
-     *            subject or an object.
+     *            The {@link BigdataValue}s that become bound for the projection
+     *            of the original DESCRIBE query. We will collect all statements
+     *            having a described resource as either a subject or an object.
+     *            This MUST be a thread-safe (and concurrency favorable) set in
+     *            order to ensure the visibility of the updates.
      * @param src
      *            The source iterator, visiting the statements that are the
      *            description of the resource(s) identified in the
@@ -89,7 +90,7 @@ public class DescribeCacheUpdater implements
      */
     public DescribeCacheUpdater(
             final IDescribeCache cache,
-            final ConcurrentHashSet<BigdataValue> describedResources,
+            final Set<BigdataValue> describedResources,
             final CloseableIteration<BigdataStatement, QueryEvaluationException> src) {
 
         if (cache == null)

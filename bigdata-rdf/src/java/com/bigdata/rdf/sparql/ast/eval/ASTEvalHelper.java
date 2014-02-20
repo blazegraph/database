@@ -36,10 +36,10 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentSkipListSet;
 
 import org.apache.log4j.Logger;
 import org.apache.log4j.MDC;
-import org.eclipse.jetty.util.ConcurrentHashSet;
 import org.openrdf.model.Value;
 import org.openrdf.query.Binding;
 import org.openrdf.query.BindingSet;
@@ -513,7 +513,7 @@ public class ASTEvalHelper {
         try {
         
         final CloseableIteration<BindingSet, QueryEvaluationException> solutions2;
-        final ConcurrentHashSet<BigdataValue> describedResources;
+        final Set<BigdataValue> describedResources;
         if (describeCache != null) {
 
             /**
@@ -540,7 +540,7 @@ public class ASTEvalHelper {
              */
      
             // Concurrency safe set.
-            describedResources = new ConcurrentHashSet<BigdataValue>();
+            describedResources = new ConcurrentSkipListSet<BigdataValue>();
             
             // Collect the bindings on those variables.
             solutions2 = new DescribeBindingsCollector(//
