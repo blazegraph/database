@@ -141,7 +141,15 @@ public class ServiceRegistry {
         return defaultServiceFactoryRef.get();
         
     }
-    
+
+    /**
+     * Register a service.
+     * 
+     * @param serviceURI
+     *            The service URI.
+     * @param factory
+     *            The factory to execute calls against that service.
+     */
     public final void add(final URI serviceURI, final ServiceFactory factory) {
 
         synchronized (this) {
