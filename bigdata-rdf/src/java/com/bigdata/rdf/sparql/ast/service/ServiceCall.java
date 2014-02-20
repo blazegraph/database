@@ -60,13 +60,16 @@ public interface ServiceCall<E> {
     IServiceOptions getServiceOptions();
     
     /**
-     * Invoke an service.
+     * Invoke an service. The caller will join the results from the service with
+     * the solutions in the context in which the service was invoked (using a
+     * solution set hash join pattern).
      * 
      * @param bindingSets
      *            The binding sets flowing into the service.
      * 
      * @return An iterator from which the solutions can be drained. If the
      *         iterator is closed, the service invocation must be cancelled.
+     * 
      * @throws Exception
      * 
      *             TODO RECHUNKING: This should probably return an
