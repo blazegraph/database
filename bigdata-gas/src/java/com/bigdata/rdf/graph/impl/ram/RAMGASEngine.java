@@ -36,8 +36,6 @@ import com.bigdata.rdf.graph.IGASProgram;
 import com.bigdata.rdf.graph.IGraphAccessor;
 import com.bigdata.rdf.graph.impl.GASEngine;
 import com.bigdata.rdf.graph.impl.util.VertexDistribution;
-import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.store.AbstractTripleStore;
 
 import cutthecrap.utils.striterators.EmptyIterator;
 import cutthecrap.utils.striterators.IStriterator;
