@@ -82,12 +82,12 @@ import cutthecrap.utils.striterators.ICloseableIterator;
  * PREFIX gas <http://www.bigdata.com/rdf/gas#>
  * #...
  * SERVICE &lt;GAS&gt; {
- *    gas:program gas:gasClass "com.bigdata.rdf.graph.analytics.BFS"
- *    gas:program gas:in &lt;IRI&gt; # one or more times, specifies the initial frontier.
- *    gas:program gas:out ?out # exactly once - will be bound to the visited vertices.
- *    gas:program gas:maxIterations 4 # optional limit on breadth first expansion.
- *    gas:program gas:maxVisited 2000 # optional limit on the #of visited vertices.
- *    gas:program gas:nthreads 4 # specify the #of threads to use (optional)
+ *    gas:program gas:gasClass "com.bigdata.rdf.graph.analytics.BFS" .
+ *    gas:program gas:in &lt;IRI&gt; . # one or more times, specifies the initial frontier.
+ *    gas:program gas:out ?out . # exactly once - will be bound to the visited vertices.
+ *    gas:program gas:maxIterations 4 . # optional limit on breadth first expansion.
+ *    gas:program gas:maxVisited 2000 . # optional limit on the #of visited vertices.
+ *    gas:program gas:nthreads 4 . # specify the #of threads to use (optional)
  * }
  * </pre>
  * 
@@ -97,12 +97,12 @@ import cutthecrap.utils.striterators.ICloseableIterator;
  * PREFIX gas <http://www.bigdata.com/rdf/gas#>
  * #...
  * SERVICE &lt;GAS&gt; {
- *    gas:program gas:gasClass "com.bigdata.rdf.graph.analytics.FuzzySSSP"
- *    gas:program gas:in &lt;IRI&gt; # one or more times, specifies the initial frontier.
- *    gas:program gas:target &lt;IRI&gt; # one or more times, identifies the target vertices and hence the paths of interest.
- *    gas:program gas:out ?out # exactly once - will be bound to the visited vertices laying within N-hops of the shortest paths.
- *    gas:program gas:maxIterations 4 # optional limit on breadth first expansion.
- *    gas:program gas:maxVisited 2000 # optional limit on the #of visited vertices.
+ *    gas:program gas:gasClass "com.bigdata.rdf.graph.analytics.FuzzySSSP" .
+ *    gas:program gas:in &lt;IRI&gt; . # one or more times, specifies the initial frontier.
+ *    gas:program gas:target &lt;IRI&gt; . # one or more times, identifies the target vertices and hence the paths of interest.
+ *    gas:program gas:out ?out . # exactly once - will be bound to the visited vertices laying within N-hops of the shortest paths.
+ *    gas:program gas:maxIterations 4 . # optional limit on breadth first expansion.
+ *    gas:program gas:maxVisited 2000 . # optional limit on the #of visited vertices.
  * }
  * </pre>
  * 
@@ -114,7 +114,15 @@ import cutthecrap.utils.striterators.ICloseableIterator;
  * 
  * TODO The input frontier could be a variable, in which case we would pull out
  * the column for that variable rather than running the algorithm once per
- * source binding set, right?  Or maybe not.
+ * source binding set, right? Or maybe not.
+ * 
+ * TODO Allow {@link IReducer} that binds the visited vertex and also the
+ * dynamic state associated with that vertex. For BFS and SSSP, this could be
+ * depth/distance and the predecessor (for path information). For BFS and SSSP,
+ * we could also have a specific target vertex (or vertices) and then report out
+ * the path for that vertex/vertices. This would significantly reduce the data
+ * reported back. (Could we run SSSP in both directions to accelerate the
+ * convergence?)
  * 
  * TODO Also support export. This could be easily done using a SPARQL SELECT
  * 
@@ -655,6 +663,7 @@ public class GASService implements CustomServiceFactory {
                     
                 }
 
+                // Run the analytic.
                 final IGASStats stats = (IGASStats) gasContext.call();
 
                 if (log.isInfoEnabled()) {
