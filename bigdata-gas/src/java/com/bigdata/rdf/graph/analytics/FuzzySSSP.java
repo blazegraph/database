@@ -63,12 +63,12 @@ import com.bigdata.rdf.graph.impl.bd.BigdataGraphFixture;
  * along the shortest path (which we get from the per-source SSSP traversals).
  * 
  * TODO Support breaking out of the analytic as soon as the frontier is known to
- * contain at least N distinct vertices. Note that for frontier implementations
- * that allow duplicates, this means that you need to wait for the end of the
- * iteration to make the decision. We already support a decision point at the
- * end of each iteration. This would allow us to lift the decision point inside
- * of the iteration and terminate processing eagerly when the frontier size
- * exceeds a specified value.
+ * contain at least N(=2k) distinct vertices (or M=10k edges). Note that for
+ * frontier implementations that allow duplicates, this means that you need to
+ * wait for the end of the iteration to make the decision. We already support a
+ * decision point at the end of each iteration. This would allow us to lift the
+ * decision point inside of the iteration and terminate processing eagerly when
+ * the frontier size exceeds a specified value.
  * 
  * TODO: Implement unit test with ground truth.
  * 
