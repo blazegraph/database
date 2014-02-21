@@ -387,6 +387,22 @@ public class TestReificationDoneRightEval extends AbstractDataDrivenSPARQLTestCa
 
 	}
 
+    /**
+     * <pre>
+     * </pre>
+     * @see <a href="http://trac.bigdata.com/ticket/815"> RDR query does too
+     *      much work</a>
+     */
+    public void test_reificationDoneRight_04() throws Exception {
+
+        new TestHelper("reif/rdr-04", // testURI,
+                "reif/rdr-04.rq",// queryFileURL
+                "reif/rdr-04.ttl",// dataFileURL
+                "reif/rdr-04.srx"// resultFileURL
+                ).runTest();
+
+    }
+
     @Override
     public Properties getProperties() {
 

@@ -13,7 +13,7 @@
    </head>
    <results>
      <result>
-        <binding name="a">
+        <binding name="s">
             <uri>http://example.com/a1</uri>
         </binding>
         <binding name="p">
@@ -30,7 +30,7 @@
         </binding>
      </result>
      <result>
-        <binding name="a">
+        <binding name="s">
             <uri>http://example.com/a2</uri>
         </binding>
         <binding name="p">
