@@ -387,7 +387,7 @@ public class SPOPredicate extends Predicate<ISPO> {
     			// inconsistent
     			return null;
     			
-    		} else {
+    		} else if (this.s().isVar()) {
     			
     			bindingSet.set((IVariable) this.s(), new Constant<IV>(s)); 
     			
@@ -398,7 +398,7 @@ public class SPOPredicate extends Predicate<ISPO> {
     			// inconsistent
     			return null;
     			
-    		} else {
+    		} else if (this.p().isVar()) {
     			
     			bindingSet.set((IVariable) this.p(), new Constant<IV>(p)); 
     			
@@ -409,7 +409,7 @@ public class SPOPredicate extends Predicate<ISPO> {
     			// inconsistent
     			return null;
     			
-    		} else {
+    		} else if (this.o().isVar()) {
     			
     			bindingSet.set((IVariable) this.o(), new Constant<IV>(o)); 
     			
@@ -421,7 +421,7 @@ public class SPOPredicate extends Predicate<ISPO> {
 //    			// inconsistent
 //    			return null;
 //    			
-//    		} else {
+//    		} else if (this.c().isVar()) {
 //    			
 //    			bindingSet.set((IVariable) this.c(), new Constant<IV>(c)); 
 //    			
