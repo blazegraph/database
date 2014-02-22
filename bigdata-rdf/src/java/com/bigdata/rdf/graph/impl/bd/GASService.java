@@ -57,10 +57,12 @@ import com.bigdata.rdf.graph.impl.GASEngine;
 import com.bigdata.rdf.graph.impl.GASState;
 import com.bigdata.rdf.graph.impl.bd.BigdataGASEngine.BigdataGraphAccessor;
 import com.bigdata.rdf.graph.impl.scheduler.CHMScheduler;
+import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
 import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
+import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.sparql.ast.service.BigdataNativeServiceOptions;
 import com.bigdata.rdf.sparql.ast.service.BigdataServiceCall;
 import com.bigdata.rdf.sparql.ast.service.CustomServiceFactory;
@@ -79,9 +81,9 @@ import cutthecrap.utils.striterators.ICloseableIterator;
  * For example, the following would run a depth-limited BFS traversal:
  * 
  * <pre>
- * PREFIX gas <http://www.bigdata.com/rdf/gas#>
+ * PREFIX gas: <http://www.bigdata.com/rdf/gas#>
  * #...
- * SERVICE &lt;GAS&gt; {
+ * SERVICE &lt;gas#service&gt; {
  *    gas:program gas:gasClass "com.bigdata.rdf.graph.analytics.BFS" .
  *    gas:program gas:in &lt;IRI&gt; . # one or more times, specifies the initial frontier.
  *    gas:program gas:out ?out . # exactly once - will be bound to the visited vertices.
@@ -94,9 +96,9 @@ import cutthecrap.utils.striterators.ICloseableIterator;
  * Or the following would run the FuzzySSSP algorithm.
  * 
  * <pre>
- * PREFIX gas <http://www.bigdata.com/rdf/gas#>
+ * PREFIX gas: <http://www.bigdata.com/rdf/gas#>
  * #...
- * SERVICE &lt;GAS&gt; {
+ * SERVICE &lt;gas:service&gt; {
  *    gas:program gas:gasClass "com.bigdata.rdf.graph.analytics.FuzzySSSP" .
  *    gas:program gas:in &lt;IRI&gt; . # one or more times, specifies the initial frontier.
  *    gas:program gas:target &lt;IRI&gt; . # one or more times, identifies the target vertices and hence the paths of interest.
@@ -150,6 +152,11 @@ public class GASService implements CustomServiceFactory {
          * The namespace used for bigdata GAS API.
          */
         String NAMESPACE = "http://www.bigdata.com/rdf/gas#";
+
+        /**
+         * The URL at which the {@link GASService} will respond.
+         */
+        URI SERVICE_KEY = new URIImpl(NAMESPACE + "service");
         
         /**
          * Used as the subject in the GAS SERVICE invocation pattern.
@@ -479,7 +486,7 @@ public class GASService implements CustomServiceFactory {
                     tmp = new LinkedList<Value>();
 
                 // found an o.
-                return (IVariable<?>) sp.o();
+                return ((VarNode)sp.o()).getValueExpression();
 
             }
 
@@ -614,10 +621,9 @@ public class GASService implements CustomServiceFactory {
         }
 
         /**
+         * Execute the GAS program.
+         * <p>
          * {@inheritDoc}
-         * 
-         * TODO Join with the source solutions?  Or is that handled by the
-         * caller?
          */
         @Override
         public ICloseableIterator<IBindingSet> call(
@@ -657,10 +663,19 @@ public class GASService implements CustomServiceFactory {
                     // Setup the initial frontier.
                     for (Value startingVertex : initialFrontier) {
 
-                        gasState.setFrontier(gasContext, startingVertex);
+                        /*
+                         * FIXME Why can't we pass in the Value (with a defined
+                         * IV) and not the IV? This should work. Passing in the
+                         * IV is against the grain of the API and the
+                         * generalized abstraction as Values. Of course, having
+                         * the IV is necessary since this is an internal, high
+                         * performance, and close to the indices operation.
+                         */
+                        gasState.setFrontier(gasContext,
+                                ((BigdataValue) startingVertex).getIV());
 
                     }
-                    
+
                 }
 
                 // Run the analytic.
@@ -702,7 +717,7 @@ public class GASService implements CustomServiceFactory {
                     int i = 0;
                     for (Value v : visitedSet) {
 
-                        out[i] = new ListBindingSet(vars,
+                        out[i++] = new ListBindingSet(vars,
                                 new IConstant[] { new Constant(v) });
 
                     }
