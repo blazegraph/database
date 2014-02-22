@@ -1012,6 +1012,22 @@ public class PipelineJoin<E> extends PipelineOp implements
 				// constrain the predicate to the given bindings.
 				IPredicate<E> asBound = predicate.asBound(bindingSet);
 
+                if (asBound == null) {
+
+                    /*
+                     * This can happen for a SIDS mode join if some of the
+                     * (s,p,o,[c]) and SID are bound on entry and they can not
+                     * be unified. For example, the s position might be
+                     * inconsistent with the Subject that can be decoded from
+                     * the SID binding.
+                     * 
+                     * @see #815 (RDR query does too much work)
+                     */
+
+                    return;
+
+                }
+				
 				if (partitionId != -1) {
 
 					/*
@@ -1049,10 +1065,11 @@ public class PipelineJoin<E> extends PipelineOp implements
 
 				if (coalesceAccessPaths) {
 
-					/*
-					 * Aggregate the source bindingSets that license the same
-					 * asBound predicate.
-					 */
+                    /*
+                     * Aggregate the source bindingSets that license the same
+                     * asBound predicate. The predicates in the keys of this map
+                     * as "as-bound".
+                     */
 					final Map<IPredicate<E>, Collection<IBindingSet>> map = combineBindingSets(chunk);
 
 					/*
@@ -1069,7 +1086,7 @@ public class PipelineJoin<E> extends PipelineOp implements
 					 * Do not coalesce access paths.
 					 */
 
-					tasks = new JoinTask.AccessPathTask[chunk.length];
+					final List<AccessPathTask> tmp = new LinkedList<AccessPathTask>();
 
 					for (int i = 0; i < chunk.length; i++) {
 
@@ -1078,7 +1095,23 @@ public class PipelineJoin<E> extends PipelineOp implements
 						// constrain the predicate to the given bindings.
 						IPredicate<E> asBound = predicate.asBound(bindingSet);
 
-						if (partitionId != -1) {
+	                    if (asBound == null) {
+
+	                        /*
+	                         * This can happen for a SIDS mode join if some of the
+	                         * (s,p,o,[c]) and SID are bound on entry and they can not
+	                         * be unified. For example, the s position might be
+	                         * inconsistent with the Subject that can be decoded from
+	                         * the SID binding.
+	                         * 
+	                         * @see #815 (RDR query does too much work)
+	                         */
+
+	                        continue;
+
+	                    }
+
+	                    if (partitionId != -1) {
 
 							/*
 							 * Constrain the predicate to the desired index
@@ -1095,10 +1128,14 @@ public class PipelineJoin<E> extends PipelineOp implements
 
 						}
 
-						tasks[i] = new AccessPathTask(asBound, Collections
-								.singletonList(bindingSet));
+						tmp.add(new AccessPathTask(asBound, Collections
+								.singletonList(bindingSet)));
 
 					}
+
+                    // Exact fit array.
+                    tasks = tmp
+                            .toArray(new JoinTask.AccessPathTask[tmp.size()]);
 
 				}
 
@@ -1143,7 +1180,23 @@ public class PipelineJoin<E> extends PipelineOp implements
 					// constrain the predicate to the given bindings.
 					IPredicate<E> asBound = predicate.asBound(bindingSet);
 
-					if (partitionId != -1) {
+	                if (asBound == null) {
+
+	                    /*
+	                     * This can happen for a SIDS mode join if some of the
+	                     * (s,p,o,[c]) and SID are bound on entry and they can not
+	                     * be unified. For example, the s position might be
+	                     * inconsistent with the Subject that can be decoded from
+	                     * the SID binding.
+	                     * 
+	                     * @see #815 (RDR query does too much work)
+	                     */
+
+	                    continue;
+
+	                }
+
+	                if (partitionId != -1) {
 
 						/*
 						 * Constrain the predicate to the desired index
@@ -1597,7 +1650,7 @@ public class PipelineJoin<E> extends PipelineOp implements
             /**
              * A vectored pipeline join (chunk at a time processing) for
              * {@link IElement}s.
-             */
+             */@Deprecated // by handleJoin2()
 			protected void handleJoin() {
 
 				final long cutoffLimit = predicate.getProperty(
