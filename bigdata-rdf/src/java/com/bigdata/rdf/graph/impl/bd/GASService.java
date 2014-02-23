@@ -53,10 +53,13 @@ import com.bigdata.rdf.graph.IGASState;
 import com.bigdata.rdf.graph.IGASStats;
 import com.bigdata.rdf.graph.IGraphAccessor;
 import com.bigdata.rdf.graph.IReducer;
+import com.bigdata.rdf.graph.analytics.BFS;
 import com.bigdata.rdf.graph.impl.GASEngine;
 import com.bigdata.rdf.graph.impl.GASState;
 import com.bigdata.rdf.graph.impl.bd.BigdataGASEngine.BigdataGraphAccessor;
 import com.bigdata.rdf.graph.impl.scheduler.CHMScheduler;
+import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.impl.literal.XSDNumericIV;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
 import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
@@ -223,6 +226,12 @@ public class GASService implements CustomServiceFactory {
          */
         URI OUT = new URIImpl(NAMESPACE + "out");
 
+        /**
+         * The state of the visited vertex (algorithm dependent, but something
+         * like traversal depth is common).
+         */
+        URI STATE = new URIImpl(NAMESPACE + "state");
+
     }
 
     static private transient final Logger log = Logger
@@ -323,12 +332,13 @@ public class GASService implements CustomServiceFactory {
         
         // options extracted from the SERVICE's graph pattern.
         private final int nthreads;
-        private final int maxIterations; // FIXME set as limit on GASState.
-        private final int maxVisited; // FIXME set as limit on GASState.
+        private final int maxIterations;
+        private final int maxVisited;
         private final Class<IGASProgram<VS, ES, ST>> gasClass;
         private final Class<IGASSchedulerImpl> schedulerClass;
         private final Value[] initialFrontier;
         private final IVariable<?> outVar;
+        private final IVariable<?> stateVar;
 
         public GASServiceCall(final AbstractTripleStore store,
                 final ServiceNode serviceNode,
@@ -433,6 +443,9 @@ public class GASService implements CustomServiceFactory {
 
             // The output variable (bound to the visited set).
             this.outVar = getVar(Options.PROGRAM, Options.OUT);
+            
+            // The state variable (bound to the state associated with each visited vertex).
+            this.stateVar = getVar(Options.PROGRAM, Options.STATE);
             
         }
 
@@ -652,6 +665,10 @@ public class GASService implements CustomServiceFactory {
                 final IGASContext<VS, ES, ST> gasContext = gasEngine.newGASContext(
                         graphAccessor, gasProgram);
 
+                gasContext.setMaxIterations(maxIterations);
+
+                gasContext.setMaxVisited(maxVisited);
+
                 final IGASState<VS, ES, ST> gasState = gasContext.getGASState();
 
                 // TODO We should look at this when extracting the parameters from the SERVICE's graph pattern.
@@ -710,17 +727,48 @@ public class GASService implements CustomServiceFactory {
                     }
                 });
 
+                /*
+                 * Bind output variables (if any).
+                 */
                 final IBindingSet[] out = new IBindingSet[visitedSet.size()];
 
                 {
-                    final IVariable[] vars = new IVariable[] { outVar };
+                    
+                    final List<IVariable> tmp = new LinkedList<IVariable>();
+                    
+                    if (outVar != null)
+                        tmp.add(outVar);
+                    
+                    if (stateVar != null)
+                        tmp.add(stateVar);
+                    
+                    final IVariable[] vars = tmp.toArray(new IVariable[tmp
+                            .size()]);
+                    
+                    final IConstant[] vals = new IConstant[vars.length];
+
                     int i = 0;
+
                     for (Value v : visitedSet) {
 
-                        out[i++] = new ListBindingSet(vars,
-                                new IConstant[] { new Constant(v) });
+                        int j = 0;
+                        if (outVar != null) {
+                            vals[j++] = new Constant(v);
+                        }
+                        if (stateVar != null) {
+                            /*
+                             * FIXME Need an API for self-reporting of an IV by
+                             * the IGASProgram.
+                             */
+                            final int depth = ((BFS.VS)gasState.getState(v)).depth();
+                            final IV depthIV = new XSDNumericIV(depth);
+                            vals[j++] = new Constant(depthIV);
+                        }
+
+                        out[i++] = new ListBindingSet(vars, vals);
 
                     }
+                    
                 }
 
                 return new ChunkedArrayIterator<IBindingSet>(out);
