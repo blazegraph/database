@@ -137,7 +137,7 @@ public class GASContext<VS, ES, ST> implements IGASContext<VS, ES, ST> {
              * GASStats.
              */
             
-            if (total.getNRounds() >= getMaxIterations()) {
+            if (total.getNRounds() + 1 >= getMaxIterations()) {
 
                 log.warn("Halting: maxIterations=" + getMaxIterations()
                         + ", #rounds=" + total.getNRounds());

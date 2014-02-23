@@ -55,7 +55,8 @@ public interface IGASContext<VS, ES, ST> extends Callable<IGASStats> {
     IGraphAccessor getGraphAccessor();
 
     /**
-     * Specify the maximum number of iterations for the algorithm.
+     * Specify the maximum number of iterations for the algorithm. A value of
+     * ONE means that the algorithm will halt after the first round.
      * 
      * @param newValue
      *            The maximum number of iterations.
