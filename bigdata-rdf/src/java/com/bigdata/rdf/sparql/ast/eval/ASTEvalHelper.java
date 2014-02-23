@@ -29,6 +29,7 @@ package com.bigdata.rdf.sparql.ast.eval;
 
 import info.aduna.iteration.CloseableIteration;
 
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -36,7 +37,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ConcurrentSkipListSet;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.log4j.Logger;
 import org.apache.log4j.MDC;
@@ -540,8 +541,9 @@ public class ASTEvalHelper {
              */
      
             // Concurrency safe set.
-            describedResources = new ConcurrentSkipListSet<BigdataValue>();
-            
+            describedResources = Collections
+                    .newSetFromMap(new ConcurrentHashMap<BigdataValue, Boolean>());
+
             // Collect the bindings on those variables.
             solutions2 = new DescribeBindingsCollector(//
                     describeVars,// what to collect
