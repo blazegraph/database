@@ -12,7 +12,7 @@
    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
    See the License for the specific language governing permissions and
    limitations under the License.
-*/
+ */
 package com.bigdata.rdf.graph;
 
 import java.util.concurrent.Callable;
@@ -48,12 +48,46 @@ public interface IGASContext<VS, ES, ST> extends Callable<IGASStats> {
      * The computation state.
      */
     IGASState<VS, ES, ST> getGASState();
-    
+
     /**
      * The graph access object.
      */
     IGraphAccessor getGraphAccessor();
-    
+
+    /**
+     * Specify the maximum number of iterations for the algorithm.
+     * 
+     * @param newValue
+     *            The maximum number of iterations.
+     * 
+     * @throws IllegalArgumentException
+     *             if the new value is non-positive.
+     */
+    void setMaxIterations(int newValue);
+
+    /**
+     * Return the maximum number iterations for the algorithm.
+     */
+    int getMaxIterations();
+
+    /**
+     * Specify the maximum number of vertices that may be visited. The algorithm
+     * will halt if this value is exceeded.
+     * 
+     * @param newValue
+     *            The maximum number of vertices in the frontier.
+     * 
+     * @throws IllegalArgumentException
+     *             if the new value is non-positive.
+     */
+    void setMaxVisited(int newValue);
+
+    /**
+     * Return the maximum number of vertices that may be visited. The algorithm
+     * will halt if this value is exceeded.
+     */
+    int getMaxVisited();
+
     /**
      * Execute one iteration.
      * 
@@ -65,11 +99,11 @@ public interface IGASContext<VS, ES, ST> extends Callable<IGASStats> {
      */
     boolean doRound(IGASStats stats) throws Exception, ExecutionException,
             InterruptedException;
- 
+
     /**
      * Execute the associated {@link IGASProgram}.
      */
     @Override
     IGASStats call() throws Exception;
-    
+
 }

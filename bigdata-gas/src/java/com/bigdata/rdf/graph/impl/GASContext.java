@@ -19,6 +19,7 @@ import java.util.Iterator;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.log4j.Logger;
 import org.openrdf.model.Statement;
@@ -55,6 +56,18 @@ public class GASContext<VS, ES, ST> implements IGASContext<VS, ES, ST> {
      * The graph analytic to be executed.
      */
     private final IGASProgram<VS, ES, ST> program;
+
+    /**
+     * The maximum number of iterations (defaults to {@link Integer#MAX_VALUE}).
+     */
+    private final AtomicInteger maxIterations = new AtomicInteger(
+            Integer.MAX_VALUE);
+
+    /**
+     * The maximum number of vertices (defaults to {@link Integer#MAX_VALUE}).
+     */
+    private final AtomicInteger maxVertices = new AtomicInteger(
+            Integer.MAX_VALUE);
 
     /**
      * 
@@ -117,6 +130,31 @@ public class GASContext<VS, ES, ST> implements IGASContext<VS, ES, ST> {
         
         while (!gasState.frontier().isEmpty()) {
 
+            /*
+             * Check halting conditions.
+             * 
+             * Note: We could also halt on maxEdges since that is tracked in the
+             * GASStats.
+             */
+            
+            if (total.getNRounds() >= getMaxIterations()) {
+
+                log.warn("Halting: maxIterations=" + getMaxIterations()
+                        + ", #rounds=" + total.getNRounds());
+
+                break;
+
+            }
+
+            if (total.getFrontierSize() >= getMaxVisited()) {
+
+                log.warn("Halting: maxVertices=" + getMaxVisited()
+                        + ", frontierSize=" + total.getFrontierSize());
+            
+                break;
+
+            }
+            
             final GASStats roundStats = new GASStats();
 
             doRound(roundStats);
@@ -655,5 +693,39 @@ public class GASContext<VS, ES, ST> implements IGASContext<VS, ES, ST> {
         }
 
     } // GatherTask
+
+    @Override
+    public void setMaxIterations(final int newValue) {
+
+        if (newValue <= 0)
+            throw new IllegalArgumentException();
+        
+        this.maxIterations.set(newValue);
+        
+    }
+
+    @Override
+    public int getMaxIterations() {
+
+        return maxIterations.get();
+        
+    }
+
+    @Override
+    public void setMaxVisited(int newValue) {
+
+        if (newValue <= 0)
+            throw new IllegalArgumentException();
+        
+        this.maxVertices.set(newValue);
+        
+    }
+
+    @Override
+    public int getMaxVisited() {
+
+        return maxVertices.get();
+        
+    }
 
 } // GASContext
