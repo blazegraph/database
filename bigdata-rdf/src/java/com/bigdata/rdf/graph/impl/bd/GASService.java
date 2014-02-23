@@ -755,7 +755,7 @@ public class GASService implements CustomServiceFactory {
                         if (outVar != null) {
                             vals[j++] = new Constant(v);
                         }
-                        if (stateVar != null) {
+                        if (stateVar != null && gasProgram instanceof BFS) {
                             /*
                              * FIXME Need an API for self-reporting of an IV by
                              * the IGASProgram.
