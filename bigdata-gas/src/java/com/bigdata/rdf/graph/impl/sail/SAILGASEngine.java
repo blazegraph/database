@@ -31,7 +31,6 @@ import org.openrdf.sail.SailException;
 
 import com.bigdata.rdf.graph.EdgesEnum;
 import com.bigdata.rdf.graph.IGASContext;
-import com.bigdata.rdf.graph.IGASProgram;
 import com.bigdata.rdf.graph.IGraphAccessor;
 import com.bigdata.rdf.graph.impl.GASEngine;
 import com.bigdata.rdf.graph.impl.util.VertexDistribution;
@@ -148,7 +147,7 @@ public class SAILGASEngine extends GASEngine {
                 final IGASContext<?, ?, ?> ctx, final Value u)
                 throws SailException {
 
-            final URI linkTypeIV = (URI) ctx.getGASProgram().getLinkType();
+            final URI linkTypeIV = (URI) ctx.getLinkType();
             if(linkTypeIV != null) {
                 /*
                  * FIXME RDR: We need to use a union of access paths for link
@@ -176,7 +175,7 @@ public class SAILGASEngine extends GASEngine {
              * since only one is optimized.
              */
             final boolean posOptimization = linkTypeIV != null
-                    && !inEdges;
+                    && inEdges;
 
             final CloseableIteration<? extends Statement, SailException> citr;
             if (posOptimization) {
@@ -238,8 +237,8 @@ public class SAILGASEngine extends GASEngine {
              * much more efficient. (If the index is local, then simply stacking
              * striterators is just as efficient.)
              */
-            return ((IGASProgram) ctx.getGASProgram()).constrainFilter(ctx,
-                    sitr);
+
+            return ctx.constrainFilter(sitr);
 
         }
 

@@ -15,7 +15,6 @@
 */
 package com.bigdata.rdf.graph.analytics;
 
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -32,8 +31,6 @@ import com.bigdata.rdf.graph.IGASScheduler;
 import com.bigdata.rdf.graph.IGASState;
 import com.bigdata.rdf.graph.IReducer;
 import com.bigdata.rdf.graph.impl.BaseGASProgram;
-
-import cutthecrap.utils.striterators.IStriterator;
 
 /**
  * Page rank assigns weights to the vertices in a graph based by on the relative
@@ -186,19 +183,6 @@ public class PR extends BaseGASProgram<PR.VS, PR.ES, Double> {
     /**
      * {@inheritDoc}
      * <p>
-     * Overridden to only visit the edges of the graph.
-     */
-    @Override
-    public IStriterator constrainFilter(
-            final IGASContext<PR.VS, PR.ES, Double> ctx, final IStriterator itr) {
-
-        return itr.addFilter(getEdgeOnlyFilter(ctx));
-
-    }
-
-    /**
-     * {@inheritDoc}
-     * <p>
      * Each vertex is initialized to the reset probability.
      * 
      * FIXME We need to do this efficiently. E.g., using a scan to find all of
@@ -332,97 +316,107 @@ public class PR extends BaseGASProgram<PR.VS, PR.ES, Double> {
 
     }
 
-    @Override
-    public void after(final IGASContext<PR.VS, PR.ES, Double> ctx) {
+    /**
+     * Class reports a map containing the page rank associated with each visited
+     * vertex.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+     *         Thompson</a>
+     */
+    public class PageRankReducer implements IReducer<PR.VS, PR.ES, Double, Map<Value,Double>> {
 
-        final ConcurrentHashMap<Value, Double> values = new ConcurrentHashMap<Value, Double>();
-
-        ctx.getGASState().reduce(
-                new IReducer<PR.VS, PR.ES, Double, Map<Value, Double>>() {
-
-                    @Override
-                    public void visit(final IGASState<VS, ES, Double> state,
-                            final Value u) {
-
-                        final VS us = state.getState(u);
-
-                        if (us != null) {
-
-                            final double pageRank = us.getValue();
-
-                            // FIXME Why are NaNs showing up?
-                            if (Double.isNaN(pageRank))
-                                return;
-
-                            // FIXME Do infinite values show up?
-                            if (Double.isInfinite(pageRank))
-                                return;
-                            
-                            if (pageRank < minPageRank) {
-                                // Ignore small values.
-                                return;
-                            }
-
-                            /*
-                             * Only report the larger ranked values.
-                             */
-
-                            if (log.isDebugEnabled())
-                                log.debug("v=" + u + ", pageRank=" + pageRank);
-
-                            values.put(u, Double.valueOf(pageRank));
-
-                        }
-
-                    }
-
-                    @Override
-                    public Map<Value, Double> get() {
-
-                        return Collections.unmodifiableMap(values);
-
-                    }
-                });
-
-        class NV implements Comparable<NV> {
-            public final double n;
-            public final Value v;
-            public NV(double n, Value v) {
-                this.n = n;
-                this.v = v;
-            }
-            @Override
-            public int compareTo(final NV o) {
-                if (o.n > this.n)
-                    return 1;
-                if (o.n < this.n)
-                    return -1;
-                return 0;
-            }
-        }
-
-        final NV[] a = new NV[values.size()];
-
-        int i = 0;
-
-        for (Map.Entry<Value, Double> e : values.entrySet()) {
+        private final ConcurrentHashMap<Value, Double> values = new ConcurrentHashMap<Value, Double>();
         
-            a[i++] = new NV(e.getValue().doubleValue(), e.getKey());
-            
+        @Override
+        public void visit(final IGASState<VS, ES, Double> state,
+                final Value u) {
+
+            final VS us = state.getState(u);
+
+            if (us != null) {
+
+                final double pageRank = us.getValue();
+
+                // FIXME Why are NaNs showing up?
+                if (Double.isNaN(pageRank))
+                    return;
+
+                // FIXME Do infinite values show up?
+                if (Double.isInfinite(pageRank))
+                    return;
+                
+                if (pageRank < minPageRank) {
+                    // Ignore small values.
+                    return;
+                }
+
+                /*
+                 * Only report the larger ranked values.
+                 */
+
+                if (log.isDebugEnabled())
+                    log.debug("v=" + u + ", pageRank=" + pageRank);
+
+                values.put(u, Double.valueOf(pageRank));
+
+            }
+
         }
 
-        Arrays.sort(a);
+        @Override
+        public Map<Value, Double> get() {
 
-        System.out.println("rank, pageRank, vertex");
-        i = 0;
-        for (NV t : a) {
+            return Collections.unmodifiableMap(values);
 
-            System.out.println(i + ", " + t.n + ", " + t.v);
-            
-            i++;
-            
         }
-
+        
     }
+    
+//    @Override
+//    public void after(final IGASContext<PR.VS, PR.ES, Double> ctx) {
+//
+//        final Map<Value, Double> values = ctx.getGASState().reduce(
+//                new PageRankReducer());
+//
+//        class NV implements Comparable<NV> {
+//            public final double n;
+//            public final Value v;
+//            public NV(double n, Value v) {
+//                this.n = n;
+//                this.v = v;
+//            }
+//            @Override
+//            public int compareTo(final NV o) {
+//                if (o.n > this.n)
+//                    return 1;
+//                if (o.n < this.n)
+//                    return -1;
+//                return 0;
+//            }
+//        }
+//
+//        final NV[] a = new NV[values.size()];
+//
+//        int i = 0;
+//
+//        for (Map.Entry<Value, Double> e : values.entrySet()) {
+//        
+//            a[i++] = new NV(e.getValue().doubleValue(), e.getKey());
+//            
+//        }
+//
+//        Arrays.sort(a);
+//
+//        System.out.println("rank, pageRank, vertex");
+//        i = 0;
+//        for (NV t : a) {
+//
+//            System.out.println(i + ", " + t.n + ", " + t.v);
+//            
+//            i++;
+//            
+//        }
+//
+//    }
 
 }

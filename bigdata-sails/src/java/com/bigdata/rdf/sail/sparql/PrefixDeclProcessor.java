@@ -18,6 +18,7 @@ import org.openrdf.model.vocabulary.RDFS;
 import org.openrdf.model.vocabulary.SESAME;
 import org.openrdf.query.MalformedQueryException;
 
+import com.bigdata.rdf.graph.impl.bd.GASService;
 import com.bigdata.rdf.internal.XSD;
 import com.bigdata.rdf.sail.sparql.ast.ASTIRI;
 import com.bigdata.rdf.sail.sparql.ast.ASTOperationContainer;
@@ -212,6 +213,8 @@ public class PrefixDeclProcessor {
                 prefixMap.put("owl", namespace = OWL.NAMESPACE);
             } else if (prefix.equals("sesame")) {
                 prefixMap.put("sesame", namespace = SESAME.NAMESPACE);
+            } else if (prefix.equals("gas")) {
+                prefixMap.put("gas", namespace = GASService.Options.NAMESPACE);
             } else {
                 // Unknown
                 namespace = null;

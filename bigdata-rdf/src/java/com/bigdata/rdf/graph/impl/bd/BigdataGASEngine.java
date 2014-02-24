@@ -35,6 +35,8 @@ import com.bigdata.rdf.graph.impl.GASEngine;
 import com.bigdata.rdf.graph.impl.util.VertexDistribution;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVUtility;
+import com.bigdata.rdf.internal.NotMaterializedException;
+import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPOKeyOrder;
@@ -361,7 +363,7 @@ public class BigdataGASEngine extends GASEngine {
                 this.ctx = ctx;
                 this.u = u;
 
-                linkTypeIV = (IV) ctx.getGASProgram().getLinkType();
+                linkTypeIV = getIV(ctx.getLinkType());
 
                 final IKeyBuilder keyBuilder;
                 /*
@@ -371,7 +373,7 @@ public class BigdataGASEngine extends GASEngine {
                  * 
                  * [u] gets bound on O.
                  * 
-                 * We use the POS(C) index. The S values give us the out-edges
+                 * We use the POS(C) index. The S values give us the in-edges
                  * for that [u] and the specified link type.
                  * 
                  * FIXME POS OPTIMIZATION: write unit test for this option to
@@ -379,7 +381,7 @@ public class BigdataGASEngine extends GASEngine {
                  * test to verify expected benefit. Watch out for the in-edges
                  * vs out-edges since only one is optimized.
                  */
-                posOptimization = linkTypeIV != null && !inEdges;
+                posOptimization = linkTypeIV != null && inEdges;
 
                 if (posOptimization) {
 
@@ -507,13 +509,13 @@ public class BigdataGASEngine extends GASEngine {
                 }
                 
                 /*
-                 * Optionally wrap the program specified filter. This filter will be
-                 * pushed down onto the index. If the index is remote, then this is
-                 * much more efficient. (If the index is local, then simply stacking
-                 * striterators is just as efficient.)
+                 * Optionally wrap the specified filter. This filter will be
+                 * pushed down onto the index. If the index is remote, then this
+                 * is much more efficient. (If the index is local, then simply
+                 * stacking striterators is just as efficient.)
                  */
-                return ((IGASProgram) ctx.getGASProgram()).constrainFilter(ctx,
-                        sitr);
+
+                return ctx.constrainFilter(sitr);
 
             }
             
@@ -548,12 +550,12 @@ public class BigdataGASEngine extends GASEngine {
             case NoEdges:
                 return EmptyIterator.DEFAULT;
             case InEdges:
-                return getEdges(kb, true/* inEdges */, ctx, (IV) u);
+                return getEdges(kb, true/* inEdges */, ctx, getIV(u));
             case OutEdges:
-                return getEdges(kb, false/* inEdges */, ctx, (IV) u);
+                return getEdges(kb, false/* inEdges */, ctx, getIV(u));
             case AllEdges: {
-                final IStriterator a = getEdges(kb, true/* inEdges */, ctx, (IV) u);
-                final IStriterator b = getEdges(kb, false/* outEdges */, ctx, (IV) u);
+                final IStriterator a = getEdges(kb, true/* inEdges */, ctx, getIV(u));
+                final IStriterator b = getEdges(kb, false/* outEdges */, ctx, getIV(u));
                 a.append(b);
                 return a;
             }
@@ -563,6 +565,29 @@ public class BigdataGASEngine extends GASEngine {
 
         }
 
+        private IV<?,?> getIV(final Value u) {
+            
+            if (u == null)
+                return null;
+            
+            if (u instanceof IV)
+                return (IV<?, ?>) u;
+
+            if (u instanceof BigdataValue) {
+            
+                final IV<?,?> iv = ((BigdataValue) u).getIV();
+                
+                if(iv == null)
+                    throw new NotMaterializedException(u.toString());
+                
+                return iv;
+                
+            }
+
+            throw new RuntimeException("No IV: " + u);
+            
+        }
+        
         @Override
         @SuppressWarnings({ "rawtypes" })
         public long getEdgeCount(final IGASContext<?, ?, ?> ctx, final Value u,
@@ -574,13 +599,13 @@ public class BigdataGASEngine extends GASEngine {
             case NoEdges:
                 return 0L;
             case InEdges:
-                return getEdgeCount(kb, true/* inEdges */, ctx, (IV) u);
+                return getEdgeCount(kb, true/* inEdges */, ctx, getIV(u));
             case OutEdges:
-                return getEdgeCount(kb, false/* inEdges */, ctx, (IV) u);
+                return getEdgeCount(kb, false/* inEdges */, ctx, getIV(u));
             case AllEdges: {
-                final long a = getEdgeCount(kb, true/* inEdges */, ctx, (IV) u);
+                final long a = getEdgeCount(kb, true/* inEdges */, ctx, getIV(u));
                 final long b = getEdgeCount(kb, false/* outEdges */, ctx,
-                        (IV) u);
+                        getIV(u));
                 final long n = a + b;
                 return n;
             }

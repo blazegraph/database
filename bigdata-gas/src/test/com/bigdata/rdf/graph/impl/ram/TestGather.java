@@ -36,8 +36,6 @@ import com.bigdata.rdf.graph.impl.GASStats;
 import com.bigdata.rdf.graph.impl.ram.RAMGASEngine.RAMGraph;
 import com.bigdata.rdf.graph.impl.ram.RAMGASEngine.RAMGraphAccessor;
 
-import cutthecrap.utils.striterators.IStriterator;
-
 /**
  * Test class for GATHER.
  * 
@@ -87,20 +85,6 @@ public class TestGather extends AbstractRAMGraphTestCase {
         @Override
         public EdgesEnum getScatterEdges() {
             return EdgesEnum.NoEdges;
-        }
-
-        /**
-         * {@inheritDoc}
-         * <p>
-         * Overridden to only visit the edges of the graph.
-         */
-        @Override
-        public IStriterator constrainFilter(
-                final IGASContext<Set<Statement>, Set<Statement>, Set<Statement>> ctx,
-                final IStriterator itr) {
-
-            return itr.addFilter(getEdgeOnlyFilter(ctx));
-
         }
 
         @Override

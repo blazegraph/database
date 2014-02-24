@@ -48,8 +48,6 @@ public class TestBFS extends AbstractBigdataGraphTestCase {
 
     public void testBFS() throws Exception {
 
-    	try {
-    	
         final SmallGraphProblem p = setupSmallGraphProblem();
 
         final IGASEngine gasEngine = getGraphFixture()
@@ -86,13 +84,6 @@ public class TestBFS extends AbstractBigdataGraphTestCase {
 
         }
         
-    	} catch (Exception ex) {
-    		
-    		ex.getCause().printStackTrace();
-    		
-    		throw ex;
-    		
-    	}
     }
 
 }
