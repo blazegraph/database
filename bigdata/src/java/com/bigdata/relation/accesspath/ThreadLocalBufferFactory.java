@@ -37,7 +37,7 @@ import com.bigdata.util.concurrent.Haltable;
 
 /**
  * A factory pattern for per-thread objects whose life cycle is tied to some
- * container. . The pool can be torn down when the container is torn down, which
+ * container. The pool can be torn down when the container is torn down, which
  * prevents its thread-local references from escaping.
  * <p>
  * Note: This implementation uses a true thread local buffers managed by a
