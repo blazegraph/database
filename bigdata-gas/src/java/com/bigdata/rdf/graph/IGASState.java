@@ -238,7 +238,11 @@ public interface IGASState<VS,ES, ST> {
      * @return The edge decoded from that vertex and <code>null</code> iff the
      *         vertex is not an edge.
      * 
-     *         TODO RDR : Link to an RDR wiki page as well.
+     * @see <a href="http://www.bigdata.com/whitepapers/reifSPARQL.pdf" >
+     *      Reification Done Right </a>
+     *      
+     * @see <a href="http://wiki.bigdata.com/wiki/index.php/RDF_GAS_API" > RDF
+     *      GAS API</a>
      */
     Statement decodeStatement(Value v);
  
