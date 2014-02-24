@@ -204,7 +204,7 @@ public class AbstractBigdataGraphTestCase extends AbstractGraphTestCase {
          */
         static private final String smallWeightedGraph = "bigdata-gas/src/test/com/bigdata/rdf/graph/data/smallWeightedGraph.ttl";
 
-        private final BigdataURI foafKnows, v1, v2, v3, v4, v5;
+        private final BigdataURI foafKnows, linkWeight, v1, v2, v3, v4, v5;
 
         public SmallWeightedGraphProblem() throws Exception {
 
@@ -216,6 +216,9 @@ public class AbstractBigdataGraphTestCase extends AbstractGraphTestCase {
 
             foafKnows = (BigdataURI) vf
                     .createURI("http://xmlns.com/foaf/0.1/knows");
+            
+            linkWeight = (BigdataURI) vf
+                    .createURI("http://www.bigdata.com/weight");
 
             v1 = (BigdataURI) vf.createURI("http://www.bigdata.com/1");
             v2 = (BigdataURI) vf.createURI("http://www.bigdata.com/2");
@@ -223,8 +226,8 @@ public class AbstractBigdataGraphTestCase extends AbstractGraphTestCase {
             v4 = (BigdataURI) vf.createURI("http://www.bigdata.com/4");
             v5 = (BigdataURI) vf.createURI("http://www.bigdata.com/5");
 
-            final BigdataValue[] terms = new BigdataValue[] { foafKnows, v1,
-                    v2, v3, v4, v5 };
+            final BigdataValue[] terms = new BigdataValue[] { foafKnows,
+                    linkWeight, v1, v2, v3, v4, v5 };
 
             // batch resolve existing IVs.
             ((BigdataSail) sail).getDatabase().getLexiconRelation()
@@ -240,6 +243,11 @@ public class AbstractBigdataGraphTestCase extends AbstractGraphTestCase {
         @SuppressWarnings("rawtypes")
         public IV getFoafKnows() {
             return foafKnows.getIV();
+        }
+
+        @SuppressWarnings("rawtypes")
+        public IV getLinkWeight() {
+            return linkWeight.getIV();
         }
 
         @SuppressWarnings("rawtypes")

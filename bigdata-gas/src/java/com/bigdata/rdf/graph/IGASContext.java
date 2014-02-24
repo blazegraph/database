@@ -116,13 +116,11 @@ public interface IGASContext<VS, ES, ST> extends Callable<IGASStats> {
      * @return The {@link Value} for the predicate that identifies the desired
      *         link type (there can be many types of links - the return value
      *         specifies which attribute is of interest).
-     * 
-     *         FIXME define getLinkAttribType() (RDR)
      */
     URI getLinkType();
 
     /**
-     * Set an optional constraint on the type of the visited links.
+     * Set an optional restriction on the type of the visited links.
      * <p>
      * Note: When this option is used, the scatter and gather will not visit the
      * property set for the vertex. Instead, the graph is treated as if it were
@@ -134,6 +132,32 @@ public interface IGASContext<VS, ES, ST> extends Callable<IGASStats> {
      *            link types are visited.
      */
     void setLinkType(URI linkType);
+
+    /**
+     * Return non-<code>null</code> iff there is a single link attribute type to
+     * be visited. This imposes a restriction on which link attributes are
+     * considered by the algorithm. The link attribute type restriction may be
+     * (and often is) paired with a link type restriction.
+     * 
+     * @return The {@link Value} for the predicate that identifies the desired
+     *         link attribute type.
+     * 
+     * @see #setLinkType(URI)
+     */
+    URI getLinkAttributeType();
+
+    /**
+     * Imposes an optional restriction on which link attributes are considered
+     * by the algorithm. The link attribute type restriction may be (and often
+     * is) paired with a link type restriction.
+     * 
+     * @param linkAttributeType
+     *            The link attribute type to visit (optional). When
+     *            <code>null</code>, the link attributes for the visited links
+     *            are NOT visited (the topology of the graph is visited, but not
+     *            the attributes for the edges).
+     */
+    void setLinkAttributeType(URI linkType);
 
     /**
      * Set an optional {@link IReducer} that will run after the
@@ -163,10 +187,10 @@ public interface IGASContext<VS, ES, ST> extends Callable<IGASStats> {
      *         TODO Rename as constrainEdgeFilter or even split into a
      *         constrainGatherFilter and a constraintScatterFilter.
      * 
-     *         FIXME APPLY : If we need access to the vertex property values in
-     *         APPLY (which we probably do, at least optionally), then there
-     *         should be a similar method to decide whether the property values
-     *         for the vertex are made available during the APPLY.
+     *         TODO APPLY : If we need access to the vertex property values in
+     *         APPLY (which we probably do, at least optionally), then perhaps
+     *         there should be a similar method to decide whether the property
+     *         values for the vertex are made available during the APPLY.
      */
     IStriterator constrainFilter(IStriterator eitr);
     

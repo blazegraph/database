@@ -217,8 +217,18 @@ public class GASService implements CustomServiceFactory {
          * 
          * @see IGASContext#setLinkType(URI)
          */
-        URI LINK_TYPE = new URIImpl(NAMESPACE+"linkType");
-        
+        URI LINK_TYPE = new URIImpl(NAMESPACE + "linkType");
+
+        /**
+         * An optional constraint on the types of the link attributes that will
+         * be visited by the algorithm - the use of this option is required if
+         * you want to process some specific link weight rather than the simple
+         * topology of the graph.
+         * 
+         * @see IGASContext#setLinkAttributeType(URI)
+         */
+        URI LINK_ATTR_TYPE = new URIImpl(NAMESPACE + "linkAttrType");
+
         /**
          * The {@link IGASScheduler} (default is {@link #DEFAULT_SCHEDULER}).
          * Class must implement {@link IGASSchedulerImpl}.
@@ -367,7 +377,7 @@ public class GASService implements CustomServiceFactory {
         private final int nthreads;
         private final int maxIterations;
         private final int maxVisited;
-        private final URI linkType;
+        private final URI linkType, linkAttrType;
         private final Class<IGASProgram<VS, ES, ST>> gasClass;
         private final Class<IGASSchedulerImpl> schedulerClass;
         private final Value[] initialFrontier;
@@ -411,6 +421,9 @@ public class GASService implements CustomServiceFactory {
 
             this.linkType = (URI) getOnlyArg(Options.PROGRAM,
                     Options.LINK_TYPE, null/* default */);
+
+            this.linkAttrType = (URI) getOnlyArg(Options.PROGRAM,
+                    Options.LINK_ATTR_TYPE, null/* default */);
 
             // GASProgram (required)
             {
@@ -719,8 +732,13 @@ public class GASService implements CustomServiceFactory {
 
                 gasContext.setMaxVisited(maxVisited);
 
+                // Optional link type constraint.
                 if (linkType != null)
                     gasContext.setLinkType(linkType);
+
+                // Optional link attribute constraint.
+                if (linkAttrType != null)
+                    gasContext.setLinkAttributeType(linkAttrType);
 
                 final IGASState<VS, ES, ST> gasState = gasContext.getGASState();
 
