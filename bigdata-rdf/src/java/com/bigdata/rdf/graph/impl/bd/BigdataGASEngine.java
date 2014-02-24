@@ -36,6 +36,7 @@ import com.bigdata.rdf.graph.impl.util.VertexDistribution;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVUtility;
 import com.bigdata.rdf.internal.NotMaterializedException;
+import com.bigdata.rdf.internal.impl.bnode.SidIV;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.spo.ISPO;
@@ -348,6 +349,7 @@ public class BigdataGASEngine extends GASEngine {
             private final IV u;
             // ctor (computed)
             private final IV linkTypeIV;
+            private final IV linkAttrTypeIV;
             private final boolean posOptimization;
             private final SPOKeyOrder keyOrder;
             private final IIndex ndx;
@@ -364,6 +366,8 @@ public class BigdataGASEngine extends GASEngine {
                 this.u = u;
 
                 linkTypeIV = getIV(ctx.getLinkType());
+                
+                linkAttrTypeIV = getIV(ctx.getLinkAttributeType());
 
                 final IKeyBuilder keyBuilder;
                 /*
@@ -376,7 +380,7 @@ public class BigdataGASEngine extends GASEngine {
                  * We use the POS(C) index. The S values give us the in-edges
                  * for that [u] and the specified link type.
                  * 
-                 * FIXME POS OPTIMIZATION: write unit test for this option to
+                 * TODO POS OPTIMIZATION: write unit test for this option to
                  * make sure that the right filter is imposed. write performance
                  * test to verify expected benefit. Watch out for the in-edges
                  * vs out-edges since only one is optimized.
@@ -397,16 +401,74 @@ public class BigdataGASEngine extends GASEngine {
 
                     keyBuilder.reset();
 
-                    // Bind P as a constant.
-                    IVUtility.encode(keyBuilder, linkTypeIV);
+//                    if (linkAttrTypeIV != null) {
+//
+//                        /*
+//                         * RDR optimization for POS(C) index:
+//                         * 
+//                         * P:= linkAttributeType
+//                         * 
+//                         * O:= unbound (the SID is in SPO(C) order, but we do
+//                         * not have S. P would be the linkType, but without S we
+//                         * can not form a prefix).
+//                         * 
+//                         * S:= unbound
+//                         * 
+//                         * C:= unbound
+//                         * 
+//                         * Note: We can only optimize this when both the
+//                         * linkType and linkAttributeType are specified.
+//                         */
+//
+//                        // P
+//                        IVUtility.encode(keyBuilder, linkAttrTypeIV);
+//
+//                        // O is a SID prefix.
+//                        {
+//
+//                            // RDR prefix byte.
+//                            keyBuilder.append(SidIV.toFlags());
+//
+//                            // SID.P:=linkType
+//                            IVUtility.encode(keyBuilder, linkTypeIV);
+//
+//                            // SID.O:=u
+//                            IVUtility.encode(keyBuilder, u);
+//
+//                        }
+//                        
+//                        // The rest of the key is unbound.
+//
+//                    } else {
 
-                    // Bind O for this key-range scan.
-                    IVUtility.encode(keyBuilder, u);
+                        // Bind P as a constant.
+                        IVUtility.encode(keyBuilder, linkTypeIV);
+
+                        // Bind O for this key-range scan.
+                        IVUtility.encode(keyBuilder, u);
+
+//                    }
 
                 } else {
 
                     /*
                      * SPO(C) or OSP(C)
+                     * 
+                     * FIXME RDR: For RDR link attribute access, the keys are
+                     * formed differently. Lower case letters are used for
+                     * variables. Upper case letters for constants.
+                     * 
+                     * For SPO(C): S:=SID(Spo(c)), P:=linkAttributeType (must
+                     * filter), O:=linkAttributeValue (read it off the index
+                     * when the filter is satisfied).
+                     * 
+                     * For OSP(C): OL=SID(Osp(c)), P:=linkAttributeType (must
+                     * filter), S:=linkAttributeValue (read it off the index
+                     * when the filter is satisfied).
+                     * 
+                     * FIXME RDR should also be supported in the SAIL and RAM
+                     * GAS engine implementations. The statements about
+                     * statements would be modeled as reified statement models.
                      */
 
                     keyOrder = getKeyOrder(kb, inEdges);

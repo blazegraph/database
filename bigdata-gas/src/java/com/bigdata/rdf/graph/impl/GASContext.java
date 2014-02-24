@@ -81,6 +81,11 @@ public class GASContext<VS, ES, ST> implements IGASContext<VS, ES, ST> {
     private final AtomicReference<URI> linkType = new AtomicReference<URI>(null);
     
     /**
+     * An optional constraint on the type of the visited link attributes.
+     */
+    private final AtomicReference<URI> linkAttributeType = new AtomicReference<URI>(null);
+    
+    /**
      * An optional {@link IReducer} that will executed after the
      * {@link IGASProgram}.
      */
@@ -824,12 +829,6 @@ public class GASContext<VS, ES, ST> implements IGASContext<VS, ES, ST> {
         
     }
 
-    /**
-     * {@inheritDoc}
-     * <p>
-     * The default implementation does not restrict the visitation to a
-     * connectivity matrix (returns <code>null</code>).
-     */
     @Override
     public URI getLinkType() {
         
@@ -841,6 +840,20 @@ public class GASContext<VS, ES, ST> implements IGASContext<VS, ES, ST> {
     public void setLinkType(final URI linkType) {
         
         this.linkType.set(linkType);
+        
+    }
+
+    @Override
+    public URI getLinkAttributeType() {
+        
+        return linkAttributeType.get();
+        
+    }
+
+    @Override
+    public void setLinkAttributeType(final URI linkAttributeType) {
+        
+        this.linkAttributeType.set(linkAttributeType);
         
     }
 
