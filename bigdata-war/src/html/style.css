@@ -106,6 +106,7 @@ body {
    border: 1px solid;
    border-bottom: none;
    min-height: 100px;
+   overflow-x: scroll;
 }
 
 .box:last-of-type {
@@ -169,5 +170,9 @@ hr {
 td {
    border: 1px solid;
    padding: 2px;
+}
+
+pre {
+   font-family: monospace;
 }
 

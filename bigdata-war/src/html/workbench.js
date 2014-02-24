@@ -250,11 +250,18 @@ $('#query-form').submit(function() {
    var settings = {
       type: 'POST',
       data: $(this).serialize(),
-      dataType: 'json',
-      accepts: {'json': 'application/sparql-results+json'},
       success: showQueryResults,
       error: queryResultsError
    }
+
+   // queries return JSON, explanations return HTML
+   if($('#query-explain').is(':checked')) {
+      settings.dataType = 'html';
+   } else {
+      settings.dataType = 'json';
+      settings.accepts =  {'json': 'application/sparql-results+json'};
+   }
+
    $.ajax('/sparql', settings);
    return false;
 });
@@ -264,25 +271,28 @@ $('#query-response-clear').click(function() {
 });
 
 function showQueryResults(data) {
-   $('#query-response').html('');
-   var table = $('<table>').appendTo($('#query-response'));
-   var thead = $('<thead>').appendTo(table);
-   var vars = [];
-   var tr = $('<tr>');
-   for(var i=0; i<data.head.vars.length; i++) {
-      tr.append('<td>' + data.head.vars[i] + '</td>');
-      vars.push(data.head.vars[i]);
-   }
-   thead.append(tr);
-   table.append(thead);
-   for(var i=0; i<data.results.bindings.length; i++) {
+   if(this.dataType == 'html') {
+      $('#query-response').html(data);
+   } else {
+      $('#query-response').html('');
+      var table = $('<table>').appendTo($('#query-response'));
+      var thead = $('<thead>').appendTo(table);
+      var vars = [];
       var tr = $('<tr>');
-      for(var j=0; j<vars.length; j++) {
-         tr.append('<td>' + data.results.bindings[i][vars[j]].value + '</td>');
+      for(var i=0; i<data.head.vars.length; i++) {
+         tr.append('<td>' + data.head.vars[i] + '</td>');
+         vars.push(data.head.vars[i]);
       }
-      table.append(tr);
+      thead.append(tr);
+      table.append(thead);
+      for(var i=0; i<data.results.bindings.length; i++) {
+         var tr = $('<tr>');
+         for(var j=0; j<vars.length; j++) {
+            tr.append('<td>' + data.results.bindings[i][vars[j]].value + '</td>');
+         }
+         table.append(tr);
+      }
    }
-
 }
 
 function queryResultsError(jqXHR, textStatus, errorThrown) {
