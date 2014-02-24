@@ -24,43 +24,44 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.graph.impl.bd;
 
 import java.lang.reflect.Constructor;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
-import java.util.concurrent.ConcurrentSkipListSet;
 
 import org.apache.log4j.Logger;
 import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
+import org.openrdf.model.ValueFactory;
 import org.openrdf.model.impl.URIImpl;
 
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
-import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.rdf.graph.IGASContext;
 import com.bigdata.rdf.graph.IGASEngine;
 import com.bigdata.rdf.graph.IGASProgram;
+import com.bigdata.rdf.graph.IGASProgram.IBinder;
 import com.bigdata.rdf.graph.IGASScheduler;
 import com.bigdata.rdf.graph.IGASSchedulerImpl;
 import com.bigdata.rdf.graph.IGASState;
 import com.bigdata.rdf.graph.IGASStats;
 import com.bigdata.rdf.graph.IGraphAccessor;
 import com.bigdata.rdf.graph.IReducer;
-import com.bigdata.rdf.graph.analytics.BFS;
 import com.bigdata.rdf.graph.impl.GASEngine;
 import com.bigdata.rdf.graph.impl.GASState;
 import com.bigdata.rdf.graph.impl.bd.BigdataGASEngine.BigdataGraphAccessor;
 import com.bigdata.rdf.graph.impl.scheduler.CHMScheduler;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.impl.literal.XSDNumericIV;
+import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataValue;
+import com.bigdata.rdf.model.BigdataValueImpl;
 import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
 import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
@@ -111,11 +112,11 @@ import cutthecrap.utils.striterators.ICloseableIterator;
  * }
  * </pre>
  * 
- * TODO Also allow the execution of gas workflows. A workflow would be more
- * along the lines of a callable, but one where the initial source and/or target
- * vertices could be identified. Or have an interface that wraps the analytics
- * (including things like FuzzySSSP) so they can declare their own arguments for
- * invocation as a SERVICE.
+ * FIXME Also allow the execution of gas workflows, such as FuzzySSSP. A workflow
+ * would be more along the lines of a Callable, but one where the initial source
+ * and/or target vertices could be identified. Or have an interface that wraps
+ * the analytics (including things like FuzzySSSP) so they can declare their own
+ * arguments for invocation as a SERVICE.
  * 
  * TODO The input frontier could be a variable, in which case we would pull out
  * the column for that variable rather than running the algorithm once per
@@ -188,6 +189,7 @@ public class GASService implements CustomServiceFactory {
          * {@value #DEFAULT_MAX_ITERATIONS}).
          * 
          * @see #DEFAULT_MAX_ITERATIONS
+         * @see IGASContext#setMaxIterations(int)
          */
         URI MAX_ITERATIONS = new URIImpl(NAMESPACE + "maxIterations");
         
@@ -198,11 +200,25 @@ public class GASService implements CustomServiceFactory {
          * (optional, default {@value #DEFAULT_MAX_VISITED}).
          * 
          * @see #DEFAULT_MAX_VISITED
+         * @see IGASContext#setMaxVisited(int)
          */
         URI MAX_VISITED = new URIImpl(NAMESPACE + "maxVisited");
         
         int DEFAULT_MAX_VISITED = Integer.MAX_VALUE;
 
+        /**
+         * An optional constraint on the types of links that will be visited by
+         * the algorithm.
+         * <p>
+         * Note: When this option is used, the scatter and gather will not visit
+         * the property set for the vertex. Instead, the graph is treated as if
+         * it were an unattributed graph and only mined for the connectivity
+         * data (which may include a link weight).
+         * 
+         * @see IGASContext#setLinkType(URI)
+         */
+        URI LINK_TYPE = new URIImpl(NAMESPACE+"linkType");
+        
         /**
          * The {@link IGASScheduler} (default is {@link #DEFAULT_SCHEDULER}).
          * Class must implement {@link IGASSchedulerImpl}.
@@ -210,7 +226,7 @@ public class GASService implements CustomServiceFactory {
         URI SCHEDULER_CLASS = new URIImpl(NAMESPACE + "schedulerClass");
  
         Class<? extends IGASSchedulerImpl> DEFAULT_SCHEDULER = CHMScheduler.class;
-        
+
         /**
          * Magic predicate used to specify a vertex in the initial frontier.
          */
@@ -218,24 +234,45 @@ public class GASService implements CustomServiceFactory {
 
         /**
          * Magic predicate used to specify a variable that will become bound to
-         * each vertex in the visited set for the analytic.
+         * each vertex in the visited set for the analytic. {@link #OUT} is
+         * always bound to the visited vertices. The other "out" variables are
+         * bound to state associated with the visited vertices in an algorithm
+         * dependent manner.
          * 
-         * TODO This is not always what we want to report. We really need to
-         * specify the {@link IReducer} to run and then get the output of that
-         * to the caller.
+         * @see IGASProgram#getBinderList()
          */
         URI OUT = new URIImpl(NAMESPACE + "out");
 
-        /**
-         * The state of the visited vertex (algorithm dependent, but something
-         * like traversal depth is common).
-         */
-        URI STATE = new URIImpl(NAMESPACE + "state");
+        URI OUT1 = new URIImpl(NAMESPACE + "out1");
 
+        URI OUT2 = new URIImpl(NAMESPACE + "out2");
+
+        URI OUT3 = new URIImpl(NAMESPACE + "out3");
+
+        URI OUT4 = new URIImpl(NAMESPACE + "out4");
+
+        URI OUT5 = new URIImpl(NAMESPACE + "out5");
+
+        URI OUT6 = new URIImpl(NAMESPACE + "out6");
+
+        URI OUT7 = new URIImpl(NAMESPACE + "out7");
+
+        URI OUT8 = new URIImpl(NAMESPACE + "out8");
+
+        URI OUT9 = new URIImpl(NAMESPACE + "out9");
+        
     }
 
     static private transient final Logger log = Logger
             .getLogger(GASService.class);
+
+    /**
+     * The list of all out variables.
+     */
+    static private List<URI> OUT_VARS = Collections.unmodifiableList(Arrays
+            .asList(new URI[] { Options.OUT, Options.OUT1, Options.OUT2,
+                    Options.OUT3, Options.OUT4, Options.OUT5, Options.OUT6,
+                    Options.OUT7, Options.OUT8, Options.OUT9 }));
 
     private final BigdataNativeServiceOptions serviceOptions;
 
@@ -319,10 +356,6 @@ public class GASService implements CustomServiceFactory {
      * 
      *         TODO Validate the service call parameters, including whether they
      *         are understood by the specific algorithm.
-     * 
-     *         TODO Both maxIterations and maxVertexSetSize should be part of
-     *         the GASState to be constraints that are applied for any
-     *         algorithm.
      */
     private static class GASServiceCall<VS, ES, ST> implements BigdataServiceCall {
 
@@ -334,11 +367,11 @@ public class GASService implements CustomServiceFactory {
         private final int nthreads;
         private final int maxIterations;
         private final int maxVisited;
+        private final URI linkType;
         private final Class<IGASProgram<VS, ES, ST>> gasClass;
         private final Class<IGASSchedulerImpl> schedulerClass;
         private final Value[] initialFrontier;
-        private final IVariable<?> outVar;
-        private final IVariable<?> stateVar;
+        private final IVariable<?>[] outVars;
 
         public GASServiceCall(final AbstractTripleStore store,
                 final ServiceNode serviceNode,
@@ -375,6 +408,9 @@ public class GASService implements CustomServiceFactory {
                     Options.MAX_VISITED,
                     store.getValueFactory().createLiteral(
                             Options.DEFAULT_MAX_VISITED))).intValue();
+
+            this.linkType = (URI) getOnlyArg(Options.PROGRAM,
+                    Options.LINK_TYPE, null/* default */);
 
             // GASProgram (required)
             {
@@ -441,12 +477,26 @@ public class GASService implements CustomServiceFactory {
             // Initial frontier.
             this.initialFrontier = getArg(Options.PROGRAM, Options.IN);
 
-            // The output variable (bound to the visited set).
-            this.outVar = getVar(Options.PROGRAM, Options.OUT);
-            
-            // The state variable (bound to the state associated with each visited vertex).
-            this.stateVar = getVar(Options.PROGRAM, Options.STATE);
-            
+            /*
+             * The output variable (bound to the visited set).
+             * 
+             * TODO This does too much work. It searches the group graph pattern
+             * 10 times, when we could do just one pass and find everything.
+             */
+            {
+
+                this.outVars = new IVariable[10];
+
+                int i = 0;
+
+                for (URI uri : OUT_VARS) {
+
+                    this.outVars[i++] = getVar(Options.PROGRAM, uri);
+
+                }
+
+            }
+
         }
 
         /**
@@ -669,6 +719,9 @@ public class GASService implements CustomServiceFactory {
 
                 gasContext.setMaxVisited(maxVisited);
 
+                if (linkType != null)
+                    gasContext.setLinkType(linkType);
+
                 final IGASState<VS, ES, ST> gasState = gasContext.getGASState();
 
                 // TODO We should look at this when extracting the parameters from the SERVICE's graph pattern.
@@ -708,68 +761,14 @@ public class GASService implements CustomServiceFactory {
                     sb.append(", stats=" + stats);
                     log.info(sb.toString());
                 }
-                
-                /* TODO We should be able to run a REDUCER here, not just
-                 * report what is in the visited set.
-                 */
-                final Set<Value> visitedSet = new ConcurrentSkipListSet<Value>();
-
-                gasState.reduce(new IReducer<VS, ES, ST, Void>() {
-
-                    @Override
-                    public void visit(IGASState<VS, ES, ST> state, Value u) {
-                        visitedSet.add(u);
-                    }
-
-                    @Override
-                    public Void get() {
-                        return null;
-                    }
-                });
 
                 /*
                  * Bind output variables (if any).
                  */
-                final IBindingSet[] out = new IBindingSet[visitedSet.size()];
 
-                {
-                    
-                    final List<IVariable> tmp = new LinkedList<IVariable>();
-                    
-                    if (outVar != null)
-                        tmp.add(outVar);
-                    
-                    if (stateVar != null)
-                        tmp.add(stateVar);
-                    
-                    final IVariable[] vars = tmp.toArray(new IVariable[tmp
-                            .size()]);
-                    
-                    final IConstant[] vals = new IConstant[vars.length];
-
-                    int i = 0;
-
-                    for (Value v : visitedSet) {
-
-                        int j = 0;
-                        if (outVar != null) {
-                            vals[j++] = new Constant(v);
-                        }
-                        if (stateVar != null && gasProgram instanceof BFS) {
-                            /*
-                             * FIXME Need an API for self-reporting of an IV by
-                             * the IGASProgram.
-                             */
-                            final int depth = ((BFS.VS)gasState.getState(v)).depth();
-                            final IV depthIV = new XSDNumericIV(depth);
-                            vals[j++] = new Constant(depthIV);
-                        }
-
-                        out[i++] = new ListBindingSet(vars, vals);
-
-                    }
-                    
-                }
+                final IBindingSet[] out = gasState
+                        .reduce(new BindingSetReducer<VS, ES, ST>(outVars,
+                                store, gasProgram, gasContext));
 
                 return new ChunkedArrayIterator<IBindingSet>(out);
 
@@ -787,6 +786,171 @@ public class GASService implements CustomServiceFactory {
 
         }
 
+        /**
+         * Class used to report {@link IBindingSet}s to the {@link GASService}.
+         * {@link IGASProgram}s can customize the way in which they interpret
+         * the declared variables by subclassing this class.
+         * 
+         * @param <VS>
+         * @param <ES>
+         * @param <ST>
+         * 
+         * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+         *         Thompson</a>
+         * 
+         *         TODO This should use the TLBFactory when we change to use
+         *         stream solutions out of the SERVICE (#507), but the TLB class
+         *         is not necessary until the reduce itself runs in concurrent
+         *         threads (it is single threaded right now based on the backing
+         *         CHM iterator).
+         */
+        public static class BindingSetReducer<VS, ES, ST> implements
+                IReducer<VS, ES, ST, IBindingSet[]> {
+
+            /**
+             * The declared output variables (the ones that the caller wants to
+             * extract). Any position that will not be extracted is a
+             * <code>null</code>.
+             */
+            private final IVariable<?>[] outVars;
+
+            /**
+             * The KB instance.
+             */
+            private final AbstractTripleStore store;
+            
+            private final LexiconRelation lex;
+            
+            /**
+             * The object used to create the variable bindings.
+             */
+            private final ValueFactory vf;
+            
+            /**
+             * The list of objects used to extract the variable bindings.
+             */
+            private final List<IBinder<VS, ES, ST>> binderList;
+            
+            /**
+             * The collected solutions.
+             */
+            private final List<IBindingSet> tmp = new LinkedList<IBindingSet>();
+            
+            /**
+             * 
+             * @param outVars
+             *            The declared output variables (the ones that the
+             *            caller wants to extract). Any position that will not
+             *            be extracted is a <code>null</code>.
+             */
+            public BindingSetReducer(//
+                    final IVariable<?>[] outVars,
+                    final AbstractTripleStore store,
+                    final IGASProgram<VS, ES, ST> gasProgram,
+                    final IGASContext<VS, ES, ST> ctx) {
+
+                this.outVars = outVars;
+
+                this.store = store;
+
+                this.lex = store.getLexiconRelation();
+                
+                this.vf = store.getValueFactory();
+                
+                this.binderList = gasProgram.getBinderList();
+
+                //                int i = 0;
+//
+//                for (Value v : visitedSet) {
+//
+//                    int j = 0;
+//                    if (outVar != null) {
+//                        vals[j++] = new Constant(v);
+//                    }
+//                    if (stateVar != null && gasProgram instanceof BFS) {
+//                        /*
+//                         * FIXME Need an API for self-reporting of an IV by
+//                         * the IGASProgram.
+//                         */
+//                        final int depth = ((BFS.VS)gasState.getState(v)).depth();
+//                        final IV depthIV = new XSDNumericIV(depth);
+//                        vals[j++] = new Constant(depthIV);
+//                    }
+//
+//                    out[i++] = new ListBindingSet(vars, vals);
+//
+//                }
+                
+            }
+            
+            @Override
+            public void visit(final IGASState<VS, ES, ST> state, final Value u) {
+
+                final IBindingSet bs = new ListBindingSet();
+                
+                for (IBinder<VS, ES, ST> b : binderList) {
+
+                    // The variable for this binder.
+                    final IVariable<?> var = outVars[b.getIndex()];
+
+                    if(var == null)
+                        continue;
+                    
+                    /*
+                     * TODO This does too much work. The API is defined in terms
+                     * of openrdf Value objects rather than IVs because it is in
+                     * a different package (not bigdata specific). The
+                     * getBinderList() method should be moved to the code that
+                     * exposes the service (this class) so it can do bigdata
+                     * specific things and DO LESS WORK. This would be a good
+                     * thing to do at the time that we add support for FuzzySSSP
+                     * (which is not an IGASProgram and hence breaks the model
+                     * anyway).
+                     */
+                    final Value val = b.bind(vf, state, u);
+
+                    if (val == null)
+                        continue;
+
+                    if (val instanceof IV) {
+
+                        // The value is already an IV.
+                        bs.set(var, new Constant((IV) val));
+
+                    } else {
+
+                        /*
+                         * The Value is a BigdataValueImpl (if the bind() method
+                         * used the supplied ValueFactory). We need to convert
+                         * it to an IV and this code ASSUMES that we can do this
+                         * using an inline IV with the as configured KB. (This
+                         * will work for anything numeric, but not for strings.)
+                         */
+                        final IV<BigdataValueImpl, ?> iv = lex
+                                .getLexiconConfiguration().createInlineIV(val);
+
+                        iv.setValue((BigdataValueImpl) val);
+
+                        bs.set(var, new Constant(iv));
+
+                    }
+
+                }
+
+                // Add to the set of generated solutions.
+                tmp.add(bs);
+
+            }
+
+            @Override
+            public IBindingSet[] get() {
+
+                return tmp.toArray(new IBindingSet[tmp.size()]);
+
+            }
+
+        }
+        
         /**
          * Factory for the {@link IGASEngine}.
          */

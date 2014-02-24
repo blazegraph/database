@@ -20,9 +20,11 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.log4j.Logger;
 import org.openrdf.model.Statement;
+import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 
 import com.bigdata.rdf.graph.EdgesEnum;
@@ -35,6 +37,10 @@ import com.bigdata.rdf.graph.IGraphAccessor;
 import com.bigdata.rdf.graph.IReducer;
 import com.bigdata.rdf.graph.IStaticFrontier;
 import com.bigdata.rdf.graph.util.GASUtil;
+
+import cutthecrap.utils.striterators.Filter;
+import cutthecrap.utils.striterators.IFilter;
+import cutthecrap.utils.striterators.IStriterator;
 
 public class GASContext<VS, ES, ST> implements IGASContext<VS, ES, ST> {
 
@@ -68,6 +74,18 @@ public class GASContext<VS, ES, ST> implements IGASContext<VS, ES, ST> {
      */
     private final AtomicInteger maxVertices = new AtomicInteger(
             Integer.MAX_VALUE);
+
+    /**
+     * An optional constraint on the type of the visited links.
+     */
+    private final AtomicReference<URI> linkType = new AtomicReference<URI>(null);
+    
+    /**
+     * An optional {@link IReducer} that will executed after the
+     * {@link IGASProgram}.
+     */
+    private final AtomicReference<IReducer<VS, ES, ST, ?>> afterOp = new AtomicReference<IReducer<VS, ES, ST, ?>>(
+            null);
 
     /**
      * 
@@ -168,8 +186,19 @@ public class GASContext<VS, ES, ST> implements IGASContext<VS, ES, ST> {
 
         gasState.traceState();
 
-        program.after(this);
-        
+        // Optional post-reduction.
+        {
+            
+            final IReducer<VS, ES, ST, ?> op = getRunAfterOp();
+
+            if (op != null) {
+
+                gasState.reduce(op);
+
+            }
+
+        }
+
         // Done
         return total;
 
@@ -374,25 +403,92 @@ public class GASContext<VS, ES, ST> implements IGASContext<VS, ES, ST> {
     /**
      * Do APPLY.
      * 
-     * TODO The apply() should be parallelized. For some algorithms, there is a
-     * moderate amount of work per vertex in apply(). Use {@link #nthreads} to
-     * set the parallelism.
-     * <p>
-     * Note: This is very similar to the {@link IGASState#reduce(IReducer)}
-     * operation. This operates over the frontier. reduce() operates over the
-     * activated vertices. Both need fine grained parallelism. Both can have
-     * either light or moderately heavy operations (a dot product would be an
-     * example of a heavier operation).
+     * @return The #of vertices for which the operation was executed.
+     * 
+     * @throws Exception
      */
-    private void apply(final IStaticFrontier f) {
+    private void apply(final IStaticFrontier f) throws Exception {
 
-        for (Value u : f) {
+//      for (Value u : f) {
+//
+//          program.apply(gasState, u, null/* sum */);
+//
+//      }
 
-            program.apply(gasState, u, null/* sum */);
+        // Note: Return value of ApplyReducer is currently ignored.
+        reduceOverFrontier(f, new ApplyReducer<Void>());
+        
+    }
 
+    private class ApplyReducer<T> implements IReducer<VS, ES, ST, T> {
+
+        @Override
+        public void visit(final IGASState<VS, ES, ST> state, final Value u) {
+
+            program.apply(state, u, null/* sum */);
+            
+        }
+
+        @Override
+        public T get() {
+
+            // Note: Nothing returned right now.
+            return null;
+            
         }
 
     }
+    
+    /**
+     * Reduce over the frontier (used for apply()).
+     * 
+     * @param f
+     *            The frontier.
+     * @param op
+     *            The {@link IReducer}.
+     * 
+     * @return The {@link IReducer#get() result}.
+     * 
+     * @throws Exception
+     */
+    public <T> T reduceOverFrontier(final IStaticFrontier f,
+            final IReducer<VS, ES, ST, T> op) throws Exception {
+
+        if (f == null)
+            throw new IllegalArgumentException();
+
+        if (op == null)
+            throw new IllegalArgumentException();
+
+        class ReduceVertexTaskFactory implements VertexTaskFactory<Long> {
+
+            @Override
+            public Callable<Long> newVertexTask(final Value u) {
+
+                return new Callable<Long>() {
+
+                    @Override
+                    public Long call() {
+
+                        // program.apply(gasState, u, null/* sum */);
+                        op.visit(gasState, u);
+
+                        // Nothing returned by visit().
+                        return ONE;
+
+                    };
+                };
+
+            };
+        }
+
+        gasEngine.newFrontierStrategy(new ReduceVertexTaskFactory(), f).call();
+
+        // Return reduction.
+        return op.get();
+
+    }
+    private static final Long ONE = Long.valueOf(1L);
 
     /**
      * @param inEdges
@@ -728,4 +824,122 @@ public class GASContext<VS, ES, ST> implements IGASContext<VS, ES, ST> {
         
     }
 
+    /**
+     * {@inheritDoc}
+     * <p>
+     * The default implementation does not restrict the visitation to a
+     * connectivity matrix (returns <code>null</code>).
+     */
+    @Override
+    public URI getLinkType() {
+        
+        return linkType.get();
+        
+    }
+
+    @Override
+    public void setLinkType(final URI linkType) {
+        
+        this.linkType.set(linkType);
+        
+    }
+
+    /**
+     * {@inheritDoc}
+     * <p>
+     * The default implementation only visits the edges.
+     */
+    @Override
+    public IStriterator constrainFilter(final IStriterator itr) {
+
+        return itr.addFilter(getEdgeOnlyFilter());
+
+    }
+
+    /**
+     * Return an {@link IFilter} that will only visit the edges of the graph.
+     * 
+     * @see IGASState#isEdge(Statement)
+     */
+    protected IFilter getEdgeOnlyFilter() {
+
+        return new EdgeOnlyFilter(this);
+        
+    }
+    
+    /**
+     * Filter visits only edges (filters out attribute values).
+     * <p>
+     * Note: This filter is pushed down onto the AP and evaluated close to the
+     * data.
+     */
+    private class EdgeOnlyFilter extends Filter {
+        private static final long serialVersionUID = 1L;
+        private final IGASState<VS, ES, ST> gasState;
+        private EdgeOnlyFilter(final IGASContext<VS, ES, ST> ctx) {
+            this.gasState = ctx.getGASState();
+        }
+        @Override
+        public boolean isValid(final Object e) {
+            return gasState.isEdge((Statement) e);
+        }
+    };
+    
+    /**
+     * Return a filter that only visits the edges of graph that are instances of
+     * the specified link attribute type.
+     * <p>
+     * Note: For bigdata, the visited edges can be decoded to recover the
+     * original link as well. 
+     * 
+     * @see IGASState#isLinkAttrib(Statement, URI)
+     * @see IGASState#decodeStatement(Value)
+     */
+    protected IFilter getLinkAttribFilter(final IGASContext<VS, ES, ST> ctx,
+            final URI linkAttribType) {
+
+        return new LinkAttribFilter(ctx, linkAttribType);
+
+    }
+
+    /**
+     * Filter visits only edges where the {@link Statement} is an instance of
+     * the specified link attribute type. For bigdata, the visited edges can be
+     * decoded to recover the original link as well.
+     */
+    private class LinkAttribFilter extends Filter {
+        private static final long serialVersionUID = 1L;
+
+        private final IGASState<VS, ES, ST> gasState;
+        private final URI linkAttribType;
+        
+        public LinkAttribFilter(final IGASContext<VS, ES, ST> ctx,
+                final URI linkAttribType) {
+            if (linkAttribType == null)
+                throw new IllegalArgumentException();
+            this.gasState = ctx.getGASState();
+            this.linkAttribType = linkAttribType;
+        }
+
+        @Override
+        public boolean isValid(final Object e) {
+            return gasState.isLinkAttrib((Statement) e, linkAttribType);
+        }
+    }
+
+    @Override
+    public <T> void setRunAfterOp(final IReducer<VS, ES, ST, T> afterOp) {
+
+        this.afterOp.set(afterOp);
+        
+    }
+
+    @SuppressWarnings("unchecked")
+    @Override
+    public <T> IReducer<VS, ES, ST, T> getRunAfterOp() {
+
+        return (IReducer<VS, ES, ST, T>) afterOp.get();
+
+    }
+    
 } // GASContext

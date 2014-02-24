@@ -15,8 +15,8 @@
 */
 package com.bigdata.rdf.graph.analytics;
 
-import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -24,6 +24,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import org.openrdf.model.Statement;
 import org.openrdf.model.Value;
+import org.openrdf.model.ValueFactory;
 
 import com.bigdata.rdf.graph.EdgesEnum;
 import com.bigdata.rdf.graph.Factory;
@@ -33,8 +34,6 @@ import com.bigdata.rdf.graph.IGASScheduler;
 import com.bigdata.rdf.graph.IGASState;
 import com.bigdata.rdf.graph.IReducer;
 import com.bigdata.rdf.graph.impl.BaseGASProgram;
-
-import cutthecrap.utils.striterators.IStriterator;
 
 /**
  * Breadth First Search (BFS) is an iterative graph traversal primitive. The
@@ -158,19 +157,6 @@ public class BFS extends BaseGASProgram<BFS.VS, BFS.ES, Void> {
     }
 
     /**
-     * {@inheritDoc}
-     * <p>
-     * Overridden to only visit the edges of the graph.
-     */
-    @Override
-    public IStriterator constrainFilter(
-            final IGASContext<BFS.VS, BFS.ES, Void> ctx, final IStriterator itr) {
-
-        return itr.addFilter(getEdgeOnlyFilter(ctx));
-
-    }
-
-    /**
      * Not used.
      */
     @Override
@@ -260,6 +246,39 @@ public class BFS extends BaseGASProgram<BFS.VS, BFS.ES, Void> {
     }
 
     /**
+     * {@inheritDoc}
+     * <p>
+     * <dl>
+     * <dt>1</dt>
+     * <dd>The depth at which the vertex was first encountered during traversal.</dd>
+     * </dl>
+     */
+    @Override
+    public List<IBinder<BFS.VS, BFS.ES, Void>> getBinderList() {
+
+        final List<IBinder<BFS.VS, BFS.ES, Void>> tmp = super.getBinderList();
+
+        tmp.add(new IBinder<BFS.VS, BFS.ES, Void>() {
+            
+            @Override
+            public int getIndex() {
+                return 1;
+            }
+            
+            @Override
+            public Value bind(final ValueFactory vf,
+                    final IGASState<BFS.VS, BFS.ES, Void> state, final Value u) {
+
+                return vf.createLiteral(state.getState(u).depth.get());
+
+            }
+        });
+
+        return tmp;
+
+    }
+
+    /**
      * Reduce the active vertex state, returning a histogram reporting the #of
      * vertices at each distance from the starting vertex. There will always be
      * one vertex at depth zero - this is the starting vertex. For each
@@ -272,11 +291,9 @@ public class BFS extends BaseGASProgram<BFS.VS, BFS.ES, Void> {
      *         Thompson</a>
      * 
      *         TODO Do another reducer that reports the actual BFS tree rather
-     *         than a histogram. For each depth, it needs to have the set of
-     *         vertices that are at that number of hops from the starting
-     *         vertex. So, there is an outer map from depth to set. The inner
-     *         set should also be concurrent if we allow concurrent reduction of
-     *         the activated vertex state.
+     *         than a histogram. We need to store the predecessor for this. That
+     *         will allow us to trivially report the BFS route between any two
+     *         vertices.
      */
     protected static class HistogramReducer implements
             IReducer<VS, ES, Void, Map<Integer, AtomicLong>> {
@@ -323,54 +340,71 @@ public class BFS extends BaseGASProgram<BFS.VS, BFS.ES, Void> {
         
     }
     
-    @Override
-    public void after(final IGASContext<BFS.VS, BFS.ES, Void> ctx) {
-
-        final HistogramReducer r = new HistogramReducer();
-        
-        ctx.getGASState().reduce(r);
-
-        class NV implements Comparable<NV> {
-            public final int n;
-            public final long v;
-            public NV(final int n, final long v) {
-                this.n = n;
-                this.v = v;
-            }
-            @Override
-            public int compareTo(final NV o) {
-                if (o.n > this.n)
-                    return -1;
-                if (o.n < this.n)
-                    return 1;
-                return 0;
-            }
-        }
-
-        final Map<Integer, AtomicLong> h = r.get();
-
-        final NV[] a = new NV[h.size()];
-
-        int i = 0;
-
-        for (Map.Entry<Integer, AtomicLong> e : h.entrySet()) {
-
-            a[i++] = new NV(e.getKey().intValue(), e.getValue().get());
-
-        }
-
-        Arrays.sort(a);
-
-        System.out.println("distance, frontierSize, sumFrontierSize");
-        long sum = 0L;
-        for (NV t : a) {
-
-            System.out.println(t.n + ", " + t.v + ", " + sum);
-
-            sum += t.v;
-
-        }
-
-    }
+//    @Override
+//    public <T> IReducer<VS, ES, Void, T> getDefaultAfterOp() {
+//
+//        class NV implements Comparable<NV> {
+//            public final int n;
+//            public final long v;
+//            public NV(final int n, final long v) {
+//                this.n = n;
+//                this.v = v;
+//            }
+//            @Override
+//            public int compareTo(final NV o) {
+//                if (o.n > this.n)
+//                    return -1;
+//                if (o.n < this.n)
+//                    return 1;
+//                return 0;
+//            }
+//        }
+//
+//        final IReducer<VS, ES, Void, T> outerReducer = new IReducer<VS, ES, Void, T>() {
+//
+//            final HistogramReducer innerReducer = new HistogramReducer();
+//
+//            @Override
+//            public void visit(IGASState<VS, ES, Void> state, Value u) {
+//
+//                innerReducer.visit(state, u);
+//                
+//            }
+//
+//            @Override
+//            public T get() {
+//                
+//                final Map<Integer, AtomicLong> h = innerReducer.get();
+//
+//                final NV[] a = new NV[h.size()];
+//
+//                int i = 0;
+//
+//                for (Map.Entry<Integer, AtomicLong> e : h.entrySet()) {
+//
+//                    a[i++] = new NV(e.getKey().intValue(), e.getValue().get());
+//
+//                }
+//
+//                Arrays.sort(a);
+//
+//                System.out.println("distance, frontierSize, sumFrontierSize");
+//                long sum = 0L;
+//                for (NV t : a) {
+//
+//                    System.out.println(t.n + ", " + t.v + ", " + sum);
+//
+//                    sum += t.v;
+//
+//                }
+//
+//                return null;
+//            }
+//            
+//        };
+//        
+//        return outerReducer;
+//
+//    }
 
 }

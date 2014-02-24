@@ -15,9 +15,12 @@
 */
 package com.bigdata.rdf.graph.analytics;
 
+import java.util.List;
+
 import org.apache.log4j.Logger;
 import org.openrdf.model.Statement;
 import org.openrdf.model.Value;
+import org.openrdf.model.ValueFactory;
 
 import com.bigdata.rdf.graph.EdgesEnum;
 import com.bigdata.rdf.graph.Factory;
@@ -26,8 +29,6 @@ import com.bigdata.rdf.graph.IGASContext;
 import com.bigdata.rdf.graph.IGASScheduler;
 import com.bigdata.rdf.graph.IGASState;
 import com.bigdata.rdf.graph.impl.BaseGASProgram;
-
-import cutthecrap.utils.striterators.IStriterator;
 
 /**
  * SSSP (Single Source, Shortest Path). This analytic computes the shortest path
@@ -52,9 +53,10 @@ import cutthecrap.utils.striterators.IStriterator;
  *         phase is executed to update the state of the distinct vertices in the
  *         frontier.
  * 
- *         TODO Add a reducer to report the actual minimum length paths. This is
- *         similar to a BFS tree, but the path lengths are not integer values so
- *         we need a different data structure to collect them.
+ *         FIXME Add a reducer to report the actual minimum length paths. This
+ *         is similar to a BFS tree, but the path lengths are not integer values
+ *         so we need a different data structure to collect them (we need to
+ *         store the predecesor when we run SSSP to do this).
  */
 public class SSSP extends BaseGASProgram<SSSP.VS, SSSP.ES, Integer/* dist */> {
 
@@ -197,20 +199,6 @@ public class SSSP extends BaseGASProgram<SSSP.VS, SSSP.ES, Integer/* dist */> {
 
         return EdgesEnum.OutEdges;
 
-    }
-
-    /**
-     * {@inheritDoc}
-     * <p>
-     * Overridden to only visit the edges of the graph.
-     */
-    @Override
-    public IStriterator constrainFilter(
-            final IGASContext<SSSP.VS, SSSP.ES, Integer> ctx,
-            final IStriterator itr) {
-
-        return itr.addFilter(getEdgeOnlyFilter(ctx));
-                
     }
 
     /**
@@ -392,6 +380,41 @@ public class SSSP extends BaseGASProgram<SSSP.VS, SSSP.ES, Integer/* dist */> {
 
         return true;
         
+    }
+
+    /**
+     * {@inheritDoc}
+     * <p>
+     * <dl>
+     * <dt>1</dt>
+     * <dd>The shortest distance from the initial frontier to the vertex.</dd>
+     * </dl>
+     */
+    @Override
+    public List<IBinder<SSSP.VS, SSSP.ES, Integer>> getBinderList() {
+
+        final List<IBinder<SSSP.VS, SSSP.ES, Integer>> tmp = super
+                .getBinderList();
+
+        tmp.add(new IBinder<SSSP.VS, SSSP.ES, Integer>() {
+
+            @Override
+            public int getIndex() {
+                return 1;
+            }
+
+            @Override
+            public Value bind(final ValueFactory vf,
+                    final IGASState<SSSP.VS, SSSP.ES, Integer> state,
+                    final Value u) {
+
+                return vf.createLiteral(state.getState(u).dist());
+
+            }
+        });
+
+        return tmp;
+
     }
 
 }
