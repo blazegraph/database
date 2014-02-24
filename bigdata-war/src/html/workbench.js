@@ -1,23 +1,52 @@
 $(function() {
 
-$('#tab-selector a').click(function() {
-   $('.tab').hide();
-   $('#' + $(this).data('target')).show();
-   $('#tab-selector a').removeClass();
-   $(this).addClass('active');
+/* Tab selection */
+
+$('#tab-selector a').click(function(e) {
+   showTab($(this).data('target'));
 });
 
-$('#tab-selector a:first').click();
+if(window.location.hash) {
+   showTab(window.location.hash.substr(1));
+} else {
+   $('#tab-selector a:first').click();
+}
 
-// TODO: set namespace initially
+function showTab(tab) {
+   $('.tab').hide();
+   $('#' + tab + '-tab').show();
+   $('#tab-selector a').removeClass();
+   $('a[data-target=' + tab + ']').addClass('active');
+   window.location.hash = tab;
+}
 
 /* Namespaces */
 
 function getNamespaces() {
    $.get('/namespace', function(data) {
-
+      var namespaces = data.getElementsByTagName('Namespace');
+      for(var i=0; i<namespaces.length; i++) {
+         var namespace = namespaces[i].textContent;
+      }
    });
 }
+
+// default namespace
+namespace = 'kb';
+$('.namespace').val(namespace);
+
+/* Namespace shortcuts */
+
+$('.namespace-shortcuts li').click(function() {
+   var textarea = $(this).parents('.tab').find('textarea');
+   var current = textarea.val();
+   var ns = $(this).data('ns');
+
+   if(current.indexOf(ns) == -1) {
+      textarea.val(ns + '\n' + current);
+   }
+});
+
 
 /* Load */
 
@@ -117,16 +146,16 @@ function handlePaste(e) {
 }
 
 function handleTypeChange(e) {
-   $('#rdf-type').toggle($(this).val() == 'rdf');
+   $('#rdf-type-container').toggle($(this).val() == 'rdf');
 }
 
 function setType(type, format) {
    $('#load-type').val(type);
    if(type == 'rdf') {
-      $('#rdf-type').show();
+      $('#rdf-type-container').show();
       $('#rdf-type').val(format);
    } else {
-      $('#rdf-type').hide();
+      $('#rdf-type-container').hide();
    }
 }
 
@@ -162,7 +191,7 @@ $('#load-box').on('drop', handleFile);
 $('#load-box').on('paste', handlePaste);
 $('#load-type').change(handleTypeChange);
 
-$('#load button').click(function() {
+$('#load-load').click(function() {
    // determine action based on type
    var settings = {
       type: 'POST',
@@ -191,18 +220,73 @@ $('#load button').click(function() {
    $.ajax('/sparql', settings); 
 });
 
+$('#load-clear').click(function() {
+   $('#load-response').text('');
+});
+
+$('#advanced-features-toggle').click(function() {
+   $('#advanced-features').toggle();
+   return false;
+});
+
 function updateResponseHTML(data) {
-   $('#response').html(data);
+   $('#load-response').html(data);
 }
 
 function updateResponseXML(data) {
    var modified = data.childNodes[0].attributes['modified'].value;
    var milliseconds = data.childNodes[0].attributes['milliseconds'].value;
-   $('#response').text('Modified: ' + modified + '\nMilliseconds: ' + milliseconds);
+   $('#load-response').text('Modified: ' + modified + '\nMilliseconds: ' + milliseconds);
 }
 
 function updateResponseError(jqXHR, textStatus, errorThrown) {
-   $('#response').text('Error! ' + textStatus + ' ' + errorThrown);
+   $('#load-response').text('Error! ' + textStatus + ' ' + errorThrown);
+}
+
+
+/* Query */
+
+$('#query-form').submit(function() {
+   var settings = {
+      type: 'POST',
+      data: $(this).serialize(),
+      dataType: 'json',
+      accepts: {'json': 'application/sparql-results+json'},
+      success: showQueryResults,
+      error: queryResultsError
+   }
+   $.ajax('/sparql', settings);
+   return false;
+});
+
+$('#query-response-clear').click(function() {
+   $('#query-response').html('');   
+});
+
+function showQueryResults(data) {
+   $('#query-response').html('');
+   var table = $('<table>').appendTo($('#query-response'));
+   var thead = $('<thead>').appendTo(table);
+   var vars = [];
+   var tr = $('<tr>');
+   for(var i=0; i<data.head.vars.length; i++) {
+      tr.append('<td>' + data.head.vars[i] + '</td>');
+      vars.push(data.head.vars[i]);
+   }
+   thead.append(tr);
+   table.append(thead);
+   for(var i=0; i<data.results.bindings.length; i++) {
+      var tr = $('<tr>');
+      for(var j=0; j<vars.length; j++) {
+         tr.append('<td>' + data.results.bindings[i][vars[j]].value + '</td>');
+      }
+      table.append(tr);
+   }
+
+}
+
+function queryResultsError(jqXHR, textStatus, errorThrown) {
+   $('#query-response').text('Error! ' + textStatus + ' ' + errorThrown);
 }
 
 
