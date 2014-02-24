@@ -324,6 +324,12 @@ public class GASState<VS, ES, ST> implements IGASState<VS, ES, ST> {
      * Note: We can not do a parallel reduction right now because the backing
      * class does not expose a parallel iterator, e.g., a segment-wise iterator.
      * The reduction over the {@link #vertexState} is quite slow as a result.
+     * <p>
+     * It looks like bulk parallel operators will be eventually introduced into
+     * the Java concurrency collections. For now, it seems like the short term
+     * solution would be to drop them onto stripped lists at the same time that
+     * they are first inserted into the CHM. I could then read over those
+     * striped lists in parallel during the reduction.
      */
     @Override
     public <T> T reduce(final IReducer<VS, ES, ST, T> op) {

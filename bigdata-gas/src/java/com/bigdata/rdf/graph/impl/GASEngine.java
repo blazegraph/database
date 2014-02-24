@@ -90,9 +90,7 @@ abstract public class GASEngine implements IGASEngine {
      */
     private final AtomicReference<Class<IGASSchedulerImpl>> schedulerClassRef;
 
-    /**
-     * The parallelism for the SCATTER and GATHER phases.
-     */
+    @Override
     public int getNThreads() {
         
         return nthreads;
