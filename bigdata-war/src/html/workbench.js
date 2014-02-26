@@ -24,16 +24,55 @@ function showTab(tab) {
 
 function getNamespaces() {
    $.get('/namespace', function(data) {
-      var namespaces = data.getElementsByTagName('Namespace');
+      $('#namespaces-list').empty();
+      var rdf = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#';
+      var namespaces = namespaces = data.getElementsByTagNameNS(rdf, 'Description')
       for(var i=0; i<namespaces.length; i++) {
-         var namespace = namespaces[i].textContent;
+         var title = namespaces[i].getElementsByTagName('title')[0].textContent;
+         var url = namespaces[i].getElementsByTagName('sparqlEndpoint')[0].getAttributeNS(rdf, 'resource');
+         $('#namespaces-list').append('<li data-name="' + title + '" data-url="' + url + '">' + title + ' - <a href="#" class="use-namespace">Use</a> - <a href="#" class="delete-namespace">Delete</a></li>');
       }
+      $('.use-namespace').click(function(e) {
+         e.preventDefault();
+         useNamespace($(this).parent().data('name'), $(this).parent().data('url'));
+      });
+      $('.delete-namespace').click(function(e) {
+         e.preventDefault();
+         deleteNamespace($(this).parent().data('name'));
+      });
    });
 }
 
+function useNamespace(name, url) {
+   $('#current-namespace').html(name);
+   $('.namespace').val(name);
+   NAMESPACE = name;
+   NAMESPACE_URL = url;
+}
+
+function deleteNamespace(namespace) {
+   if(confirm('Are you sure you want to delete the namespace ' + namespace + '?')) {
+      // FIXME: should we check if the default namespace is the one being deleted?
+      if(namespace == NAMESPACE) {
+         // FIXME: what is the desired behaviour when deleting the current namespace?
+      }
+      var url = '/namespace/' + namespace;
+      var settings = {
+         type: 'DELETE',
+         success: getNamespaces,
+         error: function() { alert('Could not delete namespace ' + namespace); }
+      };
+      $.ajax(url, settings);
+   }
+}
+
+var NAMESPACE, NAMESPACE_URL;
 // default namespace
-namespace = 'kb';
-$('.namespace').val(namespace);
+useNamespace('kb', '/namespace/kb/sparql');
+getNamespaces();
+
+$('#namespaces-refresh').click(getNamespaces);
+
 
 /* Namespace shortcuts */
 
@@ -192,16 +231,17 @@ $('#load-box').on('paste', handlePaste);
 $('#load-type').change(handleTypeChange);
 
 $('#load-load').click(function() {
-   // determine action based on type
    var settings = {
       type: 'POST',
       data: $(holder).val(),
       success: updateResponseXML,
       error: updateResponseError
    }
+
+   // determine action based on type
    switch($('#load-type').val()) {
       case 'sparql':
-         settings.data = 'update=' + encodeURI(settings.data);
+         settings.data = 'update=' + encodeURIComponent(settings.data);
          settings.success = updateResponseHTML;
          break;
       case 'rdf':
@@ -213,11 +253,11 @@ $('#load-load').click(function() {
          settings.contentType = rdf_content_types[type];
          break;
       case 'path':
-         settings.data = 'uri=file://' + encodeURI(settings.data);
+         settings.data = 'uri=file://' + encodeURIComponent(settings.data);
          break;
    }
 
-   $.ajax('/sparql', settings); 
+   $.ajax(NAMESPACE_URL, settings); 
 });
 
 $('#load-clear').click(function() {
@@ -262,7 +302,7 @@ $('#query-form').submit(function() {
       settings.accepts =  {'json': 'application/sparql-results+json'};
    }
 
-   $.ajax('/sparql', settings);
+   $.ajax(NAMESPACE_URL, settings);
    return false;
 });
 
