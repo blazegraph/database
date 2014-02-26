@@ -39,8 +39,8 @@ function moveTab(next) {
 }
 
 // these should be , and . but Hotkeys views those keypresses as these characters
-$(document).bind('keydown', 'ctrl+¼', function() { moveTab(false); });
-$(document).bind('keydown', 'ctrl+¾', function() { moveTab(true); });
+$('html, textarea, select').bind('keydown', 'ctrl+¼', function() { moveTab(false); });
+$('html, textarea, select').bind('keydown', 'ctrl+¾', function() { moveTab(true); });
 
 /* Namespaces */
 
