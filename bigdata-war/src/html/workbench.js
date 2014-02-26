@@ -20,6 +20,28 @@ function showTab(tab) {
    window.location.hash = tab;
 }
 
+function moveTab(next) {
+   // get current position
+   var current = $('#tab-selector .active');
+   if(next) {
+      if(current.next().length) {
+         current.next().click();
+      } else {
+         $('#tab-selector a:first').click();
+      }
+   } else {
+      if(current.prev().length) {
+         current.prev().click();
+      } else {
+         $('#tab-selector a:last').click();
+      }
+   }
+}
+
+// these should be , and . but Hotkeys views those keypresses as these characters
+$(document).bind('keydown', 'ctrl+¼', function() { moveTab(false); });
+$(document).bind('keydown', 'ctrl+¾', function() { moveTab(true); });
+
 /* Namespaces */
 
 function getNamespaces() {
