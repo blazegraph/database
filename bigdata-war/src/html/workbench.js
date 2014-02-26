@@ -135,32 +135,20 @@ function handleFile(e) {
    var f = files[0];
    
    // if file is too large, tell user to supply local path
-   if(f.size > 100 * 1048576) {
+   if(f.size > 1048576) {
       alert('File too large, enter local path to file');
       $('#load-box').val('/path/to/' + f.name);
       setType('path');
-      $('#load-file').val('');
-      $('#large-file-message').hide();
-      return;
-   }
-   
-   // if file is small enough, populate the textarea with it
-   if(f.size < 10 * 1024) {
-      holder = '#load-box';
-      $('#load-hidden').val('');
       $('#large-file-message').hide();
    } else {
-      // store file contents in hidden input and clear textarea
-      holder = '#load-hidden';
-      $('#load-box').val('');
-      $('#large-file-message').show();
+      // display file contents in the textarea
+      var fr = new FileReader();
+      fr.onload = function(e2) {
+         $('#load-box').val(e2.target.result);
+         guessType(f.name.split('.').pop().toLowerCase(), e2.target.result);
+      };
+      fr.readAsText(f);
    }
-   var fr = new FileReader();
-   fr.onload = function(e2) {
-      $(holder).val(e2.target.result);
-      guessType(f.name.split('.').pop().toLowerCase(), e2.target.result);
-   };
-   fr.readAsText(f);
    $('#load-file').val('');
 }
 
@@ -243,8 +231,6 @@ var rdf_content_types = {'n-quads': 'application/n-quads',
                          'turtle': 'text/turtle'};
 
 var sparql_update_commands = ['INSERT', 'DELETE'];
-// stores the id of the element that contains the data to be sent
-var holder = '#load-box';
 
 $('#load-file').change(handleFile);
 $('#load-box').on('dragover', handleDragOver);
@@ -255,7 +241,7 @@ $('#load-type').change(handleTypeChange);
 $('#load-load').click(function() {
    var settings = {
       type: 'POST',
-      data: $(holder).val(),
+      data: $('#load-box').val(),
       success: updateResponseXML,
       error: updateResponseError
    }
