@@ -12,7 +12,7 @@
       <div id="top">
         <img src="logo.png" id="logo">
         <p><label for="search-text">Search:</label> <input type="text" id="search-text"></p>
-        <p>Current namespace: <span id="current-namespace">kb</span></p>
+        <p>Current namespace: <span id="current-namespace"></span></p>
       </div>
 
       <div id="tab-selector">
@@ -135,7 +135,15 @@
       <div class="tab" id="status-tab">status
       </div>
 
-      <div class="tab" id="namespaces-tab">namespaces
+      <div class="tab" id="namespaces-tab">
+        
+        <div class="box">
+          <ul id="namespaces-list">
+
+          </ul>
+          <button id="namespaces-refresh">Refresh</button>
+        </div>
+
       </div>
 
     </div>
