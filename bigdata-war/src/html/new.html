@@ -42,7 +42,9 @@
           </div>
 
           <textarea id="load-box" placeholder="(Type in or drag a file containing RDF data, a SPARQL update or a file path or URL)"></textarea>
+          <p id="large-file-message">Your file is too large to display here, but will be uploaded as normal. <a href="#" id="clear-file">Remove file</a></p>
           <p>
+            <input type="file" id="load-file"><br>
             <label for="load-type">Type:</label>
             <select id="load-type">
               <option value="sparql" selected="selected">SPARQL</option>

@@ -88,7 +88,7 @@ function deleteNamespace(namespace) {
    }
 }
 
-var NAMESPACE, NAMESPACE_URL;
+var NAMESPACE, NAMESPACE_URL, fileContents;
 // default namespace
 useNamespace('kb', '/namespace/kb/sparql');
 getNamespaces();
@@ -135,21 +135,41 @@ function handleFile(e) {
    var f = files[0];
    
    // if file is too large, tell user to supply local path
-   if(f.size > 1048576) {
+   if(f.size > 1048576 * 100) {
       alert('File too large, enter local path to file');
       $('#load-box').val('/path/to/' + f.name);
       setType('path');
-      $('#large-file-message').hide();
+      $('#load-box').prop('disabled', false)
+      $('#large-file-message, #clear-file').hide();
    } else {
-      // display file contents in the textarea
       var fr = new FileReader();
       fr.onload = function(e2) {
-         $('#load-box').val(e2.target.result);
+         if(f.size > 10240) {
+            // do not use textarea
+            $('#load-box').prop('disabled', true)
+            $('#large-file-message, #clear-file').show()
+            $('#load-box').val('');
+            fileContents = e2.target.result;
+         } else {
+            // display file contents in the textarea
+            clearFile();
+            $('#load-box').val(e2.target.result);
+         }
          guessType(f.name.split('.').pop().toLowerCase(), e2.target.result);
       };
       fr.readAsText(f);
    }
+
    $('#load-file').val('');
+}
+
+function clearFile(e) {
+   if(e) {
+      e.preventDefault();
+   }
+   $('#load-box').prop('disabled', false)
+   $('#large-file-message, #clear-file').hide()
+   fileContents = null;
 }
 
 function guessType(extension, content) {
@@ -237,11 +257,12 @@ $('#load-box').on('dragover', handleDragOver);
 $('#load-box').on('drop', handleFile);
 $('#load-box').on('paste', handlePaste);
 $('#load-type').change(handleTypeChange);
+$('#clear-file').click(clearFile);
 
 $('#load-load').click(function() {
    var settings = {
       type: 'POST',
-      data: $('#load-box').val(),
+      data: fileContents == null ? $('#load-box').val() : fileContents,
       success: updateResponseXML,
       error: updateResponseError
    }
