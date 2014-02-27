@@ -51,8 +51,9 @@ function getNamespaces() {
       var namespaces = namespaces = data.getElementsByTagNameNS(rdf, 'Description')
       for(var i=0; i<namespaces.length; i++) {
          var title = namespaces[i].getElementsByTagName('title')[0].textContent;
+         var titleText = title == DEFAULT_NAMESPACE ? title + ' (default)' : title;
          var url = namespaces[i].getElementsByTagName('sparqlEndpoint')[0].getAttributeNS(rdf, 'resource');
-         $('#namespaces-list').append('<li data-name="' + title + '" data-url="' + url + '">' + title + ' - <a href="#" class="use-namespace">Use</a> - <a href="#" class="delete-namespace">Delete</a></li>');
+         $('#namespaces-list').append('<li data-name="' + title + '" data-url="' + url + '">' + titleText + ' - <a href="#" class="use-namespace">Use</a> - <a href="#" class="delete-namespace">Delete</a></li>');
       }
       $('.use-namespace').click(function(e) {
          e.preventDefault();
@@ -88,12 +89,17 @@ function deleteNamespace(namespace) {
    }
 }
 
-var NAMESPACE, NAMESPACE_URL, fileContents;
-// default namespace
-useNamespace('kb', '/namespace/kb/sparql');
-getNamespaces();
+function getDefaultNamespace() {
+   $.get('/sparql', function(data) {
+      DEFAULT_NAMESPACE = $(data).find('Description[rdf\\:nodeID=defaultDataset]').find('title')[0].textContent;
+      var url = $(data).find('Description[rdf\\:nodeID=defaultDataset]').find('sparqlEndpoint')[0].attributes['rdf:resource'].textContent;
+      useNamespace(DEFAULT_NAMESPACE, url);
+      getNamespaces();
+   });
+}
+var DEFAULT_NAMESPACE, NAMESPACE, NAMESPACE_URL, fileContents;
 
-$('#namespaces-refresh').click(getNamespaces);
+getDefaultNamespace();
 
 
 /* Namespace shortcuts */
