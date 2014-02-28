@@ -68,7 +68,6 @@ function getNamespaces() {
 
 function useNamespace(name, url) {
    $('#current-namespace').html(name);
-   $('.namespace').val(name);
    NAMESPACE = name;
    NAMESPACE_URL = url;
 }
