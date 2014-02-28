@@ -196,9 +196,15 @@ function identify(text, considerPath) {
    text = text.toUpperCase();
 
    if(considerPath) {
-      // match Unix or Windows paths
-      var re = /^(((\/[^\/]+)+)|([A-Z]:([\\\/][^\\\/]+)+))$/;
-      if(re.test(text.trim())) {
+      // match Unix, Windows or HTTP paths
+      // file:// is optional for local paths
+      // when file:// is not present, Windows paths may use \ or / and must include a :
+      // when file:// is present, Windows paths must use / and may include a :
+      // http[s]:// is mandatory for HTTP paths
+      var unix = /^(file:\/\/)?((\/[^\/]+)+)$/;
+      var windows = /^((file:\/\/)([A-Za-z]:?([\/][^\/\\]+)+))|([A-Za-z]:([\\\/][^\\\/]+)+)$/;
+      var http = /^https?:\/((\/[^\/]+)+)$/;
+      if(unix.test(text.trim()) || windows.test(text.trim()) || http.test(text.trim())) {
          return 'path';
       }
    }
@@ -288,7 +294,11 @@ $('#load-load').click(function() {
          settings.contentType = rdf_content_types[type];
          break;
       case 'path':
-         settings.data = 'uri=file://' + encodeURIComponent(settings.data);
+         // if no scheme is specified, assume a local path
+         if(!/^(file|(https?)):\/\//.test(settings.data)) {
+            settings.data = 'file://' + settings.data;
+         }
+         settings.data = 'uri=' + encodeURIComponent(settings.data);
          break;
    }
 
