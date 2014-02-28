@@ -335,49 +335,59 @@ $('#query-form').submit(function() {
    var settings = {
       type: 'POST',
       data: $(this).serialize(),
+      dataType: 'json',
+      accepts: {'json': 'application/sparql-results+json'},
       success: showQueryResults,
       error: queryResultsError
    }
 
-   // queries return JSON, explanations return HTML
+   $.ajax(NAMESPACE_URL, settings);
+
+   $('#query-explanation').empty();
    if($('#query-explain').is(':checked')) {
-      settings.dataType = 'html';
+      settings = {
+         type: 'POST',
+         data: $(this).serialize() + '&explain=details',
+         dataType: 'html',
+         success: showQueryExplanation,
+         error: queryResultsError
+      };
+      $.ajax(NAMESPACE_URL, settings);
    } else {
-      settings.dataType = 'json';
-      settings.accepts =  {'json': 'application/sparql-results+json'};
+      $('#query-explanation').hide();
    }
 
-   $.ajax(NAMESPACE_URL, settings);
    return false;
 });
 
 $('#query-response-clear').click(function() {
-   $('#query-response').html('');   
+   $('#query-response, #query-explanation').empty('');
+   $('#query-explanation').hide();
 });
 
 function showQueryResults(data) {
-   if(this.dataType == 'html') {
-      $('#query-response').html(data);
-   } else {
-      $('#query-response').html('');
-      var table = $('<table>').appendTo($('#query-response'));
-      var thead = $('<thead>').appendTo(table);
-      var vars = [];
-      var tr = $('<tr>');
-      for(var i=0; i<data.head.vars.length; i++) {
-         tr.append('<td>' + data.head.vars[i] + '</td>');
-         vars.push(data.head.vars[i]);
-      }
-      thead.append(tr);
-      table.append(thead);
-      for(var i=0; i<data.results.bindings.length; i++) {
-         var tr = $('<tr>');
-         for(var j=0; j<vars.length; j++) {
-            tr.append('<td>' + data.results.bindings[i][vars[j]].value + '</td>');
-         }
-         table.append(tr);
-      }
+   $('#query-response').empty();
+   var table = $('<table>').appendTo($('#query-response'));
+   var thead = $('<thead>').appendTo(table);
+   var vars = [];
+   var tr = $('<tr>');
+   for(var i=0; i<data.head.vars.length; i++) {
+      tr.append('<td>' + data.head.vars[i] + '</td>');
+      vars.push(data.head.vars[i]);
    }
+   thead.append(tr);
+   table.append(thead);
+   for(var i=0; i<data.results.bindings.length; i++) {
+      var tr = $('<tr>');
+      for(var j=0; j<vars.length; j++) {
+         tr.append('<td>' + data.results.bindings[i][vars[j]].value + '</td>');
+      }
+      table.append(tr);
+   }
+}
+
+function showQueryExplanation(data) {
+   $('#query-explanation').html(data).show();
 }
 
 function queryResultsError(jqXHR, textStatus, errorThrown) {

@@ -163,7 +163,7 @@ hr {
    text-align: right;
 }
 
-#advanced-features {
+#advanced-features, #query-explanation {
    display: none;
 }
 
