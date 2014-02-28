@@ -395,15 +395,14 @@ function queryResultsError(jqXHR, textStatus, errorThrown) {
 }
 
 
-/* Navigator */
+/* Explore */
 
-$('#navigator').submit(function() {
-   // get URI
-   var uri = $('#navigator-uri').val();
+$('#explore-form').submit(function(e) {
+   e.preventDefault();
+   var uri = $(this).find('input').val();
    if(uri) {
       loadURI(uri);   
    }
-   return false;
 });
 
 function loadURI(uri) {
@@ -440,14 +439,14 @@ function loadURI(uri) {
       data: 'query=' + encodeURI(query),
       dataType: 'json',
       accepts: {'json': 'application/sparql-results+json'},
-      success: updateNavigationStart,
-      error: updateNavigationError
+      success: updateExploreStart,
+      error: updateExploreError
    };
    $.ajax('/sparql', settings); 
 }
 
-function updateNavigationStart(data) {
-   var disp = $('#navigator-display');
+function updateExploreStart(data) {
+   var disp = $('#explore-results');
    disp.html('');
    // see if we got any results
    if(data.results.bindings.length == 0) {
@@ -498,11 +497,11 @@ function updateNavigationStart(data) {
       }
    }
    
-   disp.find('a').click(function() { loadURI(this.text); return false; });
+   disp.find('a').click(function(e) { e.preventDefault(); loadURI(this.text); });
 }
 
-function updateNavigationError(jqXHR, textStatus, errorThrown) {
-   $('#navigator-display').html('Error! ' + textStatus + ' ' + errorThrown);
+function updateExploreError(jqXHR, textStatus, errorThrown) {
+   $('#explore-results').html('Error! ' + textStatus + ' ' + errorThrown);
 }
 
 });
