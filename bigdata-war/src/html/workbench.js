@@ -371,6 +371,23 @@ $('#query-response-clear').click(function() {
    $('#query-explanation').hide();
 });
 
+$('#query-export').click(function() {
+   // FIXME: escape commas
+   var csv = '';
+   $('#query-response table tr').each(function(i, tr) {
+      $(tr).find('td').each(function(j, td) {
+         if(j > 0) {
+            csv += ',';
+         }
+         csv += td.textContent;
+      });
+      csv += '\n';
+   });
+   var uri = 'data:application/csv;charset=utf-8,' + encodeURIComponent(csv);
+   $('<a id="download-link" download="export.csv" href="' + uri + '">').appendTo('body')[0].click();
+   $('#download-link').remove();
+});
+
 function showQueryResults(data) {
    $('#query-response').empty();
    var table = $('<table>').appendTo($('#query-response'));
