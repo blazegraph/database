@@ -344,8 +344,7 @@ function submitQuery(e) {
    var settings = {
       type: 'POST',
       data: $(this).serialize(),
-      dataType: 'json',
-      accepts: {'json': 'application/sparql-results+json'},
+      headers: { 'Accept': 'application/sparql-results+json, application/rdf+xml' },
       success: showQueryResults,
       error: queryResultsError
    }
@@ -375,21 +374,48 @@ $('#query-response-clear').click(function() {
 function showQueryResults(data) {
    $('#query-response').empty();
    var table = $('<table>').appendTo($('#query-response'));
-   var thead = $('<thead>').appendTo(table);
-   var vars = [];
-   var tr = $('<tr>');
-   for(var i=0; i<data.head.vars.length; i++) {
-      tr.append('<td>' + data.head.vars[i] + '</td>');
-      vars.push(data.head.vars[i]);
-   }
-   thead.append(tr);
-   table.append(thead);
-   for(var i=0; i<data.results.bindings.length; i++) {
-      var tr = $('<tr>');
-      for(var j=0; j<vars.length; j++) {
-         tr.append('<td>' + data.results.bindings[i][vars[j]].value + '</td>');
+   if(this.dataTypes[1] == 'xml') {
+      // RDF
+      table.append($('<thead><tr><td>s</td><td>p</td><td>o</td></tr></thead>'));
+      var rows = $(data).find('Description');
+      for(var i=0; i<rows.length; i++) {
+         // FIXME: are about and nodeID the only possible attributes here?
+         var s = rows[i].attributes['rdf:about'];
+         if(typeof(s) == 'undefined') {
+            s = rows[i].attributes['rdf:nodeID'];
+         }
+         s = s.textContent;
+         for(var j=0; j<rows[i].children.length; j++) {
+            var p = rows[i].children[j].tagName;
+            var o = rows[i].children[j].attributes['rdf:resource'];
+            // FIXME: is this the correct behaviour?
+            if(typeof(o) == 'undefined') {
+               o = rows[i].children[j].textContent;
+            } else {
+               o = o.textContent;
+            }
+            var tr = $('<tr><td>' + (j == 0 ? s : '') + '</td><td>' + p + '</td><td>' + o + '</td>');
+            table.append(tr);
+         }
       }
-      table.append(tr);
+   } else {
+      // JSON
+      var thead = $('<thead>').appendTo(table);
+      var vars = [];
+      var tr = $('<tr>');
+      for(var i=0; i<data.head.vars.length; i++) {
+         tr.append('<td>' + data.head.vars[i] + '</td>');
+         vars.push(data.head.vars[i]);
+      }
+      thead.append(tr);
+      table.append(thead);
+      for(var i=0; i<data.results.bindings.length; i++) {
+         var tr = $('<tr>');
+         for(var j=0; j<vars.length; j++) {
+            tr.append('<td>' + data.results.bindings[i][vars[j]].value + '</td>');
+         }
+         table.append(tr);
+      }
    }
 }
 
