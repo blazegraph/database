@@ -90,8 +90,10 @@ function deleteNamespace(namespace) {
 
 function getDefaultNamespace() {
    $.get('/sparql', function(data) {
-      DEFAULT_NAMESPACE = $(data).find('Description[rdf\\:nodeID=defaultDataset]').find('title')[0].textContent;
-      var url = $(data).find('Description[rdf\\:nodeID=defaultDataset]').find('sparqlEndpoint')[0].attributes['rdf:resource'].textContent;
+      // Chrome does not work with rdf\:Description, so look for Description too
+      var defaultDataset = $(data).find('rdf\\:Description[rdf\\:nodeID=defaultDataset], Description[rdf\\:nodeID=defaultDataset]');
+      DEFAULT_NAMESPACE = defaultDataset.find('title')[0].textContent;
+      var url = defaultDataset.find('sparqlEndpoint')[0].attributes['rdf:resource'].textContent;
       useNamespace(DEFAULT_NAMESPACE, url);
       getNamespaces();
    });
