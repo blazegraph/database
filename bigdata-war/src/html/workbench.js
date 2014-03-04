@@ -194,8 +194,6 @@ function guessType(extension, content) {
 }
 
 function identify(text, considerPath) {
-   text = text.toUpperCase();
-
    if(considerPath) {
       // match Unix, Windows or HTTP paths
       // file:// is optional for local paths
@@ -210,6 +208,7 @@ function identify(text, considerPath) {
       }
    }
    
+   text = text.toUpperCase();
    for(var i=0; i<sparql_update_commands.length; i++) {
       if(text.indexOf(sparql_update_commands[i]) != -1) {
          return 'sparql';
