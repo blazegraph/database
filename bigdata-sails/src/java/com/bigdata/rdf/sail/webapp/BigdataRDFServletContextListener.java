@@ -473,7 +473,8 @@ public class BigdataRDFServletContextListener implements
 
         if (!file.exists()) {
 
-            throw new RuntimeException("Could not find file: " + file);
+            throw new RuntimeException("Could not find file: file=" + file
+                    + ", user.dir=" + System.getProperty("user.dir"));
 
         }
 

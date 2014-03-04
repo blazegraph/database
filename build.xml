@@ -508,26 +508,50 @@ public class BuildInfo {
 	<!--depends="bundleJar"-->
 	<target name="war" depends="bundleJar, autojar-strip-fastutil" 
 		description="Generates a WAR artifact.">
-		<delete file="${build.dir}/bigdata.war"/>
-		<echo message="Building WAR"/>
-		<war destfile="${build.dir}/bigdata.war"
-			webxml="bigdata-war/src/resources/WEB-INF/web.xml"
+      <property name="war.dir" value="${build.dir}/staged-war"
+      	  description="The staging directory for the webapp."/>
+      <property name="war.file" value="${build.dir}/bigdata.war"
+      	  description="The generated WAR file." />
+      <delete file="${war.file}" 
+      	  description="Remove the old WAR file."/>
+      <delete dir="${war.dir}" 
+      	  description="Remove old WAR staging directory."/>
+		<echo message="Staging webapp to ${war.dir}"/>
+		<copy todir="${war.dir}"
+			includeemptydirs="yes"
+			preservelastmodified="true" 
+			description="Stage the webapp to a temporary directory."
 			>
-		  <fileset dir="bigdata-war/src/html"/>
-		  <fileset dir="bigdata-war/src/jsp"/>
-		  <fileset dir="bigdata-war/src/images"/>
-          <!-- Copy the bigdata license. -->
+			<fileset dir="bigdata-war/src">
+			  <include name="**/*"/>
+	        <!-- The jetty.xml file is not used when deploying to a servlet container. -->
+			  <exclude name="**/jetty.xml"/>
+        </fileset>
+		</copy>
+      <replace file="${war.dir}/WEB-INF/web.xml"
+		  summary="true"
+      	  description="Override the default location of the RWStore.properties file.">
+        <replacefilter 
+         token="WEB-INF/RWStore.properties"
+        	value="../webapps/bigdata/WEB-INF/RWStore.properties"
+        />
+      </replace>
+      <echo message="Building webapp in ${war.file} from ${war.dir}"/>
+		<war destfile="${war.file}"
+			webxml="${war.dir}/WEB-INF/web.xml"
+			>
+		  <!-- The staged WAR files. -->
+		  <fileset dir="${war.dir}"/>
+        <!-- Copy the bigdata license. -->
 		  <file file="${bigdata.dir}/LICENSE.txt"/>
 		  <!-- Copy the top-level NOTICE file. -->
 		  <file file="${bigdata.dir}/NOTICE"/>
-          <!-- Copy all of the LEGAL directories. -->
+        <!-- Copy all of the LEGAL directories. -->
 		  <fileset dir="${bigdata.dir}/bigdata" includes="LEGAL/*"/>
 		  <fileset dir="${bigdata.dir}/bigdata-rdf" includes="LEGAL/*"/>
 		  <fileset dir="${bigdata.dir}/bigdata-sails" includes="LEGAL/*"/>
         <fileset dir="${bigdata.dir}/bigdata-gom" includes="LEGAL/*"/>
 		  <fileset dir="${bigdata.dir}/bigdata-jini" includes="LEGAL/*"/>
-		  <!-- Basic RWStore configuration. -->
-		  <file file="bigdata-war/src/resources/RWStore.properties"/>
 		  <!-- bigdata jar plus some dependencies as filtered by autojar.
 		  <lib file="${build.dir}/bigdataPlus.jar"/> -->
 		  <!-- The stripped version of fastutil. -->
@@ -554,7 +578,7 @@ public class BuildInfo {
 	  		<!-- jini only used in scale-out. -->
 		  	<exclude name="jini/**/*.jar"/>
 		  </lib>
-		  <classes file="bigdata-war/src/resources/log4j.properties"/>
+		  <classes file="${war.dir}/WEB-INF/classes/log4j.properties"/>
 		</war>
 	</target>
 	
@@ -868,6 +892,7 @@ ${postInstallMessage}</echo>
       <property name="dist.var.config.policy" location="${dist.var.config}/policy" />
       <property name="dist.var.config.logging" location="${dist.var.config}/logging" />
       <property name="dist.var.config.jini" location="${dist.var.config}/jini" />
+      <property name="dist.var.jetty" location="${dist.var}/jetty" />
       <property name="dist.doc" location="${dist.dir}/doc" />
       <property name="dist.doc.legal" location="${dist.dir}/doc/LEGAL" />
 
@@ -1144,7 +1169,14 @@ ${postInstallMessage}</echo>
             todir="${dist.var.config.jini}" />
       <copy file="${src.resources.config}/jini/startAll.config"
             todir="${dist.var.config.jini}" />
-    	
+
+      <!-- Stage the bigdata-war files (aka jetty). -->
+      <copy todir="${dist.var.jetty}" preservelastmodified="true">
+      	  <fileset dir="bigdata-war/src">
+      	    <include name="**/*"/>
+      	  </fileset>
+      	</copy>
+
     	<!-- Stage top-level license file and copyright NOTICE file. -->
 	  <copy toDir="${dist.doc}">
         <fileset file="${bigdata.dir}/LICENSE.txt"/>
@@ -1204,11 +1236,12 @@ ${postInstallMessage}</echo>
 	bigdata/var
 	bigdata/var/config - bigdata config files, 
 	bigdata/var/config/build.properties - a copy of the top level project build.properties file.
-	bigdata/var/jini - jini core service configuration files, including startAll.config which is used to start the core jini services.
-	bigdata/var/logging - log4j and java.util log configuration files.
-	bigdata/var/policy - java policy files
-	bigdata/var/policy/policy.all - policy with all permissions granted.
-	bigdata/var/policy/service.policy
+	bigdata/var/config/jini - jini core service configuration files, including startAll.config which is used to start the core jini services.
+	bigdata/var/config/logging - log4j and java.util log configuration files.
+	bigdata/var/config/policy - java policy files
+	bigdata/var/config/policy/policy.all - policy with all permissions granted.
+	bigdata/var/config/policy/service.policy
+	bigdata/var/webapp/nss - NanoSparqlServer.
 	bigdata/doc/LEGAL - license files for dependencies.
 	bigdata/doc/LICENSE.txt - bigdata license file.
 	bigdata/doc/NOTICE - copyright NOTICE files.
