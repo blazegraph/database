@@ -373,7 +373,39 @@ $('#query-response-clear').click(function() {
    $('#query-explanation').hide();
 });
 
-$('#query-export').click(function() {
+$('#query-export-csv').click(exportCSV);
+$('#query-export-xml').click(exportXML);
+
+function exportXML() {
+   var xml = '<?xml version="1.0"?>\n<sparql xmlns="http://www.w3.org/2005/sparql-results#">\n\t<head>\n';
+   var bindings = [];
+   $('#query-response thead tr td').each(function(i, td) {
+      xml += '\t\t<variable name="' + td.textContent + '"/>\n';
+      bindings.push(td.textContent);
+   });
+   xml += '\t</head>\n\t<results>\n';
+   $('#query-response tbody tr').each(function(i, tr) {
+      xml += '\t\t<result>\n';
+      $(tr).find('td').each(function(j, td) {
+         var bindingType = td.className;
+         if(bindingType == 'unbound') {
+            return;
+         }
+         var dataType = $(td).data('datatype');
+         if(dataType) {
+            dataType = ' datatype="' + dataType + '"';
+         } else {
+            dataType = '';
+         }
+         xml += '\t\t\t<binding name="' + bindings[j] + '"><' + bindingType + dataType + '>' + td.textContent + '</' + bindingType + '></binding>\n';
+      });
+      xml += '\t\t</result>\n';
+   });
+   xml += '\t</results>\n</sparql>\n';
+   downloadFile(xml, 'application/sparql-results+xml', 'export.xml');
+}
+
+function exportCSV() {
    // FIXME: escape commas
    var csv = '';
    $('#query-response table tr').each(function(i, tr) {
@@ -385,10 +417,14 @@ $('#query-export').click(function() {
       });
       csv += '\n';
    });
-   var uri = 'data:application/csv;charset=utf-8,' + encodeURIComponent(csv);
-   $('<a id="download-link" download="export.csv" href="' + uri + '">').appendTo('body')[0].click();
+   downloadFile(csv, 'application/csv', 'export.csv');
+}
+
+function downloadFile(data, type, filename) {
+   var uri = 'data:' + type + ';charset=utf-8,' + encodeURIComponent(data);
+   $('<a id="download-link" download="' + filename + '" href="' + uri + '">').appendTo('body')[0].click();
    $('#download-link').remove();
-});
+}
 
 function showQueryResults(data) {
    $('#query-response').empty();
@@ -431,7 +467,18 @@ function showQueryResults(data) {
       for(var i=0; i<data.results.bindings.length; i++) {
          var tr = $('<tr>');
          for(var j=0; j<vars.length; j++) {
-            tr.append('<td>' + data.results.bindings[i][vars[j]].value + '</td>');
+            if(vars[j] in data.results.bindings[i]) {
+               var binding = data.results.bindings[i][vars[j]];
+               if(binding.type == 'typed-literal') {
+                  var tdData = ' class="literal" data-datatype="' + binding.datatype + '"';
+               } else {
+                  var tdData = ' class="' + binding.type + '"';
+               }
+               tr.append('<td' + tdData + '>' + binding.value + '</td>');
+            } else {
+               // no binding
+               tr.append('<td class="unbound">');
+            }
          }
          table.append(tr);
       }
