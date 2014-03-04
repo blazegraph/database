@@ -480,6 +480,11 @@ function showQueryResults(data) {
       }
    } else {
       // JSON
+      if(typeof(data.boolean) != 'undefined') {
+         // ASK query
+         table.append('<tr><td>' + data.boolean + '</td></tr>').addClass('boolean');
+         return;
+      }
       var thead = $('<thead>').appendTo(table);
       var vars = [];
       var tr = $('<tr>');
