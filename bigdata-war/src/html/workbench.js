@@ -416,7 +416,13 @@ function exportXML() {
          } else {
             dataType = '';
          }
-         xml += '\t\t\t<binding name="' + bindings[j] + '"><' + bindingType + dataType + '>' + td.textContent + '</' + bindingType + '></binding>\n';
+         var lang = $(td).data('lang');
+         if(lang) {
+            lang = ' xml:lang="' + lang + '"';
+         } else {
+            lang = '';
+         }
+         xml += '\t\t\t<binding name="' + bindings[j] + '"><' + bindingType + dataType + lang + '>' + td.textContent + '</' + bindingType + '></binding>\n';
       });
       xml += '\t\t</result>\n';
    });
@@ -492,6 +498,9 @@ function showQueryResults(data) {
                   var tdData = ' class="literal" data-datatype="' + binding.datatype + '"';
                } else {
                   var tdData = ' class="' + binding.type + '"';
+                  if(binding['xml:lang']) {
+                     tdData += ' data-lang="' + binding['xml:lang'] + '"';
+                  }
                }
                tr.append('<td' + tdData + '>' + binding.value + '</td>');
             } else {
