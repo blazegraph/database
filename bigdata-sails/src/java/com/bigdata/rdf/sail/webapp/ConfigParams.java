@@ -25,6 +25,8 @@ package com.bigdata.rdf.sail.webapp;
 import javax.servlet.ServletContextEvent;
 import javax.servlet.ServletContextListener;
 
+import com.bigdata.journal.IIndexManager;
+
 /**
  * Interface declaring the <code>config-param</code>s understood by the
  * {@link BigdataRDFServletContextListener}.
@@ -41,7 +43,9 @@ public interface ConfigParams {
     /**
      * The property file (for a standalone bigdata instance) or the jini
      * configuration file (for a bigdata federation). The file must end with
-     * either ".properties" or ".config".
+     * either ".properties" or ".config". This parameter is ignored if the
+     * {@link IIndexManager} is specified as an attribute of the web application
+     * context.
      */
     String PROPERTY_FILE = "propertyFile";
 

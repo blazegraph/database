@@ -93,7 +93,6 @@ import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.jini.ha.HAJournalServer.HAQuorumService;
-import com.bigdata.journal.jini.ha.HAJournalServer.NSSConfigurationOptions;
 import com.bigdata.journal.jini.ha.HAJournalServer.RunStateEnum;
 import com.bigdata.quorum.Quorum;
 import com.bigdata.resources.StoreManager.IStoreManagerCounters;
@@ -2193,26 +2192,43 @@ public class HAJournal extends Journal {
          * Misc.
          */
         
+        /**
+         * {@inheritDoc}
+         * <p>
+         * Note: The actual port depends on how jetty was configured in
+         * <code>jetty.xml</code>. This returns the port associated with the
+         * first jetty connection.
+         * 
+         * @see <a
+         *      href="http://wiki.eclipse.org/Jetty/Tutorial/Embedding_Jetty">
+         *      Embedding Jetty </a>
+         */
         @Override
         public int getNSSPort() {
 
-            final String COMPONENT = NSSConfigurationOptions.COMPONENT;
-
-            try {
-
-                final Integer port = (Integer) server.config.getEntry(
-                        COMPONENT, NSSConfigurationOptions.PORT, Integer.TYPE,
-                        NSSConfigurationOptions.DEFAULT_PORT);
-
-                return port;
-
-            } catch (ConfigurationException e) {
-
-                throw new RuntimeException(e);
-                
-            }
+            return server.getNSSPort();
 
         }
+//        @Override
+//        public int getNSSPort() {
+//
+//            final String COMPONENT = NSSConfigurationOptions.COMPONENT;
+//
+//            try {
+//
+//                final Integer port = (Integer) server.config.getEntry(
+//                        COMPONENT, NSSConfigurationOptions.PORT, Integer.TYPE,
+//                        NSSConfigurationOptions.DEFAULT_PORT);
+//
+//                return port;
+//
+//            } catch (ConfigurationException e) {
+//
+//                throw new RuntimeException(e);
+//                
+//            }
+//
+//        }
 
         @Override
         public RunState getRunState() {

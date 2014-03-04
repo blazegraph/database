@@ -33,9 +33,7 @@ import java.net.URL;
 import java.nio.ByteBuffer;
 import java.nio.channels.ClosedByInterruptException;
 import java.rmi.Remote;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
@@ -59,6 +57,7 @@ import org.apache.zookeeper.KeeperException.NodeExistsException;
 import org.apache.zookeeper.ZooKeeper;
 import org.apache.zookeeper.data.ACL;
 import org.eclipse.jetty.server.Server;
+import org.eclipse.jetty.webapp.WebAppContext;
 
 import com.bigdata.concurrent.FutureTaskMon;
 import com.bigdata.ha.HAGlue;
@@ -440,28 +439,60 @@ public class HAJournalServer extends AbstractServer {
          */
         boolean DEFAULT_ONLINE_DISASTER_RECOVERY = false;
 
+        /**
+         * The location of the <code>jetty.xml</code> file that will be used to
+         * configure jetty (default {@value #DEFAULT_JETTY_XML}).
+         * 
+         * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/730" >
+         *      Allow configuration of embedded NSS jetty server using
+         *      jetty-web.xml </a>
+         * 
+         * @see #DEFAULT_JETTY_XML
+         */
+        String JETTY_XML = "jettyXml";
+
+        /**
+         * The default value works when deployed under the IDE with the
+         * <code>bigdata-war/src</code> directory on the classpath. When
+         * deploying outside of that context, the value needs to be set
+         * explicitly.
+         */
+        String DEFAULT_JETTY_XML = "WEB-INF/jetty.xml";
+
     }
     
-    /**
-     * Configuration options for the {@link NanoSparqlServer}.
-     */
-    public interface NSSConfigurationOptions extends ConfigParams {
-        
-        String COMPONENT = NanoSparqlServer.class.getName();
-        
-        /**
-         * The port at which the embedded {@link NanoSparqlServer} will respond
-         * to HTTP requests (default {@value #DEFAULT_PORT}). This MAY be ZERO
-         * (0) to use a random open port. 
-         * 
-         * TODO We should be able to specify the interface, not just the port. Is
-         * there any way to do that with jetty?
-         */
-        String PORT = "port";
-
-        int DEFAULT_PORT = 8080;
-        
-    }
+//    /**
+//     * Configuration options for the {@link NanoSparqlServer}.
+//     * 
+//     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/730" >
+//     *      Allow configuration of embedded NSS jetty server using jetty-web.xml
+//     *      </a>
+//     */
+//    @Deprecated
+//    public interface NSSConfigurationOptions extends ConfigParams {
+//
+//        @Deprecated
+//        String COMPONENT = NanoSparqlServer.class.getName();
+//        
+//        /**
+//         * The port at which the embedded {@link NanoSparqlServer} will respond
+//         * to HTTP requests (default {@value #DEFAULT_PORT}). This MAY be ZERO
+//         * (0) to use a random open port.
+//         * 
+//         * @deprecated This has been replaced by the use of <code>web.xml</code>
+//         *             and <code>jetty.xml</code>.
+//         * 
+//         * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/730" >
+//         *      Allow configuration of embedded NSS jetty server using
+//         *      jetty-web.xml </a>
+//         */
+//        @Deprecated
+//        String PORT = "port";
+//
+//        @Deprecated
+//        int DEFAULT_PORT = 8080;
+//
+//    }
 
     /**
      * The journal.
@@ -4466,54 +4497,15 @@ public class HAJournalServer extends AbstractServer {
      * Note: We need to wait for a quorum meet since this will create the KB
      * instance if it does not exist and we can not write on the
      * {@link HAJournal} until we have a quorum meet.
+     * 
+     * @see <a href="http://wiki.eclipse.org/Jetty/Tutorial/Embedding_Jetty">
+     *      Embedding Jetty </a>
+     * @see <a href="http://trac.bigdata.com/ticket/730" > Allow configuration
+     *      of embedded NSS jetty server using jetty-web.xml </a>
      */
     private void startNSS() {
 
         try {
-
-            final String COMPONENT = NSSConfigurationOptions.COMPONENT;
-
-            final String namespace = (String) config.getEntry(COMPONENT,
-                    NSSConfigurationOptions.NAMESPACE, String.class,
-                    NSSConfigurationOptions.DEFAULT_NAMESPACE);
-
-            final Integer queryPoolThreadSize = (Integer) config.getEntry(
-                    COMPONENT, NSSConfigurationOptions.QUERY_THREAD_POOL_SIZE,
-                    Integer.TYPE,
-                    NSSConfigurationOptions.DEFAULT_QUERY_THREAD_POOL_SIZE);
-
-            final boolean create = (Boolean) config.getEntry(COMPONENT,
-                    NSSConfigurationOptions.CREATE, Boolean.TYPE,
-                    NSSConfigurationOptions.DEFAULT_CREATE);
-
-            final Integer port = (Integer) config.getEntry(COMPONENT,
-                    NSSConfigurationOptions.PORT, Integer.TYPE,
-                    NSSConfigurationOptions.DEFAULT_PORT);
-
-            final String servletContextListenerClass = (String) config
-                    .getEntry(
-                            COMPONENT,
-                            NSSConfigurationOptions.SERVLET_CONTEXT_LISTENER_CLASS,
-                            String.class,
-                            NSSConfigurationOptions.DEFAULT_SERVLET_CONTEXT_LISTENER_CLASS);
-
-            log.warn("Starting NSS: port=" + port);
-
-            final Map<String, String> initParams = new LinkedHashMap<String, String>();
-            {
-
-                initParams.put(ConfigParams.NAMESPACE, namespace);
-
-                initParams.put(ConfigParams.QUERY_THREAD_POOL_SIZE,
-                        queryPoolThreadSize.toString());
-
-                // Note: Create will be handled by the QuorumListener (above).
-                initParams.put(ConfigParams.CREATE, Boolean.toString(create));
-
-                initParams.put(ConfigParams.SERVLET_CONTEXT_LISTENER_CLASS,
-                        servletContextListenerClass);
-
-            }
 
             if (jettyServer != null && jettyServer.isRunning()) {
 
@@ -4521,10 +4513,69 @@ public class HAJournalServer extends AbstractServer {
 
             }
 
-            // Setup the embedded jetty server for NSS webapp.
-            jettyServer = NanoSparqlServer.newInstance(port, journal,
-                    initParams);
+//            if(!USE_WEB_XML) {
+//                
+//            final String COMPONENT = NSSConfigurationOptions.COMPONENT;
+//
+//            final String namespace = (String) config.getEntry(COMPONENT,
+//                    NSSConfigurationOptions.NAMESPACE, String.class,
+//                    NSSConfigurationOptions.DEFAULT_NAMESPACE);
+//
+//            final Integer queryPoolThreadSize = (Integer) config.getEntry(
+//                    COMPONENT, NSSConfigurationOptions.QUERY_THREAD_POOL_SIZE,
+//                    Integer.TYPE,
+//                    NSSConfigurationOptions.DEFAULT_QUERY_THREAD_POOL_SIZE);
+//
+//            final boolean create = (Boolean) config.getEntry(COMPONENT,
+//                    NSSConfigurationOptions.CREATE, Boolean.TYPE,
+//                    NSSConfigurationOptions.DEFAULT_CREATE);
+//
+//            final Integer port = (Integer) config.getEntry(COMPONENT,
+//                    NSSConfigurationOptions.PORT, Integer.TYPE,
+//                    NSSConfigurationOptions.DEFAULT_PORT);
+//
+//            final String servletContextListenerClass = (String) config
+//                    .getEntry(
+//                            COMPONENT,
+//                            NSSConfigurationOptions.SERVLET_CONTEXT_LISTENER_CLASS,
+//                            String.class,
+//                            NSSConfigurationOptions.DEFAULT_SERVLET_CONTEXT_LISTENER_CLASS);
+//
+//            final Map<String, String> initParams = new LinkedHashMap<String, String>();
+//            {
+//
+//                initParams.put(ConfigParams.NAMESPACE, namespace);
+//
+//                initParams.put(ConfigParams.QUERY_THREAD_POOL_SIZE,
+//                        queryPoolThreadSize.toString());
+//
+//                // Note: Create will be handled by the QuorumListener (above).
+//                initParams.put(ConfigParams.CREATE, Boolean.toString(create));
+//
+//                initParams.put(ConfigParams.SERVLET_CONTEXT_LISTENER_CLASS,
+//                        servletContextListenerClass);
+//
+//            }
+//
+//            // Setup the embedded jetty server for NSS webapp.
+//            jettyServer = NanoSparqlServer.newInstance(port, journal,
+//                    initParams);
+//        
+//            } else {
 
+                // The location of the jetty.xml file.
+                final String jettyXml = (String) config.getEntry(
+                        ConfigurationOptions.COMPONENT,
+                        ConfigurationOptions.JETTY_XML, String.class,
+                        ConfigurationOptions.DEFAULT_JETTY_XML);
+
+                // Setup the embedded jetty server for NSS webapp.
+                jettyServer = NanoSparqlServer.newInstance(jettyXml, journal);
+
+//            }
+
+            log.warn("Starting NSS");
+            
             // Start the server.
             jettyServer.start();
 
@@ -4539,8 +4590,9 @@ public class HAJournalServer extends AbstractServer {
             final String serviceURL;
             {
 
-                final int actualPort = jettyServer.getConnectors()[0]
-                        .getLocalPort();
+                final int actualPort = getNSSPort();
+//                final int actualPort = jettyServer.getConnectors()[0]
+//                        .getLocalPort();
 
                 String hostAddr = NicUtil.getIpAddress("default.nic",
                         "default", true/* loopbackOk */);
@@ -4560,7 +4612,7 @@ public class HAJournalServer extends AbstractServer {
 
                 System.out.println(msg);
                 if (log.isInfoEnabled())
-                    log.info(msg);
+                    log.warn(msg);
 
             }
 
@@ -4573,9 +4625,48 @@ public class HAJournalServer extends AbstractServer {
 
     }
     
+//    /**
+//     * When <code>true</code>, the {@link HAJournalServer} will use
+//     * <code>jetty.xml</code> and <code>web.xml</code> to configure the
+//     * {@link NanoSparqlServer}.
+//     * 
+//     * @see <a href="http://wiki.eclipse.org/Jetty/Tutorial/Embedding_Jetty">
+//     *      Embedding Jetty </a>
+//     * @see <a href="http://trac.bigdata.com/ticket/730" > Allow configuration
+//     *      of embedded NSS jetty server using jetty-web.xml </a>
+//     * 
+//     * @deprecated Once #730 is closed, get rid of this and the old code paths
+//     *             in the method above and in the {@link NanoSparqlServer}.
+//     */
+//    private final boolean USE_WEB_XML = true;
+
     /**
-     * Conditionally create the default KB instance as identified by the
-     * {@link NSSConfigurationOptions}.
+     * The actual port depends on how jetty was configured in
+     * <code>jetty.xml</code>. This returns the port associated with the first
+     * connection for the jetty {@link Server}.
+     * 
+     * @return The port associated with the first connection for the jetty
+     *         {@link Server}.
+     * 
+     * @throws IllegalArgumentException
+     *             if the jetty {@link Server} is not running.
+     */
+    int getNSSPort() {
+
+        final Server tmp = jettyServer;
+
+        if (tmp == null)
+            throw new IllegalStateException("Server is not running");
+
+        return tmp.getConnectors()[0].getLocalPort();
+
+    }
+    
+    /**
+     * Conditionally create the default KB instance as identified in
+     * <code>web.xml</code>.
+     * 
+     * @see ConfigParams
      * 
      * @throws ConfigurationException
      * @throws ExecutionException
@@ -4584,15 +4675,59 @@ public class HAJournalServer extends AbstractServer {
     private void conditionalCreateDefaultKB() throws ConfigurationException,
             InterruptedException, ExecutionException {
 
-        final String COMPONENT = NSSConfigurationOptions.COMPONENT;
+        final Server server = this.jettyServer;
 
-        final String namespace = (String) config.getEntry(COMPONENT,
-                NSSConfigurationOptions.NAMESPACE, String.class,
-                NSSConfigurationOptions.DEFAULT_NAMESPACE);
+        if (server == null)
+            throw new IllegalStateException();
 
-        final boolean create = (Boolean) config.getEntry(COMPONENT,
-                NSSConfigurationOptions.CREATE, Boolean.TYPE,
-                NSSConfigurationOptions.DEFAULT_CREATE);
+        /*
+         * TODO This currently relies on the WebAppContext's initParams. This is
+         * somewhat fragile, but that is where this information is declared.
+         */
+        final WebAppContext wac = NanoSparqlServer.getWebApp(server);
+
+        if (wac == null)
+            throw new RuntimeException("Could not locate webapp.");
+        
+        final String namespace;
+        {
+         
+            String s = wac.getInitParameter(ConfigParams.NAMESPACE);
+
+            if (s == null)
+                s = ConfigParams.DEFAULT_NAMESPACE;
+
+            namespace = s;
+            
+            if (log.isInfoEnabled())
+                log.info(ConfigParams.NAMESPACE + "=" + namespace);
+
+        }
+
+        final boolean create;
+        {
+            
+            final String s = wac.getInitParameter(ConfigParams.CREATE);
+
+            if (s != null)
+                create = Boolean.valueOf(s);
+            else
+                create = ConfigParams.DEFAULT_CREATE;
+        
+            if (log.isInfoEnabled())
+                log.info(ConfigParams.CREATE + "=" + create);
+
+        }
+
+//        final String COMPONENT = NSSConfigurationOptions.COMPONENT;
+//
+//        final String namespace = (String) config.getEntry(COMPONENT,
+//                NSSConfigurationOptions.NAMESPACE, String.class,
+//                NSSConfigurationOptions.DEFAULT_NAMESPACE);
+//
+//        final boolean create = (Boolean) config.getEntry(COMPONENT,
+//                NSSConfigurationOptions.CREATE, Boolean.TYPE,
+//                NSSConfigurationOptions.DEFAULT_CREATE);
 
         if (create) {
 
