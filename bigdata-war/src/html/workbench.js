@@ -88,6 +88,26 @@ function deleteNamespace(namespace) {
    }
 }
 
+function createNamespace(e) {
+   e.preventDefault();
+   var namespace = $(this).find('input').val();
+   if(!namespace) {
+      return;
+   }
+   // TODO: validate namespace
+   // TODO: allow for other options to be specified
+   var data = '<?xml version="1.0" encoding="UTF-8" standalone="no"?>\n<!DOCTYPE properties SYSTEM "http://java.sun.com/dtd/properties.dtd">\n<properties>\n<entry key="com.bigdata.rdf.sail.namespace">' + namespace + '</entry>\n</properties>';
+   var settings = {
+      type: 'POST',
+      data: data,
+      contentType: 'application/xml',
+      success: getNamespaces,
+      error: function(jqXHR, textStatus, errorThrown) { alert(errorThrown); }
+   };
+   $.ajax('/namespace', settings);
+}
+$('#namespace-create').submit(createNamespace);
+
 function getDefaultNamespace() {
    $.get('/sparql', function(data) {
       // Chrome does not work with rdf\:Description, so look for Description too
