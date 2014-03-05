@@ -26,9 +26,14 @@ package com.bigdata.journal;
 import java.io.File;
 import java.io.FileFilter;
 import java.io.IOException;
+import java.util.Arrays;
+import java.util.Comparator;
 import java.util.Formatter;
 
 import org.apache.log4j.Logger;
+
+import com.bigdata.ha.halog.IHALogReader;
+import com.bigdata.journal.jini.ha.SnapshotManager;
 
 /**
  * Utility class for operations on files that are named using a commit counter.
@@ -247,4 +252,91 @@ public class CommitCounterUtility {
 
     }
 
+    /**
+     * Find and return the {@link File} associated with the greatest commit
+     * counter. This uses a reverse order search to locate the most recent file
+     * very efficiently.
+     * 
+     * @param f
+     *            The root of the directory structure for the snapshot or HALog
+     *            files.
+     * @param fileFilter
+     *            Either the {@link SnapshotManager#SNAPSHOT_FILTER} or the
+     *            {@link IHALogReader#HALOG_FILTER}.
+     * 
+     * @return The file from the directory structure associated with the
+     *         greatest commit counter.
+     * 
+     * @throws IOException
+     */
+    public static File findGreatestCommitCounter(final File f,
+            final FileFilter fileFilter) throws IOException {
+
+        if (f == null)
+            throw new IllegalArgumentException();
+
+        if (fileFilter == null)
+            throw new IllegalArgumentException();
+        
+        if (f.isDirectory()) {
+
+            final File[] files = f.listFiles(fileFilter);
+
+            /*
+             * Sort into (reverse) lexical order to force visitation in
+             * (reverse) lexical order.
+             * 
+             * Note: This should work under any OS. Files will be either
+             * directory names (3 digits) or filenames (21 digits plus the file
+             * extension). Thus the comparison centers numerically on the digits
+             * that encode either part of a commit counter (subdirectory) or an
+             * entire commit counter (HALog file).
+             */
+            Arrays.sort(files,ReverseFileComparator.INSTANCE);
+
+            for (int i = 0; i < files.length; i++) {
+
+                final File tmp = findGreatestCommitCounter(files[i], fileFilter);
+
+                if (tmp != null) {
+
+                    // Done.
+                    return tmp;
+
+                }
+
+            }
+
+        } else if (fileFilter.accept(f)) {
+
+            // Match
+            return f;
+
+        }
+
+        // No match.
+        return null;
+
+   }
+
+    /**
+     * Impose a reverse sort on files.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+     *         Thompson</a>
+     */
+    private static class ReverseFileComparator implements Comparator<File> {
+
+        @Override
+        public int compare(final File o1, final File o2) {
+
+            return o2.compareTo(o1);
+
+        }
+
+        /** Impose a reverse sort on files. */
+        private static final Comparator<File> INSTANCE = new ReverseFileComparator();
+
+    }
+    
 }
