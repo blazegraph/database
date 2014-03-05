@@ -23,6 +23,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.rdf.sail.webapp;
 
+import java.io.File;
+import java.io.InputStream;
 import java.net.URL;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -37,14 +39,15 @@ import org.eclipse.jetty.server.handler.HandlerList;
 import org.eclipse.jetty.server.handler.ResourceHandler;
 import org.eclipse.jetty.servlet.ServletContextHandler;
 import org.eclipse.jetty.servlet.ServletHolder;
-import org.openrdf.rio.RDFParser;
+import org.eclipse.jetty.util.resource.Resource;
+import org.eclipse.jetty.webapp.WebAppContext;
+import org.eclipse.jetty.xml.XmlConfiguration;
 
 import com.bigdata.Banner;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.TimestampUtility;
-import com.bigdata.rdf.store.DataLoader;
 import com.bigdata.util.config.NicUtil;
 
 /**
@@ -57,13 +60,14 @@ import com.bigdata.util.config.NicUtil;
  *      href="https://sourceforge.net/apps/mediawiki/bigdata/index.php?title=NanoSparqlServer">
  *      NanoSparqlServer </a> on the wiki.
  * 
- * @todo Add an "?explain" URL query parameter and show the execution plan and
- *       costs (or make this a navigable option from the set of running queries
- *       to drill into their running costs and offer an opportunity to kill them
- *       as well).
+ * @see <a href="http://www.eclipse.org/jetty/documentation/current/"> Jetty
+ *      Documentation </a>
  * 
- * @todo Add command (or UI) to kill a running query, e.g., from the view of the
- *       long running queries.
+ * @see <a href="http://wiki.eclipse.org/Jetty/Reference/jetty.xml_syntax" >
+ *      Jetty XML Reference </a>
+ * 
+ * @see <a href="http://wiki.eclipse.org/Jetty/Tutorial/Embedding_Jetty">
+ *      Embedding Jetty </a>
  * 
  * @todo If the addressed instance uses full transactions, then mutation should
  *       also use a full transaction.
@@ -71,22 +75,10 @@ import com.bigdata.util.config.NicUtil;
  * @todo Remote command to advance the read-behind point. This will let people
  *       bulk load a bunch of stuff before advancing queries to read from the
  *       new consistent commit point.
- * 
- * @todo Review the settings for the {@link RDFParser} instances, e.g.,
- *       verifyData, preserveBNodeIds, etc. Perhaps we should use the same
- *       defaults as the {@link DataLoader}? Regardless, collect the logic to
- *       setup the parser in a single place for the webapp.
- * 
- * @todo It is possible that we could have concurrent requests which each get
- *       the unisolated connection. This could cause two problems: (1) we could
- *       exhaust our request pool, which would cause the server to block; and
- *       (2) I need to verify that the exclusive semaphore logic for the
- *       unisolated sail connection works with cross thread access. Someone had
- *       pointed out a bizarre hole in this....
  */
 public class NanoSparqlServer {
-	
-	static private final Logger log = Logger.getLogger(NanoSparqlServer.class);
+    
+    static private final Logger log = Logger.getLogger(NanoSparqlServer.class);
 
     /**
      * Run an httpd service exposing a SPARQL endpoint. The service will respond
@@ -148,11 +140,11 @@ public class NanoSparqlServer {
      *            </dl>
      *            </p>
      */
-//	 *            <dt>bufferCapacity [#bytes]</dt>
-//	 *            <dd>Specify the capacity of the buffers used to decouple the
-//	 *            query evaluation from the consumption of the HTTP response by
-//	 *            the client. The capacity may be specified in bytes or
-//	 *            kilobytes, e.g., <code>5k</code>.</dd>
+//   *            <dt>bufferCapacity [#bytes]</dt>
+//   *            <dd>Specify the capacity of the buffers used to decouple the
+//   *            query evaluation from the consumption of the HTTP response by
+//   *            the client. The capacity may be specified in bytes or
+//   *            kilobytes, e.g., <code>5k</code>.</dd>
     public static void main(final String[] args) throws Exception {
 
         Banner.banner();
@@ -330,7 +322,11 @@ public class NanoSparqlServer {
     }
 
     /**
-     * Variant used when you already have the {@link IIndexManager} on hand.
+     * Variant used when you already have the {@link IIndexManager} on hand and
+     * DO NOT want to use <code>web.xml</code> and <code>jetty.xml</code>. For
+     * this case, the caller must specify the port and a default connection will
+     * be established at that port. This form is used by code that wants to
+     * embed a simple NSS end point.
      * 
      * @param port
      *            The port on which the service will run -OR- ZERO (0) for any
@@ -352,7 +348,7 @@ public class NanoSparqlServer {
 
         final Server server = new Server(port);
 
-        final ServletContextHandler context = getContextHandler(server,
+        final ServletContextHandler context = getContextHandler(//server,
                 initParams);
 
         // Force the use of the caller's IIndexManager.
@@ -362,7 +358,8 @@ public class NanoSparqlServer {
 
         final ResourceHandler resourceHandler = new ResourceHandler();
         
-        setupStaticResources(server, resourceHandler);
+        setupStaticResources(NanoSparqlServer.class.getClassLoader(),
+                resourceHandler);
 
         handlers.setHandlers(new Handler[] {
                 context,//
@@ -377,8 +374,136 @@ public class NanoSparqlServer {
     }
 
     /**
+     * Variant used when you already have the {@link IIndexManager} on hand and
+     * want to use <code>web.xml</code> to configure the {@link WebAppContext}
+     * and <code>jetty.xml</code> to configure the jetty {@link Server}.
+     * 
+     * @param jettyXml
+     *            The <code>jetty.xml</code> file that will be used to configure
+     *            jetty. 
+     * @param indexManager
+     *            The {@link IIndexManager}.
+     * 
+     * @return The server instance.
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/730" >
+     *      Allow configuration of embedded NSS jetty server using jetty-web.xml
+     *      </a>
+     */
+    static public Server newInstance(final String jettyXml,
+            final IIndexManager indexManager) throws Exception {
+
+        final ClassLoader classLoader = indexManager.getClass()
+                .getClassLoader();
+        
+        final Server server;
+        {
+
+            // Locate jetty.xml.
+            final URL jettyXmlUrl;
+            if (new File(jettyXml).exists()) {
+
+                jettyXmlUrl = new URL("file://" + jettyXml);
+
+            } else {
+
+                jettyXmlUrl = getStaticResourceURL(classLoader, jettyXml);
+
+            }
+
+            if (jettyXmlUrl == null) {
+
+                throw new RuntimeException("Not found: " + jettyXml);
+
+            }
+            
+            if (log.isInfoEnabled())
+                log.info("jetty configuration: jettyXml, jettyXmlUrl="
+                        + jettyXmlUrl);
+
+            // Build configuration from that resource.
+            final XmlConfiguration configuration;
+            {
+                // Open jetty.xml resource.
+                final Resource jettyConfig = Resource.newResource(jettyXmlUrl);
+                InputStream is = null;
+                try {
+                    is = jettyConfig.getInputStream();
+                    // Build configuration.
+                    configuration = new XmlConfiguration(is);
+                } finally {
+                    if (is != null) {
+                        is.close();
+                    }
+                }
+            }
+            
+            // Configure the jetty server.
+            server = (Server) configuration.configure();
+
+        }
+
+        /*
+         * Force the use of the caller's IIndexManager. This is how we get the
+         * NSS to use the already open Journal for the HAJournalServer.
+         */
+        {
+
+            final WebAppContext wac = getWebApp(server);
+
+            if (wac == null) {
+
+                /*
+                 * This is a fatal error. If we can not set the IIndexManager,
+                 * the NSS will try to interpret the propertyFile in web.xml
+                 * rather than using the one that is already open and specified
+                 * by the caller. Among other things, that breaks the
+                 * HAJournalServer startup.
+                 */
+
+                throw new RuntimeException("Could not locate "
+                        + WebAppContext.class.getName());
+
+            }
+
+            // Set the IIndexManager attribute on the WebAppContext.
+            wac.setAttribute(IIndexManager.class.getName(), indexManager);
+            
+        }
+
+        return server;
+        
+    }
+
+    /**
+     * Return the {@link WebAppContext} for the {@link Server}.
+     * 
+     * @param server
+     *            The {@link Server}.
+     *            
+     * @return The {@link WebAppContext} associated with the bigdata webapp.
+     */
+    public static WebAppContext getWebApp(final Server server) {
+
+        final WebAppContext wac = server
+                .getChildHandlerByClass(WebAppContext.class);
+
+        /*
+         * Note: This assumes that this is the webapp for bigdata. If there are
+         * multiple webapps then this assumption is no longer valid and things
+         * will break.
+         */
+ 
+        return wac;
+
+    }
+    
+    /**
      * Variant used when the life cycle of the {@link IIndexManager} will be
-     * managed by the server.
+     * managed by the server - this form is used by {@link #main(String[])}.
+     * <p>
+     * Note: This is mostly a convenience for scripts that do not need to take
+     * over the detailed control of the jetty container and the bigdata webapp.
      * 
      * @param port
      *            The port on which the service will run -OR- ZERO (0) for any
@@ -391,23 +516,21 @@ public class NanoSparqlServer {
      *            by {@link ConfigParams}.
      * 
      * @return The server instance.
-     * 
-     * @see <a href="http://wiki.eclipse.org/Jetty/Tutorial/Embedding_Jetty">
-     *      Embedding Jetty </a>
      */
     static public Server newInstance(final int port, final String propertyFile,
             final Map<String, String> initParams) throws Exception {
 
         final Server server = new Server(port);
 
-        final ServletContextHandler context = getContextHandler(server,
+        final ServletContextHandler context = getContextHandler(//server,
                 initParams);
 
         final HandlerList handlers = new HandlerList();
 
         final ResourceHandler resourceHandler = new ResourceHandler();
         
-        setupStaticResources(server, resourceHandler);
+        setupStaticResources(NanoSparqlServer.class.getClassLoader(),
+                resourceHandler);
 
         /**
          * Note: There appear to be plenty of ways to setup JSP support for
@@ -432,29 +555,14 @@ public class NanoSparqlServer {
          * Note: In order for this to work, it must also be supported in the
          * alternative newInstance() method above.
          */
-//        if (false/* jsp */) {
-//            final URL warUrl = getStaticResourceURL(server, "jsp"/* path */);
-//            final WebAppContext webappHandler = new WebAppContext(
-//                    warUrl.toExternalForm(), "/jsp");
-//            handlers.setHandlers(new Handler[] {
-//                context,//
-//                resourceHandler,//
-//                webappHandler,
-////                new DefaultHandler()//
-//                });
-//      } else {
-            handlers.setHandlers(new Handler[] {
-                    context,//
-                    resourceHandler,//
-//                    webappHandler,
-//                    new DefaultHandler()//
-                    });
-//        }
+        handlers.setHandlers(new Handler[] {//
+            context,//
+            resourceHandler,//
+        });
 
         server.setHandler(handlers);
-
-        return server;
         
+        return server;
     }
 
     /**
@@ -462,12 +570,15 @@ public class NanoSparqlServer {
      * <p>
      * Note: The {@link ContextHandler} uses the longest prefix of the request
      * URI (the contextPath) to select a specific {@link Handler}.
+     * <p>
+     * Note: If you are using <code>web.xml</code>, then all of this stuff is
+     * done there instead.
      * 
      * @param initParams
      *            The init parameters, per the web.xml definition.
      */
     static private ServletContextHandler getContextHandler(
-            final Server server,
+//            final Server server,
             final Map<String, String> initParams) throws Exception {
 
         if (initParams == null)
@@ -558,83 +669,89 @@ public class NanoSparqlServer {
         
     }
 
-    /**
-     * Setup access to the web app resources, especially index.html.
-     * 
-     * @see https://sourceforge.net/apps/trac/bigdata/ticket/330
-     * 
-     * @param server
-     * @param context
-     */
-    private static void setupStaticResources(final Server server,
-            final ServletContextHandler context) {
-
-        final URL url = getStaticResourceURL(server, "html");
-
-        if(url != null) {
-
-            /*
-             * We have located the resource. Set it as the resource base from
-             * which static content will be served.
-             */
-
-            final String webDir = url.toExternalForm();
-
-            context.setResourceBase(webDir);
-
-            context.setContextPath("/");
-
-        }
-
-    }
+//    /**
+//     * Setup access to the web app resources, especially index.html.
+//     * 
+//     * @see https://sourceforge.net/apps/trac/bigdata/ticket/330
+//     * 
+//     * @param classLoader
+//     * @param context
+//     */
+//    private static void setupStaticResources(final ClassLoader classLoader,
+//            final ServletContextHandler context) {
+//
+//        final URL url = getStaticResourceURL(classLoader, "html");
+//
+//        if (url != null) {
+//
+//            /*
+//             * We have located the resource. Set it as the resource base from
+//             * which static content will be served.
+//             */
+//
+//            final String webDir = url.toExternalForm();
+//
+//            context.setResourceBase(webDir);
+//
+//            context.setContextPath("/");
+//
+//        }
+//
+//    }
 
     /**
      * Setup access to the welcome page (index.html).
      */
-    private static void setupStaticResources(final Server server,
+    private static void setupStaticResources(final ClassLoader classLoader,
             final ResourceHandler context) {
 
         context.setDirectoriesListed(false); // Nope!
 
-        final URL url = getStaticResourceURL(server, "html");
+        final String file = "index.html";
 
-        if(url != null) {
-            
-            /*
-             * We have located the resource. Set it as the resource base from
-             * which static content will be served.
-             */
+        final URL url = getStaticResourceURL(classLoader, file);
 
-            final String webDir = url.toExternalForm();
+        if (url == null)
+            throw new RuntimeException("Could not locate file: " + file);
 
-            context.setResourceBase(webDir);
+        /*
+         * We have located the resource. Set it as the resource base from which
+         * static content will be served.
+         */
+        final String indexHtml = url.toExternalForm();
 
-            // FIXME Set to locate the flot files as part of the CountersServlet
-            // setup.
-            // resource_handler.setResourceBase(config.resourceBase);
+        final String webDir = indexHtml.substring(0,
+                indexHtml.length() - file.length());
 
-            // Note: FileResource or ResourceCollection.
-//            resourceHandler.setBaseResource(new FileResource(...));
-            
-            context.setWelcomeFiles(new String[]{"index.html"});
+        context.setResourceBase(webDir);
 
-//            context.setContextPath("/");
-
-        }
+        context.setWelcomeFiles(new String[]{"index.html"});
 
     }
 
     /**
-     * Return the URL for the static web app resources (index.html).
+     * Return the URL for the static web app resources (for example,
+     * <code>index.html</code>).
      * 
-     * @param server
+     * @param classLoader
+     *            The {@link ClassLoader} that will be used to locate the
+     *            resource (required).
+     * @param path
+     *            The path for the resource (required)
      * 
      * @return The URL for the web app resource directory -or- <code>null</code>
      *         if it could not be found on the class path.
      * 
      * @see https://sourceforge.net/apps/trac/bigdata/ticket/330
      */
-    private static URL getStaticResourceURL(final Server server, final String path) {
+    private static URL getStaticResourceURL(final ClassLoader classLoader,
+            final String path) {
+
+        if (classLoader == null)
+            throw new IllegalArgumentException();
+
+        if (path == null)
+            throw new IllegalArgumentException();
         
         /*
          * This is the resource path in the JAR.
@@ -649,11 +766,11 @@ public class NanoSparqlServer {
          */
         final String WEB_DIR_IDE = path; // "html";
 
-        URL url = server.getClass().getClassLoader().getResource(WEB_DIR_JAR);
+        URL url = classLoader.getResource(WEB_DIR_JAR);
 
         if (url == null && path != null) {
 
-            url = server.getClass().getClassLoader().getResource(path);// "html");
+            url = classLoader.getResource(path);// "html");
 
         }
 

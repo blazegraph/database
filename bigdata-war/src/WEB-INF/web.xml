@@ -4,12 +4,12 @@
   <description>Bigdata</description>
   <context-param>
   	<!-- Note: This path is relative to the directory in which you start -->
-  	<!-- the servlet container. -->
+  	<!-- the servlet container. For the IDE, this is generally the root  -->
+  	<!-- of the bigdata project. For the WAR, it depends where you start -->
+  	<!-- the servlet container. The "ant war" target rewrites this to be -->
+  	<!-- relative to the root of the servlet container by default.       -->
   	<param-name>propertyFile</param-name>
-  	<!-- Note: This path may be used with WebAppUnassembled for testing.
-  	<param-value>bigdata-war/src/resources/RWStore.properties</param-value>
-  	 -->
-  	<param-value>../webapps/bigdata/RWStore.properties</param-value>
+   <param-value>WEB-INF/RWStore.properties</param-value>
   	<description>The property file (for a standalone database instance) or the
   	jini configuration file (for a federation).  The file MUST end with either
   	".properties" or ".config".  This path is relative to the directory from

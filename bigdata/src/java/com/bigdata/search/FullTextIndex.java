@@ -1151,6 +1151,14 @@ public class FullTextIndex<V extends Comparable<V>> extends AbstractRelation {
 		                log.info("Interrupted - only partial results will be returned.");
 	            	}
 	                
+	            	/*
+	            	 * Yes, let's toss it.  We were getting into a situation
+	            	 * where the ExecutionHelper above received an interrupt
+	            	 * but we still went through the heavy-weight filtering
+	            	 * operations below (matchExact or matchRegex).
+	            	 */
+	            	throw new RuntimeException(ex);
+
 	            } catch (ExecutionException ex) {
 	
 	                throw new RuntimeException(ex);
