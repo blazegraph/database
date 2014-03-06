@@ -5,20 +5,15 @@
 <meta http-equiv="Content-Type" content="text/html;charset=utf-8" >
 <title>bigdata&#174; NanoSparqlServer</title>
 <!-- $Id$ -->
-<style>
-td {
-   border: 1px solid;
-}
-</style>
 </head>
 <body>
 
 <h2>Welcome to bigdata&#174;.</h2>  
 <p>Please consult the 
-<a href="https://sourceforge.net/apps/mediawiki/bigdata/index.php?title=NanoSparqlServer"
+<a href="http://wiki.bigdata.com/wiki/index.php/NanoSparqlServer"
  target="_blank"
    > documentation</a> for information on using the NanoSparqlServer's REST Api. </br>See the 
-   <a href="https://sourceforge.net/apps/mediawiki/bigdata/index.php?title=Main_Page" 
+   <a href="http://wiki.bigdata.com/wiki/index.php/Main_Page" 
     target="_blank"
    >wiki</a> for help on query optimization, bigdata SPARQL extensions, etc.
 </p>
@@ -30,26 +25,19 @@ The following URLs should be active when deployed in the default configuration:
 <dt>http://hostname:port/bigdata</dt>
 <dd>This page.</dd>
 <dt>http://hostname:port/bigdata/sparql</dt>
-<dd>The SPARQL REST API (<a href="sparql">Service Description + VoID Description</a>).</dd>
+<dd>The SPARQL REST API (<a href="/bigdata/sparql">Service Description + VoID Description</a>).</dd>
 <dt>http://hostname:port/bigdata/namespace</dt>
-<dd>VoID <a href="namespace">graph of available KBs</a> from this service.</dd>
+<dd>VoID <a href="/bigdata/namespace">graph of available KBs</a> from this service.</dd>
 <dt>http://hostname:port/bigdata/status</dt>
-<dd>A <a href="status">status</a> page.</dd>
+<dd>A <a href="/bigdata/status">status</a> page.</dd>
 <dt>http://hostname:port/bigdata/counters</dt>
-<dd>A <a href="counters"> performance counters</a> page.</dd>
+<dd>A <a href="/bigdata/counters"> performance counters</a> page.</dd>
 </dl>
 
 <p>
 Where <i>hostname</i> is the name of this host and <i>port</i> is the port at
 which this page was accessed.
 </p>
-
-<h2>Linked Data Navigation</h2>
-<form action="navigate" method="get">
-    <p>Enter a URI to navigate to <input type="text" name="uri"></p>
-    <p>Tenant Namespace <input type="text" name="namespace" title="Tenant namespace."> (leave empty for default KB)</p>
-    <input type="submit" value="Send" title="Submit query.">
-</form>
 
 <!-- Note: Some applications (firefox 7) can not handle a GET with a very long
      URL.  For that reason ONLY this operation defaults to a POST.  You SHOULD
@@ -59,7 +47,7 @@ which this page was accessed.
       title="W3C SPARQL 1.1 Query Recommendation"
      target="_blank"
       > SPARQL Query </a></h2>
-<FORM action="sparql" method="post" name="QUERY">
+<FORM action="/bigdata/sparql" method="post" name="QUERY">
    <P>
    <TEXTAREA name="query" rows="10" cols="80" title="Enter SPARQL Query."
    >SELECT * { ?s ?p ?o } LIMIT 1</TEXTAREA>
@@ -93,7 +81,7 @@ which this page was accessed.
       title="W3C SPARQL Update Recommendation"
      target="_blank"
      >SPARQL Update</a></h2>
-<FORM action="sparql" method="post">
+<FORM action="/bigdata/sparql" method="post">
    <P>
    <TEXTAREA name="update" rows="10" cols="80" title="Enter SPARQL Update."
    >
@@ -148,48 +136,5 @@ prefix bds:  &lt;http:&#47;&#47;www.bigdata.com&#47;rdf&#47;search#&gt;
     </p>
 </form>
 -->
-
-<h2>Multi-purpose textarea</h2>
-<input id="mp-file" type="file" name="file">
-<br>
-<input id="mp-hidden" type="hidden" name="large-file-contents">
-<p id="large-file-message" style="display: none;">Your file is too large to display here, but will be uploaded as normal.</p>
-<textarea id="mp-box" name="textarea" rows="10" cols="80"></textarea>
-<br>
-<select id="mp-type">
-<option value="sparql" selected="selected">SPARQL</option>
-<option value="rdf">RDF</option>
-<option value="path">File path</option>
-</select>
-<select id="rdf-type" style="display: none;">
-<option value="">Select RDF format</option>
-<option value="n-quads">N-Quads</option>
-<option value="n-triples">N-Triples</option>
-<option value="n3">Notation3</option>
-<option value="rdf/xml">RDF/XML</option>
-<option value="trig">TriG</option>
-<option value="trix">TriX</option>
-<option value="turtle">Turtle</option>
-</select>
-<br>
-Tenant Namespace <input type="text" name="namespace" title="Tenant namespace."> (leave empty for default KB)
-<br>
-<button type="button" id="mp-send">Send</button>
-<br> 
-Response:
-<pre id="response"></pre>
-
-<h2>Navigator</h2>
-Enter a URI to begin navigation
-<br>
-<form id="navigator">
-<input type="text" id="navigator-uri">
-<input type="submit">
-</form>
-<div id="navigator-display"></div>
-
-<script src="//ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
-<script>window.jQuery || document.write('<script src="/jquery.min.js"><\/script>')</script>
-<script src="/workbench.js"></script>
 </body>
 </html>

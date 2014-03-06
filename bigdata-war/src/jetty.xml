@@ -41,15 +41,10 @@
 				<Set name="resourceBase">
 					<SystemProperty name="jetty.resourceBase" default="bigdata-war/src" />
 				</Set>
-            <Set name="contextPath">/</Set>
+            <Set name="contextPath">/bigdata</Set>
             <Set name="descriptor">WEB-INF/web.xml</Set>
             <Set name="parentLoaderPriority">true</Set>
             <Set name="extractWAR">false</Set>
-            <Set name="welcomeFiles">
-               <Array type="java.lang.String">
-                   <Item>index.html</Item>
-               </Array>
-             </Set>
             </New>
            </Item>
          </Array>

@@ -35,6 +35,7 @@ import org.apache.log4j.Logger;
 import org.eclipse.jetty.server.Handler;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.server.handler.ContextHandler;
+import org.eclipse.jetty.server.handler.DefaultHandler;
 import org.eclipse.jetty.server.handler.HandlerList;
 import org.eclipse.jetty.server.handler.ResourceHandler;
 import org.eclipse.jetty.servlet.ServletContextHandler;
@@ -354,17 +355,17 @@ public class NanoSparqlServer {
         // Force the use of the caller's IIndexManager.
         context.setAttribute(IIndexManager.class.getName(), indexManager);
         
-        final HandlerList handlers = new HandlerList();
-
         final ResourceHandler resourceHandler = new ResourceHandler();
         
         setupStaticResources(NanoSparqlServer.class.getClassLoader(),
                 resourceHandler);
 
+        final HandlerList handlers = new HandlerList();
+
         handlers.setHandlers(new Handler[] {
-                context,//
-                resourceHandler,//
-//                new DefaultHandler()//
+                context,// maps servlets
+                resourceHandler,// maps welcome files.
+                new DefaultHandler() // responsible for anything not explicitly served.
                 });
 
         server.setHandler(handlers);
@@ -525,8 +526,6 @@ public class NanoSparqlServer {
         final ServletContextHandler context = getContextHandler(//server,
                 initParams);
 
-        final HandlerList handlers = new HandlerList();
-
         final ResourceHandler resourceHandler = new ResourceHandler();
         
         setupStaticResources(NanoSparqlServer.class.getClassLoader(),
@@ -555,9 +554,12 @@ public class NanoSparqlServer {
          * Note: In order for this to work, it must also be supported in the
          * alternative newInstance() method above.
          */
+        final HandlerList handlers = new HandlerList();
+
         handlers.setHandlers(new Handler[] {//
-            context,//
-            resourceHandler,//
+            context,// maps servlets
+            resourceHandler,// maps welcome files.
+            new DefaultHandler() // responsible for anything not explicitly served.
         });
 
         server.setHandler(handlers);
@@ -589,6 +591,9 @@ public class NanoSparqlServer {
 //                        | ServletContextHandler.NO_SESSIONS
                         );
 
+        // Path to the webapp.
+        context.setContextPath("/bigdata");
+        
 //        /*
 //         * Setup resolution for the static web app resources (index.html).
 //         */
@@ -723,8 +728,13 @@ public class NanoSparqlServer {
         final String webDir = indexHtml.substring(0,
                 indexHtml.length() - file.length());
 
+        // Path to the content in the local file system or JAR.
         context.setResourceBase(webDir);
-
+        
+        /*
+         * Note: replace with "new.html" for the new UX. Also change in
+         * web.xml.
+         */
         context.setWelcomeFiles(new String[]{"index.html"});
 
     }
@@ -756,7 +766,7 @@ public class NanoSparqlServer {
         /*
          * This is the resource path in the JAR.
          */
-        final String WEB_DIR_JAR = "bigdata-war/src"
+        final String WEB_DIR_JAR = "bigdata-war/src/html"
                 + (path == null ? "" : "/" + path);
 
         /*
@@ -764,13 +774,13 @@ public class NanoSparqlServer {
          * 
          * Note: You MUST have "bigdata-war/src" on the build path for the IDE.
          */
-        final String WEB_DIR_IDE = path; // "html";
+        final String WEB_DIR_IDE = "html/" + path; // "html";
 
         URL url = classLoader.getResource(WEB_DIR_JAR);
 
         if (url == null && path != null) {
 
-            url = classLoader.getResource(path);// "html");
+            url = classLoader.getResource(WEB_DIR_IDE);// "html");
 
         }
 

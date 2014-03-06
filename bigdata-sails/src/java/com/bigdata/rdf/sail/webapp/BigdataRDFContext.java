@@ -171,7 +171,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
      * 
      * @see #XSL_STYLESHEET
      */
-    protected static final String DEFAULT_XSL_STYLESHEET = "result-to-html.xsl";
+    protected static final String DEFAULT_XSL_STYLESHEET = "/bigdata/html/result-to-html.xsl";
     
     /**
      * URL Query parameter used to request an incremental XHTML representation
