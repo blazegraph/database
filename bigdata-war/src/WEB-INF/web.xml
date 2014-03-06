@@ -83,6 +83,15 @@
   	<description>Performance counters.</description>
   	<servlet-class>com.bigdata.rdf.sail.webapp.CountersServlet</servlet-class>
   </servlet>
+  <!-- Map the initial request into the UI. -->
+  <welcome-file-list>
+    <welcome-file>html/index.html</welcome-file>
+  </welcome-file-list>
+  <!-- Serve anything under /html/* as a simple file. -->
+  <servlet-mapping>
+    <servlet-name>default</servlet-name>             
+    <url-pattern>/html/*</url-pattern>     
+  </servlet-mapping>
   <!-- Mapping for the default KB namespace (as configured above). -->
   <servlet-mapping>
   <servlet-name>REST API</servlet-name>
