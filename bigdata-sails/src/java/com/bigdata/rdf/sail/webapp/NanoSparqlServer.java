@@ -652,6 +652,10 @@ public class NanoSparqlServer {
         context.addServlet(new ServletHolder(new MultiTenancyServlet()),
                 "/namespace/*");
         
+        // Incremental truth maintenance
+        context.addServlet(new ServletHolder(new InferenceServlet()),
+        		"/inference");
+        
         /**
          * Note: JSP pages for the servlet 2.5 specification add the following
          * dependencies:
