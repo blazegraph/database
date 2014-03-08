@@ -318,6 +318,46 @@ public class RemoteRepository {
         
     }
     
+    public void setTruthMaintenance(final boolean tm) throws Exception {
+    	
+        final ConnectOptions opts = newConnectOptions();
+
+        opts.addRequestParam("truthMaintenance", String.valueOf(tm));
+
+        checkResponseCode(doConnect(opts));
+
+    }
+    
+    public long doClosure() throws Exception {
+    	
+        final ConnectOptions opts = newConnectOptions();
+
+        opts.addRequestParam("doClosure");
+
+        HttpResponse response = null;
+        try {
+            
+            opts.setAcceptHeader(ConnectOptions.MIME_APPLICATION_XML);
+            
+            checkResponseCode(response = doConnect(opts));
+            
+            final MutationResult result = mutationResults(response);
+            
+            return result.mutationCount;
+            
+        } finally {
+            
+            try {
+                
+                if (response != null)
+                    EntityUtils.consume(response.getEntity());
+                
+            } catch (Exception ex) { }
+            
+        }
+    	
+    }
+    
     /**
      * Return the SPARQL 1.1 Service Description for the end point.
      */
