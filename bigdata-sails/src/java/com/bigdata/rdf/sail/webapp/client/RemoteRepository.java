@@ -318,6 +318,9 @@ public class RemoteRepository {
         
     }
     
+    /**
+     * Set incremental truth maintenance to either true or false on the server.
+     */
     public void setTruthMaintenance(final boolean tm) throws Exception {
     	
         final ConnectOptions opts = newConnectOptions();
@@ -327,7 +330,10 @@ public class RemoteRepository {
         checkResponseCode(doConnect(opts));
 
     }
-    
+
+    /**
+     * Compute database at once closure on the server and do a commit.
+     */
     public long doClosure() throws Exception {
     	
         final ConnectOptions opts = newConnectOptions();
