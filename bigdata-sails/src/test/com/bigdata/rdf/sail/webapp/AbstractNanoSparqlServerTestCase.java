@@ -78,7 +78,8 @@ public abstract class AbstractNanoSparqlServerTestCase<S extends IIndexManager>
     protected String m_serviceURL;
 
     /**
-     * The request path for the REST API under test.
+     * The request path for the REST API under test (does not include the
+     * ContextPath).
      */
     protected static final String requestPath = "/sparql";
 

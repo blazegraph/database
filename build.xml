@@ -1243,7 +1243,9 @@ ${postInstallMessage}</echo>
 	bigdata/var/config/policy - java policy files
 	bigdata/var/config/policy/policy.all - policy with all permissions granted.
 	bigdata/var/config/policy/service.policy
-	bigdata/var/webapp/nss - NanoSparqlServer.
+   bigdata/var/jetty - the webapp.
+   bigdata/var/jetty/jetty.xml - jetty server configuration.
+   bigdata/var/jetty/bigdata/WEB-INF/web.xml - webapp configuration.
 	bigdata/doc/LEGAL - license files for dependencies.
 	bigdata/doc/LICENSE.txt - bigdata license file.
 	bigdata/doc/NOTICE - copyright NOTICE files.

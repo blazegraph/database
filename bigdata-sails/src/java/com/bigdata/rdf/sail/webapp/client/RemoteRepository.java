@@ -1497,7 +1497,7 @@ public class RemoteRepository {
 
     }
     
-    static protected HttpUriRequest newRequest(final String uri,
+    static public HttpUriRequest newRequest(final String uri,
             final String method) {
         if (method.equals("GET")) {
             return new HttpGet(uri);
@@ -1547,6 +1547,7 @@ public class RemoteRepository {
         
     }
 
+    // TODO EntityUtils.toString(response.getEntity())?
     protected static String getResponseBody(final HttpResponse response)
             throws IOException {
 

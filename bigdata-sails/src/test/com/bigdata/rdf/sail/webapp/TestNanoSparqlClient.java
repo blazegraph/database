@@ -26,10 +26,17 @@ package com.bigdata.rdf.sail.webapp;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.Collection;
+import java.util.Map;
 
 import junit.framework.Test;
 
+import org.apache.http.HttpEntity;
+import org.apache.http.HttpResponse;
+import org.apache.http.client.methods.HttpEntityEnclosingRequestBase;
+import org.apache.http.client.methods.HttpUriRequest;
+import org.apache.http.util.EntityUtils;
 import org.openrdf.model.Graph;
 import org.openrdf.model.Literal;
 import org.openrdf.model.Resource;
@@ -50,6 +57,8 @@ import org.openrdf.rio.RDFWriterFactory;
 import org.openrdf.rio.RDFWriterRegistry;
 
 import com.bigdata.journal.IIndexManager;
+import com.bigdata.rdf.sail.webapp.client.ConnectOptions;
+import com.bigdata.rdf.sail.webapp.client.HttpException;
 import com.bigdata.rdf.sail.webapp.client.IPreparedBooleanQuery;
 import com.bigdata.rdf.sail.webapp.client.IPreparedGraphQuery;
 import com.bigdata.rdf.sail.webapp.client.IPreparedTupleQuery;
@@ -77,14 +86,380 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
 	}
 
 	public static Test suite() {
-		return ProxySuiteHelper.suiteWhenStandalone(TestNanoSparqlClient.class, "test.*DELETE.*", TestMode.quads,TestMode.sids,TestMode.triples);
+	
+        return ProxySuiteHelper.suiteWhenStandalone(TestNanoSparqlClient.class,
+                "test.*DELETE.*", TestMode.quads, TestMode.sids,
+                TestMode.triples);
+	    
 	}
+
 	public void test_startup() throws Exception {
 
 	    assertTrue("open", m_fixture.isRunning());
 	    
 	}
-	
+
+    /*
+     * Verify the correct structure of the webapp.
+     * 
+     * TODO There should be tests here to verify that we do not allow listing of
+     * the directory contents in the web application. This appears to be allowed
+     * by default and we do not test to ensure that this option is disabled. E.g.
+     * 
+     * http://172.16.0.185:8090/bigdata/html/
+     * 
+     * might list the directory contents.
+     */
+
+    /**
+     * A marker placed into index.html so we can recognize when that page is
+     * served.
+     */
+    private static final String JUNIT_TEST_MARKER_INDEX_HTML = "junit test marker: index.html";
+
+    /**
+     * bare URL of the server
+     * 
+     * <pre>
+     * http://localhost:8080
+     * </pre>
+     * 
+     * The response is should be <code>index.html</code> since we want the
+     * bigdata webapp to respond for the top-level context.
+     * 
+     * <p>
+     * Note: You must ensure that the client follows redirects using a standard
+     * policy. This is necessary for tests of the webapp structure since the
+     * container may respond with a redirect (302) to the location of the webapp
+     * when the client requests the root URL.
+     */
+    public void test_webapp_structure_rootURL() throws Exception {
+
+        final String content = doGET(m_rootURL);
+        
+        assertTrue(content.contains(JUNIT_TEST_MARKER_INDEX_HTML));
+
+    }
+
+    /**
+     * URL with correct context path
+     * 
+     * <pre>
+     * http://localhost:8080/bigdata
+     * </pre>
+     * 
+     * The response is should be <code>index.html</code>, which is specified
+     * through the welcome files list.
+     */
+    public void test_webapp_structure_contextPath() throws Exception {
+
+        final String content = doGET(m_serviceURL);
+        
+        assertTrue(content.contains(JUNIT_TEST_MARKER_INDEX_HTML));
+    }
+
+    /**
+     * URL with context path and index.html reference
+     * 
+     * <pre>
+     * http://localhost:8080/bigdata/index.html
+     * </pre>
+     * 
+     * This URL does NOT get mapped to anything (404).
+     */
+    public void test_webapp_structure_contextPath_indexHtml() throws Exception {
+
+        try {
+            
+            doGET(m_serviceURL + "/index.html");
+            
+        } catch (HttpException ex) {
+            
+            assertEquals(404, ex.getStatusCode());
+            
+        }
+        
+    }
+
+    /**
+     * The <code>favicon.ico</code> file.
+     * 
+     * @see <a href="http://www.w3.org/2005/10/howto-favicon"> How to add a
+     *      favicon </a>
+     */
+    public void test_webapp_structure_favicon() throws Exception {
+
+        doGET(m_serviceURL + "/html/favicon.ico");
+        
+    }
+
+    /**
+     * The <code>/status</code> servlet responds.
+     */
+    public void test_webapp_structure_status() throws Exception {
+
+        doGET(m_serviceURL + "/status");
+        
+    }
+
+    /**
+     * The <code>/counters</code> servlet responds.
+     */
+    public void test_webapp_structure_counters() throws Exception {
+
+        doGET(m_serviceURL + "/counters");
+        
+    }
+
+//    /**
+//     * The <code>/namespace/</code> servlet responds (multi-tenancy API).
+//     */
+//    public void test_webapp_structure_namespace() throws Exception {
+//
+//        doGET(m_serviceURL + "/namespace/");
+//        
+//    }
+
+    /**
+     * The fully qualified URL for <code>index.html</code>
+     * 
+     * <pre>
+     * http://localhost:8080/bigdata/html/index.html
+     * </pre>
+     * 
+     * The response is should be <code>index.html</code>, which is specified
+     * through the welcome files list.
+     */
+    public void test_webapp_structure_contextPath_html_indexHtml() throws Exception {
+
+        doGET(m_serviceURL + "/html/index.html");
+    }
+
+    private String doGET(final String url) throws Exception {
+
+        HttpResponse response = null;
+        HttpEntity entity = null;
+
+        try {
+            
+            final ConnectOptions opts = new ConnectOptions(url);
+            opts.method = "GET";
+
+            response = doConnect(opts);
+
+            checkResponseCode(url, response);
+
+            entity = response.getEntity();
+            
+            final String content = EntityUtils.toString(response.getEntity());
+            
+            return content;
+            
+        } finally {
+
+            try {
+                EntityUtils.consume(entity);
+            } catch (IOException ex) {
+            }
+
+        }
+
+    }
+
+    /**
+     * Throw an exception if the status code does not indicate success.
+     * 
+     * @param response
+     *            The response.
+     *            
+     * @return The response.
+     * 
+     * @throws IOException
+     */
+    private static HttpResponse checkResponseCode(final String url,
+            final HttpResponse response) throws IOException {
+        
+        final int rc = response.getStatusLine().getStatusCode();
+        
+        if (rc < 200 || rc >= 300) {
+            throw new HttpException(rc, "StatusCode=" + rc + ", StatusLine="
+                    + response.getStatusLine() + ", headers="
+                    + Arrays.toString(response.getAllHeaders())
+                    + ", ResponseBody="
+                    + EntityUtils.toString(response.getEntity()));
+
+        }
+
+        if (log.isDebugEnabled()) {
+            /*
+             * write out the status list, headers, etc.
+             */
+            log.debug("*** Response ***");
+            log.debug("Status Line: " + response.getStatusLine());
+        }
+
+        return response;
+        
+    }
+
+    /**
+     * Connect to a SPARQL end point (GET or POST query only).
+     * 
+     * @param opts
+     *            The connection options.
+     * 
+     * @return The connection.
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/619">
+     *      RemoteRepository class should use application/x-www-form-urlencoded
+     *      for large POST requests </a>
+     */
+    private HttpResponse doConnect(final ConnectOptions opts) throws Exception {
+
+        /*
+         * Generate the fully formed and encoded URL.
+         */
+        
+        final StringBuilder urlString = new StringBuilder(opts.serviceURL);
+
+        ConnectOptions.addQueryParams(urlString, opts.requestParams);
+
+        final boolean isLongRequestURL = urlString.length() > 1024;
+
+        if (isLongRequestURL && opts.method.equals("POST")
+                && opts.entity == null) {
+
+            /*
+             * URL is too long. Reset the URL to just the service endpoint and
+             * use application/x-www-form-urlencoded entity instead. Only in
+             * cases where there is not already a request entity (SPARQL query
+             * and SPARQL update).
+             */
+
+            urlString.setLength(0);
+            urlString.append(opts.serviceURL);
+
+            opts.entity = ConnectOptions.getFormEntity(opts.requestParams);
+
+        } else if (isLongRequestURL && opts.method.equals("GET")
+                && opts.entity == null) {
+
+            /*
+             * Convert automatically to a POST if the request URL is too long.
+             * 
+             * Note: [opts.entity == null] should always be true for a GET so
+             * this bit is a paranoia check.
+             */
+
+            opts.method = "POST";
+
+            urlString.setLength(0);
+            urlString.append(opts.serviceURL);
+
+            opts.entity = ConnectOptions.getFormEntity(opts.requestParams);
+            
+        }
+
+        if (log.isDebugEnabled()) {
+            log.debug("*** Request ***");
+            log.debug(opts.serviceURL);
+            log.debug(opts.method);
+            log.debug("query=" + opts.getRequestParam("query"));
+            log.debug(urlString.toString());
+        }
+
+        HttpUriRequest request = null;
+        try {
+
+            request = RemoteRepository.newRequest(urlString.toString(), opts.method);
+
+            if (opts.requestHeaders != null) {
+
+                for (Map.Entry<String, String> e : opts.requestHeaders
+                        .entrySet()) {
+
+                    request.addHeader(e.getKey(), e.getValue());
+
+                    if (log.isDebugEnabled())
+                        log.debug(e.getKey() + ": " + e.getValue());
+
+                }
+
+            }
+            
+//            // conn = doConnect(urlString.toString(), opts.method);
+//            final URL url = new URL(urlString.toString());
+//            conn = (HttpURLConnection) url.openConnection();
+//            conn.setRequestMethod(opts.method);
+//            conn.setDoOutput(true);
+//            conn.setDoInput(true);
+//            conn.setUseCaches(false);
+//            conn.setReadTimeout(opts.timeout);
+//            conn.setRequestProperty("Accept", opts.acceptHeader);
+//            if (log.isDebugEnabled())
+//                log.debug("Accept: " + opts.acceptHeader);
+            
+            if (opts.entity != null) {
+
+//                if (opts.data == null)
+//                    throw new AssertionError();
+
+//                final String contentLength = Integer.toString(opts.data.length);
+
+//                conn.setRequestProperty("Content-Type", opts.contentType);
+//                conn.setRequestProperty("Content-Length", contentLength);
+
+//                if (log.isDebugEnabled()) {
+//                    log.debug("Content-Type: " + opts.contentType);
+//                    log.debug("Content-Length: " + contentLength);
+//                }
+
+//                final ByteArrayEntity entity = new ByteArrayEntity(opts.data);
+//                entity.setContentType(opts.contentType);
+
+                ((HttpEntityEnclosingRequestBase) request).setEntity(opts.entity);
+                
+//                final OutputStream os = conn.getOutputStream();
+//                try {
+//                    os.write(opts.data);
+//                    os.flush();
+//                } finally {
+//                    os.close();
+//                }
+
+            }
+
+            final HttpResponse response = m_httpClient.execute(request);
+            
+            return response;
+            
+//            // connect.
+//            conn.connect();
+//
+//            return conn;
+
+        } catch (Throwable t) {
+            /*
+             * If something goes wrong, then close the http connection.
+             * Otherwise, the connection will be closed by the caller.
+             */
+            try {
+                
+                if (request != null)
+                    request.abort();
+                
+//                // clean up the connection resources
+//                if (conn != null)
+//                    conn.disconnect();
+                
+            } catch (Throwable t2) {
+                // ignored.
+            }
+            throw new RuntimeException(opts.serviceURL + " : " + t, t);
+        }
+
+    }
+    
     /**
      * Request the SPARQL SERVICE DESCRIPTION for the end point.
      */

@@ -106,6 +106,7 @@ import org.openrdf.rio.Rio;
 import org.openrdf.rio.helpers.StatementCollector;
 import org.openrdf.sail.SailException;
 
+import com.bigdata.BigdataStatics;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSailRepository;
@@ -214,8 +215,9 @@ public class TestFederatedQuery<S extends IIndexManager> extends
     
     protected String getRepositoryUrlBase() {
         
-        return m_serviceURL + requestPath + "/namespace/" + namespace + "_";
-        
+        return m_serviceURL + BigdataStatics.getContextPath() + requestPath
+                + "/namespace/" + namespace + "_";
+
     }
     
     /**

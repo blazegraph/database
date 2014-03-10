@@ -72,6 +72,7 @@ import org.openrdf.rio.RDFWriter;
 import org.openrdf.rio.RDFWriterRegistry;
 import org.openrdf.sail.SailException;
 
+import com.bigdata.BigdataStatics;
 import com.bigdata.bop.BufferAnnotations;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.engine.IRunningQuery;
@@ -171,7 +172,8 @@ public class BigdataRDFContext extends BigdataBaseContext {
      * 
      * @see #XSL_STYLESHEET
      */
-    protected static final String DEFAULT_XSL_STYLESHEET = "/bigdata/html/result-to-html.xsl";
+    protected static final String DEFAULT_XSL_STYLESHEET = BigdataStatics
+            .getContextPath() + "/html/result-to-html.xsl";
     
     /**
      * URL Query parameter used to request an incremental XHTML representation
