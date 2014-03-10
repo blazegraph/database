@@ -38,6 +38,7 @@ import org.eclipse.jetty.server.handler.ContextHandler;
 import org.eclipse.jetty.server.handler.DefaultHandler;
 import org.eclipse.jetty.server.handler.HandlerList;
 import org.eclipse.jetty.server.handler.ResourceHandler;
+import org.eclipse.jetty.servlet.DefaultServlet;
 import org.eclipse.jetty.servlet.ServletContextHandler;
 import org.eclipse.jetty.servlet.ServletHolder;
 import org.eclipse.jetty.util.resource.Resource;
@@ -45,6 +46,7 @@ import org.eclipse.jetty.webapp.WebAppContext;
 import org.eclipse.jetty.xml.XmlConfiguration;
 
 import com.bigdata.Banner;
+import com.bigdata.BigdataStatics;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
@@ -76,6 +78,32 @@ import com.bigdata.util.config.NicUtil;
  * @todo Remote command to advance the read-behind point. This will let people
  *       bulk load a bunch of stuff before advancing queries to read from the
  *       new consistent commit point.
+ * 
+ * @todo Note: There appear to be plenty of ways to setup JSP support for
+ *       embedded jetty, and plenty of ways to get it wrong. I wound up adding
+ *       to the classpath the following jars for jetty 7.2.2 to get this
+ *       running:
+ * 
+ *       <pre>
+ * com.sun.el_1.0.0.v201004190952.jar
+ * ecj-3.6.jar
+ * javax.el_2.1.0.v201004190952.jar
+ * javax.servlet.jsp.jstl_1.2.0.v201004190952.jar
+ * javax.servlet.jsp_2.1.0.v201004190952.jar
+ * jetty-jsp-2.1-7.2.2.v20101205.jar
+ * org.apache.jasper.glassfish_2.1.0.v201007080150.jar
+ * org.apache.taglibs.standard.glassfish_1.2.0.v201004190952.jar
+ * </pre>
+ * 
+ *       Note: JSP pages for the servlet 2.5 specification add the following
+ *       dependencies:
+ * 
+ *       <pre>
+ *     ant-1.6.5.jar
+ *     core-3.1.1.jar
+ *     jsp-2.1.jar
+ *     jsp-api-2.1.jar
+ * </pre>
  */
 public class NanoSparqlServer {
     
@@ -349,16 +377,16 @@ public class NanoSparqlServer {
 
         final Server server = new Server(port);
 
-        final ServletContextHandler context = getContextHandler(//server,
-                initParams);
+        final ServletContextHandler context = getContextHandler(initParams);
 
-        // Force the use of the caller's IIndexManager.
-        context.setAttribute(IIndexManager.class.getName(), indexManager);
-        
         final ResourceHandler resourceHandler = new ResourceHandler();
         
         setupStaticResources(NanoSparqlServer.class.getClassLoader(),
                 resourceHandler);
+        
+        // same resource base.
+        context.setResourceBase(resourceHandler.getResourceBase());
+        context.setWelcomeFiles(resourceHandler.getWelcomeFiles());
 
         final HandlerList handlers = new HandlerList();
 
@@ -369,9 +397,60 @@ public class NanoSparqlServer {
                 });
 
         server.setHandler(handlers);
-
+        
+        // Force the use of the caller's IIndexManager.
+        context.setAttribute(IIndexManager.class.getName(), indexManager);
+        
         return server;
         
+    }
+    
+    /**
+     * Variant used when the life cycle of the {@link IIndexManager} will be
+     * managed by the server - this form is used by {@link #main(String[])}.
+     * <p>
+     * Note: This is mostly a convenience for scripts that do not need to take
+     * over the detailed control of the jetty container and the bigdata webapp.
+     * 
+     * @param port
+     *            The port on which the service will run -OR- ZERO (0) for any
+     *            open port.
+     * @param propertyFile
+     *            The <code>.properties</code> file (for a standalone database
+     *            instance) or the <code>.config</code> file (for a federation).
+     * @param initParams
+     *            Initialization parameters for the web application as specified
+     *            by {@link ConfigParams}.
+     * 
+     * @return The server instance.
+     */
+    static public Server newInstance(final int port, final String propertyFileIsNotUsed,
+            final Map<String, String> initParams) throws Exception {
+
+        final Server server = new Server(port);
+
+        final ServletContextHandler context = getContextHandler(initParams);
+
+        final ResourceHandler resourceHandler = new ResourceHandler();
+        
+        setupStaticResources(NanoSparqlServer.class.getClassLoader(),
+                resourceHandler);
+
+        // same resource base.
+        context.setResourceBase(resourceHandler.getResourceBase());
+        context.setWelcomeFiles(resourceHandler.getWelcomeFiles());
+        
+        final HandlerList handlers = new HandlerList();
+
+        handlers.setHandlers(new Handler[] {//
+            context,// maps servlets
+            resourceHandler,// maps welcome files.
+            new DefaultHandler() // responsible for anything not explicitly served.
+        });
+
+        server.setHandler(handlers);
+        
+        return server;
     }
 
     /**
@@ -404,11 +483,14 @@ public class NanoSparqlServer {
             final URL jettyXmlUrl;
             if (new File(jettyXml).exists()) {
 
+                // Check the file system.
                 jettyXmlUrl = new URL("file://" + jettyXml);
 
             } else {
 
-                jettyXmlUrl = getStaticResourceURL(classLoader, jettyXml);
+                // Check the classpath.
+                jettyXmlUrl = classLoader.getResource(jettyXml);
+//                jettyXmlUrl = classLoader.getResource("bigdata-war/src/jetty.xml");
 
             }
 
@@ -500,74 +582,6 @@ public class NanoSparqlServer {
     }
     
     /**
-     * Variant used when the life cycle of the {@link IIndexManager} will be
-     * managed by the server - this form is used by {@link #main(String[])}.
-     * <p>
-     * Note: This is mostly a convenience for scripts that do not need to take
-     * over the detailed control of the jetty container and the bigdata webapp.
-     * 
-     * @param port
-     *            The port on which the service will run -OR- ZERO (0) for any
-     *            open port.
-     * @param propertyFile
-     *            The <code>.properties</code> file (for a standalone database
-     *            instance) or the <code>.config</code> file (for a federation).
-     * @param initParams
-     *            Initialization parameters for the web application as specified
-     *            by {@link ConfigParams}.
-     * 
-     * @return The server instance.
-     */
-    static public Server newInstance(final int port, final String propertyFile,
-            final Map<String, String> initParams) throws Exception {
-
-        final Server server = new Server(port);
-
-        final ServletContextHandler context = getContextHandler(//server,
-                initParams);
-
-        final ResourceHandler resourceHandler = new ResourceHandler();
-        
-        setupStaticResources(NanoSparqlServer.class.getClassLoader(),
-                resourceHandler);
-
-        /**
-         * Note: There appear to be plenty of ways to setup JSP support for
-         * embedded jetty, and plenty of ways to get it wrong. I wound up adding
-         * to the classpath the following jars for jetty 7.2.2 to get this
-         * running:
-         * 
-         * <pre>
-         * com.sun.el_1.0.0.v201004190952.jar
-         * ecj-3.6.jar
-         * javax.el_2.1.0.v201004190952.jar
-         * javax.servlet.jsp.jstl_1.2.0.v201004190952.jar
-         * javax.servlet.jsp_2.1.0.v201004190952.jar
-         * jetty-jsp-2.1-7.2.2.v20101205.jar
-         * org.apache.jasper.glassfish_2.1.0.v201007080150.jar
-         * org.apache.taglibs.standard.glassfish_1.2.0.v201004190952.jar
-         * </pre>
-         * 
-         * With those jars on the class path, the following code will run
-         * JSP pages.
-         * 
-         * Note: In order for this to work, it must also be supported in the
-         * alternative newInstance() method above.
-         */
-        final HandlerList handlers = new HandlerList();
-
-        handlers.setHandlers(new Handler[] {//
-            context,// maps servlets
-            resourceHandler,// maps welcome files.
-            new DefaultHandler() // responsible for anything not explicitly served.
-        });
-
-        server.setHandler(handlers);
-        
-        return server;
-    }
-
-    /**
      * Construct a {@link ServletContextHandler}.
      * <p>
      * Note: The {@link ContextHandler} uses the longest prefix of the request
@@ -580,7 +594,6 @@ public class NanoSparqlServer {
      *            The init parameters, per the web.xml definition.
      */
     static private ServletContextHandler getContextHandler(
-//            final Server server,
             final Map<String, String> initParams) throws Exception {
 
         if (initParams == null)
@@ -592,13 +605,8 @@ public class NanoSparqlServer {
                         );
 
         // Path to the webapp.
-        context.setContextPath("/bigdata");
-        
-//        /*
-//         * Setup resolution for the static web app resources (index.html).
-//         */
-//        setupStaticResources(server, context);
-        
+        context.setContextPath(BigdataStatics.getContextPath());
+
         /*
          * Register a listener which will handle the life cycle events for the
          * ServletContext.
@@ -638,6 +646,14 @@ public class NanoSparqlServer {
             
         }
 
+        // html directory.
+        context.addServlet(new ServletHolder(new DefaultServlet()),
+                "/html/*");
+        
+        // Appears necessary for http://localhost:8080/bigdata to bring up index.html.
+        context.addServlet(new ServletHolder(new DefaultServlet()),
+                "/");
+
         // Performance counters.
         context.addServlet(new ServletHolder(new CountersServlet()),
                 "/counters");
@@ -651,25 +667,11 @@ public class NanoSparqlServer {
         // Multi-Tenancy API.
         context.addServlet(new ServletHolder(new MultiTenancyServlet()),
                 "/namespace/*");
-        
+
         // Incremental truth maintenance
         context.addServlet(new ServletHolder(new InferenceServlet()),
         		"/inference");
         
-        /**
-         * Note: JSP pages for the servlet 2.5 specification add the following
-         * dependencies:
-         * 
-         * <pre>
-         *     ant-1.6.5.jar
-         *     core-3.1.1.jar
-         *     jsp-2.1.jar
-         *     jsp-api-2.1.jar
-         * </pre>
-         * 
-         * @see http://docs.codehaus.org/display/JETTY/Embedding+Jetty
-         */
-
 //        context.setResourceBase("bigdata-war/src/html");
 //        
 //        context.setWelcomeFiles(new String[]{"index.html"});
@@ -716,21 +718,45 @@ public class NanoSparqlServer {
 
         context.setDirectoriesListed(false); // Nope!
 
-        final String file = "index.html";
+        final String file = "html/index.html";
 
-        final URL url = getStaticResourceURL(classLoader, file);
+        final URL url;
+        {
 
-        if (url == null)
-            throw new RuntimeException("Could not locate file: " + file);
+            URL tmp = null;
+            
+            if (tmp == null) {
+
+//                // project local file system path.
+//                classLoader.getResource("bigdata-war/src/html/" + file);
+
+            }
+
+            if (tmp == null) {
+
+                // Check the classpath.
+                tmp = classLoader.getResource(file);
+
+            }
+
+            url = tmp;
+            
+            if (url == null) {
+
+                throw new RuntimeException("Could not locate index.html");
+
+            }
+
+        }
 
         /*
          * We have located the resource. Set it as the resource base from which
          * static content will be served.
          */
-        final String indexHtml = url.toExternalForm();
+        final String indexHtmlUrl = url.toExternalForm();
 
-        final String webDir = indexHtml.substring(0,
-                indexHtml.length() - file.length());
+        final String webDir = indexHtmlUrl.substring(0, indexHtmlUrl.length()
+                - file.length());
 
         // Path to the content in the local file system or JAR.
         context.setResourceBase(webDir);
@@ -739,64 +765,68 @@ public class NanoSparqlServer {
          * Note: replace with "new.html" for the new UX. Also change in
          * web.xml.
          */
-        context.setWelcomeFiles(new String[]{"index.html"});
+        context.setWelcomeFiles(new String[]{"html/index.html"});
+
+        if (log.isInfoEnabled())
+            log.info("\nindex.html: =" + indexHtmlUrl + "\nresourceBase="
+                    + webDir);
 
     }
 
-    /**
-     * Return the URL for the static web app resources (for example,
-     * <code>index.html</code>).
-     * 
-     * @param classLoader
-     *            The {@link ClassLoader} that will be used to locate the
-     *            resource (required).
-     * @param path
-     *            The path for the resource (required)
-     * 
-     * @return The URL for the web app resource directory -or- <code>null</code>
-     *         if it could not be found on the class path.
-     * 
-     * @see https://sourceforge.net/apps/trac/bigdata/ticket/330
-     */
-    private static URL getStaticResourceURL(final ClassLoader classLoader,
-            final String path) {
-
-        if (classLoader == null)
-            throw new IllegalArgumentException();
-
-        if (path == null)
-            throw new IllegalArgumentException();
-        
-        /*
-         * This is the resource path in the JAR.
-         */
-        final String WEB_DIR_JAR = "bigdata-war/src/html"
-                + (path == null ? "" : "/" + path);
-
-        /*
-         * This is the resource path in the IDE when NOT using the JAR.
-         * 
-         * Note: You MUST have "bigdata-war/src" on the build path for the IDE.
-         */
-        final String WEB_DIR_IDE = "html/" + path; // "html";
-
-        URL url = classLoader.getResource(WEB_DIR_JAR);
-
-        if (url == null && path != null) {
-
-            url = classLoader.getResource(WEB_DIR_IDE);// "html");
-
-        }
-
-        if (url == null) {
-
-            log.error("Could not locate: " + WEB_DIR_JAR + ", " + WEB_DIR_IDE
-                    + ", -or- " + path);
-        }
-
-        return url;
-
-    }
+//    /**
+//     * Return the URL for the static web app resources (for example,
+//     * <code>index.html</code>).
+//     * 
+//     * @param classLoader
+//     *            The {@link ClassLoader} that will be used to locate the
+//     *            resource (required).
+//     * @param path
+//     *            The path for the resource (required)
+//     * 
+//     * @return The URL for the web app resource directory -or- <code>null</code>
+//     *         if it could not be found on the class path.
+//     * 
+//     * @see https://sourceforge.net/apps/trac/bigdata/ticket/330
+//     */
+//    private static URL getStaticResourceURL(final ClassLoader classLoader,
+//            final String path) {
+//
+//        if (classLoader == null)
+//            throw new IllegalArgumentException();
+//
+//        if (path == null)
+//            throw new IllegalArgumentException();
+//        
+//        /*
+//         * This is the resource path in the JAR.
+//         */
+//        final String WEB_DIR_JAR = "bigdata-war/src/html"
+//                + (path == null ? "" : "/" + path);
+//
+//        /*
+//         * This is the resource path in the IDE when NOT using the JAR.
+//         * 
+//         * Note: You MUST have "bigdata-war/src" on the build path for the IDE.
+//         */
+//        final String WEB_DIR_IDE = "html/" + path; // "html";
+//
+//        URL url = classLoader.getResource(WEB_DIR_JAR);
+//
+//        if (url == null && path != null) {
+//
+//            url = classLoader.getResource(WEB_DIR_IDE);// "html");
+//
+//        }
+//
+//        if (url == null) {
+//
+//            log.error("Could not locate: " + WEB_DIR_JAR + ", " + WEB_DIR_IDE
+//                    + ", -or- " + path);
+//        }
+//
+//        return url;
+//
+//    }
 
     /**
      * Print the optional message on stderr, print the usage information on

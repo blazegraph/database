@@ -52,6 +52,7 @@ import org.openrdf.repository.RepositoryException;
 import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFParseException;
 
+import com.bigdata.BigdataStatics;
 import com.bigdata.gom.gpo.IGPO;
 import com.bigdata.gom.gpo.ILinkSet;
 import com.bigdata.gom.om.IObjectManager;
@@ -173,7 +174,8 @@ public class TestRemoteGOM extends TestCase {
 
         }
 
-        m_serviceURL = new URL("http", hostAddr, port, "/sparql"/* file */)
+        m_serviceURL = new URL("http", hostAddr, port,
+                BigdataStatics.getContextPath() + "/sparql"/* file */)
                 .toExternalForm();
 
         // final HttpClient httpClient = new DefaultHttpClient();

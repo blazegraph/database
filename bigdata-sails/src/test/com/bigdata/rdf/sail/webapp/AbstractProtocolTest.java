@@ -42,6 +42,7 @@ import org.apache.http.client.methods.HttpUriRequest;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.DefaultHttpClient;
 
+import com.bigdata.BigdataStatics;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.rdf.sail.webapp.client.ConnectOptions;
 import com.bigdata.rdf.sail.webapp.client.DefaultClientConnectionManagerFactory;
@@ -91,11 +92,15 @@ public abstract class AbstractProtocolTest  extends AbstractTestNanoSparqlClient
 	private String accept = null;
 	private boolean permit400s = false;
 
+    private final String getSparqlURL(final String serviceURL) {
+        return serviceURL + "/sparql";
+    }
+	
 	private final RequestFactory GET = new RequestFactory(){
 		@Override
 		public HttpUriRequest createRequest(String... params) {
-			final StringBuffer url = new StringBuffer(m_serviceURL);
-			url.append("/sparql");
+			final StringBuffer url = new StringBuffer();
+			url.append(getSparqlURL(m_serviceURL));
 			char sep = '?';
 			for (int i=0;i<params.length;i+=2) {
 				url.append(sep);
@@ -184,7 +189,7 @@ public abstract class AbstractProtocolTest  extends AbstractTestNanoSparqlClient
 	 * @return the data returned by the server.
 	 * @throws IOException
 	 */
-	protected String serviceRequest(String ... paramValues) throws IOException {
+	protected String serviceRequest(final String ... paramValues) throws IOException {
 		HttpUriRequest req;
 		responseContentType = null;
 		try {
@@ -244,7 +249,7 @@ public abstract class AbstractProtocolTest  extends AbstractTestNanoSparqlClient
 		requestFactory = new RequestFactory(){
 			@Override
 			public HttpUriRequest createRequest(String... params) {
-				final HttpPost rslt = new HttpPost(m_serviceURL+"/sparql");
+				final HttpPost rslt = new HttpPost(getSparqlURL(m_serviceURL));
 				try {
 					rslt.setEntity(ConnectOptions.getFormEntity(pairs2map(params)));
 				} catch (final Exception e) {
@@ -272,8 +277,8 @@ public abstract class AbstractProtocolTest  extends AbstractTestNanoSparqlClient
 
 			@Override
 			public HttpUriRequest createRequest(String... params) {
-				final StringBuffer url = new StringBuffer(m_serviceURL);
-				url.append("/sparql");
+				final StringBuffer url = new StringBuffer();
+				url.append(getSparqlURL(m_serviceURL));
 				char sep = '?';
 				for (int i=0;i<params.length;i+=2) {
 					url.append(sep);

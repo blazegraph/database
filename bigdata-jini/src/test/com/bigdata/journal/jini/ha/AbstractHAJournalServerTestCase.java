@@ -61,6 +61,7 @@ import org.openrdf.model.Value;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.TupleQueryResult;
 
+import com.bigdata.BigdataStatics;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.HAStatusEnum;
@@ -524,7 +525,8 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
     protected String getNanoSparqlServerURL(final HAGlue haGlue)
             throws IOException {
 
-        return "http://localhost:" + haGlue.getNSSPort();
+        return "http://localhost:" + haGlue.getNSSPort()
+                + BigdataStatics.getContextPath();
 
     }
 

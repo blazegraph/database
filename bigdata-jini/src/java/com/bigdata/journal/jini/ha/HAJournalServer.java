@@ -457,7 +457,7 @@ public class HAJournalServer extends AbstractServer {
          * deploying outside of that context, the value needs to be set
          * explicitly.
          */
-        String DEFAULT_JETTY_XML = "WEB-INF/jetty.xml";
+        String DEFAULT_JETTY_XML = "jetty.xml";
 
     }
     

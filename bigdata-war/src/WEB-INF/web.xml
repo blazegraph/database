@@ -89,8 +89,8 @@
   </welcome-file-list>
   <!-- Serve anything under /html/* as a simple file. -->
   <servlet-mapping>
-    <servlet-name>default</servlet-name>             
-    <url-pattern>/html/*</url-pattern>     
+    <servlet-name>default</servlet-name>
+    <url-pattern>/html/*</url-pattern>
   </servlet-mapping>
   <!-- Mapping for the default KB namespace (as configured above). -->
   <servlet-mapping>
