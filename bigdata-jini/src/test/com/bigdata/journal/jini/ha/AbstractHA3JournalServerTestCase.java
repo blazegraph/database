@@ -1768,16 +1768,20 @@ public class AbstractHA3JournalServerTestCase extends
              * well. This is a bit brute force, but maybe it is more useful for
              * that.
              * 
-             * TODO This might break in CI if the bigdata-war directory is not
-             * staged to the testing area.
+             * TODO The webapp is being deployed to the serviceDir in order
+             * to avoid complexities with the parent and child process paths
+             * to the serviceDir and the webappDir.
              */
-            final File webAppDir = new File(serviceDir, "bigdata-war/src");
-            if (!webAppDir.exists() && !webAppDir.mkdirs()) {
-                throw new IOException("Could not create directory: "
-                        + webAppDir);
+            {
+                final File webAppDir = serviceDir;
+                // webAppDir = new File(serviceDir, "bigdata-war/src");
+                if (!webAppDir.exists() && !webAppDir.mkdirs()) {
+                    throw new IOException("Could not create directory: "
+                            + webAppDir);
+                }
+                copyFiles(new File("bigdata-war/src"), webAppDir);
             }
-            copyFiles(new File("bigdata-war/src"), webAppDir);
-            
+
             // log4j configuration.
             copyFile(new File(
                     "bigdata/src/resources/logging/log4j-dev.properties"),
@@ -1810,8 +1814,14 @@ public class AbstractHA3JournalServerTestCase extends
 
         // Add override for the serviceDir.
         final String[] overrides = ConfigMath.concat(
-                new String[] { 
-                        "bigdata.serviceDir=new java.io.File(\"" + serviceDir + "\")",
+                new String[] { //
+                    // The service directory.
+                    "bigdata.serviceDir=new java.io.File(\"" + serviceDir + "\")",
+//                    // Where to find jetty.xml
+//                    HAJournalServer.ConfigurationOptions.COMPONENT + "."
+//                    + HAJournalServer.ConfigurationOptions.JETTY_XML
+//                    + "=\"bigdata-war/src/jetty.xml\"",
+//                    + "=\"" + serviceDir + "/bigdata-war/src/jetty.xml\"",
                 },
                 testOverrides);
 

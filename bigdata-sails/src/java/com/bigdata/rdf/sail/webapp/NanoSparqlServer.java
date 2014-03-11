@@ -484,7 +484,8 @@ public class NanoSparqlServer {
             if (new File(jettyXml).exists()) {
 
                 // Check the file system.
-                jettyXmlUrl = new URL("file://" + jettyXml);
+//                jettyXmlUrl = new File(jettyXml).toURI();
+                jettyXmlUrl = new URL("file:" + jettyXml);
 
             } else {
 
@@ -551,6 +552,13 @@ public class NanoSparqlServer {
 
             // Set the IIndexManager attribute on the WebAppContext.
             wac.setAttribute(IIndexManager.class.getName(), indexManager);
+            
+            /*
+             * FIXME We could use setInitParameter() here to override the init
+             * parameters in web.xml based on those given on the command line to
+             * main(). If we do this, we should be able to get rid of the
+             * non-web.xml based versions of newInstance().
+             */
             
         }
 

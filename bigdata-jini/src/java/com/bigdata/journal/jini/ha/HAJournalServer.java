@@ -4569,6 +4569,12 @@ public class HAJournalServer extends AbstractServer {
                         ConfigurationOptions.JETTY_XML, String.class,
                         ConfigurationOptions.DEFAULT_JETTY_XML);
 
+                // Note: if we do this, push the serviceDir down into newInstance().
+//                if (!jettyXml.startsWith("/")) {
+//                    // Assume that the path is relative to the serviceDir.
+//                    jettyXml = getServiceDir() + File.separator + jettyXml;
+//                }
+                
                 // Setup the embedded jetty server for NSS webapp.
                 jettyServer = NanoSparqlServer.newInstance(jettyXml, journal);
 
