@@ -691,4 +691,20 @@ function updateExploreError(jqXHR, textStatus, errorThrown) {
    $('#explore-results').html('Error! ' + textStatus + ' ' + errorThrown);
 }
 
+/* Status */
+
+$('#tab-selector a[data-target=status]').click(function(e) {
+   $.get('/bigdata/status', function(data) {
+      $('#status-tab .box').html(data);
+   });
+});
+
+/* Performance */
+
+$('#tab-selector a[data-target=performance]').click(function(e) {
+   $.get('/bigdata/counters', function(data) {
+      $('#performance-tab .box').html(data);
+   });
+});
+
 });
