@@ -277,7 +277,16 @@ public class BuildInfo {
 			<fileset dir="${bigdata.dir}/bigdata-sails/src/resources/sesame-server">
 				<include name="META-INF/**" />
 			</fileset>
-			<!-- Copy WAR resources for the embedded NanoSparqlServer -->
+			<!-- Copy WAR resources for the embedded NanoSparqlServer.     -->
+			<!-- TODO: This could cause problem since the files exist in   -->
+			<!-- both the JAR and the staged artifact (bigdata/var/jetty). -->
+			<!-- This makes it difficult to override the ones in the JAR.  -->
+			<!-- See also "run-junit" for an alterative to getting CI to run. -->
+			<!-- newer approach. -->
+			<!--fileset dir="${bigdata.dir}/bigdata-war/src">
+				<include name="**"/>
+			</fileset-->
+			<!-- older approach. -->
 			<fileset dir="." includes="bigdata-war/src/**"/>
 		</copy>
 	</target>
@@ -2074,6 +2083,7 @@ ${postInstallMessage}</echo>
         <pathelement location="${sesame-sparql-test.jar}" />
         <pathelement location="${sesame-store-test.jar}" />
         <pathelement location="${sesame-rio-test.jar}" />
+        <pathelement location="${dist.var.jetty}"/>
         <pathelement location="${dist.lib}/bigdata.jar" />
         <pathelement location="${dist.lib}/colt.jar" />
         <pathelement location="${dist.lib}/highscalelib.jar" />
