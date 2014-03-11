@@ -748,21 +748,26 @@ public class GASService implements CustomServiceFactory {
 
                 if (initialFrontier != null) {
 
+                    /*
+                     * FIXME Why can't we pass in the Value (with a defined IV)
+                     * and not the IV? This should work. Passing in the IV is
+                     * against the grain of the API and the generalized
+                     * abstraction as Values. Of course, having the IV is
+                     * necessary since this is an internal, high performance,
+                     * and close to the indices operation.
+                     */
+                    final IV[] tmp = new IV[initialFrontier.length];
+
                     // Setup the initial frontier.
+                    int i = 0;
                     for (Value startingVertex : initialFrontier) {
 
-                        /*
-                         * FIXME Why can't we pass in the Value (with a defined
-                         * IV) and not the IV? This should work. Passing in the
-                         * IV is against the grain of the API and the
-                         * generalized abstraction as Values. Of course, having
-                         * the IV is necessary since this is an internal, high
-                         * performance, and close to the indices operation.
-                         */
-                        gasState.setFrontier(gasContext,
-                                ((BigdataValue) startingVertex).getIV());
+                        tmp[i++] = ((BigdataValue) startingVertex).getIV();
 
                     }
+
+                    // set the frontier.
+                    gasState.setFrontier(gasContext, tmp);
 
                 }
 
