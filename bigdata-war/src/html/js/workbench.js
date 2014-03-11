@@ -45,7 +45,7 @@ $('html, textarea, select').bind('keydown', 'ctrl+¾', function() { moveTab(true
 /* Namespaces */
 
 function getNamespaces() {
-   $.get('/namespace', function(data) {
+   $.get('/bigdata/namespace', function(data) {
       $('#namespaces-list').empty();
       var rdf = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#';
       var namespaces = namespaces = data.getElementsByTagNameNS(rdf, 'Description')
@@ -109,7 +109,7 @@ function createNamespace(e) {
 $('#namespace-create').submit(createNamespace);
 
 function getDefaultNamespace() {
-   $.get('/sparql', function(data) {
+   $.get('/bigdata/sparql', function(data) {
       // Chrome does not work with rdf\:Description, so look for Description too
       var defaultDataset = $(data).find('rdf\\:Description[rdf\\:nodeID=defaultDataset], Description[rdf\\:nodeID=defaultDataset]');
       DEFAULT_NAMESPACE = defaultDataset.find('title')[0].textContent;
@@ -393,6 +393,7 @@ $('#query-response-clear').click(function() {
 });
 
 $('#query-export-csv').click(exportCSV);
+$('#query-export-json').click(exportJSON);
 $('#query-export-xml').click(exportXML);
 
 function exportXML() {
@@ -428,6 +429,44 @@ function exportXML() {
    });
    xml += '\t</results>\n</sparql>\n';
    downloadFile(xml, 'application/sparql-results+xml', 'export.xml');
+}
+
+function exportJSON() {
+   var json = {}
+   if($('#query-response table').hasClass('boolean')) {
+      json.head = {};
+      json['boolean'] = $('#query-response td').text();
+   } else {
+      json.head = {vars: []};
+      $('#query-response thead tr td').each(function(i, td) {
+         json.head.vars.push(td.textContent);
+      });
+      json.bindings = [];
+      $('#query-response tbody tr').each(function(i, tr) {
+         var binding = {};
+         $(tr).find('td').each(function(j, td) {
+            var bindingFields = {}
+            var bindingType = td.className;
+            if(bindingType == 'unbound') {
+               return;
+            }
+            bindingFields.type = bindingType;
+            var dataType = $(td).data('datatype');
+            if(dataType) {
+               bindingFields.type = dataType;
+            }
+            var lang = $(td).data('lang');
+            if(lang) {
+               bindingFields.lang = lang;
+            }
+            bindingFields.value = td.textContent;
+            binding[json.head.vars[j]] = bindingFields;
+         });
+         json.bindings.push(binding);
+      });
+   }
+   json = JSON.stringify(json);
+   downloadFile(json, 'application/sparql-results+json', 'export.json');
 }
 
 function exportCSV() {
