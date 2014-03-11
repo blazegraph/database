@@ -45,7 +45,7 @@ $('html, textarea, select').bind('keydown', 'ctrl+¾', function() { moveTab(true
 /* Namespaces */
 
 function getNamespaces() {
-   $.get('/bigdata/namespace', function(data) {
+   $.get('/bigdata/namespace?describe-each-named-graph=false', function(data) {
       $('#namespaces-list').empty();
       var rdf = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#';
       var namespaces = namespaces = data.getElementsByTagNameNS(rdf, 'Description')
