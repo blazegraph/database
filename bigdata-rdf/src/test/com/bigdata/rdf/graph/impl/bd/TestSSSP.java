@@ -117,6 +117,7 @@ public class TestSSSP extends AbstractBigdataGraphTestCase {
             // Converge.
             gasContext.call();
 
+            // check #of hops.
             assertEquals(0, gasState.getState(p.getV1()).dist());
 
             assertEquals(1, gasState.getState(p.getV2()).dist());
