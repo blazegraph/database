@@ -73,8 +73,13 @@ function useNamespace(name, url) {
 }
 
 function deleteNamespace(namespace) {
+   // prevent default namespace from being deleted
+   if(namespace == DEFAULT_NAMESPACE) {
+      alert('You may not delete the default namespace.');
+      return;
+   }
+
    if(confirm('Are you sure you want to delete the namespace ' + namespace + '?')) {
-      // FIXME: should we check if the default namespace is the one being deleted?
       if(namespace == NAMESPACE) {
          // FIXME: what is the desired behaviour when deleting the current namespace?
       }
