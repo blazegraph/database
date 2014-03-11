@@ -75,6 +75,18 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
     static private final transient Logger log = Logger.getLogger(MultiTenancyServlet.class); 
 
     /**
+     * URL query parameter used to override the servlet init parameter
+     * {@link ConfigParams#DESCRIBE_EACH_NAMED_GRAPH}.
+     */
+    protected static final String DESCRIBE_EACH_NAMED_GRAPH = "describe-each-named-graph";
+    
+    /**
+     * URL query parameter used to specify that only the default namespace
+     * should be described.
+     */
+    protected static final String DESCRIBE_DEFAULT_NAMESPACE = "describe-default-namespace";
+    
+    /**
      * Delegate for the sparql end point expressed by
      * <code>.../namespace/NAMESPACE/sparql</code>.
      */
@@ -498,51 +510,92 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
             
         }
         
-        /*
-         * The set of registered namespaces for KBs.
-         */
-        final List<String> namespaces = getBigdataRDFContext()
-                .getNamespaces(timestamp);
-
+        final boolean describeEachNamedGraph;
+        {
+        	final String s = req.getParameter(DESCRIBE_EACH_NAMED_GRAPH);
+        
+        	describeEachNamedGraph = s != null ?
+        		Boolean.valueOf(s) : 
+        			getBigdataRDFContext().getConfig().describeEachNamedGraph;
+        }
+        
+        final boolean describeDefaultNamespace;
+        {
+        	final String s = req.getParameter(DESCRIBE_DEFAULT_NAMESPACE);
+        
+        	describeDefaultNamespace = s != null ?
+        		Boolean.valueOf(s) : 
+        			false;
+        }
+        
         final Graph g = new GraphImpl();
 
-        for(String namespace : namespaces) {
-            
-            // Get a view onto that KB instance for that timestamp.
-            final AbstractTripleStore tripleStore = getBigdataRDFContext()
-                    .getTripleStore(namespace, timestamp);
+        if (describeDefaultNamespace) {
+        	
+        	final String namespace = getBigdataRDFContext().getConfig().namespace;
+        	
+        	describeNamespace(req, g, namespace, describeEachNamedGraph, timestamp);
+        	
+        } else {
+        	
+            /*
+             * The set of registered namespaces for KBs.
+             */
+            final List<String> namespaces = getBigdataRDFContext()
+                    .getNamespaces(timestamp);
 
-            if (tripleStore == null) {
+            for(String namespace : namespaces) {
 
-                /*
-                 * There is no such triple/quad store instance (could be a
-                 * concurrent delete of the namespace).
-                 */
-                
-                continue;
-                
+            	describeNamespace(req, g, namespace, describeEachNamedGraph, timestamp);
+
             }
 
-            final BNode aDataSet = g.getValueFactory().createBNode();
-            
+        }
+                		
+        sendGraph(req, resp, g);
+        
+    }
+    
+    /**
+     * Describe a namespace into the supplied Graph object.
+     */
+    private void describeNamespace(final HttpServletRequest req,
+    		final Graph g, final String namespace,
+    		final boolean describeEachNamedGraph, final long timestamp) 
+    				throws IOException {
+    	
+        // Get a view onto that KB instance for that timestamp.
+        final AbstractTripleStore tripleStore = getBigdataRDFContext()
+                .getTripleStore(namespace, timestamp);
+
+        if (tripleStore == null) {
+
             /*
-             * Figure out the service end point.
-             * 
-             * Note: This is just the requestURL as reported. This makes is
-             * possible to support virtual hosting and similar http proxy
-             * patterns since the SPARQL end point is just the URL at which the
-             * service is responding.
+             * There is no such triple/quad store instance (could be a
+             * concurrent delete of the namespace).
              */
-            final String serviceURI = req.getRequestURL().toString();
             
-            final VoID v = new VoID(g, tripleStore, serviceURI, aDataSet);
-
-            v.describeDataSet(false/* describeStatistics */,
-                    getBigdataRDFContext().getConfig().describeEachNamedGraph);
-
+            return;
+            
         }
 
-        sendGraph(req, resp, g);
+        final BNode aDataSet = g.getValueFactory().createBNode();
+        
+        /*
+         * Figure out the service end point.
+         * 
+         * Note: This is just the requestURL as reported. This makes is
+         * possible to support virtual hosting and similar http proxy
+         * patterns since the SPARQL end point is just the URL at which the
+         * service is responding.
+         */
+        final String serviceURI = req.getRequestURL().toString();
+        
+        final VoID v = new VoID(g, tripleStore, serviceURI, aDataSet);
+
+        v.describeDataSet(false/* describeStatistics */,
+//                getBigdataRDFContext().getConfig().describeEachNamedGraph);
+        		describeEachNamedGraph);
         
     }
 
