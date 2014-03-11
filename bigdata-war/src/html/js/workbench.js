@@ -114,7 +114,7 @@ function createNamespace(e) {
 $('#namespace-create').submit(createNamespace);
 
 function getDefaultNamespace() {
-   $.get('/bigdata/sparql', function(data) {
+   $.get('/bigdata/namespace?describe-each-named-graph=false&describe-default-namespace=true', function(data) {
       // Chrome does not work with rdf\:Description, so look for Description too
       var defaultDataset = $(data).find('rdf\\:Description[rdf\\:nodeID=defaultDataset], Description[rdf\\:nodeID=defaultDataset]');
       DEFAULT_NAMESPACE = defaultDataset.find('title')[0].textContent;
