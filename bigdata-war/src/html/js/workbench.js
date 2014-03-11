@@ -78,7 +78,7 @@ function deleteNamespace(namespace) {
       if(namespace == NAMESPACE) {
          // FIXME: what is the desired behaviour when deleting the current namespace?
       }
-      var url = '/namespace/' + namespace;
+      var url = '/bigdata/namespace/' + namespace;
       var settings = {
          type: 'DELETE',
          success: getNamespaces,
@@ -104,7 +104,7 @@ function createNamespace(e) {
       success: getNamespaces,
       error: function(jqXHR, textStatus, errorThrown) { alert(errorThrown); }
    };
-   $.ajax('/namespace', settings);
+   $.ajax('/bigdata/namespace', settings);
 }
 $('#namespace-create').submit(createNamespace);
 
@@ -538,15 +538,19 @@ function showQueryResults(data) {
          for(var j=0; j<vars.length; j++) {
             if(vars[j] in data.results.bindings[i]) {
                var binding = data.results.bindings[i][vars[j]];
+               var text = binding.value;
                if(binding.type == 'typed-literal') {
                   var tdData = ' class="literal" data-datatype="' + binding.datatype + '"';
                } else {
+                  if(binding.type == 'uri') {
+                     text = '<a href="#">' + text + '</a>';
+                  }
                   var tdData = ' class="' + binding.type + '"';
                   if(binding['xml:lang']) {
                      tdData += ' data-lang="' + binding['xml:lang'] + '"';
                   }
                }
-               tr.append('<td' + tdData + '>' + binding.value + '</td>');
+               tr.append('<td' + tdData + '>' + text + '</td>');
             } else {
                // no binding
                tr.append('<td class="unbound">');
@@ -554,6 +558,13 @@ function showQueryResults(data) {
          }
          table.append(tr);
       }
+
+      $('#query-response a').click(function(e) {
+         e.preventDefault();
+         var uri = $(this).text();
+         loadURI(uri);
+         showTab('explore');
+      });
    }
 }
 
@@ -613,7 +624,7 @@ function loadURI(uri) {
       success: updateExploreStart,
       error: updateExploreError
    };
-   $.ajax('/sparql', settings); 
+   $.ajax(NAMESPACE_URL, settings); 
 }
 
 function updateExploreStart(data) {
