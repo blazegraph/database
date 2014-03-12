@@ -93,6 +93,7 @@ import com.bigdata.rdf.internal.NoSuchVocabularyItem;
 import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.internal.impl.BlobIV;
 import com.bigdata.rdf.internal.impl.TermId;
+import com.bigdata.rdf.internal.impl.bnode.SidIV;
 import com.bigdata.rdf.internal.impl.extensions.XSDStringExtension;
 import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataLiteral;
@@ -2491,6 +2492,11 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
                 // already materialized
                 ret.put(iv, iv.getValue());
 
+            } else if (iv instanceof SidIV) {
+
+                // defer until the end
+                continue;
+
             } else if (iv.isInline()) {
 
                 // translate it into a value directly
@@ -2532,61 +2538,83 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
 
         }
 
-        if (numNotFound == 0) {
+//        if (numNotFound == 0) {
+//
+//            // Done.
+//            return ret;
+//
+//        }
 
-            // Done.
-            return ret;
+        if (numNotFound > 0) {
+
+        	// go to the indices
+        	
+	        /*
+	         * Setup and run task(s) to resolve IV(s).
+	         */
+	
+	        final ExecutorService service = getExecutorService();
+	        
+	        final List<Callable<Void>> tasks = new LinkedList<Callable<Void>>();
+	
+	        if (!termIVs.isEmpty()) {
+	
+	            tasks.add(new BatchResolveTermIVsTask(service, getId2TermIndex(),
+	                    termIVs, ret, termCache, valueFactory, termsChunksSize));
+	
+	        }
+	
+	        if (!blobIVs.isEmpty()) {
+	
+	            tasks.add(new BatchResolveBlobIVsTask(service, getBlobsIndex(),
+	                    blobIVs, ret, termCache, valueFactory, blobsChunkSize));
+	
+	        }
+	
+	        if (log.isInfoEnabled())
+	            log.info("nterms=" + n + ", numNotFound=" + numNotFound
+	                    + ", cacheSize=" + termCache.size());
+	
+	        try {
+	
+	            if (tasks.size() == 1) {
+	             
+	                tasks.get(0).call();
+	                
+	            } else {
+	
+	                // Co-thread tasks.
+	                final List<Future<Void>> futures = getExecutorService()
+	                        .invokeAll(tasks);
+	
+	                // Verify no errors.
+	                for (Future<Void> f : futures)
+	                    f.get();
+	            
+	            }
+	
+	        } catch (Exception ex) {
+	
+	            throw new RuntimeException(ex);
+	
+	        }
 
         }
-   
-        /*
-         * Setup and run task(s) to resolve IV(s).
-         */
-
-        final ExecutorService service = getExecutorService();
         
-        final List<Callable<Void>> tasks = new LinkedList<Callable<Void>>();
-
-        if (!termIVs.isEmpty()) {
-
-            tasks.add(new BatchResolveTermIVsTask(service, getId2TermIndex(),
-                    termIVs, ret, termCache, valueFactory, termsChunksSize));
-
-        }
-
-        if (!blobIVs.isEmpty()) {
-
-            tasks.add(new BatchResolveBlobIVsTask(service, getBlobsIndex(),
-                    blobIVs, ret, termCache, valueFactory, blobsChunkSize));
-
-        }
-
-        if (log.isInfoEnabled())
-            log.info("nterms=" + n + ", numNotFound=" + numNotFound
-                    + ", cacheSize=" + termCache.size());
-
-        try {
-
-            if (tasks.size() == 1) {
-             
-                tasks.get(0).call();
-                
-            } else {
-
-                // Co-thread tasks.
-                final List<Future<Void>> futures = getExecutorService()
-                        .invokeAll(tasks);
-
-                // Verify no errors.
-                for (Future<Void> f : futures)
-                    f.get();
+        /*
+         * Defer SidIVs until the end so that their ISPO components can be
+         * materialized first.
+         */
+        for (IV<?,?> iv : ivs) {
             
+            if (iv instanceof SidIV) {
+
+            	cacheTerms((SidIV<?>) iv, ret);
+            	
+                // translate it into a value directly
+                ret.put(iv, iv.asValue(this));
             }
-
-        } catch (Exception ex) {
-
-            throw new RuntimeException(ex);
-
+            
         }
 
         final long elapsed = System.currentTimeMillis() - begin;
@@ -2598,6 +2626,52 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
 
         return ret;
 
+    }
+    
+    /**
+     * We need to cache the BigdataValues on the IV components within the
+     * SidIV so that the SidIV can materialize itself into a BigdataBNode
+     * properly.
+     */
+    @SuppressWarnings("rawtypes")
+	final private void cacheTerms(final SidIV sid, 
+    		final Map<IV<?, ?>, BigdataValue> terms) {
+    	
+    	final ISPO spo = sid.getInlineValue();
+    	
+    	cacheTerm(spo.s(), terms);
+    	
+    	cacheTerm(spo.p(), terms);
+    	
+    	cacheTerm(spo.o(), terms);
+    	
+    	if (spo.c() != null) {
+    		
+    		cacheTerm(spo.c(), terms);
+    		
+    	}
+    	
+    }
+    
+    /**
+     * We need to cache the BigdataValues on the IV components within the
+     * SidIV so that the SidIV can materialize itself into a BigdataBNode
+     * properly.
+     */
+    @SuppressWarnings({ "unchecked", "rawtypes" })
+	final private void cacheTerm(final IV iv, 
+			final Map<IV<?, ?>, BigdataValue> terms) {
+    	
+    	if (iv instanceof SidIV) {
+    		
+    		cacheTerms((SidIV<?>) iv, terms);
+    		
+    	} else {
+    		
+    		iv.setValue(terms.get(iv));
+    		
+    	}
+    	
     }
     
     /**
