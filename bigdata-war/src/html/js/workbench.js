@@ -59,7 +59,7 @@ function getNamespaces() {
          } else {
             use = '<a href="#" class="use-namespace">Use</a>';
          }
-         $('#namespaces-list').append('<li data-name="' + title + '" data-url="' + url + '">' + titleText + ' - ' + use + ' - <a href="#" class="delete-namespace">Delete</a></li>');
+         $('#namespaces-list').append('<li data-name="' + title + '" data-url="' + url + '">' + titleText + ' - ' + use + ' - <a href="#" class="delete-namespace">Delete</a> - <a href="#" class="namespace-properties">Properties</a></li>');
       }
       $('.use-namespace').click(function(e) {
          e.preventDefault();
@@ -68,6 +68,10 @@ function getNamespaces() {
       $('.delete-namespace').click(function(e) {
          e.preventDefault();
          deleteNamespace($(this).parent().data('name'));
+      });
+      $('.namespace-properties').click(function(e) {
+         e.preventDefault();
+         getNamespaceProperties($(this).parent().data('name'));
       });
    });
 }
@@ -97,6 +101,18 @@ function deleteNamespace(namespace) {
       };
       $.ajax(url, settings);
    }
+}
+
+function getNamespaceProperties(namespace) {
+   $('#namespace-properties h1').html(namespace);
+   $('#namespace-properties ul').empty();
+   $('#namespace-properties').show();
+   var url = '/bigdata/namespace/' + namespace + '/properties';
+   $.get(url, function(data) {
+      $.each(data.getElementsByTagName('entry'), function(i, entry) {
+         $('#namespace-properties ul').append('<li>' + entry.getAttribute('key') + ': ' + entry.textContent + '</li>');
+      });
+   });
 }
 
 function createNamespace(e) {
