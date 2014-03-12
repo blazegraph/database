@@ -54,6 +54,11 @@ body {
    margin: 10px;
 }
 
+h1 {
+   font-size: 125%;
+   margin-bottom: 10px;
+}
+
 #container {
    /*max-width: 600px;*/
 }
