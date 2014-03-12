@@ -14,6 +14,7 @@ import org.openrdf.model.Resource;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.model.ValueFactory;
+import org.openrdf.rio.RDFHandlerException;
 import org.openrdf.rio.RDFParseException;
 import org.openrdf.rio.turtle.TurtleParser;
 import org.openrdf.rio.turtle.TurtleUtil;
@@ -864,10 +865,18 @@ public class BigdataTurtleParser extends TurtleParser {
                 throw new RDFParseException(
                         "You must set a ValueFactory to use the RDR syntax");
             }
+            
+            try {
+            	// write the RDR statement
+            	reportStatement(s, p, o);
+            } catch (RDFHandlerException ex) {
+            	throw new IOException(ex);
+            }
+            
             return valueFactory.createBNode(valueFactory.createStatement(s, p, o));
         } else {
             reportError("expecting >> to close statement identifier");
-            throw new IOException();
+            throw new IOException("expecting >> to close statement identifier");
         }
         
     }
