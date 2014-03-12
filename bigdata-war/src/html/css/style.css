@@ -181,3 +181,6 @@ pre {
    font-family: monospace;
 }
 
+#namespace-details {
+   display: none;
+}
