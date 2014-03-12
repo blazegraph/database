@@ -422,6 +422,9 @@ public class BigdataNTriplesParser extends RDFParserBase {
 			BigdataStatement st = (BigdataStatement) createStatement(
 					state.subject, state.predicate, state.object);
 			
+			// add the RDR statement inside the << >>.
+			rdfHandler.handleStatement(st);
+			
 			state.lastSID = ((BigdataValueFactory) valueFactory).createBNode(st);
 			
 //			// Resolve against LRU map to blank node for statement.
