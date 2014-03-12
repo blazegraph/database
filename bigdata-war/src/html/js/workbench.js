@@ -59,7 +59,7 @@ function getNamespaces() {
          } else {
             use = '<a href="#" class="use-namespace">Use</a>';
          }
-         $('#namespaces-list').append('<li data-name="' + title + '" data-url="' + url + '">' + titleText + ' - ' + use + ' - <a href="#" class="delete-namespace">Delete</a> - <a href="#" class="namespace-properties">Properties</a></li>');
+         $('#namespaces-list').append('<li data-name="' + title + '" data-url="' + url + '">' + titleText + ' - ' + use + ' - <a href="#" class="delete-namespace">Delete</a> - <a href="#" class="namespace-properties">Properties</a> - <a href="/bigdata/namespace/' + title + '/sparql" class="namespace-service-description">Service Description</a></li>');
       }
       $('.use-namespace').click(function(e) {
          e.preventDefault();
@@ -72,6 +72,9 @@ function getNamespaces() {
       $('.namespace-properties').click(function(e) {
          e.preventDefault();
          getNamespaceProperties($(this).parent().data('name'));
+      });
+      $('.namespace-service-description').click(function(e) {
+         return confirm('This can be an expensive operation. Proceed anyway?');
       });
    });
 }
