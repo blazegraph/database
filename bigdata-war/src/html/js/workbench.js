@@ -8,7 +8,7 @@ $('#search-form').submit(function(e) {
    if(!term) {
       return;
    }
-   var query = 'select * { ?o bds:search "' + term + '" . ?s ?p ?o . }'
+   var query = 'select ?s ?p ?o { ?o bds:search "' + term + '" . ?s ?p ?o . }'
    $('#query-box').val(query);
    $('#query-form').submit();
    showTab('query');
