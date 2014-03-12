@@ -1,5 +1,19 @@
 $(function() {
 
+/* Search */
+
+$('#search-form').submit(function(e) {
+   e.preventDefault();
+   var term = $(this).find('input').val();
+   if(!term) {
+      return;
+   }
+   var query = 'select * { ?o bds:search "' + term + '" . ?s ?p ?o . }'
+   $('#query-box').val(query);
+   $('#query-form').submit();
+   showTab('query');
+});
+
 /* Tab selection */
 
 $('#tab-selector a').click(function(e) {
