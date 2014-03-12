@@ -108,12 +108,12 @@ function deleteNamespace(namespace) {
 
 function getNamespaceProperties(namespace) {
    $('#namespace-properties h1').html(namespace);
-   $('#namespace-properties ul').empty();
+   $('#namespace-properties table').empty();
    $('#namespace-properties').show();
    var url = '/bigdata/namespace/' + namespace + '/properties';
    $.get(url, function(data) {
       $.each(data.getElementsByTagName('entry'), function(i, entry) {
-         $('#namespace-properties ul').append('<li>' + entry.getAttribute('key') + ': ' + entry.textContent + '</li>');
+         $('#namespace-properties table').append('<tr><td>' + entry.getAttribute('key') + '</td><td>' + entry.textContent + '</td></tr>');
       });
    });
 }
