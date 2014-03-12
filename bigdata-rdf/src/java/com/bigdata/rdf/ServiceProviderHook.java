@@ -32,14 +32,14 @@ import info.aduna.lang.service.ServiceRegistry;
 import java.util.ServiceLoader;
 
 import org.openrdf.query.QueryLanguage;
+import org.openrdf.query.resultio.TupleQueryResultParserRegistry;
+import org.openrdf.query.resultio.TupleQueryResultWriterRegistry;
 import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFParserRegistry;
-import org.openrdf.rio.RDFWriterRegistry;
 
 import com.bigdata.rdf.model.StatementEnum;
+import com.bigdata.rdf.rio.json.BigdataSPARQLResultsJSONWriterFactory;
 import com.bigdata.rdf.rio.ntriples.BigdataNTriplesParserFactory;
-import com.bigdata.rdf.rio.rdfxml.BigdataRDFXMLParserFactory;
-import com.bigdata.rdf.rio.rdfxml.BigdataRDFXMLWriterFactory;
 import com.bigdata.rdf.rio.turtle.BigdataTurtleParserFactory;
 
 /**
@@ -119,6 +119,16 @@ public class ServiceProviderHook {
             r.add(new BigdataTurtleParserFactory());
             
         }
+        
+        {
+        	
+        	final TupleQueryResultWriterRegistry r = TupleQueryResultWriterRegistry.getInstance();
+
+        	// add our custom RDR-enabled JSON writer
+        	r.add(new BigdataSPARQLResultsJSONWriterFactory());
+        	
+        }
+
 
 //        // Ditto, but for the writer.
 //        {
