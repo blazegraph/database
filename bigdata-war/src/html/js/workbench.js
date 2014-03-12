@@ -53,7 +53,13 @@ function getNamespaces() {
          var title = namespaces[i].getElementsByTagName('title')[0].textContent;
          var titleText = title == DEFAULT_NAMESPACE ? title + ' (default)' : title;
          var url = namespaces[i].getElementsByTagName('sparqlEndpoint')[0].getAttributeNS(rdf, 'resource');
-         $('#namespaces-list').append('<li data-name="' + title + '" data-url="' + url + '">' + titleText + ' - <a href="#" class="use-namespace">Use</a> - <a href="#" class="delete-namespace">Delete</a></li>');
+         var use;
+         if(title == NAMESPACE) {
+            use = 'In use';
+         } else {
+            use = '<a href="#" class="use-namespace">Use</a>';
+         }
+         $('#namespaces-list').append('<li data-name="' + title + '" data-url="' + url + '">' + titleText + ' - ' + use + ' - <a href="#" class="delete-namespace">Delete</a></li>');
       }
       $('.use-namespace').click(function(e) {
          e.preventDefault();
@@ -95,7 +101,8 @@ function deleteNamespace(namespace) {
 
 function createNamespace(e) {
    e.preventDefault();
-   var namespace = $(this).find('input').val();
+   var input = $(this).find('input[type=text]');
+   var namespace = input.val();
    if(!namespace) {
       return;
    }
@@ -106,7 +113,7 @@ function createNamespace(e) {
       type: 'POST',
       data: data,
       contentType: 'application/xml',
-      success: getNamespaces,
+      success: function() { input.val(''); getNamespaces(); },
       error: function(jqXHR, textStatus, errorThrown) { alert(errorThrown); }
    };
    $.ajax('/bigdata/namespace', settings);
