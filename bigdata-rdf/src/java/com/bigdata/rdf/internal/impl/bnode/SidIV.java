@@ -46,6 +46,9 @@ import com.bigdata.rdf.internal.impl.AbstractIV;
 import com.bigdata.rdf.internal.impl.AbstractInlineIV;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataBNode;
+import com.bigdata.rdf.model.BigdataResource;
+import com.bigdata.rdf.model.BigdataURI;
+import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.spo.ISPO;
@@ -169,6 +172,15 @@ public class SidIV<V extends BigdataBNode> extends AbstractInlineIV<V, ISPO>
 	        bnode = (V) lex.getValueFactory().createBNode(getID());
 	        bnode.setIV(this);
 	        bnode.setStatementIdentifier(true);
+	        
+	        final BigdataResource c = spo.c() != null ?
+	        		(BigdataResource) spo.c().asValue(lex) : null;
+	        		
+	        bnode.setStatement(lex.getValueFactory().createStatement(
+	        		(BigdataResource) spo.s().asValue(lex), 
+	        		(BigdataURI) spo.p().asValue(lex), 
+	        		(BigdataValue) spo.o().asValue(lex), 
+	        		c));
         }
         return bnode;
     }
