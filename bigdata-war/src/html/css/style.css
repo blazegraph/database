@@ -59,6 +59,11 @@ h1 {
    margin-bottom: 10px;
 }
 
+h2 {
+   font-size: 110%;
+   margin-bottom: 10px;
+}
+
 #container {
    /*max-width: 600px;*/
 }
@@ -106,11 +111,9 @@ h1 {
 }
 
 .box {
-   border: 1px solid;
    padding: 10px;
    border: 1px solid;
    border-bottom: none;
-   min-height: 100px;
    overflow-x: scroll;
 }
 
@@ -168,7 +171,7 @@ hr {
    text-align: right;
 }
 
-#advanced-features, #query-explanation {
+#advanced-features, #query-explanation, #explore-results, #namespace-properties {
    display: none;
 }
 
@@ -179,8 +182,4 @@ td {
 
 pre {
    font-family: monospace;
-}
-
-#namespace-properties {
-   display: none;
 }

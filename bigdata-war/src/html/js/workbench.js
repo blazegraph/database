@@ -673,16 +673,18 @@ function loadURI(uri) {
 }
 
 function updateExploreStart(data) {
-   var disp = $('#explore-results');
-   disp.html('');
+   var results = data.results.bindings.length > 0;
+   $('#explore-results').toggle(results);
+   $('#explore-no-results').toggle(!results);
+
    // see if we got any results
-   if(data.results.bindings.length == 0) {
-      disp.append('No vertex found!');
+   if(!results) {
+      $('#explore-no-results').html('<h1>No results found!</h1>');
       return;
    }
    
    var vertex = data.results.bindings[0].vertex;
-   disp.append('<h3>' + vertex.value + '</h3>');
+   $('#explore-header h1').text(vertex.value);
    var outbound=[], inbound=[], attributes=[];
    for(var i=0; i<data.results.bindings.length; i++) {
       var binding = data.results.bindings[i];
@@ -698,33 +700,45 @@ function updateExploreStart(data) {
       }
    }
    
+   var outgoingContainer = $('#explore-outgoing');
+   outgoingContainer.html('');
    if(outbound.length) {
-      disp.append('<h4>Outbound links</h4>');
-      var table = $('<table>').appendTo(disp);
+      outgoingContainer.append('<h2>Outgoing links</h2>');
+      var table = $('<table>').appendTo(outgoingContainer);
       for(var i=0; i<outbound.length; i++) {
          var linkAttributes = outbound[i].sidP.value + ': ' + outbound[i].sidO.value;  
          table.append('<tr><td>' + outbound[i].p.value + '</td><td><a href="#">' + outbound[i].o.value + '</a></td><td>' + linkAttributes + '</td></tr>');
       }
+   } else {
+      outgoingContainer.append('<h2>No outgoing links</h2>');
    }
 
+   var incomingContainer = $('#explore-incoming');
+   incomingContainer.html('');
    if(inbound.length) {
-      disp.append('<h4>Inbound links</h4>');
-      var table = $('<table>').appendTo(disp);
+      incomingContainer.append('<h2>Inbound links</h2>');
+      var table = $('<table>').appendTo(incomingContainer);
       for(var i=0; i<inbound.length; i++) {
          var linkAttributes = inbound[i].sidP.value + ': ' + inbound[i].sidO.value;  
          table.append('<tr><td><a href="#">' + inbound[i].s.value + '</a></td><td>' + inbound[i].p.value + '</td><td>' + linkAttributes + '</td></tr>');
       }
+   } else {
+      incomingContainer.append('<h2>No incoming links</h2>');
    }
 
+   var attributesContainer = $('#explore-attributes');
+   attributesContainer.html('');
    if(attributes.length) {
-      disp.append('<h4>Attributes</h4>');
-      var table = $('<table>').appendTo(disp);
+      attributesContainer.append('<h4>Attributes</h4>');
+      var table = $('<table>').appendTo(attributesContainer);
       for(var i=0; i<attributes.length; i++) {
          table.append('<tr><td>' + attributes[i].p.value + '</td><td>' + attributes[i].o.value + '</td></tr>');
       }
+   } else {
+      attributesContainer.append('<h2>No attributes</h2>');
    }
    
-   disp.find('a').click(function(e) { e.preventDefault(); loadURI(this.text); });
+   $('#explore-results a').click(function(e) { e.preventDefault(); loadURI(this.text); });
 }
 
 function updateExploreError(jqXHR, textStatus, errorThrown) {
