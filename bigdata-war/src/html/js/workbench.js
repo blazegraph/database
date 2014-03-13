@@ -606,9 +606,8 @@ function showQueryResults(data) {
 
       $('#query-response a').click(function(e) {
          e.preventDefault();
-         var uri = $(this).text();
-         loadURI(uri);
-         showTab('explore');
+         // var uri = $(this).text();
+         explore(this.textContent);
       });
    }
 }
@@ -738,7 +737,16 @@ function updateExploreStart(data) {
       attributesContainer.append('<h2>No attributes</h2>');
    }
    
-   $('#explore-results a').click(function(e) { e.preventDefault(); loadURI(this.text); });
+   $('#explore-results a').click(function(e) {
+      e.preventDefault();
+      explore(this.text);
+   });
+}
+
+function explore(uri) {
+   $('#explore-form input[type=text]').val(uri);
+   $('#explore-form').submit();
+   showTab('explore');
 }
 
 function updateExploreError(jqXHR, textStatus, errorThrown) {
