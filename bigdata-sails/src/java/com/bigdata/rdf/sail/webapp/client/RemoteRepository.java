@@ -141,15 +141,28 @@ public class RemoteRepository {
     static protected final String UTF8 = "UTF-8";
 
     /**
-     * Note: The default is <code>false</code>. This supports use cases where
-     * the end points are read/write databases and http caching must be defeated
-     * in order to gain access to the most recent committed state of the end
-     * point.
+     * The name of the system property that may be used to specify the default
+     * HTTP method (GET or POST) for a SPARQL QUERY or other indempotent
+     * request. 
+     * 
+     * @see #DEFAULT_QUERY_METHOD
+     * 
+     * @see <a href="http://trac.bigdata.com/ticket/854"> Allow overrride of
+     *      maximum length before converting an HTTP GET to an HTTP POST </a>
+     */
+    static public final String QUERY_METHOD = RemoteRepository.class
+            .getName() + ".queryMethod";
+    
+    /**
+     * Note: The default is {@value #DEFAULT_QUERY_METHOD}. This supports use
+     * cases where the end points are read/write databases and http caching must
+     * be defeated in order to gain access to the most recent committed state of
+     * the end point.
      * 
      * @see #getQueryMethod()
      * @see #setQueryMethod(String)
      */
-    static private final String DEFAULT_QUERY_METHOD = "POST";
+    static public final String DEFAULT_QUERY_METHOD = "POST";
     
     /**
      * The name of the system property that may be used to specify the maximum
@@ -159,7 +172,8 @@ public class RemoteRepository {
      * @see <a href="http://trac.bigdata.com/ticket/854"> Allow overrride of
      *      maximum length before converting an HTTP GET to an HTTP POST </a>
      */
-    static public final String MAX_REQUEST_URL_LENGTH = "maxRequestURLLength";
+    static public final String MAX_REQUEST_URL_LENGTH = RemoteRepository.class
+            .getName() + ".maxRequestURLLength";
 
     /**
      * The default maximum limit on a requestURL before the request is converted
@@ -192,15 +206,13 @@ public class RemoteRepository {
      * The maximum requestURL length before the request is converted into a POST
      * using a <code>application/x-www-form-urlencoded</code> request entity.
      */
-    private volatile int maxRequestURLLength = Integer.parseInt(System
-            .getProperty(MAX_REQUEST_URL_LENGTH,
-                    Integer.toString(DEFAULT_MAX_REQUEST_URL_LENGTH)));
+    private volatile int maxRequestURLLength;
     
     /**
      * The HTTP verb that will be used for a QUERY (versus a UPDATE or other
      * mutation operation).
      */
-    private volatile String queryMethod = DEFAULT_QUERY_METHOD;
+    private volatile String queryMethod;
 
     /**
      * Return the maximum requestURL length before the request is converted into
@@ -228,7 +240,7 @@ public class RemoteRepository {
     
     /**
      * Return the HTTP verb that will be used for a QUERY (versus an UPDATE or
-     * other mutation operations) (default {@value #DEFAULT_IS_GET}). POST can
+     * other mutation operations) (default {@value #DEFAULT_QUERY_METHOD}). POST can
      * often handle larger queries than GET due to limits at the HTTP client
      * layer and will defeat http caching and thus provide a current view of the
      * committed state of the SPARQL end point when the end point is a
@@ -311,6 +323,12 @@ public class RemoteRepository {
         this.httpClient = httpClient;
         
         this.executor = executor;
+
+        setMaxRequestURLLength(Integer.parseInt(System.getProperty(
+                MAX_REQUEST_URL_LENGTH,
+                Integer.toString(DEFAULT_MAX_REQUEST_URL_LENGTH))));
+        
+        setQueryMethod(System.getProperty(QUERY_METHOD, DEFAULT_QUERY_METHOD));
 
     }
 
@@ -971,7 +989,7 @@ public class RemoteRepository {
          */
         protected void setupConnectOptions() {
             
-            opts.method = "POST";
+            opts.method = getQueryMethod();
 
             if(update) {
             

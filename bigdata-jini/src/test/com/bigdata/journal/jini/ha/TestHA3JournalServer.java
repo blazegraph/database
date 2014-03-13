@@ -49,6 +49,7 @@ import com.bigdata.ha.halog.HALogWriter;
 import com.bigdata.ha.halog.IHALogReader;
 import com.bigdata.ha.msg.HARootBlockRequest;
 import com.bigdata.journal.AbstractJournal;
+import com.bigdata.journal.jini.ha.AbstractHA3JournalServerTestCase.ABC;
 import com.bigdata.journal.jini.ha.HAJournalTest.HAGlueTest;
 import com.bigdata.quorum.Quorum;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
@@ -3477,4 +3478,65 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
 		}
 	}
     
+    /**
+     * Test verifies that we can POST a SPARQL query to a follower.
+     * 
+     * @see <a href="http://trac.bigdata.com/ticket/853"> Follower does not
+     *      accept POST of idempotent operations (HA) </a>
+     */
+    public void test_postQueryOnFollowers() throws Exception {
+        
+        final ABC abc = new ABC(false/*sequential*/); // simultaneous start.
+
+        final HAGlue serverA = abc.serverA, serverB = abc.serverB, serverC = abc.serverC;
+
+        // Verify quorum is FULLY met.
+        awaitFullyMetQuorum();
+
+        // await the KB create commit point to become visible on each service.
+        awaitCommitCounter(1L, new HAGlue[] { serverA, serverB, serverC });
+
+        // Verify binary equality of ALL journals.
+        assertDigestsEquals(new HAGlue[] { serverA, serverB, serverC });
+
+        final RemoteRepository[] repos = new RemoteRepository[3];
+        repos[0] = getRemoteRepository(serverA);
+        repos[1] = getRemoteRepository(serverB);
+        repos[2] = getRemoteRepository(serverC);
+        
+        /*
+         * Verify that query on all nodes is allowed.
+         */
+        for (RemoteRepository r : repos) {
+
+            r.setQueryMethod("GET");
+            
+            // Should be empty.
+            assertEquals(0L,
+                    countResults(r.prepareTupleQuery("SELECT * {?a ?b ?c}")
+                            .evaluate()));
+
+        }
+
+        // Change the maximum length of a GET for a Query.
+        for(RemoteRepository r : repos) {
+
+            r.setMaxRequestURLLength(1);
+            
+        }
+        
+        // Run with the new length. All requests should be POSTs.
+        for (RemoteRepository r : repos) {
+
+            r.setQueryMethod("POST");
+
+            // Should be empty.
+            assertEquals(0L,
+                    countResults(r.prepareTupleQuery("SELECT * {?a ?b ?c}")
+                            .evaluate()));
+
+        }
+
+    }
+
 }
