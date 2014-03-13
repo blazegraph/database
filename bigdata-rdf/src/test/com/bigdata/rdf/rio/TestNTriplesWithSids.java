@@ -110,6 +110,10 @@ public class TestNTriplesWithSids extends AbstractTripleStoreTestCase {
 				log.info(store.dumpStore());
 
 			assertEquals("toldTriples", 3L, store.getStatementCount());//loadStats.toldTriples.get());
+			
+			final BigdataStatementIterator it = store.getStatements(null, null, null);
+			while (it.hasNext())
+				System.err.println(it.next());
 
 			final BigdataURI dcSource = store.getValueFactory().createURI(
 					"http://purl.org/dc/terms/source");
@@ -256,8 +260,8 @@ public class TestNTriplesWithSids extends AbstractTripleStoreTestCase {
 			if (log.isInfoEnabled())
 				log.info(store.dumpStore());
 
-			assertEquals("toldTriples", 3L, loadStats.toldTriples.get());
-
+			assertEquals("toldTriples", 3L, store.getStatementCount());//loadStats.toldTriples.get());
+			
 			final BigdataURI dcSource = store.getValueFactory().createURI(
 					"http://purl.org/dc/terms/source");
 
