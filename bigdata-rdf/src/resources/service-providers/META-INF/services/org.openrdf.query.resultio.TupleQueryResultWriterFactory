@@ -1,1 +1,1 @@
-com.bigdata.rdf.rio.json.BigdataSPARQLResultsJSONWriterFactory
+com.bigdata.rdf.rio.json.BigdataSPARQLResultsJSONWriterFactoryForSelect
