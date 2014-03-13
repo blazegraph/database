@@ -171,6 +171,10 @@ hr {
    text-align: right;
 }
 
+#explore-form input[type=text] {
+   width: 50%;
+}
+
 #advanced-features, #query-explanation, #explore-results, #namespace-properties {
    display: none;
 }
