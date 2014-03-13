@@ -281,7 +281,7 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
 
         m_fixture.start();
 
-		final int port = m_fixture.getConnectors()[0].getLocalPort();
+		final int port = NanoSparqlServer.getLocalPort(m_fixture);
 
 		// log.info("Getting host address");
 
@@ -355,24 +355,17 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
 //		m_indexManager = null;
 
 		namespace = null;
-		
-		m_serviceURL = null;
-
-        if (m_cm != null) {
-
-            m_cm.shutdown();
-
-            m_cm = null;
-
-		}
-		
-        m_httpClient = null;
-        
-        m_repo = null;
-
-        m_serviceURL = null;
         
         m_rootURL = null;
+		m_serviceURL = null;
+		
+        if (m_cm != null) {
+            m_cm.shutdown();
+            m_cm = null;
+        }
+
+        m_httpClient = null;
+        m_repo = null;
         
         log.info("tear down done");
 
