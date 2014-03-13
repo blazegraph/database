@@ -97,6 +97,7 @@ function useNamespace(name, url) {
    $('#current-namespace').html(name);
    NAMESPACE = name;
    NAMESPACE_URL = url;
+   getNamespaces();
 }
 
 function deleteNamespace(namespace) {
@@ -160,7 +161,6 @@ function getDefaultNamespace() {
       DEFAULT_NAMESPACE = defaultDataset.find('title')[0].textContent;
       var url = defaultDataset.find('sparqlEndpoint')[0].attributes['rdf:resource'].textContent;
       useNamespace(DEFAULT_NAMESPACE, url);
-      getNamespaces();
    });
 }
 var DEFAULT_NAMESPACE, NAMESPACE, NAMESPACE_URL, fileContents;
