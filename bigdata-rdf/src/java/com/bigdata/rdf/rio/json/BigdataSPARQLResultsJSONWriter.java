@@ -156,20 +156,6 @@ public class BigdataSPARQLResultsJSONWriter implements TupleQueryResultWriter, R
 		return TupleQueryResultFormat.JSON;
 	}
 
-	public void startRDF() {
-		
-		try {
-			
-			startQueryResult(Arrays.asList(new String[] {
-				"s", "p", "o", "c"	
-			}));
-			
-		} catch (TupleQueryResultHandlerException e) {
-			throw new RuntimeException(e);
-		}
-		
-	}
-	
 	public void startQueryResult(List<String> columnHeaders)
 		throws TupleQueryResultHandlerException
 	{
@@ -198,18 +184,6 @@ public class BigdataSPARQLResultsJSONWriter implements TupleQueryResultWriter, R
 		}
 	}
 
-	public void endRDF() {
-		
-		try {
-			
-			endQueryResult();
-			
-		} catch (TupleQueryResultHandlerException e) {
-			throw new RuntimeException(e);
-		}
-		
-	}
-	
 	public void endQueryResult()
 		throws TupleQueryResultHandlerException
 	{
@@ -224,7 +198,7 @@ public class BigdataSPARQLResultsJSONWriter implements TupleQueryResultWriter, R
 		}
 	}
 
-	public void handleStatement(final Statement stmt)
+	public void handleStatement(final Statement stmt) throws RDFHandlerException
 	{
 		try {
 			if (firstTupleWritten) {
@@ -262,10 +236,10 @@ public class BigdataSPARQLResultsJSONWriter implements TupleQueryResultWriter, R
 			writer.flush();
 		}
 		catch (TupleQueryResultHandlerException e) {
-			throw new RuntimeException(e);
+			throw new RDFHandlerException(e);
 		}
 		catch (IOException e) {
-			throw new RuntimeException(e);
+			throw new RDFHandlerException(e);
 		}
 	}
 	
@@ -447,6 +421,38 @@ public class BigdataSPARQLResultsJSONWriter implements TupleQueryResultWriter, R
 		writer.writeEOL();
 	}
 
+	/*-------------------*
+	 * RDFWriter Methods *
+	 *-------------------*/
+
+	@Override
+	public void startRDF() throws RDFHandlerException {
+		
+		try {
+			
+			startQueryResult(Arrays.asList(new String[] {
+				"s", "p", "o", "c"	
+			}));
+			
+		} catch (TupleQueryResultHandlerException e) {
+			throw new RDFHandlerException(e);
+		}
+		
+	}
+	
+	@Override
+	public void endRDF() throws RDFHandlerException {
+		
+		try {
+			
+			endQueryResult();
+			
+		} catch (TupleQueryResultHandlerException e) {
+			throw new RDFHandlerException(e);
+		}
+		
+	}
+	
 	@Override
 	public void handleComment(String arg0) throws RDFHandlerException {
 		// TODO Implement me
@@ -463,7 +469,7 @@ public class BigdataSPARQLResultsJSONWriter implements TupleQueryResultWriter, R
 	@Override
 	public RDFFormat getRDFFormat() {
 		
-		return null;
+		return BigdataSPARQLResultsJSONWriterFactoryForConstruct.JSON;
 		
 	}
 }
