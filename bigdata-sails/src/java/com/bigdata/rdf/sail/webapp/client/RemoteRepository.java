@@ -152,6 +152,16 @@ public class RemoteRepository {
     static private final String DEFAULT_QUERY_METHOD = "POST";
     
     /**
+     * The name of the system property that may be used to specify the maximum
+     * length (in characters) for a requestURL associated with an HTTP GET
+     * before it is automatically converted to an HTTP POST.
+     * 
+     * @see <a href="http://trac.bigdata.com/ticket/854"> Allow overrride of
+     *      maximum length before converting an HTTP GET to an HTTP POST </a>
+     */
+    static public final String MAX_REQUEST_URL_LENGTH = "maxRequestURLLength";
+
+    /**
      * The default maximum limit on a requestURL before the request is converted
      * into a POST using a <code>application/x-www-form-urlencoded</code>
      * request entity.
@@ -182,7 +192,9 @@ public class RemoteRepository {
      * The maximum requestURL length before the request is converted into a POST
      * using a <code>application/x-www-form-urlencoded</code> request entity.
      */
-    private volatile int maxRequestURLLength = DEFAULT_MAX_REQUEST_URL_LENGTH;
+    private volatile int maxRequestURLLength = Integer.parseInt(System
+            .getProperty(MAX_REQUEST_URL_LENGTH,
+                    Integer.toString(DEFAULT_MAX_REQUEST_URL_LENGTH)));
     
     /**
      * The HTTP verb that will be used for a QUERY (versus a UPDATE or other
@@ -538,7 +550,20 @@ public class RemoteRepository {
 
         opts.addRequestParam("queryId", queryId.toString());
 
-        checkResponseCode(doConnect(opts));
+        HttpResponse response = null;
+        try {
+            // Issue request, check response status code.
+            checkResponseCode(response = doConnect(opts));
+        } finally {
+            /*
+             * Ensure that the http response entity is consumed so that the http
+             * connection will be released in a timely fashion.
+             */
+            try {
+                EntityUtils.consume(response.getEntity());
+            } catch (IOException ex) {
+            }
+        }
             
     }
 
