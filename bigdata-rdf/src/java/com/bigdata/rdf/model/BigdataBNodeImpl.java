@@ -156,6 +156,9 @@ public class BigdataBNodeImpl extends BigdataResourceImpl implements
     
     public String toString() {
 
+    	if (sid != null) {
+    		return "<" + sid.toString() + ">";
+    	}
         return "_:" + id;
         
     }
@@ -184,8 +187,7 @@ public class BigdataBNodeImpl extends BigdataResourceImpl implements
             return false;
         
 		if ((o instanceof BigdataValue) //
-				&& isRealIV()
-				&& ((BigdataValue)o).isRealIV()
+				&& isRealIV() && ((BigdataValue)o).isRealIV()
 				&& ((BigdataValue) o).getValueFactory() == getValueFactory()) {
 
 			return getIV().equals(((BigdataValue) o).getIV());
