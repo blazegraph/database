@@ -72,6 +72,13 @@
    <servlet-class>com.bigdata.rdf.sail.webapp.MultiTenancyServlet</servlet-class>
   </servlet>
   <servlet>
+   <servlet-name>Truth Maintenance API</servlet-name>
+   <display-name>Truth Maintenance API</display-name>
+   <description>A REST API for managing truth maintenance.
+   </description>
+   <servlet-class>com.bigdata.rdf.sail.webapp.InferenceServlet</servlet-class>
+  </servlet>
+  <servlet>
   	<servlet-name>Status</servlet-name>
   	<display-name>Status</display-name>
   	<description>A status page.</description>
@@ -110,6 +117,11 @@
   <servlet-mapping>
   <servlet-name>Multi-Tenancy API</servlet-name>
   <url-pattern>/namespace/*</url-pattern>
+  </servlet-mapping>
+  <!-- Mapping for managing truth maintenance. -->
+  <servlet-mapping>
+  <servlet-name>Truth Maintenance API</servlet-name>
+  <url-pattern>/inference</url-pattern>
   </servlet-mapping>
   <!-- Mapping for the status page. -->
   <servlet-mapping>

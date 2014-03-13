@@ -58,8 +58,7 @@ public class NSSEmbeddedExample implements Runnable {
 
             server.start();
 
-            final int actualPort = server.getConnectors()[0]
-                    .getLocalPort();
+            final int actualPort = NanoSparqlServer.getLocalPort(server);
 
             String hostAddr = NicUtil.getIpAddress("default.nic",
                     "default", true/* loopbackOk */);

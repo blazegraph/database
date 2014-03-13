@@ -106,7 +106,6 @@ import org.openrdf.rio.Rio;
 import org.openrdf.rio.helpers.StatementCollector;
 import org.openrdf.sail.SailException;
 
-import com.bigdata.BigdataStatics;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSailRepository;
@@ -207,16 +206,15 @@ public class TestFederatedQuery<S extends IIndexManager> extends
      *            the index of the repository, starting with 1
      * @return
      */
-    protected String getRepositoryUrl(int i) {
+    protected String getRepositoryUrl(final int i) {
 
-        return getRepositoryUrlBase() + i;
+        return getRepositoryUrlBase() + i + "/sparql";
 
     }
     
     protected String getRepositoryUrlBase() {
         
-        return m_serviceURL + BigdataStatics.getContextPath() + requestPath
-                + "/namespace/" + namespace + "_";
+        return m_serviceURL + "/namespace/" + namespace + "_";
 
     }
     

@@ -217,7 +217,7 @@ public class TestNanoSparqlServerWithProxyIndexManager<S extends IIndexManager>
          * Proxied test suites.
          */
 		
-		//Protocol
+		// Protocol
 		suite.addTest(TestProtocolAll.suite());
         
         // Multi-tenancy API.

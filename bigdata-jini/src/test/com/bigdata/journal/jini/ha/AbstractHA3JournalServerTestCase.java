@@ -2173,6 +2173,14 @@ public class AbstractHA3JournalServerTestCase extends
              * connection.
              */
             private final String TEST_JETTY_PORT = "jetty.port";
+
+            /**
+             * The path in the local file system to the root of the web
+             * application. This is <code>bigdata-war/src</code> in the source
+             * code, but the webapp gets deployed to the serviceDir for this
+             * test suite.
+             */
+            private final String JETTY_RESOURCE_BASE = "jetty.resourceBase";
             
             /**
              * The absolute effective path of the service directory. This is
@@ -2216,7 +2224,11 @@ public class AbstractHA3JournalServerTestCase extends
                 cmds.add("-D" + TEST_LOGICAL_SERVICE_ID + "="
                         + getLogicalServiceId());
 
+                // Override the HTTP port for jetty.
                 cmds.add("-D" + TEST_JETTY_PORT + "=" + jettyPort);
+
+                // Override the location of the webapp as deployed.
+                cmds.add("-D" + JETTY_RESOURCE_BASE + "=\".\"");
 
                 super.addCommandArgs(cmds);
                 

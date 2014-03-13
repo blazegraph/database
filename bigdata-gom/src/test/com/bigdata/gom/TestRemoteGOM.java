@@ -163,7 +163,7 @@ public class TestRemoteGOM extends TestCase {
 
         m_server.start();
 
-        final int port = m_server.getConnectors()[0].getLocalPort();
+        final int port = NanoSparqlServer.getLocalPort(m_server);
 
         final String hostAddr = NicUtil.getIpAddress("default.nic", "default",
                 true/* loopbackOk */);

@@ -449,7 +449,7 @@ public class HAJournalServer extends AbstractServer {
          * 
          * @see #DEFAULT_JETTY_XML
          */
-        String JETTY_XML = "jettyXml";
+        String JETTY_XML = NanoSparqlServer.SystemProperties.JETTY_XML;
 
         /**
          * The default value works when deployed under the IDE with the
@@ -457,7 +457,7 @@ public class HAJournalServer extends AbstractServer {
          * deploying outside of that context, the value needs to be set
          * explicitly.
          */
-        String DEFAULT_JETTY_XML = "jetty.xml";
+        String DEFAULT_JETTY_XML = NanoSparqlServer.SystemProperties.DEFAULT_JETTY_XML;
 
     }
     
@@ -4576,7 +4576,8 @@ public class HAJournalServer extends AbstractServer {
 //                }
                 
                 // Setup the embedded jetty server for NSS webapp.
-                jettyServer = NanoSparqlServer.newInstance(jettyXml, journal);
+            jettyServer = NanoSparqlServer
+                    .newInstance(jettyXml, journal, null/* initParams */);
 
 //            }
 
@@ -4659,12 +4660,7 @@ public class HAJournalServer extends AbstractServer {
      */
     int getNSSPort() {
 
-        final Server tmp = jettyServer;
-
-        if (tmp == null)
-            throw new IllegalStateException("Server is not running");
-
-        return tmp.getConnectors()[0].getLocalPort();
+        return NanoSparqlServer.getLocalPort(jettyServer);
 
     }
     
