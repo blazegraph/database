@@ -125,10 +125,6 @@ public class TestProvenanceQuery extends ProxyBigdataSailTestCase {
                 
                 assertNotNull(writerFactory);
                 
-                if (!(writerFactory instanceof BigdataRDFXMLWriterFactory))
-                    fail("Expecting " + BigdataRDFXMLWriterFactory.class + " not "
-                            + writerFactory.getClass());
-                
                 final RDFWriter rdfWriter = writerFactory.getWriter(w);
 
                 rdfWriter.startRDF();
