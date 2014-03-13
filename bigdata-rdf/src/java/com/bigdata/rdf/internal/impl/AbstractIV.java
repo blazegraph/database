@@ -315,6 +315,7 @@ public abstract class AbstractIV<V extends BigdataValue, T>
         
     }
 
+    @Override
     final public byte flags() {
 
         return flags;
