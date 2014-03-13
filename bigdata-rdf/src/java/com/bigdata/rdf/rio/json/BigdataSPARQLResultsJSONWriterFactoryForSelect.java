@@ -17,7 +17,7 @@ import org.openrdf.query.resultio.TupleQueryResultWriterFactory;
  * 
  * @author Arjohn Kampman
  */
-public class BigdataSPARQLResultsJSONWriterFactory implements TupleQueryResultWriterFactory {
+public class BigdataSPARQLResultsJSONWriterFactoryForSelect implements TupleQueryResultWriterFactory {
 
 	/**
 	 * Returns {@link TupleQueryResultFormat#JSON}.

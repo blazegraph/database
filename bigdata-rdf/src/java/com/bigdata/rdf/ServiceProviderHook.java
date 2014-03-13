@@ -32,15 +32,18 @@ import info.aduna.lang.service.ServiceRegistry;
 import java.util.ServiceLoader;
 
 import org.openrdf.query.QueryLanguage;
-import org.openrdf.query.resultio.TupleQueryResultParserRegistry;
 import org.openrdf.query.resultio.TupleQueryResultWriterRegistry;
 import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFParserRegistry;
+import org.openrdf.rio.RDFWriterRegistry;
 
 import com.bigdata.rdf.model.StatementEnum;
-import com.bigdata.rdf.rio.json.BigdataSPARQLResultsJSONWriterFactory;
+import com.bigdata.rdf.rio.json.BigdataSPARQLResultsJSONWriterFactoryForConstruct;
+import com.bigdata.rdf.rio.json.BigdataSPARQLResultsJSONWriterFactoryForSelect;
 import com.bigdata.rdf.rio.ntriples.BigdataNTriplesParserFactory;
+import com.bigdata.rdf.rio.rdfxml.BigdataRDFXMLWriterFactory;
 import com.bigdata.rdf.rio.turtle.BigdataTurtleParserFactory;
+import com.bigdata.rdf.rio.turtle.BigdataTurtleWriterFactory;
 
 /**
  * This static class provides a hook which allows the replacement of services
@@ -125,18 +128,22 @@ public class ServiceProviderHook {
         	final TupleQueryResultWriterRegistry r = TupleQueryResultWriterRegistry.getInstance();
 
         	// add our custom RDR-enabled JSON writer
-        	r.add(new BigdataSPARQLResultsJSONWriterFactory());
+        	r.add(new BigdataSPARQLResultsJSONWriterFactoryForSelect());
         	
         }
 
 
-//        // Ditto, but for the writer.
-//        {
-//            final RDFWriterRegistry r = RDFWriterRegistry.getInstance();
-//
+        // Ditto, but for the writer.
+        {
+            final RDFWriterRegistry r = RDFWriterRegistry.getInstance();
+
 //            r.add(new BigdataRDFXMLWriterFactory());
-//
-//        }
+            
+            r.add(new BigdataTurtleWriterFactory());
+
+            r.add(new BigdataSPARQLResultsJSONWriterFactoryForConstruct());
+            
+        }
 
 //        {
 //            final PropertiesParserRegistry r = PropertiesParserRegistry.getInstance();

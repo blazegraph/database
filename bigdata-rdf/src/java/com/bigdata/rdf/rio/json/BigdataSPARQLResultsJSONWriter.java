@@ -14,11 +14,13 @@ import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.nio.charset.Charset;
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 
 import org.openrdf.model.BNode;
 import org.openrdf.model.Literal;
+import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.query.Binding;
@@ -26,6 +28,9 @@ import org.openrdf.query.BindingSet;
 import org.openrdf.query.TupleQueryResultHandlerException;
 import org.openrdf.query.resultio.TupleQueryResultFormat;
 import org.openrdf.query.resultio.TupleQueryResultWriter;
+import org.openrdf.rio.RDFFormat;
+import org.openrdf.rio.RDFHandlerException;
+import org.openrdf.rio.RDFWriter;
 
 import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataStatement;
@@ -35,7 +40,7 @@ import com.bigdata.rdf.model.BigdataStatement;
  * href="http://www.w3.org/TR/rdf-sparql-json-res/">SPARQL Query Results JSON
  * Format</a>.
  */
-public class BigdataSPARQLResultsJSONWriter implements TupleQueryResultWriter {
+public class BigdataSPARQLResultsJSONWriter implements TupleQueryResultWriter, RDFWriter {
 
 	/*-----------*
 	 * Variables *
@@ -50,7 +55,10 @@ public class BigdataSPARQLResultsJSONWriter implements TupleQueryResultWriter {
 	 *--------------*/
 
 	public BigdataSPARQLResultsJSONWriter(OutputStream out) {
-		Writer w = new OutputStreamWriter(out, Charset.forName("UTF-8"));
+		this(new OutputStreamWriter(out, Charset.forName("UTF-8")));
+	}
+
+	public BigdataSPARQLResultsJSONWriter(Writer w) {
 		w = new BufferedWriter(w, 1024);
 		writer = new IndentingWriter(w);
 	}
@@ -148,6 +156,20 @@ public class BigdataSPARQLResultsJSONWriter implements TupleQueryResultWriter {
 		return TupleQueryResultFormat.JSON;
 	}
 
+	public void startRDF() {
+		
+		try {
+			
+			startQueryResult(Arrays.asList(new String[] {
+				"s", "p", "o", "c"	
+			}));
+			
+		} catch (TupleQueryResultHandlerException e) {
+			throw new RuntimeException(e);
+		}
+		
+	}
+	
 	public void startQueryResult(List<String> columnHeaders)
 		throws TupleQueryResultHandlerException
 	{
@@ -176,6 +198,18 @@ public class BigdataSPARQLResultsJSONWriter implements TupleQueryResultWriter {
 		}
 	}
 
+	public void endRDF() {
+		
+		try {
+			
+			endQueryResult();
+			
+		} catch (TupleQueryResultHandlerException e) {
+			throw new RuntimeException(e);
+		}
+		
+	}
+	
 	public void endQueryResult()
 		throws TupleQueryResultHandlerException
 	{
@@ -190,6 +224,51 @@ public class BigdataSPARQLResultsJSONWriter implements TupleQueryResultWriter {
 		}
 	}
 
+	public void handleStatement(final Statement stmt)
+	{
+		try {
+			if (firstTupleWritten) {
+				writeComma();
+			}
+			else {
+				firstTupleWritten = true;
+			}
+
+			openBraces(); // start of new solution
+
+			writeKeyValue("s", stmt.getSubject());
+			writeComma();
+			writeKeyValue("p", stmt.getPredicate());
+			writeComma();
+			writeKeyValue("o", stmt.getObject());
+			if (stmt.getContext() != null) {
+				writeComma();
+				writeKeyValue("c", stmt.getContext());
+			}
+			
+//			Iterator<Binding> bindingIter = bindingSet.iterator();
+//			while (bindingIter.hasNext()) {
+//				Binding binding = bindingIter.next();
+//
+//				writeKeyValue(binding.getName(), binding.getValue());
+//
+//				if (bindingIter.hasNext()) {
+//					writeComma();
+//				}
+//			}
+
+			closeBraces(); // end solution
+
+			writer.flush();
+		}
+		catch (TupleQueryResultHandlerException e) {
+			throw new RuntimeException(e);
+		}
+		catch (IOException e) {
+			throw new RuntimeException(e);
+		}
+	}
+	
 	public void handleSolution(BindingSet bindingSet)
 		throws TupleQueryResultHandlerException
 	{
@@ -366,5 +445,25 @@ public class BigdataSPARQLResultsJSONWriter implements TupleQueryResultWriter {
 	{
 		writer.write(", ");
 		writer.writeEOL();
+	}
+
+	@Override
+	public void handleComment(String arg0) throws RDFHandlerException {
+		// TODO Implement me
+		
+	}
+
+	@Override
+	public void handleNamespace(String arg0, String arg1)
+			throws RDFHandlerException {
+		// TODO Implement me
+		
+	}
+
+	@Override
+	public RDFFormat getRDFFormat() {
+		
+		return null;
+		
 	}
 }
