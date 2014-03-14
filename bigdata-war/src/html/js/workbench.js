@@ -583,11 +583,17 @@ function showQueryResults(data) {
          for(var j=0; j<vars.length; j++) {
             if(vars[j] in data.results.bindings[i]) {
                var binding = data.results.bindings[i][vars[j]];
-               var text = binding.value;
+               if(binding.type == 'sid') {
+                  var text = getSID(binding);
+               } else {
+                  var text = binding.value;
+               }
+               // hack to escape HTML characters
+               text = $('<div/>').text(text).html();
                if(binding.type == 'typed-literal') {
                   var tdData = ' class="literal" data-datatype="' + binding.datatype + '"';
                } else {
-                  if(binding.type == 'uri') {
+                  if(binding.type == 'uri' || binding.type == 'sid') {
                      text = '<a href="#">' + text + '</a>';
                   }
                   var tdData = ' class="' + binding.type + '"';
@@ -620,6 +626,15 @@ function queryResultsError(jqXHR, textStatus, errorThrown) {
    $('#query-response').text('Error! ' + textStatus + ' ' + errorThrown);
 }
 
+function getSID(binding) {
+   return '<< <' + binding.value['sid-s'].value + '> <' + binding.value['sid-p'].value + '> <' + binding.value['sid-o'].value + '> >>';
+}
+
+function parseSID(sid) {
+   var re = /<< <([^<>]*)> <([^<>]*)> <([^<>]*)> >>/;
+   var matches = sid.match(re);
+   return {'s': matches[1], 'p': matches[2], 'o': matches[3]};
+}
 
 /* Explore */
 
