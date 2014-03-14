@@ -675,6 +675,8 @@ function loadURI(uri) {
                   }';
    
    query = query.replace('URI', uri);
+   console.log('Explore query');
+   console.log(query);
    var settings = {
       type: 'POST',
       data: 'query=' + encodeURI(query),
@@ -687,6 +689,8 @@ function loadURI(uri) {
 }
 
 function updateExploreStart(data) {
+   console.log('Explore results');
+   console.log(data);
    var results = data.results.bindings.length > 0;
    $('#explore-results').toggle(results);
    $('#explore-no-results').toggle(!results);
