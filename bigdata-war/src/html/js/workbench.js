@@ -631,7 +631,19 @@ $('#explore-form').submit(function(e) {
    var uri = $(this).find('input').val();
    if(uri) {
       loadURI(uri);
-      $('#explore-header h1').text(uri);
+
+      // if this is a SID, make the components clickable
+      var re = /< <([^<>]*)> <([^<>]*)> <([^<>]*)> >/;
+      var match = uri.match(re);
+      if(match) {
+         $('#explore-header h1').html('&lt; &lt;<a href="#">' + match[1] + '</a> &gt; &lt;<a href="#">' + match[2] + '</a> &gt; &lt;<a href="#">' + match[3] + '</a> &gt; &gt;');
+         $('#explore-header h1 a').click(function(e) {
+            e.preventDefault();
+            explore(this.text);
+         });
+      } else {
+         $('#explore-header h1').text(uri);
+      }
    }
 });
 
@@ -761,68 +773,6 @@ function updateExploreStart(data) {
    $('#explore-results a').click(function(e) {
       e.preventDefault();
       explore($(this).data('sid') ? $(this).data('sid') : this.text);
-   });
-
-   return;
-
-   var outbound={}, inbound={}, attributes={};
-   for(var i=0; i<data.results.bindings.length; i++) {
-      var binding = data.results.bindings[i];
-      var star = typeof(binding.sidP) != 'undefined';
-      if('o' in binding) {
-         var key = [binding.p.value, binding.o.value];
-         if(binding.o.type == 'uri') {
-            // leave star true if it was before, or set it to current value
-            outbound[key] = !!outbound[key] || star;
-         } else {
-            // do not show star for attributes
-            attributes[key] = false;
-         }      
-      } else {
-         var key = [binding.s.value, binding.p.value]
-         inbound[key] == !!inbound[key] || star;
-      }
-   }
-   
-   var outgoingContainer = $('#explore-outgoing');
-   outgoingContainer.html('');
-   if(outbound.length) {
-      outgoingContainer.append('<h2>Outgoing links</h2>');
-      var table = $('<table>').appendTo(outgoingContainer);
-      for(key in outbound) {
-         table.append('<tr><td>' + key[0] + '</td><td><a href="#">' + key[1] + '</a></td><td>' + (outbound[key] ? '*' : '') + '</td></tr>');
-      }
-   } else {
-      outgoingContainer.append('<h2>No outgoing links</h2>');
-   }
-
-   var incomingContainer = $('#explore-incoming');
-   incomingContainer.html('');
-   if(inbound.length) {
-      incomingContainer.append('<h2>Inbound links</h2>');
-      var table = $('<table>').appendTo(incomingContainer);
-      for(key in inbound) {
-         table.append('<tr><td>' + key[0] + '</td><td><a href="#">' + key[1] + '</a></td><td>' + (inbound[key] ? '*' : '') + '</td></tr>');
-      }
-   } else {
-      incomingContainer.append('<h2>No incoming links</h2>');
-   }
-
-   var attributesContainer = $('#explore-attributes');
-   attributesContainer.html('');
-   if(attributes.length) {
-      attributesContainer.append('<h4>Attributes</h4>');
-      var table = $('<table>').appendTo(attributesContainer);
-      for(var i=0; i<attributes.length; i++) {
-         table.append('<tr><td>' + attributes[i].p.value + '</td><td>' + attributes[i].o.value + '</td></tr>');
-      }
-   } else {
-      attributesContainer.append('<h2>No attributes</h2>');
-   }
-   
-   $('#explore-results a').click(function(e) {
-      e.preventDefault();
-      explore(this.text);
    });
 }
 
