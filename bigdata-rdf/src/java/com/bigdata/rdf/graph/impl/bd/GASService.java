@@ -721,9 +721,9 @@ public class GASService implements CustomServiceFactory {
 
                 }
 
-                final IGASProgram<VS, ES, ST> gasProgram = newGASProgram(gasClass);
-
                 final IGraphAccessor graphAccessor = newGraphAccessor(store);
+
+                final IGASProgram<VS, ES, ST> gasProgram = newGASProgram(gasClass);
 
                 final IGASContext<VS, ES, ST> gasContext = gasEngine.newGASContext(
                         graphAccessor, gasProgram);
@@ -882,28 +882,6 @@ public class GASService implements CustomServiceFactory {
                 
                 this.binderList = gasProgram.getBinderList();
 
-                //                int i = 0;
-//
-//                for (Value v : visitedSet) {
-//
-//                    int j = 0;
-//                    if (outVar != null) {
-//                        vals[j++] = new Constant(v);
-//                    }
-//                    if (stateVar != null && gasProgram instanceof BFS) {
-//                        /*
-//                         * FIXME Need an API for self-reporting of an IV by
-//                         * the IGASProgram.
-//                         */
-//                        final int depth = ((BFS.VS)gasState.getState(v)).depth();
-//                        final IV depthIV = new XSDNumericIV(depth);
-//                        vals[j++] = new Constant(depthIV);
-//                    }
-//
-//                    out[i++] = new ListBindingSet(vars, vals);
-//
-//                }
-                
             }
             
             @Override
