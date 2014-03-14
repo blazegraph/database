@@ -54,7 +54,7 @@ import cutthecrap.utils.striterators.IStriterator;
  * <dd>sum( neighbor_value / neighbor_num_out_edges ) over the in-edges of the
  * graph.</dd>
  * <dt>Apply</dt>
- * <dd>value = <i>resetProb</i> + (1.0 Ð <i>resetProb</i>) * gatherSum</dd>
+ * <dd>value = <i>resetProb</i> + (1.0 - <i>resetProb</i>) * gatherSum</dd>
  * <dt>Scatter</dt>
  * <dd>if (a) value has significantly changed <code>(fabs(old-new) GT
  * <i>epsilon</i>)</code>; or (b) iterations LT limit</dd>
