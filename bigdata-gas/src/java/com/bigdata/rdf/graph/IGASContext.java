@@ -21,8 +21,6 @@ import java.util.concurrent.ExecutionException;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 
-import cutthecrap.utils.striterators.IStriterator;
-
 /**
  * Execution context for an {@link IGASProgram}. This is distinct from the
  * {@link IGASEngine} so we can support distributed evaluation and concurrent
@@ -176,23 +174,23 @@ public interface IGASContext<VS, ES, ST> extends Callable<IGASStats> {
      */
     <T> IReducer<VS, ES, ST, T> getRunAfterOp();
 
-    /**
-     * Hook to impose a constraint on the visited edges and/or property values.
-     * 
-     * @param itr
-     *            The iterator visiting those edges and/or property values.
-     * 
-     * @return Either the same iterator or a constrained iterator.
-     * 
-     *         TODO Rename as constrainEdgeFilter or even split into a
-     *         constrainGatherFilter and a constraintScatterFilter.
-     * 
-     *         TODO APPLY : If we need access to the vertex property values in
-     *         APPLY (which we probably do, at least optionally), then perhaps
-     *         there should be a similar method to decide whether the property
-     *         values for the vertex are made available during the APPLY.
-     */
-    IStriterator constrainFilter(IStriterator eitr);
+//    /**
+//     * Hook to impose a constraint on the visited edges and/or property values.
+//     * 
+//     * @param itr
+//     *            The iterator visiting those edges and/or property values.
+//     * 
+//     * @return Either the same iterator or a constrained iterator.
+//     * 
+//     *         TODO Split into a constrainGatherFilter and a
+//     *         constraintScatterFilter?
+//     * 
+//     *         TODO APPLY : If we need access to the vertex property values in
+//     *         APPLY (which we probably do, at least optionally), then perhaps
+//     *         there should be a similar method to decide whether the property
+//     *         values for the vertex are made available during the APPLY.
+//     */
+//    IStriterator getConstrainEdgeFilter(IStriterator eitr);
     
     /**
      * Execute one iteration.

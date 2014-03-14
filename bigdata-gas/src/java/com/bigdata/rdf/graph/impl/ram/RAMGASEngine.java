@@ -33,6 +33,7 @@ import org.openrdf.sail.SailException;
 import com.bigdata.rdf.graph.EdgesEnum;
 import com.bigdata.rdf.graph.IGASContext;
 import com.bigdata.rdf.graph.IGraphAccessor;
+import com.bigdata.rdf.graph.impl.EdgeOnlyFilter;
 import com.bigdata.rdf.graph.impl.GASEngine;
 import com.bigdata.rdf.graph.impl.util.VertexDistribution;
 
@@ -349,7 +350,10 @@ public class RAMGASEngine extends GASEngine {
             /*
              * Optionally wrap the program specified filter. 
              */
-            return ctx.constrainFilter(sitr);
+//            return ctx.getConstrainEdgeFilter(sitr);
+            sitr.addFilter(new EdgeOnlyFilter(ctx));
+            
+            return sitr;
 
         }
 

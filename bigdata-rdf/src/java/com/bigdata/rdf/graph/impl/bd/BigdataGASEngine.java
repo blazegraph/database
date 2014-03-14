@@ -31,6 +31,7 @@ import com.bigdata.rdf.graph.IGASSchedulerImpl;
 import com.bigdata.rdf.graph.IGASState;
 import com.bigdata.rdf.graph.IGraphAccessor;
 import com.bigdata.rdf.graph.IStaticFrontier;
+import com.bigdata.rdf.graph.impl.EdgeOnlyFilter;
 import com.bigdata.rdf.graph.impl.GASEngine;
 import com.bigdata.rdf.graph.impl.util.VertexDistribution;
 import com.bigdata.rdf.internal.IV;
@@ -385,7 +386,8 @@ public class BigdataGASEngine extends GASEngine {
                  * test to verify expected benefit. Watch out for the in-edges
                  * vs out-edges since only one is optimized.
                  */
-                posOptimization = linkTypeIV != null && inEdges;
+                posOptimization = linkTypeIV != null && linkAttrTypeIV == null
+                        && inEdges;
 
                 if (posOptimization) {
 
@@ -401,62 +403,20 @@ public class BigdataGASEngine extends GASEngine {
 
                     keyBuilder.reset();
 
-//                    if (linkAttrTypeIV != null) {
-//
-//                        /*
-//                         * RDR optimization for POS(C) index:
-//                         * 
-//                         * P:= linkAttributeType
-//                         * 
-//                         * O:= unbound (the SID is in SPO(C) order, but we do
-//                         * not have S. P would be the linkType, but without S we
-//                         * can not form a prefix).
-//                         * 
-//                         * S:= unbound
-//                         * 
-//                         * C:= unbound
-//                         * 
-//                         * Note: We can only optimize this when both the
-//                         * linkType and linkAttributeType are specified.
-//                         */
-//
-//                        // P
-//                        IVUtility.encode(keyBuilder, linkAttrTypeIV);
-//
-//                        // O is a SID prefix.
-//                        {
-//
-//                            // RDR prefix byte.
-//                            keyBuilder.append(SidIV.toFlags());
-//
-//                            // SID.P:=linkType
-//                            IVUtility.encode(keyBuilder, linkTypeIV);
-//
-//                            // SID.O:=u
-//                            IVUtility.encode(keyBuilder, u);
-//
-//                        }
-//                        
-//                        // The rest of the key is unbound.
-//
-//                    } else {
+                    // Bind P as a constant.
+                    IVUtility.encode(keyBuilder, linkTypeIV);
 
-                        // Bind P as a constant.
-                        IVUtility.encode(keyBuilder, linkTypeIV);
-
-                        // Bind O for this key-range scan.
-                        IVUtility.encode(keyBuilder, u);
-
-//                    }
+                    // Bind O for this key-range scan.
+                    IVUtility.encode(keyBuilder, u);
 
                 } else {
 
                     /*
                      * SPO(C) or OSP(C)
                      * 
-                     * FIXME RDR: For RDR link attribute access, the keys are
-                     * formed differently. Lower case letters are used for
-                     * variables. Upper case letters for constants.
+                     * Note: For RDR link attribute access, the keys are formed
+                     * differently. Lower case letters are used for variables.
+                     * Upper case letters for constants.
                      * 
                      * For SPO(C): S:=SID(Spo(c)), P:=linkAttributeType (must
                      * filter), O:=linkAttributeValue (read it off the index
@@ -466,9 +426,9 @@ public class BigdataGASEngine extends GASEngine {
                      * filter), S:=linkAttributeValue (read it off the index
                      * when the filter is satisfied).
                      * 
-                     * FIXME RDR should also be supported in the SAIL and RAM
-                     * GAS engine implementations. The statements about
-                     * statements would be modeled as reified statement models.
+                     * TODO RDR should also be supported in the SAIL and RAM GAS
+                     * engine implementations. The statements about statements
+                     * would be modeled as reified statement models.
                      */
 
                     keyOrder = getKeyOrder(kb, inEdges);
@@ -478,7 +438,18 @@ public class BigdataGASEngine extends GASEngine {
                     keyBuilder = ndx.getIndexMetadata().getKeyBuilder();
 
                     keyBuilder.reset();
+                    
+                    if (linkAttrTypeIV != null) {
+                    
+                        /*
+                         * Restrict to the SID region of the index. See
+                         * SidIV.encode().
+                         */
+                        keyBuilder.appendSigned(SidIV.toFlags());
+                        
+                    }
 
+                    // Append [u] to the key.
                     IVUtility.encode(keyBuilder, u);
 
                 }
@@ -557,31 +528,99 @@ public class BigdataGASEngine extends GASEngine {
 
                 if (linkTypeIV != null && !posOptimization) {
                     /*
-                     * A link type constraint was specified, but we were not able to
-                     * use the POS(C) index optimization. In this case we have to
-                     * add a filter to impose that link type constraint.
+                     * A link type constraint was specified, but we were not
+                     * able to use the POS(C) index optimization. In this case
+                     * we have to add a filter to impose that link type
+                     * constraint.
+                     */
+                    if (linkAttrTypeIV == null) {
+                        /*
+                         * The linkTypeIV is the Predicate.
+                         */
+                        sitr.addFilter(new Filter() {
+                            private static final long serialVersionUID = 1L;
+
+                            @Override
+                            public boolean isValid(final Object e) {
+                                return ((ISPO) e).p().equals(linkTypeIV);
+                            }
+                        });
+                    } else {
+                        /*
+                         * The linkTypeIV is part of the SIDIV of the Subject.
+                         */
+                        sitr.addFilter(new Filter() {
+                            private static final long serialVersionUID = 1L;
+                            @Override
+                            public boolean isValid(final Object e) {
+                                final SidIV<?> subj = (SidIV<?>) ((ISPO) e).s();
+                                final ISPO linkAttr = subj.getInlineValue();
+                                final IV<?, ?> p = linkAttr.p();
+                                final boolean matched = p.equals(linkTypeIV);
+                                return matched;
+                            }
+                        });
+                    }
+                }
+                
+                if (linkAttrTypeIV != null) {
+                    /*
+                     * A link attribute type constraint was specified.
                      */
                     sitr.addFilter(new Filter() {
                         private static final long serialVersionUID = 1L;
                         @Override
                         public boolean isValid(final Object e) {
-                            return ((ISPO) e).p().equals(linkTypeIV);
+                            final IV<?,?> p = ((ISPO) e).p();
+                            final boolean matched = p.equals(linkAttrTypeIV);
+                            return matched;
                         }
                     });
                 }
                 
-                /*
-                 * Optionally wrap the specified filter. This filter will be
-                 * pushed down onto the index. If the index is remote, then this
-                 * is much more efficient. (If the index is local, then simply
-                 * stacking striterators is just as efficient.)
-                 */
+                if (linkTypeIV == null && linkAttrTypeIV == null) {
 
-                return ctx.constrainFilter(sitr);
+                    /*
+                     * Wrap the iterator with a filter that will exclude any
+                     * non-link Statements.
+                     * 
+                     * Note: This is handled automatically by the fromkey, toKey
+                     * constraint if the linkTypeIV is specified.
+                     * 
+                     * TODO This is NOT handled automatically by the fromKey,
+                     * toKey constraint if the linkAttrTypeIV is specified. In
+                     * fact, it might not be handled.
+                     */
+                    
+                    sitr.addFilter(new EdgeOnlyFilter(ctx));
 
+                }
+                
+                return sitr;
+
+//                /*
+//                 * Optionally wrap the specified filter. This filter will be
+//                 * pushed down onto the index. If the index is remote, then this
+//                 * is much more efficient. (If the index is local, then simply
+//                 * stacking striterators is just as efficient.)
+//                 */
+//
+//                return ctx.getConstrainEdgeFilter(sitr);
+                
             }
             
         } // class AP
+        
+//        /**
+//         * Return an {@link IFilter} that will only visit the edges of the graph.
+//         * 
+//         * @see IGASState#isEdge(Statement)
+//         */
+//        protected IFilter getEdgeOnlyFilter() {
+//
+//            return new EdgeOnlyFilter(this);
+//            
+//        }
         
         @SuppressWarnings({ "rawtypes" })
         private IStriterator getEdges(final AbstractTripleStore kb,
@@ -601,7 +640,7 @@ public class BigdataGASEngine extends GASEngine {
             
         }
 
-        @SuppressWarnings({ "unchecked", "rawtypes" })
+        @SuppressWarnings("unchecked")
         @Override
         public Iterator<Statement> getEdges(final IGASContext<?, ?, ?> ctx,
                 final Value u, final EdgesEnum edges) {
