@@ -750,7 +750,9 @@ function explore(uri) {
 }
 
 function updateExploreError(jqXHR, textStatus, errorThrown) {
-   $('#explore-results').html('Error! ' + textStatus + ' ' + errorThrown);
+   $('#explore-results').hide();
+   $('#explore-no-results').show();
+   $('#explore-no-results').html('Error! ' + textStatus + ' ' + errorThrown);
 }
 
 /* Status */
