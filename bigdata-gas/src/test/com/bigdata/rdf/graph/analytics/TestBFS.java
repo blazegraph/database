@@ -70,12 +70,19 @@ public class TestBFS extends AbstractSailGraphTestCase {
                 gasContext.call();
 
                 assertEquals(0, gasState.getState(p.getMike()).depth());
+                assertEquals(null, gasState.getState(p.getMike()).predecessor());
 
                 assertEquals(1, gasState.getState(p.getFoafPerson()).depth());
+                assertEquals(p.getMike(), gasState.getState(p.getFoafPerson())
+                        .predecessor());
 
                 assertEquals(1, gasState.getState(p.getBryan()).depth());
+                assertEquals(p.getMike(), gasState.getState(p.getBryan())
+                        .predecessor());
 
                 assertEquals(2, gasState.getState(p.getMartyn()).depth());
+                assertEquals(p.getBryan(), gasState.getState(p.getMartyn())
+                        .predecessor());
 
             } finally {
     

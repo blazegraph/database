@@ -222,36 +222,10 @@ abstract public class BaseGASProgram<VS, ES, ST> implements
     }
 
     /**
-     * Return an {@link IBinder} for the vertex itself
-     */
-    private IBinder<VS, ES, ST> getBinder0() {
-
-        return new IBinder<VS, ES, ST>() {
-
-            @Override
-            public int getIndex() {
-                
-                return 0;
-                
-            }
-
-            @Override
-            public Value bind(final ValueFactory vf,
-                    final IGASState<VS, ES, ST> state, final Value u) {
-     
-                return u;
-                
-            }
-
-        };
-        
-    }
-
-    /**
      * {@inheritDoc}
      * <p>
      * <dl>
-     * <dt>0</dt>
+     * <dt>{@value Bindings#VISITED}</dt>
      * <dd>The visited vertex itself.</dd>
      * </dl>
      */
@@ -260,10 +234,43 @@ abstract public class BaseGASProgram<VS, ES, ST> implements
 
         final List<IBinder<VS, ES, ST>> tmp = new LinkedList<IBinder<VS, ES, ST>>();
 
-        tmp.add(getBinder0());
+        tmp.add(new IBinder<VS, ES, ST>() {
+
+            @Override
+            public int getIndex() {
+
+                return Bindings.VISITED;
+
+            }
+
+            @Override
+            public Value bind(final ValueFactory vf,
+                    final IGASState<VS, ES, ST> state, final Value u) {
+
+                return u;
+
+            }
+
+        });
 
         return tmp;
 
     }
 
+    /**
+     * Interface declares symbolic constants for the {@link IBinder}s reported
+     * by {@link BaseGASProgram#getBinderList()}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+     *         Thompson</a>
+     */
+    public interface Bindings {
+        
+        /**
+         * The visited vertex identifier.
+         */
+        int VISITED = 0;
+
+    }
+    
 }

@@ -21,6 +21,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.openrdf.model.Statement;
 import org.openrdf.model.Value;
@@ -62,7 +63,13 @@ public class BFS extends BaseGASProgram<BFS.VS, BFS.ES, Void> {
          * scheduled.
          */
         private final AtomicInteger depth = new AtomicInteger(-1);
-
+        
+        /**
+         * The predecessor is the first source vertex to visit a given target
+         * vertex.
+         */
+        private final AtomicReference<Value> predecessor = new AtomicReference<Value>();
+        
         /**
          * The depth at which this vertex was first visited (origin ZERO) and
          * <code>-1</code> if the vertex has not been visited.
@@ -74,6 +81,15 @@ public class BFS extends BaseGASProgram<BFS.VS, BFS.ES, Void> {
         }
 
         /**
+         * Return the first vertex to discover this vertex during BFS traversal.
+         */
+        public Value predecessor() {
+
+            return predecessor.get();
+            
+        }
+
+        /**
          * Note: This marks the vertex at the current traversal depth.
          * 
          * @return <code>true</code> if the vertex was visited for the first
@@ -81,8 +97,9 @@ public class BFS extends BaseGASProgram<BFS.VS, BFS.ES, Void> {
          *         first visited the vertex (this helps to avoid multiple
          *         scheduling of a vertex).
          */
-        public boolean visit(final int depth) {
+        public boolean visit(final int depth, final Value predecessor) {
             if (this.depth.compareAndSet(-1/* expect */, depth/* newValue */)) {
+                this.predecessor.set(predecessor);
                 // Scheduled by this thread.
                 return true;
             }
@@ -163,8 +180,8 @@ public class BFS extends BaseGASProgram<BFS.VS, BFS.ES, Void> {
     public void initVertex(final IGASContext<BFS.VS, BFS.ES, Void> ctx,
             final IGASState<BFS.VS, BFS.ES, Void> state, final Value u) {
 
-        state.getState(u).visit(0);
-        
+        state.getState(u).visit(0, null/* predecessor */);
+
     }
     
     /**
@@ -222,10 +239,10 @@ public class BFS extends BaseGASProgram<BFS.VS, BFS.ES, Void> {
             final IGASScheduler sch, final Value u, final Statement e) {
 
         // remote vertex state.
-        final VS otherState = state.getState(e.getObject());
+        final VS otherState = state.getState(e.getObject()/* v */);
 
         // visit.
-        if (otherState.visit(state.round() + 1)) {
+        if (otherState.visit(state.round() + 1, u/* predecessor */)) {
 
             /*
              * This is the first visit for the remote vertex. Add it to the
@@ -249,8 +266,12 @@ public class BFS extends BaseGASProgram<BFS.VS, BFS.ES, Void> {
      * {@inheritDoc}
      * <p>
      * <dl>
-     * <dt>1</dt>
-     * <dd>The depth at which the vertex was first encountered during traversal.</dd>
+     * <dt>{@value Bindings#DEPTH}</dt>
+     * <dd>The depth at which the vertex was first encountered during traversal.
+     * </dd>
+     * <dt>{@value Bindings#PREDECESSOR}</dt>
+     * <dd>The predecessor is the first vertex that discovers a given vertex
+     * during traversal.</dd>
      * </dl>
      */
     @Override
@@ -262,7 +283,7 @@ public class BFS extends BaseGASProgram<BFS.VS, BFS.ES, Void> {
             
             @Override
             public int getIndex() {
-                return 1;
+                return Bindings.DEPTH;
             }
             
             @Override
@@ -274,8 +295,44 @@ public class BFS extends BaseGASProgram<BFS.VS, BFS.ES, Void> {
             }
         });
 
+        tmp.add(new IBinder<BFS.VS, BFS.ES, Void>() {
+            
+            @Override
+            public int getIndex() {
+                return Bindings.PREDECESSOR;
+            }
+            
+            @Override
+            public Value bind(final ValueFactory vf,
+                    final IGASState<BFS.VS, BFS.ES, Void> state, final Value u) {
+
+                return state.getState(u).predecessor.get();
+
+            }
+        });
+
         return tmp;
 
+    }
+
+    /**
+     * Additional {@link IBinder}s exposed by {@link BFS}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     */
+    public interface Bindings extends BaseGASProgram.Bindings {
+        
+        /**
+         * The depth at which the vertex was visited.
+         */
+        int DEPTH = 1;
+        
+        /**
+         * The BFS predecessor is the first vertex to discover a given vertex.
+         * 
+         */
+        int PREDECESSOR = 2;
+        
     }
 
     /**
