@@ -16,6 +16,7 @@
 package com.bigdata.rdf.graph.analytics;
 
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -24,6 +25,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.apache.log4j.Logger;
 import org.openrdf.model.Statement;
 import org.openrdf.model.Value;
+import org.openrdf.model.ValueFactory;
 
 import com.bigdata.rdf.graph.EdgesEnum;
 import com.bigdata.rdf.graph.Factory;
@@ -302,6 +304,57 @@ public class CC extends BaseGASProgram<CC.VS, CC.ES, Value> {
 
         sch.schedule(v);
 
+    }
+
+    /**
+     * {@inheritDoc}
+     * <p>
+     * <dl>
+     * <dt>{@value Bindings#LABEL}</dt>
+     * <dd>The label associated with all of the vertices in the same subgraph.
+     * The label is a vertex identifier and can be used to jump into the
+     * subgraph.</dd>
+     * </dl>
+     */
+    @Override
+    public List<IBinder<CC.VS, CC.ES, Value>> getBinderList() {
+
+        final List<IBinder<CC.VS, CC.ES, Value>> tmp = super.getBinderList();
+
+        tmp.add(new IBinder<CC.VS, CC.ES, Value>() {
+            
+            @Override
+            public int getIndex() {
+                return Bindings.LABEL;
+            }
+            
+            @Override
+            public Value bind(final ValueFactory vf,
+                    final IGASState<CC.VS, CC.ES, Value> state, final Value u) {
+
+                return state.getState(u).label.get();
+
+            }
+        });
+
+        return tmp;
+
+    }
+
+    /**
+     * Additional {@link IBinder}s exposed by {@link CC}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     */
+    public interface Bindings extends BaseGASProgram.Bindings {
+        
+        /**
+         * The label associated with all of the vertices in a subgraph. The
+         * label is a vertex identifier and can be used to jump into the
+         * subgraph.
+         */
+        int LABEL = 1;
+        
     }
 
     /**
