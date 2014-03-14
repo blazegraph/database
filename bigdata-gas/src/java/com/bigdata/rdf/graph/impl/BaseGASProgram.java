@@ -125,17 +125,17 @@ abstract public class BaseGASProgram<VS, ES, ST> implements
 
     }
     
-    /**
-     * {@inheritDoc}
-     * <p>
-     * The default implementation is a NOP.
-     */
-    @Override
-    public <T> IReducer<VS, ES, ST, T> getDefaultAfterOp() {
-    
-        return null; // NOP
-        
-    }
+//    /**
+//     * {@inheritDoc}
+//     * <p>
+//     * The default implementation is a NOP.
+//     */
+//    @Override
+//    public <T> IReducer<VS, ES, ST, T> getDefaultAfterOp() {
+//    
+//        return null; // NOP
+//        
+//    }
     
     /**
      * Populate the initial frontier using all vertices in the graph.

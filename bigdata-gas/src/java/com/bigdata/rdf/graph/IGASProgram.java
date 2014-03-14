@@ -53,14 +53,14 @@ public interface IGASProgram<VS, ES, ST> extends IGASOptions<VS, ES, ST> {
      */
     void before(IGASContext<VS, ES, ST> ctx);
 
-    /**
-     * Return a default reduction that will be applied after the
-     * {@link IGASProgram} is executed.
-     * 
-     * @return The default reduction -or- <code>null</code> if no such reduction
-     *         is defined.
-     */
-    <T> IReducer<VS, ES, ST, T> getDefaultAfterOp();
+//    /**
+//     * Return a default reduction that will be applied after the
+//     * {@link IGASProgram} is executed.
+//     * 
+//     * @return The default reduction -or- <code>null</code> if no such reduction
+//     *         is defined.
+//     */
+//    <T> IReducer<VS, ES, ST, T> getDefaultAfterOp();
 
     /**
      * Callback to initialize the state for each vertex in the initial frontier
