@@ -588,8 +588,7 @@ function showQueryResults(data) {
                } else {
                   var text = binding.value;
                }
-               // hack to escape HTML characters
-               text = $('<div/>').text(text).html();
+               text = escapeHTML(text);
                if(binding.type == 'typed-literal') {
                   var tdData = ' class="literal" data-datatype="' + binding.datatype + '"';
                } else {
@@ -612,7 +611,6 @@ function showQueryResults(data) {
 
       $('#query-response a').click(function(e) {
          e.preventDefault();
-         // var uri = $(this).text();
          explore(this.textContent);
       });
    }
@@ -626,56 +624,72 @@ function queryResultsError(jqXHR, textStatus, errorThrown) {
    $('#query-response').text('Error! ' + textStatus + ' ' + errorThrown);
 }
 
-function getSID(binding) {
-   return '<< <' + binding.value['sid-s'].value + '> <' + binding.value['sid-p'].value + '> <' + binding.value['sid-o'].value + '> >>';
-}
-
-function parseSID(sid) {
-   var re = /<< <([^<>]*)> <([^<>]*)> <([^<>]*)> >>/;
-   var matches = sid.match(re);
-   return {'s': matches[1], 'p': matches[2], 'o': matches[3]};
-}
-
 /* Explore */
 
 $('#explore-form').submit(function(e) {
    e.preventDefault();
    var uri = $(this).find('input').val();
    if(uri) {
-      loadURI(uri);   
+      loadURI(uri);
+      $('#explore-header h1').text(uri);
    }
 });
 
-function loadURI(uri) {
-   // send query to server
-   var query = 'select * \
-                  where { \
-                     bind (<URI> as ?vertex) . \
-                     { \
-                        bind (<<?vertex ?p ?o>> as ?sid) . \
-                        optional \
-                        { \
-                           { \
-                              ?sid ?sidP ?sidO . \
-                           } union { \
-                              ?sidS ?sidP ?sid . \
-                           } \
-                        } \
-                     } union { \
-                        bind (<<?s ?p ?vertex>> as ?sid) . \
-                        optional \
-                        { \
-                           { \
-                              ?sid ?sidP ?sidO . \
-                           } union { \
-                              ?sidS ?sidP ?sid . \
-                           } \
-                        } \
-                     } \
-                  }';
-   
-   query = query.replace('URI', uri);
-   console.log('Explore query');
+function loadURI(target) {
+   // identify if this is a vertex or a SID
+   var re = /< (?:<[^<>]*> ){3}>/;
+   var vertex = !target.match(re);
+
+   var vertexQuery = '\
+select ?col1 ?col2 ?incoming (count(?star) as ?star) {\n\
+  bind (<URI> as ?explore ) .\n\
+  {\n\
+    bind (<<?explore ?col1 ?col2>> as ?sid) . \n\
+    bind (false as ?incoming) . \n\
+    optional {\n\
+      { ?sid ?sidP ?star } union { ?star ?sidP ?sid }\n\
+    }\n\
+  } union {\n\
+    bind (<<?col1 ?col2 ?explore>> as ?sid) .\n\
+    bind (true as ?incoming) . \n\
+    optional {\n\
+      { ?sid ?sidP ?star } union { ?star ?sidP ?sid }\n\
+    }\n\
+  }\n\
+}\n\
+group by ?col1 ?col2 ?incoming';
+
+   var edgeQuery = '\
+select ?col1 ?col2 ?incoming (count(?star) as ?star)\n\
+with {\n\
+  select ?explore where {\n\
+    bind (<SID> as ?explore) .\n\
+  }\n\
+} as %_explore\n\
+where {\n\
+  include %_explore .\n\
+  {\n\
+    bind (<<?explore ?col1 ?col2>> as ?sid) . \n\
+    bind (false as ?incoming) . \n\
+    optional {\n\
+      { ?sid ?sidP ?star } union { ?star ?sidP ?sid }\n\
+    }\n\
+  } union {\n\
+    bind (<<?col1 ?col2 ?explore>> as ?sid) .\n\
+    bind (true as ?incoming) . \n\
+    optional {\n\
+      { ?sid ?sidP ?star } union { ?star ?sidP ?sid }\n\
+    }\n\
+  }\n\
+}\n\
+group by ?col1 ?col2 ?incoming';
+
+   if(vertex) {
+      var query = vertexQuery.replace('URI', target);
+   } else {
+      var query = edgeQuery.replace('SID', target);
+   }
+   console.log('Explore query for ' + (vertex ? 'vertex ' : 'edge ') + target);
    console.log(query);
    var settings = {
       type: 'POST',
@@ -701,20 +715,72 @@ function updateExploreStart(data) {
       return;
    }
    
-   var vertex = data.results.bindings[0].vertex;
-   $('#explore-header h1').text(vertex.value);
-   var outbound=[], inbound=[], attributes=[];
+   // clear tables
+   $('#explore-incoming table, #explore-outgoing table, #explore-attributes table').html('');
+
+   // go through each binding, adding it to the appropriate table
+   $.each(data.results.bindings, function(i, binding) {
+      var cols = [binding.col1, binding.col2].map(function(col) {
+         if(col.type == 'sid') {
+            var output = getSID(col);
+         } else {
+            var output = col.value;
+         }
+         output = escapeHTML(output);
+         if(col.type == 'uri' || col.type == 'sid') {
+            output = '<a href="#">' + output + '</a>';
+         }
+         return output;
+      });
+      var star = parseInt(binding.star.value);
+      if(star > 0) {
+         if(binding.incoming.value == 'true') {
+            var sid = '< <' +  binding.col1.value + '> <' + binding.col2.value + '> <' + $('#explore-form input[type=text]').val() + '> >';
+         } else {
+            var sid = '< <' + $('#explore-form input[type=text]').val() + '> <' +  binding.col1.value + '> <' + binding.col2.value + '> >';
+         }
+         star = '<a href="#" data-sid="' + sid + '">*</a> (' + star + ')';
+      } else {
+         star = '';
+      }
+      var row = '<tr><td>' + cols[0] + '</td><td>' + cols[1] + '</td><td>' + star + '</td></tr>';
+      if(binding.incoming.value == 'true') {
+         $('#explore-incoming table').append(row);
+      } else {
+         // either attribute or outgoing
+         if(binding.col2.type == 'uri') {
+            // outgoing
+            $('#explore-outgoing table').append(row);
+         } else {
+            // attribute
+            $('#explore-attributes table').append(row);
+         }
+      }
+   });
+
+   $('#explore-results a').click(function(e) {
+      e.preventDefault();
+      explore($(this).data('sid') ? $(this).data('sid') : this.text);
+   });
+
+   return;
+
+   var outbound={}, inbound={}, attributes={};
    for(var i=0; i<data.results.bindings.length; i++) {
       var binding = data.results.bindings[i];
-      // TODO: are attributes always on outbound relationships?
+      var star = typeof(binding.sidP) != 'undefined';
       if('o' in binding) {
+         var key = [binding.p.value, binding.o.value];
          if(binding.o.type == 'uri') {
-            outbound.push(binding);
+            // leave star true if it was before, or set it to current value
+            outbound[key] = !!outbound[key] || star;
          } else {
-            attributes.push(binding);
+            // do not show star for attributes
+            attributes[key] = false;
          }      
       } else {
-         inbound.push(binding);
+         var key = [binding.s.value, binding.p.value]
+         inbound[key] == !!inbound[key] || star;
       }
    }
    
@@ -723,9 +789,8 @@ function updateExploreStart(data) {
    if(outbound.length) {
       outgoingContainer.append('<h2>Outgoing links</h2>');
       var table = $('<table>').appendTo(outgoingContainer);
-      for(var i=0; i<outbound.length; i++) {
-         var linkAttributes = outbound[i].sidP.value + ': ' + outbound[i].sidO.value;  
-         table.append('<tr><td>' + outbound[i].p.value + '</td><td><a href="#">' + outbound[i].o.value + '</a></td><td>' + linkAttributes + '</td></tr>');
+      for(key in outbound) {
+         table.append('<tr><td>' + key[0] + '</td><td><a href="#">' + key[1] + '</a></td><td>' + (outbound[key] ? '*' : '') + '</td></tr>');
       }
    } else {
       outgoingContainer.append('<h2>No outgoing links</h2>');
@@ -736,9 +801,8 @@ function updateExploreStart(data) {
    if(inbound.length) {
       incomingContainer.append('<h2>Inbound links</h2>');
       var table = $('<table>').appendTo(incomingContainer);
-      for(var i=0; i<inbound.length; i++) {
-         var linkAttributes = inbound[i].sidP.value + ': ' + inbound[i].sidO.value;  
-         table.append('<tr><td><a href="#">' + inbound[i].s.value + '</a></td><td>' + inbound[i].p.value + '</td><td>' + linkAttributes + '</td></tr>');
+      for(key in inbound) {
+         table.append('<tr><td>' + key[0] + '</td><td><a href="#">' + key[1] + '</a></td><td>' + (inbound[key] ? '*' : '') + '</td></tr>');
       }
    } else {
       incomingContainer.append('<h2>No incoming links</h2>');
@@ -789,5 +853,21 @@ $('#tab-selector a[data-target=performance]').click(function(e) {
       $('#performance-tab .box').html(data);
    });
 });
+
+/* Utility functions */
+
+function getSID(binding) {
+   return '< <' + binding.value['sid-s'].value + '> <' + binding.value['sid-p'].value + '> <' + binding.value['sid-o'].value + '> >';
+}
+
+function parseSID(sid) {
+   var re = /<< <([^<>]*)> <([^<>]*)> <([^<>]*)> >>/;
+   var matches = sid.match(re);
+   return {'s': matches[1], 'p': matches[2], 'o': matches[3]};
+}
+
+function escapeHTML(text) {
+   return $('<div/>').text(text).html();
+}
 
 });
