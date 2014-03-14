@@ -50,8 +50,10 @@ public interface IGASOptions<VS, ES, ST> {
     EdgesEnum getSampleEdgesFilter();
     
     /**
-     * Return the set of edges to which the GATHER is applied -or-
-     * {@link EdgesEnum#NoEdges} to skip the GATHER phase.
+     * Return the set of edges to which the GATHER is applied for a
+     * <em>directed</em> graph -or- {@link EdgesEnum#NoEdges} to skip the GATHER
+     * phase. This will be interpreted based on the value reported by 
+     * {@link IGASContext#isDirectedTraversal()}.
      * 
      * TODO We may need to set dynamically when visting the vertex in the
      * frontier rather than having it be a one-time property of the vertex
@@ -60,8 +62,10 @@ public interface IGASOptions<VS, ES, ST> {
     EdgesEnum getGatherEdges();
 
     /**
-     * Return the set of edges to which the SCATTER is applied -or-
-     * {@link EdgesEnum#NoEdges} to skip the SCATTER phase.
+     * Return the set of edges to which the SCATTER is applied for a
+     * <em>directed</em> graph -or- {@link EdgesEnum#NoEdges} to skip the
+     * SCATTER phase. This will be interpreted based on the value reported by
+     * {@link IGASContext#isDirectedTraversal()}.
      */
     EdgesEnum getScatterEdges();
 

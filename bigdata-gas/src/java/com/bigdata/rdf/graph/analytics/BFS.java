@@ -239,7 +239,9 @@ public class BFS extends BaseGASProgram<BFS.VS, BFS.ES, Void> {
             final IGASScheduler sch, final Value u, final Statement e) {
 
         // remote vertex state.
-        final VS otherState = state.getState(e.getObject()/* v */);
+        final Value v = state.getOtherVertex(u, e);
+        final VS otherState = state.getState(v);
+//        final VS otherState = state.getState(e.getObject()/* v */);
 
         // visit.
         if (otherState.visit(state.round() + 1, u/* predecessor */)) {
@@ -249,7 +251,7 @@ public class BFS extends BaseGASProgram<BFS.VS, BFS.ES, Void> {
              * schedule for the next iteration.
              */
 
-            sch.schedule(e.getObject());
+            sch.schedule(v);
 
         }
 

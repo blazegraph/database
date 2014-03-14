@@ -185,6 +185,16 @@ public class GASService implements CustomServiceFactory {
         int DEFAULT_NTHREADS = 4;
 
         /**
+         * This option determines whether the traversal of the graph will
+         * interpret the edges as directed or undirected.
+         * 
+         * @see IGASContext#setDirectedTraversal(boolean)
+         */
+        URI DIRECTED_TRAVERSAL = new URIImpl(NAMESPACE + "directedTraversal");
+        
+        boolean DEFAULT_DIRECTED_TRAVERSAL = true;
+        
+        /**
          * The maximum #of iterations for the GAS program (optional, default
          * {@value #DEFAULT_MAX_ITERATIONS}).
          * 
@@ -375,6 +385,7 @@ public class GASService implements CustomServiceFactory {
         
         // options extracted from the SERVICE's graph pattern.
         private final int nthreads;
+        private final boolean directedTraversal;
         private final int maxIterations;
         private final int maxVisited;
         private final URI linkType, linkAttrType;
@@ -407,6 +418,11 @@ public class GASService implements CustomServiceFactory {
                     Options.NTHREADS,
                     store.getValueFactory().createLiteral(
                             Options.DEFAULT_NTHREADS))).intValue();
+
+            this.directedTraversal = ((Literal) getOnlyArg(Options.PROGRAM,
+                    Options.DIRECTED_TRAVERSAL, store.getValueFactory()
+                            .createLiteral(Options.DEFAULT_DIRECTED_TRAVERSAL)))
+                    .booleanValue();
 
             this.maxIterations = ((Literal) getOnlyArg(Options.PROGRAM,
                     Options.MAX_ITERATIONS, store.getValueFactory()
@@ -728,6 +744,8 @@ public class GASService implements CustomServiceFactory {
                 final IGASContext<VS, ES, ST> gasContext = gasEngine.newGASContext(
                         graphAccessor, gasProgram);
 
+                gasContext.setDirectedTraversal(directedTraversal);
+                
                 gasContext.setMaxIterations(maxIterations);
 
                 gasContext.setMaxVisited(maxVisited);

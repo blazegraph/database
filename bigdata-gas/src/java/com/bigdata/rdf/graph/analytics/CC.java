@@ -291,10 +291,6 @@ public class CC extends BaseGASProgram<CC.VS, CC.ES, Value> {
     /**
      * The remote vertex is scheduled for activation unless it has already been
      * visited.
-     * <p>
-     * Note: We are scattering to out-edges. Therefore, this vertex is
-     * {@link Statement#getSubject()}. The remote vertex is
-     * {@link Statement#getObject()}.
      */
     @Override
     public void scatter(final IGASState<CC.VS, CC.ES, Value> state,

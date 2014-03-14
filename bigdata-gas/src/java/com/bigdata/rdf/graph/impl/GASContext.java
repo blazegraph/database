@@ -19,6 +19,7 @@ import java.util.Iterator;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -62,6 +63,12 @@ public class GASContext<VS, ES, ST> implements IGASContext<VS, ES, ST> {
      */
     private final IGASProgram<VS, ES, ST> program;
 
+    /**
+     * Whether or not the edges of the graph will be traversed with directed
+     * graph semantics (default is TRUE).
+     */
+    private final AtomicBoolean directedGraph = new AtomicBoolean(true);
+    
     /**
      * The maximum number of iterations (defaults to {@link Integer#MAX_VALUE}).
      */
@@ -251,8 +258,12 @@ public class GASContext<VS, ES, ST> implements IGASContext<VS, ES, ST> {
          * APPLY is done before the SCATTER - this would not work if we pushed
          * down the APPLY into the SCATTER).
          */
-        final EdgesEnum gatherEdges = program.getGatherEdges();
-        final EdgesEnum scatterEdges = program.getScatterEdges();
+        final EdgesEnum gatherEdges = isDirectedTraversal() ? program
+                .getGatherEdges() : program.getGatherEdges()
+                .asUndirectedTraversal();
+        final EdgesEnum scatterEdges = isDirectedTraversal() ? program
+                .getScatterEdges() : program.getScatterEdges()
+                .asUndirectedTraversal();
         final boolean pushDownApplyInGather;
         final boolean pushDownApplyInScatter;
         final boolean runApplyStage;
@@ -804,6 +815,20 @@ public class GASContext<VS, ES, ST> implements IGASContext<VS, ES, ST> {
         
     }
 
+    @Override
+    public boolean isDirectedTraversal() {
+    
+        return directedGraph.get();
+        
+    }
+    
+    @Override
+    public void setDirectedTraversal(final boolean newVal) {
+
+        directedGraph.set(newVal);
+        
+    }
+    
     @Override
     public int getMaxIterations() {
 
