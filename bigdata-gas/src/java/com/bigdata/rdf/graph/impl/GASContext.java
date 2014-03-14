@@ -40,7 +40,6 @@ import com.bigdata.rdf.graph.util.GASUtil;
 
 import cutthecrap.utils.striterators.Filter;
 import cutthecrap.utils.striterators.IFilter;
-import cutthecrap.utils.striterators.IStriterator;
 
 public class GASContext<VS, ES, ST> implements IGASContext<VS, ES, ST> {
 
@@ -857,46 +856,46 @@ public class GASContext<VS, ES, ST> implements IGASContext<VS, ES, ST> {
         
     }
 
-    /**
-     * {@inheritDoc}
-     * <p>
-     * The default implementation only visits the edges.
-     */
-    @Override
-    public IStriterator constrainFilter(final IStriterator itr) {
+//    /**
+//     * {@inheritDoc}
+//     * <p>
+//     * The default implementation only visits the edges.
+//     */
+//    @Override
+//    public IStriterator getConstrainEdgeFilter(final IStriterator itr) {
+//
+//        return itr.addFilter(getEdgeOnlyFilter());
+//
+//    }
 
-        return itr.addFilter(getEdgeOnlyFilter());
-
-    }
-
-    /**
-     * Return an {@link IFilter} that will only visit the edges of the graph.
-     * 
-     * @see IGASState#isEdge(Statement)
-     */
-    protected IFilter getEdgeOnlyFilter() {
-
-        return new EdgeOnlyFilter(this);
-        
-    }
-    
-    /**
-     * Filter visits only edges (filters out attribute values).
-     * <p>
-     * Note: This filter is pushed down onto the AP and evaluated close to the
-     * data.
-     */
-    private class EdgeOnlyFilter extends Filter {
-        private static final long serialVersionUID = 1L;
-        private final IGASState<VS, ES, ST> gasState;
-        private EdgeOnlyFilter(final IGASContext<VS, ES, ST> ctx) {
-            this.gasState = ctx.getGASState();
-        }
-        @Override
-        public boolean isValid(final Object e) {
-            return gasState.isEdge((Statement) e);
-        }
-    };
+//    /**
+//     * Return an {@link IFilter} that will only visit the edges of the graph.
+//     * 
+//     * @see IGASState#isEdge(Statement)
+//     */
+//    protected IFilter getEdgeOnlyFilter() {
+//
+//        return new EdgeOnlyFilter(this);
+//        
+//    }
+//    
+//    /**
+//     * Filter visits only edges (filters out attribute values).
+//     * <p>
+//     * Note: This filter is pushed down onto the AP and evaluated close to the
+//     * data.
+//     */
+//    private class EdgeOnlyFilter extends Filter {
+//        private static final long serialVersionUID = 1L;
+//        private final IGASState<VS, ES, ST> gasState;
+//        private EdgeOnlyFilter(final IGASContext<VS, ES, ST> ctx) {
+//            this.gasState = ctx.getGASState();
+//        }
+//        @Override
+//        public boolean isValid(final Object e) {
+//            return gasState.isEdge((Statement) e);
+//        }
+//    };
     
     /**
      * Return a filter that only visits the edges of graph that are instances of

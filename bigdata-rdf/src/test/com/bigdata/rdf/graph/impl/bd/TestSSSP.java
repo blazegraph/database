@@ -175,6 +175,7 @@ public class TestSSSP extends AbstractBigdataGraphTestCase {
             // Converge.
             gasContext.call();
 
+            // Check weighted distance.
             assertEquals(0, gasState.getState(p.getV1()).dist());
 
             assertEquals(100, gasState.getState(p.getV2()).dist());
