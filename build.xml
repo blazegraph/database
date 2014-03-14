@@ -394,9 +394,6 @@ public class BuildInfo {
 			    overview="${bigdata.dir}/overview.html"
 			 windowtitle="bigdata&#174; v${build.ver}"
 			classpathref="build.classpath"
-			package="true"
-			protected="true"
-			public="true"
 			private="false"
 			>
 			<arg value="-J-Xmx1000m" />
@@ -410,6 +407,7 @@ public class BuildInfo {
 			<packageset dir="${bigdata.dir}/bigdata-sails/src/samples" />
          <packageset dir="${bigdata.dir}/bigdata-gom/src/java" />
          <packageset dir="${bigdata.dir}/bigdata-gom/src/samples" />
+         <packageset dir="${bigdata.dir}/bigdata-gas/src/java" />
 			<packageset dir="${bigdata.dir}/ctc-striterators/src/java" />
 			<doctitle>
 				<![CDATA[<h1>bigdata&#174; v${build.ver}</h1>]]></doctitle>
