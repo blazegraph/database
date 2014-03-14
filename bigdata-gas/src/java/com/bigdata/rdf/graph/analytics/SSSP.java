@@ -296,9 +296,10 @@ public class SSSP extends BaseGASProgram<SSSP.VS, SSSP.ES, Integer/* dist */> {
     public Integer gather(final IGASState<SSSP.VS, SSSP.ES, Integer> state,
             final Value u, final Statement e) {
 
-//        assert e.o().equals(u);
+//        assert e.getObject().equals(u);
 
-        final VS src = state.getState(e.getSubject());
+//        final VS src = state.getState(e.getSubject());
+        final VS src = state.getState(u);
         
         final int d = src.dist();
 
@@ -420,7 +421,7 @@ public class SSSP extends BaseGASProgram<SSSP.VS, SSSP.ES, Integer/* dist */> {
                             + newDist);
 
                 // Then add the remote vertex to the next frontier.
-                sch.schedule(e.getObject());
+                sch.schedule(other);
 
             }
 

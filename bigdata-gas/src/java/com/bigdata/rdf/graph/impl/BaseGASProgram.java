@@ -32,7 +32,6 @@ import com.bigdata.rdf.graph.FrontierEnum;
 import com.bigdata.rdf.graph.IGASContext;
 import com.bigdata.rdf.graph.IGASProgram;
 import com.bigdata.rdf.graph.IGASState;
-import com.bigdata.rdf.graph.IReducer;
 import com.bigdata.rdf.graph.impl.util.VertexDistribution;
 
 /**
@@ -65,6 +64,8 @@ abstract public class BaseGASProgram<VS, ES, ST> implements
      * The default implementation returns {@link #getGatherEdges()} and the
      * {@link #getScatterEdges()} if {@link #getGatherEdges()} returns
      * {@value EdgesEnum#NoEdges}. 
+     * 
+     * TODO This ignores {@link IGASContext#isDirectedTraversal()}
      */
     @Override
     public EdgesEnum getSampleEdgesFilter() {

@@ -67,6 +67,22 @@ public interface IGASContext<VS, ES, ST> extends Callable<IGASStats> {
     IGraphAccessor getGraphAccessor();
 
     /**
+     * Specify whether the visited edges of the graph are to be interpreted as
+     * directed or undirected (default <code>directed</code>).
+     * <p>
+     * The value specified here is used to determine how the {@link EdgesEnum}
+     * will be interpreted for the GATHER and SCATTER phases. See
+     * {@link EdgesEnum#asUndirectedTraversal()}.
+     */
+    void setDirectedTraversal(boolean newVal);
+
+    /**
+     * Return <code>true</code> if the graph should be interpreted as a directed
+     * graph.
+     */
+    boolean isDirectedTraversal();
+    
+    /**
      * Specify the maximum number of iterations for the algorithm. A value of
      * ONE means that the algorithm will halt after the first round.
      * 
