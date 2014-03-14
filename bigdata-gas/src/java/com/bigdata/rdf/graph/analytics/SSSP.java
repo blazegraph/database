@@ -146,6 +146,77 @@ public class SSSP extends BaseGASProgram<SSSP.VS, SSSP.ES, Integer/* dist */> {
 
         }
 
+        /**
+         * Mark this as a starting vertex (distance:=ZERO, changed:=true).
+         */
+        synchronized private void setStartingVertex() {
+
+            // Set distance to zero for starting vertex.
+            dist = 0;
+
+            // Must be true to trigger scatter in the 1st round!
+            changed = true;
+
+        }
+
+        /**
+         * Update the vertex state to the minimum of the combined sum and its
+         * current state.
+         * 
+         * @param u
+         *            The vertex that is the owner of this {@link VS vertex
+         *            state} (used only for debug info).
+         * @param sum
+         *            The combined sum from the gather phase.
+         * 
+         * @return <code>this</code> iff the vertex state was modified.
+         * 
+         *         FIXME PREDECESSOR: We can not track the predecessor because
+         *         the SSSP algorithm currently uses a GATHER phase and a
+         *         SCATTER phase rather than doing all the work in a push-style
+         *         SCATTER phase.
+         */
+        synchronized private VS apply(final Value u, final Integer sum) {
+
+            final int minDist = sum;
+
+            changed = false;
+            if (dist > minDist) {
+                dist = minDist;
+                changed = true;
+                if (log.isDebugEnabled())
+                    log.debug("u=" + u + ", us=" + this + ", minDist="
+                            + minDist);
+                return this;
+            }
+            
+            return null;
+
+        }
+
+        /**
+         * Update the vertex state to the new (reduced) distance.
+         * 
+         * @param predecessor
+         *            The vertex that propagated the update to this vertex.
+         * @param newDist
+         *            The new distance.
+         *            
+         * @return <code>true</code> iff this vertex state was changed.
+         */
+        synchronized private boolean scatter(final Value predecessor,
+                final int newDist) {
+            /*
+             * Validate that the distance has decreased while holding the lock.
+             */
+            if (newDist < dist) {
+                dist = newDist;
+                changed = true;
+                return true;
+            }
+            return false;
+        }
+
     }// class VS
 
     /**
@@ -212,15 +283,7 @@ public class SSSP extends BaseGASProgram<SSSP.VS, SSSP.ES, Integer/* dist */> {
 
         final VS us = state.getState(u);
 
-        synchronized (us) {
-
-            // Set distance to zero for starting vertex.
-            us.dist = 0;
-            
-            // Must be true to trigger scatter in the 1st round!
-            us.changed = true;
-            
-        }
+        us.setStartingVertex();
         
     }
     
@@ -278,18 +341,8 @@ public class SSSP extends BaseGASProgram<SSSP.VS, SSSP.ES, Integer/* dist */> {
             // Get the state for that vertex.
             final SSSP.VS us = state.getState(u);
 
-            final int minDist = sum;
-
-            synchronized(us) {
-                us.changed = false;
-                if (us.dist > minDist) {
-                    us.dist = minDist;
-                    us.changed = true;
-                    if (log.isDebugEnabled())
-                        log.debug("u=" + u + ", us=" + us + ", minDist=" + minDist);
-                    return us;
-                }
-            }
+            return us.apply(u, sum);
+            
         }
 
         // No change.
@@ -351,25 +404,25 @@ public class SSSP extends BaseGASProgram<SSSP.VS, SSSP.ES, Integer/* dist */> {
         
         final VS otherState = state.getState(other);
 
-        // last observed distance for the remote vertex.
-        final int otherDist = otherState.dist();
-        
         // new distance for the remote vertex.
         final int newDist = selfState.dist() + EDGE_LENGTH;
         
+        // last observed distance for the remote vertex.
+        final int otherDist = otherState.dist();
+
         if (newDist < otherDist) {
 
-            synchronized (otherState) {
-                otherState.dist = newDist;
-                otherState.changed = true;
-            }
-            
-            if (log.isDebugEnabled())
-                log.debug("u=" + u + " @ " + selfState.dist()
-                        + ", scheduling: " + other + " with newDist=" + newDist);
+            if (otherState.scatter(u/* predecessor */, newDist)) {
 
-            // Then add the remote vertex to the next frontier.
-            sch.schedule(e.getObject());
+                if (log.isDebugEnabled())
+                    log.debug("u=" + u + " @ " + selfState.dist()
+                            + ", scheduling: " + other + " with newDist="
+                            + newDist);
+
+                // Then add the remote vertex to the next frontier.
+                sch.schedule(e.getObject());
+
+            }
 
         }
 
@@ -400,7 +453,7 @@ public class SSSP extends BaseGASProgram<SSSP.VS, SSSP.ES, Integer/* dist */> {
 
             @Override
             public int getIndex() {
-                return 1;
+                return Bindings.DISTANCE;
             }
 
             @Override
@@ -415,6 +468,20 @@ public class SSSP extends BaseGASProgram<SSSP.VS, SSSP.ES, Integer/* dist */> {
 
         return tmp;
 
+    }
+
+    /**
+     * Additional {@link IBinder}s exposed by {@link SSSP}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     */
+    public interface Bindings extends BaseGASProgram.Bindings {
+        
+        /**
+         * The shortest distance to the vertex.
+         */
+        int DISTANCE = 1;
+        
     }
 
 }
