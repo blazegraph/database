@@ -15,12 +15,10 @@
 */
 package com.bigdata.rdf.graph.analytics;
 
-import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.openrdf.model.Statement;
@@ -35,7 +33,7 @@ import com.bigdata.rdf.graph.IBindingExtractor;
 import com.bigdata.rdf.graph.IGASContext;
 import com.bigdata.rdf.graph.IGASScheduler;
 import com.bigdata.rdf.graph.IGASState;
-import com.bigdata.rdf.graph.IReducer;
+import com.bigdata.rdf.graph.IPredecessor;
 import com.bigdata.rdf.graph.impl.BaseGASProgram;
 
 /**
@@ -46,7 +44,8 @@ import com.bigdata.rdf.graph.impl.BaseGASProgram;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
-public class BFS extends BaseGASProgram<BFS.VS, BFS.ES, Void> {
+public class BFS extends BaseGASProgram<BFS.VS, BFS.ES, Void> implements
+        IPredecessor<BFS.VS, BFS.ES, Void> {
 
 //    private static final Logger log = Logger.getLogger(BFS.class);
     
@@ -339,68 +338,112 @@ public class BFS extends BaseGASProgram<BFS.VS, BFS.ES, Void> {
         
     }
 
-    /**
-     * Reduce the active vertex state, returning a histogram reporting the #of
-     * vertices at each distance from the starting vertex. There will always be
-     * one vertex at depth zero - this is the starting vertex. For each
-     * successive depth, the #of vertices that were labeled at that depth is
-     * reported. This is essentially the same as reporting the size of the
-     * frontier in each round of the traversal, but the histograph is reported
-     * based on the vertex state.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
-     *         Thompson</a>
-     * 
-     *         TODO Do another reducer that reports the actual BFS tree rather
-     *         than a histogram. We need to store the predecessor for this. That
-     *         will allow us to trivially report the BFS route between any two
-     *         vertices.
+//    /**
+//     * Reduce the active vertex state, returning a histogram reporting the #of
+//     * vertices at each distance from the starting vertex. There will always be
+//     * one vertex at depth zero - this is the starting vertex. For each
+//     * successive depth, the #of vertices that were labeled at that depth is
+//     * reported. This is essentially the same as reporting the size of the
+//     * frontier in each round of the traversal, but the histograph is reported
+//     * based on the vertex state.
+//     * 
+//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+//     *         Thompson</a>
+//     */
+//    protected static class HistogramReducer implements
+//            IReducer<VS, ES, Void, Map<Integer, AtomicLong>> {
+//
+//        private final ConcurrentHashMap<Integer, AtomicLong> values = new ConcurrentHashMap<Integer, AtomicLong>();
+//
+//        @Override
+//        public void visit(final IGASState<VS, ES, Void> state, final Value u) {
+//
+//            final VS us = state.getState(u);
+//
+//            if (us != null) {
+//
+//                final Integer depth = Integer.valueOf(us.depth());
+//
+//                AtomicLong newval = values.get(depth);
+//
+//                if (newval == null) {
+//
+//                    final AtomicLong oldval = values.putIfAbsent(depth,
+//                            newval = new AtomicLong());
+//
+//                    if (oldval != null) {
+//
+//                        // lost data race.
+//                        newval = oldval;
+//
+//                    }
+//
+//                }
+//
+//                newval.incrementAndGet();
+//
+//            }
+//
+//        }
+//
+//        @Override
+//        public Map<Integer, AtomicLong> get() {
+//
+//            return Collections.unmodifiableMap(values);
+//            
+//        }
+//        
+//    }
+
+    /*
+     * TODO Do this in parallel for each specified target vertex.
      */
-    protected static class HistogramReducer implements
-            IReducer<VS, ES, Void, Map<Integer, AtomicLong>> {
+    @Override
+    public void prunePaths(final IGASContext<VS, ES, Void> ctx,
+            final Value[] targetVertices) {
 
-        private final ConcurrentHashMap<Integer, AtomicLong> values = new ConcurrentHashMap<Integer, AtomicLong>();
+        if (ctx == null)
+            throw new IllegalArgumentException();
 
-        @Override
-        public void visit(final IGASState<VS, ES, Void> state, final Value u) {
+        if (targetVertices == null)
+            throw new IllegalArgumentException();
+        
+        final IGASState<BFS.VS, BFS.ES, Void> gasState = ctx.getGASState();
 
-            final VS us = state.getState(u);
+        final Set<Value> retainSet = new HashSet<Value>();
 
-            if (us != null) {
+        for (Value v : targetVertices) {
 
-                final Integer depth = Integer.valueOf(us.depth());
+            if (!gasState.isVisited(v)) {
 
-                AtomicLong newval = values.get(depth);
-
-                if (newval == null) {
-
-                    final AtomicLong oldval = values.putIfAbsent(depth,
-                            newval = new AtomicLong());
-
-                    if (oldval != null) {
-
-                        // lost data race.
-                        newval = oldval;
-
-                    }
-
-                }
-
-                newval.incrementAndGet();
+                // This target was not reachable.
+                continue;
 
             }
 
-        }
+            /*
+             * Walk the precessors back to a starting vertex.
+             */
+            Value current = v;
 
-        @Override
-        public Map<Integer, AtomicLong> get() {
+            while (current != null) {
 
-            return Collections.unmodifiableMap(values);
+                retainSet.add(current);
+
+                final BFS.VS currentState = gasState.getState(current);
+
+                final Value predecessor = currentState.predecessor();
+
+                current = predecessor;
+
+            }
             
-        }
+        } // next target vertex.
+        
+        gasState.retainAll(retainSet);
         
     }
-    
+
 //    @Override
 //    public <T> IReducer<VS, ES, Void, T> getDefaultAfterOp() {
 //

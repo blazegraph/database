@@ -241,6 +241,24 @@ public class GASState<VS, ES, ST> implements IGASState<VS, ES, ST> {
 
     }
 
+    /*
+     * TODO batch parallel in java 8.
+     */
+    @Override
+    public void retainAll(final Set<Value> retainSet) {
+
+        for (Value v : vertexState.keySet()) {
+
+            if (!retainSet.contains(v)) {
+
+                vertexState.remove(v);
+
+            }
+
+        }
+
+    }
+
     @Override
     public int round() {
 

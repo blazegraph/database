@@ -53,7 +53,10 @@ import com.bigdata.rdf.graph.IGASSchedulerImpl;
 import com.bigdata.rdf.graph.IGASState;
 import com.bigdata.rdf.graph.IGASStats;
 import com.bigdata.rdf.graph.IGraphAccessor;
+import com.bigdata.rdf.graph.IPredecessor;
 import com.bigdata.rdf.graph.IReducer;
+import com.bigdata.rdf.graph.analytics.CC;
+import com.bigdata.rdf.graph.analytics.PR;
 import com.bigdata.rdf.graph.impl.GASEngine;
 import com.bigdata.rdf.graph.impl.GASState;
 import com.bigdata.rdf.graph.impl.bd.BigdataGASEngine.BigdataGraphAccessor;
@@ -112,41 +115,20 @@ import cutthecrap.utils.striterators.ICloseableIterator;
  * }
  * </pre>
  * 
- * FIXME Also allow the execution of gas workflows, such as FuzzySSSP. A workflow
- * would be more along the lines of a Callable, but one where the initial source
- * and/or target vertices could be identified. Or have an interface that wraps
- * the analytics (including things like FuzzySSSP) so they can declare their own
- * arguments for invocation as a SERVICE.
+ * FIXME Also allow the execution of gas workflows, such as FuzzySSSP. A
+ * workflow would be more along the lines of a Callable, but one where the
+ * initial source and/or target vertices could be identified. Or have an
+ * interface that wraps the analytics (including things like FuzzySSSP) so they
+ * can declare their own arguments for invocation as a SERVICE.
  * 
  * TODO The input frontier could be a variable, in which case we would pull out
  * the column for that variable rather than running the algorithm once per
  * source binding set, right? Or maybe not.
  * 
- * TODO Allow {@link IReducer} that binds the visited vertex and also the
- * dynamic state associated with that vertex. For BFS and SSSP, this could be
- * depth/distance and the predecessor (for path information). For BFS and SSSP,
- * we could also have a specific target vertex (or vertices) and then report out
- * the path for that vertex/vertices. This would significantly reduce the data
- * reported back. (Could we run SSSP in both directions to accelerate the
- * convergence?)
- * 
- * TODO Also support export. This could be easily done using a SPARQL SELECT
- * 
- * <pre>
- * SELECT ?src ?tgt ?edgeWeight {
- *    <<?src linkType ?tgt> propertyType ?edgeWeight>
- * }
- * </pre>
- * 
- * or (if you have a simple topology without edge weights)
- * 
- * <pre>
- * SELECT ?src ?tgt bind(?edgeWeight,1) {
- *    ?src linkType ?tgt
- * }
- * </pre>
- * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * 
+ * @see <a href="http://wiki.bigdata.com/wiki/index.php/RDF_GAS_API">RDF GAS
+ *      API</a>
  */
 public class GASService implements CustomServiceFactory {
 
@@ -248,10 +230,41 @@ public class GASService implements CustomServiceFactory {
         Class<? extends IGASSchedulerImpl> DEFAULT_SCHEDULER = CHMScheduler.class;
 
         /**
-         * Magic predicate used to specify a vertex in the initial frontier.
+         * Magic predicate used to specify one (or more) vertices in the initial
+         * frontier.
+         * <p>
+         * Note: Algorithms such as {@link CC} and {@link PR} automatically
+         * place all vertices into the initial frontier. For such algorithms,
+         * you do not need to specify {@link #IN}.
          */
         URI IN = new URIImpl(NAMESPACE + "in");
 
+        /**
+         * Magic predicate used to specify one (or more) target vertices. This
+         * may be used in combination with algorithms that compute paths in a
+         * graph to filter the visited vertices after the traversal in order to
+         * remove any vertex that is not part of a path to one or more of the
+         * specified target vertices.
+         * <p>
+         * In order to support this, the algorithm has to have a concept of a
+         * <code>predecessor</code>. For each <code>target</code>, the set of
+         * visited vertices is checked to see if the target was reachable. If it
+         * was reachable, then the predecessors are walked backwards until a
+         * starting vertex is reached (predecessor:=null). Each such predecessor
+         * is added to a list of vertices to be retained. This is repeated for
+         * each target. Once we have identified the combined list of vertices to
+         * be reained, all vertices NOT in that list are removed from the
+         * visited vertex state. This causes the algorithm to only report on
+         * those paths that lead to at least one of the specified target
+         * vertices.
+         * <p>
+         * Note: If you do not care about the distance between two vertices, but
+         * only whether they are reachable from one another, you can put both
+         * vertices into the initial frontier. The algorithm will then work from
+         * both points which can accelerate convergence.
+         */
+        URI TARGET = new URIImpl(NAMESPACE + "target");
+        
         /**
          * Magic predicate used to specify a variable that will become bound to
          * each vertex in the visited set for the analytic. {@link #OUT} is
@@ -392,6 +405,7 @@ public class GASService implements CustomServiceFactory {
         private final Class<IGASProgram<VS, ES, ST>> gasClass;
         private final Class<IGASSchedulerImpl> schedulerClass;
         private final Value[] initialFrontier;
+        private final Value[] targetVertices;
         private final IVariable<?>[] outVars;
 
         public GASServiceCall(final AbstractTripleStore store,
@@ -505,6 +519,9 @@ public class GASService implements CustomServiceFactory {
             
             // Initial frontier.
             this.initialFrontier = getArg(Options.PROGRAM, Options.IN);
+
+            // Target vertices
+            this.targetVertices = getArg(Options.PROGRAM, Options.TARGET);
 
             /*
              * The output variable (bound to the visited set).
@@ -760,10 +777,6 @@ public class GASService implements CustomServiceFactory {
 
                 final IGASState<VS, ES, ST> gasState = gasContext.getGASState();
 
-                // TODO We should look at this when extracting the parameters from the SERVICE's graph pattern.
-//                final FrontierEnum frontierEnum = gasProgram
-//                        .getInitialFrontierEnum();
-
                 if (initialFrontier != null) {
 
                     /*
@@ -774,16 +787,9 @@ public class GASService implements CustomServiceFactory {
                      * necessary since this is an internal, high performance,
                      * and close to the indices operation.
                      */
-                    final IV[] tmp = new IV[initialFrontier.length];
-
-                    // Setup the initial frontier.
-                    int i = 0;
-                    for (Value startingVertex : initialFrontier) {
-
-                        tmp[i++] = ((BigdataValue) startingVertex).getIV();
-
-                    }
-
+                    @SuppressWarnings("rawtypes")
+                    final IV[] tmp = toIV(initialFrontier);
+                    
                     // set the frontier.
                     gasState.setFrontier(gasContext, tmp);
 
@@ -792,6 +798,32 @@ public class GASService implements CustomServiceFactory {
                 // Run the analytic.
                 final IGASStats stats = (IGASStats) gasContext.call();
 
+                if (targetVertices != null
+                        && gasProgram instanceof IPredecessor) {
+
+                    /*
+                     * Remove vertices from the visited set that are not on a
+                     * path leading to at least one of the specified target
+                     * vertices.
+                     * 
+                     * FIXME Why can't we pass in the Value (with a defined IV)
+                     * and not the IV? This should work. Passing in the IV is
+                     * against the grain of the API and the generalized
+                     * abstraction as Values. Of course, having the IV is
+                     * necessary since this is an internal, high performance,
+                     * and close to the indices operation.
+                     */
+
+                    @SuppressWarnings("rawtypes")
+                    final IV[] tmp = toIV(targetVertices);
+
+                    @SuppressWarnings("unchecked")
+                    final IPredecessor<VS, ES, ST> t = (IPredecessor<VS, ES, ST>) gasProgram;
+                    
+                    t.prunePaths(gasContext, tmp);
+
+                }
+                
                 if (log.isInfoEnabled()) {
                     final StringBuilder sb = new StringBuilder();
                     sb.append("GAS");
@@ -827,6 +859,27 @@ public class GASService implements CustomServiceFactory {
 
         }
 
+        /**
+         * Convert a {@link Value}[] of {@link BigdataValue} instances into an
+         * {@link IV}[].
+         */
+        private static IV[] toIV(final Value[] values) {
+
+            @SuppressWarnings("rawtypes")
+            final IV[] tmp = new IV[values.length];
+
+            // Setup the initial frontier.
+            int i = 0;
+            for (Value v : values) {
+
+                tmp[i++] = ((BigdataValue) v).getIV();
+
+            }
+
+            return tmp;
+
+        }
+        
         /**
          * Class used to report {@link IBindingSet}s to the {@link GASService}.
          * {@link IGASProgram}s can customize the way in which they interpret
