@@ -55,6 +55,7 @@ import com.bigdata.rdf.graph.IGASStats;
 import com.bigdata.rdf.graph.IGraphAccessor;
 import com.bigdata.rdf.graph.IPredecessor;
 import com.bigdata.rdf.graph.IReducer;
+import com.bigdata.rdf.graph.TraversalDirectionEnum;
 import com.bigdata.rdf.graph.analytics.CC;
 import com.bigdata.rdf.graph.analytics.PR;
 import com.bigdata.rdf.graph.impl.GASEngine;
@@ -167,14 +168,19 @@ public class GASService implements CustomServiceFactory {
         int DEFAULT_NTHREADS = 4;
 
         /**
-         * This option determines whether the traversal of the graph will
-         * interpret the edges as directed or undirected.
+         * This option determines the traversal direction semantics for the
+         * {@link IGASProgram} against the graph, including whether the the
+         * edges of the graph will be interpreted as directed (
+         * {@link TraversalDirectionEnum#Forward} (which is the default),
+         * {@link TraversalDirectionEnum#Reverse}), or
+         * {@link TraversalDirectionEnum#Undirected}.
          * 
-         * @see IGASContext#setDirectedTraversal(boolean)
+         * @see TraversalDirectionEnum
+         * @see IGASContext#setTraversalDirection(TraversalDirectionEnum)
          */
-        URI DIRECTED_TRAVERSAL = new URIImpl(NAMESPACE + "directedTraversal");
+        URI TRAVERSAL_DIRECTION = new URIImpl(NAMESPACE + "traversalDirection");
         
-        boolean DEFAULT_DIRECTED_TRAVERSAL = true;
+        TraversalDirectionEnum DEFAULT_DIRECTED_TRAVERSAL = TraversalDirectionEnum.Forward;
         
         /**
          * The maximum #of iterations for the GAS program (optional, default
@@ -398,7 +404,7 @@ public class GASService implements CustomServiceFactory {
         
         // options extracted from the SERVICE's graph pattern.
         private final int nthreads;
-        private final boolean directedTraversal;
+        private final TraversalDirectionEnum traversalDirection;
         private final int maxIterations;
         private final int maxVisited;
         private final URI linkType, linkAttrType;
@@ -433,10 +439,13 @@ public class GASService implements CustomServiceFactory {
                     store.getValueFactory().createLiteral(
                             Options.DEFAULT_NTHREADS))).intValue();
 
-            this.directedTraversal = ((Literal) getOnlyArg(Options.PROGRAM,
-                    Options.DIRECTED_TRAVERSAL, store.getValueFactory()
-                            .createLiteral(Options.DEFAULT_DIRECTED_TRAVERSAL)))
-                    .booleanValue();
+            this.traversalDirection = TraversalDirectionEnum
+                    .valueOf(((Literal) getOnlyArg(
+                            Options.PROGRAM,
+                            Options.TRAVERSAL_DIRECTION,
+                            store.getValueFactory().createLiteral(
+                                    Options.DEFAULT_DIRECTED_TRAVERSAL.name())))
+                            .stringValue());
 
             this.maxIterations = ((Literal) getOnlyArg(Options.PROGRAM,
                     Options.MAX_ITERATIONS, store.getValueFactory()
@@ -761,7 +770,7 @@ public class GASService implements CustomServiceFactory {
                 final IGASContext<VS, ES, ST> gasContext = gasEngine.newGASContext(
                         graphAccessor, gasProgram);
 
-                gasContext.setDirectedTraversal(directedTraversal);
+                gasContext.setTraversalDirection(traversalDirection);
                 
                 gasContext.setMaxIterations(maxIterations);
 

@@ -19,7 +19,6 @@ import java.util.Iterator;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -37,6 +36,7 @@ import com.bigdata.rdf.graph.IGASStats;
 import com.bigdata.rdf.graph.IGraphAccessor;
 import com.bigdata.rdf.graph.IReducer;
 import com.bigdata.rdf.graph.IStaticFrontier;
+import com.bigdata.rdf.graph.TraversalDirectionEnum;
 import com.bigdata.rdf.graph.util.GASUtil;
 
 import cutthecrap.utils.striterators.Filter;
@@ -65,9 +65,10 @@ public class GASContext<VS, ES, ST> implements IGASContext<VS, ES, ST> {
 
     /**
      * Whether or not the edges of the graph will be traversed with directed
-     * graph semantics (default is TRUE).
+     * graph semantics (default is {@link TraversalDirectionEnum#Forward}).
      */
-    private final AtomicBoolean directedGraph = new AtomicBoolean(true);
+    private final AtomicReference<TraversalDirectionEnum> traversalDirection = new AtomicReference<TraversalDirectionEnum>(
+            TraversalDirectionEnum.Forward);
     
     /**
      * The maximum number of iterations (defaults to {@link Integer#MAX_VALUE}).
@@ -258,12 +259,10 @@ public class GASContext<VS, ES, ST> implements IGASContext<VS, ES, ST> {
          * APPLY is done before the SCATTER - this would not work if we pushed
          * down the APPLY into the SCATTER).
          */
-        final EdgesEnum gatherEdges = isDirectedTraversal() ? program
-                .getGatherEdges() : program.getGatherEdges()
-                .asUndirectedTraversal();
-        final EdgesEnum scatterEdges = isDirectedTraversal() ? program
-                .getScatterEdges() : program.getScatterEdges()
-                .asUndirectedTraversal();
+        final EdgesEnum gatherEdges = getTraversalDirection().asTraversed(
+                program.getGatherEdges());
+        final EdgesEnum scatterEdges = getTraversalDirection().asTraversed(
+                program.getScatterEdges());
         final boolean pushDownApplyInGather;
         final boolean pushDownApplyInScatter;
         final boolean runApplyStage;
@@ -816,17 +815,20 @@ public class GASContext<VS, ES, ST> implements IGASContext<VS, ES, ST> {
     }
 
     @Override
-    public boolean isDirectedTraversal() {
-    
-        return directedGraph.get();
-        
-    }
-    
-    @Override
-    public void setDirectedTraversal(final boolean newVal) {
+    public TraversalDirectionEnum getTraversalDirection() {
 
-        directedGraph.set(newVal);
-        
+        return traversalDirection.get();
+
+    }
+
+    @Override
+    public void setTraversalDirection(final TraversalDirectionEnum newVal) {
+
+        if (newVal == null)
+            throw new IllegalArgumentException();
+
+        traversalDirection.set(newVal);
+
     }
     
     @Override
