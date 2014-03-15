@@ -25,6 +25,7 @@ import org.openrdf.model.ValueFactory;
 import com.bigdata.rdf.graph.EdgesEnum;
 import com.bigdata.rdf.graph.Factory;
 import com.bigdata.rdf.graph.FrontierEnum;
+import com.bigdata.rdf.graph.IBindingExtractor;
 import com.bigdata.rdf.graph.IGASContext;
 import com.bigdata.rdf.graph.IGASScheduler;
 import com.bigdata.rdf.graph.IGASState;
@@ -445,12 +446,12 @@ public class SSSP extends BaseGASProgram<SSSP.VS, SSSP.ES, Integer/* dist */> {
      * </dl>
      */
     @Override
-    public List<IBinder<SSSP.VS, SSSP.ES, Integer>> getBinderList() {
+    public List<IBindingExtractor.IBinder<SSSP.VS, SSSP.ES, Integer>> getBinderList() {
 
-        final List<IBinder<SSSP.VS, SSSP.ES, Integer>> tmp = super
+        final List<IBindingExtractor.IBinder<SSSP.VS, SSSP.ES, Integer>> tmp = super
                 .getBinderList();
 
-        tmp.add(new IBinder<SSSP.VS, SSSP.ES, Integer>() {
+        tmp.add(new IBindingExtractor.IBinder<SSSP.VS, SSSP.ES, Integer>() {
 
             @Override
             public int getIndex() {
@@ -472,7 +473,7 @@ public class SSSP extends BaseGASProgram<SSSP.VS, SSSP.ES, Integer/* dist */> {
     }
 
     /**
-     * Additional {@link IBinder}s exposed by {@link SSSP}.
+     * Additional {@link IBindingExtractor.IBinder}s exposed by {@link SSSP}.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      */

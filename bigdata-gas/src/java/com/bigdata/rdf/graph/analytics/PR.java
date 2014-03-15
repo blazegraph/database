@@ -28,11 +28,12 @@ import org.openrdf.model.ValueFactory;
 import com.bigdata.rdf.graph.EdgesEnum;
 import com.bigdata.rdf.graph.Factory;
 import com.bigdata.rdf.graph.FrontierEnum;
+import com.bigdata.rdf.graph.IBindingExtractor;
+import com.bigdata.rdf.graph.IBindingExtractor.IBinder;
 import com.bigdata.rdf.graph.IGASContext;
 import com.bigdata.rdf.graph.IGASScheduler;
 import com.bigdata.rdf.graph.IGASState;
 import com.bigdata.rdf.graph.IReducer;
-import com.bigdata.rdf.graph.IGASProgram.IBinder;
 import com.bigdata.rdf.graph.analytics.CC.Bindings;
 import com.bigdata.rdf.graph.impl.BaseGASProgram;
 
@@ -348,11 +349,11 @@ public class PR extends BaseGASProgram<PR.VS, PR.ES, Double> {
      * </dl>
      */
     @Override
-    public List<IBinder<PR.VS, PR.ES, Double>> getBinderList() {
+    public List<IBindingExtractor.IBinder<PR.VS, PR.ES, Double>> getBinderList() {
 
-        final List<IBinder<PR.VS, PR.ES, Double>> tmp = super.getBinderList();
+        final List<IBindingExtractor.IBinder<PR.VS, PR.ES, Double>> tmp = super.getBinderList();
 
-        tmp.add(new IBinder<PR.VS, PR.ES, Double>() {
+        tmp.add(new IBindingExtractor.IBinder<PR.VS, PR.ES, Double>() {
             
             @Override
             public int getIndex() {
@@ -373,7 +374,7 @@ public class PR extends BaseGASProgram<PR.VS, PR.ES, Double> {
     }
 
     /**
-     * Additional {@link IBinder}s exposed by {@link PR}.
+     * Additional {@link IBindingExtractor.IBinder}s exposed by {@link PR}.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      */

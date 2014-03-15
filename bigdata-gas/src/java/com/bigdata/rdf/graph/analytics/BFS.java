@@ -30,6 +30,7 @@ import org.openrdf.model.ValueFactory;
 import com.bigdata.rdf.graph.EdgesEnum;
 import com.bigdata.rdf.graph.Factory;
 import com.bigdata.rdf.graph.FrontierEnum;
+import com.bigdata.rdf.graph.IBindingExtractor;
 import com.bigdata.rdf.graph.IGASContext;
 import com.bigdata.rdf.graph.IGASScheduler;
 import com.bigdata.rdf.graph.IGASState;
@@ -277,11 +278,11 @@ public class BFS extends BaseGASProgram<BFS.VS, BFS.ES, Void> {
      * </dl>
      */
     @Override
-    public List<IBinder<BFS.VS, BFS.ES, Void>> getBinderList() {
+    public List<IBindingExtractor.IBinder<BFS.VS, BFS.ES, Void>> getBinderList() {
 
-        final List<IBinder<BFS.VS, BFS.ES, Void>> tmp = super.getBinderList();
+        final List<IBindingExtractor.IBinder<BFS.VS, BFS.ES, Void>> tmp = super.getBinderList();
 
-        tmp.add(new IBinder<BFS.VS, BFS.ES, Void>() {
+        tmp.add(new IBindingExtractor.IBinder<BFS.VS, BFS.ES, Void>() {
             
             @Override
             public int getIndex() {
@@ -297,7 +298,7 @@ public class BFS extends BaseGASProgram<BFS.VS, BFS.ES, Void> {
             }
         });
 
-        tmp.add(new IBinder<BFS.VS, BFS.ES, Void>() {
+        tmp.add(new IBindingExtractor.IBinder<BFS.VS, BFS.ES, Void>() {
             
             @Override
             public int getIndex() {
@@ -318,7 +319,7 @@ public class BFS extends BaseGASProgram<BFS.VS, BFS.ES, Void> {
     }
 
     /**
-     * Additional {@link IBinder}s exposed by {@link BFS}.
+     * Additional {@link IBindingExtractor.IBinder}s exposed by {@link BFS}.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      */

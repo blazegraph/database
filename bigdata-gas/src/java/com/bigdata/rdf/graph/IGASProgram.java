@@ -15,11 +15,8 @@
 */
 package com.bigdata.rdf.graph;
 
-import java.util.List;
-
 import org.openrdf.model.Statement;
 import org.openrdf.model.Value;
-import org.openrdf.model.ValueFactory;
 
 /**
  * Abstract interface for GAS programs.
@@ -43,7 +40,8 @@ import org.openrdf.model.ValueFactory;
  *         an API that is aimed at vectored (for GPU) execution with 2D
  *         partitioning (for out-of-core, multi-node).
  */
-public interface IGASProgram<VS, ES, ST> extends IGASOptions<VS, ES, ST> {
+public interface IGASProgram<VS, ES, ST> extends IGASOptions<VS, ES, ST>,
+        IBindingExtractor<VS, ES, ST> {
 
     /**
      * One time initialization before the {@link IGASProgram} is executed.
@@ -204,42 +202,5 @@ public interface IGASProgram<VS, ES, ST> extends IGASOptions<VS, ES, ST> {
      *         the frontier is non-empty).
      */
     boolean nextRound(IGASContext<VS, ES, ST> ctx);
-
-    /**
-     * Return a list of interfaces that may be used to extract variable bindings
-     * for the vertices visited by the algorithm.
-     */ 
-    List<IBinder<VS, ES, ST>> getBinderList();
-    
-    /**
-     * An interface that may be used to extract variable bindings for the
-     * vertices visited by the algorithm.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
-     *         Thompson</a>
-     */
-    public interface IBinder<VS, ES, ST> {
-
-        /**
-         * The ordinal index of the variable that is bound by this
-         * {@link IBinder}. By convention, index ZERO is the vertex. Indices
-         * greater than ZERO are typically aspects of the state of the vertex.
-         */
-        int getIndex();
-
-        /**
-         * @param vf
-         *            The {@link ValueFactory} used to create the return
-         *            {@link Value}.
-         * @param u
-         *            The vertex.
-         * 
-         * @return The {@link Value} for that ordinal variable or
-         *         <code>null</code> if there is no binding for that ordinal
-         *         variable.
-         */
-        Value bind(ValueFactory vf, final IGASState<VS, ES, ST> state, Value u);
-
-    }
 
 }
