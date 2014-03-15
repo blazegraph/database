@@ -17,9 +17,6 @@ package com.bigdata.rdf.graph;
 
 import java.util.List;
 
-import org.openrdf.model.Value;
-import org.openrdf.model.ValueFactory;
-
 /**
  * This interface makes it possible to extract bindings for variables from an
  * {@link IGASProgram}.
@@ -39,37 +36,6 @@ import org.openrdf.model.ValueFactory;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
 public interface IBindingExtractor<VS, ES, ST> {
-
-    /**
-     * An interface that may be used to extract variable bindings for the
-     * vertices visited by the algorithm.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
-     *         Thompson</a>
-     */
-    public interface IBinder<VS, ES, ST> {
-    
-        /**
-         * The ordinal index of the variable that is bound by this
-         * {@link IBinder}. By convention, index ZERO is the vertex. Indices
-         * greater than ZERO are typically aspects of the state of the vertex.
-         */
-        int getIndex();
-    
-        /**
-         * @param vf
-         *            The {@link ValueFactory} used to create the return
-         *            {@link Value}.
-         * @param u
-         *            The vertex.
-         * 
-         * @return The {@link Value} for that ordinal variable or
-         *         <code>null</code> if there is no binding for that ordinal
-         *         variable.
-         */
-        Value bind(ValueFactory vf, final IGASState<VS, ES, ST> state, Value u);
-    
-    }
 
     /**
      * Return a list of interfaces that may be used to extract variable bindings

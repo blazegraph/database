@@ -44,8 +44,7 @@ import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.journal.IIndexManager;
-import com.bigdata.rdf.graph.IBindingExtractor;
-import com.bigdata.rdf.graph.IBindingExtractor.IBinder;
+import com.bigdata.rdf.graph.IBinder;
 import com.bigdata.rdf.graph.IGASContext;
 import com.bigdata.rdf.graph.IGASEngine;
 import com.bigdata.rdf.graph.IGASProgram;
@@ -871,7 +870,7 @@ public class GASService implements CustomServiceFactory {
             /**
              * The list of objects used to extract the variable bindings.
              */
-            private final List<IBindingExtractor.IBinder<VS, ES, ST>> binderList;
+            private final List<IBinder<VS, ES, ST>> binderList;
             
             /**
              * The collected solutions.
@@ -908,7 +907,7 @@ public class GASService implements CustomServiceFactory {
 
                 final IBindingSet bs = new ListBindingSet();
                 
-                for (IBindingExtractor.IBinder<VS, ES, ST> b : binderList) {
+                for (IBinder<VS, ES, ST> b : binderList) {
 
                     // The variable for this binder.
                     final IVariable<?> var = outVars[b.getIndex()];

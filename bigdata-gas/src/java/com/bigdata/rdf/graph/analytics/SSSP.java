@@ -25,6 +25,7 @@ import org.openrdf.model.ValueFactory;
 import com.bigdata.rdf.graph.EdgesEnum;
 import com.bigdata.rdf.graph.Factory;
 import com.bigdata.rdf.graph.FrontierEnum;
+import com.bigdata.rdf.graph.IBinder;
 import com.bigdata.rdf.graph.IBindingExtractor;
 import com.bigdata.rdf.graph.IGASContext;
 import com.bigdata.rdf.graph.IGASScheduler;
@@ -446,12 +447,12 @@ public class SSSP extends BaseGASProgram<SSSP.VS, SSSP.ES, Integer/* dist */> {
      * </dl>
      */
     @Override
-    public List<IBindingExtractor.IBinder<SSSP.VS, SSSP.ES, Integer>> getBinderList() {
+    public List<IBinder<SSSP.VS, SSSP.ES, Integer>> getBinderList() {
 
-        final List<IBindingExtractor.IBinder<SSSP.VS, SSSP.ES, Integer>> tmp = super
+        final List<IBinder<SSSP.VS, SSSP.ES, Integer>> tmp = super
                 .getBinderList();
 
-        tmp.add(new IBindingExtractor.IBinder<SSSP.VS, SSSP.ES, Integer>() {
+        tmp.add(new IBinder<SSSP.VS, SSSP.ES, Integer>() {
 
             @Override
             public int getIndex() {
