@@ -67,20 +67,22 @@ public interface IGASContext<VS, ES, ST> extends Callable<IGASStats> {
     IGraphAccessor getGraphAccessor();
 
     /**
-     * Specify whether the visited edges of the graph are to be interpreted as
-     * directed or undirected (default <code>directed</code>).
+     * Specify the traversal direction for the {@link IGASProgram}.
      * <p>
      * The value specified here is used to determine how the {@link EdgesEnum}
-     * will be interpreted for the GATHER and SCATTER phases. See
-     * {@link EdgesEnum#asUndirectedTraversal()}.
+     * will be interpreted for the GATHER and SCATTER phases. The default is
+     * {@link TraversalDirectionEnum#Forward}.
+     * 
+     * @see TraversalDirectionEnum#asTraversed(EdgesEnum)
+     * @see EdgesEnum#asUndirectedTraversal()
      */
-    void setDirectedTraversal(boolean newVal);
+    void setTraversalDirection(TraversalDirectionEnum newVal);
 
     /**
-     * Return <code>true</code> if the graph should be interpreted as a directed
-     * graph.
+     * Return a type safe value indicating the traversal direction for the
+     * {@link IGASProgram}.
      */
-    boolean isDirectedTraversal();
+    TraversalDirectionEnum getTraversalDirection();
     
     /**
      * Specify the maximum number of iterations for the algorithm. A value of
