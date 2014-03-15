@@ -15,6 +15,8 @@
 */
 package com.bigdata.rdf.graph;
 
+import java.util.Set;
+
 import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
@@ -259,5 +261,13 @@ public interface IGASState<VS,ES, ST> {
      *            Another vertex.
      */
     int compareTo(Value u, Value v);
+
+    /**
+     * Retain only those vertices in the visited set that are found in the
+     * specified collection.
+     * 
+     * @param retainSet The set of vertices to be retained.
+     */
+    void retainAll(Set<Value> retainSet);
 
 }
