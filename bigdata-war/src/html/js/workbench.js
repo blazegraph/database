@@ -751,7 +751,7 @@ function updateExploreStart(data) {
          } else {
             var sid = '<< <' + $('#explore-form input[type=text]').val() + '> <' +  binding.col1.value + '> <' + binding.col2.value + '> >>';
          }
-         star = '<a href="#" data-sid="' + sid + '">*</a> (' + star + ')';
+         star = '<a href="#" data-sid="' + sid + '"><< * (' + star + ') >></a>';
       } else {
          star = '';
       }
