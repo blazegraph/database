@@ -30,6 +30,7 @@ import org.openrdf.model.ValueFactory;
 import com.bigdata.rdf.graph.EdgesEnum;
 import com.bigdata.rdf.graph.Factory;
 import com.bigdata.rdf.graph.FrontierEnum;
+import com.bigdata.rdf.graph.IBindingExtractor;
 import com.bigdata.rdf.graph.IGASScheduler;
 import com.bigdata.rdf.graph.IGASState;
 import com.bigdata.rdf.graph.IReducer;
@@ -313,11 +314,11 @@ public class CC extends BaseGASProgram<CC.VS, CC.ES, Value> {
      * </dl>
      */
     @Override
-    public List<IBinder<CC.VS, CC.ES, Value>> getBinderList() {
+    public List<IBindingExtractor.IBinder<CC.VS, CC.ES, Value>> getBinderList() {
 
-        final List<IBinder<CC.VS, CC.ES, Value>> tmp = super.getBinderList();
+        final List<IBindingExtractor.IBinder<CC.VS, CC.ES, Value>> tmp = super.getBinderList();
 
-        tmp.add(new IBinder<CC.VS, CC.ES, Value>() {
+        tmp.add(new IBindingExtractor.IBinder<CC.VS, CC.ES, Value>() {
             
             @Override
             public int getIndex() {
@@ -338,7 +339,7 @@ public class CC extends BaseGASProgram<CC.VS, CC.ES, Value> {
     }
 
     /**
-     * Additional {@link IBinder}s exposed by {@link CC}.
+     * Additional {@link IBindingExtractor.IBinder}s exposed by {@link CC}.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      */
