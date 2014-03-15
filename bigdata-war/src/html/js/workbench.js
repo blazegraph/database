@@ -633,10 +633,10 @@ $('#explore-form').submit(function(e) {
       loadURI(uri);
 
       // if this is a SID, make the components clickable
-      var re = /< <([^<>]*)> <([^<>]*)> <([^<>]*)> >/;
+      var re = /<< <([^<>]*)> <([^<>]*)> <([^<>]*)> >>/;
       var match = uri.match(re);
       if(match) {
-         $('#explore-header h1').html('&lt; &lt;<a href="#">' + match[1] + '</a> &gt; &lt;<a href="#">' + match[2] + '</a> &gt; &lt;<a href="#">' + match[3] + '</a> &gt; &gt;');
+         $('#explore-header h1').html('&lt;&lt; &lt;<a href="#">' + match[1] + '</a> &gt; &lt;<a href="#">' + match[2] + '</a> &gt; &lt;<a href="#">' + match[3] + '</a> &gt; &gt;&gt;');
          $('#explore-header h1 a').click(function(e) {
             e.preventDefault();
             explore(this.text);
@@ -649,7 +649,7 @@ $('#explore-form').submit(function(e) {
 
 function loadURI(target) {
    // identify if this is a vertex or a SID
-   var re = /< (?:<[^<>]*> ){3}>/;
+   var re = /<< (?:<[^<>]*> ){3}>>/;
    var vertex = !target.match(re);
 
    var vertexQuery = '\
@@ -675,7 +675,7 @@ group by ?col1 ?col2 ?incoming';
 select ?col1 ?col2 ?incoming (count(?star) as ?star)\n\
 with {\n\
   select ?explore where {\n\
-    bind (<SID> as ?explore) .\n\
+    bind (SID as ?explore) .\n\
   }\n\
 } as %_explore\n\
 where {\n\
@@ -747,9 +747,9 @@ function updateExploreStart(data) {
       var star = parseInt(binding.star.value);
       if(star > 0) {
          if(binding.incoming.value == 'true') {
-            var sid = '< <' +  binding.col1.value + '> <' + binding.col2.value + '> <' + $('#explore-form input[type=text]').val() + '> >';
+            var sid = '<< <' +  binding.col1.value + '> <' + binding.col2.value + '> <' + $('#explore-form input[type=text]').val() + '> >>';
          } else {
-            var sid = '< <' + $('#explore-form input[type=text]').val() + '> <' +  binding.col1.value + '> <' + binding.col2.value + '> >';
+            var sid = '<< <' + $('#explore-form input[type=text]').val() + '> <' +  binding.col1.value + '> <' + binding.col2.value + '> >>';
          }
          star = '<a href="#" data-sid="' + sid + '">*</a> (' + star + ')';
       } else {
@@ -807,7 +807,7 @@ $('#tab-selector a[data-target=performance]').click(function(e) {
 /* Utility functions */
 
 function getSID(binding) {
-   return '< <' + binding.value['sid-s'].value + '> <' + binding.value['sid-p'].value + '> <' + binding.value['sid-o'].value + '> >';
+   return '<< <' + binding.value['sid-s'].value + '> <' + binding.value['sid-p'].value + '> <' + binding.value['sid-o'].value + '> >>';
 }
 
 function parseSID(sid) {
