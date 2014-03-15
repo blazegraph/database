@@ -175,6 +175,10 @@ hr {
    width: 50%;
 }
 
+#explore-tab td:last-of-type {
+   border: none;
+}
+
 #advanced-features, #query-explanation, #explore-results, #namespace-properties {
    display: none;
 }
