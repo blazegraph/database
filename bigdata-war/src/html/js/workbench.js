@@ -636,13 +636,13 @@ $('#explore-form').submit(function(e) {
       var re = /<< <([^<>]*)> <([^<>]*)> <([^<>]*)> >>/;
       var match = uri.match(re);
       if(match) {
-         $('#explore-header h1').html('&lt;&lt; &lt;<a href="#">' + match[1] + '</a> &gt; &lt;<a href="#">' + match[2] + '</a> &gt; &lt;<a href="#">' + match[3] + '</a> &gt; &gt;&gt;');
+         $('#explore-header').html('<h1>&lt;&lt; &lt;<a href="#">' + match[1] + '</a> &gt; &lt;<a href="#">' + match[2] + '</a> &gt; &lt;<a href="#">' + match[3] + '</a> &gt; &gt;&gt;</h1>');
          $('#explore-header h1 a').click(function(e) {
             e.preventDefault();
             explore(this.text);
          });
       } else {
-         $('#explore-header h1').text(uri);
+         $('#explore-header').html('<h1>' + uri + '</h1>');
       }
    }
 });
@@ -718,15 +718,7 @@ function updateExploreStart(data) {
    console.log('Explore results');
    console.log(data);
    var results = data.results.bindings.length > 0;
-   $('#explore-results').toggle(results);
-   $('#explore-no-results').toggle(!results);
 
-   // see if we got any results
-   if(!results) {
-      $('#explore-no-results').html('<h1>No results found!</h1>');
-      return;
-   }
-   
    // clear tables
    $('#explore-incoming, #explore-outgoing, #explore-attributes').html('<table>');
 
@@ -790,9 +782,8 @@ function explore(uri) {
 }
 
 function updateExploreError(jqXHR, textStatus, errorThrown) {
-   $('#explore-results').hide();
-   $('#explore-no-results').show();
-   $('#explore-no-results').html('Error! ' + textStatus + ' ' + errorThrown);
+   $('#explore-results .box').html('');
+   $('#explore-header').html('Error! ' + textStatus + ' ' + errorThrown);
 }
 
 /* Status */
