@@ -728,7 +728,7 @@ function updateExploreStart(data) {
    }
    
    // clear tables
-   $('#explore-incoming table, #explore-outgoing table, #explore-attributes table').html('');
+   $('#explore-incoming, #explore-outgoing, #explore-attributes').html('<table>');
 
    // go through each binding, adding it to the appropriate table
    $.each(data.results.bindings, function(i, binding) {
@@ -769,6 +769,13 @@ function updateExploreStart(data) {
          }
       }
    });
+
+   var sections = {incoming: 'Incoming Links', outgoing: 'Outgoing Links', attributes: 'Attributes'};
+   for(var k in sections) {
+      if($('#explore-' + k + ' table tr').length == 0) {
+         $('#explore-' + k).html('No ' + sections[k]);
+      }
+   }
 
    $('#explore-results a').click(function(e) {
       e.preventDefault();
