@@ -86,6 +86,7 @@ import com.bigdata.resources.IndexManager;
 import com.bigdata.resources.OverflowManager;
 import com.bigdata.service.DataService;
 import com.bigdata.service.Split;
+import com.bigdata.util.InnerCause;
 import com.bigdata.util.concurrent.Computable;
 import com.bigdata.util.concurrent.Memoizer;
 
@@ -1537,11 +1538,29 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 
             for (int i = 0; i <= nkeys; i++) {
 
-                // normal read following the node hierarchy, using cache, etc.
-                final AbstractNode<?> child = ((Node) node).getChild(i);
+                try {
+                    
+                    // normal read following the node hierarchy, using cache, etc.
+                    final AbstractNode<?> child = ((Node) node).getChild(i);
 
-                // recursive dump
-                dumpPages(ndx, child, stats);
+                    // recursive dump
+                    dumpPages(ndx, child, stats);
+                    
+                } catch (Throwable t) {
+                    
+                    if (InnerCause.isInnerCause(t, InterruptedException.class)
+                            || InnerCause.isInnerCause(t,
+                                    InterruptedException.class)) {
+                        throw new RuntimeException(t);
+                    }
+                    /*
+                     * Log the error and track the #of errors, but keep scanning
+                     * the index.
+                     */
+                    stats.nerrors++;
+                    log.error("Error reading child[i=" + i + "]: " + t, t);
+                    continue;
+                }
 
             }
 
