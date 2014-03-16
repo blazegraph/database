@@ -30,6 +30,7 @@ import java.io.Reader;
 import java.io.StringWriter;
 import java.io.Writer;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.UUID;
@@ -39,6 +40,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import javax.servlet.ServletRegistration;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
@@ -255,30 +257,9 @@ public class QueryServlet extends BigdataRDFServlet {
             return;
         }
 
-        /*
-         * Figure out the service end point.
-         * 
-         * Note: This code to figure out the service end point is a hack. It
-         * tends to work for the special case of ServiceDescription because
-         * there is an identity between the request URL and the service end
-         * point in this special case.
-         */
+        // The serviceURIs for this graph.
+        final String[] serviceURI = BigdataServlet.getServiceURIs(req);
         
-        final String serviceURI;
-        {
-            
-            final StringBuffer sb = req.getRequestURL();
-
-            final int indexOf = sb.indexOf("?");
-
-            if (indexOf == -1) {
-                serviceURI = sb.toString();
-            } else {
-                serviceURI = sb.substring(0, indexOf);
-            }
-
-        }
-
         /*
          * TODO Resolve the SD class name and ctor via a configuration property
          * for extensible descriptions.

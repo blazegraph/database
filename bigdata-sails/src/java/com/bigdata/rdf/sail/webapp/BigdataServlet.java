@@ -29,6 +29,8 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.Writer;
+import java.util.LinkedList;
+import java.util.List;
 
 import javax.servlet.ServletContext;
 import javax.servlet.http.HttpServlet;
@@ -41,6 +43,7 @@ import com.bigdata.ha.HAStatusEnum;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.quorum.AbstractQuorum;
+import com.bigdata.rdf.sail.webapp.HALoadBalancerServlet.InitParams;
 import com.bigdata.rdf.sail.webapp.client.IMimeTypes;
 
 /**
@@ -58,11 +61,25 @@ abstract public class BigdataServlet extends HttpServlet implements IMimeTypes {
 
     /**
      * The name of the {@link ServletContext} attribute whose value is the
+     * {@link BigdataRDFContext}.
+     */
+    static public final transient String ATTRIBUTE_RDF_CONTEXT = BigdataRDFContext.class
+            .getName();
+    
+    /**
+     * The name of the {@link ServletContext} attribute whose value is the
      * {@link IIndexManager}.
      */
     /*package*/ static final transient String ATTRIBUTE_INDEX_MANAGER = 
         IIndexManager.class.getName();
 
+    /**
+     * The {@link ServletContext} attribute whose value is the prefix for the
+     * {@link HALoadBalancerServlet} iff it is running.
+     */
+    static final String ATTRIBUTE_LBS_PREFIX = HALoadBalancerServlet.class
+            .getName() + "." + InitParams.PREFIX;
+            
 //    /**
 //     * The {@link ServletContext} attribute whose value is the
 //     * {@link SparqlCache}.
@@ -91,12 +108,19 @@ abstract public class BigdataServlet extends HttpServlet implements IMimeTypes {
         HTTP_BADREQUEST = HttpServletResponse.SC_BAD_REQUEST,
         HTTP_METHOD_NOT_ALLOWED = HttpServletResponse.SC_METHOD_NOT_ALLOWED,
 		HTTP_INTERNALERROR = HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
-		HTTP_NOTIMPLEMENTED = HttpServletResponse.SC_NOT_IMPLEMENTED;
+        HTTP_NOTIMPLEMENTED = HttpServletResponse.SC_NOT_IMPLEMENTED;
 
-    protected <T> T getRequiredServletContextAttribute(final String name) {
+    static <T> T getRequiredServletContextAttribute(
+            final ServletContext servletContext, final String name) {
+
+        if (servletContext == null)
+            throw new IllegalArgumentException();
+
+        if (name == null)
+            throw new IllegalArgumentException();
 
         @SuppressWarnings("unchecked")
-        final T v = (T) getServletContext().getAttribute(name);
+        final T v = (T) servletContext.getAttribute(name);
 
         if (v == null)
             throw new RuntimeException("Not set: " + name);
@@ -105,14 +129,54 @@ abstract public class BigdataServlet extends HttpServlet implements IMimeTypes {
 
     }
 
+    static final SparqlEndpointConfig getConfig(
+            final ServletContext servletContext) {
+
+        return getBigdataRDFContext(servletContext).getConfig();
+
+    }
+
+    protected final BigdataRDFContext getBigdataRDFContext() {
+        
+        return getBigdataRDFContext(getServletContext());
+        
+    }
+
+    static final BigdataRDFContext getBigdataRDFContext(
+            final ServletContext servletContext) {
+
+//        if (m_context == null) {
+//
+//            m_context = 
+        return getRequiredServletContextAttribute(servletContext,
+                ATTRIBUTE_RDF_CONTEXT);
+
+//        }
+//
+//        return m_context;
+
+    }
+
+//    private volatile BigdataRDFContext m_context;
+
     /**
      * The backing {@link IIndexManager}.
      */
-	protected IIndexManager getIndexManager() {
-	
-	    return getRequiredServletContextAttribute(ATTRIBUTE_INDEX_MANAGER);
-	    
-	}
+    protected IIndexManager getIndexManager() {
+        
+        return getIndexManager(getServletContext());
+        
+    }
+
+    /**
+     * The backing {@link IIndexManager}.
+     */
+    static IIndexManager getIndexManager(final ServletContext servletContext) {
+
+        return getRequiredServletContextAttribute(servletContext,
+                ATTRIBUTE_INDEX_MANAGER);
+
+    }
 
 //    /**
 //     * Return the {@link Quorum} -or- <code>null</code> if the
@@ -137,10 +201,11 @@ abstract public class BigdataServlet extends HttpServlet implements IMimeTypes {
      * {@link IIndexManager} is not an {@link AbstractQuorum} or is not HA
      * enabled.
      */
-    protected HAStatusEnum getHAStatus() {
-        
-        final IIndexManager indexManager = getIndexManager();
+    static public HAStatusEnum getHAStatus(final IIndexManager indexManager) {
 
+        if (indexManager == null)
+            throw new IllegalArgumentException();
+        
         if (indexManager instanceof AbstractJournal) {
 
             // Note: Invocation against local object (NOT RMI).
@@ -163,10 +228,20 @@ abstract public class BigdataServlet extends HttpServlet implements IMimeTypes {
      * 
      * @throws IOException
      */
-    protected boolean isWritable(final HttpServletRequest req,
+    static boolean isWritable(final HttpServletRequest req,
             final HttpServletResponse resp) throws IOException {
         
-        final HAStatusEnum haStatus = getHAStatus();
+        if(getConfig(req.getServletContext()).readOnly) {
+            
+            buildResponse(resp, HTTP_METHOD_NOT_ALLOWED, MIME_TEXT_PLAIN,
+                    "Not writable.");
+
+            // Not writable.  Response has been committed.
+            return false;
+            
+        }
+        final HAStatusEnum haStatus = getHAStatus(getIndexManager(req
+                .getServletContext()));
         if (haStatus == null) {
             // No quorum.
             return true;
@@ -195,10 +270,11 @@ abstract public class BigdataServlet extends HttpServlet implements IMimeTypes {
      * 
      * @throws IOException
      */
-    protected boolean isReadable(final HttpServletRequest req,
+    static boolean isReadable(final HttpServletRequest req,
             final HttpServletResponse resp) throws IOException {
 
-        final HAStatusEnum haStatus = getHAStatus();
+        final HAStatusEnum haStatus = getHAStatus(getIndexManager(req
+                .getServletContext()));
         if (haStatus == null) {
             // No quorum.
             return true;
@@ -279,7 +355,99 @@ abstract public class BigdataServlet extends HttpServlet implements IMimeTypes {
 //        return getRequiredServletContextAttribute(ATTRIBUTE_SPARQL_CACHE);
 //        
 //    }
-    
+
+    /**
+     * Return the serviceURI(s) for this service (one or more).
+     * 
+     * @param req
+     *            The request.
+     *            
+     * @return The known serviceURIs for this service.
+     */
+    static public String[] getServiceURIs(final HttpServletRequest req) {
+
+        // One or more.
+        final List<String> serviceURIs = new LinkedList<String>();
+
+        /*
+         * Figure out the service end point.
+         * 
+         * Note: This is just the requestURL as reported. This makes is
+         * possible to support virtual hosting and similar http proxy
+         * patterns since the SPARQL end point is just the URL at which the
+         * service is responding.
+         */
+        final String uri;
+        {
+            
+            final StringBuffer sb = req.getRequestURL();
+
+            final int indexOf = sb.indexOf("?");
+
+            if (indexOf == -1) {
+                uri = sb.toString();
+            } else {
+                uri = sb.substring(0, indexOf);
+            }
+            serviceURIs.add(uri);
+
+        }
+
+        /**
+         * If the load balancer servlet is registered, then get its effective
+         * service URI. This will be a load balanced version of the serviceURI
+         * that we obtained above. We are trying to go from
+         * 
+         * http://localhost:8080/bigdata/sparql
+         * 
+         * to
+         * 
+         * http://localhost:8080/bigdata/LBS/sparql
+         * 
+         * where LBS is the prefix of the load balancer servlet.
+         */
+        {
+            final String prefix = (String) req.getServletContext()
+                    .getAttribute(ATTRIBUTE_LBS_PREFIX);
+
+            if (prefix != null) {
+                
+                // locate the // in the protocol.
+                final int doubleSlash = uri.indexOf("//");
+                
+                // skip past that and locate the next /
+                final int nextSlash = uri
+                        .indexOf('/', doubleSlash + 2/* fromIndex */);
+
+                // The ContextPath for the webapp. This should be the next thing
+                // in the [uri].
+                final String contextPath = req.getServletContext()
+                        .getContextPath();
+
+                // The index of the end of the ContextPath.
+                final int endContextPath = nextSlash
+                        + contextPath.length();
+
+                // everything up to the *start* of the ContextPath
+                final String baseURL = uri.substring(0/* beginIndex */,
+                        nextSlash/* endIndex */);
+
+                final String s = baseURL // base URL
+                        + prefix // LBS prefix (includes ContextPath)
+                        + (prefix.endsWith("/") ? "" : "/")
+                        + uri.substring(endContextPath + 1) // remainder of requestURL.
+                        ;
+
+                serviceURIs.add(s);
+                
+            }
+            
+        }
+
+        return serviceURIs.toArray(new String[serviceURIs.size()]);
+        
+    }
+
     static public void buildResponse(final HttpServletResponse resp,
             final int status, final String mimeType) throws IOException {
 

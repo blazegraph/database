@@ -39,7 +39,6 @@ import java.util.Iterator;
 import java.util.Properties;
 
 import javax.servlet.Servlet;
-import javax.servlet.ServletContext;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
@@ -80,13 +79,6 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
     static private final transient Logger log = Logger.getLogger(BigdataRDFServlet.class);
 
     /**
-     * The name of the {@link ServletContext} attribute whose value is the
-     * {@link BigdataRDFContext}.
-     */
-    static public final transient String ATTRIBUTE_RDF_CONTEXT = BigdataRDFContext.class
-            .getName();
-    
-    /**
      * The name of the <code>UTF-8</code> character encoding.
      */
     protected static final String UTF8 = "UTF-8";
@@ -123,51 +115,31 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
         
     }
 
-    final protected SparqlEndpointConfig getConfig() {
-        
-        return getBigdataRDFContext().getConfig();
-
-    }
-
-    final protected BigdataRDFContext getBigdataRDFContext() {
-
-        if (m_context == null) {
-
-            m_context = getRequiredServletContextAttribute(ATTRIBUTE_RDF_CONTEXT);
-
-        }
-
-        return m_context;
-
-    }
-
-    private volatile BigdataRDFContext m_context;
-
-    /**
-     * {@inheritDoc}
-     * <p>
-     * Note: Overridden to support read-only deployments.
-     * 
-     * @see SparqlEndpointConfig#readOnly
-     * @see ConfigParams#READ_ONLY
-     */
-    @Override
-    protected boolean isWritable(final HttpServletRequest req,
-            final HttpServletResponse resp) throws IOException {
-        
-        if(getConfig().readOnly) {
-            
-            buildResponse(resp, HTTP_METHOD_NOT_ALLOWED, MIME_TEXT_PLAIN,
-                    "Not writable.");
-
-            // Not writable.  Response has been committed.
-            return false;
-            
-        }
-        
-        return super.isWritable(req, resp);
-        
-    }
+//    /**
+//     * {@inheritDoc}
+//     * <p>
+//     * Note: Overridden to support read-only deployments.
+//     * 
+//     * @see SparqlEndpointConfig#readOnly
+//     * @see ConfigParams#READ_ONLY
+//     */
+//    @Override
+//    static boolean isWritable(final HttpServletRequest req,
+//            final HttpServletResponse resp) throws IOException {
+//        
+//        if(getConfig().readOnly) {
+//            
+//            buildResponse(resp, HTTP_METHOD_NOT_ALLOWED, MIME_TEXT_PLAIN,
+//                    "Not writable.");
+//
+//            // Not writable.  Response has been committed.
+//            return false;
+//            
+//        }
+//        
+//        return super.isWritable(req, resp);
+//        
+//    }
 
     /**
      * Write the stack trace onto the output stream. This will show up in the
@@ -274,7 +246,7 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
         
         if (timestamp == null) {
             
-            return getConfig().timestamp;
+            return getConfig(req.getServletContext()).timestamp;
             
         }
 
@@ -319,7 +291,7 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
             }
             
             // use the default namespace.
-            return getConfig().namespace;
+            return getConfig(req.getServletContext()).namespace;
             
         }
 
