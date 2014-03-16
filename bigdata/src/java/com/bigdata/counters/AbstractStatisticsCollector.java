@@ -43,6 +43,7 @@ import java.util.UUID;
 import org.apache.log4j.Logger;
 import org.apache.system.SystemUtil;
 
+import com.bigdata.Banner;
 import com.bigdata.LRUNexus;
 import com.bigdata.counters.httpd.CounterSetHTTPD;
 import com.bigdata.counters.linux.StatisticsCollectorForLinux;
@@ -754,7 +755,7 @@ abstract public class AbstractStatisticsCollector implements IStatisticsCollecto
      *             if no implementation is available for your operating system.
      */
     public static void main(final String[] args) throws InterruptedException {
-
+        Banner.banner();
         final int DEFAULT_COUNT = 10;
         final int nargs = args.length;
         final int interval;
