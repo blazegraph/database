@@ -3716,7 +3716,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
      * 
      * @see PlatformStatsPlugIn
      */
-    protected AbstractStatisticsCollector getPlatformStatisticsCollector() {
+    public AbstractStatisticsCollector getPlatformStatisticsCollector() {
 
         final IPlugIn<Journal, AbstractStatisticsCollector> plugin = pluginPlatformStats
                 .get();
@@ -3728,6 +3728,17 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
 
         return t;
 
+    }
+
+    public Object getGangliaService() {
+
+        final IPlugIn<Journal, ?> plugin = pluginGanglia.get();
+
+        if (plugin == null)
+            return null;
+
+        return plugin.getService();
+        
     }
     
     /**
