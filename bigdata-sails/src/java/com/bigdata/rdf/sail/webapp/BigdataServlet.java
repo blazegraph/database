@@ -228,10 +228,11 @@ abstract public class BigdataServlet extends HttpServlet implements IMimeTypes {
      * 
      * @throws IOException
      */
-    static boolean isWritable(final HttpServletRequest req,
-            final HttpServletResponse resp) throws IOException {
+    static boolean isWritable(final ServletContext servletContext,
+            final HttpServletRequest req, final HttpServletResponse resp)
+            throws IOException {
         
-        if(getConfig(req.getServletContext()).readOnly) {
+        if (getConfig(servletContext).readOnly) {
             
             buildResponse(resp, HTTP_METHOD_NOT_ALLOWED, MIME_TEXT_PLAIN,
                     "Not writable.");
@@ -240,8 +241,7 @@ abstract public class BigdataServlet extends HttpServlet implements IMimeTypes {
             return false;
             
         }
-        final HAStatusEnum haStatus = getHAStatus(getIndexManager(req
-                .getServletContext()));
+        final HAStatusEnum haStatus = getHAStatus(getIndexManager(servletContext));
         if (haStatus == null) {
             // No quorum.
             return true;
@@ -270,11 +270,11 @@ abstract public class BigdataServlet extends HttpServlet implements IMimeTypes {
      * 
      * @throws IOException
      */
-    static boolean isReadable(final HttpServletRequest req,
-            final HttpServletResponse resp) throws IOException {
+    static boolean isReadable(final ServletContext ctx,
+            final HttpServletRequest req, final HttpServletResponse resp)
+            throws IOException {
 
-        final HAStatusEnum haStatus = getHAStatus(getIndexManager(req
-                .getServletContext()));
+        final HAStatusEnum haStatus = getHAStatus(getIndexManager(ctx));
         if (haStatus == null) {
             // No quorum.
             return true;
@@ -364,7 +364,8 @@ abstract public class BigdataServlet extends HttpServlet implements IMimeTypes {
      *            
      * @return The known serviceURIs for this service.
      */
-    static public String[] getServiceURIs(final HttpServletRequest req) {
+    static public String[] getServiceURIs(final ServletContext servletContext,
+            final HttpServletRequest req) {
 
         // One or more.
         final List<String> serviceURIs = new LinkedList<String>();
@@ -407,8 +408,8 @@ abstract public class BigdataServlet extends HttpServlet implements IMimeTypes {
          * where LBS is the prefix of the load balancer servlet.
          */
         {
-            final String prefix = (String) req.getServletContext()
-                    .getAttribute(ATTRIBUTE_LBS_PREFIX);
+            final String prefix = (String) servletContext.getAttribute(
+                    ATTRIBUTE_LBS_PREFIX);
 
             if (prefix != null) {
                 
@@ -421,8 +422,7 @@ abstract public class BigdataServlet extends HttpServlet implements IMimeTypes {
 
                 // The ContextPath for the webapp. This should be the next thing
                 // in the [uri].
-                final String contextPath = req.getServletContext()
-                        .getContextPath();
+                final String contextPath = servletContext.getContextPath();
 
                 // The index of the end of the ContextPath.
                 final int endContextPath = nextSlash

@@ -118,7 +118,7 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
     protected void doPost(final HttpServletRequest req,
             final HttpServletResponse resp) throws IOException {
 
-        if (!isWritable(req, resp)) {
+        if (!isWritable(getServletContext(), req, resp)) {
             // Service must be writable.
             return;
         }
@@ -146,7 +146,7 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
     protected void doDelete(final HttpServletRequest req,
             final HttpServletResponse resp) throws IOException {
 
-        if (!isWritable(req, resp)) {
+        if (!isWritable(getServletContext(), req, resp)) {
             // Service must be writable.
             return;
         }
@@ -172,7 +172,7 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
     protected void doPut(final HttpServletRequest req,
             final HttpServletResponse resp) throws IOException {
 
-        if (!isWritable(req, resp)) {
+        if (!isWritable(getServletContext(), req, resp)) {
             // Service must be writable.
             return;
         }
@@ -582,8 +582,8 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
         final BNode aDataSet = g.getValueFactory().createBNode();
         
         // Figure out the service end point(s).
-        final String[] serviceURI = getServiceURIs(req);
-        
+        final String[] serviceURI = getServiceURIs(getServletContext(), req);
+
         final VoID v = new VoID(g, tripleStore, serviceURI, aDataSet);
 
         v.describeDataSet(false/* describeStatistics */,

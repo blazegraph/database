@@ -258,8 +258,9 @@ public class QueryServlet extends BigdataRDFServlet {
         }
 
         // The serviceURIs for this graph.
-        final String[] serviceURI = BigdataServlet.getServiceURIs(req);
-        
+        final String[] serviceURI = BigdataServlet.getServiceURIs(
+                getServletContext(), req);
+
         /*
          * TODO Resolve the SD class name and ctor via a configuration property
          * for extensible descriptions.
@@ -297,7 +298,7 @@ public class QueryServlet extends BigdataRDFServlet {
     private void doUpdate(final HttpServletRequest req,
             final HttpServletResponse resp) throws IOException {
 
-        if (!isWritable(req, resp)) {
+        if (!isWritable(getServletContext(), req, resp)) {
             // Service must be writable.
             return;
         }
@@ -397,7 +398,7 @@ public class QueryServlet extends BigdataRDFServlet {
     void doQuery(final HttpServletRequest req, final HttpServletResponse resp)
             throws IOException {
 
-        if (!isReadable(req, resp)) {
+        if (!isReadable(getServletContext(), req, resp)) {
             // HA Quorum in use, but quorum is not met.
             return;
         }
@@ -1011,7 +1012,7 @@ public class QueryServlet extends BigdataRDFServlet {
     private void doEstCard(final HttpServletRequest req,
             final HttpServletResponse resp) throws IOException {
 
-        if (!isReadable(req, resp)) {
+        if (!isReadable(getServletContext(), req, resp)) {
             // HA Quorum in use, but quorum is not met.
             return;
         }
@@ -1108,7 +1109,7 @@ public class QueryServlet extends BigdataRDFServlet {
     private void doContexts(final HttpServletRequest req,
             final HttpServletResponse resp) throws IOException {
 
-        if (!isReadable(req, resp)) {
+        if (!isReadable(getServletContext(), req, resp)) {
             // HA Quorum in use, but quorum is not met.
             return;
         }
@@ -1174,7 +1175,7 @@ public class QueryServlet extends BigdataRDFServlet {
     private void doShardReport(final HttpServletRequest req,
             final HttpServletResponse resp) throws IOException {
 
-        if (!isReadable(req, resp)) {
+        if (!isReadable(getServletContext(), req, resp)) {
             // HA Quorum in use, but quorum is not met.
             return;
         }

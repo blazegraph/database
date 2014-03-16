@@ -563,10 +563,10 @@ public class HALoadBalancerServlet extends ProxyServlet {
     }
 
     private String getLeaderURL(final HttpServletRequest request) {
-        
-        final ServletContext servletContext = request.getServletContext();
 
-        final HAJournal journal = (HAJournal) BigdataServlet
+        final ServletContext servletContext = getServletContext();
+
+         final HAJournal journal = (HAJournal) BigdataServlet
                 .getIndexManager(servletContext);
 
         final Quorum<HAGlue, QuorumService<HAGlue>> quorum = journal.getQuorum();
