@@ -246,7 +246,7 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
         
         if (timestamp == null) {
             
-            return getConfig(req.getServletContext()).timestamp;
+            return getConfig(getServletContext()).timestamp;
             
         }
 
@@ -291,7 +291,7 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
             }
             
             // use the default namespace.
-            return getConfig(req.getServletContext()).namespace;
+            return getConfig(getServletContext()).namespace;
             
         }
 
