@@ -260,6 +260,18 @@ public class GangliaService implements Runnable, IGangliaMetricsReporter {
 			"gexec"//
 	};
 
+    /**
+     * Return a copy of the default metrics used to generate {@link IHostReport}
+     * s.
+     * 
+     * @see #getHostReport()
+     */
+    public String[] getDefaultHostReportOn() {
+
+        return Arrays.copyOf(defaultHostReportOn, defaultHostReportOn.length);
+        
+	}
+	
 	/** Place into descending order by load_one. */
 	private static final Comparator<IHostReport> defaultHostReportComparator = new HostReportComparator(
 			"load_one", false/* asc */);
