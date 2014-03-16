@@ -581,15 +581,8 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
 
         final BNode aDataSet = g.getValueFactory().createBNode();
         
-        /*
-         * Figure out the service end point.
-         * 
-         * Note: This is just the requestURL as reported. This makes is
-         * possible to support virtual hosting and similar http proxy
-         * patterns since the SPARQL end point is just the URL at which the
-         * service is responding.
-         */
-        final String serviceURI = req.getRequestURL().toString();
+        // Figure out the service end point(s).
+        final String[] serviceURI = getServiceURIs(req);
         
         final VoID v = new VoID(g, tripleStore, serviceURI, aDataSet);
 

@@ -70,23 +70,23 @@ public class VoID {
      * The graph in which the service description is accumulated (from the
      * constructor).
      */
-    protected final Graph g;
+    private final Graph g;
     
     /**
      * The KB instance that is being described (from the constructor).
      */
-    protected final AbstractTripleStore tripleStore;
+    private final AbstractTripleStore tripleStore;
     
     /**
-     * The service end point (from the constructor).
+     * The service end point(s) (from the constructor).
      */
-    protected final String serviceURI;
+    private final String[] serviceURI;
 
     /**
      * The value factory used to create values for the service description graph
      * {@link #g}.
      */
-    protected final ValueFactory f;
+    private final ValueFactory f;
     
 //    /**
 //     * The resource which models the service.
@@ -96,12 +96,12 @@ public class VoID {
     /**
      * The resource which models the data set.
      */
-    protected final Resource aDataset;
+    private final Resource aDataset;
 
     /**
      * The resource which models the default graph in the data set.
      */
-    protected final BNode aDefaultGraph;
+    private final BNode aDefaultGraph;
 
     /**
      * 
@@ -117,7 +117,7 @@ public class VoID {
      *            <i>tripleStore</i>).
      */
     public VoID(final Graph g, final AbstractTripleStore tripleStore,
-            final String serviceURI, final Resource aDataset) {
+            final String[] serviceURI, final Resource aDataset) {
 
         if (g == null)
             throw new IllegalArgumentException();
@@ -128,6 +128,13 @@ public class VoID {
         if (serviceURI == null)
             throw new IllegalArgumentException();
 
+        if (serviceURI.length == 0)
+            throw new IllegalArgumentException();
+
+        for (String s : serviceURI)
+            if (s == null)
+                throw new IllegalArgumentException();
+        
         if (aDataset == null)
             throw new IllegalArgumentException();
 
@@ -177,14 +184,15 @@ public class VoID {
         /**
          * Service end point for this namespace.
          * 
-         * 
          * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/689" >
          *      Missing URL encoding in RemoteRepositoryManager </a>
          */
-        g.add(aDataset,
-                VoidVocabularyDecl.sparqlEndpoint,
-                f.createURI(serviceURI + "/"
-                        + ConnectOptions.urlEncode(namespace) + "/sparql"));
+        for (String uri : serviceURI) {
+            g.add(aDataset,
+                    VoidVocabularyDecl.sparqlEndpoint,
+                    f.createURI(uri + "/" + ConnectOptions.urlEncode(namespace)
+                            + "/sparql"));
+        }
 
         // any URI is considered to be an entity.
         g.add(aDataset, VoidVocabularyDecl.uriRegexPattern,

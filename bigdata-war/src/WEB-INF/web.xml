@@ -1,8 +1,23 @@
-<!DOCTYPE web-app PUBLIC "-//Sun Microsystems, Inc.//DTD Web Application 2.3//EN" "http://java.sun.com/dtd/web-app_2_3.dtd">
-<web-app>
+<?xml version="1.0" encoding="UTF-8"?>
+<web-app xmlns="http://java.sun.com/xml/ns/javaee"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="http://java.sun.com/xml/ns/javaee http://java.sun.com/xml/ns/javaee/web-app_3_1.xsd"
+      version="3.1">
   <display-name>Bigdata</display-name>
   <description>Bigdata</description>
   <context-param>
+   <description>The property file (for a standalone database instance) or the
+   jini configuration file (for a federation).  The file MUST end with either
+   ".properties" or ".config".  This path is relative to the directory from
+   which you start the servlet container so you may have to edit it for your
+   installation, e.g., by specifying an absolution path.  Also, it is a good
+   idea to review the RWStore.properties file as well and specify the location
+   of the database file on which it will persist your data.
+   
+   Note: You MAY override this parameter using
+   "-Dcom.bigdata.rdf.sail.webapp.ConfigParams.propertyFile=FILE"
+   when starting the servlet container.
+   </description>
   	<!-- Note: This path is relative to the directory in which you start -->
   	<!-- the servlet container. For the IDE, this is generally the root  -->
   	<!-- of the bigdata project. For the WAR, it depends where you start -->
@@ -10,46 +25,34 @@
   	<!-- relative to the root of the servlet container by default.       -->
   	<param-name>propertyFile</param-name>
    <param-value>WEB-INF/RWStore.properties</param-value>
-  	<description>The property file (for a standalone database instance) or the
-  	jini configuration file (for a federation).  The file MUST end with either
-  	".properties" or ".config".  This path is relative to the directory from
-  	which you start the servlet container so you may have to edit it for your
-  	installation, e.g., by specifying an absolution path.  Also, it is a good
-  	idea to review the RWStore.properties file as well and specify the location
-  	of the database file on which it will persist your data.
-  	
-  	Note: You MAY override this parameter using
-  	"-Dcom.bigdata.rdf.sail.webapp.ConfigParams.propertyFile=FILE"
-  	when starting the servlet container.
-  	</description>
   </context-param>
   <context-param>
+   <description>The default bigdata namespace of for the triple or quad store
+   instance to be exposed.</description>
   	<param-name>namespace</param-name>
   	<param-value>kb</param-value>
-  	<description>The default bigdata namespace of for the triple or quad store
-  	instance to be exposed.</description>
   </context-param>
   <context-param>
+   <description>When true a new triple or quads store instance will be created
+   if none is found at that namespace.</description>
   	<param-name>create</param-name>
   	<param-value>true</param-value>
-  	<description>When true a new triple or quads store instance will be created
-  	if none is found at that namespace.</description>
   </context-param>
   <context-param>
+   <description>The size of the thread pool used to service SPARQL queries -OR-
+    ZERO (0) for an unbounded thread pool.</description>
   	<param-name>queryThreadPoolSize</param-name>
   	<param-value>16</param-value>
-  	<description>The size of the thread pool used to service SPARQL queries -OR-
-    ZERO (0) for an unbounded thread pool.</description>
   </context-param>
   <context-param>
+   <description>When true, the REST API will not permit mutation operations.</description>
    <param-name>readOnly</param-name>
    <param-value>false</param-value>
-   <description>When true, the REST API will not permit mutation operations.</description>
   </context-param>
   <context-param>
+   <description>When non-zero, the timeout for queries (milliseconds).</description>
    <param-name>queryTimeout</param-name>
    <param-value>0</param-value>
-   <description>When non-zero, the timeout for queries (milliseconds).</description>
   </context-param>
   <listener>
    <listener-class>com.bigdata.rdf.sail.webapp.BigdataRDFServletContextListener</listener-class>
@@ -62,6 +65,7 @@
   	</description>
   	<servlet-class>com.bigdata.rdf.sail.webapp.RESTServlet</servlet-class>
   	<load-on-startup>0</load-on-startup>
+  	<async-supported>true</async-supported>
   </servlet>
   <servlet>
    <servlet-name>Multi-Tenancy API</servlet-name>
@@ -70,6 +74,7 @@
    or Fedetation.
    </description>
    <servlet-class>com.bigdata.rdf.sail.webapp.MultiTenancyServlet</servlet-class>
+   <async-supported>true</async-supported>
   </servlet>
   <servlet>
    <servlet-name>Truth Maintenance API</servlet-name>
@@ -77,23 +82,92 @@
    <description>A REST API for managing truth maintenance.
    </description>
    <servlet-class>com.bigdata.rdf.sail.webapp.InferenceServlet</servlet-class>
+   <async-supported>true</async-supported>
   </servlet>
   <servlet>
   	<servlet-name>Status</servlet-name>
   	<display-name>Status</display-name>
   	<description>A status page.</description>
   	<servlet-class>com.bigdata.rdf.sail.webapp.StatusServlet</servlet-class>
+   <async-supported>true</async-supported>
   </servlet>
   <servlet>
   	<servlet-name>Counters</servlet-name>
   	<display-name>Performance counters</display-name>
   	<description>Performance counters.</description>
   	<servlet-class>com.bigdata.rdf.sail.webapp.CountersServlet</servlet-class>
+   <async-supported>true</async-supported>
+  </servlet><!-- 
+  <servlet>
+   <servlet-name>Load Balancer</servlet-name>
+   <description>
+   The HA Load Balancer servlet provides a transparent proxy for
+   requests arriving its configured URL pattern (the "external"
+   interface for the load balancer) to the root of the web
+   application.  
+
+   The use of the load balancer is entirely optional.  If the
+   security rules permit, then clients MAY make requests directly
+   against a specific service. Thus, no specific provision exists
+   to disable the load balancer servlet, but you may choose not to
+   deploy it.
+
+   When successfully deployed, requests having prefix
+   corresponding to the URL pattern for the load balancer
+   (typically, "/bigdata/LBS/*") are automatically redirected to
+   a joined service in the met quorum based on the configured
+   load balancer policy. 
+
+   The load balancer policies are "HA aware." They will always
+   redirect update requests to the quorum leader.  The default
+   polices will load balance read requests over the leader and
+   followers in a manner that reflects the CPU, IO Wait, and GC
+   Time associated with each service.  The PlatformStatsPlugIn
+   and GangliaPlugIn MUST be enabled for the default load
+   balancer policy to operate. It depends on those plugins to
+   maintain a model of the load on the HA replication cluster.
+   The GangliaPlugIn should be run only as a listener if you are
+   are running the real gmond process on the host.  If you are 
+   not running gmond, then the GangliaPlugIn should be configured
+   as both a listener and a sender.
+   </description>
+   <servlet-class>com.bigdata.rdf.sail.webapp.HALoadBalancerServlet</servlet-class>
+   <load-on-startup>1</load-on-startup>
+   <async-supported>true</async-supported>
+   <init-param>
+      <param-name>prefix</param-name>
+      <param-value>/bigdata/LBS</param-value>
+      <description>
+      The prefix that will be stripped from the request. This must correspond
+      to the URL-pattern, without the trailing wildcard.  The standard value
+      is "/bigdata/LBS".
+      </description>
+   </init-param>
+   <init-param>
+      <param-name>policy</param-name>
+      <param-value></param-value>
+      <description>
+      The load balancer policy. This must be an instance of the
+      IHALoadBalancerPolicy interface.  A default policy is used when no
+      value is specified.
+      </description>
+   </init-param>
+   <init-param>
+      <param-name>comparator</param-name>
+      <param-value></param-value>
+      <description>
+      The class name of the Comparator instance that places
+      IHostReports into a total ordering from the host with the least
+      load to the host with the greatest load (optional).  A default
+      is used when no value is specified.
+      </description>
+   </init-param>
   </servlet>
-  <!-- Map the initial request into the UI. -->
-  <welcome-file-list>
-    <welcome-file>html/index.html</welcome-file>
-  </welcome-file-list>
+  <servlet-mapping>
+    <servlet-name>Load Balancer</servlet-name>
+    <url-pattern>/LBS/*</url-pattern>
+  </servlet-mapping>
+  -->
   <!-- Serve anything under /html/* as a simple file. -->
   <servlet-mapping>
     <servlet-name>default</servlet-name>
@@ -133,4 +207,8 @@
   <servlet-name>Counters</servlet-name>
   <url-pattern>/counters</url-pattern>
   </servlet-mapping>
+  <!-- Map the initial request into the UI. -->
+  <welcome-file-list>
+    <welcome-file>html/index.html</welcome-file>
+  </welcome-file-list>
 </web-app>
