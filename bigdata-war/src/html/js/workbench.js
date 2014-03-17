@@ -589,6 +589,7 @@ function showQueryResults(data) {
                   var text = binding.value;
                }
                text = escapeHTML(text);
+               text = text.replace(/\n/g, '<br>');
                if(binding.type == 'typed-literal') {
                   var tdData = ' class="literal" data-datatype="' + binding.datatype + '"';
                } else {
@@ -633,10 +634,10 @@ $('#explore-form').submit(function(e) {
       loadURI(uri);
 
       // if this is a SID, make the components clickable
-      var re = /<< <([^<>]*)> <([^<>]*)> <([^<>]*)> >>/;
+      var re = /<< *<([^<>]*)> *<([^<>]*)> *<([^<>]*)> *>>/;
       var match = uri.match(re);
       if(match) {
-         $('#explore-header').html('<h1>&lt;&lt; &lt;<a href="#">' + match[1] + '</a> &gt; &lt;<a href="#">' + match[2] + '</a> &gt; &lt;<a href="#">' + match[3] + '</a> &gt; &gt;&gt;</h1>');
+         $('#explore-header').html('<h1>&lt;&lt; &lt;<a href="#">' + match[1] + '</a>&gt;<br>&lt;<a href="#">' + match[2] + '</a> &gt;<br>&lt;<a href="#">' + match[3] + '</a> &gt; &gt;&gt;</h1>');
          $('#explore-header h1 a').click(function(e) {
             e.preventDefault();
             explore(this.text);
@@ -649,7 +650,8 @@ $('#explore-form').submit(function(e) {
 
 function loadURI(target) {
    // identify if this is a vertex or a SID
-   var re = /<< (?:<[^<>]*> ){3}>>/;
+   target = target.trim().replace(/\n/g, ' ');
+   var re = /<< *(?:<[^<>]*> *){3} *>>/;
    var vertex = !target.match(re);
 
    var vertexQuery = '\
@@ -730,7 +732,7 @@ function updateExploreStart(data) {
          } else {
             var output = col.value;
          }
-         output = escapeHTML(output);
+         output = escapeHTML(output).replace(/\n/g, '<br>');
          if(col.type == 'uri' || col.type == 'sid') {
             output = '<a href="#">' + output + '</a>';
          }
@@ -764,8 +766,11 @@ function updateExploreStart(data) {
 
    var sections = {incoming: 'Incoming Links', outgoing: 'Outgoing Links', attributes: 'Attributes'};
    for(var k in sections) {
-      if($('#explore-' + k + ' table tr').length == 0) {
-         $('#explore-' + k).html('No ' + sections[k]);
+      var id = '#explore-' + k;
+      if($(id + ' table tr').length == 0) {
+         $(id).html('No ' + sections[k]);
+      } else {
+         $(id).prepend('<h1>' + sections[k] + '</h1>');
       }
    }
 
@@ -805,7 +810,7 @@ $('#tab-selector a[data-target=performance]').click(function(e) {
 /* Utility functions */
 
 function getSID(binding) {
-   return '<< <' + binding.value['sid-s'].value + '> <' + binding.value['sid-p'].value + '> <' + binding.value['sid-o'].value + '> >>';
+   return '<< <' + binding.value['sid-s'].value + '>\n<' + binding.value['sid-p'].value + '>\n<' + binding.value['sid-o'].value + '> >>';
 }
 
 function parseSID(sid) {
