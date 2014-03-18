@@ -867,7 +867,7 @@ $('#tab-selector a[data-target=performance]').click(function(e) {
 /* Utility functions */
 
 function getSID(binding) {
-   return '<< <' + binding.value['sid-s'].value + '>\n<' + binding.value['sid-p'].value + '>\n<' + binding.value['sid-o'].value + '> >>';
+   return '<<\n  <' + binding.value['s'].value + '>,\n<' + binding.value['p'].value + '>,\n  <' + binding.value['o'].value + '>\n>>';
 }
 
 function parseSID(sid) {

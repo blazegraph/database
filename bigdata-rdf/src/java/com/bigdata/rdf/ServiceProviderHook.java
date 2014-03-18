@@ -38,6 +38,7 @@ import org.openrdf.rio.RDFParserRegistry;
 import org.openrdf.rio.RDFWriterRegistry;
 
 import com.bigdata.rdf.model.StatementEnum;
+import com.bigdata.rdf.rio.json.BigdataSPARQLResultsJSONParserFactory;
 import com.bigdata.rdf.rio.json.BigdataSPARQLResultsJSONWriterFactoryForConstruct;
 import com.bigdata.rdf.rio.json.BigdataSPARQLResultsJSONWriterFactoryForSelect;
 import com.bigdata.rdf.rio.ntriples.BigdataNTriplesParserFactory;
@@ -118,8 +119,14 @@ public class ServiceProviderHook {
 
             r.add(new BigdataNTriplesParserFactory());
             
-            // subclassed the turtle parser to allow for fully numeric bnode ids
+            // subclassed the turtle parser for RDR
             r.add(new BigdataTurtleParserFactory());
+            
+            /*
+             * Allows parsing of JSON SPARQL Results with an {s,p,o,[c]} header.
+             * RDR-enabled.
+             */
+            r.add(new BigdataSPARQLResultsJSONParserFactory());
             
         }
         
@@ -127,7 +134,7 @@ public class ServiceProviderHook {
         	
         	final TupleQueryResultWriterRegistry r = TupleQueryResultWriterRegistry.getInstance();
 
-        	// add our custom RDR-enabled JSON writer
+        	// add our custom RDR-enabled JSON writer (RDR-enabled)
         	r.add(new BigdataSPARQLResultsJSONWriterFactoryForSelect());
         	
         }
@@ -139,8 +146,10 @@ public class ServiceProviderHook {
 
 //            r.add(new BigdataRDFXMLWriterFactory());
             
+            // RDR-enabled
             r.add(new BigdataTurtleWriterFactory());
 
+            // RDR-enabled
             r.add(new BigdataSPARQLResultsJSONWriterFactoryForConstruct());
             
         }
