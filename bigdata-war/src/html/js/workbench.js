@@ -787,25 +787,40 @@ function updateExploreError(jqXHR, textStatus, errorThrown) {
 
 /* Status */
 
-$('#tab-selector a[data-target=status]').click(function(e) {
+$('#tab-selector a[data-target=status]').click(getStatus);
+
+function getStatus(e) {
+   if(e) {
+      e.preventDefault();
+   }
    $.get('/bigdata/status', function(data) {
-      var accepted = data.match(/Accepted query count=(\d+)/)[1];
-      var running = data.match(/Running query count=(\d+)/)[1];
-      var numbers = $(data).get(-1).textContent;
+      // get data inside a jQuery object
+      data = $('<div>').append(data);
+      getStatusNumbers(data);
+   });
+}
+
+function getStatusNumbers(data) {
+      var accepted = data.text().match(/Accepted query count=(\d+)/)[1];
+      var running = data.text().match(/Running query count=(\d+)/)[1];
+      var numbers = $(data).find('pre')[0].textContent;
       $('#accepted-query-count').html(accepted);
       $('#running-query-count').html(running);
       $('#status-numbers').html(numbers);
-   });
-});
+}
 
 $('#show-queries').click(function(e) {
    e.preventDefault();
    $.get('/bigdata/status?showQueries', function(data) {
+      // get data inside a jQuery object
+      data = $('<div>').append(data);
+
+      // update status numbers
+      getStatusNumbers(data);
+
       // clear current list
       $('#running-queries').empty();
 
-      // get data inside a jQuery object
-      data = $('<div>').append(data);
       data.find('h1').each(function(i, e) {
          // per running query, data is structured h1 form (with numbers/cancel data) h2 pre (with SPARQL)
          e = $(e);
@@ -834,7 +849,7 @@ function cancelQuery(e) {
    e.preventDefault();
    if(confirm('Cancel query?')) {
       var id = $(this).data('queryId');
-      $.post('/bigdata/?cancel&queryId=' + id);
+      $.post('/bigdata/status?cancelQuery&queryId=' + id, function() { getStatus(); });
       $(this).parents('li').remove();
    }
 }
