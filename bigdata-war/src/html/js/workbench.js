@@ -20,12 +20,6 @@ $('#tab-selector a').click(function(e) {
    showTab($(this).data('target'));
 });
 
-if(window.location.hash) {
-   showTab(window.location.hash.substr(1));
-} else {
-   $('#tab-selector a:first').click();
-}
-
 function showTab(tab) {
    $('.tab').hide();
    $('#' + tab + '-tab').show();
@@ -795,9 +789,57 @@ function updateExploreError(jqXHR, textStatus, errorThrown) {
 
 $('#tab-selector a[data-target=status]').click(function(e) {
    $.get('/bigdata/status', function(data) {
-      $('#status-tab .box').html(data);
+      var accepted = data.match(/Accepted query count=(\d+)/)[1];
+      var running = data.match(/Running query count=(\d+)/)[1];
+      var numbers = $(data).get(-1).textContent;
+      $('#accepted-query-count').html(accepted);
+      $('#running-query-count').html(running);
+      $('#status-numbers').html(numbers);
    });
 });
+
+$('#show-queries').click(function(e) {
+   e.preventDefault();
+   $.get('/bigdata/status?showQueries', function(data) {
+      // clear current list
+      $('#running-queries').empty();
+
+      // get data inside a jQuery object
+      data = $('<div>').append(data);
+      data.find('h1').each(function(i, e) {
+         // per running query, data is structured h1 form (with numbers/cancel data) h2 pre (with SPARQL)
+         e = $(e);
+         // get numbers string, which includes cancel link
+         var form = e.next();
+         var numbers = form.find('p')[0].textContent;
+         // remove cancel link
+         numbers = numbers.substring(0, numbers.lastIndexOf(','));
+         // get query id
+         var queryId = form.find('input[type=hidden]').val();
+         // get SPARQL
+         var sparql = form.next().next().html();
+
+         // got all data, create a li for each query
+         var li = $('<li><div class="query"><pre>' + sparql + '</pre></div><div class="query-numbers">' + numbers + ', <a href="#" class="cancel-query">Cancel</a></div><div class="query-details"><a href="#" class="query-details collapsed">Details</a></div>');
+         li.find('a').data('queryId', queryId);
+         $('#running-queries').append(li);
+      });
+
+      $('.cancel-query').click(cancelQuery);
+      $('a.query-details').click(getQueryDetails);
+   });
+});
+
+function cancelQuery(e) {
+   e.preventDefault();
+   if(confirm('Cancel query?')) {
+      var id = $(this).data('queryId');
+      $.post('/bigdata/?cancel&queryId=' + id);
+      $(this).parents('li').remove();
+   }
+}
+
+function getQueryDetails(e) {}
 
 /* Performance */
 
@@ -821,6 +863,12 @@ function parseSID(sid) {
 
 function escapeHTML(text) {
    return $('<div/>').text(text).html();
+}
+
+if(window.location.hash) {
+   $('a[data-target=' + window.location.hash.substring(1) + ']').click();
+} else {
+   $('#tab-selector a:first').click();
 }
 
 });

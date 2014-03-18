@@ -191,3 +191,23 @@ td {
 pre {
    font-family: monospace;
 }
+
+#running-queries li {
+   margin: 10px 0;
+}
+
+#running-queries div {
+   border: 1px solid;
+   border-bottom: none;
+   padding: 10px;
+}
+
+#running-queries .query {
+   max-height: 50px;
+   overflow: scroll;
+}
+
+#running-queries div.query-details {
+   border-bottom: 1px solid;
+}
+
