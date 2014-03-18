@@ -107,15 +107,15 @@ public class BigdataSPARQLResultsJSONWriter implements TupleQueryResultWriter, R
 			writer.write(", ");
 			writeKey("value");
 			openBraces();
-			writeKeyValue("sid-s", stmt.getSubject());
+			writeKeyValue("s", stmt.getSubject());
 			writeComma();
-			writeKeyValue("sid-p", stmt.getPredicate());
+			writeKeyValue("p", stmt.getPredicate());
 			writeComma();
-			writeKeyValue("sid-o", stmt.getObject());
+			writeKeyValue("o", stmt.getObject());
 			
 			if (stmt.getContext() != null) {
 				writeComma();
-				writeKeyValue("sid-c", stmt.getContext());
+				writeKeyValue("c", stmt.getContext());
 			}
 			closeBraces();
 			
@@ -469,7 +469,7 @@ public class BigdataSPARQLResultsJSONWriter implements TupleQueryResultWriter, R
 	@Override
 	public RDFFormat getRDFFormat() {
 		
-		return BigdataSPARQLResultsJSONWriterFactoryForConstruct.JSON;
+		return BigdataSPARQLResultsJSONParserFactory.JSON;
 		
 	}
 }
