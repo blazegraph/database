@@ -2488,6 +2488,15 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
             }
             
         }
+        
+        /*
+         * Add the SID terms to the IVs to materialize.
+         */
+        for (IV<?, ?> iv : unrequestedSidTerms) {
+        	
+        	ivs.add(iv);
+        	
+        }
 
         /*
          * Filter out the inline values first and those that have already
@@ -2700,7 +2709,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
 			
 			if (!ivs.contains(iv)) {
 				
-				ivs.add(iv);
+//				ivs.add(iv);
 				
 				unrequested.add(iv);
 				
