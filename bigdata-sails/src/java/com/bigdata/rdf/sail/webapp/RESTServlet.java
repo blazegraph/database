@@ -57,6 +57,8 @@ public class RESTServlet extends BigdataRDFServlet {
     private InsertServlet m_insertServlet;
     private DeleteServlet m_deleteServlet;
     private UpdateServlet m_updateServlet;
+    private WorkbenchServlet m_workbenchServlet;
+    
     /**
      * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/584">
      *      DESCRIBE CACHE </a>
@@ -80,12 +82,14 @@ public class RESTServlet extends BigdataRDFServlet {
         m_updateServlet = new UpdateServlet();
         m_deleteServlet = new DeleteServlet();
         m_describeServlet = new DescribeCacheServlet();
+        m_workbenchServlet = new WorkbenchServlet();
 
         m_queryServlet.init(getServletConfig());
         m_insertServlet.init(getServletConfig());
         m_updateServlet.init(getServletConfig());
         m_deleteServlet.init(getServletConfig());
         m_describeServlet.init(getServletConfig());
+        m_workbenchServlet.init(getServletConfig());
         
     }
     
@@ -118,6 +122,11 @@ public class RESTServlet extends BigdataRDFServlet {
         if (m_describeServlet != null) {
             m_describeServlet.destroy();
             m_describeServlet = null;
+        }
+
+        if (m_workbenchServlet != null) {
+            m_workbenchServlet.destroy();
+            m_workbenchServlet = null;
         }
 
         super.destroy();
@@ -222,7 +231,11 @@ public class RESTServlet extends BigdataRDFServlet {
 
             buildResponse(resp, HTTP_OK, MIME_TEXT_PLAIN);
             
-        } else if(req.getParameter("uri") != null) {
+        } else if (req.getParameter(WorkbenchServlet.ATTR_WORKBENCH) != null) {
+        	
+        	m_workbenchServlet.doPost(req, resp);
+        	
+        } else if (req.getParameter("uri") != null) {
 
             // INSERT via w/ URIs
             m_insertServlet.doPost(req, resp);
