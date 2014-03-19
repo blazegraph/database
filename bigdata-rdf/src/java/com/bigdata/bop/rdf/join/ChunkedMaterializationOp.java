@@ -398,55 +398,55 @@ public class ChunkedMaterializationOp extends PipelineOp {
 
     }
     
-    /**
-     * Either add the IV to the list if it needs materialization, or else
-     * delegate to {@link #handleSid(SidIV, Collection, boolean)} if it's a
-     * SidIV.
-     */
-    static private void handleIV(final IV<?, ?> iv, 
-    		final Collection<IV<?, ?>> ids, 
-    		final boolean materializeInlineIVs) {
-    	
-    	if (iv instanceof SidIV) {
-    		
-    		handleSid((SidIV<?>) iv, ids, materializeInlineIVs);
-    		
-    	} else if (iv.needsMaterialization() || materializeInlineIVs) {
-    		
-    		ids.add(iv);
-    		
-    	}
-    	
-    }
-    
-    /**
-     * Sids need to be handled specially because their individual ISPO
-     * components might need materialization.
-     */
-    static private void handleSid(final SidIV<?> sid,
-    		final Collection<IV<?, ?>> ids, 
-    		final boolean materializeInlineIVs) {
-    	
-    	final ISPO spo = sid.getInlineValue();
-    	
-    	System.err.println("handling a sid");
-    	System.err.println("adding s: " + spo.s());
-    	System.err.println("adding p: " + spo.p());
-    	System.err.println("adding o: " + spo.o());
-    	
-    	handleIV(spo.s(), ids, materializeInlineIVs);
-    	
-    	handleIV(spo.p(), ids, materializeInlineIVs);
-    	
-    	handleIV(spo.o(), ids, materializeInlineIVs);
-    	
-    	if (spo.c() != null) {
-    		
-    		handleIV(spo.c(), ids, materializeInlineIVs);
-    		
-    	}
-
-    }
+//    /**
+//     * Either add the IV to the list if it needs materialization, or else
+//     * delegate to {@link #handleSid(SidIV, Collection, boolean)} if it's a
+//     * SidIV.
+//     */
+//    static private void handleIV(final IV<?, ?> iv, 
+//    		final Collection<IV<?, ?>> ids, 
+//    		final boolean materializeInlineIVs) {
+//    	
+//    	if (iv instanceof SidIV) {
+//    		
+//    		handleSid((SidIV<?>) iv, ids, materializeInlineIVs);
+//    		
+//    	} else if (iv.needsMaterialization() || materializeInlineIVs) {
+//    		
+//    		ids.add(iv);
+//    		
+//    	}
+//    	
+//    }
+//    
+//    /**
+//     * Sids need to be handled specially because their individual ISPO
+//     * components might need materialization.
+//     */
+//    static private void handleSid(final SidIV<?> sid,
+//    		final Collection<IV<?, ?>> ids, 
+//    		final boolean materializeInlineIVs) {
+//    	
+//    	final ISPO spo = sid.getInlineValue();
+//    	
+//    	System.err.println("handling a sid");
+//    	System.err.println("adding s: " + spo.s());
+//    	System.err.println("adding p: " + spo.p());
+//    	System.err.println("adding o: " + spo.o());
+//    	
+//    	handleIV(spo.s(), ids, materializeInlineIVs);
+//    	
+//    	handleIV(spo.p(), ids, materializeInlineIVs);
+//    	
+//    	handleIV(spo.o(), ids, materializeInlineIVs);
+//    	
+//    	if (spo.c() != null) {
+//    		
+//    		handleIV(spo.c(), ids, materializeInlineIVs);
+//    		
+//    	}
+//
+//    }
 
     /**
      * Resolve the term identifiers in the {@link IBindingSet} using the map
