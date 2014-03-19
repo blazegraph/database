@@ -36,6 +36,7 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -104,6 +105,7 @@ import com.bigdata.rdf.model.BigdataValueFactoryImpl;
 import com.bigdata.rdf.model.BigdataValueSerializer;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.spo.ISPO;
+import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.vocab.NoVocabulary;
 import com.bigdata.rdf.vocab.Vocabulary;
@@ -2471,6 +2473,22 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
         // BlobIVs which must be resolved against an index.
         final Collection<BlobIV<?>> blobIVs = new LinkedList<BlobIV<?>>();
         
+        final Set<IV<?, ?>> unrequestedSidTerms = new LinkedHashSet<IV<?, ?>>();
+        
+        /*
+         * We need to materialize terms inside of SIDs so that the SIDs
+         * can be materialized properly.
+         */
+        for (IV<?,?> iv : ivs) {
+            
+            if (iv instanceof SidIV) {
+
+            	handleSid((SidIV) iv, ivs, unrequestedSidTerms);
+            	
+            }
+            
+        }
+
         /*
          * Filter out the inline values first and those that have already
          * been materialized and cached.
@@ -2602,8 +2620,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
         }
         
         /*
-         * Defer SidIVs until the end so that their ISPO components can be
-         * materialized first.
+         * SidIVs require special handling.
          */
         for (IV<?,?> iv : ivs) {
             
@@ -2613,7 +2630,20 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
             	
                 // translate it into a value directly
                 ret.put(iv, iv.asValue(this));
+                
             }
+            
+        }
+
+        /*
+         * Remove any IVs that were not explicitly requested in the method 
+         * call but that got pulled into materialization because of a SID.
+         */
+        for (IV<?,?> iv : unrequestedSidTerms) {
+
+        	ivs.remove(iv);
+        	
+        	ret.remove(iv);
             
         }
 
@@ -2626,6 +2656,58 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
 
         return ret;
 
+    }
+    
+    /**
+     * Add the terms inside a SID to the collection of IVs to materialize if
+     * they are not already there.
+     */
+	@SuppressWarnings("rawtypes")
+	final private void handleSid(final SidIV sid, 
+			final Collection<IV<?, ?>> ivs, 
+			final Set<IV<?, ?>> unrequested) {
+    	
+    	final ISPO spo = sid.getInlineValue();
+
+    	handleTerm(spo.s(), ivs, unrequested);
+		
+    	handleTerm(spo.p(), ivs, unrequested);
+		
+    	handleTerm(spo.o(), ivs, unrequested);
+		
+    	if (spo.c() != null) {
+    	
+    		handleTerm(spo.c(), ivs, unrequested);
+    		
+    	}
+		
+    }
+    
+    /**
+     * Add the terms inside a SID to the collection of IVs to materialize if
+     * they are not already there.
+     */
+	@SuppressWarnings("rawtypes")
+	final private void handleTerm(final IV<?, ?> iv, 
+			final Collection<IV<?, ?>> ivs, 
+			final Set<IV<?, ?>> unrequested) {
+
+		if (iv instanceof SidIV) {
+			
+			handleSid((SidIV) iv, ivs, unrequested);
+			
+		} else {
+			
+			if (!ivs.contains(iv)) {
+				
+				ivs.add(iv);
+				
+				unrequested.add(iv);
+				
+			}
+			
+		}
+		
     }
     
     /**

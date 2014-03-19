@@ -243,11 +243,11 @@ public class BigdataStatementIteratorImpl
     private void handleIV(final IV<?, ?> iv, 
     		final Collection<IV<?, ?>> ids) {
     	
-    	if (iv instanceof SidIV) {
-    		
-    		handleSid((SidIV<?>) iv, ids);
-    		
-    	}
+//    	if (iv instanceof SidIV) {
+//    		
+//    		handleSid((SidIV<?>) iv, ids);
+//    		
+//    	}
     		
     	if (bnodes == null || !bnodes.containsKey(iv)) {
     	
@@ -257,28 +257,28 @@ public class BigdataStatementIteratorImpl
     	
     }
     
-    /**
-     * Sids need to be handled specially because their individual ISPO
-     * components might need materialization as well.
-     */
-    private void handleSid(final SidIV<?> sid,
-    		final Collection<IV<?, ?>> ids) {
-    	
-    	final ISPO spo = sid.getInlineValue();
-    	
-    	handleIV(spo.s(), ids);
-    	
-    	handleIV(spo.p(), ids);
-    	
-    	handleIV(spo.o(), ids);
-    	
-    	if (spo.c() != null) {
-    		
-        	handleIV(spo.c(), ids);
-    		
-    	}
-
-    }
+//    /**
+//     * Sids need to be handled specially because their individual ISPO
+//     * components might need materialization as well.
+//     */
+//    private void handleSid(final SidIV<?> sid,
+//    		final Collection<IV<?, ?>> ids) {
+//    	
+//    	final ISPO spo = sid.getInlineValue();
+//    	
+//    	handleIV(spo.s(), ids);
+//    	
+//    	handleIV(spo.p(), ids);
+//    	
+//    	handleIV(spo.o(), ids);
+//    	
+//    	if (spo.c() != null) {
+//    		
+//        	handleIV(spo.c(), ids);
+//    		
+//    	}
+//
+//    }
 
 
     
