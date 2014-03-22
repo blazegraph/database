@@ -31,6 +31,8 @@ import java.io.ObjectStreamException;
 import java.io.Serializable;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
@@ -84,6 +86,11 @@ public class IPAddrIV<V extends BigdataURI> extends AbstractInlineIV<V, InetAddr
 	private transient String hostAddress;
 	
 	/**
+	 * The IPv4 prefix byte.
+	 */
+	private transient byte prefix;
+	
+	/**
 	 * The cached byte[] key for the encoding of this IV.
 	 */
 	private transient byte[] key;
@@ -95,7 +102,7 @@ public class IPAddrIV<V extends BigdataURI> extends AbstractInlineIV<V, InetAddr
 
     public IV<V, InetAddress> clone(final boolean clearCache) {
 
-        final IPAddrIV<V> tmp = new IPAddrIV<V>(value);
+        final IPAddrIV<V> tmp = new IPAddrIV<V>(value, prefix);
 
         // Propagate the cached byte[] key.
         tmp.key = key;
@@ -116,7 +123,7 @@ public class IPAddrIV<V extends BigdataURI> extends AbstractInlineIV<V, InetAddr
     /**
 	 * Ctor with internal value specified.
 	 */
-	public IPAddrIV(final InetAddress value) {
+	public IPAddrIV(final InetAddress value, final byte prefix) {
 
         /*
          * TODO Using XSDBoolean so that we can know how to decode this thing
@@ -126,8 +133,16 @@ public class IPAddrIV<V extends BigdataURI> extends AbstractInlineIV<V, InetAddr
         
         this.value = value;
         
+        this.prefix = prefix;
+        
     }
 
+	/*
+	 * Somebody please fix this for the love of god.
+	 */
+	public static final Pattern pattern = 
+			Pattern.compile("((?:[0-9]{1,3}\\.){3}[0-9]{1,3})((\\/)(([0-9]{1,2})))?");
+	
     /**
 	 * Ctor with host address specified.
 	 */
@@ -139,8 +154,35 @@ public class IPAddrIV<V extends BigdataURI> extends AbstractInlineIV<V, InetAddr
          */
         super(VTE.URI, DTE.XSDBoolean);
         
-        this.value = InetAddress.getByName(hostAddress);
         this.hostAddress = hostAddress;
+        
+		final Matcher matcher = pattern.matcher(hostAddress);
+		
+		final boolean matches = matcher.matches();
+		
+		if (matches) {
+		
+			final String ip = matcher.group(1);
+			
+//			log.debug(ip);
+			
+			this.value = InetAddress.getByName(ip);
+			
+			final String suffix = matcher.group(4);
+			
+//			log.debug(suffix);
+			
+			this.prefix = suffix != null ? Byte.valueOf(suffix) : (byte) 33;
+			
+		} else {
+			
+			throw new IllegalArgumentException("not an IP: " + hostAddress);
+			
+//			log.debug("no match");
+			
+		}
+		
+
         
     }
 
@@ -205,7 +247,13 @@ public class IPAddrIV<V extends BigdataURI> extends AbstractInlineIV<V, InetAddr
 	@Override
 	public String getLocalName() {
 		if (hostAddress == null) {
-			hostAddress = value.getHostAddress();
+			
+			if (prefix < 33) {
+				hostAddress = value.getHostAddress() + "/" + prefix;
+			} else {
+				hostAddress = value.getHostAddress();
+			}
+			
 		}
 		return hostAddress;
 	}
@@ -218,7 +266,8 @@ public class IPAddrIV<V extends BigdataURI> extends AbstractInlineIV<V, InetAddr
             return true;
         if (o instanceof IPAddrIV) {
         		final InetAddress value2 = ((IPAddrIV<?>) o).value;
-        		return value.equals(value2);
+        		final byte prefix2 = ((IPAddrIV<?>) o).prefix;
+        		return value.equals(value2) && prefix == prefix2;
         }
         return false;
 	}
@@ -256,7 +305,11 @@ public class IPAddrIV<V extends BigdataURI> extends AbstractInlineIV<V, InetAddr
 
         if (key == null) {
         
-            key = value.getAddress();
+        	key = new byte[5];
+        	
+            System.arraycopy(value.getAddress(), 0, key, 0, 4);
+            
+            key[4] = prefix;
             
         }
 
@@ -305,9 +358,13 @@ public class IPAddrIV<V extends BigdataURI> extends AbstractInlineIV<V, InetAddr
 
         	try {
         		
-	            final InetAddress value = InetAddress.getByAddress(key);
+        		final byte[] ip = new byte[4];
+        		
+        		System.arraycopy(key, 0, ip, 0, 4);
+        		
+	            final InetAddress value = InetAddress.getByAddress(ip);
 	            
-	            return new IPAddrIV(value);
+	            return new IPAddrIV(value, key[5]);
 	            
         	} catch (UnknownHostException ex) {
         		
