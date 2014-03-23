@@ -165,6 +165,7 @@ import com.bigdata.service.IBigdataFederation;
 import com.bigdata.sparse.GlobalRowStoreUtil;
 import com.bigdata.striterator.ChunkedArrayIterator;
 import com.bigdata.striterator.ChunkedConvertingIterator;
+import com.bigdata.striterator.ChunkedWrappedIterator;
 import com.bigdata.striterator.DelegateChunkedIterator;
 import com.bigdata.striterator.EmptyChunkedIterator;
 import com.bigdata.striterator.IChunkedIterator;
@@ -2704,6 +2705,34 @@ abstract public class AbstractTripleStore extends
             final URI p, final Value o, final Resource c) {
 
         return asStatementIterator(getAccessPath(s, p, o, c).iterator());
+
+    }
+    
+    /**
+     * Efficient batched, streaming resolution of triple patterns to statements
+     * spanned by those triple patterns that are present in the data.
+     * <p>
+     * Note: If the input contains triple patterns that have a high cardinality
+     * in the data, then a large number of statements may be returned.
+     * 
+     * @param triplePatterns
+     *            A collection of triple patterns or fully bound statements. If
+     *            this collection contains triple patterns that have a high
+     *            cardinality in the data, then a large number of statements may
+     *            be returned.
+     * 
+     * @return An iterator from which the materialized statements spanned by
+     *         those triple patterns may be read.
+     * 
+     * @see <a href="http://trac.bigdata.com/ticket/866" > Efficient batch
+     *      remove of a collection of triple patterns </a>
+     */
+    public BigdataStatementIterator getStatements(
+            final IChunkedOrderedIterator<BigdataTriplePattern> triplePatterns) {
+
+        return asStatementIterator(new ChunkedWrappedIterator<ISPO>(
+                new BigdataTriplePatternMaterializer(this, triplePatterns)
+                        .start(getExecutorService())));
 
     }
 
