@@ -544,14 +544,10 @@ public class IVUtility {
              * as an IPAddrIV.  We need to fix the Extension mechanism for URIs.
              * Extension is already used above. 
         	 */
-        	try {
-	        	final byte[] addr = new byte[4];
-	        	System.arraycopy(key, o, addr, 0, 4);
-	            final InetAddress ip = InetAddress.getByAddress(addr);
-	            return new IPAddrIV(ip);//, key[o+4]);
-        	} catch (UnknownHostException ex) {
-        		throw new RuntimeException(ex);
-        	}
+        	final byte[] addr = new byte[5];
+        	System.arraycopy(key, o, addr, 0, 5);
+            final Inet4Address ip = new Inet4Address(addr);
+            return new IPAddrIV(ip);
         }
         case XSDByte: {
             final byte x = key[o];//KeyBuilder.decodeByte(key[o]);

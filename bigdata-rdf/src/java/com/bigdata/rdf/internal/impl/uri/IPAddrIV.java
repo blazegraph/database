@@ -29,7 +29,6 @@ import java.io.ObjectInput;
 import java.io.ObjectOutput;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
-import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -39,19 +38,14 @@ import org.openrdf.model.Value;
 
 import com.bigdata.btree.BytesUtil.UnsignedByteArrayComparator;
 import com.bigdata.btree.keys.IKeyBuilder;
-import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.io.LongPacker;
 import com.bigdata.rdf.internal.DTE;
-import com.bigdata.rdf.internal.ILexiconConfiguration;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.IVUtility;
+import com.bigdata.rdf.internal.Inet4Address;
 import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.internal.impl.AbstractInlineIV;
 import com.bigdata.rdf.lexicon.LexiconRelation;
-import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataURI;
-import com.bigdata.rdf.model.BigdataValueFactory;
-import com.bigdata.rdf.spo.SPOKeyOrder;
 
 /**
  * Internal value representing an inline IP address.  Uses the InetAddress
@@ -62,7 +56,7 @@ import com.bigdata.rdf.spo.SPOKeyOrder;
  * <p>
  * {@inheritDoc}
  */
-public class IPAddrIV<V extends BigdataURI> extends AbstractInlineIV<V, InetAddress>
+public class IPAddrIV<V extends BigdataURI> extends AbstractInlineIV<V, Inet4Address>
         implements Serializable, URI {
 
     /**
@@ -79,7 +73,7 @@ public class IPAddrIV<V extends BigdataURI> extends AbstractInlineIV<V, InetAddr
 	/**
 	 * The inline IP address.
 	 */
-	private final InetAddress value;
+	private final Inet4Address value;
 	
 	/**
 	 * The cached string representation of this IP.
@@ -101,7 +95,7 @@ public class IPAddrIV<V extends BigdataURI> extends AbstractInlineIV<V, InetAddr
 	 */
 	private transient V uri;
 
-    public IV<V, InetAddress> clone(final boolean clearCache) {
+    public IV<V, Inet4Address> clone(final boolean clearCache) {
 
         final IPAddrIV<V> tmp = new IPAddrIV<V>(value);//, prefix);
 
@@ -124,7 +118,7 @@ public class IPAddrIV<V extends BigdataURI> extends AbstractInlineIV<V, InetAddr
     /**
 	 * Ctor with internal value specified.
 	 */
-	public IPAddrIV(final InetAddress value) {//, final byte prefix) {
+	public IPAddrIV(final Inet4Address value) {//, final byte prefix) {
 
         /*
          * TODO Using XSDBoolean so that we can know how to decode this thing
@@ -167,11 +161,24 @@ public class IPAddrIV<V extends BigdataURI> extends AbstractInlineIV<V, InetAddr
 			
 //			log.debug(ip);
 			
-			this.value = InetAddress.getByName(ip);
-			
-//			final String suffix = matcher.group(4);
+			final String suffix = matcher.group(4);
 			
 //			log.debug(suffix);
+
+			final String[] s;
+			if (suffix != null) {
+				
+				s = new String[5];
+				System.arraycopy(ip.split("\\.", -1), 0, s, 0, 4);
+				s[4] = suffix;
+				
+			} else {
+				
+				s = ip.split("\\.", -1);
+
+			}
+			
+			this.value = Inet4Address.textToAddr(s);
 			
 //			this.prefix = suffix != null ? Byte.valueOf(suffix) : (byte) 33;
 			
@@ -188,7 +195,7 @@ public class IPAddrIV<V extends BigdataURI> extends AbstractInlineIV<V, InetAddr
 	/**
 	 * Returns the inline value.
 	 */
-	public InetAddress getInlineValue() throws UnsupportedOperationException {
+	public Inet4Address getInlineValue() throws UnsupportedOperationException {
 		return value;
 	}
 
@@ -246,13 +253,7 @@ public class IPAddrIV<V extends BigdataURI> extends AbstractInlineIV<V, InetAddr
 	@Override
 	public String getLocalName() {
 		if (hostAddress == null) {
-			
-//			if (prefix < 33) {
-//				hostAddress = value.getHostAddress() + "/" + prefix;
-//			} else {
-				hostAddress = value.getHostAddress();
-//			}
-			
+			hostAddress = value.toString();
 		}
 		return hostAddress;
 	}
@@ -264,9 +265,8 @@ public class IPAddrIV<V extends BigdataURI> extends AbstractInlineIV<V, InetAddr
         if (this == o)
             return true;
         if (o instanceof IPAddrIV) {
-        		final InetAddress value2 = ((IPAddrIV<?>) o).value;
-//        		final byte prefix2 = ((IPAddrIV<?>) o).prefix;
-        		return value.equals(value2);// && prefix == prefix2;
+        		final Inet4Address value2 = ((IPAddrIV<?>) o).value;
+        		return value.equals(value2);
         }
         return false;
 	}
@@ -303,17 +303,7 @@ public class IPAddrIV<V extends BigdataURI> extends AbstractInlineIV<V, InetAddr
     private byte[] key() {
 
         if (key == null) {
-        
-//        	final IKeyBuilder kb = KeyBuilder.newInstance();
-//        	
-//        	kb.append(value.getAddress());
-//        	
-//        	kb.append(prefix);
-//        	
-//        	key = kb.getKey();
-
-        	key = value.getAddress();
-        	
+        	key = value.getBytes();
         }
 
         return key;
@@ -358,19 +348,7 @@ public class IPAddrIV<V extends BigdataURI> extends AbstractInlineIV<V, InetAddr
         }
         
         private Object readResolve() throws ObjectStreamException {
-
-        	try {
-        		
-	            final InetAddress value = InetAddress.getByAddress(key);
-	            
-	            return new IPAddrIV(value);
-	            
-        	} catch (UnknownHostException ex) {
-        		
-        		throw new RuntimeException(ex);
-        		
-        	}
-            
+	        return new Inet4Address(key);
         }
 
     }
