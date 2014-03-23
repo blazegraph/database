@@ -1,6 +1,11 @@
 package com.bigdata.rdf.internal;
 
 import java.math.BigInteger;
+import java.util.Arrays;
+
+import org.apache.log4j.Logger;
+
+import com.bigdata.btree.BytesUtil.UnsignedByteArrayComparator;
 
 /**
  * This class represents an Internet Protocol version 4 (IPv4) address.
@@ -59,21 +64,22 @@ import java.math.BigInteger;
 
 public final class Inet4Address {
     
-
-    final long address;
+//	private static final Logger log = Logger.getLogger(Inet4Address.class);
+	
+    final byte[] address;
     
     public Inet4Address(final byte addr[]) {
     	
-    	if (addr == null || addr.length != 5)
-    		throw new IllegalArgumentException();
-    	
-        long address  = addr[4] & 0xFFl;
-        address |= ((addr[3] << 8) & 0xFF00l);
-        address |= ((addr[2] << 16) & 0xFF0000l);
-        address |= ((addr[1] << 24) & 0xFF000000l);
-        address |= ((addr[0] << 32) & 0xFF00000000l);
+//    	if (addr == null || addr.length != 5)
+//    		throw new IllegalArgumentException();
+//    	
+//        long address  = addr[4] & 0xFFl;
+//        address |= ((addr[3] << 8) & 0xFF00l);
+//        address |= ((addr[2] << 16) & 0xFF0000l);
+//        address |= ((addr[1] << 24) & 0xFF000000l);
+//        address |= (((long)(addr[0] << 32)) & 0xFF00000000l);
         
-        this.address = address;
+        this.address = addr;
         
     }
 
@@ -86,14 +92,16 @@ public final class Inet4Address {
      */
     public byte[] getBytes() {
     	
-        byte[] addr = new byte[5];
-        addr[0] = (byte) ((address >>> 32) & 0xFF);
-        addr[1] = (byte) ((address >>> 24) & 0xFF);
-        addr[2] = (byte) ((address >>> 16) & 0xFF);
-        addr[3] = (byte) ((address >>> 8) & 0xFF);
-        addr[4] = (byte) (address & 0xFF);
-        
-        return addr;
+//        byte[] addr = new byte[5];
+//        addr[0] = (byte) ((address >>> 32) & 0xFF);
+//        addr[1] = (byte) ((address >>> 24) & 0xFF);
+//        addr[2] = (byte) ((address >>> 16) & 0xFF);
+//        addr[3] = (byte) ((address >>> 8) & 0xFF);
+//        addr[4] = (byte) (address & 0xFF);
+//        
+//        return addr;
+    	
+    	return address;
         
     }
 
@@ -107,35 +115,26 @@ public final class Inet4Address {
         return numericToTextFormat(getBytes());
     }
 
-    /**
-     * Returns a hashcode for this IP address.
-     *
-     * @return  a hash code value for this IP address.
-     */
-    public int hashCode() {
-        return BigInteger.valueOf(address).hashCode();
-    }
+    @Override
+	public int hashCode() {
+		final int prime = 31;
+		int result = 1;
+		result = prime * result + Arrays.hashCode(address);
+		return result;
+	}
 
-    /**
-     * Compares this object against the specified object.
-     * The result is <code>true</code> if and only if the argument is
-     * not <code>null</code> and it represents the same IP address as
-     * this object.
-     * <p>
-     * Two instances of <code>InetAddress</code> represent the same IP
-     * address if the length of the byte arrays returned by
-     * <code>getAddress</code> is the same for both, and each of the
-     * array components is the same for the byte arrays.
-     *
-     * @param   obj   the object to compare against.
-     * @return  <code>true</code> if the objects are the same;
-     *          <code>false</code> otherwise.
-     * @see     java.net.InetAddress#getAddress()
-     */
-    public boolean equals(Object obj) {
-        return (obj != null) && (obj instanceof Inet4Address) &&
-            (((Inet4Address)obj).address == address);
-    }
+	@Override
+	public boolean equals(Object obj) {
+		if (this == obj)
+			return true;
+		if (obj == null)
+			return false;
+		if (getClass() != obj.getClass())
+			return false;
+		Inet4Address other = (Inet4Address) obj;
+
+		return UnsignedByteArrayComparator.INSTANCE.compare(address, other.address) == 0;
+	}
 
     // Utilities
     /*
