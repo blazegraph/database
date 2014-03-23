@@ -548,7 +548,7 @@ public class IVUtility {
 	        	final byte[] addr = new byte[4];
 	        	System.arraycopy(key, o, addr, 0, 4);
 	            final InetAddress ip = InetAddress.getByAddress(addr);
-	            return new IPAddrIV(ip, key[o+4]);
+	            return new IPAddrIV(ip);//, key[o+4]);
         	} catch (UnknownHostException ex) {
         		throw new RuntimeException(ex);
         	}
