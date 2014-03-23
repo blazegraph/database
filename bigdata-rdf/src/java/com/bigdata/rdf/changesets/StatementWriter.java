@@ -144,7 +144,7 @@ public class StatementWriter {
         
     }
     
-    private static long removeStatements(final AbstractTripleStore database,
+    public static long removeStatements(final AbstractTripleStore database,
             final ISPO[] stmts, 
             final int numStmts,
             final boolean computeClosureForStatementIdentifiers,
