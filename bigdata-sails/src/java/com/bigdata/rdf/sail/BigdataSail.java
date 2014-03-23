@@ -2790,7 +2790,7 @@ public class BigdataSail extends SailBase implements Sail {
         /**
          * Note: The CONTEXT is ignored when in statementIdentifier mode!
          */
-        public synchronized int removeStatements(final ISPO[] stmts, final int numStmts) throws SailException {
+        public synchronized int removeStatements(final ISPO[] stmts) throws SailException {
             
             assertWritableConn();
 
@@ -2828,8 +2828,7 @@ public class BigdataSail extends SailBase implements Sail {
                  * visits only the explicit statements.
                  */
                 final IChunkedOrderedIterator<ISPO> itr = 
-                		new ChunkedArrayIterator<ISPO>(numStmts, stmts,
-                        null/* keyOrder */);
+                		new ChunkedArrayIterator<ISPO>(stmts);
 
                 // The tempStore absorbing retractions.
                 final AbstractTripleStore tempStore = getRetractionBuffer()
@@ -2854,18 +2853,17 @@ public class BigdataSail extends SailBase implements Sail {
                 
                 if (changeLog == null) {
                     
-                    n = database.removeStatements(stmts, numStmts);
+                    n = database.removeStatements(stmts, stmts.length);
                     
                 } else {
                 
-//                    final IChunkedOrderedIterator<ISPO> itr = 
-//                        database.computeClosureForStatementIdentifiers(
-//                        		new ChunkedArrayIterator<ISPO>(numStmts, stmts,
-//                                        null/* keyOrder */));
+                    final IChunkedOrderedIterator<ISPO> itr = 
+                        database.computeClosureForStatementIdentifiers(
+                        		new ChunkedArrayIterator<ISPO>(stmts));
                     
                     // no need to compute closure for sids since we just did it
-                    n = StatementWriter.removeStatements(database, stmts, numStmts, 
-                            database.getStatementIdentifiers()/* computeClosureForStatementIdentifiers */,
+                    n = StatementWriter.removeStatements(database, itr, 
+                            false/* computeClosureForStatementIdentifiers */,
                             changeLog);
                     
 //                    final IAccessPath<ISPO> ap = 

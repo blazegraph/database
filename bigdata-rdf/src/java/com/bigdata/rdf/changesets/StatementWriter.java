@@ -130,7 +130,7 @@ public class StatementWriter {
 //            
 //            final BigdataStatement[] stmts = 
 //                new BigdataStatement[database.getChunkCapacity()];
-            final SPO[] stmts = new SPO[database.getChunkCapacity()];
+            final ISPO[] stmts = new ISPO[database.getChunkCapacity()];
             
             int i = 0;
             while ((i = nextChunk(itr, stmts)) > 0) {
