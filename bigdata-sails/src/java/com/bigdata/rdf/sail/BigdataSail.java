@@ -23,7 +23,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 /*
 Portions of this code are:
 
-Copyright Aduna (http://www.aduna-software.com/) � 2001-2007
+Copyright Aduna (http://www.aduna-software.com/) 2001-2007
 
 All rights reserved.
 
@@ -146,6 +146,7 @@ import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.service.AbstractFederation;
 import com.bigdata.service.IBigdataFederation;
+import com.bigdata.striterator.ChunkedArrayIterator;
 import com.bigdata.striterator.CloseableIteratorWrapper;
 import com.bigdata.striterator.IChunkedIterator;
 import com.bigdata.striterator.IChunkedOrderedIterator;
@@ -2746,6 +2747,125 @@ public class BigdataSail extends SailBase implements Sail {
                     // no need to compute closure for sids since we just did it
                     n = StatementWriter.removeStatements(database, itr, 
                             false/* computeClosureForStatementIdentifiers */,
+                            changeLog);
+                    
+//                    final IAccessPath<ISPO> ap = 
+//                        database.getAccessPath(s, p, o, c);
+//    
+//                    final IChunkedOrderedIterator<ISPO> itr = ap.iterator();
+//                    
+//                    if (itr.hasNext()) {
+//                        
+//                        final BigdataStatementIteratorImpl itr2 = 
+//                            new BigdataStatementIteratorImpl(database, bnodes2, itr)
+//                                .start(database.getExecutorService()); 
+//                        
+//                        final BigdataStatement[] stmts = 
+//                            new BigdataStatement[database.getChunkCapacity()];
+//                        
+//                        int i = 0;
+//                        while (i < stmts.length && itr2.hasNext()) {
+//                            stmts[i++] = itr2.next();
+//                            if (i == stmts.length) {
+//                                // process stmts[]
+//                                n += removeAndNotify(stmts, i);
+//                                i = 0;
+//                            }
+//                        }
+//                        if (i > 0) {
+//                            n += removeAndNotify(stmts, i);
+//                        }
+//                        
+//                    }
+                    
+                }
+
+            }
+
+            // avoid overflow.
+            return (int) Math.min(Integer.MAX_VALUE, n);
+            
+        }
+        
+        /**
+         * Note: The CONTEXT is ignored when in statementIdentifier mode!
+         */
+        public synchronized int removeStatements(final ISPO[] stmts, final int numStmts) throws SailException {
+            
+            assertWritableConn();
+
+            flushStatementBuffers(true/* flushAssertBuffer */, false/* flushRetractBuffer */);
+
+            if (m_listeners != null) {
+
+                /*
+                 * FIXME to support the SailConnectionListener we need to
+                 * pre-materialize the explicit statements that are to be
+                 * deleted and then notify the listener for each such explicit
+                 * statement. Since that is a lot of work, make sure that we do
+                 * not generate notices unless there are registered listeners!
+                 */
+
+                throw new UnsupportedOperationException();
+                
+            }
+
+            // #of explicit statements removed.
+            long n = 0;
+
+            if (getTruthMaintenance()) {
+
+                /*
+                 * Since we are doing truth maintenance we need to copy the
+                 * matching "explicit" statements into a temporary store rather
+                 * than deleting them directly. This uses the internal API to
+                 * copy the statements to the temporary store without
+                 * materializing them as Sesame Statement objects.
+                 */
+
+                /*
+                 * Obtain a chunked iterator using the triple pattern that
+                 * visits only the explicit statements.
+                 */
+                final IChunkedOrderedIterator<ISPO> itr = 
+                		new ChunkedArrayIterator<ISPO>(numStmts, stmts,
+                        null/* keyOrder */);
+
+                // The tempStore absorbing retractions.
+                final AbstractTripleStore tempStore = getRetractionBuffer()
+                        .getStatementStore();
+
+                // Copy explicit statements to tempStore.
+                n = tempStore.addStatements(tempStore, true/* copyOnly */,
+                        itr, null/* filter */);
+
+                /*
+                 * Nothing more happens until the commit or incremental write
+                 * flushes the retraction buffer and runs TM.
+                 */
+                
+            } else {
+
+                /*
+                 * Since we are not doing truth maintenance, just remove the
+                 * statements from the database (synchronous, batch api, not
+                 * buffered).
+                 */
+                
+                if (changeLog == null) {
+                    
+                    n = database.removeStatements(stmts, numStmts);
+                    
+                } else {
+                
+//                    final IChunkedOrderedIterator<ISPO> itr = 
+//                        database.computeClosureForStatementIdentifiers(
+//                        		new ChunkedArrayIterator<ISPO>(numStmts, stmts,
+//                                        null/* keyOrder */));
+                    
+                    // no need to compute closure for sids since we just did it
+                    n = StatementWriter.removeStatements(database, stmts, numStmts, 
+                            database.getStatementIdentifiers()/* computeClosureForStatementIdentifiers */,
                             changeLog);
                     
 //                    final IAccessPath<ISPO> ap = 

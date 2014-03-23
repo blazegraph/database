@@ -80,11 +80,6 @@ public class IPAddrIV<V extends BigdataURI> extends AbstractInlineIV<V, Inet4Add
 	 */
 	private transient String hostAddress;
 	
-//	/**
-//	 * The IPv4 prefix byte.
-//	 */
-//	private transient byte prefix;
-	
 	/**
 	 * The cached byte[] key for the encoding of this IV.
 	 */
@@ -127,8 +122,6 @@ public class IPAddrIV<V extends BigdataURI> extends AbstractInlineIV<V, Inet4Add
         super(VTE.URI, DTE.XSDBoolean);
         
         this.value = value;
-        
-//        this.prefix = prefix;
         
     }
 
@@ -179,8 +172,6 @@ public class IPAddrIV<V extends BigdataURI> extends AbstractInlineIV<V, Inet4Add
 			}
 			
 			this.value = Inet4Address.textToAddr(s);
-			
-//			this.prefix = suffix != null ? Byte.valueOf(suffix) : (byte) 33;
 			
 		} else {
 			
