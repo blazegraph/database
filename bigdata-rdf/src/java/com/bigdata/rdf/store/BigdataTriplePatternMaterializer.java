@@ -24,7 +24,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.rdf.store;
 
-import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -42,6 +41,7 @@ import org.apache.system.SystemUtil;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPOAccessPath;
 import com.bigdata.relation.accesspath.BlockingBuffer;
+import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.striterator.AbstractChunkedResolverator;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 import com.bigdata.util.concurrent.LatchedExecutor;
@@ -241,8 +241,9 @@ public class BigdataTriplePatternMaterializer
              * database.computeClosureForStatementIdentifiers(
              * database.getAccessPath(s, p, o, c).iterator());
              */
-            final SPOAccessPath ap = (SPOAccessPath) state.getAccessPath(stmt.getSubject(),
-                    stmt.getPredicate(), stmt.getObject(), stmt.getContext());
+            final IAccessPath<ISPO> ap = (IAccessPath<ISPO>) state.getAccessPath(
+            		stmt.getSubject(), stmt.getPredicate(), 
+            		stmt.getObject(), stmt.getContext());
             
 //            if(ap.isFullyBoundForKey()) {
 //                /*
