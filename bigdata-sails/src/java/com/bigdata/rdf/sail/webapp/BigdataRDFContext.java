@@ -72,19 +72,14 @@ import org.openrdf.rio.RDFWriter;
 import org.openrdf.rio.RDFWriterRegistry;
 import org.openrdf.sail.SailException;
 
-import com.bigdata.bop.BufferAnnotations;
-import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
-import com.bigdata.bop.join.PipelineJoin;
-import com.bigdata.btree.IndexMetadata;
 import com.bigdata.counters.CAT;
 import com.bigdata.io.NullOutputStream;
-import com.bigdata.journal.IBufferStrategy;
 import com.bigdata.journal.IIndexManager;
+import com.bigdata.journal.ITransactionService;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
-import com.bigdata.journal.RWStrategy;
 import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rdf.changesets.IChangeLog;
 import com.bigdata.rdf.changesets.IChangeRecord;
@@ -106,9 +101,7 @@ import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryType;
 import com.bigdata.rdf.sparql.ast.Update;
 import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.relation.AbstractResource;
 import com.bigdata.relation.RelationSchema;
-import com.bigdata.rwstore.RWStore;
 import com.bigdata.sparse.ITPS;
 import com.bigdata.sparse.SparseRowStore;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
@@ -2208,273 +2201,163 @@ public class BigdataRDFContext extends BigdataBaseContext {
     }
 
     /**
-     * Return various interesting metadata about the KB state.
-     * 
-     * @todo The range counts can take some time if the cluster is heavily
-     *       loaded since they must query each shard for the primary statement
-     *       index and the TERM2ID index.
-     */
-    protected StringBuilder getKBInfo(final String namespace,
-            final long timestamp) {
-
-        final StringBuilder sb = new StringBuilder();
-
-        BigdataSailRepositoryConnection conn = null;
-
-        try {
-
-            conn = getQueryConnection(namespace, timestamp);
-            
-            final AbstractTripleStore tripleStore = conn.getTripleStore();
-
-            sb.append("class\t = " + tripleStore.getClass().getName() + "\n");
-
-            sb
-                    .append("indexManager\t = "
-                            + tripleStore.getIndexManager().getClass()
-                                    .getName() + "\n");
-
-            sb.append("namespace\t = " + tripleStore.getNamespace() + "\n");
-
-            sb.append("timestamp\t = "
-                    + TimestampUtility.toString(tripleStore.getTimestamp())
-                    + "\n");
-
-            sb.append("statementCount\t = " + tripleStore.getStatementCount()
-                    + "\n");
-
-            sb.append("termCount\t = " + tripleStore.getTermCount() + "\n");
-
-            sb.append("uriCount\t = " + tripleStore.getURICount() + "\n");
-
-            sb.append("literalCount\t = " + tripleStore.getLiteralCount() + "\n");
-
-            /*
-             * Note: The blank node count is only available when using the told
-             * bnodes mode.
-             */
-            sb
-                    .append("bnodeCount\t = "
-                            + (tripleStore.getLexiconRelation()
-                                    .isStoreBlankNodes() ? ""
-                                    + tripleStore.getBNodeCount() : "N/A")
-                            + "\n");
-
-            sb.append(IndexMetadata.Options.BTREE_BRANCHING_FACTOR
-                    + "="
-                    + tripleStore.getSPORelation().getPrimaryIndex()
-                            .getIndexMetadata().getBranchingFactor() + "\n");
-
-            sb.append(IndexMetadata.Options.WRITE_RETENTION_QUEUE_CAPACITY
-                    + "="
-                    + tripleStore.getSPORelation().getPrimaryIndex()
-                            .getIndexMetadata()
-                            .getWriteRetentionQueueCapacity() + "\n");
-
-            sb.append("-- All properties.--\n");
-            
-            // get the triple store's properties from the global row store.
-            final Map<String, Object> properties = getIndexManager()
-                    .getGlobalRowStore(timestamp).read(RelationSchema.INSTANCE,
-                            namespace);
-
-            // write them out,
-            for (String key : properties.keySet()) {
-                sb.append(key + "=" + properties.get(key)+"\n");
-            }
-
-            /*
-             * And show some properties which can be inherited from
-             * AbstractResource. These have been mainly phased out in favor of
-             * BOP annotations, but there are a few places where they are still
-             * in use.
-             */
-            
-            sb.append("-- Interesting AbstractResource effective properties --\n");
-            
-            sb.append(AbstractResource.Options.CHUNK_CAPACITY + "="
-                    + tripleStore.getChunkCapacity() + "\n");
-
-            sb.append(AbstractResource.Options.CHUNK_OF_CHUNKS_CAPACITY + "="
-                    + tripleStore.getChunkOfChunksCapacity() + "\n");
-
-            sb.append(AbstractResource.Options.CHUNK_TIMEOUT + "="
-                    + tripleStore.getChunkTimeout() + "\n");
-
-            sb.append(AbstractResource.Options.FULLY_BUFFERED_READ_THRESHOLD + "="
-                    + tripleStore.getFullyBufferedReadThreshold() + "\n");
-
-            sb.append(AbstractResource.Options.MAX_PARALLEL_SUBQUERIES + "="
-                    + tripleStore.getMaxParallelSubqueries() + "\n");
-
-            /*
-             * And show some interesting effective properties for the KB, SPO
-             * relation, and lexicon relation.
-             */
-            sb.append("-- Interesting KB effective properties --\n");
-            
-            sb
-                    .append(AbstractTripleStore.Options.TERM_CACHE_CAPACITY
-                            + "="
-                            + tripleStore
-                                    .getLexiconRelation()
-                                    .getProperties()
-                                    .getProperty(
-                                            AbstractTripleStore.Options.TERM_CACHE_CAPACITY,
-                                            AbstractTripleStore.Options.DEFAULT_TERM_CACHE_CAPACITY) + "\n");
-
-            /*
-             * And show several interesting properties with their effective
-             * defaults.
-             */
-
-            sb.append("-- Interesting Effective BOP Annotations --\n");
-
-            sb.append(BufferAnnotations.CHUNK_CAPACITY
-                    + "="
-                    + tripleStore.getProperties().getProperty(
-                            BufferAnnotations.CHUNK_CAPACITY,
-                            "" + BufferAnnotations.DEFAULT_CHUNK_CAPACITY)
-                    + "\n");
-
-            sb
-                    .append(BufferAnnotations.CHUNK_OF_CHUNKS_CAPACITY
-                            + "="
-                            + tripleStore
-                                    .getProperties()
-                                    .getProperty(
-                                            BufferAnnotations.CHUNK_OF_CHUNKS_CAPACITY,
-                                            ""
-                                                    + BufferAnnotations.DEFAULT_CHUNK_OF_CHUNKS_CAPACITY)
-                            + "\n");
-
-            sb.append(BufferAnnotations.CHUNK_TIMEOUT
-                    + "="
-                    + tripleStore.getProperties().getProperty(
-                            BufferAnnotations.CHUNK_TIMEOUT,
-                            "" + BufferAnnotations.DEFAULT_CHUNK_TIMEOUT)
-                    + "\n");
-
-            sb.append(PipelineJoin.Annotations.MAX_PARALLEL_CHUNKS
-                    + "="
-                    + tripleStore.getProperties().getProperty(
-                            PipelineJoin.Annotations.MAX_PARALLEL_CHUNKS,
-                            "" + PipelineJoin.Annotations.DEFAULT_MAX_PARALLEL_CHUNKS) + "\n");
-
-            sb
-                    .append(IPredicate.Annotations.FULLY_BUFFERED_READ_THRESHOLD
-                            + "="
-                            + tripleStore
-                                    .getProperties()
-                                    .getProperty(
-                                            IPredicate.Annotations.FULLY_BUFFERED_READ_THRESHOLD,
-                                            ""
-                                                    + IPredicate.Annotations.DEFAULT_FULLY_BUFFERED_READ_THRESHOLD)
-                            + "\n");
-
-            // sb.append(tripleStore.predicateUsage());
-
-            if (tripleStore.getIndexManager() instanceof Journal) {
-
-                final Journal journal = (Journal) tripleStore.getIndexManager();
-                
-                final IBufferStrategy strategy = journal.getBufferStrategy();
-                
-                if (strategy instanceof RWStrategy) {
-                
-                    final RWStore store = ((RWStrategy) strategy).getStore();
-                    
-                    store.showAllocators(sb);
-                    
-                }
-                
-            }
-
-        } catch (Throwable t) {
-
-            log.warn(t.getMessage(), t);
-
-        } finally {
-            
-            if(conn != null) {
-                try {
-                    conn.close();
-                } catch (RepositoryException e) {
-                    log.error(e, e);
-                }
-                
-            }
-            
-        }
-
-        return sb;
-
-    }
-
-    /**
      * Return a list of the namespaces for the {@link AbstractTripleStore}s
      * registered against the bigdata instance.
+     * 
+     * @see <a href="http://trac.bigdata.com/ticket/867"> NSS concurrency
+     *      problem with list namespaces and create namespace </a>
      */
     /*package*/ List<String> getNamespaces(final long timestamp) {
-    
-        // the triple store namespaces.
-        final List<String> namespaces = new LinkedList<String>();
-
-        final SparseRowStore grs = getIndexManager().getGlobalRowStore(
-                timestamp);
-
-        if (grs == null) {
-
-            log.warn("No GRS @ timestamp="
-                    + TimestampUtility.toString(timestamp));
-
-            // Empty.
-            return namespaces;
-            
+        
+        final long tx = newTx(timestamp);
+        
+		try {
+			
+		    return getNamespaces(timestamp, tx);
+			
+		} finally {
+			
+		    abortTx(tx);
+		    
         }
-
-        // scan the relation schema in the global row store.
-        @SuppressWarnings("unchecked")
-        final Iterator<ITPS> itr = (Iterator<ITPS>) grs
-                .rangeIterator(RelationSchema.INSTANCE);
-
-        while (itr.hasNext()) {
-
-            // A timestamped property value set is a logical row with
-            // timestamped property values.
-            final ITPS tps = itr.next();
-
-            // If you want to see what is in the TPS, uncomment this.
-//          System.err.println(tps.toString());
-            
-            // The namespace is the primary key of the logical row for the
-            // relation schema.
-            final String namespace = (String) tps.getPrimaryKey();
-
-            // Get the name of the implementation class
-            // (AbstractTripleStore, SPORelation, LexiconRelation, etc.)
-            final String className = (String) tps.get(RelationSchema.CLASS)
-                    .getValue();
-
-            if (className == null) {
-                // Skip deleted triple store entry.
-                continue;
-            }
-
-            try {
-                final Class<?> cls = Class.forName(className);
-                if (AbstractTripleStore.class.isAssignableFrom(cls)) {
-                    // this is a triple store (vs something else).
-                    namespaces.add(namespace);
-                }
-            } catch (ClassNotFoundException e) {
-                log.error(e,e);
-            }
-
-        }
-
-        return namespaces;
 
     }
+
+	private List<String> getNamespaces(long timestamp, final long tx) {
+
+        if (timestamp == ITx.READ_COMMITTED) {
+
+            // Use the last commit point.
+            timestamp = getIndexManager().getLastCommitTime();
+
+        }
+
+        // the triple store namespaces.
+		final List<String> namespaces = new LinkedList<String>();
+
+		if (log.isInfoEnabled())
+		    log.info("getNamespaces for " + timestamp);
+
+		final SparseRowStore grs = getIndexManager().getGlobalRowStore(
+				timestamp);
+
+		if (grs == null) {
+
+			log.warn("No GRS @ timestamp="
+					+ TimestampUtility.toString(timestamp));
+
+			// Empty.
+			return namespaces;
+
+		}
+
+		// scan the relation schema in the global row store.
+		@SuppressWarnings("unchecked")
+		final Iterator<ITPS> itr = (Iterator<ITPS>) grs
+				.rangeIterator(RelationSchema.INSTANCE);
+
+		while (itr.hasNext()) {
+
+			// A timestamped property value set is a logical row with
+			// timestamped property values.
+			final ITPS tps = itr.next();
+
+			// If you want to see what is in the TPS, uncomment this.
+			// System.err.println(tps.toString());
+
+			// The namespace is the primary key of the logical row for the
+			// relation schema.
+			final String namespace = (String) tps.getPrimaryKey();
+
+			// Get the name of the implementation class
+			// (AbstractTripleStore, SPORelation, LexiconRelation, etc.)
+			final String className = (String) tps.get(RelationSchema.CLASS)
+					.getValue();
+
+			if (className == null) {
+				// Skip deleted triple store entry.
+				continue;
+			}
+
+			try {
+				final Class<?> cls = Class.forName(className);
+				if (AbstractTripleStore.class.isAssignableFrom(cls)) {
+					// this is a triple store (vs something else).
+					namespaces.add(namespace);
+				}
+			} catch (ClassNotFoundException e) {
+				log.error(e, e);
+			}
+
+		}
+
+//        if (log.isInfoEnabled())
+//            log.info("getNamespaces returning " + namespaces.size());
+
+		return namespaces;
+
+	}
     
+	/**
+     * Obtain a new transaction to protect operations against the specified view
+     * of the database.
+     * 
+     * @param timestamp
+     *            The timestamp for the desired view.
+     * 
+     * @return The transaction identifier -or- <code>timestamp</code> if the
+     *         {@link IIndexManager} is not a {@link Journal}.
+     * 
+     * @see ITransactionService#newTx(long)
+     * 
+     * @see <a href="http://trac.bigdata.com/ticket/867"> NSS concurrency
+     *      problem with list namespaces and create namespace </a>
+     */
+    public long newTx(final long timestamp) {
+
+        long tx = timestamp; // use dirty reads unless Journal.
+
+        if (getIndexManager() instanceof Journal) {
+            final ITransactionService txs = ((Journal) getIndexManager())
+                    .getLocalTransactionManager().getTransactionService();
+
+            try {
+                tx = txs.newTx(timestamp);
+            } catch (IOException e) {
+                // Note: Local operation.  Will not throw IOException.
+                throw new RuntimeException(e);
+            }
+
+        }
+
+        return tx;
+    }
+
+	/**
+	 * Abort a transaction obtained by {@link #newTx(long)}.
+	 * 
+	 * @param tx
+	 *            The transaction identifier.
+	 */
+	public void abortTx(final long tx) {
+		if (getIndexManager() instanceof Journal) {
+//			if (!TimestampUtility.isReadWriteTx(tx)) {
+//				// Not a transaction.
+//				throw new IllegalStateException();
+//			}
+
+			final ITransactionService txs = ((Journal) getIndexManager())
+					.getLocalTransactionManager().getTransactionService();
+
+			try {
+				txs.abort(tx);
+			} catch (IOException e) {
+				// Note: Local operation. Will not throw IOException.
+				throw new RuntimeException(e);
+			}
+
+		}
+
+	}
+	
 }

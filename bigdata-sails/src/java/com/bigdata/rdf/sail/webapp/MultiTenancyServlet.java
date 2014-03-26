@@ -459,29 +459,46 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
      * @throws IOException
      */
     private void doShowProperties(final HttpServletRequest req,
-            final HttpServletResponse resp) throws IOException {
+			final HttpServletResponse resp) throws IOException {
 
-        final String namespace = getNamespace(req);
+		final String namespace = getNamespace(req);
 
-        final long timestamp = getTimestamp(req);
+		long timestamp = getTimestamp(req);
 
-        final AbstractTripleStore tripleStore = getBigdataRDFContext()
-                .getTripleStore(namespace, timestamp);
+		if (timestamp == ITx.READ_COMMITTED) {
 
-        if (tripleStore == null) {
-            /*
-             * There is no such triple/quad store instance.
-             */
-            buildResponse(resp, HTTP_NOTFOUND, MIME_TEXT_PLAIN);
-            return;
-        }
+			// Use the last commit point.
+			timestamp = getIndexManager().getLastCommitTime();
 
-        final Properties properties = PropertyUtil.flatCopy(tripleStore
-                .getProperties());
+		}
 
-        sendProperties(req, resp, properties);
-        
-    }
+		final long tx = getBigdataRDFContext().newTx(timestamp);
+		
+		try {
+		    
+			final AbstractTripleStore tripleStore = getBigdataRDFContext()
+					.getTripleStore(namespace, timestamp);
+
+			if (tripleStore == null) {
+				/*
+				 * There is no such triple/quad store instance.
+				 */
+				buildResponse(resp, HTTP_NOTFOUND, MIME_TEXT_PLAIN);
+				return;
+			}
+
+			final Properties properties = PropertyUtil.flatCopy(tripleStore
+					.getProperties());
+
+			sendProperties(req, resp, properties);
+
+		} finally {
+
+		    getBigdataRDFContext().abortTx(tx);
+		    
+		}
+
+	}
 
     /**
      * Generate a VoID Description for the known namespaces.
@@ -498,51 +515,66 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
             
         }
         
-        /*
-         * The set of registered namespaces for KBs.
+        /**
+         * Protect the entire operation with a transaction, including the
+         * describe of each namespace that we discover.
+         * 
+         * @see <a href="http://trac.bigdata.com/ticket/867"> NSS concurrency
+         *      problem with list namespaces and create namespace </a>
          */
-        final List<String> namespaces = getBigdataRDFContext()
-                .getNamespaces(timestamp);
+        final long tx = getBigdataRDFContext().newTx(timestamp);
+        
+		try {
+			/*
+			 * The set of registered namespaces for KBs.
+			 */
+			final List<String> namespaces = getBigdataRDFContext()
+					.getNamespaces(timestamp);
 
-        final Graph g = new GraphImpl();
+			final Graph g = new GraphImpl();
 
-        for(String namespace : namespaces) {
-            
-            // Get a view onto that KB instance for that timestamp.
-            final AbstractTripleStore tripleStore = getBigdataRDFContext()
-                    .getTripleStore(namespace, timestamp);
+			for (String namespace : namespaces) {
 
-            if (tripleStore == null) {
+				// Get a view onto that KB instance for that timestamp.
+				final AbstractTripleStore tripleStore = getBigdataRDFContext()
+						.getTripleStore(namespace, timestamp);
 
-                /*
-                 * There is no such triple/quad store instance (could be a
-                 * concurrent delete of the namespace).
-                 */
-                
-                continue;
-                
-            }
+				if (tripleStore == null) {
 
-            final BNode aDataSet = g.getValueFactory().createBNode();
-            
-            /*
-             * Figure out the service end point.
-             * 
-             * Note: This is just the requestURL as reported. This makes is
-             * possible to support virtual hosting and similar http proxy
-             * patterns since the SPARQL end point is just the URL at which the
-             * service is responding.
-             */
-            final String serviceURI = req.getRequestURL().toString();
-            
-            final VoID v = new VoID(g, tripleStore, serviceURI, aDataSet);
+					/*
+					 * There is no such triple/quad store instance (could be a
+					 * concurrent delete of the namespace).
+					 */
 
-            v.describeDataSet(false/* describeStatistics */,
-                    getBigdataRDFContext().getConfig().describeEachNamedGraph);
+					continue;
 
+				}
+
+				final BNode aDataSet = g.getValueFactory().createBNode();
+
+				/*
+				 * Figure out the service end point.
+				 * 
+				 * Note: This is just the requestURL as reported. This makes is
+				 * possible to support virtual hosting and similar http proxy
+				 * patterns since the SPARQL end point is just the URL at which
+				 * the service is responding.
+				 */
+				final String serviceURI = req.getRequestURL().toString();
+
+				final VoID v = new VoID(g, tripleStore, serviceURI, aDataSet);
+
+				v.describeDataSet(
+						false/* describeStatistics */,
+						getBigdataRDFContext().getConfig().describeEachNamedGraph);
+
+			}
+
+			sendGraph(req, resp, g);
+
+		} finally {
+			getBigdataRDFContext().abortTx(tx);
         }
-
-        sendGraph(req, resp, g);
         
     }
 
