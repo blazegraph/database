@@ -515,7 +515,7 @@ public class MemoryGroupByOp extends GroupByOp {
          *         for the group was dropped (type error or violated HAVING
          *         constraint).
          */
-        public IBindingSet aggregate(final Iterable<IBindingSet> solutions) {
+        private IBindingSet aggregate(final Iterable<IBindingSet> solutions) {
 
             if (!solutions.iterator().hasNext()) {
                 // Drop empty group.
@@ -704,7 +704,7 @@ public class MemoryGroupByOp extends GroupByOp {
      *            will be bound.
      * @param selectDependency
      *            When <code>true</code>, some aggregates bind variables which
-     *            are relied on both other aggregates. In this case, this method
+     *            are relied on by other aggregates. In this case, this method
      *            must ensure that those bindings become visible.
      * @param aggregates
      *            The binding set on which the results are being bound (by the
@@ -782,7 +782,8 @@ public class MemoryGroupByOp extends GroupByOp {
                 expr.reset();
                 
                 for (IBindingSet bset : solutions) {
-                    Object constants[]=new Object[expr.arity()];
+                    
+                    final Object constants[] = new Object[expr.arity()];
 
                     for (int i=0;i<expr.arity();i++){
 
