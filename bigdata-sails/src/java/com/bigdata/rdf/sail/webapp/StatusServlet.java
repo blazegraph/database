@@ -58,7 +58,6 @@ import com.bigdata.counters.CounterSet;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.DumpJournal;
 import com.bigdata.journal.IIndexManager;
-import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.rdf.sail.sparql.ast.SimpleNode;
 import com.bigdata.rdf.sail.webapp.BigdataRDFContext.AbstractQueryTask;
@@ -95,12 +94,6 @@ public class StatusServlet extends BigdataRDFServlet {
 
     static private final transient Logger log = Logger
             .getLogger(StatusServlet.class);
-
-    /**
-     * The name of a request parameter used to request metadata about the
-     * default namespace.
-     */
-    private static final String SHOW_KB_INFO = "showKBInfo";
 
     /**
      * The name of a request parameter used to request a list of the namespaces
@@ -415,9 +408,6 @@ public class StatusServlet extends BigdataRDFServlet {
                 maxBopLength = 0;
         }
 
-        // Information about the KB (stats, properties).
-        final boolean showKBInfo = req.getParameter(SHOW_KB_INFO) != null;
-
         // bigdata namespaces known to the index manager.
         final boolean showNamespaces = req.getParameter(SHOW_NAMESPACES) != null;
 
@@ -542,19 +532,10 @@ public class StatusServlet extends BigdataRDFServlet {
 
             }
 
-            if (showNamespaces) {
-
-                long timestamp = getTimestamp(req);
-
-                if (timestamp == ITx.READ_COMMITTED) {
-
-                    // Use the last commit point.
-                    timestamp = getIndexManager().getLastCommitTime();
-
-                }
-
+			if (showNamespaces) {
+			    
                 final List<String> namespaces = getBigdataRDFContext()
-                        .getNamespaces(timestamp);
+                        .getNamespaces(getTimestamp(req));
 
                 current.node("h3", "Namespaces: ");
 
@@ -564,15 +545,7 @@ public class StatusServlet extends BigdataRDFServlet {
 
                 }
 
-            }
-
-            if (showKBInfo) {
-
-                // General information on the connected kb.
-                current.node("pre", getBigdataRDFContext().getKBInfo(
-                        getNamespace(req), getTimestamp(req)).toString());
-
-            }
+			}
 
             /*
              * Performance counters for the QueryEngine.

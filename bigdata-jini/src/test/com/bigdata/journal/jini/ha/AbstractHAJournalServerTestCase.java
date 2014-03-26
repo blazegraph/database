@@ -82,6 +82,7 @@ import com.bigdata.rdf.sail.webapp.client.ConnectOptions;
 import com.bigdata.rdf.sail.webapp.client.DefaultClientConnectionManagerFactory;
 import com.bigdata.rdf.sail.webapp.client.HttpException;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
+import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryManager;
 import com.bigdata.util.InnerCause;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
@@ -545,6 +546,21 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
         final HttpClient httpClient = new DefaultHttpClient(ccm);
 
         final RemoteRepository repo = new RemoteRepository(sparqlEndpointURL,
+                httpClient, executorService);
+
+        return repo;
+        
+    }
+
+    protected RemoteRepositoryManager getRemoteRepositoryManager(final HAGlue haGlue)
+            throws IOException {
+
+        final String endpointURL = getNanoSparqlServerURL(haGlue);
+
+        // Client for talking to the NSS.
+        final HttpClient httpClient = new DefaultHttpClient(ccm);
+
+        final RemoteRepositoryManager repo = new RemoteRepositoryManager(endpointURL,
                 httpClient, executorService);
 
         return repo;
