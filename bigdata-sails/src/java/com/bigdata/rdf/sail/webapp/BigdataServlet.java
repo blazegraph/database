@@ -43,7 +43,6 @@ import com.bigdata.ha.HAStatusEnum;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.quorum.AbstractQuorum;
-import com.bigdata.rdf.sail.webapp.HALoadBalancerServlet.InitParams;
 import com.bigdata.rdf.sail.webapp.client.IMimeTypes;
 
 /**
@@ -76,9 +75,12 @@ abstract public class BigdataServlet extends HttpServlet implements IMimeTypes {
     /**
      * The {@link ServletContext} attribute whose value is the prefix for the
      * {@link HALoadBalancerServlet} iff it is running.
+     * <p>
+     * Note: Do NOT reference the <code>HALoadBalancerServlet</code> here. It
+     * will drag in the jetty dependencies and that breaks the tomcat WAR
+     * deployment.
      */
-    static final String ATTRIBUTE_LBS_PREFIX = HALoadBalancerServlet.class
-            .getName() + "." + InitParams.PREFIX;
+    static final String ATTRIBUTE_LBS_PREFIX = "com.bigdata.rdf.sail.webapp.HALoadBalancerServlet.prefix";
             
 //    /**
 //     * The {@link ServletContext} attribute whose value is the
