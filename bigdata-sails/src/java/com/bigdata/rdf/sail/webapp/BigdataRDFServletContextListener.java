@@ -44,7 +44,6 @@ import javax.servlet.ServletContextEvent;
 import javax.servlet.ServletContextListener;
 
 import org.apache.log4j.Logger;
-import org.eclipse.jetty.webapp.WebAppContext;
 
 import com.bigdata.Banner;
 import com.bigdata.bop.engine.QueryEngine;
@@ -103,10 +102,10 @@ public class BigdataRDFServletContextListener implements
     private boolean closeIndexManager;
 
     /**
-     * The name of the {@link WebAppContext} attribute under which we store any
-     * overrides for the init parameters of the {@link WebAppContext}. Note that
-     * it is NOT possible to actual modify the init parameters specified in the
-     * <code>web.xml</code> file. Therefore, we attach the overrides as an
+     * The name of the {@link ServletContext} attribute under which we store
+     * any overrides for the init parameters of the {@link ServletContext}. Note
+     * that it is NOT possible to actual modify the init parameters specified in
+     * the <code>web.xml</code> file. Therefore, we attach the overrides as an
      * attribute and then consult them from within
      * {@link BigdataRDFServletContextListener#contextInitialized(javax.servlet.ServletContextEvent)}
      * .
