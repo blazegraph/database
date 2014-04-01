@@ -1781,7 +1781,7 @@ public class PipelineJoin<E> extends PipelineOp implements
 
                             if (bindex++ % 50 == 0) {
                                 // Periodically check for an interrupt.
-                                if (Thread.currentThread().isInterrupted())
+                                if (Thread.interrupted())
                                     throw new InterruptedException();
                             }
 
