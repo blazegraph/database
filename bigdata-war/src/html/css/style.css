@@ -209,5 +209,6 @@ pre {
 
 #running-queries div.query-details {
    border-bottom: 1px solid;
+   overflow-x: scroll;
 }
 
