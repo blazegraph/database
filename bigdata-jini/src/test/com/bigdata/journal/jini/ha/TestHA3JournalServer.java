@@ -181,6 +181,9 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
         assertDigestsEquals(new HAGlue[] { serverA, serverB });
 
         // Verify can not write on follower.
+        log.warn("ServerA port: " + serverA.getNSSPort());
+        log.warn("ServerB port: " + serverB.getNSSPort());
+        
         assertWriteRejected(serverB);
         
         // Start 3rd service.

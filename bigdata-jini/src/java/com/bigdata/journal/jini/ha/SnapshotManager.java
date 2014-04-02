@@ -1096,6 +1096,8 @@ public class SnapshotManager {
                     + haLogBytesOnDisk//
                     + ", journalSize="
                     + journalSize//
+                    + ", thresholdPercentLogSize="
+                    + thresholdPercentLogSize//
                     + ", percentLogSize="
                     + actualPercentLogSize//
                     + "%, takeSnapshot=" + takeSnapshot //

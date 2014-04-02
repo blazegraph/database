@@ -378,7 +378,8 @@ public class StatusServlet extends BigdataRDFServlet {
 
         if (req.getParameter(HA) != null
                 && getIndexManager() instanceof AbstractJournal
-                && ((AbstractJournal) getIndexManager()).isHighlyAvailable()) {
+               //  && ((AbstractJournal) getIndexManager()).isHighlyAvailable()) {
+        		&& ((AbstractJournal) getIndexManager()).getQuorum() != null) { // for HA1
 
             new HAStatusServletUtil(getIndexManager()).doHAStatus(req, resp);
 

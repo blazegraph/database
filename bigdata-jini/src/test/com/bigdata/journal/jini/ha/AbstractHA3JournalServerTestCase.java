@@ -133,7 +133,7 @@ public class AbstractHA3JournalServerTestCase extends
      * Implementation listens for the death of the child process and can be used
      * to decide when the child process is no longer executing.
      */
-    private static class ServiceListener implements IServiceListener {
+    public static class ServiceListener implements IServiceListener {
 
         private volatile HAGlue haGlue;
         private volatile ProcessHelper processHelper;
@@ -218,7 +218,11 @@ public class AbstractHA3JournalServerTestCase extends
      * The {@link Remote} interfaces for these services (if started and
      * successfully discovered).
      */
-    private HAGlue serverA = null, serverB = null, serverC = null;
+    protected HAGlue serverA = null;
+
+	protected HAGlue serverB = null;
+
+	protected HAGlue serverC = null;
 
     /**
      * {@link UUID}s for the {@link HAJournalServer}s.
@@ -232,17 +236,20 @@ public class AbstractHA3JournalServerTestCase extends
      * @see <a href="http://trac.bigdata.com/ticket/730" > Allow configuration
      *      of embedded NSS jetty server using jetty-web.xml </a>
      */
-    private final int A_JETTY_PORT = 8090, B_JETTY_PORT = A_JETTY_PORT + 1,
-            C_JETTY_PORT = B_JETTY_PORT + 1;
+    protected final int A_JETTY_PORT = 8090;
+	protected final int B_JETTY_PORT = A_JETTY_PORT + 1;
+	protected final int C_JETTY_PORT = B_JETTY_PORT + 1;
 
     /**
      * These {@link IServiceListener}s are used to reliably detect that the
      * corresponding process starts and (most importantly) that it is really
      * dies once it has been shutdown or destroyed.
      */
-    private ServiceListener serviceListenerA = null, serviceListenerB = null;
+    protected ServiceListener serviceListenerA = null;
 
-    private ServiceListener serviceListenerC = null;
+	protected ServiceListener serviceListenerB = null;
+
+    protected ServiceListener serviceListenerC = null;
     
     private LookupDiscoveryManager lookupDiscoveryManager = null;
 
@@ -1143,14 +1150,14 @@ public class AbstractHA3JournalServerTestCase extends
         
     }
 
-    private void safeShutdown(final HAGlue haGlue, final File serviceDir,
+    void safeShutdown(final HAGlue haGlue, final File serviceDir,
             final ServiceListener serviceListener) {
 
         safeShutdown(haGlue, serviceDir, serviceListener, false/* now */);
 
     }
     
-    private void safeShutdown(final HAGlue haGlue, final File serviceDir,
+    protected void safeShutdown(final HAGlue haGlue, final File serviceDir,
             final ServiceListener serviceListener, final boolean now) {
 
         if (haGlue == null)
@@ -1368,6 +1375,10 @@ public class AbstractHA3JournalServerTestCase extends
 
     }
 
+    protected String getZKConfigFile() {
+    	return "zkClient.config";
+    }
+    
     /**
      * Return Zookeeper quorum that can be used to reflect (or act on) the
      * distributed quorum state for the logical service.
@@ -1382,7 +1393,7 @@ public class AbstractHA3JournalServerTestCase extends
             KeeperException, IOException {
 
         final Configuration config = ConfigurationProvider
-                .getInstance(new String[] { SRC_PATH + "zkClient.config" });
+                .getInstance(new String[] { SRC_PATH + getZKConfigFile() });
 
         zkClientConfig = new ZookeeperClientConfig(config);
 
@@ -1551,7 +1562,7 @@ public class AbstractHA3JournalServerTestCase extends
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      */
-    abstract private class StartServerTask implements Callable<HAGlue> {
+    public abstract class StartServerTask implements Callable<HAGlue> {
 
         private final String name;
         private final String configName;

@@ -3428,8 +3428,8 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
             if (quorum == null)
                 return;
 
-            if (!quorum.isHighlyAvailable())
-                return;
+//            if (!quorum.isHighlyAvailable())
+//                return;
 
             /**
              * CRITICAL SECTION. We need obtain a distributed consensus for the
