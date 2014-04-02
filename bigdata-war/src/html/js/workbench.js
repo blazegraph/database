@@ -811,7 +811,20 @@ function getStatusNumbers(data) {
 
 $('#show-queries').click(function(e) {
    e.preventDefault();
-   $.get('/bigdata/status?showQueries', function(data) {
+   showQueries(false);
+});
+
+$('#show-query-details').click(function(e) {
+   e.preventDefault();
+   showQueries(true);
+});
+
+function showQueries(details) {
+   var url = '/bigdata/status?showQueries';
+   if(details) {
+      url += '=details';
+   }
+   $.get(url, function(data) {
       // get data inside a jQuery object
       data = $('<div>').append(data);
 
@@ -822,7 +835,6 @@ $('#show-queries').click(function(e) {
       $('#running-queries').empty();
 
       data.find('h1').each(function(i, e) {
-         // per running query, data is structured h1 form (with numbers/cancel data) h2 pre (with SPARQL)
          e = $(e);
          // get numbers string, which includes cancel link
          var form = e.next();
@@ -832,18 +844,25 @@ $('#show-queries').click(function(e) {
          // get query id
          var queryId = form.find('input[type=hidden]').val();
          // get SPARQL
-         var sparql = form.next().next().html();
+         var sparqlContainer = form.next().next();
+         var sparql = sparqlContainer.html();
+
+         if(details) {
+            var queryDetails = $('<div>').append(sparqlContainer.nextUntil('h1')).html();
+         } else {
+            var queryDetails = '<a href="#">Details</a>';
+         }
 
          // got all data, create a li for each query
-         var li = $('<li><div class="query"><pre>' + sparql + '</pre></div><div class="query-numbers">' + numbers + ', <a href="#" class="cancel-query">Cancel</a></div><div class="query-details"><a href="#" class="query-details collapsed">Details</a></div>');
+         var li = $('<li><div class="query"><pre>' + sparql + '</pre></div><div class="query-numbers">' + numbers + ', <a href="#" class="cancel-query">Cancel</a></div><div class="query-details">' + queryDetails + '</div>');
          li.find('a').data('queryId', queryId);
          $('#running-queries').append(li);
       });
 
       $('.cancel-query').click(cancelQuery);
-      $('a.query-details').click(getQueryDetails);
+      $('.query-details a').click(getQueryDetails);
    });
-});
+}
 
 function cancelQuery(e) {
    e.preventDefault();
@@ -854,7 +873,26 @@ function cancelQuery(e) {
    }
 }
 
-function getQueryDetails(e) {}
+function getQueryDetails(e) {
+   e.preventDefault();
+   var id = $(this).data('queryId');
+   $.ajax({url: '/bigdata/status?showQueries=details&queryId=' + id,
+      success: function(data) {
+         // get data inside a jQuery object
+         data = $('<div>').append(data);
+
+         // update status numbers
+         getStatusNumbers(data);
+
+         // details begin after second pre
+         var details = $('<div>').append($(data.find('pre')[1]).nextAll()).html();
+
+         $(this).parent().html(details);
+      },
+      context: this
+   });
+}
+
 
 /* Performance */
 
