@@ -420,5 +420,14 @@ public interface BDS {
      * The default timeout for a free text search (milliseconds).
      */
     final long DEFAULT_TIMEOUT = Long.MAX_VALUE;
+    
+    /**
+     * Magic predicate to specify that we want a range count done on the search.
+     * Bind the range count to the variable in the object position.  Will
+     * attempt to do a fast range count on the index rather than materializing
+     * the hits into an array.  This is only possible if matchExact == false
+     * and matchRegex == null.
+     */
+    final URI RANGE_COUNT = new URIImpl(NAMESPACE + "rangeCount");
 
 }
