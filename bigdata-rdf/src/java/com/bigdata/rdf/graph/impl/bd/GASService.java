@@ -67,6 +67,7 @@ import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueImpl;
 import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
+import com.bigdata.rdf.sparql.ast.DummyConstantNode;
 import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
@@ -1037,9 +1038,21 @@ public class GASService implements CustomServiceFactory {
                         final IV<BigdataValueImpl, ?> iv = lex
                                 .getLexiconConfiguration().createInlineIV(val);
 
-                        iv.setValue((BigdataValueImpl) val);
+                        if (iv != null) {
 
-                        bs.set(var, new Constant(iv));
+                        	iv.setValue((BigdataValueImpl) val);
+
+                        	bs.set(var, new Constant(iv));
+                        	
+                        } else if (val instanceof BigdataValue) {
+                        	
+                        	bs.set(var, new Constant(DummyConstantNode.toDummyIV((BigdataValue) val)));
+                        	
+                        } else {
+                        	
+                        	throw new RuntimeException("FIXME");
+                        	
+                        }
 
                     }
 
