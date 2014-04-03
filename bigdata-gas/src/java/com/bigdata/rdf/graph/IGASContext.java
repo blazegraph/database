@@ -15,6 +15,7 @@
  */
 package com.bigdata.rdf.graph;
 
+import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 
@@ -174,7 +175,7 @@ public interface IGASContext<VS, ES, ST> extends Callable<IGASStats> {
      *            the attributes for the edges).
      */
     void setLinkAttributeType(URI linkType);
-
+    
     /**
      * Set an optional {@link IReducer} that will run after the
      * {@link IGASProgram} is terminated. This may be used to extract results
@@ -227,5 +228,35 @@ public interface IGASContext<VS, ES, ST> extends Callable<IGASStats> {
      */
     @Override
     IGASStats call() throws Exception;
+    
+    
+    /**
+     * Set the target vertices for the program (if any).
+     */
+    void setTargetVertices(Value[] targetVertices);
+
+    /**
+     * Get the target vertices for the program (if any).
+     * @return
+     */
+    Set<Value> getTargetVertices();
+
+    /**
+     * Specify the maximum number of iterations for the algorithm to continue
+     * once all the target vertices have been reached. Default is for the
+     * program to run until completion without regard to whether the target
+     * vertices have been reached or not. A value of ZERO will stop the program
+     * exactly when all target vertices are found in the frontier.
+     * 
+     * @param newValue
+     *            The maximum number of iterations past the target vertices.
+     */
+    void setMaxIterationsAfterTargets(int newValue);
+
+    /**
+     * Return the maximum number iterations for the algorithm to continue
+     * once all the target vertices have been reached.
+     */
+    int getMaxIterationsAfterTargets();
 
 }
