@@ -15,6 +15,7 @@
 */
 package com.bigdata.rdf.graph.analytics;
 
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -309,21 +310,27 @@ public class PATHS extends BaseGASProgram<PATHS.VS, PATHS.ES, Void> implements
             }
         });
 
-//        tmp.add(new IBinder<PATHS.VS, PATHS.ES, Void>() {
-//            
-//            @Override
-//            public int getIndex() {
-//                return Bindings.PREDECESSOR;
-//            }
-//            
-//            @Override
-//            public Value bind(final ValueFactory vf,
-//                    final IGASState<PATHS.VS, PATHS.ES, Void> state, final Value u) {
-//
-//                return state.getState(u).predecessor.get();
-//
-//            }
-//        });
+        tmp.add(new IBinder<PATHS.VS, PATHS.ES, Void>() {
+            
+            @Override
+            public int getIndex() {
+                return Bindings.PREDECESSOR;
+            }
+            
+            @Override
+            public Value bind(final ValueFactory vf,
+                    final IGASState<PATHS.VS, PATHS.ES, Void> state, final Value u) {
+
+            	final String s = Arrays.toString(state.getState(u).predecessors.toArray());
+            	
+            	if (log.isTraceEnabled()) {
+            		log.trace(s);
+            	}
+            	
+                return vf.createLiteral(s);
+
+            }
+        });
 
         return tmp;
 
@@ -341,11 +348,11 @@ public class PATHS extends BaseGASProgram<PATHS.VS, PATHS.ES, Void> implements
          */
         int DEPTH = 1;
         
-//        /**
-//         * The BFS predecessor is the first vertex to discover a given vertex.
-//         * 
-//         */
-//        int PREDECESSOR = 2;
+        /**
+         * The BFS predecessor is the first vertex to discover a given vertex.
+         * 
+         */
+        int PREDECESSOR = 2;
         
     }
 
