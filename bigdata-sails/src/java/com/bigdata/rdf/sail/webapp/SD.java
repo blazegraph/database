@@ -36,8 +36,11 @@ import org.openrdf.model.ValueFactory;
 import org.openrdf.model.impl.URIImpl;
 import org.openrdf.model.vocabulary.RDF;
 
+import com.bigdata.ha.HAGlue;
+import com.bigdata.ha.QuorumService;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.IIndexManager;
+import com.bigdata.quorum.Quorum;
 import com.bigdata.rdf.axioms.Axioms;
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.axioms.OwlAxioms;
@@ -641,7 +644,10 @@ public class SD {
 
                 final AbstractJournal jnl = (AbstractJournal) indexManager;
 
-                if (jnl.isHighlyAvailable()) {
+                final Quorum<HAGlue, QuorumService<HAGlue>> quorum = jnl
+                        .getQuorum();
+                
+                if (quorum != null && quorum.isHighlyAvailable()) {
 
                     g.add(aService, SD.feature, HighlyAvailable);
 

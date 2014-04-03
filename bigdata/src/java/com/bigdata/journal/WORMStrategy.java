@@ -272,7 +272,7 @@ public class WORMStrategy extends AbstractBufferStrategy implements
      * which use this flag to conditionally track the checksum of the entire
      * write cache buffer).
      */
-    private final boolean isHighlyAvailable;
+    private final boolean isQuorumUsed;
     
     /**
      * The {@link UUID} which identifies the journal (this is the same for each
@@ -970,11 +970,11 @@ public class WORMStrategy extends AbstractBufferStrategy implements
                 com.bigdata.journal.Options.HALOG_COMPRESSOR,
                 com.bigdata.journal.Options.DEFAULT_HALOG_COMPRESSOR);
 
-        isHighlyAvailable = quorum != null && quorum.isHighlyAvailable();
+        isQuorumUsed = quorum != null; // && quorum.isHighlyAvailable();
 
         final boolean useWriteCacheService = fileMetadata.writeCacheEnabled
                 && !fileMetadata.readOnly && fileMetadata.closeTime == 0L
-                || isHighlyAvailable;
+                || isQuorumUsed;
         
         if (useWriteCacheService) {
             /*
@@ -1049,7 +1049,7 @@ public class WORMStrategy extends AbstractBufferStrategy implements
                 final long fileExtent)
                 throws InterruptedException {
 
-            super(baseOffset, buf, useChecksum, isHighlyAvailable,
+            super(baseOffset, buf, useChecksum, isQuorumUsed,
                     bufferHasData, opener, fileExtent);
 
         }
@@ -1379,6 +1379,7 @@ public class WORMStrategy extends AbstractBufferStrategy implements
      *       to get the data from another node based on past experience for that
      *       record.
      */
+    @Override
     public ByteBuffer read(final long addr) {
 
         try {
