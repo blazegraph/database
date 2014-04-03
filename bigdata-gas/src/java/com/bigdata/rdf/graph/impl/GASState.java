@@ -217,6 +217,13 @@ public class GASState<VS, ES, ST> implements IGASState<VS, ES, ST> {
     }
 
     @Override
+    public boolean isVisited(final Set<Value> v) {
+        
+    	return vertexState.keySet().containsAll(v);
+    	
+    }
+
+    @Override
     public ES getState(final Statement e) {
 
         if (edgeState == null)
@@ -452,5 +459,11 @@ public class GASState<VS, ES, ST> implements IGASState<VS, ES, ST> {
         return ret;
         
     }
+    
+//    public Set<Value> values() {
+//    	
+//    	return vertexState.keySet();
+//    	
+//    }
     
 }

@@ -15,7 +15,11 @@
 */
 package com.bigdata.rdf.graph.impl;
 
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.Iterator;
+import java.util.LinkedHashSet;
+import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -100,6 +104,20 @@ public class GASContext<VS, ES, ST> implements IGASContext<VS, ES, ST> {
             null);
 
     /**
+     * A collection of target vertices for the program to reach.
+     */
+    private final Set<Value> targetVertices = 
+    		Collections.synchronizedSet(new LinkedHashSet<Value>());
+    
+    /**
+     * The maximum number of iterations after the target vertices have been
+     * reached. Default behavior is to continue on even after the targets have
+     * been reached.
+     */
+    private final AtomicInteger maxIterationsAfterTargets = new AtomicInteger(
+            Integer.MAX_VALUE);
+    
+    /**
      * 
      * @param namespace
      *            The namespace of the graph (KB instance).
@@ -158,6 +176,11 @@ public class GASContext<VS, ES, ST> implements IGASContext<VS, ES, ST> {
 
         program.before(this);
         
+		if (log.isTraceEnabled()) {
+			log.trace("# of targets: " + targetVertices.size());
+			log.trace("max iterations after targets: " + maxIterationsAfterTargets.get());
+		}
+
         while (!gasState.frontier().isEmpty()) {
 
             /*
@@ -167,7 +190,30 @@ public class GASContext<VS, ES, ST> implements IGASContext<VS, ES, ST> {
              * GASStats.
              */
             
-            if (total.getNRounds() + 1 >= getMaxIterations()) {
+            if (targetVertices.size() > 0 && 
+            		getMaxIterationsAfterTargets() < Integer.MAX_VALUE) {
+            	
+	            if (gasState.isVisited(targetVertices)) {
+	            	
+	            	/*
+	            	 * If we've reached all target vertices then halt the
+	            	 * program N rounds from now where 
+	            	 * N = maxIterationsAfterTargets.
+	            	 */
+        			this.maxIterations.set(Math.min(getMaxIterations(),
+    					(int) total.getNRounds() + getMaxIterationsAfterTargets()));
+	            	
+	            	if (log.isTraceEnabled()) {
+	            		log.trace("All targets reached at round " + 
+	            				total.getNRounds() + ", halting at round " + 
+	            				this.maxIterations.get());
+	            	}
+	            	
+	            }
+	            	
+            }
+            
+            if (total.getNRounds() + 1 > getMaxIterations()) {
 
                 log.warn("Halting: maxIterations=" + getMaxIterations()
                         + ", #rounds=" + total.getNRounds());
@@ -882,6 +928,39 @@ public class GASContext<VS, ES, ST> implements IGASContext<VS, ES, ST> {
         this.linkAttributeType.set(linkAttributeType);
         
     }
+    
+    @Override
+    public void setTargetVertices(final Value[] targetVertices) {
+    	
+    	this.targetVertices.addAll(Arrays.asList(targetVertices));
+    	
+    }
+
+    @Override
+    public Set<Value> getTargetVertices() {
+    	
+    	return this.targetVertices;
+    	
+    }
+    
+    @Override
+    public void setMaxIterationsAfterTargets(final int newValue) {
+
+        if (newValue < 0)
+            throw new IllegalArgumentException();
+        
+        this.maxIterationsAfterTargets.set(newValue);
+        
+    }
+
+    @Override
+    public int getMaxIterationsAfterTargets() {
+
+        return maxIterationsAfterTargets.get();
+        
+    }
+
+
 
 //    /**
 //     * {@inheritDoc}

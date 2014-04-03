@@ -194,6 +194,19 @@ public class GASService implements CustomServiceFactory {
         int DEFAULT_MAX_ITERATIONS = Integer.MAX_VALUE;
 
         /**
+         * The maximum #of iterations for the GAS program after the targets
+         * have been reached (optional, default
+         * {@value #DEFAULT_MAX_ITERATIONS_AFTER_TARGETS}).  Default behavior
+         * is to not stop once the targets are reached.
+         * 
+         * @see #DEFAULT_MAX_ITERATIONS_AFTER_TARGETS
+         * @see IGASContext#setMaxIterationsAfterTargets(int)
+         */
+        URI MAX_ITERATIONS_AFTER_TARGETS = new URIImpl(NAMESPACE + "maxIterationsAfterTargets");
+        
+        int DEFAULT_MAX_ITERATIONS_AFTER_TARGETS = Integer.MAX_VALUE;
+
+        /**
          * The maximum #of vertices in the visited set for the GAS program
          * (optional, default {@value #DEFAULT_MAX_VISITED}).
          * 
@@ -406,6 +419,7 @@ public class GASService implements CustomServiceFactory {
         private final int nthreads;
         private final TraversalDirectionEnum traversalDirection;
         private final int maxIterations;
+        private final int maxIterationsAfterTargets;
         private final int maxVisited;
         private final URI linkType, linkAttrType;
         private final Class<IGASProgram<VS, ES, ST>> gasClass;
@@ -450,6 +464,11 @@ public class GASService implements CustomServiceFactory {
             this.maxIterations = ((Literal) getOnlyArg(Options.PROGRAM,
                     Options.MAX_ITERATIONS, store.getValueFactory()
                             .createLiteral(Options.DEFAULT_MAX_ITERATIONS)))
+                    .intValue();
+
+            this.maxIterationsAfterTargets = ((Literal) getOnlyArg(Options.PROGRAM,
+                    Options.MAX_ITERATIONS_AFTER_TARGETS, store.getValueFactory()
+                            .createLiteral(Options.DEFAULT_MAX_ITERATIONS_AFTER_TARGETS)))
                     .intValue();
 
             this.maxVisited = ((Literal) getOnlyArg(
@@ -774,8 +793,16 @@ public class GASService implements CustomServiceFactory {
                 
                 gasContext.setMaxIterations(maxIterations);
 
-                gasContext.setMaxVisited(maxVisited);
+                gasContext.setMaxIterationsAfterTargets(maxIterationsAfterTargets);
 
+                gasContext.setMaxVisited(maxVisited);
+                
+                if (targetVertices != null) {
+
+                	gasContext.setTargetVertices(toIV(targetVertices));
+                	
+                }
+                
                 // Optional link type constraint.
                 if (linkType != null)
                     gasContext.setLinkType(linkType);
@@ -803,7 +830,7 @@ public class GASService implements CustomServiceFactory {
                     gasState.setFrontier(gasContext, tmp);
 
                 }
-
+                
                 // Run the analytic.
                 final IGASStats stats = (IGASStats) gasContext.call();
 

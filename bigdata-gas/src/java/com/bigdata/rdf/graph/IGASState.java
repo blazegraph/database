@@ -119,6 +119,18 @@ public interface IGASState<VS,ES, ST> {
     boolean isVisited(Value v);
     
     /**
+     * Return <code>true</code> iff the specified vertices all have an associated
+     * vertex state object - this is interpreted as meaning that the vertex has
+     * been "visited".
+     * 
+     * @param v
+     *            The vertices.
+     * @return <code>true</code> iff there is vertex state associated with all
+     *         specified vertices.
+     */
+    boolean isVisited(Set<Value> v);
+    
+    /**
      * The current frontier.
      */
     IStaticFrontier frontier();
