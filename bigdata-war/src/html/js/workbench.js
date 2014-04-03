@@ -86,8 +86,6 @@ function getNamespaces() {
       $('.namespace-service-description').click(function(e) {
          return confirm('This can be an expensive operation. Proceed anyway?');
       });
-
-      READY = true;
    });
 }
 
@@ -166,7 +164,7 @@ function getDefaultNamespace() {
       useNamespace(DEFAULT_NAMESPACE, url);
    });
 }
-var DEFAULT_NAMESPACE, NAMESPACE, NAMESPACE_URL, READY, fileContents;
+var DEFAULT_NAMESPACE, NAMESPACE, NAMESPACE_URL, fileContents;
 
 getDefaultNamespace();
 
@@ -591,13 +589,12 @@ function showQueryResults(data) {
                } else {
                   var text = binding.value;
                }
-               text = escapeHTML(text);
-               text = text.replace(/\n/g, '<br>');
+               linkText = escapeHTML(text).replace(/\n/g, '<br>');
                if(binding.type == 'typed-literal') {
                   var tdData = ' class="literal" data-datatype="' + binding.datatype + '"';
                } else {
                   if(binding.type == 'uri' || binding.type == 'sid') {
-                     text = '<a href="#">' + text + '</a>';
+                     text = '<a href="' + buildExploreHash(text) + '">' + linkText + '</a>';
                   }
                   var tdData = ' class="' + binding.type + '"';
                   if(binding['xml:lang']) {
@@ -640,7 +637,7 @@ $('#explore-form').submit(function(e) {
       var re = /<< *<([^<>]*)> *<([^<>]*)> *<([^<>]*)> *>>/;
       var match = uri.match(re);
       if(match) {
-         $('#explore-header').html('<h1>&lt;&lt; &lt;<a href="#">' + match[1] + '</a>&gt;<br>&lt;<a href="#">' + match[2] + '</a> &gt;<br>&lt;<a href="#">' + match[3] + '</a> &gt; &gt;&gt;</h1>');
+         $('#explore-header').html('<h1>&lt;&lt; &lt;<a href="' + buildExploreHash(match[1]) + '">' + match[1] + '</a>&gt;<br>&lt;<a href="' + buildExploreHash(match[2]) + '">' + match[2] + '</a> &gt;<br>&lt;<a href="' + buildExploreHash(match[3]) + '">' + match[3] + '</a> &gt; &gt;&gt;</h1>');
          $('#explore-header h1 a').click(function(e) {
             e.preventDefault();
             explore(this.text);
@@ -650,6 +647,10 @@ $('#explore-form').submit(function(e) {
       }
    }
 });
+
+function buildExploreHash(uri) {
+   return '#explore:' + NAMESPACE + ':' + uri;
+}
 
 function loadURI(target) {
    // identify if this is a vertex or a SID
@@ -706,8 +707,6 @@ group by ?col1 ?col2 ?incoming';
    } else {
       var query = edgeQuery.replace('SID', target);
    }
-   console.log('Explore query for ' + (vertex ? 'vertex ' : 'edge ') + target);
-   console.log(query);
    var settings = {
       type: 'POST',
       data: 'query=' + encodeURI(query),
@@ -720,8 +719,6 @@ group by ?col1 ?col2 ?incoming';
 }
 
 function updateExploreStart(data) {
-   console.log('Explore results');
-   console.log(data);
    var results = data.results.bindings.length > 0;
 
    // clear tables
@@ -731,13 +728,13 @@ function updateExploreStart(data) {
    $.each(data.results.bindings, function(i, binding) {
       var cols = [binding.col1, binding.col2].map(function(col) {
          if(col.type == 'sid') {
-            var output = getSID(col);
+            var uri = getSID(col);
          } else {
-            var output = col.value;
+            var uri = col.value;
          }
-         output = escapeHTML(output).replace(/\n/g, '<br>');
+         output = escapeHTML(uri).replace(/\n/g, '<br>');
          if(col.type == 'uri' || col.type == 'sid') {
-            output = '<a href="#">' + output + '</a>';
+            output = '<a href="' + buildExploreHash(uri) + '">' + output + '</a>';
          }
          return output;
       });
@@ -748,7 +745,7 @@ function updateExploreStart(data) {
          } else {
             var sid = '<< <' + $('#explore-form input[type=text]').val() + '> <' +  binding.col1.value + '> <' + binding.col2.value + '> >>';
          }
-         star = '<a href="#" data-sid="' + sid + '"><< * (' + star + ') >></a>';
+         star = '<a href="' + buildExploreHash(sid) + '"><< * (' + star + ') >></a>';
       } else {
          star = '';
       }
@@ -779,15 +776,43 @@ function updateExploreStart(data) {
 
    $('#explore-results a').click(function(e) {
       e.preventDefault();
-      explore($(this).data('sid') ? $(this).data('sid') : this.text);
+      var components = parseHash(this.hash);
+      selectNamespace(components[2]);
+      explore(components[3]);
    });
 }
 
-function explore(uri) {
+function explore(uri, nopush) {
    $('#explore-form input[type=text]').val(uri);
    $('#explore-form').submit();
    showTab('explore');
+   if(!nopush) {
+      history.pushState(null, null, '#explore:' + NAMESPACE + ':' + uri);
+   }
 }
+
+function parseHash(hash) {
+   // match #tab:namespace:uri
+   // :namespace:uri group optional
+   // namespace optional
+   var re = /#([^:]+)(?::([^:]*):(.+))?/;
+   return hash.match(re);
+}
+
+// handle history buttons and initial display of first tab
+window.addEventListener("popstate", function(e) {
+   var hash = parseHash(this.location.hash);
+   if(!hash) {
+      $('#tab-selector a:first').click();
+   } else {
+      if(hash[1] == 'explore') {
+         selectNamespace(hash[2]);
+         explore(hash[3], true);
+      } else {
+         $('a[data-target=' + hash[1] + ']').click();
+      }
+   }
+});
 
 function updateExploreError(jqXHR, textStatus, errorThrown) {
    $('#explore-results .box').html('');
@@ -925,42 +950,6 @@ function parseSID(sid) {
 
 function escapeHTML(text) {
    return $('<div/>').text(text).html();
-}
-
-function initialExplore(namespace, uri) {
-   if(!READY) {
-      setTimeout(function() { initialExplore(namespace, uri); }, 10);
-   } else {
-      if(namespace != '') {
-         selectNamespace(namespace);
-      }
-      explore(uri);
-   }      
-}
-
-if(window.location.hash) {
-   // remove # and see if there is some data to retrieve for this hash
-   var hash = window.location.hash.substring(1);
-   var i = hash.indexOf(':');
-   if(i != -1) {
-      var data = hash.substring(i + 1);
-      hash = hash.substring(0, i);
-      // currently only the explore tab uses this
-      // data is in the form namespace:uri
-      // if no namespace is specified, use the default one
-      // TODO: this may need to be rethought if we start remembering the namespace the user selects
-      if(hash == 'explore') {
-         i = data.indexOf(':');
-         var namespace = data.substring(0, i);
-         var uri = data.substring(i + 1);
-
-         // wait for namespaces to be retrieved
-         initialExplore(namespace, uri);
-      }
-   }
-   $('a[data-target=' + hash + ']').click();
-} else {
-   $('#tab-selector a:first').click();
 }
 
 });
