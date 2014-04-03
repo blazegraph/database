@@ -638,10 +638,6 @@ $('#explore-form').submit(function(e) {
       var match = uri.match(re);
       if(match) {
          $('#explore-header').html('<h1>&lt;&lt; &lt;<a href="' + buildExploreHash(match[1]) + '">' + match[1] + '</a>&gt;<br>&lt;<a href="' + buildExploreHash(match[2]) + '">' + match[2] + '</a> &gt;<br>&lt;<a href="' + buildExploreHash(match[3]) + '">' + match[3] + '</a> &gt; &gt;&gt;</h1>');
-         $('#explore-header h1 a').click(function(e) {
-            e.preventDefault();
-            explore(this.text);
-         });
       } else {
          $('#explore-header').html('<h1>' + uri + '</h1>');
       }
