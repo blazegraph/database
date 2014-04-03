@@ -25,7 +25,9 @@ function showTab(tab) {
    $('#' + tab + '-tab').show();
    $('#tab-selector a').removeClass();
    $('a[data-target=' + tab + ']').addClass('active');
-   window.location.hash = tab;
+   if(window.location.hash.substring(1).indexOf(tab) != 0) {
+      window.location.hash = tab;
+   }
 }
 
 function moveTab(next) {
@@ -84,7 +86,14 @@ function getNamespaces() {
       $('.namespace-service-description').click(function(e) {
          return confirm('This can be an expensive operation. Proceed anyway?');
       });
+
+      READY = true;
    });
+}
+
+function selectNamespace(name) {
+   // for programmatically selecting a namespace with just its name
+   $('#namespaces-list li[data-name=' + name + '] a.use-namespace').click();
 }
 
 function useNamespace(name, url) {
@@ -157,7 +166,7 @@ function getDefaultNamespace() {
       useNamespace(DEFAULT_NAMESPACE, url);
    });
 }
-var DEFAULT_NAMESPACE, NAMESPACE, NAMESPACE_URL, fileContents;
+var DEFAULT_NAMESPACE, NAMESPACE, NAMESPACE_URL, READY, fileContents;
 
 getDefaultNamespace();
 
@@ -918,8 +927,38 @@ function escapeHTML(text) {
    return $('<div/>').text(text).html();
 }
 
+function initialExplore(namespace, uri) {
+   if(!READY) {
+      setTimeout(function() { initialExplore(namespace, uri); }, 10);
+   } else {
+      if(namespace != '') {
+         selectNamespace(namespace);
+      }
+      explore(uri);
+   }      
+}
+
 if(window.location.hash) {
-   $('a[data-target=' + window.location.hash.substring(1) + ']').click();
+   // remove # and see if there is some data to retrieve for this hash
+   var hash = window.location.hash.substring(1);
+   var i = hash.indexOf(':');
+   if(i != -1) {
+      var data = hash.substring(i + 1);
+      hash = hash.substring(0, i);
+      // currently only the explore tab uses this
+      // data is in the form namespace:uri
+      // if no namespace is specified, use the default one
+      // TODO: this may need to be rethought if we start remembering the namespace the user selects
+      if(hash == 'explore') {
+         i = data.indexOf(':');
+         var namespace = data.substring(0, i);
+         var uri = data.substring(i + 1);
+
+         // wait for namespaces to be retrieved
+         initialExplore(namespace, uri);
+      }
+   }
+   $('a[data-target=' + hash + ']').click();
 } else {
    $('#tab-selector a:first').click();
 }
