@@ -3429,13 +3429,12 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                 return;
 
             if (!quorum.isHighlyAvailable()) {
-            	// FIXME: Find the reason why this delay is needed and remove it!
-            	//
-            	try {
-					Thread.sleep(1000);
-				} catch (InterruptedException e) {
-					e.printStackTrace();
-				}
+            	// FIXME: Find the reason why this delay is needed to pass HA1 snapshot tests
+//            	try {
+//					Thread.sleep(1000);
+//				} catch (InterruptedException e) {
+//					e.printStackTrace();
+//				}
             	return;
             }
 
