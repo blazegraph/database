@@ -15,7 +15,9 @@
 */
 package com.bigdata.rdf.graph.analytics;
 
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.log4j.Logger;
@@ -31,6 +33,7 @@ import com.bigdata.rdf.graph.IBindingExtractor;
 import com.bigdata.rdf.graph.IGASContext;
 import com.bigdata.rdf.graph.IGASScheduler;
 import com.bigdata.rdf.graph.IGASState;
+import com.bigdata.rdf.graph.IPredecessor;
 import com.bigdata.rdf.graph.impl.BaseGASProgram;
 
 /**
@@ -46,7 +49,8 @@ import com.bigdata.rdf.graph.impl.BaseGASProgram;
  *         so we need a different data structure to collect them (we need to
  *         store the predecesor when we run SSSP to do this).
  */
-public class SSSP extends BaseGASProgram<SSSP.VS, SSSP.ES, Integer/* dist */> {
+public class SSSP extends BaseGASProgram<SSSP.VS, SSSP.ES, Integer/* dist */> 
+		implements IPredecessor<SSSP.VS, SSSP.ES, Integer/* dist */> {
 
     private static final Logger log = Logger.getLogger(SSSP.class);
 
@@ -100,6 +104,15 @@ public class SSSP extends BaseGASProgram<SSSP.VS, SSSP.ES, Integer/* dist */> {
          * with the minimum observed distance.
          */
         private final AtomicReference<Value> predecessor = new AtomicReference<Value>();
+
+        /**
+         * Return the vertex preceding this vertex on the shortest path.
+         */
+        public Value predecessor() {
+
+            return predecessor.get();
+            
+        }
 
 //        /**
 //         * Set the distance for the vertex to ZERO. This is done for the
@@ -445,6 +458,22 @@ public class SSSP extends BaseGASProgram<SSSP.VS, SSSP.ES, Integer/* dist */> {
             }
         });
 
+        tmp.add(new IBinder<SSSP.VS, SSSP.ES, Integer>() {
+            
+            @Override
+            public int getIndex() {
+                return Bindings.PREDECESSOR;
+            }
+            
+            @Override
+            public Value bind(final ValueFactory vf,
+                    final IGASState<SSSP.VS, SSSP.ES, Integer> state, final Value u) {
+
+                return state.getState(u).predecessor.get();
+
+            }
+        });
+
         return tmp;
 
     }
@@ -461,6 +490,58 @@ public class SSSP extends BaseGASProgram<SSSP.VS, SSSP.ES, Integer/* dist */> {
          */
         int DISTANCE = 1;
         
+        /**
+         * The predecessor vertex on a shortest path.
+         * 
+         */
+        int PREDECESSOR = 2;
+        
     }
+
+	@Override
+	public void prunePaths(IGASContext<VS, ES, Integer> ctx,
+			Value[] targetVertices) {
+		
+        if (ctx == null)
+            throw new IllegalArgumentException();
+
+        if (targetVertices == null)
+            throw new IllegalArgumentException();
+        
+        final IGASState<SSSP.VS, SSSP.ES, Integer> gasState = ctx.getGASState();
+
+        final Set<Value> retainSet = new HashSet<Value>();
+
+        for (Value v : targetVertices) {
+
+            if (!gasState.isVisited(v)) {
+
+                // This target was not reachable.
+                continue;
+
+            }
+
+            /*
+             * Walk the precessors back to a starting vertex.
+             */
+            Value current = v;
+
+            while (current != null) {
+
+                retainSet.add(current);
+
+                final SSSP.VS currentState = gasState.getState(current);
+
+                final Value predecessor = currentState.predecessor();
+
+                current = predecessor;
+
+            }
+            
+        } // next target vertex.
+        
+        gasState.retainAll(retainSet);
+		
+	}
 
 }
