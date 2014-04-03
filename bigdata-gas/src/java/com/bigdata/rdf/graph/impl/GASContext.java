@@ -200,8 +200,12 @@ public class GASContext<VS, ES, ST> implements IGASContext<VS, ES, ST> {
 	            	 * program N rounds from now where 
 	            	 * N = maxIterationsAfterTargets.
 	            	 */
-        			this.maxIterations.set(Math.min(getMaxIterations(),
-    					(int) total.getNRounds() + getMaxIterationsAfterTargets()));
+	            	synchronized(this.maxIterations) {
+	            		
+	        			this.maxIterations.set(Math.min(getMaxIterations(),
+	    					(int) total.getNRounds() + getMaxIterationsAfterTargets()));
+	        			
+	            	}
 	            	
 	            	if (log.isTraceEnabled()) {
 	            		log.trace("All targets reached at round " + 
