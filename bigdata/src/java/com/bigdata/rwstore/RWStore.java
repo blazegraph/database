@@ -688,7 +688,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
                 throws InterruptedException {
 
             super(buf, useChecksum, m_quorum != null
-                    && m_quorum.isHighlyAvailable(), bufferHasData, opener,
+                    /*&& m_quorum.isHighlyAvailable()*/, bufferHasData, opener,
                     fileExtent,
                     m_bufferedWrite);
 
@@ -1083,7 +1083,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
             final boolean highlyAvailable = m_quorum != null
                     && m_quorum.isHighlyAvailable();
 
-            final boolean prefixWrites = highlyAvailable;
+            final boolean prefixWrites = m_quorum != null; // highlyAvailable
 
             return new RWWriteCacheService(m_writeCacheBufferCount,
                     m_minCleanListSize, m_readCacheBufferCount, prefixWrites, m_compactionThreshold, m_hotCacheSize, m_hotCacheThreshold,

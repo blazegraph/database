@@ -184,7 +184,7 @@ public class AbstractHA3BackupTestCase extends AbstractHA3JournalServerTestCase 
 
                     // Verify journal can be dumped without error.
                     dumpJournal(jnl);
-
+                    
                     /*
                      * Now roll that journal forward using the HALog directory.
                      */

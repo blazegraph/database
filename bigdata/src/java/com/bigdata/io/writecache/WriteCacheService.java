@@ -1151,6 +1151,7 @@ abstract public class WriteCacheService implements IWriteCache {
                     done = WriteCache.transferTo(cache/* src */,
                             curCompactingCache/* dst */, serviceMap, 0/*threshold*/);
                     if (done) {
+                        // Everything was compacted.  Send just the address metadata (empty cache block).
                         sendAddressMetadata(cache);
                         
                         if (log.isDebugEnabled())
@@ -1164,7 +1165,7 @@ abstract public class WriteCacheService implements IWriteCache {
                      */
                     if (flush) {
                         /*
-                         * Send out the full cache block.
+                         * Send out the full cache block. FIXME Why are we not calling sendAddressMetadata() here?
                          */
                         writeCacheBlock(curCompactingCache);
                         addClean(curCompactingCache, true/* addFirst */);
@@ -1231,7 +1232,7 @@ abstract public class WriteCacheService implements IWriteCache {
          * been allocated on the leader in the same order in which the leader
          * made those allocations. This information is used to infer the order
          * in which the allocators for the different allocation slot sizes are
-         * created. This method will synchronous send those address notices and
+         * created. This method will synchronously send those address notices and
          * and also makes sure that the followers see the recycled addresses
          * records so they can keep both their allocators and the actual
          * allocations synchronized with the leader.
@@ -1249,8 +1250,9 @@ abstract public class WriteCacheService implements IWriteCache {
                 throws IllegalStateException, InterruptedException,
                 ExecutionException, IOException {
 
-            if (quorum == null || !quorum.isHighlyAvailable()
-                    || !quorum.getClient().isLeader(quorumToken)) {
+//            if (quorum == null || !quorum.isHighlyAvailable()
+//                    || !quorum.getClient().isLeader(quorumToken)) {
+            if (quorum == null) {
                 return;
             }
 
@@ -1354,7 +1356,7 @@ abstract public class WriteCacheService implements IWriteCache {
              * unit tests need to be updated to specify [isHighlyAvailable] for
              * ALL quorum based test runs.
              */
-            final boolean isHA = quorum != null && quorum.isHighlyAvailable();
+            final boolean isHA = quorum != null;
 
             // IFF HA and this is the quorum leader.
             final boolean isHALeader = isHA
@@ -1441,10 +1443,12 @@ abstract public class WriteCacheService implements IWriteCache {
                 quorumMember.logWriteCacheBlock(pkg.getMessage(), pkg.getData().duplicate()); 
                 
                 // ASYNC MSG RMI + NIO XFER.
-                remoteWriteFuture = quorumMember.replicate(null/* req */, pkg.getMessage(),
-                		pkg.getData().duplicate());
-                
-                counters.get().nsend++;
+                if (quorum.replicationFactor() > 1) {
+	                remoteWriteFuture = quorumMember.replicate(null/* req */, pkg.getMessage(),
+	                		pkg.getData().duplicate());
+	                
+	                counters.get().nsend++;
+                }
 
                 /*
                  * The quorum leader logs the write cache block here. For the
