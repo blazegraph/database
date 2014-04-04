@@ -1356,7 +1356,7 @@ abstract public class WriteCacheService implements IWriteCache {
              * unit tests need to be updated to specify [isHighlyAvailable] for
              * ALL quorum based test runs.
              */
-            final boolean isHA = quorum != null;
+            final boolean isHA = quorum != null && quorum.isHighlyAvailable();
 
             // IFF HA and this is the quorum leader.
             final boolean isHALeader = isHA
