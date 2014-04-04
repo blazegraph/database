@@ -1085,8 +1085,8 @@ ${postInstallMessage}</echo>
             todir="${dist.dir}/etc/init.d" />
       <chmod file="${dist.dir}/etc/init.d/bigdataHA" perm="755" />
 
-      <copy file="${src.resources}/etc/bigdata/bigdataHA.config"
-            todir="${dist.dir}/etc/bigdata" />
+      <copy file="${src.resources}/etc/default/bigdata/bigdataHA"
+            todir="${dist.dir}/etc/default/bigdata" />
 
       <copy file="${src.resources}/bin/config/browser.config"
             todir="${dist.bin.config}" />
@@ -1245,7 +1245,7 @@ ${postInstallMessage}</echo>
 	bigdata/doc/NOTICE - copyright NOTICE files.
 	bigdata/doc/docs - javadoc (FIXME INSTALL JAVADOC, HA wiki page)
 	bigdata/etc/init.d/bigdataHA - HA services start/stop script.
-	bigdata/etc/bigdata/bigdataHA.config - HA services required config file.
+	bigdata/etc/default/bigdata/bigdataHA - HA services required config file.
 	
 	Note: This directory structure is currently reused for the rpm, but the
 	top-level of the rpm directory structure includes the release version as
