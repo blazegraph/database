@@ -15,8 +15,13 @@
 */
 package com.bigdata.rdf.graph;
 
+import java.util.List;
+
 import org.openrdf.model.Value;
 import org.openrdf.model.ValueFactory;
+
+import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.IVariable;
 
 /**
  * An interface that may be used to extract variable bindings for the
@@ -35,17 +40,35 @@ public interface IBinder<VS, ES, ST> {
     int getIndex();
 
     /**
+     * New multi-binding strategy allows binders to bind multiple values to
+     * a given output variable (multiplying the number of solutions by the
+     * number of bindings).
+     * 
      * @param vf
      *            The {@link ValueFactory} used to create the return
      *            {@link Value}.
+     *            
+     * @param state
+     * 			  The {@link IGASState}.
+     * 	
      * @param u
-     *            The vertex.
+     * 			  The vertex.
      * 
+     * @param outVars
+     * 			  The array of output variables.
+     * 
+     * @param bs
+     *            The current binding set. Can be used to conditionally bind
+     *            values based on the current solution.
+     *            
      * @return The {@link Value} for that ordinal variable or
      *         <code>null</code> if there is no binding for that ordinal
      *         variable.
      */
-    Value bind(ValueFactory vf, final IGASState<VS, ES, ST> state, Value u);
+    List<Value> bind(ValueFactory vf, IGASState<VS, ES, ST> state, 
+    		Value u, IVariable<?>[] outVars, IBindingSet bs);
 
+//    Value bind(ValueFactory vf, final IGASState<VS, ES, ST> state, Value u);
+    
 }
 
