@@ -15,20 +15,25 @@
 */
 package com.bigdata.rdf.graph.analytics;
 
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
-import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
+import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.log4j.Logger;
 import org.openrdf.model.Statement;
+import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.model.ValueFactory;
 
+import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.IVariable;
+import com.bigdata.rdf.graph.BinderBase;
 import com.bigdata.rdf.graph.EdgesEnum;
 import com.bigdata.rdf.graph.Factory;
 import com.bigdata.rdf.graph.FrontierEnum;
@@ -39,14 +44,15 @@ import com.bigdata.rdf.graph.IGASScheduler;
 import com.bigdata.rdf.graph.IGASState;
 import com.bigdata.rdf.graph.IPredecessor;
 import com.bigdata.rdf.graph.impl.BaseGASProgram;
+import com.bigdata.rdf.internal.IV;
 
 /**
- * Breadth First Search (BFS) is an iterative graph traversal primitive. The
- * frontier is expanded iteratively until no new vertices are discovered. Each
- * visited vertex is marked with the round (origin ZERO) in which it was
- * visited. This is its distance from the initial frontier.
- * 
- * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * PATHS is an iterative graph traversal operation. The frontier is expanded
+ * iteratively until no new vertices are discovered, or until the target
+ * vertices have all been reached. Each vertex is marked with its depth and with
+ * a list of all predecessors and their edges to the vertex. This algorithm is
+ * useful for creating a complete connected subgraph between a source and a set
+ * of targets.
  */
 public class PATHS extends BaseGASProgram<PATHS.VS, PATHS.ES, Void> implements
         IPredecessor<PATHS.VS, PATHS.ES, Void> {
@@ -70,11 +76,12 @@ public class PATHS extends BaseGASProgram<PATHS.VS, PATHS.ES, Void> implements
         private final AtomicInteger depth = new AtomicInteger(-1);
         
         /**
-         * The predecessors are the first source vertex to visit a given target
-         * vertex.
+         * The predecessors are the source vertices to visit a given target
+         * vertex.  Each one has a list of edges along which they were able to
+         * reach this vertex.
          */
-        private final Set<Value> predecessors = 
-        		Collections.synchronizedSet(new LinkedHashSet<Value>());
+        private final Map<Value, Set<URI>> predecessors = 
+        		Collections.synchronizedMap(new LinkedHashMap<Value, Set<URI>>());
         
         /**
          * The depth at which this vertex was first visited (origin ZERO) and
@@ -87,12 +94,32 @@ public class PATHS extends BaseGASProgram<PATHS.VS, PATHS.ES, Void> implements
         }
 
         /**
-         * Return the first vertex to discover this vertex during BFS traversal.
+         * Return the vertices that discovered this vertex during BFS traversal.
          */
-        public Set<Value> predecessors() {
+        public Map<Value, Set<URI>> predecessors() {
 
             return predecessors;
             
+        }
+        
+        /**
+         * Add a predecessor (might have already been added) and the edge
+         * along which the predecessor discovered this vertex.
+         */
+        public synchronized void addPredecessor(final Value pred, final URI edge) {
+        	
+        	Set<URI> edges = predecessors.get(pred);
+        	
+        	if (edges == null) {
+        	
+        		edges = new LinkedHashSet<URI>();
+        		
+        		predecessors.put(pred, edges);
+        		
+        	}
+        	
+        	edges.add(edge);
+        	
         }
 
         /**
@@ -103,21 +130,20 @@ public class PATHS extends BaseGASProgram<PATHS.VS, PATHS.ES, Void> implements
          *         first visited the vertex (this helps to avoid multiple
          *         scheduling of a vertex).
          */
-        public boolean visit(final int depth, final Value predecessor) {
-        	if (predecessor != null)
-        		this.predecessors.add(predecessor);
+        public boolean visit(final int depth, final Value pred, final URI edge) {
+        	
+        	if (pred != null) {
+//        		this.predecessors.add(pred);
+        		addPredecessor(pred, edge);
+        	}
+        	
             if (this.depth.compareAndSet(-1/* expect */, depth/* newValue */)) {
                 // Scheduled by this thread.
                 return true;
             }
+            
             return false;
-//            synchronized (this) {
-//                if (this.depth == -1) {
-//                    this.depth = depth;
-//                    return true;
-//                }
-//                return false;
-//            }
+            
         }
 
         @Override
@@ -187,7 +213,7 @@ public class PATHS extends BaseGASProgram<PATHS.VS, PATHS.ES, Void> implements
     public void initVertex(final IGASContext<PATHS.VS, PATHS.ES, Void> ctx,
             final IGASState<PATHS.VS, PATHS.ES, Void> state, final Value u) {
 
-        state.getState(u).visit(0, null/* predecessor */);
+        state.getState(u).visit(0, null/* predecessor */, null/* edge */);
 
     }
     
@@ -245,11 +271,6 @@ public class PATHS extends BaseGASProgram<PATHS.VS, PATHS.ES, Void> implements
     public void scatter(final IGASState<PATHS.VS, PATHS.ES, Void> state,
             final IGASScheduler sch, final Value u, final Statement e) {
 
-//        if (state.getTargetVertices().contains(u)) {
-//        	// don't schedule any more vertices, we've hit a target 
-//        	return;
-//        }
-        
         // remote vertex state.
         final Value v = state.getOtherVertex(u, e);
 
@@ -257,7 +278,7 @@ public class PATHS extends BaseGASProgram<PATHS.VS, PATHS.ES, Void> implements
 //        final VS otherState = state.getState(e.getObject()/* v */);
 
         // visit.
-        if (otherState.visit(state.round() + 1, u/* predecessor */)) {
+        if (otherState.visit(state.round() + 1, u/* predecessor */, e.getPredicate())) {
 
             /*
              * This is the first visit for the remote vertex. Add it to the
@@ -284,9 +305,12 @@ public class PATHS extends BaseGASProgram<PATHS.VS, PATHS.ES, Void> implements
      * <dt>{@value Bindings#DEPTH}</dt>
      * <dd>The depth at which the vertex was first encountered during traversal.
      * </dd>
-     * <dt>{@value Bindings#PREDECESSOR}</dt>
-     * <dd>The predecessor is the first vertex that discovers a given vertex
+     * <dt>{@value Bindings#PREDECESSORS}</dt>
+     * <dd>The predecessors are all the vertices that discovers a given vertex
      * during traversal.</dd>
+     * <dt>{@value Bindings#EDGES}</dt>
+     * <dd>These are the edges along which each predecessor discovered a given 
+     * vertex during traversal.</dd>
      * </dl>
      */
     @Override
@@ -294,7 +318,7 @@ public class PATHS extends BaseGASProgram<PATHS.VS, PATHS.ES, Void> implements
 
         final List<IBinder<PATHS.VS, PATHS.ES, Void>> tmp = super.getBinderList();
 
-        tmp.add(new IBinder<PATHS.VS, PATHS.ES, Void>() {
+        tmp.add(new BinderBase<PATHS.VS, PATHS.ES, Void>() {
             
             @Override
             public int getIndex() {
@@ -308,28 +332,89 @@ public class PATHS extends BaseGASProgram<PATHS.VS, PATHS.ES, Void> implements
                 return vf.createLiteral(state.getState(u).depth.get());
 
             }
+
         });
 
         tmp.add(new IBinder<PATHS.VS, PATHS.ES, Void>() {
             
             @Override
             public int getIndex() {
-                return Bindings.PREDECESSOR;
+                return Bindings.PREDECESSORS;
             }
             
             @Override
-            public Value bind(final ValueFactory vf,
-                    final IGASState<PATHS.VS, PATHS.ES, Void> state, final Value u) {
+            public List<Value> bind(final ValueFactory vf,
+                    final IGASState<PATHS.VS, PATHS.ES, Void> state, 
+                    final Value u, final IVariable<?>[] outVars,
+                    final IBindingSet bs) {
 
-            	final String s = Arrays.toString(state.getState(u).predecessors.toArray());
+            	final VS vs = state.getState(u);
             	
-            	if (log.isTraceEnabled()) {
-            		log.trace(s);
-            	}
-            	
-                return vf.createLiteral(s);
+            	return new LinkedList<Value>(vs.predecessors().keySet());
 
             }
+            
+        });
+
+        tmp.add(new IBinder<PATHS.VS, PATHS.ES, Void>() {
+            
+            @Override
+            public int getIndex() {
+                return Bindings.EDGES;
+            }
+            
+			@Override
+			@SuppressWarnings({ "rawtypes", "unchecked" })
+            public List<Value> bind(final ValueFactory vf,
+                    final IGASState<PATHS.VS, PATHS.ES, Void> state, 
+                    final Value u, final IVariable<?>[] outVars,
+                    final IBindingSet bs) {
+
+				/*
+				 * We want to return a different set of edges depending on
+				 * which predecessor the caller is asking about.  We can
+				 * find that information in the binding set. 
+				 */
+				
+            	final IVariable<?> var = outVars[Bindings.PREDECESSORS];
+            	
+            	if (!bs.isBound(var)) {
+            		
+            		if (log.isTraceEnabled()) {
+            			log.trace("no predecessors");
+            		}
+            		
+            		return Collections.EMPTY_LIST;
+            		
+            	}
+            	
+            	final IV predIV = (IV) bs.get(var).get();
+            	
+            	final Value predVal;
+            	
+            	if (predIV instanceof Value) {
+            		
+            		predVal = (Value) predIV;
+            		
+            	} else if (predIV.hasValue()) {
+            		
+            		predVal = predIV.getValue();
+            		
+            	} else {
+            		
+            		throw new RuntimeException("FIXME");
+            		
+            	}
+            	
+            	final VS vs = state.getState(u);
+            	
+            	/*
+            	 * Return the edges for this predecessor.
+            	 */
+            	return new LinkedList<Value>(vs.predecessors().get(predVal));
+
+            }
+            
         });
 
         return tmp;
@@ -349,69 +434,17 @@ public class PATHS extends BaseGASProgram<PATHS.VS, PATHS.ES, Void> implements
         int DEPTH = 1;
         
         /**
-         * The BFS predecessor is the first vertex to discover a given vertex.
+         * The predecessors are all vertices to discover a given vertex.
          * 
          */
-        int PREDECESSOR = 2;
+        int PREDECESSORS = 2;
+        
+        /**
+         * The edges along which each predecessor discovered a given vertex.
+         */
+        int EDGES = 3;
         
     }
-
-//    /**
-//     * Reduce the active vertex state, returning a histogram reporting the #of
-//     * vertices at each distance from the starting vertex. There will always be
-//     * one vertex at depth zero - this is the starting vertex. For each
-//     * successive depth, the #of vertices that were labeled at that depth is
-//     * reported. This is essentially the same as reporting the size of the
-//     * frontier in each round of the traversal, but the histograph is reported
-//     * based on the vertex state.
-//     * 
-//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
-//     *         Thompson</a>
-//     */
-//    protected static class HistogramReducer implements
-//            IReducer<VS, ES, Void, Map<Integer, AtomicLong>> {
-//
-//        private final ConcurrentHashMap<Integer, AtomicLong> values = new ConcurrentHashMap<Integer, AtomicLong>();
-//
-//        @Override
-//        public void visit(final IGASState<VS, ES, Void> state, final Value u) {
-//
-//            final VS us = state.getState(u);
-//
-//            if (us != null) {
-//
-//                final Integer depth = Integer.valueOf(us.depth());
-//
-//                AtomicLong newval = values.get(depth);
-//
-//                if (newval == null) {
-//
-//                    final AtomicLong oldval = values.putIfAbsent(depth,
-//                            newval = new AtomicLong());
-//
-//                    if (oldval != null) {
-//
-//                        // lost data race.
-//                        newval = oldval;
-//
-//                    }
-//
-//                }
-//
-//                newval.incrementAndGet();
-//
-//            }
-//
-//        }
-//
-//        @Override
-//        public Map<Integer, AtomicLong> get() {
-//
-//            return Collections.unmodifiableMap(values);
-//            
-//        }
-//        
-//    }
 
     /*
      * TODO Do this in parallel for each specified target vertex.
@@ -428,10 +461,6 @@ public class PATHS extends BaseGASProgram<PATHS.VS, PATHS.ES, Void> implements
         
         final IGASState<PATHS.VS, PATHS.ES, Void> gasState = ctx.getGASState();
 
-//        for (Value v : gasState.values()) {
-//        	log.trace(v);
-//        }
-                
         final Set<Value> retainSet = new HashSet<Value>();
 
         for (Value v : targetVertices) {
@@ -450,20 +479,6 @@ public class PATHS extends BaseGASProgram<PATHS.VS, PATHS.ES, Void> implements
             
             visitPredecessors(gasState, v, retainSet);
             
-//            Value current = v;
-//
-//            while (current != null) {
-//
-//                retainSet.add(current);
-//
-//                final PATHS.VS currentState = gasState.getState(current);
-//
-//                final Value predecessor = currentState.predecessor();
-//
-//                current = predecessor;
-//
-//            }
-            
         } // next target vertex.
         
         gasState.retainAll(retainSet);
@@ -476,7 +491,7 @@ public class PATHS extends BaseGASProgram<PATHS.VS, PATHS.ES, Void> implements
     	
     	final PATHS.VS currentState = gasState.getState(v);
     	
-        for (Value pred : currentState.predecessors()) {
+        for (Value pred : currentState.predecessors().keySet()) {
 
         	if (pred == null) {
         		
@@ -497,72 +512,5 @@ public class PATHS extends BaseGASProgram<PATHS.VS, PATHS.ES, Void> implements
         }
     	
     }
-
-//    @Override
-//    public <T> IReducer<VS, ES, Void, T> getDefaultAfterOp() {
-//
-//        class NV implements Comparable<NV> {
-//            public final int n;
-//            public final long v;
-//            public NV(final int n, final long v) {
-//                this.n = n;
-//                this.v = v;
-//            }
-//            @Override
-//            public int compareTo(final NV o) {
-//                if (o.n > this.n)
-//                    return -1;
-//                if (o.n < this.n)
-//                    return 1;
-//                return 0;
-//            }
-//        }
-//
-//        final IReducer<VS, ES, Void, T> outerReducer = new IReducer<VS, ES, Void, T>() {
-//
-//            final HistogramReducer innerReducer = new HistogramReducer();
-//
-//            @Override
-//            public void visit(IGASState<VS, ES, Void> state, Value u) {
-//
-//                innerReducer.visit(state, u);
-//                
-//            }
-//
-//            @Override
-//            public T get() {
-//                
-//                final Map<Integer, AtomicLong> h = innerReducer.get();
-//
-//                final NV[] a = new NV[h.size()];
-//
-//                int i = 0;
-//
-//                for (Map.Entry<Integer, AtomicLong> e : h.entrySet()) {
-//
-//                    a[i++] = new NV(e.getKey().intValue(), e.getValue().get());
-//
-//                }
-//
-//                Arrays.sort(a);
-//
-//                System.out.println("distance, frontierSize, sumFrontierSize");
-//                long sum = 0L;
-//                for (NV t : a) {
-//
-//                    System.out.println(t.n + ", " + t.v + ", " + sum);
-//
-//                    sum += t.v;
-//
-//                }
-//
-//                return null;
-//            }
-//            
-//        };
-//        
-//        return outerReducer;
-//
-//    }
 
 }

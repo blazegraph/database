@@ -25,6 +25,11 @@ import org.openrdf.model.Statement;
 import org.openrdf.model.Value;
 import org.openrdf.model.ValueFactory;
 
+import sun.reflect.generics.reflectiveObjects.NotImplementedException;
+
+import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.IVariable;
+import com.bigdata.rdf.graph.BinderBase;
 import com.bigdata.rdf.graph.EdgesEnum;
 import com.bigdata.rdf.graph.Factory;
 import com.bigdata.rdf.graph.FrontierEnum;
@@ -441,7 +446,7 @@ public class SSSP extends BaseGASProgram<SSSP.VS, SSSP.ES, Integer/* dist */>
         final List<IBinder<SSSP.VS, SSSP.ES, Integer>> tmp = super
                 .getBinderList();
 
-        tmp.add(new IBinder<SSSP.VS, SSSP.ES, Integer>() {
+        tmp.add(new BinderBase<SSSP.VS, SSSP.ES, Integer>() {
 
             @Override
             public int getIndex() {
@@ -456,9 +461,10 @@ public class SSSP extends BaseGASProgram<SSSP.VS, SSSP.ES, Integer/* dist */>
                 return vf.createLiteral(state.getState(u).dist());
 
             }
+
         });
 
-        tmp.add(new IBinder<SSSP.VS, SSSP.ES, Integer>() {
+        tmp.add(new BinderBase<SSSP.VS, SSSP.ES, Integer>() {
             
             @Override
             public int getIndex() {
@@ -472,6 +478,7 @@ public class SSSP extends BaseGASProgram<SSSP.VS, SSSP.ES, Integer/* dist */>
                 return state.getState(u).predecessor.get();
 
             }
+
         });
 
         return tmp;

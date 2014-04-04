@@ -30,6 +30,7 @@ import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.ListIterator;
 import java.util.Set;
 
 import org.apache.log4j.Logger;
@@ -995,7 +996,9 @@ public class GASService implements CustomServiceFactory {
             @Override
             public void visit(final IGASState<VS, ES, ST> state, final Value u) {
 
-                final IBindingSet bs = new ListBindingSet();
+                final List<IBindingSet> bSets = new LinkedList<IBindingSet>();
+                
+                bSets.add(new ListBindingSet());
                 
                 for (IBinder<VS, ES, ST> b : binderList) {
 
@@ -1004,65 +1007,118 @@ public class GASService implements CustomServiceFactory {
 
                     if(var == null)
                         continue;
-                    
+
+                	final Iterator<IBindingSet> it = bSets.iterator();
+                	
+                	final List<IBindingSet> bSets2 = new LinkedList<IBindingSet>();
+                	
+                	while (it.hasNext()) {
+                		
+                		final IBindingSet parent = it.next();
+                		
+						if (log.isTraceEnabled())
+							log.trace("parent: " + parent);
+                		
+                    	final List<Value> vals = 
+                    			b.bind(vf, state, u, outVars, parent);
+                    	
+                    	if (vals.size() == 0) {
+                    		
+                    		// do nothing, leave the parent in the bSets
+                    		
+                    	} else if (vals.size() == 1) {
+                    		
+                    		/*
+                    		 * Bind the single value, leave the parent in the 
+                    		 * bSets.
+                    		 */
+                    		
+                    		final Value val = vals.get(0);
+                    		
+                    		bind(var, val, parent);
+                    		
+							if (log.isTraceEnabled())
+								log.trace("parent (after bind): " + parent);
+                    		
+                    	} else {
+                    	
+                    		/* 
+                    		 * Remove the parent from the bSets, for each new
+                    		 * value, clone the parent, bind the value, and add
+                    		 * the new solution to the bSets
+                    		 */
+                    		
+                    		for (Value val : vals) {
+                    			
+                    			final IBindingSet child = parent.clone();
+                    			
+                    			bind(var, val, child);
+                    			
+    							if (log.isTraceEnabled())
+    								log.trace("child: " + child);
+                        		
+                    			bSets2.add(child);
+                    			
+                    		}
+                    		
+                    		it.remove();
+                    		
+                    	}
+                		
+                	}
+
+                	bSets.addAll(bSets2);
+                	
+                }
+
+                // Add to the set of generated solutions.
+                tmp.addAll(bSets);
+
+            }
+
+            @SuppressWarnings({ "unchecked", "rawtypes" })
+			protected void bind(final IVariable<?> var, final Value val, final IBindingSet bs) {
+            	
+                if (val == null)
+                    return;
+
+                if (val instanceof IV) {
+
+                    // The value is already an IV.
+                    bs.set(var, new Constant((IV) val));
+
+                } else {
+
                     /*
-                     * TODO This does too much work. The API is defined in terms
-                     * of openrdf Value objects rather than IVs because it is in
-                     * a different package (not bigdata specific). The
-                     * getBinderList() method should be moved to the code that
-                     * exposes the service (this class) so it can do bigdata
-                     * specific things and DO LESS WORK. This would be a good
-                     * thing to do at the time that we add support for FuzzySSSP
-                     * (which is not an IGASProgram and hence breaks the model
-                     * anyway).
+                     * The Value is a BigdataValueImpl (if the bind() method
+                     * used the supplied ValueFactory). We need to convert
+                     * it to an IV and this code ASSUMES that we can do this
+                     * using an inline IV with the as configured KB. (This
+                     * will work for anything numeric, but not for strings.)
                      */
-                    final Value val = b.bind(vf, state, u);
+                    final IV<BigdataValueImpl, ?> iv = lex
+                            .getLexiconConfiguration().createInlineIV(val);
 
-                    if (val == null)
-                        continue;
+                    if (iv != null) {
 
-                    if (val instanceof IV) {
+                    	iv.setValue((BigdataValueImpl) val);
 
-                        // The value is already an IV.
-                        bs.set(var, new Constant((IV) val));
-
+                    	bs.set(var, new Constant(iv));
+                    	
+                    } else if (val instanceof BigdataValue) {
+                    	
+                    	bs.set(var, new Constant(DummyConstantNode.toDummyIV((BigdataValue) val)));
+                    	
                     } else {
-
-                        /*
-                         * The Value is a BigdataValueImpl (if the bind() method
-                         * used the supplied ValueFactory). We need to convert
-                         * it to an IV and this code ASSUMES that we can do this
-                         * using an inline IV with the as configured KB. (This
-                         * will work for anything numeric, but not for strings.)
-                         */
-                        final IV<BigdataValueImpl, ?> iv = lex
-                                .getLexiconConfiguration().createInlineIV(val);
-
-                        if (iv != null) {
-
-                        	iv.setValue((BigdataValueImpl) val);
-
-                        	bs.set(var, new Constant(iv));
-                        	
-                        } else if (val instanceof BigdataValue) {
-                        	
-                        	bs.set(var, new Constant(DummyConstantNode.toDummyIV((BigdataValue) val)));
-                        	
-                        } else {
-                        	
-                        	throw new RuntimeException("FIXME");
-                        	
-                        }
-
+                    	
+                    	throw new RuntimeException("FIXME");
+                    	
                     }
 
                 }
 
-                // Add to the set of generated solutions.
-                tmp.add(bs);
-
             }
-
+            
             @Override
             public IBindingSet[] get() {
 

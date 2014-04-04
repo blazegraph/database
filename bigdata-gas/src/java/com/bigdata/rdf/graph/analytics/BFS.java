@@ -25,6 +25,7 @@ import org.openrdf.model.Statement;
 import org.openrdf.model.Value;
 import org.openrdf.model.ValueFactory;
 
+import com.bigdata.rdf.graph.BinderBase;
 import com.bigdata.rdf.graph.EdgesEnum;
 import com.bigdata.rdf.graph.Factory;
 import com.bigdata.rdf.graph.FrontierEnum;
@@ -282,7 +283,7 @@ public class BFS extends BaseGASProgram<BFS.VS, BFS.ES, Void> implements
 
         final List<IBinder<BFS.VS, BFS.ES, Void>> tmp = super.getBinderList();
 
-        tmp.add(new IBinder<BFS.VS, BFS.ES, Void>() {
+        tmp.add(new BinderBase<BFS.VS, BFS.ES, Void>() {
             
             @Override
             public int getIndex() {
@@ -296,9 +297,10 @@ public class BFS extends BaseGASProgram<BFS.VS, BFS.ES, Void> implements
                 return vf.createLiteral(state.getState(u).depth.get());
 
             }
+            
         });
 
-        tmp.add(new IBinder<BFS.VS, BFS.ES, Void>() {
+        tmp.add(new BinderBase<BFS.VS, BFS.ES, Void>() {
             
             @Override
             public int getIndex() {
@@ -312,6 +314,7 @@ public class BFS extends BaseGASProgram<BFS.VS, BFS.ES, Void> implements
                 return state.getState(u).predecessor.get();
 
             }
+
         });
 
         return tmp;

@@ -26,6 +26,8 @@ import org.openrdf.model.Statement;
 import org.openrdf.model.Value;
 import org.openrdf.model.ValueFactory;
 
+
+import com.bigdata.rdf.graph.BinderBase;
 import com.bigdata.rdf.graph.EdgesEnum;
 import com.bigdata.rdf.graph.Factory;
 import com.bigdata.rdf.graph.FrontierEnum;
@@ -237,7 +239,7 @@ abstract public class BaseGASProgram<VS, ES, ST> implements
 
         final List<IBinder<VS, ES, ST>> tmp = new LinkedList<IBinder<VS, ES, ST>>();
 
-        tmp.add(new IBinder<VS, ES, ST>() {
+        tmp.add(new BinderBase<VS, ES, ST>() {
 
             @Override
             public int getIndex() {
