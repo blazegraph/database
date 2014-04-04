@@ -86,12 +86,17 @@ function getNamespaces() {
       $('.namespace-service-description').click(function(e) {
          return confirm('This can be an expensive operation. Proceed anyway?');
       });
+      NAMESPACES_READY = true;
    });
 }
 
 function selectNamespace(name) {
    // for programmatically selecting a namespace with just its name
-   $('#namespaces-list li[data-name=' + name + '] a.use-namespace').click();
+   if(!NAMESPACES_READY) {
+      setTimeout(function() { selectNamespace(name); }, 10);
+   } else {
+      $('#namespaces-list li[data-name=' + name + '] a.use-namespace').click();
+   }
 }
 
 function useNamespace(name, url) {
@@ -164,7 +169,7 @@ function getDefaultNamespace() {
       useNamespace(DEFAULT_NAMESPACE, url);
    });
 }
-var DEFAULT_NAMESPACE, NAMESPACE, NAMESPACE_URL, fileContents;
+var DEFAULT_NAMESPACE, NAMESPACE, NAMESPACE_URL, NAMESPACES_READY, fileContents;
 
 getDefaultNamespace();
 
@@ -773,9 +778,17 @@ function updateExploreStart(data) {
    $('#explore-results a').click(function(e) {
       e.preventDefault();
       var components = parseHash(this.hash);
-      selectNamespace(components[2]);
-      explore(components[3]);
+      exploreNamespacedURI(components[2], components[3]);
    });
+}
+
+function exploreNamespacedURI(namespace, uri, nopush) {
+   if(!NAMESPACES_READY) {
+      setTimeout(function() { exploreNamespacedURI(namespace, uri, nopush); }, 10);
+   } else {
+      selectNamespace(namespace);
+      explore(uri, nopush);
+   }
 }
 
 function explore(uri, nopush) {
@@ -802,8 +815,7 @@ window.addEventListener("popstate", function(e) {
       $('#tab-selector a:first').click();
    } else {
       if(hash[1] == 'explore') {
-         selectNamespace(hash[2]);
-         explore(hash[3], true);
+         exploreNamespacedURI(hash[2], hash[3], true);
       } else {
          $('a[data-target=' + hash[1] + ']').click();
       }
