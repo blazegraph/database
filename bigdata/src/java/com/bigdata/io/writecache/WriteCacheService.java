@@ -1250,9 +1250,8 @@ abstract public class WriteCacheService implements IWriteCache {
                 throws IllegalStateException, InterruptedException,
                 ExecutionException, IOException {
 
-//            if (quorum == null || !quorum.isHighlyAvailable()
+            if (quorum == null) { //|| !quorum.isHighlyAvailable()
 //                    || !quorum.getClient().isLeader(quorumToken)) {
-            if (quorum == null) {
                 return;
             }
 
@@ -1346,20 +1345,20 @@ abstract public class WriteCacheService implements IWriteCache {
         private void writeCacheBlock(final WriteCache cache)
                 throws InterruptedException, ExecutionException, IOException {
 
-            /*
-             * IFF HA
-             * 
-             * TODO isHA should be true even if the quorum is not highly
-             * available since there still could be other services in the write
-             * pipeline (e.g., replication to an offline HAJournalServer prior
-             * to changing over into an HA3 quorum or off-site replication). The
-             * unit tests need to be updated to specify [isHighlyAvailable] for
-             * ALL quorum based test runs.
-             */
-            final boolean isHA = quorum != null && quorum.isHighlyAvailable();
+//            /*
+//             * IFF HA
+//             * 
+//             * TODO isHA should be true even if the quorum is not highly
+//             * available since there still could be other services in the write
+//             * pipeline (e.g., replication to an offline HAJournalServer prior
+//             * to changing over into an HA3 quorum or off-site replication). The
+//             * unit tests need to be updated to specify [isHighlyAvailable] for
+//             * ALL quorum based test runs.
+//             */
+//            final boolean isHA = quorum != null && quorum.isHighlyAvailable();
 
             // IFF HA and this is the quorum leader.
-            final boolean isHALeader = isHA
+            final boolean isHALeader = quorum != null
                     && quorum.getClient().isLeader(quorumToken);
 
             /*
@@ -1440,14 +1439,16 @@ abstract public class WriteCacheService implements IWriteCache {
                  * then clean up the documentation here (see the commented
                  * out version of this line below).
                  */
-                quorumMember.logWriteCacheBlock(pkg.getMessage(), pkg.getData().duplicate()); 
-                
-                // ASYNC MSG RMI + NIO XFER.
+                quorumMember.logWriteCacheBlock(pkg.getMessage(), pkg.getData().duplicate());
+
                 if (quorum.replicationFactor() > 1) {
-	                remoteWriteFuture = quorumMember.replicate(null/* req */, pkg.getMessage(),
-	                		pkg.getData().duplicate());
-	                
-	                counters.get().nsend++;
+
+                    // ASYNC MSG RMI + NIO XFER.
+                    remoteWriteFuture = quorumMember.replicate(null/* req */,
+                            pkg.getMessage(), pkg.getData().duplicate());
+
+                    counters.get().nsend++;
+
                 }
 
                 /*
