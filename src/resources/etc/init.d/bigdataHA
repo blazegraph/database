@@ -49,7 +49,7 @@ cd `dirname $0`
 #/sbin/sysctl -w vm.swappiness=0
 
 # Setup the environment.
-source /etc/default/bigdata/bigdataHA
+source /etc/default/bigdataHA
 
 if [ -z "$binDir" ]; then
    echo $"$0 : environment not setup: binDir is undefined."
