@@ -339,8 +339,8 @@ $('#load-file').change(handleFile);
 $('#load-box').on('dragover', handleDragOver)
    .on('drop', handleFile)
    .on('paste', handlePaste)
-   .bind('keydown', 'ctrl+return', submitLoad)
-   .change(handleTypeChange);
+   .bind('keydown', 'ctrl+return', submitLoad);
+$('#load-type').change(handleTypeChange);
 $('#clear-file').click(clearFile);
 
 $('#load-load').click(submitLoad);
