@@ -710,7 +710,7 @@ group by ?col1 ?col2 ?incoming';
    }
    var settings = {
       type: 'POST',
-      data: 'query=' + encodeURI(query),
+      data: 'query=' + encodeURIComponent(query),
       dataType: 'json',
       accepts: {'json': 'application/sparql-results+json'},
       success: updateExploreStart,
