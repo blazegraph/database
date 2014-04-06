@@ -21,14 +21,11 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.log4j.Logger;
+import org.openrdf.model.Literal;
 import org.openrdf.model.Statement;
 import org.openrdf.model.Value;
 import org.openrdf.model.ValueFactory;
 
-import sun.reflect.generics.reflectiveObjects.NotImplementedException;
-
-import com.bigdata.bop.IBindingSet;
-import com.bigdata.bop.IVariable;
 import com.bigdata.rdf.graph.BinderBase;
 import com.bigdata.rdf.graph.EdgesEnum;
 import com.bigdata.rdf.graph.Factory;
@@ -77,7 +74,7 @@ public class SSSP extends BaseGASProgram<SSSP.VS, SSSP.ES, Integer/* dist */>
      * is a single link attribute type that is of interest, so the caller should
      * also be able to specify that.
      */
-    private final static int EDGE_LENGTH = 1;
+    private final static double EDGE_LENGTH = 1.0f;
     
     public static class VS {
 
@@ -90,7 +87,7 @@ public class SSSP extends BaseGASProgram<SSSP.VS, SSSP.ES, Integer/* dist */>
          * double. We also need tests with non-integer weights and non- positive
          * weights.
          */
-        private Integer dist = Integer.MAX_VALUE;
+        private Double dist = Double.MAX_VALUE;
 
 //        /**
 //         * Note: This flag is cleared by apply() and then conditionally set
@@ -145,7 +142,7 @@ public class SSSP extends BaseGASProgram<SSSP.VS, SSSP.ES, Integer/* dist */>
          * to this vertex and {@link Integer#MAX_VALUE} until this vertex is
          * visited.
          */
-        public int dist() {
+        public double dist() {
             synchronized (this) {
                 return dist;
             }
@@ -166,7 +163,7 @@ public class SSSP extends BaseGASProgram<SSSP.VS, SSSP.ES, Integer/* dist */>
         synchronized private void setStartingVertex() {
 
             // Set distance to zero for starting vertex.
-            dist = 0;
+            dist = 0.0;
             this.predecessor.set(null);
 
 //            // Must be true to trigger scatter in the 1st round!
@@ -220,7 +217,7 @@ public class SSSP extends BaseGASProgram<SSSP.VS, SSSP.ES, Integer/* dist */>
          * @return <code>true</code> iff this vertex state was changed.
          */
         synchronized private boolean scatter(final Value predecessor,
-                final int newDist) {
+                final double newDist) {
             /*
              * Validate that the distance has decreased while holding the lock.
              */
@@ -399,11 +396,22 @@ public class SSSP extends BaseGASProgram<SSSP.VS, SSSP.ES, Integer/* dist */>
         
         final VS otherState = state.getState(other);
 
+        final double edgeLength;
+        if (e.getObject() instanceof Literal) {
+        	
+        	edgeLength = ((Literal) e.getObject()).doubleValue();
+        	
+        } else {
+        	
+        	edgeLength = EDGE_LENGTH;
+        	
+        }
+        	
         // new distance for the remote vertex.
-        final int newDist = selfState.dist() + EDGE_LENGTH;
+        final double newDist = selfState.dist() + edgeLength; //EDGE_LENGTH;
         
         // last observed distance for the remote vertex.
-        final int otherDist = otherState.dist();
+        final double otherDist = otherState.dist();
 
         // Note: test first without lock.
         if (newDist < otherDist) {
