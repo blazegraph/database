@@ -139,7 +139,47 @@ public class TestPaths extends ProxyBigdataSailTestCase {
 //
 //    }
 //
-//    public void testSimpleSSSP() throws Exception {
+	public void testSimpleSSSP() throws Exception {
+
+		final BigdataSail sail = getSail();
+		sail.initialize();
+		final BigdataSailRepository repo = new BigdataSailRepository(sail);
+
+		final BigdataSailRepositoryConnection cxn = repo.getConnection();
+		cxn.setAutoCommit(false);
+
+		try {
+
+			cxn.add(open("sssp.ttl"), "", RDFFormat.TURTLE);
+			cxn.commit();
+
+			log.trace("\n" + sail.getDatabase().dumpStore());
+
+			final String query = IOUtils.toString(open("sssp.rq"));
+
+			log.trace("\n" + query);
+
+			final TupleQuery tqr = cxn.prepareTupleQuery(QueryLanguage.SPARQL,
+					query);
+
+			final TupleQueryResult result = tqr.evaluate();
+
+			while (result.hasNext()) {
+
+				log.trace(result.next());
+
+			}
+
+			result.close();
+
+		} finally {
+			cxn.close();
+			sail.__tearDownUnitTest();
+		}
+
+	}
+
+//    public void testPaths() throws Exception {
 //    	
 //    	final BigdataSail sail = getSail();
 //    	sail.initialize();
@@ -150,12 +190,12 @@ public class TestPaths extends ProxyBigdataSailTestCase {
 //        
 //        try {
 //    
-//        	cxn.add(open("paths2.ttl"), "", RDFFormat.TURTLE);
+//        	cxn.add(open("paths4.ttl"), "", RDFFormat.TURTLE);
 //        	cxn.commit();
 //        	
 //        	log.trace("\n"+sail.getDatabase().dumpStore());
 //        	
-//        	final String query = IOUtils.toString(open("paths2.rq"));
+//        	final String query = IOUtils.toString(open("paths4.rq"));
 //        	
 //        	log.trace("\n"+query);
 //        	
@@ -177,44 +217,5 @@ public class TestPaths extends ProxyBigdataSailTestCase {
 //        }
 //
 //    }
-
-    public void testPaths() throws Exception {
-    	
-    	final BigdataSail sail = getSail();
-    	sail.initialize();
-    	final BigdataSailRepository repo = new BigdataSailRepository(sail);
-    	
-    	final BigdataSailRepositoryConnection cxn = repo.getConnection();
-        cxn.setAutoCommit(false);
-        
-        try {
-    
-        	cxn.add(open("paths4.ttl"), "", RDFFormat.TURTLE);
-        	cxn.commit();
-        	
-        	log.trace("\n"+sail.getDatabase().dumpStore());
-        	
-        	final String query = IOUtils.toString(open("paths4.rq"));
-        	
-        	log.trace("\n"+query);
-        	
-        	final TupleQuery tqr = cxn.prepareTupleQuery(QueryLanguage.SPARQL, query);
-        	
-        	final TupleQueryResult result = tqr.evaluate();
-        	
-        	while (result.hasNext()) {
-        		
-        		log.trace(result.next());
-        		
-        	}
-        	
-        	result.close();
-            
-        } finally {
-            cxn.close();
-            sail.__tearDownUnitTest();
-        }
-
-    }
 
 }

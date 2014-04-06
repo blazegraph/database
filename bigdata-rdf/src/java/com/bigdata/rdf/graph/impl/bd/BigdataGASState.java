@@ -191,4 +191,29 @@ public class BigdataGASState<VS, ES, ST> extends GASState<VS, ES, ST> {
 
     }
     
+	@Override
+    @SuppressWarnings("rawtypes")
+    public Value getOtherVertex(final Value u, final Statement e) {
+
+    	if (e.getSubject() instanceof SidIV) {
+    		
+    		final ISPO spo = ((SidIV) e.getSubject()).getInlineValue();
+    		
+    		if (spo.s().equals(u))
+    			return spo.o();
+    		
+    		return spo.s();
+    		
+    	} else {
+    	
+	        if (e.getSubject().equals(u))
+	            return e.getObject();
+	
+	        return e.getSubject();
+	        
+    	}
+
+    }
+
+    
 }
