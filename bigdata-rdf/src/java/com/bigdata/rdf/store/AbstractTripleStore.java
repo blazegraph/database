@@ -95,6 +95,7 @@ import com.bigdata.rdf.internal.IDatatypeURIResolver;
 import com.bigdata.rdf.internal.IExtension;
 import com.bigdata.rdf.internal.IExtensionFactory;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.NotMaterializedException;
 import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.internal.constraints.RangeBOp;
 import com.bigdata.rdf.internal.impl.BlobIV;
@@ -3275,12 +3276,18 @@ abstract public class AbstractTripleStore extends
 //        
 //        }
 
-        final BigdataValue v = getTerm(iv);
-
-        if (v == null)
-            return "<NOT_FOUND#" + iv + ">";
-
-        final String s = (v instanceof URI ? abbrev((URI) v) : v.toString());
+        String s = "";
+        
+        try {
+	        
+        	final BigdataValue v = getTerm(iv);
+	
+	        if (v == null)
+	            return "<NOT_FOUND#" + iv + ">";
+	
+	        s = (v instanceof URI ? abbrev((URI) v) : v.toString());
+	        
+        } catch (NotMaterializedException ex) { }
 
         return s + ("(" + iv + ")");
 
