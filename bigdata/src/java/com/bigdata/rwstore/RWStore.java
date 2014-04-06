@@ -1080,8 +1080,8 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
     private RWWriteCacheService newWriteCacheService() {
         try {
 
-            final boolean highlyAvailable = m_quorum != null
-                    && m_quorum.isHighlyAvailable();
+//            final boolean highlyAvailable = m_quorum != null
+//                    && m_quorum.isHighlyAvailable();
 
             final boolean prefixWrites = m_quorum != null; // highlyAvailable
 
@@ -1089,7 +1089,8 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
                     m_minCleanListSize, m_readCacheBufferCount, prefixWrites, m_compactionThreshold, m_hotCacheSize, m_hotCacheThreshold,
 
                     convertAddr(m_fileSize), m_reopener, m_quorum, this) {
-                
+
+                        @Override
                         @SuppressWarnings("unchecked")
                         public WriteCache newWriteCache(final IBufferAccess buf,
                                 final boolean useChecksum,

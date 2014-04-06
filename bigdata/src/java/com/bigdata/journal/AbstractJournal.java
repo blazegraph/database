@@ -3555,13 +3555,17 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                  * file.
                  */
                 final QuorumService<HAGlue> localService = quorum.getClient();
-                try {
-                    localService.logRootBlock(newRootBlock);
-                } catch (IOException e) {
-                    throw new RuntimeException(e);
+                if (localService != null) {
+                    // Quorum service not asynchronously closed.
+                    try {
+                        // Write the closing root block on the HALog file.
+                        localService.logRootBlock(newRootBlock);
+                    } catch (IOException e) {
+                        throw new RuntimeException(e);
+                    }
                 }
             }
-
+            
             if (txLog.isInfoEnabled())
                 txLog.info("COMMIT: commitTime=" + commitTime);
 
@@ -3812,7 +3816,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
             if (log.isInfoEnabled())
                 log.info("commitTime=" + commitTime);
 
-			final CommitState cs = new CommitState(this, commitTime);
+            final CommitState cs = new CommitState(this, commitTime);
 
             /*
              * Flush application data, decide whether or not the store is dirty,
@@ -3828,7 +3832,6 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
             }
 
             // Do GATHER (iff HA).
-
             cs.gatherPhase();
 
             /*
@@ -3872,7 +3875,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                     // Non-HA mode.
                     cs.commitSimple();
     
-                 } else {
+                } else {
 
                     // HA mode commit (2-phase commit).
                     cs.commitHA();
