@@ -505,7 +505,7 @@ public class StatusServlet extends BigdataRDFServlet {
                 final Quorum<HAGlue, QuorumService<HAGlue>> quorum = ((AbstractJournal) getIndexManager())
                         .getQuorum();
 
-                if (quorum != null && quorum.isHighlyAvailable()) {
+                if (quorum != null) {//&& quorum.isHighlyAvailable()) {
 
                     new HAStatusServletUtil(getIndexManager()).doGet(req, resp,
                             current);

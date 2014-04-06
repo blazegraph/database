@@ -517,10 +517,11 @@ public class HARestore {
             final long commitCounter = SnapshotManager
                     .parseCommitCounterFile(journalFile.getName());
 
+            // TODO Note: Accept version from main development branch when merging versions.
             // temporary file in the same directory as the snapshot.
-            final File out = File.createTempFile("" + commitCounter + "-",
-                    Journal.Options.JNL, journalFile.getAbsoluteFile()
-                            .getParentFile());
+            final File out = File.createTempFile("HARestore-TMP"
+                    + commitCounter + "-", Journal.Options.JNL, journalFile
+                    .getAbsoluteFile().getParentFile());
 
             System.out.println("Decompressing " + in + " to " + out);
             
