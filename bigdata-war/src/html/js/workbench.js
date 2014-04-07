@@ -20,12 +20,12 @@ $('#tab-selector a').click(function(e) {
    showTab($(this).data('target'));
 });
 
-function showTab(tab) {
+function showTab(tab, nohash) {
    $('.tab').hide();
    $('#' + tab + '-tab').show();
    $('#tab-selector a').removeClass();
    $('a[data-target=' + tab + ']').addClass('active');
-   if(window.location.hash.substring(1).indexOf(tab) != 0) {
+   if(!nohash && window.location.hash.substring(1).indexOf(tab) != 0) {
       window.location.hash = tab;
    }
 }
@@ -169,12 +169,29 @@ function getDefaultNamespace() {
       useNamespace(DEFAULT_NAMESPACE, url);
    });
 }
-var DEFAULT_NAMESPACE, NAMESPACE, NAMESPACE_URL, NAMESPACES_READY, fileContents;
+var DEFAULT_NAMESPACE, NAMESPACE, NAMESPACE_URL, NAMESPACES_READY, fileContents, NAMESPACE_SHORTCUTS;
 
 getDefaultNamespace();
 
 
 /* Namespace shortcuts */
+
+NAMESPACE_SHORTCUTS = {
+   'rdf': 'http://www.w3.org/1999/02/22-rdf-syntax-ns#',
+   'rdfs': 'http://www.w3.org/2000/01/rdf-schema#',
+   'owl': 'http://www.w3.org/2002/07/owl#',
+   'bd': 'http://www.bigdata.com/rdf#',
+   'bds': 'http://www.bigdata.com/rdf/search#',
+   'foaf': 'http://xmlns.com/foaf/0.1/',
+   'hint': 'http://www.bigdata.com/queryHints#',
+   'dc': 'http://purl.org/dc/elements/1.1/',
+   'xsd': 'http://www.w3.org/2001/XMLSchema#'
+};
+
+$('.namespace-shortcuts').html('<ul>');
+for(var ns in NAMESPACE_SHORTCUTS) {
+   $('.namespace-shortcuts ul').append('<li data-ns="prefix ' + ns + ': <' + NAMESPACE_SHORTCUTS[ns] + '>">' + ns.toUpperCase() + '</li>');
+}
 
 $('.namespace-shortcuts li').click(function() {
    var textarea = $(this).parents('.tab').find('textarea');
@@ -600,7 +617,7 @@ function showQueryResults(data) {
                } else {
                   var text = binding.value;
                   if(binding.type == 'uri') {
-                     text = '<' + text + '>';
+                     text = abbreviate(text);
                   }
                }
                linkText = escapeHTML(text).replace(/\n/g, '<br>');
@@ -649,7 +666,8 @@ $('#explore-form').submit(function(e) {
       loadURI(uri);
 
       // if this is a SID, make the components clickable
-      var re = /<< *(<[^<>]*>) *(<[^<>]*>) *(<[^<>]*>) *>>/;
+      // var re = /<< *(<[^<>]*>) *(<[^<>]*>) *(<[^<>]*>) *>>/;
+      var re = /<< *([^ ]+) +([^ ]+) +([^ ]+) *>>/;
       var match = uri.match(re);
       if(match) {
          var header = $('<h1>');
@@ -672,7 +690,8 @@ function buildExploreHash(uri) {
 function loadURI(target) {
    // identify if this is a vertex or a SID
    target = target.trim().replace(/\n/g, ' ');
-   var re = /<< *(?:<[^<>]*> *){3} *>>/;
+   // var re = /<< *(?:<[^<>]*> *){3} *>>/;
+   var re = /<< *([^ ]+) +([^ ]+) +([^ ]+) *>>/;
    var vertex = !target.match(re);
 
    var vertexQuery = '\
@@ -815,7 +834,7 @@ function exploreNamespacedURI(namespace, uri, nopush) {
 function explore(uri, nopush) {
    $('#explore-form input[type=text]').val(uri);
    $('#explore-form').submit();
-   showTab('explore');
+   showTab('explore', true);
    if(!nopush) {
       history.pushState(null, null, '#explore:' + NAMESPACE + ':' + uri);
    }
@@ -970,11 +989,21 @@ $('#tab-selector a[data-target=performance]').click(function(e) {
 /* Utility functions */
 
 function getSID(binding) {
-   return '<<\n  <' + binding.value['s'].value + '>\n<' + binding.value['p'].value + '>\n  <' + binding.value['o'].value + '>\n>>';
+   return '<<\n ' + abbreviate(binding.value['s'].value) + '\n ' + abbreviate(binding.value['p'].value) + '\n ' + abbreviate(binding.value['o'].value) + '\n>>';
+}
+
+function abbreviate(uri) {
+   for(var ns in NAMESPACE_SHORTCUTS) {
+      if(uri.indexOf(NAMESPACE_SHORTCUTS[ns]) == 0) {
+         return uri.replace(NAMESPACE_SHORTCUTS[ns], ns + ':');
+      }
+   }
+   return '<' + uri + '>';
 }
 
 function parseSID(sid) {
-   var re = /<< <([^<>]*)> <([^<>]*)> <([^<>]*)> >>/;
+   // var re = /<< <([^<>]*)> <([^<>]*)> <([^<>]*)> >>/;
+   var re = /<< *([^ ]+) +([^ ]+) +([^ ]+) *>>/;
    var matches = sid.match(re);
    return {'s': matches[1], 'p': matches[2], 'o': matches[3]};
 }
