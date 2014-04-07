@@ -69,13 +69,13 @@ public class TestSSSP extends AbstractBigdataGraphTestCase {
             // Converge.
             gasContext.call();
 
-            assertEquals(0, gasState.getState(p.getMike()).dist());
+            assertEquals(0.0, gasState.getState(p.getMike()).dist());
 
-            assertEquals(1, gasState.getState(p.getFoafPerson()).dist());
+            assertEquals(1.0, gasState.getState(p.getFoafPerson()).dist());
 
-            assertEquals(1, gasState.getState(p.getBryan()).dist());
+            assertEquals(1.0, gasState.getState(p.getBryan()).dist());
 
-            assertEquals(2, gasState.getState(p.getMartyn()).dist());
+            assertEquals(2.0, gasState.getState(p.getMartyn()).dist());
 
         } finally {
 
@@ -118,15 +118,15 @@ public class TestSSSP extends AbstractBigdataGraphTestCase {
             gasContext.call();
 
             // check #of hops.
-            assertEquals(0, gasState.getState(p.getV1()).dist());
+            assertEquals(0.0, gasState.getState(p.getV1()).dist());
 
-            assertEquals(1, gasState.getState(p.getV2()).dist());
+            assertEquals(1.0, gasState.getState(p.getV2()).dist());
 
-            assertEquals(1, gasState.getState(p.getV3()).dist());
+            assertEquals(1.0, gasState.getState(p.getV3()).dist());
 
-            assertEquals(2, gasState.getState(p.getV4()).dist());
+            assertEquals(2.0, gasState.getState(p.getV4()).dist());
 
-            assertEquals(2, gasState.getState(p.getV5()).dist());
+            assertEquals(2.0, gasState.getState(p.getV5()).dist());
 
         } finally {
 
@@ -176,15 +176,15 @@ public class TestSSSP extends AbstractBigdataGraphTestCase {
             gasContext.call();
 
             // Check weighted distance.
-            assertEquals(0, gasState.getState(p.getV1()).dist());
+            assertEquals(0.0, gasState.getState(p.getV1()).dist());
 
-            assertEquals(100, gasState.getState(p.getV2()).dist());
+            assertEquals(100.0, gasState.getState(p.getV2()).dist());
 
-            assertEquals(100, gasState.getState(p.getV3()).dist());
+            assertEquals(100.0, gasState.getState(p.getV3()).dist());
 
-            assertEquals(125, gasState.getState(p.getV4()).dist());
+            assertEquals(150.0, gasState.getState(p.getV4()).dist());
 
-            assertEquals(125, gasState.getState(p.getV5()).dist());
+            assertEquals(175.0, gasState.getState(p.getV5()).dist());
 
         } finally {
 

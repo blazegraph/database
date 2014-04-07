@@ -215,5 +215,39 @@ public class BigdataGASState<VS, ES, ST> extends GASState<VS, ES, ST> {
 
     }
 
+    /**
+     * This will only work for the BigdataGASState.
+     */
+    @Override
+    public Literal getLinkAttr(final Value u, final Statement e) {
+    	
+    	if (e.getObject() instanceof IV) {
+    		
+    		final IV iv = (IV) e.getObject();
+    		
+    		if (iv.isLiteral()) {
+
+    			if (iv.isInline()) {
+    				
+    				return (Literal) iv;
+    				
+    			} else {
+    				
+    				return (Literal) iv.getValue();
+    				
+    			}
+    			
+    		}
+    		
+    	} else if (e.getObject() instanceof Literal) {
+    		
+    		return (Literal) e.getObject();
+    		
+    	}
+    		
+		return null;
+    	
+    }
+
     
 }

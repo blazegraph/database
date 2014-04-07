@@ -23,6 +23,7 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.log4j.Logger;
+import org.openrdf.model.Literal;
 import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
@@ -410,6 +411,16 @@ public class GASState<VS, ES, ST> implements IGASState<VS, ES, ST> {
 
         return e.getSubject();
 
+    }
+    
+    /**
+     * This will only work for the BigdataGASState.
+     */
+    @Override
+    public Literal getLinkAttr(final Value u, final Statement e) {
+    	
+    	return null;
+    	
     }
 
     @Override
