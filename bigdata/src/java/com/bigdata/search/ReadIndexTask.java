@@ -10,8 +10,6 @@ import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ISimpleSplitHandler;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
-import com.bigdata.btree.keys.IKeyBuilder;
-import com.bigdata.btree.keys.SuccessorUtil;
 
 /**
  * Procedure reads on the terms index, aggregating data on a per-{@link Hit}
@@ -131,12 +129,12 @@ public class ReadIndexTask<V extends Comparable<V>> extends AbstractIndexTask<V>
             log.debug("queryTerm=" + queryTerm + ", termWeight="
                     + queryTermWeight);
 
-        final Thread t = Thread.currentThread();
+//        final Thread t = Thread.currentThread();
         
         while (itr.hasNext()) {
 
             // don't test for interrupted on each result -- too much work.
-            if (nhits % 1000 == 0 && t.isInterrupted()) {
+            if (nhits % 1000 == 0 && Thread.interrupted()) {
 
 //                if (log.isInfoEnabled())
                 log.warn("Interrupted: queryTerm=" + queryTerm + ", nhits="
