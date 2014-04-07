@@ -599,6 +599,9 @@ function showQueryResults(data) {
                   var text = getSID(binding);
                } else {
                   var text = binding.value;
+                  if(binding.type == 'uri') {
+                     text = '<' + text + '>';
+                  }
                }
                linkText = escapeHTML(text).replace(/\n/g, '<br>');
                if(binding.type == 'typed-literal') {
@@ -646,12 +649,18 @@ $('#explore-form').submit(function(e) {
       loadURI(uri);
 
       // if this is a SID, make the components clickable
-      var re = /<< *<([^<>]*)> *<([^<>]*)> *<([^<>]*)> *>>/;
+      var re = /<< *(<[^<>]*>) *(<[^<>]*>) *(<[^<>]*>) *>>/;
       var match = uri.match(re);
       if(match) {
-         $('#explore-header').html('<h1>&lt;&lt; &lt;<a href="' + buildExploreHash(match[1]) + '">' + match[1] + '</a>&gt;<br>&lt;<a href="' + buildExploreHash(match[2]) + '">' + match[2] + '</a> &gt;<br>&lt;<a href="' + buildExploreHash(match[3]) + '">' + match[3] + '</a> &gt; &gt;&gt;</h1>');
+         var header = $('<h1>');
+         header.append('<< <br>');
+         for(var i=1; i<4; i++) {
+            header.append($('<a href="' + buildExploreHash(match[i]) + '">').text(match[i])).append('<br>');
+         }
+         header.append(' >>');
+         $('#explore-header').html(header);
       } else {
-         $('#explore-header').html('<h1>' + uri + '</h1>');
+         $('#explore-header').html($('<h1>').text(uri));
       }
    }
 });
@@ -668,7 +677,7 @@ function loadURI(target) {
 
    var vertexQuery = '\
 select ?col1 ?col2 ?incoming (count(?star) as ?star) {\n\
-  bind (<URI> as ?explore ) .\n\
+  bind (URI as ?explore ) .\n\
   {\n\
     bind (<<?explore ?col1 ?col2>> as ?sid) . \n\
     bind (false as ?incoming) . \n\
@@ -741,6 +750,9 @@ function updateExploreStart(data) {
             var uri = getSID(col);
          } else {
             var uri = col.value;
+            if(col.type == 'uri') {
+               uri = '<' + uri + '>';
+            }
          }
          output = escapeHTML(uri).replace(/\n/g, '<br>');
          if(col.type == 'uri' || col.type == 'sid') {
@@ -751,9 +763,9 @@ function updateExploreStart(data) {
       var star = parseInt(binding.star.value);
       if(star > 0) {
          if(binding.incoming.value == 'true') {
-            var sid = '<< <' +  binding.col1.value + '> <' + binding.col2.value + '> <' + $('#explore-form input[type=text]').val() + '> >>';
+            var sid = '<< <' +  binding.col1.value + '> <' + binding.col2.value + '> ' + $('#explore-form input[type=text]').val() + ' >>';
          } else {
-            var sid = '<< <' + $('#explore-form input[type=text]').val() + '> <' +  binding.col1.value + '> <' + binding.col2.value + '> >>';
+            var sid = '<< ' + $('#explore-form input[type=text]').val() + ' <' +  binding.col1.value + '> <' + binding.col2.value + '> >>';
          }
          star = '<a href="' + buildExploreHash(sid) + '"><< * (' + star + ') >></a>';
       } else {
