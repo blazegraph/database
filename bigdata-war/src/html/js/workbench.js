@@ -225,6 +225,7 @@ function handleFile(e) {
          if(f.size > 10240) {
             // do not use textarea
             $('#load-box').prop('disabled', true)
+            $('#filename').html(f.name);
             $('#large-file-message, #clear-file').show()
             $('#load-box').val('');
             fileContents = e2.target.result;
