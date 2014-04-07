@@ -179,7 +179,7 @@ hr {
    border: none;
 }
 
-#advanced-features, #query-explanation, #namespace-properties {
+#advanced-features, #query-response, #query-explanation, #query-tab .bottom *, #load-response, #load-clear, #explore-results, #namespace-properties {
    display: none;
 }
 

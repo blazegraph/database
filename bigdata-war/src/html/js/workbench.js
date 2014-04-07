@@ -382,7 +382,8 @@ function submitLoad(e) {
 }
 
 $('#load-clear').click(function() {
-   $('#load-response').text('');
+   $('#load-response, #load-clear').hide();
+   $('#load-response pre').text('');
 });
 
 $('#advanced-features-toggle').click(function() {
@@ -391,17 +392,20 @@ $('#advanced-features-toggle').click(function() {
 });
 
 function updateResponseHTML(data) {
-   $('#load-response').html(data);
+   $('#load-response, #load-clear').show();
+   $('#load-response pre').html(data);
 }
 
 function updateResponseXML(data) {
    var modified = data.childNodes[0].attributes['modified'].value;
    var milliseconds = data.childNodes[0].attributes['milliseconds'].value;
-   $('#load-response').text('Modified: ' + modified + '\nMilliseconds: ' + milliseconds);
+   $('#load-response, #load-clear').show();
+   $('#load-response pre').text('Modified: ' + modified + '\nMilliseconds: ' + milliseconds);
 }
 
 function updateResponseError(jqXHR, textStatus, errorThrown) {
-   $('#load-response').text('Error! ' + textStatus + ' ' + errorThrown);
+   $('#load-response, #load-clear').show();
+   $('#load-response pre').text('Error! ' + textStatus + ' ' + errorThrown);
 }
 
 
@@ -440,7 +444,7 @@ function submitQuery(e) {
 
 $('#query-response-clear').click(function() {
    $('#query-response, #query-explanation').empty('');
-   $('#query-explanation').hide();
+   $('#query-response, #query-explanation, #query-tab .bottom *').hide();
 });
 
 $('#query-export-csv').click(exportCSV);
@@ -543,6 +547,7 @@ function downloadFile(data, type, filename) {
 
 function showQueryResults(data) {
    $('#query-response').empty();
+   $('#query-response, #query-tab .bottom *').show();
    var table = $('<table>').appendTo($('#query-response'));
    if(this.dataTypes[1] == 'xml') {
       // RDF
@@ -627,6 +632,7 @@ function showQueryExplanation(data) {
 }
 
 function queryResultsError(jqXHR, textStatus, errorThrown) {
+   $('#query-response, #query-tab .bottom *').show();
    $('#query-response').text('Error! ' + textStatus + ' ' + errorThrown);
 }
 
@@ -724,6 +730,8 @@ function updateExploreStart(data) {
 
    // clear tables
    $('#explore-incoming, #explore-outgoing, #explore-attributes').html('<table>');
+   $('#explore-tab .bottom').hide();
+   $('#explore-results, #explore-results .box').show();
 
    // go through each binding, adding it to the appropriate table
    $.each(data.results.bindings, function(i, binding) {
@@ -823,8 +831,10 @@ window.addEventListener("popstate", function(e) {
 });
 
 function updateExploreError(jqXHR, textStatus, errorThrown) {
-   $('#explore-results .box').html('');
-   $('#explore-header').html('Error! ' + textStatus + ' ' + errorThrown);
+   $('#explore-tab .bottom').show();
+   $('#explore-results .box').html('').hide();
+   $('#explore-header').text('Error! ' + textStatus + ' ' + errorThrown);
+   $('#explore-results, #explore-header').show();
 }
 
 /* Status */
