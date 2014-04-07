@@ -110,20 +110,20 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
         super(name);
     }
 
-    /**
-     * Complex hack to override the {@link HAJournal} properties.
-     * 
-     * @param in
-     *            The {@link NV}[] from the configuration (if you can get it).
-     *            
-     * @return The {@link NV}[] from which the {@link Properties} will be
-     *         constructed by {@link JiniClientConfig}
-     */
-    public static NV[] getTestHAJournalProperties(final NV[] in) {
-
-        return in;
-        
-    }
+//    /**
+//     * Complex hack to override the {@link HAJournal} properties.
+//     * 
+//     * @param in
+//     *            The {@link NV}[] from the configuration (if you can get it).
+//     *            
+//     * @return The {@link NV}[] from which the {@link Properties} will be
+//     *         constructed by {@link JiniClientConfig}
+//     */
+//    public static NV[] getTestHAJournalProperties(final NV[] in) {
+//
+//        return in;
+//        
+//    }
     
 //    protected BufferMode getDiskMode() {
 //    	return BufferMode.DiskRW;
