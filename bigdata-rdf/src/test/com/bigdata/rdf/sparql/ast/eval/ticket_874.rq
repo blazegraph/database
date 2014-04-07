@@ -1,0 +1,9 @@
+prefix xsd:  <http://www.w3.org/2001/XMLSchema#>
+SELECT * 
+where { 
+  ?s ?p ?o . 
+  FILTER strStarts(str(?s), "http://arvados.org/schema/modified") .
+  { ?user <http://arvados.org/schema/user_is_admin> "true"^^xsd:boolean }
+  union { ?user <http://arvados.org/schema/permission/can_read> ?s }
+  ?user <http://arvados.org/schema/api_token> <token:ckedd> 
+}
