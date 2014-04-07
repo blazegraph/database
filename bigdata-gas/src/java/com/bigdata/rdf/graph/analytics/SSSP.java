@@ -396,10 +396,15 @@ public class SSSP extends BaseGASProgram<SSSP.VS, SSSP.ES, Integer/* dist */>
         
         final VS otherState = state.getState(other);
 
+        final Literal l = state.getLinkAttr(u, e);
+        
         final double edgeLength;
-        if (e.getObject() instanceof Literal) {
+        if (l != null) {
         	
-        	edgeLength = ((Literal) e.getObject()).doubleValue();
+        	if (log.isDebugEnabled())
+        		log.debug(l);
+        	
+        	edgeLength = l.doubleValue();
         	
         } else {
         	

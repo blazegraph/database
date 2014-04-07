@@ -17,6 +17,7 @@ package com.bigdata.rdf.graph;
 
 import java.util.Set;
 
+import org.openrdf.model.Literal;
 import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
@@ -174,6 +175,18 @@ public interface IGASState<VS,ES, ST> {
      * @return The other end of the link.
      */
     Value getOtherVertex(Value u, Statement e);
+    
+    /**
+     * Return the link attribute, if there is one.
+     * 
+     * @param u
+     *            One end of the link.
+     * @param e
+     *            The link.
+     * 
+     * @return The other end of the link.
+     */
+    Literal getLinkAttr(Value u, Statement e);
     
     /**
      * Return a useful representation of an edge (non-batch API, debug only).
