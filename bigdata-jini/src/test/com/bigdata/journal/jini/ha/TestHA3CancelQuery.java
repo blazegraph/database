@@ -122,7 +122,7 @@ public class TestHA3CancelQuery extends AbstractHA3JournalServerTestCase {
          * Do CANCEL for each service using the SPARQL end point associated with
          * a non-default namespace:
          * 
-         * /sparql/namespace/NAMESPACE
+         * /namespace/NAMESPACE/sparql
          */
         {
             final String namespace = "kb";
@@ -146,7 +146,7 @@ public class TestHA3CancelQuery extends AbstractHA3JournalServerTestCase {
      * instance associated with the given <i>namespace</i>. The
      * {@link RemoteRepository} will use a URL for the SPARQL end point that is
      * associated with the specified namespace and formed as
-     * <code>/sparql/namespace/<i>namespace</i></code> rather than the default
+     * <code>/namespace/<i>namespace</i>/sparql</code> rather than the default
      * KB SPARQL end point (<code>/sparql</code>).
      * 
      * @param haGlue
