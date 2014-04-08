@@ -220,7 +220,8 @@ public class ASTBindingAssigner implements IASTOptimizer {
                 log.info("Replaced " + nmods + " instances of " + oldVal
                         + " with " + newVal);
 
-            assert nmods > 0; // Failed to replace something.
+            // mods will no longer always be > 0 (subgroups)
+//            assert nmods > 0; // Failed to replace something.
 
             ntotal += nmods;
 
