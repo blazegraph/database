@@ -93,13 +93,13 @@ public class TestHA3CancelQuery extends AbstractHA3JournalServerTestCase {
         // Verify quorum is FULLY met.
         awaitFullyMetQuorum();
 
+        // Verify leader vs followers.
+        awaitHAStatus(serverA, HAStatusEnum.Leader);
+        awaitHAStatus(serverB, HAStatusEnum.Follower);
+        awaitHAStatus(serverC, HAStatusEnum.Follower);
+
         // await the KB create commit point to become visible on each service.
         awaitCommitCounter(1L, new HAGlue[] { serverA, serverB, serverC });
-
-        // Verify leader vs followers.
-        assertEquals(HAStatusEnum.Leader, serverA.getHAStatus());
-        assertEquals(HAStatusEnum.Follower, serverB.getHAStatus());
-        assertEquals(HAStatusEnum.Follower, serverC.getHAStatus());
 
         /*
          * Do CANCEL for each service using the default namespace.
