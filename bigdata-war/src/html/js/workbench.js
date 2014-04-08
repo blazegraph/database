@@ -1,5 +1,8 @@
 $(function() {
 
+// global variables
+var DEFAULT_NAMESPACE, NAMESPACE, NAMESPACE_URL, NAMESPACES_READY, NAMESPACE_SHORTCUTS, FILE_CONTENTS, QUERY_RESULTS;
+
 /* Search */
 
 $('#search-form').submit(function(e) {
@@ -169,7 +172,6 @@ function getDefaultNamespace() {
       useNamespace(DEFAULT_NAMESPACE, url);
    });
 }
-var DEFAULT_NAMESPACE, NAMESPACE, NAMESPACE_URL, NAMESPACES_READY, fileContents, NAMESPACE_SHORTCUTS;
 
 getDefaultNamespace();
 
@@ -245,7 +247,7 @@ function handleFile(e) {
             $('#filename').html(f.name);
             $('#large-file-message, #clear-file').show()
             $('#load-box').val('');
-            fileContents = e2.target.result;
+            FILE_CONTENTS = e2.target.result;
          } else {
             // display file contents in the textarea
             clearFile();
@@ -265,7 +267,7 @@ function clearFile(e) {
    }
    $('#load-box').prop('disabled', false)
    $('#large-file-message, #clear-file').hide()
-   fileContents = null;
+   FILE_CONTENTS = null;
 }
 
 function guessType(extension, content) {
@@ -338,6 +340,7 @@ var rdf_types = {'nq': 'n-quads',
                  'rdfs': 'rdf/xml',
                  'owl': 'rdf/xml',
                  'xml': 'rdf/xml',
+                 'json': 'json',
                  'trig': 'trig',
                  'trix': 'trix',
                  //'xml': 'trix',
@@ -347,6 +350,7 @@ var rdf_content_types = {'n-quads': 'application/n-quads',
                          'n-triples': 'text/plain',
                          'n3': 'text/n3',
                          'rdf/xml': 'application/rdf+xml',
+                         'json': 'application/sparql-results+json',
                          'trig': 'application/trig',
                          'trix': 'application/trix',
                          'turtle': 'text/turtle'};
@@ -368,7 +372,7 @@ function submitLoad(e) {
 
    var settings = {
       type: 'POST',
-      data: fileContents == null ? $('#load-box').val() : fileContents,
+      data: FILE_CONTENTS == null ? $('#load-box').val() : FILE_CONTENTS,
       success: updateResponseXML,
       error: updateResponseError
    }
@@ -505,40 +509,7 @@ function exportXML() {
 }
 
 function exportJSON() {
-   var json = {}
-   if($('#query-response table').hasClass('boolean')) {
-      json.head = {};
-      json['boolean'] = $('#query-response td').text();
-   } else {
-      json.head = {vars: []};
-      $('#query-response thead tr td').each(function(i, td) {
-         json.head.vars.push(td.textContent);
-      });
-      json.bindings = [];
-      $('#query-response tbody tr').each(function(i, tr) {
-         var binding = {};
-         $(tr).find('td').each(function(j, td) {
-            var bindingFields = {}
-            var bindingType = td.className;
-            if(bindingType == 'unbound') {
-               return;
-            }
-            bindingFields.type = bindingType;
-            var dataType = $(td).data('datatype');
-            if(dataType) {
-               bindingFields.type = dataType;
-            }
-            var lang = $(td).data('lang');
-            if(lang) {
-               bindingFields.lang = lang;
-            }
-            bindingFields.value = td.textContent;
-            binding[json.head.vars[j]] = bindingFields;
-         });
-         json.bindings.push(binding);
-      });
-   }
-   json = JSON.stringify(json);
+   var json = JSON.stringify(QUERY_RESULTS);
    downloadFile(json, 'application/sparql-results+json', 'export.json');
 }
 
@@ -593,6 +564,8 @@ function showQueryResults(data) {
       }
    } else {
       // JSON
+      // save data for export
+      QUERY_RESULTS = data;
       if(typeof(data.boolean) != 'undefined') {
          // ASK query
          table.append('<tr><td>' + data.boolean + '</td></tr>').addClass('boolean');
