@@ -317,17 +317,10 @@ function handlePaste(e) {
    } 
 }
 
-function handleTypeChange(e) {
-   $('#rdf-type-container').toggle($(this).val() == 'rdf');
-}
-
 function setType(type, format) {
    $('#load-type').val(type);
    if(type == 'rdf') {
-      $('#rdf-type-container').show();
       $('#rdf-type').val(format);
-   } else {
-      $('#rdf-type-container').hide();
    }
 }
 
@@ -362,7 +355,6 @@ $('#load-box').on('dragover', handleDragOver)
    .on('drop', handleFile)
    .on('paste', handlePaste)
    .bind('keydown', 'ctrl+return', submitLoad);
-$('#load-type').change(handleTypeChange);
 $('#clear-file').click(clearFile);
 
 $('#load-load').click(submitLoad);

@@ -145,10 +145,6 @@ textarea {
    box-sizing: border-box;
 }
 
-#rdf-type-container {
-   display: none;
-}
-
 hr {
    background: #929292;
    border: none;

@@ -42,24 +42,22 @@
             <input type="file" id="load-file"><br>
             <label for="load-type">Type:</label>
             <select id="load-type">
-              <option value="sparql" selected="selected">SPARQL</option>
-              <option value="rdf">RDF</option>
-              <option value="path">File path</option>
+              <option value="sparql" selected="selected">SPARQL Update</option>
+              <option value="rdf">RDF Data</option>
+              <option value="path">File Path or URL</option>
             </select>
-            <span id="rdf-type-container">
-              <label for="rdf-type">Format:</label>
-              <select id="rdf-type">
-                <option value="">Select RDF format</option>
-                <option value="n-quads">N-Quads</option>
-                <option value="n-triples">N-Triples</option>
-                <option value="n3">Notation3</option>
-                <option value="rdf/xml">RDF/XML</option>
-                <option value="json">JSON</option>
-                <option value="trig">TriG</option>
-                <option value="trix">TriX</option>
-                <option value="turtle">Turtle</option>
-              </select>
-            </span>
+            <label for="rdf-type">Format:</label>
+            <select id="rdf-type">
+              <option value="">Select RDF format</option>
+              <option value="n-quads">N-Quads</option>
+              <option value="n-triples">N-Triples</option>
+              <option value="n3">Notation3</option>
+              <option value="rdf/xml">RDF/XML</option>
+              <option value="json">JSON</option>
+              <option value="trig">TriG</option>
+              <option value="trix">TriX</option>
+              <option value="turtle">Turtle</option>
+            </select>
           </p>
           <hr class="shadow">
           <button id="load-load">Load</button>
