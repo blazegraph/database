@@ -15,6 +15,7 @@
 */
 package com.bigdata.rdf.graph.analytics;
 
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -275,6 +276,8 @@ public class PATHS extends BaseGASProgram<PATHS.VS, PATHS.ES, Void> implements
         final Value v = state.getOtherVertex(u, e);
 
         final VS otherState = state.getState(v);
+        
+        final int otherDepth = otherState.depth();
 //        final VS otherState = state.getState(e.getObject()/* v */);
 
         // visit.
@@ -417,6 +420,62 @@ public class PATHS extends BaseGASProgram<PATHS.VS, PATHS.ES, Void> implements
             
         });
 
+        tmp.add(new IBinder<PATHS.VS, PATHS.ES, Void>() {
+            
+            @Override
+            public int getIndex() {
+                return Bindings.PRED_DEPTH;
+            }
+            
+			@Override
+			@SuppressWarnings({ "rawtypes", "unchecked" })
+            public List<Value> bind(final ValueFactory vf,
+                    final IGASState<PATHS.VS, PATHS.ES, Void> state, 
+                    final Value u, final IVariable<?>[] outVars,
+                    final IBindingSet bs) {
+
+				/*
+				 * We want to return a different set of edges depending on
+				 * which predecessor the caller is asking about.  We can
+				 * find that information in the binding set. 
+				 */
+				
+            	final IVariable<?> var = outVars[Bindings.PREDECESSORS];
+            	
+            	if (!bs.isBound(var)) {
+            		
+            		if (log.isTraceEnabled()) {
+            			log.trace("no predecessors");
+            		}
+            		
+            		return Collections.EMPTY_LIST;
+            		
+            	}
+            	
+            	final IV predIV = (IV) bs.get(var).get();
+            	
+            	final Value predVal;
+            	
+            	if (predIV instanceof Value) {
+            		
+            		predVal = (Value) predIV;
+            		
+            	} else if (predIV.hasValue()) {
+            		
+            		predVal = predIV.getValue();
+            		
+            	} else {
+            		
+            		throw new RuntimeException("FIXME");
+            		
+            	}
+            	
+            	return Arrays.asList(new Value[] { vf.createLiteral(state.getState(predVal).depth.get()) });
+
+            }
+            
+        });
+
         return tmp;
 
     }
@@ -444,6 +503,8 @@ public class PATHS extends BaseGASProgram<PATHS.VS, PATHS.ES, Void> implements
          */
         int EDGES = 3;
         
+        int PRED_DEPTH = 4;
+        
     }
 
     /*
@@ -453,6 +514,9 @@ public class PATHS extends BaseGASProgram<PATHS.VS, PATHS.ES, Void> implements
     public void prunePaths(final IGASContext<VS, ES, Void> ctx,
             final Value[] targetVertices) {
 
+//    	if(true)
+//    	return;
+    	
         if (ctx == null)
             throw new IllegalArgumentException();
 
@@ -491,23 +555,37 @@ public class PATHS extends BaseGASProgram<PATHS.VS, PATHS.ES, Void> implements
     	
     	final PATHS.VS currentState = gasState.getState(v);
     	
+//    	final int curDepth = currentState.depth.get();
+    	
         for (Value pred : currentState.predecessors().keySet()) {
 
-        	if (pred == null) {
+//        	if (pred == null) {
+//        		
+//        		continue;
+//        		
+//        	}
+        	
+//        	if (retainSet.contains(pred)) {
+//        		
+//        		continue;
+//        		
+//        	}
+        	
+//        	final int predDepth = gasState.getState(pred).depth.get();
+//        	
+//        	if (predDepth >= curDepth) {
+//        		
+//        		continue;
+//        		
+//        	}
+
+        	if (!retainSet.contains(pred)) {
         		
-        		continue;
-        		
+	        	retainSet.add(pred);
+	        	
+	        	visitPredecessors(gasState, pred, retainSet);
+	        	
         	}
-        	
-        	if (retainSet.contains(pred)) {
-        		
-        		continue;
-        		
-        	}
-        	
-        	retainSet.add(pred);
-        	
-        	visitPredecessors(gasState, pred, retainSet);
         	
         }
     	
