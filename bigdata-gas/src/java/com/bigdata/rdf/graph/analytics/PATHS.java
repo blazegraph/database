@@ -131,19 +131,21 @@ public class PATHS extends BaseGASProgram<PATHS.VS, PATHS.ES, Void> implements
          *         first visited the vertex (this helps to avoid multiple
          *         scheduling of a vertex).
          */
-        public boolean visit(final int depth, final Value pred, final URI edge) {
+        public synchronized boolean visit(final int depth, final Value pred, final URI edge) {
+
+        	boolean ret = false;
         	
-        	if (pred != null) {
+            if (this.depth.compareAndSet(-1/* expect */, depth/* newValue */)) {
+                // Scheduled by this thread.
+                ret = true;
+            }
+            
+        	if (pred != null && this.depth() > 0 && this.depth() == depth) {
 //        		this.predecessors.add(pred);
         		addPredecessor(pred, edge);
         	}
         	
-            if (this.depth.compareAndSet(-1/* expect */, depth/* newValue */)) {
-                // Scheduled by this thread.
-                return true;
-            }
-            
-            return false;
+            return ret;
             
         }
 
@@ -281,6 +283,7 @@ public class PATHS extends BaseGASProgram<PATHS.VS, PATHS.ES, Void> implements
 //        final VS otherState = state.getState(e.getObject()/* v */);
 
         // visit.
+        
         if (otherState.visit(state.round() + 1, u/* predecessor */, e.getPredicate())) {
 
             /*
