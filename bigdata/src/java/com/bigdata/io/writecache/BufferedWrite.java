@@ -137,8 +137,12 @@ public class BufferedWrite {
 		
 	}
 
-	// Used to zero pad slots in buffered writes
-	final byte[] s_zeros = new byte[256];
+    /**
+     * Used to zero pad slots in buffered writes.
+     * 
+     * @see <a href="http://trac.bigdata.com/ticket/721#comment:10"> HA1 </a>
+     */
+	private final byte[] s_zeros = new byte[256];
 	
 	/**
 	 * Buffer a write.
