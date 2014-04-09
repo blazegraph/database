@@ -344,7 +344,7 @@ var rdf_content_types = {'n-quads': 'application/n-quads',
                          'n3': 'text/n3',
                          'rdf/xml': 'application/rdf+xml',
                          'json': 'application/sparql-results+json',
-                         'trig': 'application/trig',
+                         'trig': 'application/x-trig',
                          'trix': 'application/trix',
                          'turtle': 'text/turtle'};
 
