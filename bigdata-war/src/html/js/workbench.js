@@ -441,6 +441,8 @@ function submitQuery(e) {
 
    $.ajax(NAMESPACE_URL, settings);
 
+   $('#query-response').show().html('Query running...');   
+
    $('#query-explanation').empty();
    if($('#query-explain').is(':checked')) {
       settings = {
