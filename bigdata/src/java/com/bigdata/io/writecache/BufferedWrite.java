@@ -137,6 +137,9 @@ public class BufferedWrite {
 		
 	}
 
+	// Used to zero pad slots in buffered writes
+	final byte[] s_zeros = new byte[256];
+	
 	/**
 	 * Buffer a write.
 	 * 
@@ -188,6 +191,19 @@ public class BufferedWrite {
 		}
 		// copy the caller's record into the buffer.
 		m_data.put(data);
+		
+		// if data_len < slot_len then clear remainder of buffer
+		int padding = slot_len - data_len;
+		while (padding > 0) {
+			if (padding > s_zeros.length) {
+				m_data.put(s_zeros);
+				padding -= s_zeros.length;
+			} else {
+				m_data.put(s_zeros, 0, padding);
+				break;
+			}
+		}
+		
 		// update the file offset by the size of the allocation slot
 		m_endAddr += slot_len;
 		// update the buffer position by the size of the allocation slot.
@@ -250,8 +266,9 @@ public class BufferedWrite {
         final ByteBuffer m_data = tmp.buffer();
 
 		// reset the buffer state.
-		m_data.position(0);
-		m_data.limit(m_data.capacity());
+		//m_data.position(0);
+		//m_data.limit(m_data.capacity());
+		m_data.clear();
 		
 		m_startAddr = -1;
 		m_endAddr = 0;

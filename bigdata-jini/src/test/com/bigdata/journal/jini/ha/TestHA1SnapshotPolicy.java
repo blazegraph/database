@@ -6,6 +6,8 @@ import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
+import net.jini.config.Configuration;
+
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.HAStatusEnum;
 import com.bigdata.ha.msg.HARootBlockRequest;
@@ -13,10 +15,7 @@ import com.bigdata.ha.msg.HASnapshotRequest;
 import com.bigdata.ha.msg.IHASnapshotResponse;
 import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.Journal;
-import com.bigdata.journal.jini.ha.AbstractHA3JournalServerTestCase.LargeLoadTask;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
-
-import net.jini.config.Configuration;
 
 public class TestHA1SnapshotPolicy extends AbstractHA3BackupTestCase {
 
@@ -438,8 +437,8 @@ public class TestHA1SnapshotPolicy extends AbstractHA3BackupTestCase {
      */
     public void testA_snapshot_multipleTx_restore_validate() throws Exception {
 
-        final int N1 = 7; // #of transactions to run before the snapshot.
-        final int N2 = 8; // #of transactions to run after the snapshot.
+        final int N1 = 7; //7; // #of transactions to run before the snapshot.
+        final int N2 = 8; //8; // #of transactions to run after the snapshot.
         
         // Start service.
         final HAGlue serverA = startA();
@@ -459,12 +458,12 @@ public class TestHA1SnapshotPolicy extends AbstractHA3BackupTestCase {
 
         // Now run N transactions.
         for (int i = 0; i < N1; i++) {
-
-            simpleTransaction();
             
-        }
+           simpleTransaction();
 
-        final long commitCounterN1 = N1 + 1;
+        }
+                
+       final long commitCounterN1 = N1 + 1;
 
         awaitCommitCounter(commitCounterN1, serverA);
 
@@ -478,7 +477,7 @@ public class TestHA1SnapshotPolicy extends AbstractHA3BackupTestCase {
 
             // Snapshot directory is empty.
             assertEquals(1, recursiveCount(getSnapshotDirA(),SnapshotManager.SNAPSHOT_FILTER));
-
+            
             // request snapshot on A.
             final Future<IHASnapshotResponse> ft = serverA
                     .takeSnapshot(new HASnapshotRequest(0/* percentLogSize */));
