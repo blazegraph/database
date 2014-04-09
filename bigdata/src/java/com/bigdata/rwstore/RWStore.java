@@ -6963,7 +6963,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
     	
     	if (log.isDebugEnabled())
     		log.debug("writeRaw: " + offset);
-
+    	
         // Guard IO against concurrent file extension.
         final Lock lock = m_extensionLock.readLock();
         
@@ -7066,6 +7066,22 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 			
 			return sb.toString();
 		}
+	}
+	
+	/**
+	 * Can be used to determine if an address is within an allocated slot.
+	 * 
+	 * @param addr
+	 * @return whether addr is within slot allocated area
+	 */
+	public boolean verifyAllocatedAddress(final long addr) {
+        for (int index = 0; index < m_allocs.size(); index++) {
+            final FixedAllocator xfa = m_allocs.get(index);
+            if (xfa.verifyAllocatedAddress(addr))
+            	return true;
+        }
+		
+        return false;
 	}
 	
 	public StoreState getStoreState() {
