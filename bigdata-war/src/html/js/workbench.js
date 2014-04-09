@@ -392,7 +392,10 @@ function submitLoad(e) {
          break;
    }
 
-   $.ajax(NAMESPACE_URL, settings); 
+   $('#load-response').show();
+   $('#load-response pre').html('Data loading...');   
+
+   $.ajax(NAMESPACE_URL, settings);
 }
 
 $('#load-clear').click(function() {
@@ -439,9 +442,9 @@ function submitQuery(e) {
       error: queryResultsError
    }
 
-   $.ajax(NAMESPACE_URL, settings);
-
    $('#query-response').show().html('Query running...');   
+
+   $.ajax(NAMESPACE_URL, settings);
 
    $('#query-explanation').empty();
    if($('#query-explain').is(':checked')) {
