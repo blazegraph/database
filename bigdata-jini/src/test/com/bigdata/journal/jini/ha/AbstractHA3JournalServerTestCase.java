@@ -227,8 +227,11 @@ public class AbstractHA3JournalServerTestCase extends
     /**
      * {@link UUID}s for the {@link HAJournalServer}s.
      */
-    private UUID serverAId = UUID.randomUUID(), serverBId = UUID.randomUUID(),
-            serverCId = UUID.randomUUID();
+    protected UUID serverAId = UUID.randomUUID();
+
+	private UUID serverBId = UUID.randomUUID();
+
+	private UUID serverCId = UUID.randomUUID();
 
     /**
      * The HTTP ports at which the services will respond.

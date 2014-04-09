@@ -740,12 +740,12 @@ public class TestHA5JournalServer extends AbstractHA5JournalServerTestCase {
                 serverA, serverB, serverC });
 
         // D and E will have go through Rebuild before joining
-        assertEquals(token2, awaitFullyMetQuorum(10/* ticks */));
+        assertEquals(token2, awaitFullyMetQuorum(20/* ticks */));
 
 //        Note: I have seen this timeout. This warrants exploring. BBT.
 //        // Wait until C is fully ready.
-        assertEquals(HAStatusEnum.Follower, awaitNSSAndHAReady(serverD, 2*awaitQuorumTimeout, TimeUnit.MILLISECONDS));
-        assertEquals(HAStatusEnum.Follower, awaitNSSAndHAReady(serverE, 2*awaitQuorumTimeout, TimeUnit.MILLISECONDS));
+        assertEquals(HAStatusEnum.Follower, awaitNSSAndHAReady(serverD, 4*awaitQuorumTimeout, TimeUnit.MILLISECONDS));
+        assertEquals(HAStatusEnum.Follower, awaitNSSAndHAReady(serverE, 4*awaitQuorumTimeout, TimeUnit.MILLISECONDS));
 
         // Verify binary equality of ALL journals.
         assertDigestsEquals(new HAGlue[] { serverA, serverB, serverC, serverD, serverE});

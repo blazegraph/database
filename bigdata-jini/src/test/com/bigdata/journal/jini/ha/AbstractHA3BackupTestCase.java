@@ -170,17 +170,30 @@ public class AbstractHA3BackupTestCase extends AbstractHA3JournalServerTestCase 
             {
 
                 final Properties p = new Properties();
-
-                p.setProperty(Journal.Options.FILE, out.getAbsoluteFile()
-                        .toString());
-
-                Journal jnl = new Journal(p);
+                final File aout = out.getAbsoluteFile();
+                // log.warn(aout.toString() + " modified: " + aout.lastModified());
+                
+                p.setProperty(Journal.Options.FILE, aout.toString());
+                
+               Journal jnl = new Journal(p);
 
                 try {
 
                     // Verify snapshot at the expected commit point.
                     assertEquals(commitCounterN, jnl.getRootBlockView()
                             .getCommitCounter());
+//                    {
+//	                    final MessageDigest digest = MessageDigest
+//	                            .getInstance("MD5");
+//	
+//	                    // digest of restored journal.
+//	                    ((IHABufferStrategy) (jnl.getBufferStrategy()))
+//	                            .computeDigest(null/* snapshot */, digest);
+//	
+//	                    final byte[] digest2 = digest.digest();
+//	
+//	                    System.err.println("Pre-restore: " + BytesUtil.toHexString(digest2));
+//                    }
 
                     // Verify journal can be dumped without error.
                     dumpJournal(jnl);
@@ -190,6 +203,7 @@ public class AbstractHA3BackupTestCase extends AbstractHA3JournalServerTestCase 
                      */
                     final HARestore rest = new HARestore(jnl, getHALogDirA());
 
+                    // System.err.println("Prior: " + jnl.getRootBlockView().toString());
                     /*
                      * Note: We can not test where we stop at the specified
                      * commit point in this method because the Journal state on
@@ -198,7 +212,21 @@ public class AbstractHA3BackupTestCase extends AbstractHA3JournalServerTestCase 
                      */
                     rest.restore(false/* listCommitPoints */, Long.MAX_VALUE/* haltingCommitCounter */);
 
-                    // Verify journal now at the expected commit point.
+                    // System.err.println("Post: " + jnl.getRootBlockView().toString());
+                    /*
+                     * FIXME For some reason, we need to close and reopen the
+                     * journal before it can be used. See HARestore.
+                     */
+                    if (true) {
+                        jnl.close();
+
+                        // reopen.
+                        jnl = new Journal(p);
+                    }
+
+                    // System.err.println("Post reopen: " + jnl.getRootBlockView().toString());
+                    
+                   // Verify journal now at the expected commit point.
                     assertEquals(commitCounterM, jnl.getRootBlockView()
                             .getCommitCounter());
 
@@ -231,25 +259,17 @@ public class AbstractHA3BackupTestCase extends AbstractHA3JournalServerTestCase 
                             final String digest2Str = new BigInteger(1, digest2)
                                     .toString(16);
 
+                            System.err.println("Original: " + serverA.getRootBlock(new HARootBlockRequest(null)).getRootBlock().toString());
+                            System.err.println("Restored: " + jnl.getRootBlockView().toString());
+                            
                             fail("Digests differ after restore and replay: expected="
                                     + digestAStr + ", actual=" + digest2Str);
-
+                            
                         }
 
                     }
 
-                    /*
-                     * FIXME For some reason, we need to close and reopen the
-                     * journal before it can be used. See HARestore.
-                     */
-                    if (true) {
-                        jnl.close();
-
-                        // reopen.
-                        jnl = new Journal(p);
-                    }
-
-                    // Verify can dump journal after restore.
+                     // Verify can dump journal after restore.
                     dumpJournal(jnl);
 
                 } finally {
