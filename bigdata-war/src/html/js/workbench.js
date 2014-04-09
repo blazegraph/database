@@ -339,14 +339,14 @@ var rdf_types = {'nq': 'n-quads',
                  //'xml': 'trix',
                  'ttl': 'turtle'};
                  
-var rdf_content_types = {'n-quads': 'application/n-quads',
+var rdf_content_types = {'n-quads': 'text/x-nquads',
                          'n-triples': 'text/plain',
-                         'n3': 'text/n3',
+                         'n3': 'text/rdf+n3',
                          'rdf/xml': 'application/rdf+xml',
                          'json': 'application/sparql-results+json',
                          'trig': 'application/x-trig',
                          'trix': 'application/trix',
-                         'turtle': 'text/turtle'};
+                         'turtle': 'application/x-turtle'};
 
 var sparql_update_commands = ['INSERT', 'DELETE'];
 
