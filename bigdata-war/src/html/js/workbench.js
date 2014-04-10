@@ -607,6 +607,7 @@ function showQueryResults(data) {
       }
       var thead = $('<thead>').appendTo(table);
       var vars = [];
+      var varsUsed = {}
       var tr = $('<tr>');
       for(var i=0; i<data.head.vars.length; i++) {
          tr.append('<td>' + data.head.vars[i] + '</td>');
@@ -618,6 +619,7 @@ function showQueryResults(data) {
          var tr = $('<tr>');
          for(var j=0; j<vars.length; j++) {
             if(vars[j] in data.results.bindings[i]) {
+               varsUsed[vars[j]] = true;
                var binding = data.results.bindings[i][vars[j]];
                if(binding.type == 'sid') {
                   var text = getSID(binding);
@@ -649,10 +651,13 @@ function showQueryResults(data) {
       }
 
       // see if we have RDF data
-      if(vars.length == 3) {
-         if(vars[0] == 's' && vars[1] == 'p' && vars[2] == 'o') {
-            $('#query-export-rdf').show();
+      if((vars.length == 3 && vars[0] == 's' && vars[1] == 'p' && vars[2] == 'o') ||
+         (vars.length == 4 && vars[0] == 's' && vars[1] == 'p' && vars[2] == 'o') && vars[3] == 'c' && !('c' in varsUsed)) {
+         if(vars.length == 4) {
+            // remove (unused) c variable from JSON
+            QUERY_RESULTS.head.vars.pop()
          }
+         $('#query-export-rdf').show();
       }
 
       $('#query-response a').click(function(e) {
