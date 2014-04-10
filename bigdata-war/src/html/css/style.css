@@ -121,6 +121,38 @@ h2 {
    border-bottom: 1px solid;
 }
 
+.modal {
+   display: none;
+   z-index: 1;
+   position: fixed;
+   top: 0;
+   left: 0;
+   width: 50%;
+   margin-top: 100px;
+   margin-left: 25%;
+   background-color: white;
+   padding: 20px;
+}
+
+#overlay {
+   display: none;
+   position: fixed;
+   top: 0;
+   left: 0;
+   width: 100%;
+   height: 100%;
+   background-color: grey;
+   opacity: 0.5;
+}
+
+.modal-open #overlay {
+   display: initial;
+}
+
+.modal-open {
+   overflow: hidden;
+}
+
 .namespace-shortcuts {
    text-align: right;
 }

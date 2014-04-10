@@ -107,12 +107,27 @@
         </div>
 
         <div class="bottom">
+          <button id="query-export-rdf">Export RDF</button>
           <button id="query-export-csv">Export CSV</button>
           <button id="query-export-json">Export JSON</button>
           <button id="query-export-xml">Export XML</button>
           <button id="query-response-clear">Clear</button>
         </div>
 
+      </div>
+
+      <div id="query-export" class="modal">
+        <select>
+          <option value="application/rdf+xml">RDF/XML</option>
+          <option value="application/x-turtle">N-Triples</option>
+          <option value="application/x-turtle">Turtle</option>
+          <option value="text/rdf+n3">N3</option>
+          <option value="application/trix">TriX</option>
+          <option value="application/x-trig">TRIG</option>
+          <option value="text/x-nquads">NQUADS</option>
+        </select>
+        <button id="query-download-rdf">Export</button>
+        <button class="modal-cancel">Cancel</button>
       </div>
 
       <div class="tab" id="explore-tab">
@@ -171,6 +186,8 @@
       </div>
 
     </div>
+
+    <div id="overlay"></div>
 
     <!--[if IE]><script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script><![endif]-->
     <script src="//ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>

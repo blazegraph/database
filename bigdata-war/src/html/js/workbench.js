@@ -3,6 +3,18 @@ $(function() {
 // global variables
 var DEFAULT_NAMESPACE, NAMESPACE, NAMESPACE_URL, NAMESPACES_READY, NAMESPACE_SHORTCUTS, FILE_CONTENTS, QUERY_RESULTS;
 
+/* Modal functions */
+
+function showModal(id) {
+   $('#' + id).show();
+   $('body').addClass('modal-open');
+}
+
+$('.modal-cancel').click(function() {
+   $('body').removeClass('modal-open');
+   $(this).parents('.modal').hide();
+});
+
 /* Search */
 
 $('#search-form').submit(function(e) {
@@ -466,9 +478,33 @@ $('#query-response-clear').click(function() {
    $('#query-response, #query-explanation, #query-tab .bottom *').hide();
 });
 
+$('#query-export-rdf').click(function() { showModal('query-export'); });
 $('#query-export-csv').click(exportCSV);
 $('#query-export-json').click(exportJSON);
 $('#query-export-xml').click(exportXML);
+
+$('#query-download-rdf').click(function() {
+   var dataType = $(this).siblings('select').val();
+   var settings = {
+      type: 'POST',
+      data: JSON.stringify(QUERY_RESULTS),
+      contentType: 'application/sparql-results+json',
+      headers: { 'Accept': dataType },
+      success: downloadRDFSuccess,
+      error: downloadRDFError
+   };
+   $.ajax('/bigdata/sparql?workbench&convert', settings);
+   $(this).siblings('.modal-cancel').click();
+});
+
+function downloadRDFSuccess(data) {
+   console.log(data);
+   downloadFile(data, 'text/plain', 'export');
+}
+
+function downloadRDFError(jqXHR, textStatus, errorThrown) {
+   alert(errorThrown);
+}   
 
 function exportXML() {
    var xml = '<?xml version="1.0"?>\n<sparql xmlns="http://www.w3.org/2005/sparql-results#">\n\t<head>\n';
@@ -533,6 +569,7 @@ function downloadFile(data, type, filename) {
 
 function showQueryResults(data) {
    $('#query-response').empty();
+   $('#query-export-rdf').hide();
    $('#query-response, #query-tab .bottom *').show();
    var table = $('<table>').appendTo($('#query-response'));
    if(this.dataTypes[1] == 'xml') {
@@ -609,6 +646,13 @@ function showQueryResults(data) {
             }
          }
          table.append(tr);
+      }
+
+      // see if we have RDF data
+      if(vars.length == 3) {
+         if(vars[0] == 's' && vars[1] == 'p' && vars[2] == 'o') {
+            $('#query-export-rdf').show();
+         }
       }
 
       $('#query-response a').click(function(e) {
