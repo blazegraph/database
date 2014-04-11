@@ -17,6 +17,10 @@ import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.Journal;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
 
+/**
+ * Test suite for the restore of the HA1 Journal from a snapshot and transaction
+ * logs.
+ */
 public class TestHA1SnapshotPolicy extends AbstractHA3BackupTestCase {
 
     public TestHA1SnapshotPolicy() {
@@ -437,8 +441,8 @@ public class TestHA1SnapshotPolicy extends AbstractHA3BackupTestCase {
      */
     public void testA_snapshot_multipleTx_restore_validate() throws Exception {
 
-        final int N1 = 7; //7; // #of transactions to run before the snapshot.
-        final int N2 = 8; //8; // #of transactions to run after the snapshot.
+        final int N1 = 7; // #of transactions to run before the snapshot.
+        final int N2 = 8; // #of transactions to run after the snapshot.
         
         // Start service.
         final HAGlue serverA = startA();
@@ -458,12 +462,12 @@ public class TestHA1SnapshotPolicy extends AbstractHA3BackupTestCase {
 
         // Now run N transactions.
         for (int i = 0; i < N1; i++) {
-            
-           simpleTransaction();
 
+            simpleTransaction();
+            
         }
-                
-       final long commitCounterN1 = N1 + 1;
+
+        final long commitCounterN1 = N1 + 1;
 
         awaitCommitCounter(commitCounterN1, serverA);
 
@@ -477,7 +481,7 @@ public class TestHA1SnapshotPolicy extends AbstractHA3BackupTestCase {
 
             // Snapshot directory is empty.
             assertEquals(1, recursiveCount(getSnapshotDirA(),SnapshotManager.SNAPSHOT_FILTER));
-            
+
             // request snapshot on A.
             final Future<IHASnapshotResponse> ft = serverA
                     .takeSnapshot(new HASnapshotRequest(0/* percentLogSize */));
@@ -503,6 +507,19 @@ public class TestHA1SnapshotPolicy extends AbstractHA3BackupTestCase {
 
         }
 
+        {
+            // Snapshot directory contains just the expected snapshot
+            assertExpectedSnapshots(getSnapshotDirA(),
+                    new long[] { commitCounterN1 });
+
+            /*
+             * Now, get the snapshot that we took above, decompress it, and then
+             * roll it forward and verify it against the current committed
+             * journal.
+             */
+            doRestoreA(serverA, commitCounterN1);
+        }
+
         // Now run M transactions.
         for (int i = 0; i < N2; i++) {
 
@@ -513,7 +530,6 @@ public class TestHA1SnapshotPolicy extends AbstractHA3BackupTestCase {
         final long commitCounterN2 = N2 + N1 + 1;
 
         awaitCommitCounter(commitCounterN2, serverA);
-
 
         // Snapshot directory contains just the expected snapshot
         assertExpectedSnapshots(getSnapshotDirA(), new long[]{commitCounterN1});

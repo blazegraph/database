@@ -43,6 +43,7 @@ import com.bigdata.ha.msg.HADigestRequest;
 import com.bigdata.ha.msg.HARootBlockRequest;
 import com.bigdata.journal.CommitCounterUtility;
 import com.bigdata.journal.IHABufferStrategy;
+import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.Journal;
 import com.bigdata.rdf.sail.webapp.client.ConnectOptions;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
@@ -146,9 +147,11 @@ public class AbstractHA3BackupTestCase extends AbstractHA3JournalServerTestCase 
          * The current commit counter on the server. This is the commit point
          * that should be restored.
          */
-        final long commitCounterM = serverA
-                .getRootBlock(new HARootBlockRequest(null/* storeUUID */))
-                .getRootBlock().getCommitCounter();
+        
+        final IRootBlockView serverARootBlock = serverA.getRootBlock(
+                new HARootBlockRequest(null/* storeUUID */)).getRootBlock();
+
+        final long commitCounterM = serverARootBlock.getCommitCounter();
 
         final File snapshotFile = SnapshotManager.getSnapshotFile(
                 getSnapshotDirA(), commitCounterN);
@@ -170,40 +173,26 @@ public class AbstractHA3BackupTestCase extends AbstractHA3JournalServerTestCase 
             {
 
                 final Properties p = new Properties();
-                final File aout = out.getAbsoluteFile();
-                // log.warn(aout.toString() + " modified: " + aout.lastModified());
-                
-                p.setProperty(Journal.Options.FILE, aout.toString());
-                
-               Journal jnl = new Journal(p);
+
+                p.setProperty(Journal.Options.FILE, out.getAbsoluteFile()
+                        .toString());
+
+                Journal jnl = new Journal(p);
 
                 try {
 
                     // Verify snapshot at the expected commit point.
                     assertEquals(commitCounterN, jnl.getRootBlockView()
                             .getCommitCounter());
-//                    {
-//	                    final MessageDigest digest = MessageDigest
-//	                            .getInstance("MD5");
-//	
-//	                    // digest of restored journal.
-//	                    ((IHABufferStrategy) (jnl.getBufferStrategy()))
-//	                            .computeDigest(null/* snapshot */, digest);
-//	
-//	                    final byte[] digest2 = digest.digest();
-//	
-//	                    System.err.println("Pre-restore: " + BytesUtil.toHexString(digest2));
-//                    }
 
                     // Verify journal can be dumped without error.
                     dumpJournal(jnl);
-                    
+
                     /*
                      * Now roll that journal forward using the HALog directory.
                      */
                     final HARestore rest = new HARestore(jnl, getHALogDirA());
 
-                    // System.err.println("Prior: " + jnl.getRootBlockView().toString());
                     /*
                      * Note: We can not test where we stop at the specified
                      * commit point in this method because the Journal state on
@@ -212,7 +201,6 @@ public class AbstractHA3BackupTestCase extends AbstractHA3JournalServerTestCase 
                      */
                     rest.restore(false/* listCommitPoints */, Long.MAX_VALUE/* haltingCommitCounter */);
 
-                    // System.err.println("Post: " + jnl.getRootBlockView().toString());
                     /*
                      * FIXME For some reason, we need to close and reopen the
                      * journal before it can be used. See HARestore.
@@ -224,12 +212,18 @@ public class AbstractHA3BackupTestCase extends AbstractHA3JournalServerTestCase 
                         jnl = new Journal(p);
                     }
 
-                    // System.err.println("Post reopen: " + jnl.getRootBlockView().toString());
+                    // Verify can dump journal after restore.
+                    dumpJournal(jnl);
                     
-                   // Verify journal now at the expected commit point.
+                    // Verify journal now at the expected commit point.
                     assertEquals(commitCounterM, jnl.getRootBlockView()
                             .getCommitCounter());
 
+                    if (!serverARootBlock.equals(jnl.getRootBlockView())) {
+                        fail("Root blocks differ: serverA=" + serverARootBlock
+                                + ", restored=" + jnl.getRootBlockView());
+                    }
+                    
                     /*
                      * Compute digest of the restored journal. The digest should
                      * agree with the digest of the Journal on A since we rolled
@@ -242,14 +236,17 @@ public class AbstractHA3BackupTestCase extends AbstractHA3JournalServerTestCase 
                                 new HADigestRequest(null/* storeUUID */))
                                 .getDigest();
 
-                        final MessageDigest digest = MessageDigest
-                                .getInstance("MD5");
+                        final byte[] digest2;
+                        {
+                            final MessageDigest digest = MessageDigest
+                                    .getInstance("MD5");
 
-                        // digest of restored journal.
-                        ((IHABufferStrategy) (jnl.getBufferStrategy()))
-                                .computeDigest(null/* snapshot */, digest);
+                            // digest of restored journal.
+                            ((IHABufferStrategy) (jnl.getBufferStrategy()))
+                                    .computeDigest(null/* snapshot */, digest);
 
-                        final byte[] digest2 = digest.digest();
+                            digest2 = digest.digest();
+                        }
 
                         if (!BytesUtil.bytesEqual(digestA, digest2)) {
 
@@ -259,18 +256,12 @@ public class AbstractHA3BackupTestCase extends AbstractHA3JournalServerTestCase 
                             final String digest2Str = new BigInteger(1, digest2)
                                     .toString(16);
 
-                            System.err.println("Original: " + serverA.getRootBlock(new HARootBlockRequest(null)).getRootBlock().toString());
-                            System.err.println("Restored: " + jnl.getRootBlockView().toString());
-                            
                             fail("Digests differ after restore and replay: expected="
                                     + digestAStr + ", actual=" + digest2Str);
-                            
+
                         }
 
                     }
-
-                     // Verify can dump journal after restore.
-                    dumpJournal(jnl);
 
                 } finally {
 

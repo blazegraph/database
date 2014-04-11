@@ -227,7 +227,7 @@ public class AbstractHA3JournalServerTestCase extends
     /**
      * {@link UUID}s for the {@link HAJournalServer}s.
      */
-    protected UUID serverAId = UUID.randomUUID();
+    private UUID serverAId = UUID.randomUUID();
 
 	private UUID serverBId = UUID.randomUUID();
 

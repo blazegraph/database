@@ -970,7 +970,7 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
      * Verify the the digest of the journal is equal to the digest of the
      * indicated snapshot on the specified service.
      * <p>
-     * Note: This can only succeed if the journal is at the specififed commit
+     * Note: This can only succeed if the journal is at the specified commit
      * point. If there are concurrent writes on the journal, then it's digest
      * will no longer be consistent with the snapshot.
      * 
