@@ -7,6 +7,9 @@
 # pid file that is written by $binDir/startHAServices.  These SHOULD be
 # absolute path names.
 
+#BD_USER=
+#BD_GROUP=
+
 #binDir=
 #pidFile=
 
