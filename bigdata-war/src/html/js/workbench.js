@@ -483,6 +483,20 @@ $('#query-export-csv').click(exportCSV);
 $('#query-export-json').click(exportJSON);
 $('#query-export-xml').click(exportXML);
 
+var rdf_extensions = {
+   "application/rdf+xml": ['RDF/XML', 'rdf'],
+   "application/x-turtle": ['N-Triples', 'nt'],
+   "application/x-turtle": ['Turtle', 'ttl'],
+   "text/rdf+n3": ['N3', 'n3'],
+   "application/trix": ['TriX', 'trix'],
+   "application/x-trig": ['TRIG', 'trig'],
+   "text/x-nquads": ['NQUADS', 'nq']
+};
+
+for(var contentType in rdf_extensions) {
+   $('#query-export select').append('<option value="' + contentType + '">' + rdf_extensions[contentType][0] + '</option>');
+}
+
 $('#query-download-rdf').click(function() {
    var dataType = $(this).siblings('select').val();
    var settings = {
@@ -490,16 +504,16 @@ $('#query-download-rdf').click(function() {
       data: JSON.stringify(QUERY_RESULTS),
       contentType: 'application/sparql-results+json',
       headers: { 'Accept': dataType },
-      success: downloadRDFSuccess,
+      success: function(data) { downloadRDFSuccess(data, dataType); },
       error: downloadRDFError
    };
    $.ajax('/bigdata/sparql?workbench&convert', settings);
    $(this).siblings('.modal-cancel').click();
 });
 
-function downloadRDFSuccess(data) {
-   console.log(data);
-   downloadFile(data, 'text/plain', 'export');
+function downloadRDFSuccess(data, dataType) {
+   var filename = 'export.' + rdf_extensions[dataType][1];
+   downloadFile(data, dataType, filename);
 }
 
 function downloadRDFError(jqXHR, textStatus, errorThrown) {
