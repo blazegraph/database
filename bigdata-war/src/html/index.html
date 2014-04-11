@@ -117,10 +117,20 @@
       </div>
 
       <div id="query-export" class="modal">
-        <select>
-        </select>
-        <button id="query-download-rdf">Export</button>
-        <button class="modal-cancel">Cancel</button>
+        <h1>Export</h1>
+        <p>
+          <label for="export-format">Format: </label>
+          <select id="export-format"></select>
+        </p>
+        <p>
+          <label for="export-filename">Filename: </label>
+          <input type="text" id="export-filename" value="export">
+          .<span id="export-filename-extension"></span>
+        </p>
+        <p>
+          <button id="query-download-rdf">Export</button>
+          <button class="modal-cancel">Cancel</button>
+        </p>
       </div>
 
       <div class="tab" id="explore-tab">
