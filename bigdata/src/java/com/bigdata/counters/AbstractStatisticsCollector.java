@@ -92,7 +92,7 @@ abstract public class AbstractStatisticsCollector implements IStatisticsCollecto
     static {
     
 		String s = System.getProperty(BigdataStatics.HOSTNAME);
-        if (s != null) {
+        if (s != null && s.trim().length() != 0) {
             log.warn("Hostname override: hostname=" + s);
         } else {
 		try {
