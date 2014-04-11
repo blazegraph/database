@@ -868,7 +868,10 @@ function parseHash(hash) {
 }
 
 // handle history buttons and initial display of first tab
-window.addEventListener("popstate", function(e) {
+window.addEventListener("popstate", handlePopState);
+$(handlePopState);
+
+function handlePopState() {
    var hash = parseHash(this.location.hash);
    if(!hash) {
       $('#tab-selector a:first').click();
@@ -879,7 +882,7 @@ window.addEventListener("popstate", function(e) {
          $('a[data-target=' + hash[1] + ']').click();
       }
    }
-});
+}
 
 function updateExploreError(jqXHR, textStatus, errorThrown) {
    $('#explore-tab .bottom').show();
