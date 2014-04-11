@@ -478,7 +478,7 @@ $('#query-response-clear').click(function() {
    $('#query-response, #query-explanation, #query-tab .bottom *').hide();
 });
 
-$('#query-export-rdf').click(function() { showModal('query-export'); });
+$('#query-export-rdf').click(function() { updateExportFileExtension(); showModal('query-export'); });
 $('#query-export-csv').click(exportCSV);
 $('#query-export-json').click(exportJSON);
 $('#query-export-xml').click(exportXML);
@@ -494,25 +494,34 @@ var rdf_extensions = {
 };
 
 for(var contentType in rdf_extensions) {
-   $('#query-export select').append('<option value="' + contentType + '">' + rdf_extensions[contentType][0] + '</option>');
+   $('#export-format').append('<option value="' + contentType + '">' + rdf_extensions[contentType][0] + '</option>');
+}
+
+$('#export-format').change(updateExportFileExtension);
+
+function updateExportFileExtension() {
+   $('#export-filename-extension').html(rdf_extensions[$('#export-format').val()][1]);
 }
 
 $('#query-download-rdf').click(function() {
-   var dataType = $(this).siblings('select').val();
+   var dataType = $('#export-format').val();
    var settings = {
       type: 'POST',
       data: JSON.stringify(QUERY_RESULTS),
       contentType: 'application/sparql-results+json',
       headers: { 'Accept': dataType },
-      success: function(data) { downloadRDFSuccess(data, dataType); },
+      success: function(data) { downloadRDFSuccess(data, dataType, $('#export-filename').val()); },
       error: downloadRDFError
    };
    $.ajax('/bigdata/sparql?workbench&convert', settings);
    $(this).siblings('.modal-cancel').click();
 });
 
-function downloadRDFSuccess(data, dataType) {
-   var filename = 'export.' + rdf_extensions[dataType][1];
+function downloadRDFSuccess(data, dataType, filename) {
+   if(filename == '') {
+      filename = 'export';
+   }
+   filename += '.' + rdf_extensions[dataType][1];
    downloadFile(data, dataType, filename);
 }
 
