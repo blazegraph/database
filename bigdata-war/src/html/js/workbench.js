@@ -672,6 +672,8 @@ function showQueryResults(data) {
             QUERY_RESULTS.head.vars.pop()
          }
          $('#query-export-rdf').show();
+      } else {
+         $('#query-export-rdf').hide();
       }
 
       $('#query-response a').click(function(e) {
