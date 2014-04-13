@@ -89,7 +89,7 @@ case "$1" in
 	    fi
 	fi
 	if [ ! -f "$pidFile" ]; then
-		action $"`date` : `hostname` : bringing up services: " sudo -u $BD_USER -g $BD_GROUP source /etc/default/bigdataHA ; $binDir/startHAServices
+		action $"`date` : `hostname` : bringing up services: " sudo -u $BD_USER -g $BD_GROUP bash -c "source /etc/default/bigdataHA ; $binDir/startHAServices"
 	else
             echo $"`date` : `hostname` : running as $pid"
 	fi 
