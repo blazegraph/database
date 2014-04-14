@@ -1512,7 +1512,7 @@ public class SnapshotManager {
         if (!src.exists())
             throw new FileNotFoundException(src.getAbsolutePath());
 
-        if (!dst.exists() && dst.length() == 0)
+        if (dst.exists() && dst.length() != 0)
             throw new IOException("Output file exists and is not empty: "
                     + dst.getAbsolutePath());
 
