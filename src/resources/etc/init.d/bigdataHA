@@ -70,6 +70,12 @@ fi
 
 cd $FED_DIR
 
+if [ ! -d "$DATA_DIR/lost+found" ]; then
+	mount /dev/vg/lv_bigdata $DATA_DIR
+	action $"`date` : `hostname` : restoring bigdata journal file: " sudo -u $BD_USER -g $BD_GROUP bin/HARestore
+fi
+
+
 
 #
 # See how we were called.
