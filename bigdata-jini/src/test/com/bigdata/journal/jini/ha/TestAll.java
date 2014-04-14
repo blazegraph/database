@@ -108,6 +108,15 @@ public class TestAll extends TestCase {
         // Test suite of longer running stress tests for an HA3 cluster.
         suite.addTestSuite(StressTestHA3JournalServer.class);
 
+        // Test suite of longer running stress tests for an HA5 cluster.
+        suite.addTestSuite(TestHA5JournalServer.class);
+        suite.addTestSuite(TestHA5JournalServerWithHALogs.class);
+
+        // Test suite of longer running stress tests for an HA1 cluster.
+        suite.addTestSuite(TestHA1JournalServer.class);
+        suite.addTestSuite(TestHA1SnapshotPolicy.class);
+        suite.addTestSuite(TestHA1SnapshotPolicy2.class);
+
         return suite;
 
     }
