@@ -521,7 +521,7 @@ public class TestWORMWriteCacheService extends TestCase3 {
 
         final int nbuffers = 1;
         final boolean useChecksums = false;
-        final boolean isHighlyAvailable = false;
+        final boolean isHighlyAvailable = true; // for HA1! false;
 
         // No write pipeline.
         final int k = 1;
@@ -574,7 +574,7 @@ public class TestWORMWriteCacheService extends TestCase3 {
          */
         final double largeRecordRate = 0d;
         final boolean useChecksums = false;
-        final boolean isHighlyAvailable = false;
+        final boolean isHighlyAvailable = true;
 
         final int k = 1;
         final long lastCommitTime = 0L;
@@ -619,7 +619,7 @@ public class TestWORMWriteCacheService extends TestCase3 {
 
         final int nbuffers = 2;
         final boolean useChecksums = false;
-        final boolean isHighlyAvailable = false;
+        final boolean isHighlyAvailable = true; // for HA1! false;
 
         // No write pipeline.
         final int k = 1;
@@ -672,7 +672,7 @@ public class TestWORMWriteCacheService extends TestCase3 {
          */
         final double largeRecordRate = 0d;
         final boolean useChecksums = false;
-        final boolean isHighlyAvailable = false;
+        final boolean isHighlyAvailable = true; // for HA1! false;
 
         // No write pipeline.
         final int k = 1;
@@ -681,8 +681,7 @@ public class TestWORMWriteCacheService extends TestCase3 {
         final String logicalServiceId = "logicalService_"+getName();
         final MockQuorum<HAPipelineGlue, MyMockQuorumMember<HAPipelineGlue>> quorum = new MockQuorum<HAPipelineGlue, MyMockQuorumMember<HAPipelineGlue>>(
                 k, fixture);
-        try {
-            
+        try {            
             fixture.start();
             quorum.start(new MyMockQuorumMember<HAPipelineGlue>(fixture,logicalServiceId));
 
@@ -718,7 +717,7 @@ public class TestWORMWriteCacheService extends TestCase3 {
 
         final int nbuffers = 6;
         final boolean useChecksums = true;
-        final boolean isHighlyAvailable = false;
+        final boolean isHighlyAvailable = true; // for HA1! false;
 
         // No write pipeline.
         final int k = 1;
@@ -771,7 +770,7 @@ public class TestWORMWriteCacheService extends TestCase3 {
          */
         final double largeRecordRate = 0d;
         final boolean useChecksums = true;
-        final boolean isHighlyAvailable = false;
+        final boolean isHighlyAvailable = true; // for HA1! false;
 
         // No write pipeline.
         final int k = 1;
@@ -2120,6 +2119,19 @@ public class TestWORMWriteCacheService extends TestCase3 {
                     + ", isHighlyAvailable=" + isHighlyAvailable);
         }
         
+        // Await quorum meet.
+        assertCondition(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    assertEquals(0L, quorum.token());
+                } catch (Exception e) {
+                    fail();
+                }
+            }
+
+        }, 5000/*timeout*/, TimeUnit.MILLISECONDS);
+
         File file = null;
         ReopenFileChannel opener = null;
         WriteCacheService writeCacheService = null;
