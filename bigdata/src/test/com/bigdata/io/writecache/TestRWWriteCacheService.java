@@ -35,6 +35,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map.Entry;
 import java.util.Random;
+import java.util.concurrent.TimeUnit;
 
 import junit.framework.AssertionFailedError;
 
@@ -48,7 +49,6 @@ import com.bigdata.quorum.MockQuorumFixture.MockQuorum;
 import com.bigdata.quorum.QuorumActor;
 import com.bigdata.rwstore.RWWriteCacheService;
 import com.bigdata.util.ChecksumUtility;
-import com.bigdata.util.InnerCause;
 
 /**
  * Test suite for the {@link WriteCacheService} using scattered writes on a
@@ -137,6 +137,19 @@ public class TestRWWriteCacheService extends TestCase3 {
 
         actor.castVote(0);
         fixture.awaitDeque();
+
+        // Await quorum meet.
+        assertCondition(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    assertEquals(0L, quorum.token());
+                } catch (Exception e) {
+                    fail();
+                }
+            }
+
+        }, 5000/*timeout*/, TimeUnit.MILLISECONDS);
 
         file = File.createTempFile(getName(), ".rw.tmp");
 
