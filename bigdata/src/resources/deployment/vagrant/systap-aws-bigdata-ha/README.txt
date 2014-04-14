@@ -53,7 +53,7 @@ alternately:
   % easy_install boto
 
 
-If while running the python scripts the error message appears “ImportError: No module named boto”, you will need to set the
+If while running the python scripts the error message appears "ImportError: No module named boto", you will need to set the
 PYTHONPATH environment variable, for example:
 
   % export PYTHONPATH=/usr/local/lib/python2.7/site-packages
@@ -72,6 +72,7 @@ Launching the cluster may take up to 10 minutes.  When complete the cluster crea
 
 SSH to a specific node:
 
+  % source aws.rc  # all vagrant commands will depend on exported AWS environment variables 
   % vagrant ssh bigdataA
 
 
