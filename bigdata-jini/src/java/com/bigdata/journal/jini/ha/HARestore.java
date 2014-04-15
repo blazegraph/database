@@ -48,7 +48,13 @@ import com.bigdata.journal.Options;
 
 /**
  * Utility class may be used to apply HALog files to a {@link Journal}, rolling
- * it forward to a specific commit point.
+ * it forward to a specific commit point. This class can decompress a snapshot
+ * file for processing. It can also identify the most recent snapshot in the
+ * snapshot directory, and then decompress that snapshot for processing. When
+ * starting with a snapshot, the target journal file may be specified on the
+ * command line.
+ * 
+ * @see #main(String[])
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
@@ -384,17 +390,31 @@ public class HARestore {
      * @param args
      *            <code>[options] journalOrSnapshotFileOrSnapshotDir haLogDir</code>
      * <br>
-     *            where <code>journalFile</code> is the name of the journal file<br>
+     *            where <code>journalOrSnapshotFileOrSnapshotDir</code> is the
+     *            name of the journal file (ending in <code>.jnl</code>), the
+     *            name of a specific snapshot file (ending in
+     *            <code>.jnl.gz</code>), or the name of the snapshot directory
+     *            (this is generally a directory named <code>snapshot</code>
+     *            that is a child of the service directory) <br>
      *            where <code>haLogDir</code> is the name of a directory
-     *            containing zero or more HALog files<br>
+     *            containing zero or more HALog files (this is generally a
+     *            directory name <code>HALog</code> that is a child of the
+     *            service directory)<br>
      *            where <code>options</code> are any of:
      *            <dl>
-     *            <dt>-l</dt> <dd>List available commit points, but do not apply
+     *            <dt>-l</dt>
+     *            <dd>List available commit points, but do not apply
      *            them. This option provides information about the current
      *            commit point on the journal and the commit points available in
-     *            the HALog files.</dd> <dt>-h commitCounter</dt> <dd>The last
-     *            commit counter that will be applied (halting point for
-     *            restore).</dd>
+     *            the HALog files.</dd>
+     *            <dt>-h commitCounter</dt>
+     *            <dd>The last commit counter that will be applied (halting
+     *            point for restore).</dd>
+     *            <dt>-o journalFile</dt>
+     *            <dd>When restoring from a snapshot, this parameter specifies
+     *            the name of the journal file to be created.  It is an error
+     *            if the file exists (this utility will not overwrite an existing
+     *            journal file).</dd>
      *            </dl>
      * 
      * @return <code>0</code> iff the operation was fully successful.
@@ -424,6 +444,8 @@ public class HARestore {
         int i = 0;
 
         boolean listCommitPoints = false;
+        
+        String decompressTargetFile = null;
 
         // Defaults to Long.MAX_VALUE.
         long haltingCommitCounter = Long.MAX_VALUE;
@@ -447,10 +469,16 @@ public class HARestore {
 
             else if (arg.equals("-h")) {
 
-                haltingCommitCounter = Long.parseLong(args[i + 1]);
+                haltingCommitCounter = Long.parseLong(args[++i]);
 
             }
 
+            else if (arg.equals("-o")) {
+
+                decompressTargetFile = args[++i];
+
+            }
+            
             else
                 throw new RuntimeException("Unknown argument: " + arg);
 
@@ -475,10 +503,12 @@ public class HARestore {
             /*
              * File is a directory.
              * 
+             * We assume that it is the snapshot directory.
+             * 
              * Locate the most recent snapshot in that directory structure.
              */
         
-            File tmp = CommitCounterUtility.findGreatestCommitCounter(
+            final File tmp = CommitCounterUtility.findGreatestCommitCounter(
                     journalFile, SnapshotManager.SNAPSHOT_FILTER);
 
             if (tmp == null) {
@@ -507,8 +537,8 @@ public class HARestore {
             /*
              * File is a snapshot.
              * 
-             * Decompress the snapshot onto a temporary file in the current
-             * working directory.
+             * Decompress the snapshot onto either a temporary file or the file
+             * specified by the caller (in which case the file must not exist).
              */
 
             // source is the snapshot.
@@ -517,11 +547,24 @@ public class HARestore {
             final long commitCounter = SnapshotManager
                     .parseCommitCounterFile(journalFile.getName());
 
-            // TODO Note: Accept version from main development branch when merging versions.
-            // temporary file in the same directory as the snapshot.
-            final File out = File.createTempFile("HARestore-TMP"
-                    + commitCounter + "-", Journal.Options.JNL, journalFile
-                    .getAbsoluteFile().getParentFile());
+            final File out;
+            if (decompressTargetFile == null) {
+                /*
+                 * Temporary file in the current working directory
+                 */
+                out = File.createTempFile("restored-from-snapshot" + "-"
+                        + commitCounter + "-", Journal.Options.JNL, journalFile
+                        .getAbsoluteFile().getParentFile());
+            } else {
+                /*
+                 * Decompress onto a file specified by the caller.
+                 */
+                out = new File(decompressTargetFile);
+                if (out.exists()) {
+                    // Do not decompress onto an existing file.
+                    throw new IOException("File exists: " + out);
+                }
+            }
 
             System.out.println("Decompressing " + in + " to " + out);
             
@@ -532,7 +575,9 @@ public class HARestore {
             
         }
 
-        // Validate journal file.
+        /*
+         * Log some metadata about the journal file.
+         */
         {
 
             System.out.println("Journal File: " + journalFile);
@@ -560,6 +605,9 @@ public class HARestore {
 
         }
 
+        /*
+         * Open the journal.
+         */
         try {
 
             final Properties properties = new Properties();
@@ -580,6 +628,9 @@ public class HARestore {
 
             try {
 
+                /*
+                 * Apply zero or more HALog files to roll forward the journal.
+                 */
                 final HARestore util = new HARestore(journal, haLogDir);
 
                 util.restore(listCommitPoints, haltingCommitCounter);
@@ -602,7 +653,7 @@ public class HARestore {
 
     private static void usage(final String[] args) {
 
-        System.err.println("usage: (-l|-h commitPoint) <journalFile> haLogDir");
+        System.err.println("usage: (-l|-h haltingCommitPoint|-o outputJournalFile) <journalFile|snapshotFile|snapshotDir> haLogDir");
 
     }
 

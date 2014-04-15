@@ -268,10 +268,13 @@ public class ClientAsynchronousIterator<E> implements IAsynchronousIterator<E>,
      */
     private class ReaderTask implements Callable<Void> {
 
+        @Override
         public Void call() throws Exception {
 
-            final Thread t = Thread.currentThread();
+//            final Thread t = Thread.currentThread();
 
+            boolean interrupted = false;
+            
             try {
 
                 /*
@@ -299,10 +302,11 @@ public class ClientAsynchronousIterator<E> implements IAsynchronousIterator<E>,
                         if (trace)
                             System.err.print('~');
                         
-                        if (t.isInterrupted()) {
+                        if (Thread.interrupted()) {
 
                             // thread interrupted, so we are done.
-                            break;
+                            interrupted = true;
+                            break; // break out of while(true)
                             
                         }
 
@@ -344,10 +348,11 @@ public class ClientAsynchronousIterator<E> implements IAsynchronousIterator<E>,
                      */
 
                     // don't call blocking method next() if we were interrupted.
-                    if (t.isInterrupted()) {
+                    if (Thread.interrupted()) {
 
                         // thread interrupted, so we are done.
-                        break;
+                        interrupted = true;
+                        break; // break out of while(true)
                         
                     }
 
@@ -392,7 +397,7 @@ public class ClientAsynchronousIterator<E> implements IAsynchronousIterator<E>,
                 }
 
                 if (INFO)
-                    log.info("Reader is done.");
+                    log.info("Reader is done: interrupted" + interrupted);
 
                 return null;
                 
@@ -448,7 +453,8 @@ public class ClientAsynchronousIterator<E> implements IAsynchronousIterator<E>,
         }
 
     }
-    
+
+    @Override
     public void close() {
 
         if (future == null) {
