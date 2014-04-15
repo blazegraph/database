@@ -4659,7 +4659,7 @@ public class HAJournalServer extends AbstractServer {
             throw new IllegalStateException("Server is not running");
 
         return tmp.getConnectors()[0].getLocalPort();
-
+        
     }
     
     /**

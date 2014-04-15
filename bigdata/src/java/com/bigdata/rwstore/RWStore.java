@@ -688,7 +688,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
                 throws InterruptedException {
 
             super(buf, useChecksum, m_quorum != null
-                    && m_quorum.isHighlyAvailable(), bufferHasData, opener,
+                    /*&& m_quorum.isHighlyAvailable()*/, bufferHasData, opener,
                     fileExtent,
                     m_bufferedWrite);
 
@@ -1080,16 +1080,17 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
     private RWWriteCacheService newWriteCacheService() {
         try {
 
-            final boolean highlyAvailable = m_quorum != null
-                    && m_quorum.isHighlyAvailable();
+//            final boolean highlyAvailable = m_quorum != null
+//                    && m_quorum.isHighlyAvailable();
 
-            final boolean prefixWrites = highlyAvailable;
+            final boolean prefixWrites = m_quorum != null; // highlyAvailable
 
             return new RWWriteCacheService(m_writeCacheBufferCount,
                     m_minCleanListSize, m_readCacheBufferCount, prefixWrites, m_compactionThreshold, m_hotCacheSize, m_hotCacheThreshold,
 
                     convertAddr(m_fileSize), m_reopener, m_quorum, this) {
-                
+
+                        @Override
                         @SuppressWarnings("unchecked")
                         public WriteCache newWriteCache(final IBufferAccess buf,
                                 final boolean useChecksum,
@@ -6962,7 +6963,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
     	
     	if (log.isDebugEnabled())
     		log.debug("writeRaw: " + offset);
-
+    	
         // Guard IO against concurrent file extension.
         final Lock lock = m_extensionLock.readLock();
         
@@ -7065,6 +7066,22 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 			
 			return sb.toString();
 		}
+	}
+	
+	/**
+	 * Can be used to determine if an address is within an allocated slot.
+	 * 
+	 * @param addr
+	 * @return whether addr is within slot allocated area
+	 */
+	public boolean verifyAllocatedAddress(final long addr) {
+        for (int index = 0; index < m_allocs.size(); index++) {
+            final FixedAllocator xfa = m_allocs.get(index);
+            if (xfa.verifyAllocatedAddress(addr))
+            	return true;
+        }
+		
+        return false;
 	}
 	
 	public StoreState getStoreState() {

@@ -440,7 +440,16 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
          * Wait for the service to report that it is ready as a leader or
          * follower.
          */
-        haGlue.awaitHAReady(awaitQuorumTimeout, TimeUnit.MILLISECONDS);
+        return awaitNSSAndHAReady(haGlue, awaitQuorumTimeout, TimeUnit.MILLISECONDS);
+    }
+
+    protected HAStatusEnum awaitNSSAndHAReady(final HAGlue haGlue, long timout, TimeUnit unit)
+            throws Exception {
+        /*
+         * Wait for the service to report that it is ready as a leader or
+         * follower.
+         */
+        haGlue.awaitHAReady(timout, unit);
         /*
          * Wait for the NSS to report the status of the service (this verifies
          * that the NSS interface is running).
@@ -525,7 +534,9 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
     protected String getNanoSparqlServerURL(final HAGlue haGlue)
             throws IOException {
 
-        return "http://localhost:" + haGlue.getNSSPort();
+    	final int port = haGlue.getNSSPort();
+    	
+        return "http://localhost:" + port;
 
     }
 
@@ -541,7 +552,7 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
 
         final String sparqlEndpointURL = getNanoSparqlServerURL(haGlue)
                 + "/sparql";
-
+        
         // Client for talking to the NSS.
         final HttpClient httpClient = new DefaultHttpClient(ccm);
 
@@ -959,7 +970,7 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
      * Verify the the digest of the journal is equal to the digest of the
      * indicated snapshot on the specified service.
      * <p>
-     * Note: This can only succeed if the journal is at the specififed commit
+     * Note: This can only succeed if the journal is at the specified commit
      * point. If there are concurrent writes on the journal, then it's digest
      * will no longer be consistent with the snapshot.
      * 
@@ -1247,5 +1258,35 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
         }
 
     }
+
+//    /**
+//     * The effective name for this test as used to name the directories in which
+//     * we store things.
+//     * 
+//     * TODO If there are method name collisions across the different test
+//     * classes then the test suite name can be added to this. Also, if there are
+//     * file naming problems, then this value can be munged before it is
+//     * returned.
+//     */
+//    private final String effectiveTestFileName = getClass().getSimpleName()
+//            + "." + getName();
+//
+//    /**
+//     * The directory that is the parent of each {@link HAJournalServer}'s
+//     * individual service directory.
+//     */
+//    protected File getTestDir() {
+//        return new File(TGT_PATH, getEffectiveTestFileName());
+//    }
+//
+//    /**
+//     * The effective name for this test as used to name the directories in which
+//     * we store things.
+//     */
+//    protected String getEffectiveTestFileName() {
+//        
+//        return effectiveTestFileName;
+//        
+//    }
 
 }
