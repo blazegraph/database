@@ -55,10 +55,13 @@ import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.engine.QueryLog;
 import com.bigdata.bop.fed.QueryEngineFactory;
 import com.bigdata.counters.CounterSet;
+import com.bigdata.ha.HAGlue;
+import com.bigdata.ha.QuorumService;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.DumpJournal;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.Journal;
+import com.bigdata.quorum.Quorum;
 import com.bigdata.rdf.sail.sparql.ast.SimpleNode;
 import com.bigdata.rdf.sail.webapp.BigdataRDFContext.AbstractQueryTask;
 import com.bigdata.rdf.sail.webapp.BigdataRDFContext.RunningQuery;
@@ -378,7 +381,8 @@ public class StatusServlet extends BigdataRDFServlet {
 
         if (req.getParameter(HA) != null
                 && getIndexManager() instanceof AbstractJournal
-                && ((AbstractJournal) getIndexManager()).isHighlyAvailable()) {
+               //  && ((AbstractJournal) getIndexManager()).isHighlyAvailable()) {
+        		&& ((AbstractJournal) getIndexManager()).getQuorum() != null) { // for HA1
 
             new HAStatusServletUtil(getIndexManager()).doHAStatus(req, resp);
 
@@ -496,12 +500,17 @@ public class StatusServlet extends BigdataRDFServlet {
 
             // final boolean showQuorum = req.getParameter(SHOW_QUORUM) != null;
 
-            if (getIndexManager() instanceof AbstractJournal
-                    && ((AbstractJournal) getIndexManager())
-                            .isHighlyAvailable()) {
+            if (getIndexManager() instanceof AbstractJournal) {
 
-                new HAStatusServletUtil(getIndexManager()).
-                        doGet(req, resp, current);
+                final Quorum<HAGlue, QuorumService<HAGlue>> quorum = ((AbstractJournal) getIndexManager())
+                        .getQuorum();
+
+                if (quorum != null) {//&& quorum.isHighlyAvailable()) {
+
+                    new HAStatusServletUtil(getIndexManager()).doGet(req, resp,
+                            current);
+
+                }
 
             }
 

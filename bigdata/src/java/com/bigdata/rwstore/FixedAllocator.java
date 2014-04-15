@@ -839,6 +839,7 @@ public class FixedAllocator implements Allocator {
 				m_statsBucket.allocate(size);
 			}
 			
+			
 			return value;
 		} else {
  			StringBuilder sb = new StringBuilder();
@@ -1298,6 +1299,35 @@ public class FixedAllocator implements Allocator {
 			log.trace("FA index: " + m_index + ", freed: " + count);
 		
 		return count;
+	}
+
+	/**
+	 * Determines if the provided physical address is within an allocated slot
+	 * @param addr
+	 * @return
+	 */
+	public boolean verifyAllocatedAddress(long addr) {
+		if (log.isTraceEnabled())
+			log.trace("Checking Allocator " + m_index + ", size: " + m_size);
+
+		final Iterator<AllocBlock> blocks = m_allocBlocks.iterator();
+		final long range = m_size * m_bitSize * 32;
+		while (blocks.hasNext()) {
+			final int startAddr = blocks.next().m_addr;
+			if (startAddr != 0) {
+				final long start = RWStore.convertAddr(startAddr);
+				final long end = start + range;
+				
+				if (log.isTraceEnabled())
+					log.trace("Checking " + addr + " between " + start + " - " + end);
+				
+				if (addr >= start && addr < end)
+					return true;
+			} else {
+				break;
+			}
+		}
+		return false;
 	}
 
 }
