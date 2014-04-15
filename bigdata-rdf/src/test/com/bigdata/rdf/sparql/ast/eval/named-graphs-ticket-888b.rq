@@ -1,0 +1,7 @@
+PREFIX : <http://sample.com/>
+
+SELECT DISTINCT ?g
+WHERE {
+  GRAPH ?g { ?s ?p ?o }
+  FILTER NOT EXISTS { GRAPH ?g { <http://sample.com/I> <http://sample.com/live>  "a_live". }}
+}

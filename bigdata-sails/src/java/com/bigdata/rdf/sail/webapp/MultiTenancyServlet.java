@@ -106,20 +106,20 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
     protected void doPost(final HttpServletRequest req,
             final HttpServletResponse resp) throws IOException {
 
-        if (!isWritable(req, resp)) {
-            // Service must be writable.
-            return;
-        }
-
         if (req.getRequestURI().endsWith("/namespace")) {
-        
+
+            // CREATE NAMESPACE.
             doCreateNamespace(req, resp);
 
             return;
             
         }
 
-        // Pass through to the SPARQL end point REST API.
+        /*
+         * Pass through to the SPARQL end point REST API.
+         * 
+         * Note: This also handles CANCEL QUERY, which is a POST.
+         */
         m_restServlet.doPost(req, resp);
 
     }
@@ -220,6 +220,11 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
     private void doCreateNamespace(final HttpServletRequest req,
             final HttpServletResponse resp) throws IOException {
         
+        if (!isWritable(req, resp)) {
+            // Service must be writable.
+            return;
+        }
+
         final BigdataRDFContext context = getBigdataRDFContext();
 
         final IIndexManager indexManager = context.getIndexManager();

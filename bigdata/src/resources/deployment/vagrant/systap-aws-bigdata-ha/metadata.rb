@@ -1,0 +1,15 @@
+name		'systap-bigdataHA'
+maintainer	'Daniel Mekonnen'
+maintainer_email 'daniel<no-spam-at>systap.com'
+license		'All rights reserved'
+description	'Installs/Configures Systap Bigdata High Availability'
+long_description IO.read(File.join(File.dirname(__FILE__), 'README.txt'))
+version		'0.1.0'
+
+depends		'apt'
+depends		'java', '>= 1.22.0' 
+depends		'ant'
+depends		'subversion'
+depends		'lvm'
+depends		'hadoop'
+depends		'emacs'

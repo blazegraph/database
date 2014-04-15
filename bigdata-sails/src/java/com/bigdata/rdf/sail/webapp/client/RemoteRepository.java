@@ -579,8 +579,7 @@ public class RemoteRepository {
              */
             try {
                 EntityUtils.consume(response.getEntity());
-            } catch (IOException ex) {
-            }
+            } catch (IOException ex) {log.warn(ex); }
         }
             
     }
@@ -637,7 +636,7 @@ public class RemoteRepository {
                 if (resp != null)
                     EntityUtils.consume(resp.getEntity());
                 
-            } catch (Exception ex) { }
+            } catch (Exception ex) {log.warn(ex); }
             
         }
 
@@ -690,7 +689,7 @@ public class RemoteRepository {
                 if (resp != null)
                     EntityUtils.consume(resp.getEntity());
                 
-            } catch (Exception ex) { }
+            } catch (Exception ex) {log.warn(ex); }
             
         }
     	
@@ -749,7 +748,7 @@ public class RemoteRepository {
                 if (response != null)
                     EntityUtils.consume(response.getEntity());
                 
-            } catch (Exception ex) { }
+            } catch (Exception ex) {log.warn(ex); }
             
         }
         
@@ -829,7 +828,7 @@ public class RemoteRepository {
                 if (response != null)
                     EntityUtils.consume(response.getEntity());
                 
-            } catch (Exception ex) { }
+            } catch (Exception ex) {log.warn(ex); }
             
         }
         
@@ -917,7 +916,7 @@ public class RemoteRepository {
                 if (response != null)
                     EntityUtils.consume(response.getEntity());
                 
-            } catch (Exception ex) { }
+            } catch (Exception ex) {log.warn(ex); }
             
         }
         
@@ -1487,7 +1486,7 @@ public class RemoteRepository {
 //                    conn.disconnect();
                 
             } catch (Throwable t2) {
-                // ignored.
+                log.warn(t2); // ignored.
             }
             throw new RuntimeException(sparqlEndpointURL + " : " + t, t);
         }
@@ -1665,7 +1664,7 @@ public class RemoteRepository {
 		    				
 		    				try {
 		    					cancel(queryId);
-		    				} catch (Exception ex) { }
+		    				} catch (Exception ex) {log.warn(ex); }
 		    				
 		    			}
 		    			
@@ -1693,13 +1692,13 @@ public class RemoteRepository {
             if (entity != null && result == null) {
                 try {
                     EntityUtils.consume(entity);
-                } catch (IOException ex) { }
+                } catch (IOException ex) {log.warn(ex); }
             }
             
             if (response != null && tqrImpl == null) {
             	try {
             		cancel(queryId);
-            	} catch(Exception ex) { }
+            	} catch(Exception ex) {log.warn(ex); }
             }
             
         }
@@ -1811,7 +1810,7 @@ public class RemoteRepository {
 		    				
 		    				try {
 		    					cancel(queryId);
-		    				} catch (Exception ex) { }
+		    				} catch (Exception ex) {log.warn(ex); }
 		    				
 		    			}
 		    			
@@ -1843,11 +1842,11 @@ public class RemoteRepository {
             if (response != null && result == null) {
                 try {
                     EntityUtils.consume(entity);
-                } catch (IOException ex) { }
+                } catch (IOException ex) {log.warn(ex); }
                 
                 try {
                 	cancel(queryId);
-                } catch (Exception ex) { }
+                } catch (Exception ex) {log.warn(ex); }
             }
 
         }
@@ -1912,11 +1911,11 @@ public class RemoteRepository {
         	if (result == null) {
 	            try {
 	                EntityUtils.consume(entity);
-	            } catch (IOException ex) { }
+	            } catch (IOException ex) {log.warn(ex); }
 	            
 	            try {
 	            	cancel(queryId);
-	            } catch (Exception ex) { }
+	            } catch (Exception ex) {log.warn(ex); }
         	}
 
         }
@@ -1996,7 +1995,7 @@ public class RemoteRepository {
 //            response.disconnect();
             try {
                 EntityUtils.consume(entity);
-            } catch (IOException ex) { }
+            } catch (IOException ex) {log.warn(ex); }
 
         }
 
@@ -2058,7 +2057,7 @@ public class RemoteRepository {
 //            response.disconnect();
             try {
                 EntityUtils.consume(entity);
-            } catch (IOException ex) { }
+            } catch (IOException ex) {log.warn(ex); }
 
         }
 
@@ -2120,7 +2119,7 @@ public class RemoteRepository {
 //            response.disconnect();
             try {
                 EntityUtils.consume(entity);
-            } catch (IOException ex) { }
+            } catch (IOException ex) {log.warn(ex); }
 
         }
 
@@ -2178,7 +2177,7 @@ public class RemoteRepository {
 //            response.disconnect();
             try {
                 EntityUtils.consume(entity);
-            } catch (IOException ex) { }
+            } catch (IOException ex) {log.warn(ex); }
 
         }
 
