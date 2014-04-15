@@ -87,7 +87,6 @@ import com.bigdata.jini.util.ConfigMath;
 import com.bigdata.jini.util.JiniUtil;
 import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.StoreState;
-import com.bigdata.journal.jini.ha.HAJournalServer.ConfigurationOptions;
 import com.bigdata.journal.jini.ha.HAJournalTest.HAGlueTest;
 import com.bigdata.quorum.AbstractQuorumClient;
 import com.bigdata.quorum.AsynchronousQuorumCloseException;
@@ -110,7 +109,7 @@ import com.bigdata.zookeeper.ZooHelper;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
-public class AbstractHA3JournalServerTestCase extends
+public abstract class AbstractHA3JournalServerTestCase extends
         AbstractHAJournalServerTestCase implements DiscoveryListener {
 
     /** Quorum client used to monitor (or act on) the logical service quorum. */
@@ -133,7 +132,7 @@ public class AbstractHA3JournalServerTestCase extends
      * Implementation listens for the death of the child process and can be used
      * to decide when the child process is no longer executing.
      */
-    public static class ServiceListener implements IServiceListener {
+    static class ServiceListener implements IServiceListener {
 
         private volatile HAGlue haGlue;
         private volatile ProcessHelper processHelper;
@@ -152,13 +151,14 @@ public class AbstractHA3JournalServerTestCase extends
             this.haGlue = haGlue;
         }
 
-        @SuppressWarnings("unused")
-        public HAGlue getHAGlue() {
+//        @SuppressWarnings("unused")
+//        public HAGlue getHAGlue() {
+//
+//            return haGlue;
+//            
+//        }
 
-            return haGlue;
-            
-        }
-
+        @Override
         public void add(final ProcessHelper processHelper) {
 
             if (processHelper == null)
@@ -1378,8 +1378,30 @@ public class AbstractHA3JournalServerTestCase extends
 
     }
 
-    protected String getZKConfigFile() {
-    	return "zkClient.config";
+    /**
+     * Return the zookeeper client configuration file.
+     */
+    final protected String getZKConfigFile() {
+
+        return "zkClient.config";
+        
+    }
+    
+    /**
+     * The as-configured replication factor.
+     * <p>
+     * Note: This is defined in the HAJournal.config file, which is where the
+     * {@link HAJournalServer} gets the correct value. We also need to have the
+     * replicationFactor on hand for the test suite so we can setup the quorum
+     * in the test fixture correctly. However, it is difficult to reach the
+     * appropriate HAJournal.config file from the text fixture during
+     * {@link #setUp()}. Therefore, for the test setup, this is achieved by
+     * overriding this abstract method in the test class.
+     */
+    protected int replicationFactor() {
+
+        return 3;
+        
     }
     
     /**
@@ -1407,7 +1429,7 @@ public class AbstractHA3JournalServerTestCase extends
         // Note: Save reference.
         this.zookeeper = new ZooKeeper(zoohosts, sessionTimeout, new Watcher() {
             @Override
-            public void process(WatchedEvent event) {
+            public void process(final WatchedEvent event) {
                 if (log.isInfoEnabled())
                     log.info(event);
             }
@@ -1457,9 +1479,19 @@ public class AbstractHA3JournalServerTestCase extends
         logicalServiceZPath = logicalServiceZPathPrefix + "/"
                 + logicalServiceId;
 
-        final int replicationFactor = (Integer) config.getEntry(
-                ZookeeperClientConfig.Options.NAMESPACE,
-                ConfigurationOptions.REPLICATION_FACTOR, Integer.TYPE);        
+        /**
+         * Note: This is defined in the HAJournal.config file, which is where
+         * the HAJournalServer gets the correct value.
+         * 
+         * However, we also need to have the replicationFactor on hand for the
+         * test suite so we can setup the quorum in the test fixture correctly.
+         */
+        final int replicationFactor = replicationFactor();
+//        {
+//            replicationFactor = (Integer) config.getEntry(
+//                    ConfigurationOptions.COMPONENT,
+//                    ConfigurationOptions.REPLICATION_FACTOR, Integer.TYPE);
+//        }
 
 //        if (!zka.awaitZookeeperConnected(10, TimeUnit.SECONDS)) {
 //
@@ -1565,7 +1597,7 @@ public class AbstractHA3JournalServerTestCase extends
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      */
-    public abstract class StartServerTask implements Callable<HAGlue> {
+    abstract class StartServerTask implements Callable<HAGlue> {
 
         private final String name;
         private final String configName;

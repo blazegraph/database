@@ -1165,7 +1165,7 @@ abstract public class WriteCacheService implements IWriteCache {
                      */
                     if (flush) {
                         /*
-                         * Send out the full cache block. FIXME Why are we not calling sendAddressMetadata() here?
+                         * Send out the full cache block.
                          */
                         writeCacheBlock(curCompactingCache);
                         addClean(curCompactingCache, true/* addFirst */);
@@ -1245,6 +1245,8 @@ abstract public class WriteCacheService implements IWriteCache {
          * @throws InterruptedException
          * @throws ExecutionException
          * @throws IOException
+         * 
+         * @see <a href="http://trac.bigdata.com/ticket/721"> HA1 </a>
          */
         private void sendAddressMetadata(final WriteCache cache)
                 throws IllegalStateException, InterruptedException,
@@ -1345,19 +1347,14 @@ abstract public class WriteCacheService implements IWriteCache {
         private void writeCacheBlock(final WriteCache cache)
                 throws InterruptedException, ExecutionException, IOException {
 
-//            /*
-//             * IFF HA
-//             * 
-//             * TODO isHA should be true even if the quorum is not highly
-//             * available since there still could be other services in the write
-//             * pipeline (e.g., replication to an offline HAJournalServer prior
-//             * to changing over into an HA3 quorum or off-site replication). The
-//             * unit tests need to be updated to specify [isHighlyAvailable] for
-//             * ALL quorum based test runs.
-//             */
-//            final boolean isHA = quorum != null && quorum.isHighlyAvailable();
-
-            // IFF HA and this is the quorum leader.
+            /**
+             * IFF HA and this is the quorum leader.
+             * 
+             * Note: This is true for HA1 as well. The code path enabled by this
+             * is responsible for writing the HALog files.
+             * 
+             * @see <a href="http://trac.bigdata.com/ticket/721"> HA1 </a>
+             */
             final boolean isHALeader = quorum != null
                     && quorum.getClient().isLeader(quorumToken);
 
@@ -1441,6 +1438,12 @@ abstract public class WriteCacheService implements IWriteCache {
                  */
                 quorumMember.logWriteCacheBlock(pkg.getMessage(), pkg.getData().duplicate());
 
+                /*
+                 * TODO Do we want to always support the replication code path
+                 * when a quorum exists (that is, also for HA1) in case there
+                 * are pipeline listeners that are not HAJournalServer
+                 * instances? E.g., for offsite replication?
+                 */
                 if (quorum.replicationFactor() > 1) {
 
                     // ASYNC MSG RMI + NIO XFER.

@@ -521,7 +521,7 @@ public class TestWORMWriteCacheService extends TestCase3 {
 
         final int nbuffers = 1;
         final boolean useChecksums = false;
-        final boolean isHighlyAvailable = true; // for HA1! false;
+        final boolean isHighlyAvailable = true;
 
         // No write pipeline.
         final int k = 1;
@@ -619,7 +619,7 @@ public class TestWORMWriteCacheService extends TestCase3 {
 
         final int nbuffers = 2;
         final boolean useChecksums = false;
-        final boolean isHighlyAvailable = true; // for HA1! false;
+        final boolean isHighlyAvailable = true;
 
         // No write pipeline.
         final int k = 1;
@@ -672,7 +672,7 @@ public class TestWORMWriteCacheService extends TestCase3 {
          */
         final double largeRecordRate = 0d;
         final boolean useChecksums = false;
-        final boolean isHighlyAvailable = true; // for HA1! false;
+        final boolean isHighlyAvailable = true;
 
         // No write pipeline.
         final int k = 1;
@@ -717,7 +717,7 @@ public class TestWORMWriteCacheService extends TestCase3 {
 
         final int nbuffers = 6;
         final boolean useChecksums = true;
-        final boolean isHighlyAvailable = true; // for HA1! false;
+        final boolean isHighlyAvailable = true;
 
         // No write pipeline.
         final int k = 1;
@@ -770,7 +770,7 @@ public class TestWORMWriteCacheService extends TestCase3 {
          */
         final double largeRecordRate = 0d;
         final boolean useChecksums = true;
-        final boolean isHighlyAvailable = true; // for HA1! false;
+        final boolean isHighlyAvailable = true;
 
         // No write pipeline.
         final int k = 1;

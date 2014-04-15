@@ -74,6 +74,11 @@ public class TestAll extends TestCase {
         // Basic tests for a single HAJournalServer (quorum does not meet)
         suite.addTestSuite(TestHAJournalServer.class);
 
+        // HA1 test suite.
+        suite.addTestSuite(TestHA1JournalServer.class);
+        suite.addTestSuite(TestHA1SnapshotPolicy.class);
+        suite.addTestSuite(TestHA1SnapshotPolicy2.class);
+
         // HA2 test suite (k=3, but only 2 services are running).
         suite.addTestSuite(TestHA2JournalServer.class);
 
@@ -108,17 +113,16 @@ public class TestAll extends TestCase {
         // Verify ability to override the HAJournal implementation class.
         suite.addTestSuite(TestHAJournalServerOverride.class); 
 
-        // Test suite of longer running stress tests for an HA3 cluster.
-        suite.addTestSuite(StressTestHA3JournalServer.class);
-
-        // Test suite of longer running stress tests for an HA5 cluster.
+        // HA5 test suite.
         suite.addTestSuite(TestHA5JournalServer.class);
         suite.addTestSuite(TestHA5JournalServerWithHALogs.class);
 
-        // Test suite of longer running stress tests for an HA1 cluster.
-        suite.addTestSuite(TestHA1JournalServer.class);
-        suite.addTestSuite(TestHA1SnapshotPolicy.class);
-        suite.addTestSuite(TestHA1SnapshotPolicy2.class);
+        /*
+         * Stress tests.
+         */
+        
+        // Test suite of longer running stress tests for an HA3 cluster.
+        suite.addTestSuite(StressTestHA3JournalServer.class);
 
         return suite;
 

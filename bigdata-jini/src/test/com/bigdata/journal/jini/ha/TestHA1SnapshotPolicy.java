@@ -30,10 +30,13 @@ public class TestHA1SnapshotPolicy extends AbstractHA3BackupTestCase {
         super(name);
     }
  
-    protected String getZKConfigFile() {
-    	return "zkClient1.config"; // 1 stage pipeline
+    @Override
+    protected int replicationFactor() {
+
+        return 1;
+        
     }
-    
+
     /**
      * {@inheritDoc}
      * <p>
@@ -60,7 +63,7 @@ public class TestHA1SnapshotPolicy extends AbstractHA3BackupTestCase {
                 "com.bigdata.journal.jini.ha.HAJournalServer.snapshotPolicy=new com.bigdata.journal.jini.ha.DefaultSnapshotPolicy("+neverRun+",0)",
                 // "com.bigdata.journal.jini.ha.HAJournalServer.snapshotPolicy=new com.bigdata.journal.jini.ha.NoSnapshotPolicy()",
                 // "com.bigdata.journal.jini.ha.HAJournalServer.onlineDisasterRecovery=true",
-                "com.bigdata.journal.jini.ha.HAJournalServer.replicationFactor=1",
+                "com.bigdata.journal.jini.ha.HAJournalServer.replicationFactor="+replicationFactor(),
         };
         
     }

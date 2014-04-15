@@ -1,3 +1,26 @@
+/**
+
+Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
+
+Contact:
+     SYSTAP, LLC
+     4501 Tower Road
+     Greensboro, NC 27410
+     licenses@bigdata.com
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; version 2 of the License.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+*/
 package com.bigdata.journal.jini.ha;
 
 import java.util.concurrent.Callable;
@@ -10,9 +33,12 @@ import net.jini.config.Configuration;
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.HAStatusEnum;
 import com.bigdata.ha.msg.HARootBlockRequest;
-import com.bigdata.journal.jini.ha.AbstractHA3JournalServerTestCase.ABC;
-import com.bigdata.journal.jini.ha.AbstractHA3JournalServerTestCase.LargeLoadTask;
 
+/**
+ * HA5 test suite.
+ * 
+ * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ */
 public class TestHA5JournalServer extends AbstractHA5JournalServerTestCase {
 
     /**
@@ -31,11 +57,18 @@ public class TestHA5JournalServer extends AbstractHA5JournalServerTestCase {
                 "com.bigdata.journal.jini.ha.HAJournalServer.snapshotPolicy=new com.bigdata.journal.jini.ha.NoSnapshotPolicy()",
 //                "com.bigdata.journal.jini.ha.HAJournalServer.HAJournalClass=\""+HAJournalTest.class.getName()+"\"",
                 "com.bigdata.journal.jini.ha.HAJournalServer.onlineDisasterRecovery=true",
-                "com.bigdata.journal.jini.ha.HAJournalServer.replicationFactor=5",
+                "com.bigdata.journal.jini.ha.HAJournalServer.replicationFactor="+replicationFactor(),
         };
         
     }
     
+    @Override
+    protected int replicationFactor() {
+
+        return 5;
+        
+    }
+
     public TestHA5JournalServer() {
     }
 
@@ -49,9 +82,11 @@ public class TestHA5JournalServer extends AbstractHA5JournalServerTestCase {
      * @throws Exception
      */
     public void testStartABC_DE() throws Exception {
-    	doStartABC_DE();
+   
+        doStartABC_DE();
+        
     }
-    
+ 
     protected void doStartABC_DE() throws Exception {
 
         // Start 3 services.
@@ -171,117 +206,115 @@ public class TestHA5JournalServer extends AbstractHA5JournalServerTestCase {
      * HA5 is fully met after 5 services are started simultaneously
      */
     public void testABCDESimultaneous() throws Exception {
-    	
-    	final ABCDE startup = new ABCDE(false);
-    	
-    	awaitFullyMetQuorum();
-    	
+
+        final ABCDE startup = new ABCDE(false);
+
+        awaitFullyMetQuorum();
+
         startup.assertDigestsEqual();
     }
-    
+
     /**
      * HA5 is fully met after 5 services are started sequentially
      */
     public void testABCDESequential() throws Exception {
-    	
-    	final ABCDE startup = new ABCDE(true);
-    	
-    	awaitFullyMetQuorum();
-    	
+
+        final ABCDE startup = new ABCDE(true);
+
+        awaitFullyMetQuorum();
+
         startup.assertDigestsEqual();
     }
-    
+
     /**
      * HA5 remains met with 1 service failure
      */
     public void testABCDEShutdownC() throws Exception {
-    	
-    	final ABCDE startup = new ABCDE(true);
-    	
-    	final long token = awaitFullyMetQuorum();
-    	
+
+        final ABCDE startup = new ABCDE(true);
+
+        final long token = awaitFullyMetQuorum();
+
         startup.assertDigestsEqual();
-        
+
         shutdownC();
-        
-        awaitPipeline(new HAGlue[] {serverA, serverB, serverD, serverE});
-        
+
+        awaitPipeline(new HAGlue[] { serverA, serverB, serverD, serverE });
+
         assertEquals(token, awaitMetQuorum());
     }
-    
+
     /**
      * HA5 remains met with 2 service failures
      */
     public void testABCDEShutdownBD() throws Exception {
-    	
-    	final ABCDE startup = new ABCDE(true);
-    	
-    	final long token = awaitFullyMetQuorum();
-    	
+
+        final ABCDE startup = new ABCDE(true);
+
+        final long token = awaitFullyMetQuorum();
+
         startup.assertDigestsEqual();
-        
+
         shutdownB();
         shutdownD();
-        
-        awaitPipeline(new HAGlue[] {serverA, serverC, serverE});
-        
+
+        awaitPipeline(new HAGlue[] { serverA, serverC, serverE });
+
         assertEquals(token, awaitMetQuorum());
     }
-    
+
     /**
-     * HA5 breaks with 3 service failures and re-meets when one
-     * is restarted
+     * HA5 breaks with 3 service failures and re-meets when one is restarted
      */
     public void testABCDEShutdownBCD() throws Exception {
-    	
-    	final ABCDE startup = new ABCDE(true);
-    	
-    	final long token = awaitFullyMetQuorum();
-    	
+
+        final ABCDE startup = new ABCDE(true);
+
+        final long token = awaitFullyMetQuorum();
+
         startup.assertDigestsEqual();
-        
+
         shutdownB();
         shutdownC();
         shutdownD();
-        
+
         // Non-deterministic pipeline order
         // awaitPipeline(new HAGlue[] {serverA, serverE});
-        
+
         try {
-        	awaitMetQuorum();
-        	fail("Quorum should not be met");
+            awaitMetQuorum();
+            fail("Quorum should not be met");
         } catch (TimeoutException te) {
-        	// expected
+            // expected
         }
-        
+
         startC();
-        
+
         assertFalse(token == awaitMetQuorum());
     }
-    
+
     /**
-     * HA5 breaks when leader fails, meets on new token
-     * then fully meets on same token when previous leader
-     * is restarted
+     * HA5 breaks when leader fails, meets on new token then fully meets on same
+     * token when previous leader is restarted
      */
     public void testABCDEShutdownLeader() throws Exception {
-    	
-    	final ABCDE startup = new ABCDE(true);
-    	
-    	final long token = awaitFullyMetQuorum();
-    	
+
+        final ABCDE startup = new ABCDE(true);
+
+        final long token = awaitFullyMetQuorum();
+
         startup.assertDigestsEqual();
-        
+
         shutdownA();
-        
+
         // pipeline order is non-deterministic
-        
+
         final long token2 = awaitMetQuorum();
-        
-        assertFalse(token==token2);
-        
+
+        assertFalse(token == token2);
+
         startA();
-        
+
         assertTrue(token2 == awaitFullyMetQuorum());
     }
     

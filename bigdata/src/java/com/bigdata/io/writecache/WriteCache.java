@@ -310,7 +310,7 @@ abstract public class WriteCache implements IWriteCache {
         
         /**
          * When a record is used as a read cache then the readCount is
-         * maintained as a metric on its access. ???This could be used to
+         * maintained as a metric on its access. This could be used to
          * determine eviction/compaction.
          * <p>
          * Note: volatile to guarantee visibility of updates. Might do better

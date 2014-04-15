@@ -4574,7 +4574,7 @@ public class HAJournalServer extends AbstractServer {
 
 //            }
 
-            log.warn("Starting NSS from " + jettyXml);
+            log.warn("Starting NSS");
             
             // Start the server.
             jettyServer.start();
@@ -4658,9 +4658,8 @@ public class HAJournalServer extends AbstractServer {
         if (tmp == null)
             throw new IllegalStateException("Server is not running");
 
-        final int port = tmp.getConnectors()[0].getLocalPort();
-        haLog.warn("Returning NSSPort: " + port);
-        return port;
+        return tmp.getConnectors()[0].getLocalPort();
+        
     }
     
     /**

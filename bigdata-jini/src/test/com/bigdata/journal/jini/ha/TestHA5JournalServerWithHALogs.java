@@ -1,17 +1,43 @@
+/**
+
+Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
+
+Contact:
+     SYSTAP, LLC
+     4501 Tower Road
+     Greensboro, NC 27410
+     licenses@bigdata.com
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; version 2 of the License.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+*/
 package com.bigdata.journal.jini.ha;
 
 import java.io.File;
 import java.util.Calendar;
 
+import net.jini.config.Configuration;
+
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.halog.HALogReader;
 import com.bigdata.ha.halog.IHALogReader;
 import com.bigdata.journal.CommitCounterUtility;
-import com.bigdata.journal.jini.ha.AbstractHA3JournalServerTestCase.ABC;
 
-import net.jini.config.Configuration;
-import junit.framework.TestCase;
-
+/**
+ * HA5 test suite.
+ * 
+ * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ */
 public class TestHA5JournalServerWithHALogs extends AbstractHA5JournalServerTestCase {
 
     /**
@@ -46,6 +72,13 @@ public class TestHA5JournalServerWithHALogs extends AbstractHA5JournalServerTest
         
     }
 
+    @Override
+    protected int replicationFactor() {
+
+        return 5;
+        
+    }
+
     /**
      * {@inheritDoc}
      * <p>
@@ -67,7 +100,7 @@ public class TestHA5JournalServerWithHALogs extends AbstractHA5JournalServerTest
         return new String[]{
                 "com.bigdata.journal.jini.ha.HAJournalServer.restorePolicy=new com.bigdata.journal.jini.ha.DefaultRestorePolicy()",
                 "com.bigdata.journal.jini.ha.HAJournalServer.snapshotPolicy=new com.bigdata.journal.jini.ha.DefaultSnapshotPolicy("+neverRun+",0)",
-                "com.bigdata.journal.jini.ha.HAJournalServer.replicationFactor=5",
+                "com.bigdata.journal.jini.ha.HAJournalServer.replicationFactor="+replicationFactor(),
         };
         
     }

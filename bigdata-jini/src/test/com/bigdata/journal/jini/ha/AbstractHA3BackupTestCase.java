@@ -63,6 +63,13 @@ public class AbstractHA3BackupTestCase extends AbstractHA3JournalServerTestCase 
         super(name);
     }
 
+    @Override
+    protected int replicationFactor() {
+
+        return 3;
+        
+    }
+
     /**
      * Issue HTTP request to a service to take a snapshot.
      * 

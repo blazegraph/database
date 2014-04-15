@@ -184,7 +184,7 @@ public class SD {
      * withstand a failure.
      */
     static public final URI ReplicationFactor = new URIImpl(BDFNS
-            + "replicationCount");
+            + "replicationFactor");
     
     /**
      * An {@link IBigdataFederation}.

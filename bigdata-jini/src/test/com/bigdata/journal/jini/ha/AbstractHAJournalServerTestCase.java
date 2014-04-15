@@ -1259,35 +1259,34 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
 
     }
 
-    /**
-     * The effective name for this test as used to name the directories in which
-     * we store things.
-     * 
-     * TODO If there are method name collisions across the different test
-     * classes then the test suite name can be added to this. Also, if there are
-     * file naming problems, then this value can be munged before it is
-     * returned.
-     */
-    private final String effectiveTestFileName = getClass().getSimpleName()
-            + "." + getName();
-
-    /**
-     * The directory that is the parent of each {@link HAJournalServer}'s
-     * individual service directory.
-     */
-    protected File getTestDir() {
-        return new File(TGT_PATH, getEffectiveTestFileName());
-    }
-
-    /**
-     * The effective name for this test as used to name the directories in which
-     * we store things.
-     */
-    protected String getEffectiveTestFileName() {
-        
-        return effectiveTestFileName;
-        
-    }
-
+//    /**
+//     * The effective name for this test as used to name the directories in which
+//     * we store things.
+//     * 
+//     * TODO If there are method name collisions across the different test
+//     * classes then the test suite name can be added to this. Also, if there are
+//     * file naming problems, then this value can be munged before it is
+//     * returned.
+//     */
+//    private final String effectiveTestFileName = getClass().getSimpleName()
+//            + "." + getName();
+//
+//    /**
+//     * The directory that is the parent of each {@link HAJournalServer}'s
+//     * individual service directory.
+//     */
+//    protected File getTestDir() {
+//        return new File(TGT_PATH, getEffectiveTestFileName());
+//    }
+//
+//    /**
+//     * The effective name for this test as used to name the directories in which
+//     * we store things.
+//     */
+//    protected String getEffectiveTestFileName() {
+//        
+//        return effectiveTestFileName;
+//        
+//    }
 
 }
