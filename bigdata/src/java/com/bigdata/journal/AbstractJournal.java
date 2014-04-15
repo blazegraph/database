@@ -3429,13 +3429,8 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                 return;
 
             if (!quorum.isHighlyAvailable()) {
-            	// FIXME: Find the reason why this delay is needed to pass HA1 snapshot tests
-//            	try {
-//					Thread.sleep(1000);
-//				} catch (InterruptedException e) {
-//					e.printStackTrace();
-//				}
-            	return;
+                // Gather and 2-phase commit are not used in HA1.
+                return;
             }
 
             /**
@@ -3550,9 +3545,11 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
             store._commitRecord = store._getCommitRecord();
 
             if (quorum != null) {
-                /*
+                /**
                  * Write the root block on the HALog file, closing out that
                  * file.
+                 * 
+                 * @see <a href="http://trac.bigdata.com/ticket/721"> HA1 </a>
                  */
                 final QuorumService<HAGlue> localService = quorum.getClient();
                 if (localService != null) {
@@ -3872,7 +3869,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
                 if (quorum == null || quorum.replicationFactor() == 1) {
                     
-                    // Non-HA mode.
+                    // Non-HA mode (including HA1).
                     cs.commitSimple();
     
                 } else {
