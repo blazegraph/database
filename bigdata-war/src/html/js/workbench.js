@@ -478,58 +478,66 @@ $('#query-response-clear').click(function() {
    $('#query-response, #query-explanation, #query-tab .bottom *').hide();
 });
 
-$('#query-export-rdf').click(function() { updateExportFileExtension(); showModal('query-export'); });
-$('#query-export-csv').click(exportCSV);
-$('#query-export-json').click(exportJSON);
-$('#query-export-xml').click(exportXML);
+$('#query-export').click(function() { updateExportFileExtension(); showModal('query-export-modal'); });
 
-var rdf_extensions = {
-   "application/rdf+xml": ['RDF/XML', 'rdf'],
-   "application/x-turtle": ['N-Triples', 'nt'],
-   "application/x-turtle": ['Turtle', 'ttl'],
-   "text/rdf+n3": ['N3', 'n3'],
-   "application/trix": ['TriX', 'trix'],
-   "application/x-trig": ['TRIG', 'trig'],
-   "text/x-nquads": ['NQUADS', 'nq']
+var export_extensions = {
+   "application/rdf+xml": ['RDF/XML', 'rdf', true],
+   "application/x-turtle": ['N-Triples', 'nt', true],
+   "application/x-turtle": ['Turtle', 'ttl', true],
+   "text/rdf+n3": ['N3', 'n3', true],
+   "application/trix": ['TriX', 'trix', true],
+   "application/x-trig": ['TRIG', 'trig', true],
+   "text/x-nquads": ['NQUADS', 'nq', true],
+
+   "text/csv": ['CSV', 'csv', false, exportCSV],
+   "application/sparql-results+json": ['JSON', 'json', false, exportJSON],
+   // "text/tab-separated-values": ['TSV', 'tsv', false, exportTSV],
+   "application/sparql-results+xml": ['XML', 'xml', false, exportXML]
 };
 
-for(var contentType in rdf_extensions) {
-   $('#export-format').append('<option value="' + contentType + '">' + rdf_extensions[contentType][0] + '</option>');
+for(var contentType in export_extensions) {
+   var optgroup = export_extensions[contentType][2] ? '#rdf-formats' : '#non-rdf-formats';
+   $(optgroup).append('<option value="' + contentType + '">' + export_extensions[contentType][0] + '</option>');
 }
+
+$('#export-format option:first').prop('selected', true);
 
 $('#export-format').change(updateExportFileExtension);
 
 function updateExportFileExtension() {
-   $('#export-filename-extension').html(rdf_extensions[$('#export-format').val()][1]);
+   $('#export-filename-extension').html(export_extensions[$('#export-format').val()][1]);
 }
 
-$('#query-download-rdf').click(function() {
+$('#query-download').click(function() {
    var dataType = $('#export-format').val();
-   var settings = {
-      type: 'POST',
-      data: JSON.stringify(QUERY_RESULTS),
-      contentType: 'application/sparql-results+json',
-      headers: { 'Accept': dataType },
-      success: function(data) { downloadRDFSuccess(data, dataType, $('#export-filename').val()); },
-      error: downloadRDFError
-   };
-   $.ajax('/bigdata/sparql?workbench&convert', settings);
-   $(this).siblings('.modal-cancel').click();
-});
-
-function downloadRDFSuccess(data, dataType, filename) {
+   var filename = $('#export-filename').val();
    if(filename == '') {
       filename = 'export';
    }
-   filename += '.' + rdf_extensions[dataType][1];
-   downloadFile(data, dataType, filename);
-}
+   filename += '.' + export_extensions[dataType][1];
+   if(export_extensions[dataType][2]) {
+      // RDF
+      var settings = {
+         type: 'POST',
+         data: JSON.stringify(QUERY_RESULTS),
+         contentType: 'application/sparql-results+json',
+         headers: { 'Accept': dataType },
+         success: function() { downloadFile(data, dataType, filename); },
+         error: downloadRDFError
+      };
+      $.ajax('/bigdata/sparql?workbench&convert', settings);
+   } else {
+      // not RDF
+      export_extensions[dataType][3](filename);
+   }
+   $(this).siblings('.modal-cancel').click();
+});
 
 function downloadRDFError(jqXHR, textStatus, errorThrown) {
    alert(errorThrown);
 }   
 
-function exportXML() {
+function exportXML(filename) {
    var xml = '<?xml version="1.0"?>\n<sparql xmlns="http://www.w3.org/2005/sparql-results#">\n\t<head>\n';
    var bindings = [];
    $('#query-response thead tr td').each(function(i, td) {
@@ -561,27 +569,32 @@ function exportXML() {
       xml += '\t\t</result>\n';
    });
    xml += '\t</results>\n</sparql>\n';
-   downloadFile(xml, 'application/sparql-results+xml', 'export.xml');
+   downloadFile(xml, 'application/sparql-results+xml', filename);
 }
 
-function exportJSON() {
+function exportJSON(filename) {
    var json = JSON.stringify(QUERY_RESULTS);
-   downloadFile(json, 'application/sparql-results+json', 'export.json');
+   downloadFile(json, 'application/sparql-results+json', filename);
 }
 
-function exportCSV() {
-   // FIXME: escape commas
+function exportCSV(filename) {
    var csv = '';
    $('#query-response table tr').each(function(i, tr) {
       $(tr).find('td').each(function(j, td) {
          if(j > 0) {
             csv += ',';
          }
-         csv += td.textContent;
+         var val = td.textContent;
+         // quote value if it contains " , \n or \r
+         // replace " with ""
+         if(val.match(/[",\n\r]/)) {
+            val = '"' + val.replace('"', '""') + '"';
+         }
+         csv += val;
       });
       csv += '\n';
    });
-   downloadFile(csv, 'application/csv', 'export.csv');
+   downloadFile(csv, 'text/csv', filename);
 }
 
 function downloadFile(data, type, filename) {
@@ -680,9 +693,12 @@ function showQueryResults(data) {
             // remove (unused) c variable from JSON
             QUERY_RESULTS.head.vars.pop()
          }
-         $('#query-export-rdf').show();
+         $('#rdf-formats').prop('disabled', false);
       } else {
-         $('#query-export-rdf').hide();
+         $('#rdf-formats').prop('disabled', true);
+         if($('#rdf-formats option:selected').length == 1) {
+            $('#non-rdf-formats option:first').prop('selected', true);
+         }
       }
 
       $('#query-response a').click(function(e) {
@@ -1046,6 +1062,16 @@ function abbreviate(uri) {
       }
    }
    return '<' + uri + '>';
+}
+
+function unabbreviate(uri) {
+   if(uri.charAt(0) == '<') {
+      // not abbreviated
+      return uri;
+   }
+   // get namespace
+   var namespace = uri.split(':', 1)[0];
+   return '<' + uri.replace(namespace, NAMESPACE_SHORTCUTS[namespace]) + '>';
 }
 
 function parseSID(sid) {

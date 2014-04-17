@@ -107,20 +107,20 @@
         </div>
 
         <div class="bottom">
-          <button id="query-export-rdf">Export RDF</button>
-          <button id="query-export-csv">Export CSV</button>
-          <button id="query-export-json">Export JSON</button>
-          <button id="query-export-xml">Export XML</button>
+          <button id="query-export">Export</button>
           <button id="query-response-clear">Clear</button>
         </div>
 
       </div>
 
-      <div id="query-export" class="modal">
+      <div id="query-export-modal" class="modal">
         <h1>Export</h1>
         <p>
           <label for="export-format">Format: </label>
-          <select id="export-format"></select>
+          <select id="export-format">
+            <optgroup id="rdf-formats" label="RDF"></optgroup>
+            <optgroup id="non-rdf-formats" label="Other"></optgroup>
+          </select>
         </p>
         <p>
           <label for="export-filename">Filename: </label>
@@ -128,7 +128,7 @@
           .<span id="export-filename-extension"></span>
         </p>
         <p>
-          <button id="query-download-rdf">Export</button>
+          <button id="query-download">Export</button>
           <button class="modal-cancel">Cancel</button>
         </p>
       </div>
