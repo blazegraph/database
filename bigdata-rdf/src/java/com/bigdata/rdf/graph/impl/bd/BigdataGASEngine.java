@@ -409,27 +409,39 @@ public class BigdataGASEngine extends GASEngine {
                     // Bind O for this key-range scan.
                     IVUtility.encode(keyBuilder, u);
 
-                } else {
+                } else if (!inEdges) {
 
                     /*
-                     * SPO(C) or OSP(C)
-                     * 
-                     * Note: For RDR link attribute access, the keys are formed
-                     * differently. Lower case letters are used for variables.
-                     * Upper case letters for constants.
-                     * 
-                     * For SPO(C): S:=SID(Spo(c)), P:=linkAttributeType (must
-                     * filter), O:=linkAttributeValue (read it off the index
-                     * when the filter is satisfied).
-                     * 
-                     * For OSP(C): OL=SID(Osp(c)), P:=linkAttributeType (must
-                     * filter), S:=linkAttributeValue (read it off the index
-                     * when the filter is satisfied).
-                     * 
-                     * TODO RDR should also be supported in the SAIL and RAM GAS
-                     * engine implementations. The statements about statements
-                     * would be modeled as reified statement models.
-                     */
+					 * SPO(C) or OSP(C)
+					 * 
+					 * Note: For RDR link attribute access, the keys are formed
+					 * differently. Lower case letters are used for variables.
+					 * Upper case letters for constants.
+					 * 
+					 * For SPO(C): S:=SID(Spo(c)), P:=linkAttributeType (must
+					 * filter), O:=linkAttributeValue (read it off the index
+					 * when the filter is satisfied).
+					 * 
+					 * For OSP(C): OL=SID(Osp(c)), P:=linkAttributeType (must
+					 * filter), S:=linkAttributeValue (read it off the index
+					 * when the filter is satisfied). WRONG WRONG WRONG 
+					 * linkAttributeValue will always always always be an O 
+					 * 
+					 * TODO RDR should also be supported in the SAIL and RAM GAS
+					 * engine implementations. The statements about statements
+					 * would be modeled as reified statement models.
+					 * 
+					 * TODO This logic is completely wrong for reverse
+					 * traversal. Sids are always stored in SPO order regardless
+					 * of what index they are in. So when we are traversing in
+					 * reverse, this logic will attempt to decode the reverse
+					 * links from the Sid in the OSP index but will instead find
+					 * nothing at all, because first of all the Sid is in the S
+					 * position of the link weight statement and secondly even
+					 * if it were in the O position (which its not), we would
+					 * end up with its forward links instead since the sid is
+					 * always stored in SPO order.
+					 */
 
                     keyOrder = getKeyOrder(kb, inEdges);
 
@@ -452,6 +464,33 @@ public class BigdataGASEngine extends GASEngine {
                     // Append [u] to the key.
                     IVUtility.encode(keyBuilder, u);
 
+                } else {
+                	
+                    keyOrder = getKeyOrder(kb, inEdges);
+
+                    ndx = kb.getSPORelation().getIndex(keyOrder);
+
+                    keyBuilder = ndx.getIndexMetadata().getKeyBuilder();
+
+                    keyBuilder.reset();
+
+                    /*
+                     * Just have to ignore it.  We need to introduce a join to
+                     * handle it.
+                     */
+//                    if (linkAttrTypeIV != null) {
+//                    
+//                        /*
+//                         * Restrict to the SID region of the index. See
+//                         * SidIV.encode().
+//                         */
+//                        keyBuilder.appendSigned(SidIV.toFlags());
+//                        
+//                    }
+
+                    // Append [u] to the key.
+                    IVUtility.encode(keyBuilder, u);
+                	
                 }
 
                 fromKey = keyBuilder.getKey();
