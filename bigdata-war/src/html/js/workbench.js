@@ -2,6 +2,7 @@ $(function() {
 
 // global variables
 var DEFAULT_NAMESPACE, NAMESPACE, NAMESPACE_URL, NAMESPACES_READY, NAMESPACE_SHORTCUTS, FILE_CONTENTS, QUERY_RESULTS;
+var PAGE_SIZE=10, TOTAL_PAGES, CURRENT_PAGE;
 
 /* Modal functions */
 
@@ -454,7 +455,8 @@ function submitQuery(e) {
       error: queryResultsError
    }
 
-   $('#query-response').show().html('Query running...');   
+   $('#query-response').show().html('Query running...');
+   $('#query-pagination').hide();
 
    $.ajax(NAMESPACE_URL, settings);
 
@@ -475,7 +477,7 @@ function submitQuery(e) {
 
 $('#query-response-clear').click(function() {
    $('#query-response, #query-explanation').empty('');
-   $('#query-response, #query-explanation, #query-tab .bottom *').hide();
+   $('#query-response, #query-pagination, #query-explanation, #query-tab .bottom *').hide();
 });
 
 $('#query-export').click(function() { updateExportFileExtension(); showModal('query-export-modal'); });
@@ -606,7 +608,7 @@ function downloadFile(data, type, filename) {
 function showQueryResults(data) {
    $('#query-response').empty();
    $('#query-export-rdf').hide();
-   $('#query-response, #query-tab .bottom *').show();
+   $('#query-response, #query-pagination, #query-tab .bottom *').show();
    var table = $('<table>').appendTo($('#query-response'));
    if(this.dataTypes[1] == 'xml') {
       // RDF
@@ -634,29 +636,125 @@ function showQueryResults(data) {
       }
    } else {
       // JSON
-      // save data for export
+      // save data for export and pagination
       QUERY_RESULTS = data;
+
       if(typeof(data.boolean) != 'undefined') {
          // ASK query
          table.append('<tr><td>' + data.boolean + '</td></tr>').addClass('boolean');
          return;
       }
+
+      // see if we have RDF data
+      var isRDF = false;
+      if(data.head.vars.length == 3 && data.head.vars[0] == 's' && data.head.vars[1] == 'p' && data.head.vars[2] == 'o') {
+         isRDF = true;
+      } else if(data.head.vars.length == 4 && data.head.vars[0] == 's' && data.head.vars[1] == 'p' && data.head.vars[2] == 'o' && data.head.vars[3] == 'c') {
+         // see if c is used or not
+         for(var i=0; i<data.results.bindings.length; i++) {
+            if('c' in data.results.bindings[i]) {
+               isRDF = false;
+               break;
+            }
+         }
+
+         if(isRDF) {
+            // remove (unused) c variable from JSON
+            data.head.vars.pop();
+         }
+      }
+
+      if(isRDF) {
+         $('#rdf-formats').prop('disabled', false);
+      } else {
+         $('#rdf-formats').prop('disabled', true);
+         if($('#rdf-formats option:selected').length == 1) {
+            $('#non-rdf-formats option:first').prop('selected', true);
+         }
+      }
+
+      // put query variables in table header
       var thead = $('<thead>').appendTo(table);
-      var vars = [];
-      var varsUsed = {}
       var tr = $('<tr>');
       for(var i=0; i<data.head.vars.length; i++) {
-         tr.append('<td>' + data.head.vars[i] + '</td>');
-         vars.push(data.head.vars[i]);
+         tr.append('<th>' + data.head.vars[i] + '</th>');
       }
       thead.append(tr);
       table.append(thead);
-      for(var i=0; i<data.results.bindings.length; i++) {
+
+      setNumberOfPages();
+      showPage(1);
+
+      $('#query-response a').click(function(e) {
+         e.preventDefault();
+         explore(this.textContent);
+      });
+   }
+}
+
+function showQueryExplanation(data) {
+   $('#query-explanation').html(data).show();
+}
+
+function queryResultsError(jqXHR, textStatus, errorThrown) {
+   $('#query-response, #query-tab .bottom *').show();
+   $('#query-response').text('Error! ' + textStatus + ' ' + errorThrown);
+}
+
+/* Pagination */
+
+function setNumberOfPages() {
+   TOTAL_PAGES = Math.ceil(QUERY_RESULTS.results.bindings.length / PAGE_SIZE);
+   $('#result-pages').html(TOTAL_PAGES);
+}
+
+function setPageSize(n) {
+   n = parseInt(n, 10);
+   if(typeof n != 'number' || n % 1 != 0 || n < 1 || n == PAGE_SIZE) {
+      return;
+   }
+
+   PAGE_SIZE = n;
+   setNumberOfPages();
+   // TODO: show page containing current first result
+   showPage(1);
+}
+
+$('#results-per-page').change(function() { setPageSize(this.value); });
+$('#previous-page').click(function() { showPage(CURRENT_PAGE - 1); });
+$('#next-page').click(function() { showPage(CURRENT_PAGE + 1); });
+$('#current-page').keyup(function(e) {
+   if(e.which == 13) {
+      var n = parseInt(this.value, 10);
+      if(typeof n != 'number' || n % 1 != 0 || n < 1 || n > TOTAL_PAGES) {
+         this.value = CURRENT_PAGE;
+      } else {
+         showPage(n);
+      }
+   }
+});
+
+function showPage(n) {
+   if(typeof n != 'number' || n % 1 != 0 || n < 1 || n > TOTAL_PAGES) {
+      return;
+   }
+
+   CURRENT_PAGE = n;
+
+   // clear table results, leaving header
+   $('#query-response tbody tr').remove();
+
+   // work out indices for this page
+   var start = (CURRENT_PAGE - 1) * PAGE_SIZE;
+   var end = Math.min(CURRENT_PAGE * PAGE_SIZE, QUERY_RESULTS.results.bindings.length);
+
+   // add matching bindings
+   var table = $('#query-response table');
+   for(var i=start; i<end; i++) {
          var tr = $('<tr>');
-         for(var j=0; j<vars.length; j++) {
-            if(vars[j] in data.results.bindings[i]) {
-               varsUsed[vars[j]] = true;
-               var binding = data.results.bindings[i][vars[j]];
+         for(var j=0; j<QUERY_RESULTS.head.vars.length; j++) {
+            if(QUERY_RESULTS.head.vars[j] in QUERY_RESULTS.results.bindings[i]) {
+               var binding = QUERY_RESULTS.results.bindings[i][QUERY_RESULTS.head.vars[j]];
                if(binding.type == 'sid') {
                   var text = getSID(binding);
                } else {
@@ -684,37 +782,11 @@ function showQueryResults(data) {
             }
          }
          table.append(tr);
-      }
-
-      // see if we have RDF data
-      if((vars.length == 3 && vars[0] == 's' && vars[1] == 'p' && vars[2] == 'o') ||
-         (vars.length == 4 && vars[0] == 's' && vars[1] == 'p' && vars[2] == 'o') && vars[3] == 'c' && !('c' in varsUsed)) {
-         if(vars.length == 4) {
-            // remove (unused) c variable from JSON
-            QUERY_RESULTS.head.vars.pop()
-         }
-         $('#rdf-formats').prop('disabled', false);
-      } else {
-         $('#rdf-formats').prop('disabled', true);
-         if($('#rdf-formats option:selected').length == 1) {
-            $('#non-rdf-formats option:first').prop('selected', true);
-         }
-      }
-
-      $('#query-response a').click(function(e) {
-         e.preventDefault();
-         explore(this.textContent);
-      });
    }
-}
 
-function showQueryExplanation(data) {
-   $('#query-explanation').html(data).show();
-}
-
-function queryResultsError(jqXHR, textStatus, errorThrown) {
-   $('#query-response, #query-tab .bottom *').show();
-   $('#query-response').text('Error! ' + textStatus + ' ' + errorThrown);
+   // update current results numbers
+   $('#current-results').html((start + 1) + ' - ' + end);
+   $('#current-page').val(n);
 }
 
 /* Explore */
