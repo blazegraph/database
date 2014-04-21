@@ -36,7 +36,10 @@
           <div class="namespace-shortcuts">
           </div>
 
-          <textarea id="load-box" placeholder="(Type in or drag a file containing RDF data, a SPARQL update or a file path or URL)"></textarea>
+          <div>
+            <div id="load-errors"></div>
+            <textarea id="load-box" placeholder="(Type in or drag a file containing RDF data, a SPARQL update or a file path or URL)"></textarea>
+          </div>
           <p id="large-file-message">Your file <span id="filename"></span> is too large to display here, but will be uploaded as normal. <a href="#" id="clear-file">Remove file</a></p>
           <p>
             <input type="file" id="load-file"><br>

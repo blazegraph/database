@@ -367,6 +367,7 @@ $('#load-file').change(handleFile);
 $('#load-box').on('dragover', handleDragOver)
    .on('drop', handleFile)
    .on('paste', handlePaste)
+   .on('input propertychange', function() { $('#load-errors').hide(); })
    .bind('keydown', 'ctrl+return', submitLoad);
 $('#clear-file').click(clearFile);
 
@@ -436,6 +437,7 @@ function updateResponseXML(data) {
 function updateResponseError(jqXHR, textStatus, errorThrown) {
    $('#load-response, #load-clear').show();
    $('#load-response pre').text('Error! ' + textStatus + ' ' + jqXHR.statusText);
+   highlightError(jqXHR.statusText, 'load');
 }
 
 
@@ -700,24 +702,29 @@ function showQueryExplanation(data) {
 function queryResultsError(jqXHR, textStatus, errorThrown) {
    $('#query-response, #query-tab .bottom *').show();
    $('#query-response').text('Error! ' + textStatus + ' ' + jqXHR.statusText);
-   var match = errorThrown.match(/line (\d+), column (\d+)/);
+   highlightError(jqXHR.statusText, 'query');
+}
+
+function highlightError(description, pane) {
+   var match = description.match(/line (\d+), column (\d+)/);
    if(match) {
       // highlight character at error position
       var line = match[1] - 1;
       var column = match[2] - 1;
-      var query = $('#query-box').val();
-      var lines = query.split('\n');
-      $('#query-errors').html('');
+      var input = $('#' + pane + '-box').val();
+      var lines = input.split('\n');
+      var container = '#' + pane + '-errors';
+      $(container).html('');
       for(var i=0; i<line; i++) {
          var p = $('<p>').text(lines[i]);
-         $('#query-errors').append(p);
+         $(container).append(p);
       }
-      $('#query-errors').append('<p id="error-line">');
-      $('#error-line').append(document.createTextNode(lines[line].substr(0, column)));
-      $('#error-line').append($('<span id="error-character">').text(lines[line].charAt(column) || ' '));
-      $('#error-line').append(document.createTextNode(lines[line].substr(column + 1)));
-      $('#query-errors').show();
-      $('#query-box').scrollTop(0);
+      $(container).append('<p class="error-line">');
+      $(container + ' .error-line').append(document.createTextNode(lines[line].substr(0, column)));
+      $(container + ' .error-line').append($('<span class="error-character">').text(lines[line].charAt(column) || ' '));
+      $(container + ' .error-line').append(document.createTextNode(lines[line].substr(column + 1)));
+      $(container).show();
+      $('#' + pane + '-box').scrollTop(0);
    }
 }
 
