@@ -441,7 +441,8 @@ function updateResponseError(jqXHR, textStatus, errorThrown) {
 
 /* Query */
 
-$('#query-box').bind('keydown', 'ctrl+return', function(e) { e.preventDefault(); $('#query-form').submit(); });
+$('#query-box').bind('keydown', 'ctrl+return', function(e) { e.preventDefault(); $('#query-form').submit(); })
+               .on('input propertychange', function() { $('#query-errors').hide(); });
 $('#query-form').submit(submitQuery);
 
 function submitQuery(e) {
@@ -699,6 +700,25 @@ function showQueryExplanation(data) {
 function queryResultsError(jqXHR, textStatus, errorThrown) {
    $('#query-response, #query-tab .bottom *').show();
    $('#query-response').text('Error! ' + textStatus + ' ' + jqXHR.statusText);
+   var match = errorThrown.match(/line (\d+), column (\d+)/);
+   if(match) {
+      // highlight character at error position
+      var line = match[1] - 1;
+      var column = match[2] - 1;
+      var query = $('#query-box').val();
+      var lines = query.split('\n');
+      $('#query-errors').html('');
+      for(var i=0; i<line; i++) {
+         var p = $('<p>').text(lines[i]);
+         $('#query-errors').append(p);
+      }
+      $('#query-errors').append('<p id="error-line">');
+      $('#error-line').append(document.createTextNode(lines[line].substr(0, column)));
+      $('#error-line').append($('<span id="error-character">').text(lines[line].charAt(column) || ' '));
+      $('#error-line').append(document.createTextNode(lines[line].substr(column + 1)));
+      $('#query-errors').show();
+      $('#query-box').scrollTop(0);
+   }
 }
 
 /* Pagination */
