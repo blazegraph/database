@@ -170,7 +170,7 @@ function createNamespace(e) {
       data: data,
       contentType: 'application/xml',
       success: function() { input.val(''); getNamespaces(); },
-      error: function(jqXHR, textStatus, errorThrown) { alert(errorThrown); }
+      error: function(jqXHR, textStatus, errorThrown) { alert(jqXHR.statusText); }
    };
    $.ajax('/bigdata/namespace', settings);
 }
@@ -435,7 +435,7 @@ function updateResponseXML(data) {
 
 function updateResponseError(jqXHR, textStatus, errorThrown) {
    $('#load-response, #load-clear').show();
-   $('#load-response pre').text('Error! ' + textStatus + ' ' + errorThrown);
+   $('#load-response pre').text('Error! ' + textStatus + ' ' + jqXHR.statusText);
 }
 
 
@@ -536,7 +536,7 @@ $('#query-download').click(function() {
 });
 
 function downloadRDFError(jqXHR, textStatus, errorThrown) {
-   alert(errorThrown);
+   alert(jqXHR.statusText);
 }   
 
 function exportXML(filename) {
@@ -698,7 +698,7 @@ function showQueryExplanation(data) {
 
 function queryResultsError(jqXHR, textStatus, errorThrown) {
    $('#query-response, #query-tab .bottom *').show();
-   $('#query-response').text('Error! ' + textStatus + ' ' + errorThrown);
+   $('#query-response').text('Error! ' + textStatus + ' ' + jqXHR.statusText);
 }
 
 /* Pagination */
@@ -1000,7 +1000,7 @@ function handlePopState() {
 function updateExploreError(jqXHR, textStatus, errorThrown) {
    $('#explore-tab .bottom').show();
    $('#explore-results .box').html('').hide();
-   $('#explore-header').text('Error! ' + textStatus + ' ' + errorThrown);
+   $('#explore-header').text('Error! ' + textStatus + ' ' + jqXHR.statusText);
    $('#explore-results, #explore-header').show();
 }
 
