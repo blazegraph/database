@@ -148,6 +148,11 @@ public class QueryServlet extends BigdataRDFServlet {
     protected void doPost(final HttpServletRequest req,
             final HttpServletResponse resp) throws IOException {
 
+        /*
+         * Note: HALoadBalancerServlet MUST be maintained if idempotent methods
+         * are added to doPost() in order to ensure that they are load balanced
+         * rather than always directed to the quorum leader.
+         */
 
         if (req.getParameter(ATTR_UPDATE) != null) {
             

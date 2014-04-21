@@ -30,6 +30,7 @@ import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import org.apache.log4j.Logger;
 import org.openrdf.model.URI;
 import org.openrdf.model.impl.URIImpl;
 
@@ -42,8 +43,8 @@ import com.bigdata.rdf.sail.webapp.client.MiniMime;
  */
 public class RESTServlet extends BigdataRDFServlet {
 
-//    private static final transient Logger log = Logger
-//            .getLogger(RESTServlet.class);
+    private static final transient Logger log = Logger
+            .getLogger(RESTServlet.class);
 
     /**
      * 
@@ -137,6 +138,9 @@ public class RESTServlet extends BigdataRDFServlet {
     protected void doGet(final HttpServletRequest req,
             final HttpServletResponse resp) throws IOException {
 
+        if (log.isInfoEnabled())
+            log.info(req.toString());
+        
         /*
          * Look for linked data GET requests.
          * 
@@ -201,7 +205,10 @@ public class RESTServlet extends BigdataRDFServlet {
     protected void doPost(final HttpServletRequest req,
             final HttpServletResponse resp) throws IOException {
     	
-		if (req.getParameter(QueryServlet.ATTR_QUERY) != null
+        if (log.isInfoEnabled())
+            log.info(req.toString());
+
+        if (req.getParameter(QueryServlet.ATTR_QUERY) != null
                 || req.getParameter(QueryServlet.ATTR_UPDATE) != null
                 || req.getParameter(QueryServlet.ATTR_UUID) != null
                 || req.getParameter(QueryServlet.ATTR_ESTCARD) != null
@@ -249,9 +256,14 @@ public class RESTServlet extends BigdataRDFServlet {
 
 	}
 
-	static boolean hasMimeType(final HttpServletRequest req, String mimeType) {
-		String contentType = req.getContentType();
-		return contentType != null &&  mimeType.equals(new MiniMime(contentType).getMimeType());
+    static boolean hasMimeType(final HttpServletRequest req,
+            final String mimeType) {
+
+        final String contentType = req.getContentType();
+        
+        return contentType != null
+                && mimeType.equals(new MiniMime(contentType).getMimeType());
+        
 	}
 
     /**
@@ -264,6 +276,9 @@ public class RESTServlet extends BigdataRDFServlet {
     protected void doPut(final HttpServletRequest req,
             final HttpServletResponse resp) throws IOException {
 
+        if (log.isInfoEnabled())
+            log.info(req.toString());
+
         m_updateServlet.doPut(req, resp);
 
     }
@@ -274,6 +289,9 @@ public class RESTServlet extends BigdataRDFServlet {
     @Override
     protected void doDelete(final HttpServletRequest req,
             final HttpServletResponse resp) throws IOException {
+
+        if (log.isInfoEnabled())
+            log.info(req.toString());
 
         m_deleteServlet.doDelete(req, resp);
 
