@@ -207,17 +207,25 @@ hr {
    border: none;
 }
 
-#advanced-features, #query-response, #query-explanation, #query-tab .bottom *, #load-response, #load-clear, #explore-results, #namespace-properties {
+#advanced-features, #query-response, #query-pagination, #query-explanation, #query-tab .bottom *, #load-response, #load-clear, #explore-results, #namespace-properties {
    display: none;
 }
 
-td {
+th, td {
    border: 1px solid;
    padding: 5px;
 }
 
+th {
+   font-weight: bold;
+}
+
 pre {
    font-family: monospace;
+}
+
+#page-selector {
+   float: right;
 }
 
 #running-queries li {
