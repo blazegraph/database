@@ -103,6 +103,21 @@
         <div id="query-response" class="box">
         </div>
 
+        <div id="query-pagination" class="box">
+          <span id="current-results"></span>
+          <select id="results-per-page">
+            <option>10</option>
+            <option>25</option>
+            <option>50</option>
+            <option>100</option>
+          </select> per page
+          <div id="page-selector">
+            <button id="previous-page">&lt;</button>
+            Page <input type="text" id="current-page"> of <span id="result-pages"></span>
+            <button id="next-page">&gt;</button>            
+          </div>
+        </div>
+
         <div id="query-explanation" class="box">
         </div>
 
