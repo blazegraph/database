@@ -228,20 +228,20 @@ pre {
    float: right;
 }
 
-#query-box {
+#load-box, #query-box {
    background-color: transparent;
    padding: 2px;
    border-width: 1px;
 }
 
 /* these should have the same typography so the error highlighting matches up with the query text */
-#query-box, #query-errors {
+#load-box, #load-errors, #query-box, #query-errors {
    font-family: sans-serif;
    font-size: 90%;
    line-height: normal;
 }
 
-#query-errors {
+#load-errors, #query-errors {
    position: absolute;
    z-index: -1;
    padding: 8px 3px;
@@ -249,11 +249,11 @@ pre {
    white-space: pre;
 }
 
-#error-line {
+.error-line {
    background-color: lightgreen;
 }
 
-#error-character {
+.error-character {
    background-color: red;
 }
 
