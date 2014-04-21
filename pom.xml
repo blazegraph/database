@@ -78,7 +78,7 @@ dependencies.
       <zookeeper.version>3.3.3</zookeeper.version>
       <sesame.version>2.6.10</sesame.version>
       <slf4j.version>1.6.1</slf4j.version>
-      <jetty.version>9.1.3.v20140225</jetty.version>
+      <jetty.version>9.1.4.v20140401</jetty.version>
       <!--jetty.version>7.2.2.v20101205</jetty.version-->
       <servlet.version>3.1.0</servlet.version>
       <lucene.version>3.0.0</lucene.version>
