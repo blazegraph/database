@@ -1,0 +1,10 @@
+#!/bin/bash
+
+source /etc/default/bigdataHA
+
+SERVICE_DIR="$FED_DIR/$FEDNAME/$LOGICAL_SERVICE_ID/HAJournalServer"
+LIB_DIR="$FED_DIR/lib"
+
+java -cp $LIB_DIR/bigdata.jar:$LIB_DIR/commons-logging.jar:$LIB_DIR/log4j.jar:$LIB_DIR/highscalelib.jar:$LIB_DIR/fastutil.jar:$LIB_DIR/dsiutils.jar:$LIB_DIR/lgplutils.jar:$LIB_DIR/icu4j.jar -Dlog4j.configuration=file:var/config/logging/log4j.properties com.bigdata.journal.jini.ha.HARestore -o $DATA_DIR/bigdata-ha.jnl $SERVICE_DIR/snapshot $SERVICE_DIR/HALog
+
+

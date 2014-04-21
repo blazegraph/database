@@ -337,8 +337,8 @@ L>//
         
         public boolean hasNext() throws InterruptedException {
 
-            // The thread in which this method runs.
-            final Thread t = Thread.currentThread();
+//            // The thread in which this method runs.
+//            final Thread t = Thread.currentThread();
 
             // when we start looking for a chunk.
             final long begin = System.nanoTime();
@@ -349,7 +349,7 @@ L>//
                 master.halted();
 
                 // interrupted?
-                if (t.isInterrupted()) {
+                if (Thread.interrupted()) {
 
                     throw master.halt(new InterruptedException(toString()));
 

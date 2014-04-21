@@ -43,6 +43,7 @@ import com.bigdata.ha.msg.HADigestRequest;
 import com.bigdata.ha.msg.HARootBlockRequest;
 import com.bigdata.journal.CommitCounterUtility;
 import com.bigdata.journal.IHABufferStrategy;
+import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.Journal;
 import com.bigdata.rdf.sail.webapp.client.ConnectOptions;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
@@ -60,6 +61,13 @@ public class AbstractHA3BackupTestCase extends AbstractHA3JournalServerTestCase 
 
     public AbstractHA3BackupTestCase(final String name) {
         super(name);
+    }
+
+    @Override
+    protected int replicationFactor() {
+
+        return 3;
+        
     }
 
     /**
@@ -146,9 +154,11 @@ public class AbstractHA3BackupTestCase extends AbstractHA3JournalServerTestCase 
          * The current commit counter on the server. This is the commit point
          * that should be restored.
          */
-        final long commitCounterM = serverA
-                .getRootBlock(new HARootBlockRequest(null/* storeUUID */))
-                .getRootBlock().getCommitCounter();
+        
+        final IRootBlockView serverARootBlock = serverA.getRootBlock(
+                new HARootBlockRequest(null/* storeUUID */)).getRootBlock();
+
+        final long commitCounterM = serverARootBlock.getCommitCounter();
 
         final File snapshotFile = SnapshotManager.getSnapshotFile(
                 getSnapshotDirA(), commitCounterN);
@@ -198,10 +208,29 @@ public class AbstractHA3BackupTestCase extends AbstractHA3JournalServerTestCase 
                      */
                     rest.restore(false/* listCommitPoints */, Long.MAX_VALUE/* haltingCommitCounter */);
 
+                    /*
+                     * FIXME For some reason, we need to close and reopen the
+                     * journal before it can be used. See HARestore.
+                     */
+                    if (true) {
+                        jnl.close();
+
+                        // reopen.
+                        jnl = new Journal(p);
+                    }
+
+                    // Verify can dump journal after restore.
+                    dumpJournal(jnl);
+                    
                     // Verify journal now at the expected commit point.
                     assertEquals(commitCounterM, jnl.getRootBlockView()
                             .getCommitCounter());
 
+                    if (!serverARootBlock.equals(jnl.getRootBlockView())) {
+                        fail("Root blocks differ: serverA=" + serverARootBlock
+                                + ", restored=" + jnl.getRootBlockView());
+                    }
+                    
                     /*
                      * Compute digest of the restored journal. The digest should
                      * agree with the digest of the Journal on A since we rolled
@@ -214,14 +243,17 @@ public class AbstractHA3BackupTestCase extends AbstractHA3JournalServerTestCase 
                                 new HADigestRequest(null/* storeUUID */))
                                 .getDigest();
 
-                        final MessageDigest digest = MessageDigest
-                                .getInstance("MD5");
+                        final byte[] digest2;
+                        {
+                            final MessageDigest digest = MessageDigest
+                                    .getInstance("MD5");
 
-                        // digest of restored journal.
-                        ((IHABufferStrategy) (jnl.getBufferStrategy()))
-                                .computeDigest(null/* snapshot */, digest);
+                            // digest of restored journal.
+                            ((IHABufferStrategy) (jnl.getBufferStrategy()))
+                                    .computeDigest(null/* snapshot */, digest);
 
-                        final byte[] digest2 = digest.digest();
+                            digest2 = digest.digest();
+                        }
 
                         if (!BytesUtil.bytesEqual(digestA, digest2)) {
 
@@ -237,20 +269,6 @@ public class AbstractHA3BackupTestCase extends AbstractHA3JournalServerTestCase 
                         }
 
                     }
-
-                    /*
-                     * FIXME For some reason, we need to close and reopen the
-                     * journal before it can be used. See HARestore.
-                     */
-                    if (true) {
-                        jnl.close();
-
-                        // reopen.
-                        jnl = new Journal(p);
-                    }
-
-                    // Verify can dump journal after restore.
-                    dumpJournal(jnl);
 
                 } finally {
 

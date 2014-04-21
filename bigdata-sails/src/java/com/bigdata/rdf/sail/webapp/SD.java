@@ -36,8 +36,11 @@ import org.openrdf.model.ValueFactory;
 import org.openrdf.model.impl.URIImpl;
 import org.openrdf.model.vocabulary.RDF;
 
+import com.bigdata.ha.HAGlue;
+import com.bigdata.ha.QuorumService;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.IIndexManager;
+import com.bigdata.quorum.Quorum;
 import com.bigdata.rdf.axioms.Axioms;
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.axioms.OwlAxioms;
@@ -161,11 +164,28 @@ public class SD {
             + "KB/IsolatableIndices");
 
     /**
-     * A highly available deployment.
+     * A highly available deployment - this feature refers to the presence of
+     * the {@link HAGlue} interface, the capability for online backups, and the
+     * existence of a targer {@link #ReplicationFactor}. You must consult the
+     * target {@link #ReplicationFactor} in order to determine whether the
+     * database is in principle capable of tolerating one or more failures and
+     * the actual #of running joined instances to determine whether the database
+     * can withstand a failure.
      */
     static public final URI HighlyAvailable = new URIImpl(BDFNS
             + "HighlyAvailable");
 
+    /**
+     * The value of this feature is the target replication factor for the
+     * database expressed as an <code>xsd:int</code>. If this is ONE (1), then
+     * the database is setup with a quorum and has the capability for online
+     * backup, but it is not replicated. TWO (2) indicates mirroring, but is not
+     * highly available. THREE (3) is the minimum configuration that can
+     * withstand a failure.
+     */
+    static public final URI ReplicationFactor = new URIImpl(BDFNS
+            + "replicationFactor");
+    
     /**
      * An {@link IBigdataFederation}.
      */
@@ -652,7 +672,15 @@ public class SD {
 
                 final AbstractJournal jnl = (AbstractJournal) indexManager;
 
-                if (jnl.isHighlyAvailable()) {
+                final Quorum<HAGlue, QuorumService<HAGlue>> quorum = jnl
+                        .getQuorum();
+                
+                if (quorum != null) {
+
+                    final int k = quorum.replicationFactor();
+                    
+                    g.add(aService, SD.ReplicationFactor, tripleStore
+                            .getValueFactory().createLiteral(k));
 
                     g.add(aService, SD.feature, HighlyAvailable);
 

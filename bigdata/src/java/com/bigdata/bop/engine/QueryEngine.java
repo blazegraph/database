@@ -610,7 +610,7 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
      * <p>
      * If the deadline has expired, {@link IRunningQuery#cancel(boolean)} will
      * be invoked. In order for a compute bound operator to terminate in a
-     * timely fashion, it MUST periodically test {@link Thread#isInterrupted()}.
+     * timely fashion, it MUST periodically test {@link Thread#interrupted()}.
      * <p>
      * Note: The deadline of a query may be set at most once. Thus, a query
      * which is entered into the {@link #deadlineQueue} may not have its

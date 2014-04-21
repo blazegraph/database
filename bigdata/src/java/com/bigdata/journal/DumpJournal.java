@@ -311,17 +311,22 @@ public class DumpJournal {
                     
                 }
 
-            } catch( RuntimeException ex) {
+            } catch( Throwable t) {
                 
-                ex.printStackTrace();
+                t.printStackTrace();
 
-                System.err.println("Error: "+ex+" on file: "+file);
+                System.err.println("Error: " + t + " on file: " + file);
+
+                // Abnormal completion.
+                System.exit(1);
                 
             }
             
             System.out.println("==================================");
 
         }
+
+        System.out.println("Normal completion");
         
     }
     

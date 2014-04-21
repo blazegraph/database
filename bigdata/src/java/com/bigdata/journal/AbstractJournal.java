@@ -2479,17 +2479,17 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
 	}
 
-    /**
-     * Return <code>true</code> if the journal is configured for high
-     * availability.
-     * 
-     * @see QuorumManager#isHighlyAvailable()
-     */
-	public boolean isHighlyAvailable() {
-
-        return quorum == null ? false : quorum.isHighlyAvailable();
-
-	}
+//    /**
+//     * Return <code>true</code> if the journal is configured for high
+//     * availability.
+//     * 
+//     * @see Quorum#isHighlyAvailable()
+//     */
+//	public boolean isHighlyAvailable() {
+//
+//        return quorum == null ? false : quorum.isHighlyAvailable();
+//
+//	}
 
     /**
      * {@inheritDoc}
@@ -3437,8 +3437,10 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
             if (quorum == null)
                 return;
 
-            if (!quorum.isHighlyAvailable())
+            if (!quorum.isHighlyAvailable()) {
+                // Gather and 2-phase commit are not used in HA1.
                 return;
+            }
 
             /**
              * CRITICAL SECTION. We need obtain a distributed consensus for the
@@ -3551,6 +3553,25 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
             // reload the commit record from the new root block.
             store._commitRecord = store._getCommitRecord();
 
+            if (quorum != null) {
+                /**
+                 * Write the root block on the HALog file, closing out that
+                 * file.
+                 * 
+                 * @see <a href="http://trac.bigdata.com/ticket/721"> HA1 </a>
+                 */
+                final QuorumService<HAGlue> localService = quorum.getClient();
+                if (localService != null) {
+                    // Quorum service not asynchronously closed.
+                    try {
+                        // Write the closing root block on the HALog file.
+                        localService.logRootBlock(newRootBlock);
+                    } catch (IOException e) {
+                        throw new RuntimeException(e);
+                    }
+                }
+            }
+            
             if (txLog.isInfoEnabled())
                 txLog.info("COMMIT: commitTime=" + commitTime);
 
@@ -3855,9 +3876,9 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                 // Prepare the new root block.
                 cs.newRootBlock();
 
-                if (quorum == null) {
+                if (quorum == null || quorum.replicationFactor() == 1) {
                     
-                    // Non-HA mode.
+                    // Non-HA mode (including HA1).
                     cs.commitSimple();
     
                 } else {

@@ -63,6 +63,7 @@ import com.bigdata.bop.IVariable;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.bop.engine.IRunningQuery;
+import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.rdf.join.ChunkedMaterializationIterator;
 import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rdf.internal.IV;
@@ -659,6 +660,38 @@ public class ASTEvalHelper {
 
     /**
      * Evaluate a query plan (core method).
+     * <p>
+     * As explained in some depth at <a
+     * href="https://sourceforge.net/apps/trac/bigdata/ticket/707">
+     * BlockingBuffer.close() does not unblock threads </a> and <a
+     * href="http://trac.bigdata.com/ticket/864"> Semantics of interrupting a
+     * running query</a>, (a) you can not interrupted the thread that submits a
+     * query until the {@link CloseableIteration} has been returned to the
+     * caller submitting that query; (b)
+     * <p>
+     * (a) If you interrupt the thread submitting the query, the query may
+     * actually execute. This can occur because the interrupt can arise between
+     * the time at which the query begins to execute on the {@link QueryEngine}
+     * and the time at which the {@link IRunningQuery} object is bound up inside
+     * of the returned {@link CloseableIteration} and returned to the caller.
+     * Until the caller has possession of the {@link CloseableIteration}, an
+     * interrupt will not cause the associated {@link IRunningQuery} to be
+     * terminated. See <a
+     * href="https://sourceforge.net/apps/trac/bigdata/ticket/707">
+     * BlockingBuffer.close() does not unblock threads </a>
+     * <p>
+     * (b) If you interrupt the thread draining the solutions from the
+     * {@link CloseableIteration} or otherwise cause
+     * {@link CloseableIteration#close()} to become invoked, then the
+     * {@link IRunningQuery} will be interrupted. Per <a
+     * href="http://trac.bigdata.com/ticket/864"> Semantics of interrupting a
+     * running query</a>, that interrupt is interpreted as <em>normal</em>
+     * termination (this supports the use case of LIMIT and is built deeply into
+     * the {@link QueryEngine} semantics). In order for the application to
+     * distinguish between a case where it has interrupted the query and a case
+     * where the query has been interrupted by a LIMIT, the application MUST
+     * notice when it decides to interrupt a given query and then discard the
+     * outcome of that query.
      * 
      * @param astContainer
      *            The query model.
@@ -682,6 +715,11 @@ public class ASTEvalHelper {
      *         containing the solutions for the query.
      * 
      * @throws QueryEvaluationException
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/707">
+     *      BlockingBuffer.close() does not unblock threads </a>
+     * @see <a href="http://trac.bigdata.com/ticket/864"> Semantics of
+     *      interrupting a running query</a>
      */
     static //private Note: Exposed to CBD class.
     CloseableIteration<BindingSet, QueryEvaluationException> evaluateQuery(

@@ -108,6 +108,7 @@ public class ASTSearchOptimizer implements IASTOptimizer {
         set.add(BDS.SUBJECT_SEARCH);
         set.add(BDS.SEARCH_TIMEOUT);
         set.add(BDS.MATCH_REGEX);
+        set.add(BDS.RANGE_COUNT);
         
         searchUris = Collections.unmodifiableSet(set);
         

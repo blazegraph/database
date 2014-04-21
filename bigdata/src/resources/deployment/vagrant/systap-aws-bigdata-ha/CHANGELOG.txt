@@ -1,0 +1,8 @@
+# CHANGELOG for systap-aws-bigdata-ha
+
+This file is used to list changes made in each version of systap-aws-bigdata-ha.
+
+## 0.1.0:
+
+* Initial release of systap-aws-bigdata-ha
+
