@@ -2247,6 +2247,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 	/**
 	 * Invokes {@link #shutdownNow()}.
 	 */
+    @Override
 	synchronized public void close() {
 
 		// Note: per contract for close().
@@ -2260,6 +2261,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
 	}
 
+	@Override
 	synchronized public void destroy() {
 
 		if (log.isInfoEnabled())
@@ -2324,6 +2326,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 	 * journal until the quorum has met and {@link #init()} has been invoked for
 	 * the {@link Quorum}.
 	 */
+    @Override
 	public boolean isOpen() {
 
 		return _bufferStrategy != null && _bufferStrategy.isOpen();
@@ -2335,6 +2338,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
      * if {@link #closeForWrites(long)} was used to seal the journal against
      * further writes.
      */
+    @Override
     public boolean isReadOnly() {
 
         if (readOnly) {
@@ -2443,12 +2447,14 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
     }
 
+    @Override
 	public boolean isStable() {
 
 	    return _bufferStrategy.isStable();
 
 	}
 
+    @Override
 	public boolean isFullyBuffered() {
 
 		return _bufferStrategy.isFullyBuffered();
@@ -2497,6 +2503,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
      * through a concurrent {@link #abort()} or {@link #commitNow(long)}. The
      * {@link IRootBlockView} itself is an immutable data structure.
      */
+    @Override
 	final public IRootBlockView getRootBlockView() {
 
 //		final ReadLock lock = _fieldReadWriteLock.readLock();
@@ -2564,6 +2571,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
     }
 
+    @Override
     final public long getLastCommitTime() {
 
 //		final ReadLock lock = _fieldReadWriteLock.readLock();
@@ -2597,6 +2605,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 	 * @param committer
 	 *            The commiter.
 	 */
+    @Override
 	final public void setCommitter(final int rootSlot, final ICommitter committer) {
 
 		assertOpen();
