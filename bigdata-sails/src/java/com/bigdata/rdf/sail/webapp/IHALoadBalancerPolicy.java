@@ -22,7 +22,14 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.rdf.sail.webapp;
 
+import java.io.IOException;
+
+import javax.servlet.ServletConfig;
+import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+import com.bigdata.journal.IIndexManager;
 
 /**
  * Load balancer policy interface.
@@ -35,15 +42,62 @@ import javax.servlet.http.HttpServletRequest;
 public interface IHALoadBalancerPolicy {
 
     /**
-     * Return the URL to which the request will be proxied. The returned URL
-     * must include the protocol, hostname and port (if a non-default port will
-     * be used) as well as the target request path.
+     * Initialize the load balancer policy.
+     * 
+     * @param servletConfig
+     * @param indexManager
+     */
+    void init(ServletConfig servletConfig, IIndexManager indexManager)
+            throws ServletException;
+
+    /**
+     * Destroy the load balancer policy (stop any asynchronous processing,
+     * release any resources).
+     */
+    void destroy();
+
+    /**
+     * Invoked for each request. If the response is not committed, then it will
+     * be handled by the {@link HALoadBalancerServlet}.
+     * 
+     * @param isUpdate
+     *            <code>true</code> iff this is an UPDATE versus READ-ONLY
+     *            request. UPDATEs MUST be handled by the quorum leader. Read
+     *            requests can be handled by any service that is joined with the
+     *            met quorum.
+     * @param request
+     *            The request.
+     * @param response
+     *            The response.
+     * 
+     * @return <code>true</code> iff the request was handled.
+     */
+    boolean service(final boolean isUpdate, final HttpServletRequest request,
+            final HttpServletResponse response) throws ServletException,
+            IOException;
+
+    /**
+     * Return the URL to which a non-idempotent request will be proxied.
      * 
      * @param req
      *            The request.
      * 
-     * @return The URL.
+     * @return The proxyTo URL -or- <code>null</code> if we could not find a
+     *         service to which we could proxy this request.
      */
-    String proxyTo(HttpServletRequest req);
+    String getLeaderURL(HttpServletRequest req);
+
+    /**
+     * Return the URL to which a <strong>read-only</strong> request will be
+     * proxied. The returned URL must include the protocol, hostname and port
+     * (if a non-default port will be used) as well as the target request path.
+     * 
+     * @param req
+     *            The request.
+     * 
+     * @return The proxyTo URL -or- <code>null</code> if we could not find a
+     *         service to which we could proxy this request.
+     */
+    String getReaderURL(HttpServletRequest req);
     
 }
