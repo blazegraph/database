@@ -55,11 +55,13 @@ import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.engine.QueryLog;
 import com.bigdata.bop.fed.QueryEngineFactory;
 import com.bigdata.counters.CounterSet;
+import com.bigdata.ha.HAGlue;
+import com.bigdata.ha.QuorumService;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.DumpJournal;
 import com.bigdata.journal.IIndexManager;
-import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
+import com.bigdata.quorum.Quorum;
 import com.bigdata.rdf.sail.sparql.ast.SimpleNode;
 import com.bigdata.rdf.sail.webapp.BigdataRDFContext.AbstractQueryTask;
 import com.bigdata.rdf.sail.webapp.BigdataRDFContext.RunningQuery;
@@ -95,12 +97,6 @@ public class StatusServlet extends BigdataRDFServlet {
 
     static private final transient Logger log = Logger
             .getLogger(StatusServlet.class);
-
-    /**
-     * The name of a request parameter used to request metadata about the
-     * default namespace.
-     */
-    private static final String SHOW_KB_INFO = "showKBInfo";
 
     /**
      * The name of a request parameter used to request a list of the namespaces
@@ -385,7 +381,8 @@ public class StatusServlet extends BigdataRDFServlet {
 
         if (req.getParameter(HA) != null
                 && getIndexManager() instanceof AbstractJournal
-                && ((AbstractJournal) getIndexManager()).isHighlyAvailable()) {
+               //  && ((AbstractJournal) getIndexManager()).isHighlyAvailable()) {
+        		&& ((AbstractJournal) getIndexManager()).getQuorum() != null) { // for HA1
 
             new HAStatusServletUtil(getIndexManager()).doHAStatus(req, resp);
 
@@ -414,9 +411,6 @@ public class StatusServlet extends BigdataRDFServlet {
             if (maxBopLength < 0)
                 maxBopLength = 0;
         }
-
-        // Information about the KB (stats, properties).
-        final boolean showKBInfo = req.getParameter(SHOW_KB_INFO) != null;
 
         // bigdata namespaces known to the index manager.
         final boolean showNamespaces = req.getParameter(SHOW_NAMESPACES) != null;
@@ -506,12 +500,17 @@ public class StatusServlet extends BigdataRDFServlet {
 
             // final boolean showQuorum = req.getParameter(SHOW_QUORUM) != null;
 
-            if (getIndexManager() instanceof AbstractJournal
-                    && ((AbstractJournal) getIndexManager())
-                            .isHighlyAvailable()) {
+            if (getIndexManager() instanceof AbstractJournal) {
 
-                new HAStatusServletUtil(getIndexManager()).
-                        doGet(req, resp, current);
+                final Quorum<HAGlue, QuorumService<HAGlue>> quorum = ((AbstractJournal) getIndexManager())
+                        .getQuorum();
+
+                if (quorum != null) {//&& quorum.isHighlyAvailable()) {
+
+                    new HAStatusServletUtil(getIndexManager()).doGet(req, resp,
+                            current);
+
+                }
 
             }
 
@@ -542,19 +541,10 @@ public class StatusServlet extends BigdataRDFServlet {
 
             }
 
-            if (showNamespaces) {
-
-                long timestamp = getTimestamp(req);
-
-                if (timestamp == ITx.READ_COMMITTED) {
-
-                    // Use the last commit point.
-                    timestamp = getIndexManager().getLastCommitTime();
-
-                }
-
+			if (showNamespaces) {
+			    
                 final List<String> namespaces = getBigdataRDFContext()
-                        .getNamespaces(timestamp);
+                        .getNamespaces(getTimestamp(req));
 
                 current.node("h3", "Namespaces: ");
 
@@ -564,15 +554,7 @@ public class StatusServlet extends BigdataRDFServlet {
 
                 }
 
-            }
-
-            if (showKBInfo) {
-
-                // General information on the connected kb.
-                current.node("pre", getBigdataRDFContext().getKBInfo(
-                        getNamespace(req), getTimestamp(req)).toString());
-
-            }
+			}
 
             /*
              * Performance counters for the QueryEngine.

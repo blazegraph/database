@@ -54,6 +54,8 @@ abstract public class PageStats extends BaseIndexStats {
      * {@link #SLOT_SIZES}.
      */
     public long blobs;
+    /** The #of errors encountered during traversal. */
+    public long nerrors;
     /**
      * This map is used to report the histogram of pages based on the actual
      * byte count of the user data in the allocation when the backing slot size
@@ -126,6 +128,7 @@ abstract public class PageStats extends BaseIndexStats {
         sb.append(",maxLeafBytes=" + maxLeafBytes);
         sb.append(",bytesPerNode=" + getBytesPerNode());
         sb.append(",bytesPerLeaf=" + getBytesPerLeaf());
+        sb.append(",nerrors=" + nerrors);
         final long npages = (nleaves + nnodes);
         for (int i = 0; i < SLOT_SIZES.length; i++) {
             final long slotsThisSize = histogram[i];
@@ -173,6 +176,8 @@ abstract public class PageStats extends BaseIndexStats {
         sb.append("nleaves");
         sb.append('\t');
         sb.append("nentries");
+        sb.append('\t');
+        sb.append("nerrors");
         sb.append('\t');
         sb.append("nodeBytes");
         sb.append('\t');
@@ -240,6 +245,8 @@ abstract public class PageStats extends BaseIndexStats {
         sb.append(stats.nleaves);
         sb.append('\t');
         sb.append(stats.ntuples);
+        sb.append('\t');
+        sb.append(stats.nerrors);
         sb.append('\t');
         sb.append(stats.nodeBytes);
         sb.append('\t');

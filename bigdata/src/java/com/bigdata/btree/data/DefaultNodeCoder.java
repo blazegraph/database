@@ -43,6 +43,7 @@ import com.bigdata.btree.raba.codec.IRabaCoder;
 import com.bigdata.io.AbstractFixedByteArrayBuffer;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.rawstore.Bytes;
+import com.bigdata.rawstore.IRawStore;
 
 /**
  * Default implementation for immutable {@link INodeData} records.
@@ -217,8 +218,17 @@ public class DefaultNodeCoder implements IAbstractNodeDataCoder<INodeData>,
         // childAddr[] : @todo code childAddr[] (needs IAddressManager if store aware coding).
 //        final int O_childAddr = buf.pos();
         for (int i = 0; i <= nkeys; i++) {
+
+            /*
+             * See #855 (Child identity is not persistent).
+             */
+            final long childAddr = node.getChildAddr(i);
             
-            buf.putLong(node.getChildAddr(i));
+            if (childAddr == IRawStore.NULL)
+                throw new AssertionError("Child is not persistent: index=" + i
+                        + " out of " + nkeys + " entries, " + node.toString());
+            
+            buf.putLong(childAddr);
             
         }
         

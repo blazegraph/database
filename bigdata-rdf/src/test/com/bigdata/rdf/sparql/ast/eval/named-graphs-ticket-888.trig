@@ -1,0 +1,14 @@
+@prefix  :     <http://sample.com/> .
+
+<http://graph.com/test> {
+  :I :am   "a" .
+  :I :live "a_live" .
+  :I :work "a_work" .
+}
+
+<http://graph.com/test_1> {
+  :I :am   "a" .
+  :I :am   "b" .
+  :I :work "a_work" .
+  :I :work "b_work" .
+}

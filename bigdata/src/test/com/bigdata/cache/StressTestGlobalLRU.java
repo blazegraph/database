@@ -448,7 +448,7 @@ public class StressTestGlobalLRU extends TestCase implements IComparisonTest {
 
                         if (c.n % 1000000 == 0) {
 
-                            if (Thread.currentThread().isInterrupted()) {
+                            if (Thread.interrupted()) {
 
                                 /*
                                  * Notice interrupts in case we are using a

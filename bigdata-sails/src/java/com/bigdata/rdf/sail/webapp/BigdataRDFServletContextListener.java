@@ -418,17 +418,6 @@ public class BigdataRDFServletContextListener implements
 //        context.setAttribute(BigdataServlet.ATTRIBUTE_SPARQL_CACHE,
 //                new SparqlCache(new MemoryManager(DirectBufferPool.INSTANCE)));
 
-        if (log.isInfoEnabled()) {
-            /*
-             * Log some information about the default kb (#of statements, etc).
-             */
-            final long effectiveTimestamp = config.timestamp == ITx.READ_COMMITTED ? indexManager
-                    .getLastCommitTime() : config.timestamp;
-            log.info("\n"
-                    + rdfContext
-                            .getKBInfo(config.namespace, effectiveTimestamp));
-        }
-
         {
         
             final boolean forceOverflow = Boolean

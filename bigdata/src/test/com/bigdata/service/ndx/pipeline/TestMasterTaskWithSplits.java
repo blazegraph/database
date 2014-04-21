@@ -496,7 +496,7 @@ public class TestMasterTaskWithSplits extends AbstractKeyRangeMasterTestCase {
                                         + minProducerDelay);
 
                         if (halt.get()
-                                || Thread.currentThread().isInterrupted()) {
+                                || Thread.interrupted()) {
 
                             if (log.isInfoEnabled())
                                 log.info("Producer halting.");
@@ -575,7 +575,7 @@ public class TestMasterTaskWithSplits extends AbstractKeyRangeMasterTestCase {
 
                 for (Op op : schedule) {
 
-                    if (halt.get() || Thread.currentThread().isInterrupted()) {
+                    if (halt.get() || Thread.interrupted()) {
 
                         if (log.isInfoEnabled())
                             log.info("Redirecter halting.");
@@ -593,7 +593,7 @@ public class TestMasterTaskWithSplits extends AbstractKeyRangeMasterTestCase {
 
                     Thread.sleep(delayMillis);
 
-                    if (halt.get() || Thread.currentThread().isInterrupted()) {
+                    if (halt.get() || Thread.interrupted()) {
 
                         if (log.isInfoEnabled())
                             log.info("Redirecter halting.");

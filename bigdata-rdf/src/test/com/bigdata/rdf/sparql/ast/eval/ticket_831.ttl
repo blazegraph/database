@@ -1,0 +1,11 @@
+@prefix : <http://example.org/data/> .   
+                                                                             
+:person1                                                                                  
+    a :Person ; 
+    :age 21;                                                                 
+    :name "Person 1".   
+
+:person2                                                                                  
+    a :Person ;  
+    :age 11;                                                                    
+    :name "Person 2".
