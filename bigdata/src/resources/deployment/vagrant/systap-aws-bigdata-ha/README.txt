@@ -46,11 +46,12 @@ Boto: AWS API
 -------------
 The "Boto" python library for the AWS API must be installed in order to instantiate the cluster.  If not already installed:
 
-  % pip install boto
+  % sudo pip install pycrypto
+  % sudo pip install boto
 
 alternately:
 
-  % easy_install boto
+  % sudo easy_install boto
 
 
 If while running the python scripts the error message appears "ImportError: No module named boto", you will need to set the
