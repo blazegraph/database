@@ -16,8 +16,7 @@
 
       <div id="top">
         <img src="/bigdata/html/images/logo.png" id="logo">
-        <form id="search-form"><label for="search-text">Search:</label> <input type="text" id="search-text"></form>
-        <p>Current namespace: <span id="current-namespace"></span></p>
+        <form id="search-form"><label for="search-text">SEARCH:</label> <input type="text" id="search-text"><button type="submit"><span>&nbsp;</span></button></form>
       </div>
 
       <div id="tab-selector">
@@ -27,6 +26,7 @@
         <a data-target="status">Status</a>
         <a data-target="performance">Performance</a>
         <a data-target="namespaces">Namespaces</a>
+        <p>Current namespace: <span id="current-namespace"></span></p>
       </div>
 
       <div class="tab" id="load-tab">
@@ -51,7 +51,6 @@
             </select>
             <label for="rdf-type">Format:</label>
             <select id="rdf-type">
-              <option value="">Select RDF format</option>
               <option value="n-quads">N-Quads</option>
               <option value="n-triples">N-Triples</option>
               <option value="n3">Notation3</option>
@@ -86,20 +85,21 @@
             <div id="query-errors"></div>
             <textarea id="query-box" name="query" placeholder="(Input a SPARQL query)"></textarea>
 
-            <a href="#" id="advanced-features-toggle">Advanced features</a>
-
-            <div id="advanced-features">
-              <input type="checkbox" id="query-explain"> <label for="query-explain">Explain</label>
-              <input type="checkbox" name="analytic" value="true" id="query-analytic"> <label for="query-analytic">Analytic</label>
-              <input type="checkbox" name="RTO" value="true" id="query-rto"> <label for="query-rto">Runtime Query Optimizer</label>
+            <div class="controls-container">
+              <input type="reset" value="Clear" class="orange right">
+            </div>
+            <div class="controls-container">
+              <div class="clear right">
+                <a href="#" id="advanced-features-toggle">ADVANCED FEATURES</a>:
+                <span id="advanced-features">
+                  <input type="checkbox" id="query-explain"><label for="query-explain"><span></span> EXPLAIN</label>
+                  <input type="checkbox" name="analytic" value="true" id="query-analytic"><label for="query-analytic"><span></span> ANALYTIC</label>
+                  <input type="checkbox" name="RTO" value="true" id="query-rto"><label for="query-rto"><span></span> RUNTIME QUERY OPTIMIZER</label>
+                </span>
+                <input type="submit" value="Execute" class="green">
+              </div>
             </div>
 
-            <hr class="shadow">
-
-            <div id="load-buttons">
-              <input type="submit" value="Execute">
-              <input type="reset" value="Clear">
-            </div>
           </form>
 
         </div>
@@ -116,18 +116,18 @@
             <option>100</option>
           </select> per page
           <div id="page-selector">
-            <button id="previous-page">&lt;</button>
+            <button id="previous-page">&#9664;</button>
             Page <input type="text" id="current-page"> of <span id="result-pages"></span>
-            <button id="next-page">&gt;</button>            
+            <button id="next-page">&#9654;</button>            
           </div>
         </div>
 
         <div id="query-explanation" class="box">
         </div>
 
-        <div class="bottom">
-          <button id="query-export">Export</button>
-          <button id="query-response-clear">Clear</button>
+        <div id="query-export-container" class="controls-container">
+          <button id="query-export" class="right orange">Export</button>
+          <button id="query-response-clear" class="right clear orange">Clear</button>
         </div>
 
       </div>
@@ -206,6 +206,8 @@
         </div>
 
       </div>
+
+      <div class="clear">&nbsp;</div>
 
     </div>
 
