@@ -26,6 +26,7 @@ $('#search-form').submit(function(e) {
    }
    var query = 'select ?s ?p ?o { ?o bds:search "' + term + '" . ?s ?p ?o . }'
    $('#query-box').val(query);
+   $('#query-errors').hide();
    $('#query-form').submit();
    showTab('query');
 });
@@ -480,7 +481,7 @@ function submitQuery(e) {
 
 $('#query-response-clear').click(function() {
    $('#query-response, #query-explanation').empty('');
-   $('#query-response, #query-pagination, #query-explanation, #query-tab .bottom *').hide();
+   $('#query-response, #query-pagination, #query-explanation, #query-export-container').hide();
 });
 
 $('#query-export').click(function() { updateExportFileExtension(); showModal('query-export-modal'); });
@@ -611,7 +612,7 @@ function downloadFile(data, type, filename) {
 function showQueryResults(data) {
    $('#query-response').empty();
    $('#query-export-rdf').hide();
-   $('#query-response, #query-pagination, #query-tab .bottom *').show();
+   $('#query-response, #query-pagination, #query-export-container').show();
    var table = $('<table>').appendTo($('#query-response'));
    if(this.dataTypes[1] == 'xml') {
       // RDF
@@ -700,7 +701,7 @@ function showQueryExplanation(data) {
 }
 
 function queryResultsError(jqXHR, textStatus, errorThrown) {
-   $('#query-response, #query-tab .bottom *').show();
+   $('#query-response, #query-export-container').show();
    $('#query-response').text('Error! ' + textStatus + ' ' + jqXHR.statusText);
    highlightError(jqXHR.statusText, 'query');
 }
@@ -812,7 +813,7 @@ function showPage(n) {
    }
 
    // update current results numbers
-   $('#current-results').html((start + 1) + ' - ' + end);
+   $('#current-results').html((start + 1) + '-' + end);
    $('#current-page').val(n);
 }
 
