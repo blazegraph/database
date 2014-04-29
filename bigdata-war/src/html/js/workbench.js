@@ -2,7 +2,7 @@ $(function() {
 
 // global variables
 var DEFAULT_NAMESPACE, NAMESPACE, NAMESPACE_URL, NAMESPACES_READY, NAMESPACE_SHORTCUTS, FILE_CONTENTS, QUERY_RESULTS;
-var PAGE_SIZE=10, TOTAL_PAGES, CURRENT_PAGE;
+var PAGE_SIZE = 50, TOTAL_PAGES, CURRENT_PAGE;
 
 /* Modal functions */
 
@@ -686,6 +686,7 @@ function showQueryResults(data) {
       thead.append(tr);
       table.append(thead);
 
+      $('#total-results').html(data.results.bindings.length);
       setNumberOfPages();
       showPage(1);
 
@@ -737,9 +738,13 @@ function setNumberOfPages() {
 }
 
 function setPageSize(n) {
-   n = parseInt(n, 10);
-   if(typeof n != 'number' || n % 1 != 0 || n < 1 || n == PAGE_SIZE) {
-      return;
+   if(n == 'all') {
+      n = QUERY_RESULTS.results.bindings.length;
+   } else {
+      n = parseInt(n, 10);
+      if(typeof n != 'number' || n % 1 != 0 || n < 1 || n == PAGE_SIZE) {
+         return;
+      }
    }
 
    PAGE_SIZE = n;
