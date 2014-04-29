@@ -1209,16 +1209,18 @@ ${postInstallMessage}</echo>
 
       	<!-- Stage documentation from the wiki. -->
       <get dest="${dist.doc}/HAJournalServer.html"
-          src="http://wiki.bigdata.com/wiki/index.php/HAJournalServer"
+          src="http://wiki.bigdata.com/wiki/index.php/HAJournalServer?printable=yes"
          />
       <get dest="${dist.doc}/NanoSparqlServer.html" 
-          src="http://wiki.bigdata.com/wiki/index.php/NanoSparqlServer"
+          src="http://wiki.bigdata.com/wiki/index.php/NanoSparqlServer?printable=yes"
          />
 
-      <!-- Stage files specific to NSS deployments provided by Brew and Chef.  -->
+      <!-- Note: Commented out. This is breaking the RDR build. -->
+      <!-- Stage files specific to NSS deployments provided by Brew and Chef.  
       <copy file="${src.resources}/bin/bigdata"
             todir="${dist.bin}" />
       <chmod file="${dist.bin}/bigdata" perm="755" />
+-->
     </target>
 
     <!--                                                    -->
