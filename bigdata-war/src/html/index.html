@@ -40,17 +40,22 @@
             <div id="load-errors"></div>
             <textarea id="load-box" placeholder="(Type in or drag a file containing RDF data, a SPARQL update or a file path or URL)"></textarea>
           </div>
-          <p id="large-file-message">Your file <span id="filename"></span> is too large to display here, but will be uploaded as normal. <a href="#" id="clear-file">Remove file</a></p>
-          <p>
-            <input type="file" id="load-file"><br>
-            <label for="load-type">Type:</label>
-            <select id="load-type">
+
+          <div class="controls-container">
+            <span id="load-file-container" class="orange">Upload a local file<input type="file" id="load-file"></span>
+            <button class="orange right">Clear</button>
+            <p id="large-file-message">Your file <span id="filename"></span> is too large to display here, but will be uploaded as normal. <a href="#" id="clear-file">Remove file</a></p>
+          </div>
+
+          <div class="controls-container right has-vertical-divider">
+            <label for="load-type">TYPE:</label>
+            <select id="load-type" class="blue">
               <option value="sparql" selected="selected">SPARQL Update</option>
               <option value="rdf">RDF Data</option>
               <option value="path">File Path or URL</option>
             </select>
-            <label for="rdf-type">Format:</label>
-            <select id="rdf-type">
+            <label for="rdf-type">FORMAT:</label>
+            <select id="rdf-type" class="blue">
               <option value="n-quads">N-Quads</option>
               <option value="n-triples">N-Triples</option>
               <option value="n3">Notation3</option>
@@ -60,17 +65,17 @@
               <option value="trix">TriX</option>
               <option value="turtle">Turtle</option>
             </select>
-          </p>
-          <hr class="shadow">
-          <button id="load-load">Load</button>
+            <span class="vertical-divider">&nbsp;</span>
+            <button id="load-load" class="green">Load</button>
+          </div>
+
         </div>
 
         <div class="box" id="load-response">
           <pre></pre>
-        </div>
-
-        <div class="bottom">
-          <button id="load-clear">Clear output</button>
+          <div class="controls-container right">
+            <button id="load-clear" class="orange">Clear output</button>
+          </div>
         </div>
 
       </div>
@@ -125,9 +130,11 @@
         <div id="query-explanation" class="box">
         </div>
 
-        <div id="query-export-container" class="controls-container">
-          <button id="query-export" class="right orange">Export</button>
-          <button id="query-response-clear" class="right clear orange">Clear</button>
+        <div id="query-export-container" class="box">
+          <div class="controls-container">
+            <button id="query-export" class="right orange">Export</button>
+            <button id="query-response-clear" class="right clear orange">Clear</button>
+          </div>
         </div>
 
       </div>
