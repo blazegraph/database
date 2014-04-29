@@ -1209,12 +1209,16 @@ ${postInstallMessage}</echo>
 
       	<!-- Stage documentation from the wiki. -->
       <get dest="${dist.doc}/HAJournalServer.html"
-          src="http://sourceforge.net/apps/mediawiki/bigdata/index.php?title=HAJournalServer&amp;printable=yes"
+          src="http://wiki.bigdata.com/wiki/index.php/HAJournalServer"
          />
       <get dest="${dist.doc}/NanoSparqlServer.html" 
-          src="http://sourceforge.net/apps/mediawiki/bigdata/index.php?title=NanoSparqlServer&amp;printable=yes"
+          src="http://wiki.bigdata.com/wiki/index.php/NanoSparqlServer"
          />
-    	
+
+      <!-- Stage files specific to NSS deployments provided by Brew and Chef.  -->
+      <copy file="${src.resources}/bin/bigdata"
+            todir="${dist.bin}" />
+      <chmod file="${dist.bin}/bigdata" perm="755" />
     </target>
 
     <!--                                                    -->
@@ -1280,6 +1284,7 @@ ${postInstallMessage}</echo>
           <exclude name="bigdata/bin/disco-tool" />
           <exclude name="bigdata/bin/pstart" />
           <exclude name="bigdata/bin/startHAServices" />
+          <exclude name="bigdata/bin/bigdata" />
         </tarfileset>
 
         <!-- Add scripts separately, making them executable -->
@@ -1288,6 +1293,35 @@ ${postInstallMessage}</echo>
           <include name="bigdata/bin/disco-tool" />
           <include name="bigdata/bin/pstart" />
           <include name="bigdata/bin/startHAServices" />
+        </tarfileset>
+      </tar>
+
+    </target>
+
+    <target name="deploy-artifact-nss" depends="clean, stage"
+            description="Create compressed tar file for Jetty based deployment via Brew and Chef installers.">
+
+      <tar destfile="${bigdata.dir}/REL-NSS.${version}.tgz"
+           compression="gzip">
+
+        <tarfileset dir="${bigdata.dir}/dist">
+          <include name="bigdata/doc/**" />
+          <exclude name="bigdata/doc/HAJournalServer.html" />
+          <include name="bigdata/lib/**" />
+          <exclude name="bigdata/lib/bigdata-ganglia.jar" />
+          <exclude name="bigdata/lib/browser.jar" />
+          <exclude name="bigdata/lib/reggie.jar" />
+          <exclude name="bigdata/lib/zookeeper.jar" />
+          <exclude name="bigdata/lib/jsk-*.jar" />
+          <exclude name="bigdata/lib-dl" />
+          <exclude name="bigdata/lib-ext" />
+          <include name="bigdata/var/jetty/**" />
+        </tarfileset>
+
+        <!-- Add scripts separately, making them executable -->
+
+        <tarfileset dir="${bigdata.dir}/dist" filemode="755">
+          <include name="bigdata/bin/bigdata" />
         </tarfileset>
       </tar>
 
