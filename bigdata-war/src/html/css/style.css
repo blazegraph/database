@@ -51,7 +51,7 @@ table {
 /* Workbench */
 
 body {
-   margin: 50px 10px;
+   margin: 10px;
    background-color: #f1f1f1;
    font-family: sans-serif;
    font-size: 80%;
@@ -69,7 +69,6 @@ h2 {
 }
 
 #container {
-   max-width: 1000px;
    margin: 0 auto;
 }
 
@@ -84,10 +83,6 @@ h2 {
 
 #search-form {
    padding-top: 80px;
-}
-
-#search-form label {
-   font-size: 50%;
 }
 
 #search-form input {
@@ -150,11 +145,11 @@ h2 {
    display: none;
    clear: both;
    background: white;
+   padding: 20px 0;
 }
 
 .box {
-   padding: 20px 55px;
-   border-bottom: none;
+   margin: 20px;
    overflow-x: scroll;
 }
 
@@ -226,21 +221,21 @@ textarea {
    box-sizing: border-box;
 }
 
-label[for=load-type], label[for=rdf-type] {
-   margin: 0 10px 0 30px;
+hr {
+   background: #929292;
+   border: none;
+   height: 5px;
+   width: 50%;
+   margin: 20px auto;
 }
 
-.has-vertical-divider {
-   line-height: 55px;
+#load-load {
+   margin: 0 auto;
+   display: block;
 }
 
-.vertical-divider {
-   height: 55px;
-   display: inline-block;
-   width: 0;
-   border-left: 1px solid #d7d7d7;
-   padding-left: 30px;
-   margin-left: 30px;
+#load-buttons {
+   text-align: center;
 }
 
 .bottom {
@@ -255,7 +250,7 @@ label[for=load-type], label[for=rdf-type] {
    border: none;
 }
 
-#advanced-features, #query-response, #query-pagination, #query-explanation, #query-export-container, #load-response, #load-clear, #explore-results, #namespace-properties {
+#advanced-features, #query-response, #query-pagination, #query-explanation, #query-export-container, #load-response, #load-clear-container, #explore-results, #namespace-properties {
    display: none;
 }
 
@@ -306,14 +301,6 @@ pre {
    background-color: red;
 }
 
-#advanced-features {
-   margin-right: 50px;
-}
-
-#advanced-features label {
-   margin-left: 20px;
-}
-
 #running-queries li {
    margin: 10px 0;
 }
@@ -334,103 +321,17 @@ pre {
    overflow-x: scroll;
 }
 
-.controls-container {
-   padding: 25px;
-}
-
-button, input[type=reset], input[type=submit], input[type=file], #load-file-container, select {
-   width: 110px;
-   height: 25px;
-   border: 1px solid #e4e4e4;
-   color: #616161;
-}
-
-#load-file-container {
-   display: inline-block;
-   position: relative;
-   text-align: center;
-   line-height: 25px;
-}
-
-#load-file {
-   position: absolute;
-   top: 0;
-   left: 0;
-   opacity: 0;
-}
-
-input[type=checkbox] {
-   display: none;
-}
-
-input[type="checkbox"] + label span {
-   display: inline-block;
-   width: 13px;
-   height: 13px;
-   margin: 0;
-   vertical-align: middle;
-   background-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAA0AAAANCAIAAAD9iXMrAAAA4UlEQVQoU11RARLCIAzr/1+hMHF7iN6x0rLph0wp9Tx3jLVrSNNALE24YR/PzlwRV9nftTPz42gnt2dj0iaXg5LSTagobWpxOqk02vr8CSiBANGqljsaaznIf95HClZCszLy3GnpVi7B7VCwQgBBShqg62uWs07QXI2g1bB+LgdZjtg0dNOKnvbm0beEmgkNARANB4wv95n/ifMYDmBWgnlewL4Gq6cYyw/DVxIRT5YfVh/rq9L0fflKWAg+H8sDw6kYzu/DTUbZJ0hxGFVgDIuPLeHOirHQBTt8HUHFxWLeD+xTIgvbAhziAAAAAElFTkSuQmCC");
-}
-
-input[type="checkbox"]:checked + label span {
-   background-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAA0AAAANCAIAAAD9iXMrAAABb0lEQVQoFQXBTYuNYRjA8f913S/neRyUD2AzRVgoNTsZzUodG76Jz2QpZWEhNmNBaM682KCMEsnCHKYx5nm77+vy+8mbnf1spaZK0ShopQY1XI0qroTkdqoas5VnB+tNwyxikQgFJKAFM8rEauTe2nYE5g1NAy0xIpAdQMCNbuCCEUTVBWugJTf8+ND+/UWc0R/y7VOriWZGO8PdFTQFzgSSIKHbe3S/H3j9ZCGx04gqrrig4qYFALh0Az1/uv3wTpqXy9cJDo5Fqpi6MCZGqII7a5vP//yeX7n1ApgCABBcVZw8IU4A4Oe72+L6dWczCGogaCG4KioiuFDh83tWh+cWDx4frc5+2Q0i4AyRGlzNrFSqcXLMx6271za2YsvVm0/3Xy2Oj6hOHMCqLJfLl9/X85w8oxGqUB0VELynM+oJGxeXMTljhxrSUxM1oAURCmBMI/8GFJW3u3vRJhcVN4jJy6iqSKHmkk1LttDH+h9YiLIwVyNFQAAAAABJRU5ErkJggg==");
-}
-
-#load-response > pre {
-   overflow-x: scroll;
-}
-
 .clear {
    clear: both;
-}
-
-.right {
-   float: right;
-}
-
-.orange {
-    background-color: #ffd8b3;
-    background-image: -webkit-gradient(linear, left top, left bottom, from(#ffffff), to(#ffd8b3));
-    background-image: -webkit-linear-gradient(top, #ffffff, #ffd8b3);
-    background-image: -moz-linear-gradient(top, #ffffff, #ffd8b3);
-    background-image: -ms-linear-gradient(top, #ffffff, #ffd8b3);
-    background-image: -o-linear-gradient(top, #ffffff, #ffd8b3);
-    background-image: linear-gradient(to bottom, #ffffff, #ffd8b3);
-    filter:progid:DXImageTransform.Microsoft.gradient(GradientType=0,startColorstr=#ffffff, endColorstr=#ffd8b3);
-}
-
-.blue {
-    background-color: #d3e4f6;
-    background-image: -webkit-gradient(linear, left top, left bottom, from(#ffffff), to(#d3e4f6));
-    background-image: -webkit-linear-gradient(top, #ffffff, #d3e4f6);
-    background-image: -moz-linear-gradient(top, #ffffff, #d3e4f6);
-    background-image: -ms-linear-gradient(top, #ffffff, #d3e4f6);
-    background-image: -o-linear-gradient(top, #ffffff, #d3e4f6);
-    background-image: linear-gradient(to bottom, #ffffff, #d3e4f6);
-    filter:progid:DXImageTransform.Microsoft.gradient(GradientType=0,startColorstr=#ffffff, endColorstr=#d3e4f6);
-}
-
-.green {
-    background-color: #d9e689;
-    background-image: -webkit-gradient(linear, left top, left bottom, from(#ffffff), to(#d9e689));
-    background-image: -webkit-linear-gradient(top, #ffffff, #d9e689);
-    background-image: -moz-linear-gradient(top, #ffffff, #d9e689);
-    background-image: -ms-linear-gradient(top, #ffffff, #d9e689);
-    background-image: -o-linear-gradient(top, #ffffff, #d9e689);
-    background-image: linear-gradient(to bottom, #ffffff, #d9e689);
-    filter:progid:DXImageTransform.Microsoft.gradient(GradientType=0,startColorstr=#ffffff, endColorstr=#d9e689);
 }
 
 #query-pagination {
    border: 1px solid #e1e1e1;
    padding: 10px 25px;
-   margin: 0 55px;
-   color: #e1e1e1;
 }
 
 #results-per-page {
    width: 60px;
-   color: #e1e1e1;
 }
 
 #query-pagination button {
@@ -438,10 +339,17 @@ input[type="checkbox"]:checked + label span {
    height: 20px;
    border: 1px solid #e1e1e1;
    background: transparent;
-   color: #e1e1e1;
 }
 
 #current-page {
    border: 1px solid #e1e1e1;
-   color: #e1e1e1;
 }
+
+#query-export-container {
+   text-align: right;
+}
+
+#load-clear-container {
+   text-align: right;
+}
+

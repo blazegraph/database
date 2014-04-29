@@ -919,7 +919,6 @@ function updateExploreStart(data) {
 
    // clear tables
    $('#explore-incoming, #explore-outgoing, #explore-attributes').html('<table>');
-   $('#explore-tab .bottom').hide();
    $('#explore-results, #explore-results .box').show();
 
    // go through each binding, adding it to the appropriate table
@@ -1026,7 +1025,6 @@ function handlePopState() {
 }
 
 function updateExploreError(jqXHR, textStatus, errorThrown) {
-   $('#explore-tab .bottom').show();
    $('#explore-results .box').html('').hide();
    $('#explore-header').text('Error! ' + textStatus + ' ' + jqXHR.statusText);
    $('#explore-results, #explore-header').show();
