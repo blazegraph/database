@@ -154,13 +154,11 @@ h2 {
 
 .box {
    padding: 20px 55px;
-   /*border: 1px solid;*/
    border-bottom: none;
    overflow-x: scroll;
 }
 
 .box:last-of-type {
-   /*border-bottom: 1px solid;*/
 }
 
 .modal {
@@ -228,21 +226,24 @@ textarea {
    box-sizing: border-box;
 }
 
-hr {
-   background: #929292;
-   border: none;
-   height: 5px;
-   width: 50%;
-   margin: 20px auto;
+label[for=load-type], label[for=rdf-type] {
+   margin: 0 10px 0 30px;
 }
 
-#load-load {
-   margin: 0 auto;
-   display: block;
+.has-vertical-divider {
+   line-height: 55px;
+}
+
+.vertical-divider {
+   height: 55px;
+   display: inline-block;
+   width: 0;
+   border-left: 1px solid #d7d7d7;
+   padding-left: 30px;
+   margin-left: 30px;
 }
 
 .bottom {
-   /*border-top: 1px solid;*/
    text-align: right;
 }
 
@@ -254,7 +255,7 @@ hr {
    border: none;
 }
 
-#advanced-features, #query-response, #query-pagination, #query-explanation, #query-tab .bottom *, #load-response, #load-clear, #explore-results, #namespace-properties {
+#advanced-features, #query-response, #query-pagination, #query-explanation, #query-export-container, #load-response, #load-clear, #explore-results, #namespace-properties {
    display: none;
 }
 
@@ -337,11 +338,25 @@ pre {
    padding: 25px;
 }
 
-button, input[type=reset], input[type=submit], input[type=file], select {
+button, input[type=reset], input[type=submit], input[type=file], #load-file-container, select {
    width: 110px;
    height: 25px;
    border: 1px solid #e4e4e4;
    color: #616161;
+}
+
+#load-file-container {
+   display: inline-block;
+   position: relative;
+   text-align: center;
+   line-height: 25px;
+}
+
+#load-file {
+   position: absolute;
+   top: 0;
+   left: 0;
+   opacity: 0;
 }
 
 input[type=checkbox] {
@@ -361,6 +376,9 @@ input[type="checkbox"]:checked + label span {
    background-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAA0AAAANCAIAAAD9iXMrAAABb0lEQVQoFQXBTYuNYRjA8f913S/neRyUD2AzRVgoNTsZzUodG76Jz2QpZWEhNmNBaM682KCMEsnCHKYx5nm77+vy+8mbnf1spaZK0ShopQY1XI0qroTkdqoas5VnB+tNwyxikQgFJKAFM8rEauTe2nYE5g1NAy0xIpAdQMCNbuCCEUTVBWugJTf8+ND+/UWc0R/y7VOriWZGO8PdFTQFzgSSIKHbe3S/H3j9ZCGx04gqrrig4qYFALh0Az1/uv3wTpqXy9cJDo5Fqpi6MCZGqII7a5vP//yeX7n1ApgCABBcVZw8IU4A4Oe72+L6dWczCGogaCG4KioiuFDh83tWh+cWDx4frc5+2Q0i4AyRGlzNrFSqcXLMx6271za2YsvVm0/3Xy2Oj6hOHMCqLJfLl9/X85w8oxGqUB0VELynM+oJGxeXMTljhxrSUxM1oAURCmBMI/8GFJW3u3vRJhcVN4jJy6iqSKHmkk1LttDH+h9YiLIwVyNFQAAAAABJRU5ErkJggg==");
 }
 
+#load-response > pre {
+   overflow-x: scroll;
+}
 
 .clear {
    clear: both;
@@ -407,10 +425,12 @@ input[type="checkbox"]:checked + label span {
    border: 1px solid #e1e1e1;
    padding: 10px 25px;
    margin: 0 55px;
+   color: #e1e1e1;
 }
 
 #results-per-page {
    width: 60px;
+   color: #e1e1e1;
 }
 
 #query-pagination button {
@@ -418,7 +438,10 @@ input[type="checkbox"]:checked + label span {
    height: 20px;
    border: 1px solid #e1e1e1;
    background: transparent;
+   color: #e1e1e1;
 }
 
 #current-page {
    border: 1px solid #e1e1e1;
+   color: #e1e1e1;
+}
