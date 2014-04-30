@@ -186,6 +186,14 @@ public class ConditionalRoutingOp extends PipelineOp {
 
                     for (int i = 0; i < chunk.length; i++) {
 
+                        if (i % 20 == 0 && Thread.interrupted()) {
+
+                            // Eagerly notice if the operator is interrupted.
+                            throw new RuntimeException(
+                                    new InterruptedException());
+
+                        }
+
                         final IBindingSet bset = chunk[i].clone();
 
                         if (condition.accept(bset)) {
