@@ -101,6 +101,8 @@ import com.bigdata.quorum.zk.ZKQuorumImpl;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSailRepository;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
+import com.bigdata.rdf.sail.webapp.HALoadBalancerServlet;
+import com.bigdata.rdf.sail.webapp.IHALoadBalancerPolicy;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.service.jini.RemoteDestroyAdmin;
 
@@ -357,6 +359,19 @@ public class HAJournalTest extends HAJournal {
          * Variant that does not clear out the last root cause.
          */
         public Throwable getLastRootCause() throws IOException;
+
+        /**
+         * Set the {@link IHALoadBalancerPolicy} for each active instance of the
+         * {@link HALoadBalancerServlet}.
+         * 
+         * @param policy
+         *            The policy.
+         *            
+         * @throws IOException
+         */
+        public void setHALoadBalancerPolicy(final IHALoadBalancerPolicy policy)
+                throws IOException;
+        
     }
 
     /**
@@ -830,7 +845,7 @@ public class HAJournalTest extends HAJournal {
         }
 
         @Override
-        public long awaitHAReady(long timeout, TimeUnit unit)
+        public long awaitHAReady(final long timeout, final TimeUnit unit)
                 throws InterruptedException, TimeoutException,
                 AsynchronousQuorumCloseException {
 
@@ -842,7 +857,7 @@ public class HAJournalTest extends HAJournal {
         }
 
         @Override
-        public IHARootBlockResponse getRootBlock(IHARootBlockRequest msg) {
+        public IHARootBlockResponse getRootBlock(final IHARootBlockRequest msg) {
 
             checkMethod("getRootBlock",
                     new Class[] { IHARootBlockRequest.class });
@@ -886,7 +901,7 @@ public class HAJournalTest extends HAJournal {
         }
 
         @Override
-        public IHADigestResponse computeDigest(IHADigestRequest req)
+        public IHADigestResponse computeDigest(final IHADigestRequest req)
                 throws IOException, NoSuchAlgorithmException, DigestException {
 
             checkMethod("computeDigest", new Class[] { IHADigestRequest.class });
@@ -896,8 +911,9 @@ public class HAJournalTest extends HAJournal {
         }
 
         @Override
-        public IHALogDigestResponse computeHALogDigest(IHALogDigestRequest req)
-                throws IOException, NoSuchAlgorithmException, DigestException {
+        public IHALogDigestResponse computeHALogDigest(
+                final IHALogDigestRequest req) throws IOException,
+                NoSuchAlgorithmException, DigestException {
 
             checkMethod("computeHALogDigest",
                     new Class[] { IHALogDigestRequest.class });
@@ -908,7 +924,7 @@ public class HAJournalTest extends HAJournal {
 
         @Override
         public IHASnapshotDigestResponse computeHASnapshotDigest(
-                IHASnapshotDigestRequest req) throws IOException,
+                final IHASnapshotDigestRequest req) throws IOException,
                 NoSuchAlgorithmException, DigestException {
 
             checkMethod("computeHASnapshotDigest",
@@ -919,8 +935,8 @@ public class HAJournalTest extends HAJournal {
         }
 
         @Override
-        public Future<IHASnapshotResponse> takeSnapshot(IHASnapshotRequest req)
-                throws IOException {
+        public Future<IHASnapshotResponse> takeSnapshot(
+                final IHASnapshotRequest req) throws IOException {
 
             checkMethod("takeSnapshot",
                     new Class[] { IHASnapshotRequest.class });
@@ -930,7 +946,8 @@ public class HAJournalTest extends HAJournal {
         }
 
         @Override
-        public Future<Void> rebuildFromLeader(IHARemoteRebuildRequest req) throws IOException {
+        public Future<Void> rebuildFromLeader(final IHARemoteRebuildRequest req)
+                throws IOException {
 
             checkMethod("restoreFromLeader",
                     new Class[] { IHARemoteRebuildRequest.class });
@@ -956,7 +973,7 @@ public class HAJournalTest extends HAJournal {
 
         @Override
         public void gatherMinimumVisibleCommitTime(
-                IHAGatherReleaseTimeRequest req) throws IOException {
+                final IHAGatherReleaseTimeRequest req) throws IOException {
 
             checkMethod("gatherMinimumVisibleCommitTime",
                     new Class[] { IHAGatherReleaseTimeRequest.class });
@@ -967,7 +984,7 @@ public class HAJournalTest extends HAJournal {
 
         @Override
         public IHANotifyReleaseTimeResponse notifyEarliestCommitTime(
-                IHANotifyReleaseTimeRequest req) throws IOException,
+                final IHANotifyReleaseTimeRequest req) throws IOException,
                 InterruptedException, BrokenBarrierException {
 
             checkMethod("notifyEarliestCommitTime",
@@ -1070,7 +1087,7 @@ public class HAJournalTest extends HAJournal {
         }
 
         @Override
-        public Future<Void> abort2Phase(IHA2PhaseAbortMessage abortMessage) {
+        public Future<Void> abort2Phase(final IHA2PhaseAbortMessage abortMessage) {
 
             checkMethod("abort2Phase",
                     new Class[] { IHA2PhaseAbortMessage.class });
@@ -1137,7 +1154,7 @@ public class HAJournalTest extends HAJournal {
 
         @Override
         public IHAWriteSetStateResponse getHAWriteSetState(
-                IHAWriteSetStateRequest req) {
+                final IHAWriteSetStateRequest req) {
 
             checkMethod("getHAWriteSetState",
                     new Class[] { IHAWriteSetStateRequest.class });
@@ -1148,7 +1165,7 @@ public class HAJournalTest extends HAJournal {
 
         @Override
         public IHALogRootBlocksResponse getHALogRootBlocksForWriteSet(
-                IHALogRootBlocksRequest msg) throws IOException {
+                final IHALogRootBlocksRequest msg) throws IOException {
 
             checkMethod("getHALogRootBlocksForWriteSet",
                     new Class[] { IHALogRootBlocksRequest.class });
@@ -1158,7 +1175,7 @@ public class HAJournalTest extends HAJournal {
         }
 
         @Override
-        public Future<Void> sendHALogForWriteSet(IHALogRequest msg)
+        public Future<Void> sendHALogForWriteSet(final IHALogRequest msg)
                 throws IOException {
 
             checkMethod("sendHALogForWriteSet",
@@ -1169,7 +1186,7 @@ public class HAJournalTest extends HAJournal {
         }
 
         @Override
-        public Future<IHASendStoreResponse> sendHAStore(IHARebuildRequest msg)
+        public Future<IHASendStoreResponse> sendHAStore(final IHARebuildRequest msg)
                 throws IOException {
 
             checkMethod("sendHAStore", new Class[] { IHARebuildRequest.class });
@@ -1426,6 +1443,20 @@ public class HAJournalTest extends HAJournal {
          * @see HAGlueTest#getAndClearLastRootCause()
          */
         private AtomicReference<Throwable> lastRootCause = new AtomicReference<Throwable>();
+
+        @Override
+        public void setHALoadBalancerPolicy(final IHALoadBalancerPolicy policy)
+                throws IOException {
+
+            if (policy == null)
+                throw new IllegalArgumentException();
+
+            if (log.isInfoEnabled())
+                log.info("Will set LBS policy: " + policy);
+            
+            getHAJournalServer().setHALoadBalancerPolicy(policy);
+            
+        }
         
         
     } // class HAGlueTestImpl

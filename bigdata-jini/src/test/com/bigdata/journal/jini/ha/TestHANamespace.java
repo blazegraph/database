@@ -93,7 +93,8 @@ public class TestHANamespace extends AbstractHA3JournalServerTestCase {
 		// Wait until up and running as the leader.
 		awaitHAStatus(leader, HAStatusEnum.Leader);
 		
-		final RemoteRepositoryManager repositoryManager = getRemoteRepositoryManager(leader);
+        final RemoteRepositoryManager repositoryManager = getRemoteRepositoryManager(
+                leader, false/* useLBS */);
 
 		final Semaphore awaitDone = new Semaphore(0);
 		

@@ -550,29 +550,51 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
     protected RemoteRepository getRemoteRepository(final HAGlue haGlue)
             throws IOException {
 
-        final String sparqlEndpointURL = getNanoSparqlServerURL(haGlue)
-                + "/sparql";
+        return getRemoteRepository(haGlue, false/* useLoadBalancer */);
         
+    }
+
+    /**
+     * Return a {@link RemoteRepository} for talking to the
+     * {@link NanoSparqlServer} instance associated with an {@link HAGlue}
+     * interface.
+     * 
+     * @param haGlue
+     *            The service.
+     * @param useLoadBalancer
+     *            when <code>true</code> the URL will be the load balancer on
+     *            that service and the request MAY be redirected to another
+     *            service.
+     * 
+     * @throws IOException
+     */
+    protected RemoteRepository getRemoteRepository(final HAGlue haGlue,
+            final boolean useLoadBalancer) throws IOException {
+
+        final String sparqlEndpointURL = getNanoSparqlServerURL(haGlue)
+//                + (useLoadBalancer ? "/LBS" : "") 
+                + "/sparql";
+
         // Client for talking to the NSS.
         final HttpClient httpClient = new DefaultHttpClient(ccm);
 
         final RemoteRepository repo = new RemoteRepository(sparqlEndpointURL,
-                httpClient, executorService);
+                useLoadBalancer, httpClient, executorService);
 
         return repo;
         
     }
 
-    protected RemoteRepositoryManager getRemoteRepositoryManager(final HAGlue haGlue)
-            throws IOException {
+    protected RemoteRepositoryManager getRemoteRepositoryManager(
+            final HAGlue haGlue, final boolean useLBS) throws IOException {
 
         final String endpointURL = getNanoSparqlServerURL(haGlue);
 
         // Client for talking to the NSS.
         final HttpClient httpClient = new DefaultHttpClient(ccm);
 
-        final RemoteRepositoryManager repo = new RemoteRepositoryManager(endpointURL,
-                httpClient, executorService);
+        final RemoteRepositoryManager repo = new RemoteRepositoryManager(
+                endpointURL, useLBS, httpClient, executorService);
 
         return repo;
         
@@ -592,16 +614,21 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
     protected long countResults(final TupleQueryResult result) throws Exception {
 
         long count = 0;
+        try {
 
-        while (result.hasNext()) {
+            while (result.hasNext()) {
 
-            result.next();
+                result.next();
 
-            count++;
+                count++;
 
+            }
+            
+        } finally {
+            
+            result.close();
+            
         }
-
-        result.close();
 
         return count;
 
@@ -613,14 +640,38 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
      * 
      * @param haGlue
      *            The service.
+     * 
      * @return The value reported by COUNT(*).
+     * 
      * @throws Exception
      * @throws IOException
      */
     protected long getCountStar(final HAGlue haGlue) throws IOException,
             Exception {
 
-        return new CountStarTask(haGlue).call();
+        return getCountStar(haGlue, false/* useLBS */);
+
+    }
+
+    /**
+     * Report COUNT(*) for the default SPARQL end point for an {@link HAGlue}
+     * instance.
+     * 
+     * @param haGlue
+     *            The service.
+     * @param useLBS
+     *            <code>true</code> iff the load balancer end point should be
+     *            used for the request.
+     * 
+     * @return The value reported by COUNT(*).
+     * 
+     * @throws Exception
+     * @throws IOException
+     */
+    protected long getCountStar(final HAGlue haGlue, final boolean useLBS)
+            throws IOException, Exception {
+
+        return new CountStarTask(haGlue, useLBS).call();
 
     }
 
@@ -629,9 +680,6 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
      * {@link HAGlue} instance.
      */
     protected class CountStarTask implements Callable<Long> {
-        
-//        /** The service to query. */
-//        private final HAGlue haGlue;
         
         /**
          * The SPARQL end point for that service.
@@ -647,17 +695,19 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
         /**
          * @param haGlue
          *            The service to query.
-         *            
-         * @throws IOException 
+         * @param useLBS
+         *            <code>true</code> iff the load balanced end point should
+         *            be used.
+         * 
+         * @throws IOException
          */
-        public CountStarTask(final HAGlue haGlue) throws IOException {
-        
-//            this.haGlue = haGlue;
-            
+        public CountStarTask(final HAGlue haGlue, final boolean useLBS)
+                throws IOException {
+
             /*
              * Run query against one of the services.
              */
-            remoteRepo = getRemoteRepository(haGlue);
+            remoteRepo = getRemoteRepository(haGlue, useLBS);
 
         }
 
@@ -665,6 +715,7 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
          * Return the #of triples reported by <code>COUNT(*)</code> for
          * the SPARQL end point.
          */
+        @Override
         public Long call() throws Exception {
             
             final String query = "SELECT (COUNT(*) AS ?count) WHERE { ?s ?p ?o }";
@@ -678,10 +729,11 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
             // done.
             final Value v = bs.getBinding("count").getValue();
             
-            return (long) ((org.openrdf.model.Literal) v).intValue();                
+            return ((org.openrdf.model.Literal) v).longValue();
+
         }
 
-    };
+    }
 
     /**
      * Wait until the KB exists.

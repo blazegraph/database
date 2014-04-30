@@ -96,6 +96,7 @@ import com.bigdata.quorum.QuorumException;
 import com.bigdata.quorum.zk.ZKQuorumClient;
 import com.bigdata.quorum.zk.ZKQuorumImpl;
 import com.bigdata.rdf.sail.webapp.client.HttpException;
+import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
 import com.bigdata.service.jini.JiniClientConfig;
 import com.bigdata.service.jini.RemoteDestroyAdmin;
 import com.bigdata.util.InnerCause;
@@ -1403,7 +1404,7 @@ public abstract class AbstractHA3JournalServerTestCase extends
         return 3;
         
     }
-    
+
     /**
      * Return Zookeeper quorum that can be used to reflect (or act on) the
      * distributed quorum state for the logical service.
@@ -2791,6 +2792,26 @@ public abstract class AbstractHA3JournalServerTestCase extends
      */
     protected void simpleTransaction_noQuorumCheck(final HAGlue leader)
             throws IOException, Exception {
+
+        simpleTransaction_noQuorumCheck(leader, false/* useLoadBalancer */);
+
+    }
+
+    /**
+     * Immediately issues a simple transaction against the service.
+     * 
+     * @param haGlue
+     *            The service (must be the leader to succeed unless using the
+     *            load balancer).
+     * @param useLoadBalancer
+     *            When <code>true</code> the LBS will be used and the update
+     *            request may be directed to any service and will be proxied to
+     *            the leader if necessary.
+     * @throws IOException
+     * @throws Exception
+     */
+    protected void simpleTransaction_noQuorumCheck(final HAGlue haGlue,
+            final boolean useLoadBalancer) throws IOException, Exception {
         
         final StringBuilder sb = new StringBuilder();
         sb.append("DROP ALL;\n");
@@ -2802,9 +2823,12 @@ public abstract class AbstractHA3JournalServerTestCase extends
 
         final String updateStr = sb.toString();
 
-        getRemoteRepository(leader).prepareUpdate(updateStr).evaluate();
-            
-     }
+        final RemoteRepository repo = getRemoteRepository(haGlue,
+                useLoadBalancer);
+
+        repo.prepareUpdate(updateStr).evaluate();
+
+    }
     
     /**
      * Verify that an attempt to read on the specified service is disallowed.

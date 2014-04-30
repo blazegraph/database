@@ -97,7 +97,7 @@
   	<description>Performance counters.</description>
   	<servlet-class>com.bigdata.rdf.sail.webapp.CountersServlet</servlet-class>
    <async-supported>true</async-supported>
-  </servlet><!-- 
+  </servlet><!-- -->
   <servlet>
    <servlet-name>Load Balancer</servlet-name>
    <description>
@@ -112,11 +112,22 @@
    to disable the load balancer servlet, but you may choose not to
    deploy it.
 
-   When successfully deployed, requests having prefix
-   corresponding to the URL pattern for the load balancer
-   (typically, "/bigdata/LBS/*") are automatically redirected to
-   a joined service in the met quorum based on the configured
-   load balancer policy. 
+   When successfully deployed, requests having prefix corresponding to
+   the URL pattern for the load balancer are automatically redirected
+   to a joined service in the met quorum based on the configured load
+   balancer policy.
+   
+   Requests directed to /bigdata/LBS/leader are proxied to the quorum
+   leader - this URL must be used for non-idempotent requests
+   (updates).
+   
+   Requests directed to /bigdata/LBS/read are load balanced over the
+   services joined with the met quourm.  This URL may only be used
+   with idempotent requests (reads).
+      
+   For non-HA deployments, requests are simply forwarded to the local
+   service after stripping off the /LBS/leader or /LBS/read prefix.
+   Thus, it is always safe to use the LBS request URLs.
 
    The load balancer policies are "HA aware." They will always
    redirect update requests to the quorum leader.  The default
@@ -134,40 +145,26 @@
    <servlet-class>com.bigdata.rdf.sail.webapp.HALoadBalancerServlet</servlet-class>
    <load-on-startup>1</load-on-startup>
    <async-supported>true</async-supported>
-   <init-param>
-      <param-name>prefix</param-name>
-      <param-value>/bigdata/LBS</param-value>
-      <description>
-      The prefix that will be stripped from the request. This must correspond
-      to the URL-pattern, without the trailing wildcard.  The standard value
-      is "/bigdata/LBS".
-      </description>
-   </init-param>
-   <init-param>
-      <param-name>policy</param-name>
-      <param-value></param-value>
-      <description>
-      The load balancer policy. This must be an instance of the
-      IHALoadBalancerPolicy interface.  A default policy is used when no
-      value is specified.
-      </description>
-   </init-param>
-   <init-param>
-      <param-name>comparator</param-name>
-      <param-value></param-value>
-      <description>
-      The class name of the Comparator instance that places
-      IHostReports into a total ordering from the host with the least
-      load to the host with the greatest load (optional).  A default
-      is used when no value is specified.
-      </description>
-   </init-param>
   </servlet>
+  <!-- 
+  <filter>
+  <filter-name>CachedHttpServletRequestFilter</filter-name>
+    <filter-class>com.bigdata.rdf.sail.webapp.CachedHttpServletRequestFilter</filter-class>
+    <async-supported>true</async-supported>
+  </filter>
+  <filter-mapping>
+         Filter caches the requests. The load balancer needs to inspect 
+         request before deciding whether it needs to process it locally
+         or proxy it to another service.  This means that we need to be
+         able to re-read the request, which is what this filter enables. 
+    <filter-name>CachedHttpServletRequestFilter</filter-name>
+    <url-pattern>/LBS/*</url-pattern>
+  </filter-mapping>-->
   <servlet-mapping>
     <servlet-name>Load Balancer</servlet-name>
     <url-pattern>/LBS/*</url-pattern>
   </servlet-mapping>
-  -->
+  <!-- -->
   <!-- Serve anything under /html/* as a simple file. -->
   <servlet-mapping>
     <servlet-name>default</servlet-name>
