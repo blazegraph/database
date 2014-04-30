@@ -1,16 +1,25 @@
 require 'formula'
 
-# Documentation: https://github.com/mxcl/homebrew/wiki/Formula-Cookbook
-#                /usr/local/Library/Contributions/example-formula.rb
-# PLEASE REMOVE ALL GENERATED COMMENTS BEFORE SUBMITTING YOUR PULL REQUEST!
-
 class Bigdata < Formula
   homepage 'http://bigdata.com/blog/'
   url 'http://bigdata.com/deploy/bigdata-1.3.0.tgz'
-  sha1 'a395a243a2746ce47cf8893f2207fd2e0de4a9c1'
+  sha1 '466cbce9241e3d418a53a88d81b108f42f4e9f4a'
 
   def install
     prefix.install Dir['*']
+
+    # Set the installation path as the root for the bin scripts:
+    system "sed -i .bk 's|<%= BD_HOME %>|#{prefix}|' #{bin}/bigdata"
+
+    
+    # Set the Jetty root as the resourceBase in the jetty.xml file:
+    system "sed -i .bk 's|<%= JETTY_DIR %>|#{prefix}/var/jetty|' #{prefix}/var/jetty/etc/jetty.xml"
+
+    # Set the installation path as the root for bigdata.jnl file location (<bigdata_home>/data):
+    system "sed -i .bk 's|<%= BD_HOME %>|#{prefix}|' #{prefix}/var/jetty/WEB-INF/RWStore.properties"
+
+    # Set the installation path as the root for log files (<bigdata_home>/log):
+    system "sed -i .bk 's|<%= BD_HOME %>|#{prefix}|' #{prefix}/var/jetty/WEB-INF/classes/log4j.properties"
   end
 
   def caveats; <<-EOS.undent
@@ -33,11 +42,11 @@ class Bigdata < Formula
 
           % bigdata restart
 
-     To tune the server configuration, edit the "#{var}/jetty/WEB-INF/RWStore.properties" file.
+     To tune the server configuration, edit the "#{prefix}/var/jetty/WEB-INF/RWStore.properties" file.
 
      Further documentation:
 	
-          #{doc}
+          #{prefix}/doc
     EOS
   end
 
