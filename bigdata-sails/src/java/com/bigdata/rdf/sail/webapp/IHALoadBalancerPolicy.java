@@ -60,11 +60,12 @@ public interface IHALoadBalancerPolicy {
      * Invoked for each request. If the response is not committed, then it will
      * be handled by the {@link HALoadBalancerServlet}.
      * 
-     * @param isUpdate
-     *            <code>true</code> iff this is an UPDATE versus READ-ONLY
-     *            request. UPDATEs MUST be handled by the quorum leader. Read
-     *            requests can be handled by any service that is joined with the
-     *            met quorum.
+     * @param isLeaderRequest
+     *            <code>true</code> iff this request must be directed to the
+     *            leaeder and <code>false</code> iff this request may be load
+     *            balanced over the joined services. UPDATEs MUST be handled by
+     *            the leader. Read requests can be handled by any service that
+     *            is joined with the met quorum.
      * @param request
      *            The request.
      * @param response
@@ -72,9 +73,9 @@ public interface IHALoadBalancerPolicy {
      * 
      * @return <code>true</code> iff the request was handled.
      */
-    boolean service(final boolean isUpdate, final HttpServletRequest request,
-            final HttpServletResponse response) throws ServletException,
-            IOException;
+    boolean service(final boolean isLeaderRequest,
+            final HttpServletRequest request, final HttpServletResponse response)
+            throws ServletException, IOException;
 
     /**
      * Return the URL to which a non-idempotent request will be proxied.

@@ -81,7 +81,16 @@ abstract public class BigdataServlet extends HttpServlet implements IMimeTypes {
      * deployment.
      */
     static final String ATTRIBUTE_LBS_PREFIX = "com.bigdata.rdf.sail.webapp.HALoadBalancerServlet.prefix";
-            
+    
+    /**
+     * The {@link ServletContext} attribute that is managed by the
+     * {@link HALoadBalancerServlet} and which maintains a collection of the
+     * active instances of that servlet. This is used to administer the
+     * {@link IHALoadBalancerPolicy} associated with the load balancer servlet
+     * instances.
+     */
+    static final String ATTRIBUTE_LBS_INSTANCES = "com.bigdata.rdf.sail.webapp.HALoadBalancerServlet.instances";
+    
 //    /**
 //     * The {@link ServletContext} attribute whose value is the
 //     * {@link SparqlCache}.
@@ -173,7 +182,7 @@ abstract public class BigdataServlet extends HttpServlet implements IMimeTypes {
     /**
      * The backing {@link IIndexManager}.
      */
-    static IIndexManager getIndexManager(final ServletContext servletContext) {
+    static public IIndexManager getIndexManager(final ServletContext servletContext) {
 
         return getRequiredServletContextAttribute(servletContext,
                 ATTRIBUTE_INDEX_MANAGER);

@@ -86,22 +86,36 @@ public class RemoteRepositoryManager extends RemoteRepository {
         
     }
     
+    public RemoteRepositoryManager(final String serviceURL,
+            final HttpClient httpClient, final Executor executor) {
+
+        this(serviceURL, false/* useLBS */, httpClient, executor);
+
+    }
+    
     /**
      * 
      * @param serviceURL
      *            The path to the root of the web application (without the
      *            trailing "/"). <code>/sparql</code> will be appended to this
      *            path to obtain the SPARQL end point for the default data set.
+     * @param useLBS
+     *            When <code>true</code>, the REST API methods will use the load
+     *            balancer aware requestURLs. The load balancer has essentially
+     *            zero cost when not using HA, so it is recommended to always
+     *            specify <code>true</code>. When <code>false</code>, the REST
+     *            API methods will NOT use the load balancer aware requestURLs.
      * @param httpClient
      * @param executor
      */
     public RemoteRepositoryManager(final String serviceURL,
-            final HttpClient httpClient, final Executor executor) {
+            final boolean useLBS, final HttpClient httpClient,
+            final Executor executor) {
 
-        super(serviceURL + "/sparql", httpClient, executor);
+        super(serviceURL + "/sparql", useLBS, httpClient, executor);
 
         this.baseServiceURL = serviceURL;
-        
+
     }
 
     /**
@@ -134,22 +148,46 @@ public class RemoteRepositoryManager extends RemoteRepository {
     public RemoteRepository getRepositoryForNamespace(final String namespace) {
 
         return new RemoteRepository(getRepositoryBaseURLForNamespace(namespace)
-                + "/sparql", httpClient, executor);
+                + "/sparql", useLBS, httpClient, executor);
         
     }
 
     /**
-     * Obtain a {@link RemoteRepository} for the data set having the
-     * specified SPARQL end point.
+     * Obtain a {@link RemoteRepository} for the data set having the specified
+     * SPARQL end point.
      * 
      * @param sparqlEndpointURL
      *            The URL of the SPARQL end point.
-     *            
+     * @param useLBS
+     *            When <code>true</code>, the REST API methods will use the load
+     *            balancer aware requestURLs. The load balancer has essentially
+     *            zero cost when not using HA, so it is recommended to always
+     *            specify <code>true</code>. When <code>false</code>, the REST
+     *            API methods will NOT use the load balancer aware requestURLs.
+     * 
+     * @return An interface which may be used to talk to that data set.
+     */
+    public RemoteRepository getRepositoryForURL(final String sparqlEndpointURL,
+            final boolean useLBS) {
+
+        return new RemoteRepository(sparqlEndpointURL, useLBS, httpClient,
+                executor);
+
+    }
+
+    /**
+     * Obtain a {@link RemoteRepository} for the data set having the specified
+     * SPARQL end point. The load balancer will be used or not as per the
+     * parameters to the {@link RemoteRepositoryManager} constructor.
+     * 
+     * @param sparqlEndpointURL
+     *            The URL of the SPARQL end point.
+     * 
      * @return An interface which may be used to talk to that data set.
      */
     public RemoteRepository getRepositoryForURL(final String sparqlEndpointURL) {
 
-        return new RemoteRepository(sparqlEndpointURL, httpClient, executor);
+        return getRepositoryForURL(sparqlEndpointURL, useLBS);
 
     }
 
