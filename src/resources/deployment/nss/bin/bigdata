@@ -24,8 +24,8 @@
 #
 # the following template line will be replaced by a deployer application (e.g. brew, chef)
 #
-export INSTALL_TYPE="BREW"
-export BD_HOME="/usr/local/Cellar/bigdata/1.3.0"
+export INSTALL_TYPE="<%= INSTALL_TYPE %>"
+export BD_HOME="<%= BD_HOME %>"
 pidFile=${BD_HOME}/var/lock/pid
 binDir=${BD_HOME}/bin
 
@@ -101,6 +101,7 @@ case "$1" in
 #
 # Usage
 #
+	me=`basename $0`
         echo $"Usage: $0 {start|stop|status|restart}"
         exit 1
 esac
