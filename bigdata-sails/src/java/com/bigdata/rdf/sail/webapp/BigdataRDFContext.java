@@ -1997,7 +1997,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
                  * XSL style sheet directive.
                  */
                 mimeType = BigdataServlet.MIME_APPLICATION_XML;
-                charset = Charset.forName("UTF-8");
+                charset = Charset.forName(BigdataRDFServlet.UTF8);
                 fileExt = "xml";
             } else {
                 mimeType = format.getDefaultMIMEType();
