@@ -11,12 +11,12 @@ export LOG4J_CONFIG=${JETTY_DIR}/WEB-INF/classes/log4j.properties
 
 
 export LOG_DIR=${BD_HOME}/var/log
-if [! -d $LOG_DIR ]; then
+if [ ! -d $LOG_DIR ]; then
   mkdir -p $LOG_DIR
 fi
 
 export DATA_DIR=${BD_HOME}/var/data
-if [! -d $DATA_DIR ]; then
+if [ ! -d $DATA_DIR ]; then
 	mkdir -p $DATA_DIR
 fi
 
@@ -33,7 +33,7 @@ if [ -z "${JETTY_XML}" ]; then
    export JETTY_XML="${JETTY_DIR}/etc/jetty.xml"
 fi
 if [ -z "${JETTY_RESOURCE_BASE}" ]; then
-   export JETTY_RESOURCE_BASE="${JETTY_DIR}/var/jetty"
+   export JETTY_RESOURCE_BASE="${JETTY_DIR}"
 fi
 
 
@@ -52,7 +52,7 @@ export JAVA_OPTS="\
 
 # Setup the directory for the pid of the ServiceStarter process.
 lockDir=${INSTALL_DIR}/var/lock
-if [! -d $lockDir ]; then
+if [ ! -d $lockDir ]; then
 	mkdir -p $lockDir
 fi
 pidFile=$lockDir/pid
