@@ -15,14 +15,21 @@
 */
 package com.bigdata.ganglia;
 
+import java.io.Serializable;
 import java.util.Comparator;
 
 /**
  * Orders {@link IHostReport}s. 
  */
-public class HostReportComparator implements Comparator<IHostReport> {
+public class HostReportComparator implements Comparator<IHostReport>,
+        Serializable {
 
-	private final String metricName;
+	/**
+     * 
+     */
+    private static final long serialVersionUID = 1L;
+    
+    private final String metricName;
 	private final boolean asc;
 
 	/**

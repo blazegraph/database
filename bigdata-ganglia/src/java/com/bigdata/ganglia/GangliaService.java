@@ -1364,6 +1364,36 @@ public class GangliaService implements Runnable, IGangliaMetricsReporter {
 	 */
 	public IHostReport[] getHostReport(final String[] reportOn,
 			final Comparator<IHostReport> comparator) {
+	    
+        final String[] hosts = gangliaState.getKnownHosts();
+
+        return getHostReport(hosts, reportOn, comparator);
+        
+	}
+	
+    /**
+     * Return a host report based on the current state (similar to
+     * <code>gstat -a</code>).
+     * <p>
+     * Note: The report will not be accurate immediately as the
+     * {@link GangliaService} needs to build up a model of the current state of
+     * the monitored hosts.
+     * 
+     * @param hosts
+     *            The hosts for which host reports will be returned.
+     * @param reportOn
+     *            The metrics to be reported for each host. The
+     *            {@link IHostReport#getMetrics()} is an ordered map and will
+     *            reflect the metrics in the order in which they are requested
+     *            here.
+     * @param comparator
+     *            The comparator used to order the {@link IHostReport}s.
+     * 
+     * @return The {@link IHostReport}s for each specified host ordered by the
+     *         given {@link Comparator}.
+     */
+    public IHostReport[] getHostReport(final String[] hosts,
+            final String[] reportOn, final Comparator<IHostReport> comparator) {
 
 		if (reportOn == null || reportOn.length == 0)
 			throw new IllegalArgumentException();
@@ -1371,8 +1401,6 @@ public class GangliaService implements Runnable, IGangliaMetricsReporter {
 		if (comparator == null)
 			throw new IllegalArgumentException();
 		
-		final String[] hosts = gangliaState.getKnownHosts();
-
 		final IHostReport[] a = new IHostReport[hosts.length];
 
 		for (int i = 0; i < a.length; i++) {
