@@ -1,7 +1,11 @@
 #!/bin/bash
 
 export INSTALL_DIR=${BD_HOME}
-export LIB_DIR=${INSTALL_DIR}/lib
+if [ $INSTALL_TYPE == "BREW" ]; then
+	export LIB_DIR=${INSTALL_DIR}/libexec
+else
+	export LIB_DIR=${INSTALL_DIR}/lib
+fi
 export JETTY_CLASSPATH=`find ${LIB_DIR} -name '*.jar' -print0 | tr '\0' ':'`
 export JETTY_DIR=${INSTALL_DIR}/var/jetty
 export CONFIG_DIR=${INSTALL_DIR}/var/config
@@ -66,10 +70,8 @@ cmd="java ${JAVA_OPTS} \
     $NSS_PROPERTIES\
 "
 
-echo "Running: $cmd"
+# echo "Running: $cmd"
 $cmd > /dev/null 2>&1 &
-# $cmd&
 pid=$!
-echo "PID=$pid"
+# echo "PID=$pid"
 echo "$pid">$pidFile
-exit

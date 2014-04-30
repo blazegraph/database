@@ -3,27 +3,31 @@ require 'formula'
 class Bigdata < Formula
   homepage 'http://bigdata.com/blog/'
   url 'http://bigdata.com/deploy/bigdata-1.3.0.tgz'
-  sha1 '466cbce9241e3d418a53a88d81b108f42f4e9f4a'
+  sha1 '5bfec0cfe47139dc0ab3ead7f61d5fc156b57bb9'
 
   def install
     prefix.install Dir['*']
 
-    # Set the installation path as the root for the bin scripts:
-    system "sed -i .bk 's|<%= BD_HOME %>|#{prefix}|' #{bin}/bigdata"
+    # make brew happy and rename the "lib" directory:
+    system "mv #{lib} #{libexec}"
 
-    
+    # Set the installation path as the root for the bin scripts:
+    system "sed -i .bak 's|<%= BD_HOME %>|#{prefix}|' #{bin}/bigdata"
+    system "sed -i .bak 's|<%= INSTALL_TYPE %>|BREW|' #{bin}/bigdata ; rm #{bin}/bigdata.bak"
+
+
     # Set the Jetty root as the resourceBase in the jetty.xml file:
-    system "sed -i .bk 's|<%= JETTY_DIR %>|#{prefix}/var/jetty|' #{prefix}/var/jetty/etc/jetty.xml"
+    system "sed -i .bak 's|<%= JETTY_DIR %>|#{prefix}/var/jetty|' #{prefix}/var/jetty/etc/jetty.xml ; rm #{prefix}/var/jetty/etc/jetty.xml.bak"
 
     # Set the installation path as the root for bigdata.jnl file location (<bigdata_home>/data):
-    system "sed -i .bk 's|<%= BD_HOME %>|#{prefix}|' #{prefix}/var/jetty/WEB-INF/RWStore.properties"
+    system "sed -i .bak 's|<%= BD_HOME %>|#{prefix}|' #{prefix}/var/jetty/WEB-INF/RWStore.properties ; rm #{prefix}/var/jetty/WEB-INF/RWStore.properties.bak"
 
     # Set the installation path as the root for log files (<bigdata_home>/log):
-    system "sed -i .bk 's|<%= BD_HOME %>|#{prefix}|' #{prefix}/var/jetty/WEB-INF/classes/log4j.properties"
+    system "sed -i .bak 's|<%= BD_HOME %>|#{prefix}|' #{prefix}/var/jetty/WEB-INF/classes/log4j.properties; rm #{prefix}/var/jetty/WEB-INF/classes/log4j.properties.bak "
   end
 
   def caveats; <<-EOS.undent
-     After launching, visit the Bigdata Workbench at: 
+     After launching, visit the Bigdata Workbench at:
 
        http://localhost:8080/bigdata
 
@@ -45,7 +49,7 @@ class Bigdata < Formula
      To tune the server configuration, edit the "#{prefix}/var/jetty/WEB-INF/RWStore.properties" file.
 
      Further documentation:
-	
+
           #{prefix}/doc
     EOS
   end
