@@ -24,7 +24,8 @@
 #
 # the following template line will be replaced by a deployer application (e.g. brew, chef)
 #
-export BD_HOME="<%= BD_HOME %>"
+export INSTALL_TYPE="BREW"
+export BD_HOME="/usr/local/Cellar/bigdata/1.3.0"
 pidFile=${BD_HOME}/var/lock/pid
 binDir=${BD_HOME}/bin
 
@@ -47,8 +48,9 @@ case "$1" in
 	    fi
 	fi
 	if [ ! -f "$pidFile" ]; then
-		echo $"`date` : `hostname` : bringing up services: " 
+		echo -ne $"`date` : `hostname` : bringing bigdata services up ... "
 		$binDir/startNSS
+		echo "done!"
 	else
             echo $"`date` : `hostname` : running as $pid"
 	fi 
@@ -65,9 +67,10 @@ case "$1" in
 		echo $"`date` : `hostname` : $pid died?"
 		rm -f "$pidFile"
 	    else
-		echo $"`date` : `hostname` : bringing down services: " 
+		echo -ne $"`date` : `hostname` : bringing bigdata service down ... "
 		kill $pid
 		rm -f "$pidFile"
+		echo "done!"
 	    fi
 	fi
         ;;
