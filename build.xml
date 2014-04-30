@@ -1215,12 +1215,21 @@ ${postInstallMessage}</echo>
           src="http://wiki.bigdata.com/wiki/index.php/NanoSparqlServer?printable=yes"
          />
 
-      <!-- Note: Commented out. This is breaking the RDR build. -->
-      <!-- Stage files specific to NSS deployments provided by Brew and Chef.  
-      <copy file="${src.resources}/bin/bigdata"
+      <!-- Stage files specific to NSS deployments provided by Brew and Chef. -->
+      <chmod file="${dist.bin}/bigdata" perm="755" />
+      <copy file="${src.resources}/deployment/nss/bin/bigdata"
             todir="${dist.bin}" />
       <chmod file="${dist.bin}/bigdata" perm="755" />
--->
+      <copy file="${src.resources}/deployment/nss/bin/startNSS"
+            todir="${dist.bin}" />
+      <chmod file="${dist.bin}/startNSS" perm="755" />
+      <copy file="${src.resources}/deployment/nss/etc/jetty.xml"
+            todir="${dist.var.jetty}/etc" />
+      <copy file="${src.resources}/deployment/nss/WEB-INF/RWStore.properties"
+            todir="${dist.var.jetty}/WEB-INF" />
+      <copy file="${src.resources}/deployment/nss/WEB-INF/classes/log4j.properties"
+            todir="${dist.var.jetty}/WEB-INF/classes" />
+
     </target>
 
     <!--                                                    -->
@@ -1318,12 +1327,17 @@ ${postInstallMessage}</echo>
           <exclude name="bigdata/lib-dl" />
           <exclude name="bigdata/lib-ext" />
           <include name="bigdata/var/jetty/**" />
+          <include name="bigdata/var/config/logging/logging.properties" />
+          <exclude name="bigdata/var/jetty/jetty.xml" />
+          <exclude name="bigdata/var/jetty/html/new.html" />
+          <exclude name="bigdata/var/jetty/html/old.html" />
         </tarfileset>
 
         <!-- Add scripts separately, making them executable -->
 
         <tarfileset dir="${bigdata.dir}/dist" filemode="755">
           <include name="bigdata/bin/bigdata" />
+          <include name="bigdata/bin/startNSS" />
         </tarfileset>
       </tar>
 
