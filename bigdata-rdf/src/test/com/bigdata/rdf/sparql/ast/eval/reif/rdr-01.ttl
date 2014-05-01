@@ -27,13 +27,6 @@ _:s1 rdf:type rdf:Statement .
 _:s1 dc:source   <http://hr.example.com/employees#bob> ;
      dc:created  "2012-02-05T12:34:00Z"^^xsd:dateTime .
 
-_:s1 rdf:subject bd:alice .
-_:s1 rdf:predicate foaf:mbox .
-_:s1 rdf:object <mailto:alice@work> .
-_:s1 rdf:type rdf:Statement .
-_:s1 dc:source   <http://hr.example.com/employees#bob> ;
-     dc:created  "2012-02-05T12:34:00Z"^^xsd:dateTime .
-
 # Terse
 #<<bd:alice foaf:knows bd:bob>>
 #   dc:source      re:engine_1;

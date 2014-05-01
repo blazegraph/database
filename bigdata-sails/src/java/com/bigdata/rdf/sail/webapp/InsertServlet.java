@@ -106,7 +106,7 @@ public class InsertServlet extends BigdataRDFServlet {
     protected void doPost(HttpServletRequest req, HttpServletResponse resp)
             throws IOException {
 
-        if (!isWritable(req, resp)) {
+        if (!isWritable(getServletContext(), req, resp)) {
             // Service must be writable.
             return;
         }

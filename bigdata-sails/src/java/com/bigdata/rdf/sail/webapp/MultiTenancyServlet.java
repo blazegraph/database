@@ -75,6 +75,18 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
     static private final transient Logger log = Logger.getLogger(MultiTenancyServlet.class); 
 
     /**
+     * URL query parameter used to override the servlet init parameter
+     * {@link ConfigParams#DESCRIBE_EACH_NAMED_GRAPH}.
+     */
+    protected static final String DESCRIBE_EACH_NAMED_GRAPH = "describe-each-named-graph";
+    
+    /**
+     * URL query parameter used to specify that only the default namespace
+     * should be described.
+     */
+    protected static final String DESCRIBE_DEFAULT_NAMESPACE = "describe-default-namespace";
+    
+    /**
      * Delegate for the sparql end point expressed by
      * <code>.../namespace/NAMESPACE/sparql</code>.
      */
@@ -134,7 +146,7 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
     protected void doDelete(final HttpServletRequest req,
             final HttpServletResponse resp) throws IOException {
 
-        if (!isWritable(req, resp)) {
+        if (!isWritable(getServletContext(), req, resp)) {
             // Service must be writable.
             return;
         }
@@ -160,7 +172,7 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
     protected void doPut(final HttpServletRequest req,
             final HttpServletResponse resp) throws IOException {
 
-        if (!isWritable(req, resp)) {
+        if (!isWritable(getServletContext(), req, resp)) {
             // Service must be writable.
             return;
         }
@@ -220,7 +232,7 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
     private void doCreateNamespace(final HttpServletRequest req,
             final HttpServletResponse resp) throws IOException {
         
-        if (!isWritable(req, resp)) {
+        if (!isWritable(getServletContext(), req, resp)) {
             // Service must be writable.
             return;
         }
@@ -520,6 +532,22 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
             
         }
         
+        final boolean describeEachNamedGraph;
+        {
+            final String s = req.getParameter(DESCRIBE_EACH_NAMED_GRAPH);
+        
+            describeEachNamedGraph = s != null ?
+                Boolean.valueOf(s) : 
+                    getBigdataRDFContext().getConfig().describeEachNamedGraph;
+        }
+
+        final boolean describeDefaultNamespace;
+        {
+            final String s = req.getParameter(DESCRIBE_DEFAULT_NAMESPACE);
+
+            describeDefaultNamespace = s != null ? Boolean.valueOf(s) : false;
+        }
+
         /**
          * Protect the entire operation with a transaction, including the
          * describe of each namespace that we discover.
@@ -528,58 +556,78 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
          *      problem with list namespaces and create namespace </a>
          */
         final long tx = getBigdataRDFContext().newTx(timestamp);
-        
-		try {
-			/*
-			 * The set of registered namespaces for KBs.
-			 */
-			final List<String> namespaces = getBigdataRDFContext()
-					.getNamespaces(timestamp);
 
-			final Graph g = new GraphImpl();
+        try {
+            
+            final Graph g = new GraphImpl();
 
-			for (String namespace : namespaces) {
+            if (describeDefaultNamespace) {
 
-				// Get a view onto that KB instance for that timestamp.
-				final AbstractTripleStore tripleStore = getBigdataRDFContext()
-						.getTripleStore(namespace, timestamp);
+                final String namespace = getBigdataRDFContext().getConfig().namespace;
 
-				if (tripleStore == null) {
+                describeNamespace(req, g, namespace, describeEachNamedGraph,
+                        timestamp);
 
-					/*
-					 * There is no such triple/quad store instance (could be a
-					 * concurrent delete of the namespace).
-					 */
+            } else {
 
-					continue;
+                /*
+                 * The set of registered namespaces for KBs.
+                 */
+                final List<String> namespaces = getBigdataRDFContext()
+                        .getNamespaces(timestamp);
 
-				}
+                for (String namespace : namespaces) {
 
-				final BNode aDataSet = g.getValueFactory().createBNode();
+                    describeNamespace(req, g, namespace,
+                            describeEachNamedGraph, timestamp);
 
-				/*
-				 * Figure out the service end point.
-				 * 
-				 * Note: This is just the requestURL as reported. This makes is
-				 * possible to support virtual hosting and similar http proxy
-				 * patterns since the SPARQL end point is just the URL at which
-				 * the service is responding.
-				 */
-				final String serviceURI = req.getRequestURL().toString();
+                }
 
-				final VoID v = new VoID(g, tripleStore, serviceURI, aDataSet);
+            }
 
-				v.describeDataSet(
-						false/* describeStatistics */,
-						getBigdataRDFContext().getConfig().describeEachNamedGraph);
+            sendGraph(req, resp, g);
 
-			}
+        } finally {
 
-			sendGraph(req, resp, g);
-
-		} finally {
-			getBigdataRDFContext().abortTx(tx);
+            getBigdataRDFContext().abortTx(tx);
+            
         }
+
+    }
+    
+    /**
+     * Describe a namespace into the supplied Graph object.
+     */
+    private void describeNamespace(final HttpServletRequest req,
+            final Graph g, final String namespace,
+            final boolean describeEachNamedGraph, final long timestamp) 
+                    throws IOException {
+        
+        // Get a view onto that KB instance for that timestamp.
+        final AbstractTripleStore tripleStore = getBigdataRDFContext()
+                .getTripleStore(namespace, timestamp);
+
+        if (tripleStore == null) {
+
+            /*
+             * There is no such triple/quad store instance (could be a
+             * concurrent delete of the namespace).
+             */
+            
+            return;
+            
+        }
+
+        final BNode aDataSet = g.getValueFactory().createBNode();
+        
+        // Figure out the service end point(s).
+        final String[] serviceURI = getServiceURIs(getServletContext(), req);
+
+        final VoID v = new VoID(g, tripleStore, serviceURI, aDataSet);
+
+        v.describeDataSet(false/* describeStatistics */,
+//                getBigdataRDFContext().getConfig().describeEachNamedGraph);
+                describeEachNamedGraph);
         
     }
 

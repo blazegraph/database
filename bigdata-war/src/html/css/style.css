@@ -1,0 +1,355 @@
+/* http://meyerweb.com/eric/tools/css/reset/ 
+   v2.0 | 20110126
+   License: none (public domain)
+*/
+
+html, body, div, span, applet, object, iframe,
+h1, h2, h3, h4, h5, h6, p, blockquote, pre,
+a, abbr, acronym, address, big, cite, code,
+del, dfn, em, img, ins, kbd, q, s, samp,
+small, strike, strong, sub, sup, tt, var,
+b, u, i, center,
+dl, dt, dd, ol, ul, li,
+fieldset, form, label, legend,
+table, caption, tbody, tfoot, thead, tr, th, td,
+article, aside, canvas, details, embed, 
+figure, figcaption, footer, header, hgroup, 
+menu, nav, output, ruby, section, summary,
+time, mark, audio, video {
+   margin: 0;
+   padding: 0;
+   border: 0;
+   font-size: 100%;
+   font: inherit;
+   vertical-align: baseline;
+}
+/* HTML5 display-role reset for older browsers */
+article, aside, details, figcaption, figure, 
+footer, header, hgroup, menu, nav, section {
+   display: block;
+}
+body {
+   line-height: 1;
+}
+ol, ul {
+   list-style: none;
+}
+blockquote, q {
+   quotes: none;
+}
+blockquote:before, blockquote:after,
+q:before, q:after {
+   content: '';
+   content: none;
+}
+table {
+   border-collapse: collapse;
+   border-spacing: 0;
+}
+
+
+/* Workbench */
+
+body {
+   margin: 10px;
+   background-color: #f1f1f1;
+   font-family: sans-serif;
+   font-size: 80%;
+   color: #545454;
+}
+
+h1 {
+   font-size: 125%;
+   margin-bottom: 10px;
+}
+
+h2 {
+   font-size: 110%;
+   margin-bottom: 10px;
+}
+
+#container {
+   margin: 0 auto;
+}
+
+#top {
+   text-align: right;
+   margin-bottom: 20px;
+}
+
+#logo {
+   float: left;
+}
+
+#search-form {
+   padding-top: 80px;
+}
+
+#search-form input {
+   border: 1px solid #e3e3e3;
+   margin: 0;
+   height: 21px;
+}
+
+#search-form button {
+   background-image: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAsAAAAMCAMAAACDd7esAAAArlBMVEX////7+/vQ0NDExMT09PSzs7MZGRkAAAAHBweHh4f9/f3JyckDAwNXV1fPz8/b29uCgoIEBASNjY1GRkY8PDz+/v57e3sLCwsRERGOjo7Nzc3R0dEjIyO7u7vf399ra2sVFRXk5OT4+PhAQEAqKirw8PAkJCQSEhJvb28pKSlpaWn5+fny8vJ0dHQwMDAhISFYWFgYGBg+Pj7t7e0lJSXZ2dmlpaUmJiahoaGMjIzmLhVjAAAACXZwQWcAAAAVAAAAFABoZ/l0AAAAXklEQVQIHQXBAwLDQAAAsHS6sXNn29b/P7YEUSqdAWRzIeQLRSiVK3G1Vm9As9VG0onQ7UE/DDBMYBTGmExnzBdLWK0322QX9gc4ns6Xa3y7PwCk888XgHf4APD9/QGT1gbfV95+QQAAAABJRU5ErkJggg==');
+   background-repeat: no-repeat;
+   background-color: white;
+   background-position: 6px 6px;
+   border: 1px solid #e3e3e3;
+   border-left: none;
+   padding: 0;
+   margin: 0;
+   width: 25px;
+   height: 25px;
+}
+
+.shadow {
+   -webkit-box-shadow: 0px 3px 5px 0px rgba(50, 50, 50, 0.75);
+   -moz-box-shadow:    0px 3px 5px 0px rgba(50, 50, 50, 0.75);
+   box-shadow:         0px 3px 5px 0px rgba(50, 50, 50, 0.75);
+}
+
+#tab-selector {
+   clear: both;
+   padding-top: 20px;
+}
+
+#tab-selector a {
+   padding: 10px;
+   border: 1px solid #dadada;
+   border-bottom: none;
+   display: inline-block;
+   float: left;
+   cursor: pointer;
+   width: 108px;
+   margin-right: 9px;
+   text-transform: uppercase;
+   text-align: center;
+   font-weight: bold;
+   background-color: #ebebeb;
+}
+
+#tab-selector p {
+   float: right;
+   font-weight: bold;
+   padding-top: 11px;
+}
+
+#tab-selector .active {
+   background: white;
+   border-color: white;
+}
+
+.tab {
+   display: none;
+   clear: both;
+   background: white;
+   padding: 20px 0;
+}
+
+.box {
+   margin: 20px;
+   overflow-x: scroll;
+}
+
+.box:last-of-type {
+}
+
+.modal {
+   display: none;
+   z-index: 1;
+   position: fixed;
+   top: 0;
+   left: 0;
+   width: 50%;
+   margin-top: 100px;
+   margin-left: 25%;
+   background-color: white;
+   padding: 20px;
+}
+
+#overlay {
+   display: none;
+   position: fixed;
+   top: 0;
+   left: 0;
+   width: 100%;
+   height: 100%;
+   background-color: grey;
+   opacity: 0.5;
+}
+
+.modal-open #overlay {
+   display: initial;
+}
+
+.modal-open {
+   overflow: hidden;
+}
+
+.namespace-shortcuts {
+   float: right;
+   margin-bottom: 20px;
+}
+
+.namespace-shortcuts li {
+   display: inline-block;
+   border: 1px solid #e4e4e4;
+   padding: 5px;
+   margin-left: 5px;
+   cursor: pointer;
+   width: 40px;
+   text-align: center;
+}
+
+.namespace-shortcuts li:hover {
+   border-color: #b7b7b7;
+   background-color: #b7b7b7;
+   color: #ededed;
+}
+
+#large-file-message {
+   display: none;
+   margin: 5px 0;
+}
+
+textarea {
+   margin: 5px 0;
+   width: 100%;
+   height: 200px;
+   box-sizing: border-box;
+}
+
+hr {
+   background: #929292;
+   border: none;
+   height: 5px;
+   width: 50%;
+   margin: 20px auto;
+}
+
+#load-load {
+   margin: 0 auto;
+   display: block;
+}
+
+#load-buttons {
+   text-align: center;
+}
+
+.bottom {
+   text-align: right;
+}
+
+#explore-form input[type=text] {
+   width: 50%;
+}
+
+#explore-tab td:last-of-type {
+   border: none;
+}
+
+#advanced-features, #query-response, #query-pagination, #query-explanation, #query-export-container, #load-response, #load-clear-container, #explore-results, #namespace-properties {
+   display: none;
+}
+
+th, td {
+   border: 1px solid;
+   padding: 5px;
+}
+
+th {
+   font-weight: bold;
+}
+
+pre {
+   font-family: monospace;
+}
+
+#page-selector {
+   float: right;
+}
+
+#load-box, #query-box {
+   background-color: transparent;
+   padding: 2px;
+   border-width: 1px;
+   border-color: #e1e1e1;
+}
+
+/* these should have the same typography so the error highlighting matches up with the query text */
+#load-box, #load-errors, #query-box, #query-errors {
+   font-family: sans-serif;
+   font-size: 90%;
+   line-height: normal;
+}
+
+#load-errors, #query-errors {
+   position: absolute;
+   z-index: -1;
+   padding: 8px 3px;
+   color: transparent;
+   white-space: pre;
+}
+
+.error-line {
+   background-color: lightgreen;
+}
+
+.error-character {
+   background-color: red;
+}
+
+#running-queries li {
+   margin: 10px 0;
+}
+
+#running-queries div {
+   border: 1px solid;
+   border-bottom: none;
+   padding: 10px;
+}
+
+#running-queries .query {
+   max-height: 50px;
+   overflow: scroll;
+}
+
+#running-queries div.query-details {
+   border-bottom: 1px solid;
+   overflow-x: scroll;
+}
+
+.clear {
+   clear: both;
+}
+
+#query-pagination {
+   border: 1px solid #e1e1e1;
+   padding: 10px 25px;
+}
+
+#results-per-page {
+   width: 60px;
+}
+
+#query-pagination button {
+   width: 20px;
+   height: 20px;
+   border: 1px solid #e1e1e1;
+   background: transparent;
+}
+
+#current-page {
+   border: 1px solid #e1e1e1;
+}
+
+#query-export-container {
+   text-align: right;
+}
+
+#load-clear-container {
+   text-align: right;
+}
+

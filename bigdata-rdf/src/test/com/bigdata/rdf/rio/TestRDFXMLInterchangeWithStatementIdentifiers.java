@@ -74,6 +74,7 @@ import org.openrdf.rio.RDFWriterRegistry;
 import org.openrdf.rio.rdfxml.RDFXMLWriter;
 import org.openrdf.sail.SailException;
 
+import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataLiteral;
@@ -138,7 +139,13 @@ public class TestRDFXMLInterchangeWithStatementIdentifiers extends
     public void test_rdfXmlInterchange() throws RDFHandlerException,
             IOException {
 
-        final AbstractTripleStore store = getStore();
+		final Properties properties = new Properties(getProperties());
+
+		// turn off entailments.
+		properties.setProperty(AbstractTripleStore.Options.AXIOMS_CLASS,
+				NoAxioms.class.getName());
+
+        final AbstractTripleStore store = getStore(properties);
 
         try {
 
@@ -595,10 +602,16 @@ public class TestRDFXMLInterchangeWithStatementIdentifiers extends
             final BigdataLiteral bryan = valueFactory.createLiteral("bryan");
             final BigdataLiteral mike = valueFactory.createLiteral("mike");
 
-            final BigdataBNode sid1 = valueFactory.createBNode("_sid1");
-            final BigdataBNode sid2 = valueFactory.createBNode("_sid2");
-            final BigdataBNode sid3 = valueFactory.createBNode("_sid3");
+            final BigdataBNode sid1 = valueFactory.createBNode("sid1");
+            final BigdataBNode sid2 = valueFactory.createBNode("sid2");
+            final BigdataBNode sid3 = valueFactory.createBNode("sid3");
 
+            sid1.setStatementIdentifier(true);
+            sid2.setStatementIdentifier(true);
+            sid3.setStatementIdentifier(true);
+            
+            store.addTerms(new BigdataValue[] { x, y, z, A, B, C, rdfType, dcCreator, bryan, mike });
+            
             {
              
                 final StatementBuffer buf = new StatementBuffer(store, 10/* capacity */);
@@ -684,9 +697,15 @@ public class TestRDFXMLInterchangeWithStatementIdentifiers extends
 
             while (itr.hasNext()) {
 
-                final Statement stmt = itr.next();
+                final BigdataStatement stmt = (BigdataStatement) itr.next();
 
-                rdfWriter.handleStatement(stmt);
+                if (stmt.isExplicit()) {
+                
+                	System.err.println(stmt);
+                	
+                	rdfWriter.handleStatement(stmt);
+                	
+                }
 
             }
 
@@ -703,6 +722,8 @@ public class TestRDFXMLInterchangeWithStatementIdentifiers extends
         // write the rdf/xml on the console.
         if(log.isInfoEnabled())
             log.info(rdfXml);
+        
+        System.err.println(rdfXml);
 
         /*
          * Deserialize the RDF/XML into a temporary store and verify read-back

@@ -96,6 +96,7 @@ import com.bigdata.quorum.QuorumException;
 import com.bigdata.quorum.zk.ZKQuorumClient;
 import com.bigdata.quorum.zk.ZKQuorumImpl;
 import com.bigdata.rdf.sail.webapp.client.HttpException;
+import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
 import com.bigdata.service.jini.JiniClientConfig;
 import com.bigdata.service.jini.RemoteDestroyAdmin;
 import com.bigdata.util.InnerCause;
@@ -1403,7 +1404,7 @@ public abstract class AbstractHA3JournalServerTestCase extends
         return 3;
         
     }
-    
+
     /**
      * Return Zookeeper quorum that can be used to reflect (or act on) the
      * distributed quorum state for the logical service.
@@ -1814,16 +1815,20 @@ public abstract class AbstractHA3JournalServerTestCase extends
              * well. This is a bit brute force, but maybe it is more useful for
              * that.
              * 
-             * TODO This might break in CI if the bigdata-war directory is not
-             * staged to the testing area.
+             * TODO The webapp is being deployed to the serviceDir in order
+             * to avoid complexities with the parent and child process paths
+             * to the serviceDir and the webappDir.
              */
-            final File webAppDir = new File(serviceDir, "bigdata-war/src");
-            if (!webAppDir.exists() && !webAppDir.mkdirs()) {
-                throw new IOException("Could not create directory: "
-                        + webAppDir);
+            {
+                final File webAppDir = serviceDir;
+                // webAppDir = new File(serviceDir, "bigdata-war/src");
+                if (!webAppDir.exists() && !webAppDir.mkdirs()) {
+                    throw new IOException("Could not create directory: "
+                            + webAppDir);
+                }
+                copyFiles(new File("bigdata-war/src"), webAppDir);
             }
-            copyFiles(new File("bigdata-war/src"), webAppDir);
-            
+
             // log4j configuration.
             copyFile(new File(
                     "bigdata/src/resources/logging/log4j-dev.properties"),
@@ -1856,8 +1861,14 @@ public abstract class AbstractHA3JournalServerTestCase extends
 
         // Add override for the serviceDir.
         final String[] overrides = ConfigMath.concat(
-                new String[] { 
-                        "bigdata.serviceDir=new java.io.File(\"" + serviceDir + "\")",
+                new String[] { //
+                    // The service directory.
+                    "bigdata.serviceDir=new java.io.File(\"" + serviceDir + "\")",
+//                    // Where to find jetty.xml
+//                    HAJournalServer.ConfigurationOptions.COMPONENT + "."
+//                    + HAJournalServer.ConfigurationOptions.JETTY_XML
+//                    + "=\"bigdata-war/src/jetty.xml\"",
+//                    + "=\"" + serviceDir + "/bigdata-war/src/jetty.xml\"",
                 },
                 testOverrides);
 
@@ -2209,6 +2220,14 @@ public abstract class AbstractHA3JournalServerTestCase extends
              * connection.
              */
             private final String TEST_JETTY_PORT = "jetty.port";
+
+            /**
+             * The path in the local file system to the root of the web
+             * application. This is <code>bigdata-war/src</code> in the source
+             * code, but the webapp gets deployed to the serviceDir for this
+             * test suite.
+             */
+            private final String JETTY_RESOURCE_BASE = "jetty.resourceBase";
             
             /**
              * The absolute effective path of the service directory. This is
@@ -2252,7 +2271,11 @@ public abstract class AbstractHA3JournalServerTestCase extends
                 cmds.add("-D" + TEST_LOGICAL_SERVICE_ID + "="
                         + getLogicalServiceId());
 
+                // Override the HTTP port for jetty.
                 cmds.add("-D" + TEST_JETTY_PORT + "=" + jettyPort);
+
+                // Override the location of the webapp as deployed.
+                cmds.add("-D" + JETTY_RESOURCE_BASE + "=\".\"");
 
                 super.addCommandArgs(cmds);
                 
@@ -2769,6 +2792,26 @@ public abstract class AbstractHA3JournalServerTestCase extends
      */
     protected void simpleTransaction_noQuorumCheck(final HAGlue leader)
             throws IOException, Exception {
+
+        simpleTransaction_noQuorumCheck(leader, false/* useLoadBalancer */);
+
+    }
+
+    /**
+     * Immediately issues a simple transaction against the service.
+     * 
+     * @param haGlue
+     *            The service (must be the leader to succeed unless using the
+     *            load balancer).
+     * @param useLoadBalancer
+     *            When <code>true</code> the LBS will be used and the update
+     *            request may be directed to any service and will be proxied to
+     *            the leader if necessary.
+     * @throws IOException
+     * @throws Exception
+     */
+    protected void simpleTransaction_noQuorumCheck(final HAGlue haGlue,
+            final boolean useLoadBalancer) throws IOException, Exception {
         
         final StringBuilder sb = new StringBuilder();
         sb.append("DROP ALL;\n");
@@ -2780,9 +2823,12 @@ public abstract class AbstractHA3JournalServerTestCase extends
 
         final String updateStr = sb.toString();
 
-        getRemoteRepository(leader).prepareUpdate(updateStr).evaluate();
-            
-     }
+        final RemoteRepository repo = getRemoteRepository(haGlue,
+                useLoadBalancer);
+
+        repo.prepareUpdate(updateStr).evaluate();
+
+    }
     
     /**
      * Verify that an attempt to read on the specified service is disallowed.

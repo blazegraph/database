@@ -31,6 +31,7 @@ import java.util.UUID;
 
 import org.apache.http.HttpResponse;
 import org.apache.http.impl.client.DefaultHttpClient;
+import org.apache.http.impl.client.DefaultRedirectStrategy;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.QueryEvaluationException;
 import org.openrdf.query.TupleQueryResult;
@@ -142,8 +143,14 @@ public class RemoteServiceCallImpl implements RemoteServiceCall {
         
         o.addRequestParam("queryId", queryId.toString());
 
-        final RemoteRepository repo = new RemoteRepository(uriStr,
-                new DefaultHttpClient(params.getClientConnectionManager()),
+        final DefaultHttpClient httpClient = new DefaultHttpClient(
+                params.getClientConnectionManager());
+
+        // Setup a standard strategy for following redirects.
+        httpClient.setRedirectStrategy(new DefaultRedirectStrategy());
+        
+        final RemoteRepository repo = new RemoteRepository(uriStr,//
+                httpClient,//
                 params.getTripleStore().getExecutorService()
                 );
         

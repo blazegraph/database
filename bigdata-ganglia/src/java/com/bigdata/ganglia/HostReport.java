@@ -25,7 +25,8 @@ public class HostReport implements IHostReport {
 	private final String hostName;
 	private final Map<String, IGangliaMetricMessage> metrics;
 
-	public HostReport(final String hostName, final Map<String,IGangliaMetricMessage> metrics) {
+    public HostReport(final String hostName,
+            final Map<String, IGangliaMetricMessage> metrics) {
 
 		if(hostName == null)
 			throw new IllegalArgumentException();
@@ -52,5 +53,12 @@ public class HostReport implements IHostReport {
 		return metrics;
 		
 	}
-	
+
+	@Override
+	public String toString() {
+	    
+        return getClass().getName() + "{hostName=" + hostName + ", metrics="
+                + metrics + "}";
+
+	}
 }

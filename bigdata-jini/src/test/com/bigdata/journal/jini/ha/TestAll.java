@@ -113,6 +113,9 @@ public class TestAll extends TestCase {
         // Verify ability to override the HAJournal implementation class.
         suite.addTestSuite(TestHAJournalServerOverride.class); 
 
+        // The HA load balancer test suite.
+        suite.addTest(TestAll_LBS.suite());
+        
         // HA5 test suite.
         suite.addTestSuite(TestHA5JournalServer.class);
         suite.addTestSuite(TestHA5JournalServerWithHALogs.class);

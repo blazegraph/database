@@ -28,9 +28,9 @@ import java.io.File;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-import org.apache.http.client.HttpClient;
 import org.apache.http.conn.ClientConnectionManager;
 import org.apache.http.impl.client.DefaultHttpClient;
+import org.apache.http.impl.client.DefaultRedirectStrategy;
 import org.openrdf.model.ValueFactory;
 import org.openrdf.repository.Repository;
 import org.openrdf.repository.RepositoryConnection;
@@ -76,7 +76,14 @@ public class BigdataSailRemoteRepository implements Repository {
         this.ccm = DefaultClientConnectionManagerFactory.getInstance()
                 .newInstance();
 
-        final HttpClient httpClient = new DefaultHttpClient(ccm);
+        final DefaultHttpClient httpClient = new DefaultHttpClient(ccm);
+
+        /*
+         * Enable a standard http redirect policy. This allows references to
+         * http://localhost:8080 to be redirected to
+         * http://localhost:8080/bigdata.
+         */
+        httpClient.setRedirectStrategy(new DefaultRedirectStrategy());
 
         this.nss = new RemoteRepository(
                 sparqlEndpointURL, httpClient, executor);

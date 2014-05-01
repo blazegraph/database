@@ -41,6 +41,7 @@ import java.util.UUID;
 import org.apache.http.client.HttpClient;
 import org.apache.http.conn.ClientConnectionManager;
 import org.apache.http.impl.client.DefaultHttpClient;
+import org.apache.http.impl.client.DefaultRedirectStrategy;
 import org.eclipse.jetty.server.Server;
 import org.openrdf.model.Graph;
 import org.openrdf.model.Literal;
@@ -71,6 +72,7 @@ import org.openrdf.rio.RDFWriterRegistry;
 import org.openrdf.rio.helpers.StatementCollector;
 import org.openrdf.sail.SailException;
 
+import com.bigdata.BigdataStatics;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
@@ -123,16 +125,33 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
      */
 	private ClientConnectionManager m_cm;
 	
+	/**
+	 * Exposed to tests that do direct HTTP GET/POST operations.
+	 */
+    protected HttpClient m_httpClient = null;
+
     /**
      * The client-API wrapper to the NSS.
      */
     protected RemoteRepositoryManager m_repo;
 
     /**
-	 * The effective {@link NanoSparqlServer} http end point.
-	 */
+     * The effective {@link NanoSparqlServer} http end point (including the
+     * ContextPath).
+     */
 	protected String m_serviceURL;
 
+    /**
+     * The URL of the root of the web application server. This does NOT include
+     * the ContextPath for the webapp.
+     * 
+     * <pre>
+     * http://localhost:8080 -- root URL
+     * http://localhost:8080/bigdata -- webapp URL (includes "/bigdata" context path.
+     * </pre>
+     */
+	protected String m_rootURL;
+	
 //	/**
 //	 * The request path for the REST API under test.
 //	 */
@@ -262,7 +281,7 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
 
         m_fixture.start();
 
-		final int port = m_fixture.getConnectors()[0].getLocalPort();
+		final int port = NanoSparqlServer.getLocalPort(m_fixture);
 
 		// log.info("Getting host address");
 
@@ -275,14 +294,16 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
 
         }
 
-        m_serviceURL = new URL("http", hostAddr, port, //
-                "" // file
-//              "/sparql/"// file
+        m_rootURL = new URL("http", hostAddr, port, ""/* contextPath */
         ).toExternalForm();
 
+        m_serviceURL = new URL("http", hostAddr, port,
+                BigdataStatics.getContextPath()).toExternalForm();
+
         if (log.isInfoEnabled())
-            log.info("Setup done: name=" + getName() + ", namespace="
-                    + namespace + ", serviceURL=" + m_serviceURL);
+            log.info("Setup done: \nname=" + getName() + "\nnamespace="
+                    + namespace + "\nrootURL=" + m_rootURL + "\nserviceURL="
+                    + m_serviceURL);
 
 //        final HttpClient httpClient = new DefaultHttpClient();
 
@@ -291,8 +312,20 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
         m_cm = DefaultClientConnectionManagerFactory.getInstance()
                 .newInstance();
 
+        final DefaultHttpClient httpClient = new DefaultHttpClient(m_cm);
+        m_httpClient = httpClient;
+        
+        /*
+         * Ensure that the client follows redirects using a standard policy.
+         * 
+         * Note: This is necessary for tests of the webapp structure since the
+         * container may respond with a redirect (302) to the location of the
+         * webapp when the client requests the root URL.
+         */
+        httpClient.setRedirectStrategy(new DefaultRedirectStrategy());
+
         m_repo = new RemoteRepositoryManager(m_serviceURL,
-                new DefaultHttpClient(m_cm),
+                m_httpClient,
                 m_indexManager.getExecutorService());
 
     }
@@ -322,22 +355,21 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
 //		m_indexManager = null;
 
 		namespace = null;
-		
+        
+        m_rootURL = null;
 		m_serviceURL = null;
-
+		
         if (m_cm != null) {
-
             m_cm.shutdown();
-
             m_cm = null;
+        }
 
-		}
-		
-		m_repo = null;
-		
-		log.info("tear down done");
-		
-		super.tearDown();
+        m_httpClient = null;
+        m_repo = null;
+        
+        log.info("tear down done");
+
+        super.tearDown();
 
 	}
 

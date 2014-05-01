@@ -103,6 +103,8 @@ import com.bigdata.quorum.zk.ZKQuorumClient;
 import com.bigdata.quorum.zk.ZKQuorumImpl;
 import com.bigdata.rdf.sail.CreateKBTask;
 import com.bigdata.rdf.sail.webapp.ConfigParams;
+import com.bigdata.rdf.sail.webapp.HALoadBalancerServlet;
+import com.bigdata.rdf.sail.webapp.IHALoadBalancerPolicy;
 import com.bigdata.rdf.sail.webapp.NanoSparqlServer;
 import com.bigdata.rwstore.RWStore;
 import com.bigdata.service.AbstractHATransactionService;
@@ -449,7 +451,7 @@ public class HAJournalServer extends AbstractServer {
          * 
          * @see #DEFAULT_JETTY_XML
          */
-        String JETTY_XML = "jettyXml";
+        String JETTY_XML = NanoSparqlServer.SystemProperties.JETTY_XML;
 
         /**
          * The default value works when deployed under the IDE with the
@@ -457,7 +459,7 @@ public class HAJournalServer extends AbstractServer {
          * deploying outside of that context, the value needs to be set
          * explicitly.
          */
-        String DEFAULT_JETTY_XML = "WEB-INF/jetty.xml";
+        String DEFAULT_JETTY_XML = NanoSparqlServer.SystemProperties.DEFAULT_JETTY_XML;
 
     }
     
@@ -4513,66 +4515,21 @@ public class HAJournalServer extends AbstractServer {
 
             }
 
-//            if(!USE_WEB_XML) {
-//                
-//            final String COMPONENT = NSSConfigurationOptions.COMPONENT;
-//
-//            final String namespace = (String) config.getEntry(COMPONENT,
-//                    NSSConfigurationOptions.NAMESPACE, String.class,
-//                    NSSConfigurationOptions.DEFAULT_NAMESPACE);
-//
-//            final Integer queryPoolThreadSize = (Integer) config.getEntry(
-//                    COMPONENT, NSSConfigurationOptions.QUERY_THREAD_POOL_SIZE,
-//                    Integer.TYPE,
-//                    NSSConfigurationOptions.DEFAULT_QUERY_THREAD_POOL_SIZE);
-//
-//            final boolean create = (Boolean) config.getEntry(COMPONENT,
-//                    NSSConfigurationOptions.CREATE, Boolean.TYPE,
-//                    NSSConfigurationOptions.DEFAULT_CREATE);
-//
-//            final Integer port = (Integer) config.getEntry(COMPONENT,
-//                    NSSConfigurationOptions.PORT, Integer.TYPE,
-//                    NSSConfigurationOptions.DEFAULT_PORT);
-//
-//            final String servletContextListenerClass = (String) config
-//                    .getEntry(
-//                            COMPONENT,
-//                            NSSConfigurationOptions.SERVLET_CONTEXT_LISTENER_CLASS,
-//                            String.class,
-//                            NSSConfigurationOptions.DEFAULT_SERVLET_CONTEXT_LISTENER_CLASS);
-//
-//            final Map<String, String> initParams = new LinkedHashMap<String, String>();
-//            {
-//
-//                initParams.put(ConfigParams.NAMESPACE, namespace);
-//
-//                initParams.put(ConfigParams.QUERY_THREAD_POOL_SIZE,
-//                        queryPoolThreadSize.toString());
-//
-//                // Note: Create will be handled by the QuorumListener (above).
-//                initParams.put(ConfigParams.CREATE, Boolean.toString(create));
-//
-//                initParams.put(ConfigParams.SERVLET_CONTEXT_LISTENER_CLASS,
-//                        servletContextListenerClass);
-//
-//            }
-//
-//            // Setup the embedded jetty server for NSS webapp.
-//            jettyServer = NanoSparqlServer.newInstance(port, journal,
-//                    initParams);
-//        
-//            } else {
+            // The location of the jetty.xml file.
+            final String jettyXml = (String) config.getEntry(
+                    ConfigurationOptions.COMPONENT,
+                    ConfigurationOptions.JETTY_XML, String.class,
+                    ConfigurationOptions.DEFAULT_JETTY_XML);
 
-                // The location of the jetty.xml file.
-                final String jettyXml = (String) config.getEntry(
-                        ConfigurationOptions.COMPONENT,
-                        ConfigurationOptions.JETTY_XML, String.class,
-                        ConfigurationOptions.DEFAULT_JETTY_XML);
-
+                // Note: if we do this, push the serviceDir down into newInstance().
+//                if (!jettyXml.startsWith("/")) {
+//                    // Assume that the path is relative to the serviceDir.
+//                    jettyXml = getServiceDir() + File.separator + jettyXml;
+//                }
+                
                 // Setup the embedded jetty server for NSS webapp.
-                jettyServer = NanoSparqlServer.newInstance(jettyXml, journal);
-
-//            }
+            jettyServer = NanoSparqlServer
+                    .newInstance(jettyXml, journal, null/* initParams */);
 
             log.warn("Starting NSS");
             
@@ -4625,21 +4582,6 @@ public class HAJournalServer extends AbstractServer {
 
     }
     
-//    /**
-//     * When <code>true</code>, the {@link HAJournalServer} will use
-//     * <code>jetty.xml</code> and <code>web.xml</code> to configure the
-//     * {@link NanoSparqlServer}.
-//     * 
-//     * @see <a href="http://wiki.eclipse.org/Jetty/Tutorial/Embedding_Jetty">
-//     *      Embedding Jetty </a>
-//     * @see <a href="http://trac.bigdata.com/ticket/730" > Allow configuration
-//     *      of embedded NSS jetty server using jetty-web.xml </a>
-//     * 
-//     * @deprecated Once #730 is closed, get rid of this and the old code paths
-//     *             in the method above and in the {@link NanoSparqlServer}.
-//     */
-//    private final boolean USE_WEB_XML = true;
-
     /**
      * The actual port depends on how jetty was configured in
      * <code>jetty.xml</code>. This returns the port associated with the first
@@ -4653,13 +4595,49 @@ public class HAJournalServer extends AbstractServer {
      */
     int getNSSPort() {
 
-        final Server tmp = jettyServer;
+        return NanoSparqlServer.getLocalPort(jettyServer);
 
-        if (tmp == null)
-            throw new IllegalStateException("Server is not running");
-
-        return tmp.getConnectors()[0].getLocalPort();
+    }
+    
+    /**
+     * Change the {@link IHALoadBalancerPolicy}.
+     * <p>
+     * TODO There are some intrinsic problems with this method that should be
+     * resolved before exposing it as an administrative API on the
+     * {@link HAGlue} interface.
+     * <p>
+     * (1) This only applies to running instances of the
+     * {@link HALoadBalancerServlet}. If an instance is started after this
+     * method is called, it will run with the as-configured
+     * {@link IHALoadBalancerPolicy} instance of the one specified in the last
+     * invocation of this method.
+     * <p>
+     * (2) There are various race conditions that exist with respect to: (a) the
+     * atomic change over of the {@link IHALoadBalancerPolicy} during an
+     * in-flight request; and (b) the atomic destroy of the old policy once
+     * there are no more in-flight requests using that old policy.
+     * 
+     * TODO Either the {@link IHALoadBalancerPolicy} needs to be serializable or
+     * we need to pass along the class name and the configuration parameters.
+     * For this case, the configuration should be set from the caller specified
+     * values rather than those potentially associated with <code>web.xml</code>
+     * , especially since <code>web.xml</code> might not even have the necessary
+     * configuration parameters defined for the caller specified policy.
+     */
+    public void setHALoadBalancerPolicy(final IHALoadBalancerPolicy policy) {
         
+        final Server server = this.jettyServer;
+
+        if (server == null)
+            throw new IllegalStateException();
+
+        final WebAppContext wac = NanoSparqlServer.getWebApp(server);
+        
+        if (log.isInfoEnabled())
+            log.info("Will set LBS: wac=" + wac + ", policy: " + policy);
+
+        HALoadBalancerServlet.setPolicy(wac.getServletContext(), policy);
+
     }
     
     /**

@@ -268,7 +268,7 @@ public class HAJournal extends Journal {
      * The {@link HAJournalServer} instance that is managing this
      * {@link HAJournal}.
      */
-    protected HAJournalServer getHAJournalServer() {
+    public HAJournalServer getHAJournalServer() {
         
         return server;
         

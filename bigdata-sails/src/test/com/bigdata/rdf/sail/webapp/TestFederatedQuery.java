@@ -206,16 +206,16 @@ public class TestFederatedQuery<S extends IIndexManager> extends
      *            the index of the repository, starting with 1
      * @return
      */
-    protected String getRepositoryUrl(int i) {
+    protected String getRepositoryUrl(final int i) {
 
-        return getRepositoryUrlBase() + i;
+        return getRepositoryUrlBase() + i + "/sparql";
 
     }
     
     protected String getRepositoryUrlBase() {
         
-        return m_serviceURL + requestPath + "/namespace/" + namespace + "_";
-        
+        return m_serviceURL + "/namespace/" + namespace + "_";
+
     }
     
     /**

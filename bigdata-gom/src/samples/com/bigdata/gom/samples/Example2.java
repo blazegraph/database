@@ -18,6 +18,7 @@ import org.openrdf.model.Value;
 import org.openrdf.model.vocabulary.RDFS;
 import org.openrdf.query.BindingSet;
 
+import com.bigdata.BigdataStatics;
 import com.bigdata.gom.gpo.IGPO;
 import com.bigdata.gom.gpo.ILinkSet;
 import com.bigdata.gom.om.IObjectManager;
@@ -288,7 +289,8 @@ public class Example2 implements Callable<Void> {
         /**
          * The top-level SPARQL end point for a NanoSparqlServer instance.
          */
-        final String sparqlEndpointURL = "http://localhost:8080/sparql/";
+        final String sparqlEndpointURL = "http://localhost:8080/"
+                + BigdataStatics.getContextPath() + "/sparql/";
 
         /**
          * The namespace of the KB instance that you want to connect to on that

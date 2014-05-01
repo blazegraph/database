@@ -399,7 +399,7 @@ public class SD {
     /**
      * The service end point (from the constructor).
      */
-    protected final String serviceURI;
+    protected final String[] serviceURI;
 
     /**
      * The value factory used to create values for the service description graph
@@ -435,7 +435,7 @@ public class SD {
      * @see #describeService()
      */
     public SD(final Graph g, final AbstractTripleStore tripleStore,
-            final String serviceURI) {
+            final String... serviceURI) {
 
         if (g == null)
             throw new IllegalArgumentException();
@@ -445,6 +445,13 @@ public class SD {
         
         if (serviceURI == null)
             throw new IllegalArgumentException();
+
+        if (serviceURI.length == 0)
+            throw new IllegalArgumentException();
+
+        for (String s : serviceURI)
+            if (s == null)
+                throw new IllegalArgumentException();
 
         this.g = g;
         
@@ -518,7 +525,11 @@ public class SD {
      */
     protected void describeServiceEndpoints() {
 
-        g.add(aService, SD.endpoint, g.getValueFactory().createURI(serviceURI));
+        for (String uri : serviceURI) {
+
+            g.add(aService, SD.endpoint, g.getValueFactory().createURI(uri));
+
+        }
 
     }
     

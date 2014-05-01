@@ -8,6 +8,7 @@ import org.apache.http.impl.client.DefaultHttpClient;
 import org.openrdf.query.GraphQueryResult;
 import org.openrdf.query.TupleQueryResult;
 
+import com.bigdata.BigdataStatics;
 import com.bigdata.rdf.sail.webapp.client.DefaultClientConnectionManagerFactory;
 import com.bigdata.rdf.sail.webapp.client.IPreparedGraphQuery;
 import com.bigdata.rdf.sail.webapp.client.IPreparedTupleQuery;
@@ -60,8 +61,9 @@ public class TestQuery {
 	 */
 	public static void main(String[] args) throws Exception {
 		
-		final String serviceURL = "http://localhost:8080/sparql";
-		
+        final String serviceURL = "http://localhost:8080"
+                + BigdataStatics.getContextPath() + "/sparql";
+
 		final HttpClient httpClient = 
 			new DefaultHttpClient(DefaultClientConnectionManagerFactory.getInstance().newInstance());
 		

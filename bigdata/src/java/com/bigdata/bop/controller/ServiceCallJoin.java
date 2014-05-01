@@ -58,6 +58,7 @@ import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.sparql.ast.service.BigdataServiceCall;
 import com.bigdata.rdf.sparql.ast.service.ExternalServiceCall;
+import com.bigdata.rdf.sparql.ast.service.IDoNotJoinService;
 import com.bigdata.rdf.sparql.ast.service.RemoteServiceCall;
 import com.bigdata.rdf.sparql.ast.service.ServiceCall;
 import com.bigdata.rdf.sparql.ast.service.ServiceCallUtility;
@@ -585,6 +586,52 @@ public class ServiceCallJoin extends PipelineOp {
                         : new UnsyncLocalOutputBuffer<IBindingSet>(
                                 op.getChunkCapacity(), sink2);
 
+                if (serviceCall instanceof IDoNotJoinService) {
+                	
+                    // The iterator draining the subquery
+                    ICloseableIterator<IBindingSet[]> serviceSolutionItr = null;
+                    try {
+
+                        /*
+                         * Invoke the service.
+                         * 
+                         * Note: Returns [null] IFF SILENT and SERVICE ERROR.
+                         */
+                        
+                        serviceSolutionItr = doServiceCall(serviceCall, chunk);
+
+                        if (serviceSolutionItr != null) {
+
+                        	while (serviceSolutionItr.hasNext()) {
+                        		
+                        		final IBindingSet[] bsets = 
+                        				serviceSolutionItr.next();
+                        		
+                        		for (IBindingSet bs : bsets) {
+                        		
+                        			unsyncBuffer.add(bs);
+                        			
+                        		}
+                        		
+                        	}
+
+                        }
+
+                    } finally {
+
+                        // ensure the service call iterator is closed.
+                        if (serviceSolutionItr != null)
+                            serviceSolutionItr.close();
+
+                    }
+                    
+                    unsyncBuffer.flush();
+
+                    // done.
+                    return null;
+                	
+                }
+                
                 final JVMHashJoinUtility state = new JVMHashJoinUtility(op,
                         silent ? JoinTypeEnum.Optional : JoinTypeEnum.Normal
                         );

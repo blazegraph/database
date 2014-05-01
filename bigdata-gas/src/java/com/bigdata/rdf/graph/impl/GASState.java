@@ -23,6 +23,7 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.log4j.Logger;
+import org.openrdf.model.Literal;
 import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
@@ -210,6 +211,20 @@ public class GASState<VS, ES, ST> implements IGASState<VS, ES, ST> {
     }
 
     @Override
+    public boolean isVisited(final Value v) {
+        
+        return vertexState.get(v) != null;
+        
+    }
+
+    @Override
+    public boolean isVisited(final Set<Value> v) {
+        
+    	return vertexState.keySet().containsAll(v);
+    	
+    }
+
+    @Override
     public ES getState(final Statement e) {
 
         if (edgeState == null)
@@ -231,6 +246,24 @@ public class GASState<VS, ES, ST> implements IGASState<VS, ES, ST> {
         }
 
         return es;
+
+    }
+
+    /*
+     * TODO batch parallel in java 8.
+     */
+    @Override
+    public void retainAll(final Set<Value> retainSet) {
+
+        for (Value v : vertexState.keySet()) {
+
+            if (!retainSet.contains(v)) {
+
+                vertexState.remove(v);
+
+            }
+
+        }
 
     }
 
@@ -313,6 +346,16 @@ public class GASState<VS, ES, ST> implements IGASState<VS, ES, ST> {
      * 
      * TODO REDUCE : parallelize with nthreads. The reduce operations are often
      * lightweight, so maybe a fork/join pool would work better?
+     * <p>
+     * Note: We can not do a parallel reduction right now because the backing
+     * class does not expose a parallel iterator, e.g., a segment-wise iterator.
+     * The reduction over the {@link #vertexState} is quite slow as a result.
+     * <p>
+     * It looks like bulk parallel operators will be eventually introduced into
+     * the Java concurrency collections. For now, it seems like the short term
+     * solution would be to drop them onto stripped lists at the same time that
+     * they are first inserted into the CHM. I could then read over those
+     * striped lists in parallel during the reduction.
      */
     @Override
     public <T> T reduce(final IReducer<VS, ES, ST, T> op) {
@@ -369,6 +412,16 @@ public class GASState<VS, ES, ST> implements IGASState<VS, ES, ST> {
         return e.getSubject();
 
     }
+    
+    /**
+     * This will only work for the BigdataGASState.
+     */
+    @Override
+    public Literal getLinkAttr(final Value u, final Statement e) {
+    	
+    	return null;
+    	
+    }
 
     @Override
     public boolean isEdge(final Statement e) {
@@ -417,5 +470,11 @@ public class GASState<VS, ES, ST> implements IGASState<VS, ES, ST> {
         return ret;
         
     }
+    
+//    public Set<Value> values() {
+//    	
+//    	return vertexState.keySet();
+//    	
+//    }
     
 }

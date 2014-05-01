@@ -15,8 +15,8 @@
 */
 package com.bigdata.rdf.graph.analytics;
 
-import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -25,17 +25,18 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.apache.log4j.Logger;
 import org.openrdf.model.Statement;
 import org.openrdf.model.Value;
+import org.openrdf.model.ValueFactory;
 
+import com.bigdata.rdf.graph.BinderBase;
 import com.bigdata.rdf.graph.EdgesEnum;
 import com.bigdata.rdf.graph.Factory;
 import com.bigdata.rdf.graph.FrontierEnum;
-import com.bigdata.rdf.graph.IGASContext;
+import com.bigdata.rdf.graph.IBinder;
+import com.bigdata.rdf.graph.IBindingExtractor;
 import com.bigdata.rdf.graph.IGASScheduler;
 import com.bigdata.rdf.graph.IGASState;
 import com.bigdata.rdf.graph.IReducer;
 import com.bigdata.rdf.graph.impl.BaseGASProgram;
-
-import cutthecrap.utils.striterators.IStriterator;
 
 /**
  * Connected components computes the distinct sets of non-overlapping subgraphs
@@ -190,19 +191,6 @@ public class CC extends BaseGASProgram<CC.VS, CC.ES, Value> {
     /**
      * {@inheritDoc}
      * <p>
-     * Overridden to only visit the edges of the graph.
-     */
-    @Override
-    public IStriterator constrainFilter(
-            final IGASContext<CC.VS, CC.ES, Value> ctx, final IStriterator itr) {
-
-        return itr.addFilter(getEdgeOnlyFilter(ctx));
-
-    }
-
-    /**
-     * {@inheritDoc}
-     * <p>
      * Return the label of the remote vertex.
      */
     @Override
@@ -306,10 +294,6 @@ public class CC extends BaseGASProgram<CC.VS, CC.ES, Value> {
     /**
      * The remote vertex is scheduled for activation unless it has already been
      * visited.
-     * <p>
-     * Note: We are scattering to out-edges. Therefore, this vertex is
-     * {@link Statement#getSubject()}. The remote vertex is
-     * {@link Statement#getObject()}.
      */
     @Override
     public void scatter(final IGASState<CC.VS, CC.ES, Value> state,
@@ -322,6 +306,105 @@ public class CC extends BaseGASProgram<CC.VS, CC.ES, Value> {
     }
 
     /**
+     * {@inheritDoc}
+     * <p>
+     * <dl>
+     * <dt>{@value Bindings#LABEL}</dt>
+     * <dd>The label associated with all of the vertices in the same subgraph.
+     * The label is a vertex identifier and can be used to jump into the
+     * subgraph.</dd>
+     * </dl>
+     */
+    @Override
+    public List<IBinder<CC.VS, CC.ES, Value>> getBinderList() {
+
+        final List<IBinder<CC.VS, CC.ES, Value>> tmp = super.getBinderList();
+
+        tmp.add(new BinderBase<CC.VS, CC.ES, Value>() {
+            
+            @Override
+            public int getIndex() {
+                return Bindings.LABEL;
+            }
+            
+            @Override
+            public Value bind(final ValueFactory vf,
+                    final IGASState<CC.VS, CC.ES, Value> state, final Value u) {
+
+                return state.getState(u).label.get();
+
+            }
+
+        });
+
+        return tmp;
+
+    }
+
+    /**
+     * Additional {@link IBindingExtractor.IBinder}s exposed by {@link CC}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     */
+    public interface Bindings extends BaseGASProgram.Bindings {
+        
+        /**
+         * The label associated with all of the vertices in a subgraph. The
+         * label is a vertex identifier and can be used to jump into the
+         * subgraph.
+         */
+        int LABEL = 1;
+        
+    }
+
+    /**
+     * Returns a map containing the labels assigned to each connected component
+     * (which gives you a vertex in that connected component) and the #of
+     * vertices in each connected component.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+     *         Thompson</a>
+     */
+    public class ConnectedComponentsReducer implements IReducer<CC.VS,CC.ES,Value,Map<Value,AtomicInteger>> {
+
+        final ConcurrentHashMap<Value, AtomicInteger> labels = new ConcurrentHashMap<Value, AtomicInteger>();
+
+        @Override
+        public void visit(final IGASState<VS, ES, Value> state, final Value u) {
+
+            final VS us = state.getState(u);
+
+            if (us != null) {
+
+                final Value label = us.getLabel();
+
+                if (log.isDebugEnabled())
+                    log.debug("v=" + u + ", label=" + label);
+
+                final AtomicInteger oldval = labels.putIfAbsent(label,
+                        new AtomicInteger(1));
+
+                if (oldval != null) {
+
+                    // lost race. increment existing counter.
+                    oldval.incrementAndGet();
+
+                }
+
+            }
+
+        }
+
+        @Override
+        public Map<Value, AtomicInteger> get() {
+
+            return Collections.unmodifiableMap(labels);
+
+        }
+
+    }
+    
+    /**
      * Returns a map containing the labels assigned to each connected component
      * (which gives you a vertex in that connected component) and the #of
      * vertices in each connected component.
@@ -329,83 +412,44 @@ public class CC extends BaseGASProgram<CC.VS, CC.ES, Value> {
     public Map<Value, AtomicInteger> getConnectedComponents(
             final IGASState<CC.VS, CC.ES, Value> state) {
 
-        final ConcurrentHashMap<Value, AtomicInteger> labels = new ConcurrentHashMap<Value, AtomicInteger>();
-
-        return state
-                .reduce(new IReducer<CC.VS, CC.ES, Value, Map<Value, AtomicInteger>>() {
-
-                    @Override
-                    public void visit(final IGASState<VS, ES, Value> state,
-                            final Value u) {
-
-                        final VS us = state.getState(u);
-
-                        if (us != null) {
-
-                            final Value label = us.getLabel();
-
-                            if (log.isDebugEnabled())
-                                log.debug("v=" + u + ", label=" + label);
-
-                            final AtomicInteger oldval = labels.putIfAbsent(
-                                    label, new AtomicInteger(1));
-
-                            if (oldval != null) {
-
-                                // lost race. increment existing counter.
-                                oldval.incrementAndGet();
-                                
-                            }
-                            
-                        }
-
-                    }
-
-                    @Override
-                    public Map<Value, AtomicInteger> get() {
-
-                        return Collections.unmodifiableMap(labels);
-
-                    }
-                });
-
+        return state.reduce(new ConnectedComponentsReducer());
     }
     
-    @Override
-    public void after(final IGASContext<CC.VS, CC.ES, Value> ctx) {
-
-        final Map<Value, AtomicInteger> labels = getConnectedComponents(ctx
-                .getGASState());
-
-        System.out.println("There are " + labels.size()
-                + " connected components");
-        
-        class NV implements Comparable<NV> {
-            public final int n;
-            public final Value v;
-            public NV(int n, Value v) {
-                this.n = n;
-                this.v = v;
-            }
-            @Override
-            public int compareTo(final NV o) {
-                return o.n - this.n;
-            }
-        }
-
-        final NV[] a = new NV[labels.size()];
-        int i = 0;
-        for (Map.Entry<Value, AtomicInteger> e : labels.entrySet()) {
-            a[i++] = new NV(e.getValue().intValue(), e.getKey());
-        }
-
-        Arrays.sort(a);
-        
-        System.out.println("size, label");
-        for(NV t : a) {
-            System.out.println(t.n + ", " + t.v);
-        }
-        
-    }
+//    @Override
+//    public void after(final IGASContext<CC.VS, CC.ES, Value> ctx) {
+//
+//        final Map<Value, AtomicInteger> labels = getConnectedComponents(ctx
+//                .getGASState());
+//
+//        System.out.println("There are " + labels.size()
+//                + " connected components");
+//        
+//        class NV implements Comparable<NV> {
+//            public final int n;
+//            public final Value v;
+//            public NV(int n, Value v) {
+//                this.n = n;
+//                this.v = v;
+//            }
+//            @Override
+//            public int compareTo(final NV o) {
+//                return o.n - this.n;
+//            }
+//        }
+//
+//        final NV[] a = new NV[labels.size()];
+//        int i = 0;
+//        for (Map.Entry<Value, AtomicInteger> e : labels.entrySet()) {
+//            a[i++] = new NV(e.getValue().intValue(), e.getKey());
+//        }
+//
+//        Arrays.sort(a);
+//        
+//        System.out.println("size, label");
+//        for(NV t : a) {
+//            System.out.println(t.n + ", " + t.v);
+//        }
+//        
+//    }
     
 }

@@ -37,6 +37,7 @@ import java.util.Properties;
 import junit.extensions.proxy.IProxyTest;
 import junit.framework.Test;
 
+import org.apache.log4j.Logger;
 import org.openrdf.model.Resource;
 import org.openrdf.query.Binding;
 import org.openrdf.query.BindingSet;
@@ -68,6 +69,8 @@ public abstract class ProxyBigdataSailTestCase
     implements IProxyTest
 {
 
+//	protected final transient static Logger log = Logger.getLogger(ProxyBigdataSailTestCase.class);
+	
     public ProxyBigdataSailTestCase() {}
     public ProxyBigdataSailTestCase(String name){super(name);}
     

@@ -3147,6 +3147,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
      * {@link #executorService}, then the {@link IConcurrencyManager}, the
      * {@link ITransactionService} and finally the {@link IResourceLockService}.
      */
+    @Override
     synchronized public void shutdown() {
         
         if (!isOpen())
@@ -3227,6 +3228,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
             new ShutdownHelper(executorService, 1000/* logTimeout */,
                     TimeUnit.MILLISECONDS) {
                
+                @Override
                 protected void logTimeout() {
 
                     log.warn("Waiting on task(s)"
@@ -3266,6 +3268,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
      * Note: The {@link IConcurrencyManager} is shutdown first, then the
      * {@link ITransactionService} and finally the {@link IResourceManager}.
      */
+    @Override
     synchronized public void shutdownNow() {
 
         if (!isOpen())
@@ -3373,12 +3376,14 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
 
     }
     
+    @Override
     public <T> Future<T> submit(AbstractTask<T> task) {
 
         return concurrencyManager.submit(task);
         
     }
 
+    @Override
     @SuppressWarnings("rawtypes")
     public List<Future> invokeAll(
             Collection<? extends AbstractTask> tasks, long timeout,
@@ -3388,6 +3393,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
         
     }
 
+    @Override
     public <T> List<Future<T>> invokeAll(
             Collection<? extends AbstractTask<T>> tasks)
             throws InterruptedException {
@@ -3396,12 +3402,14 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
         
     }
 
+    @Override
     public IResourceManager getResourceManager() {
         
         return concurrencyManager.getResourceManager();
         
     }
 
+    @Override
     public ILocalTransactionManager getTransactionManager() {
 
 //        return concurrencyManager.getTransactionManager();
@@ -3416,6 +3424,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
 
     }
 
+    @Override
     public WriteExecutorService getWriteService() {
 
         return concurrencyManager.getWriteService();
@@ -3434,6 +3443,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
      * @return This implementation returns <code>false</code> since overflow
      *         is NOT supported.
      */
+    @Override
     public boolean shouldOverflow() {
 
         return false;
@@ -3443,12 +3453,14 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
     /**
      * Note: This implementation always returns <code>false</code>.
      */
+    @Override
     public boolean isOverflowEnabled() {
         
         return false;
         
     }
     
+    @Override
     public Future<Object> overflow() {
         
         throw new UnsupportedOperationException();
@@ -3476,6 +3488,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
      * @throws UnsupportedOperationException
      *             since {@link #overflow()} is not supported.
      */
+    @Override
     public File getIndexSegmentFile(IndexMetadata indexMetadata) {
         
         throw new UnsupportedOperationException();
@@ -3486,6 +3499,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
      * @throws UnsupportedOperationException
      *             always.
      */
+    @Override
     public IBigdataFederation<?> getFederation() {
 
         throw new UnsupportedOperationException();
@@ -3496,6 +3510,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
      * @throws UnsupportedOperationException
      *             always.
      */
+    @Override
     public DataService getDataService() {
 
         throw new UnsupportedOperationException();
@@ -3506,6 +3521,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
      * @throws UnsupportedOperationException
      *             always.
      */
+    @Override
     public UUID getDataServiceUUID() {
 
         throw new UnsupportedOperationException();
@@ -3516,6 +3532,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
      * Always returns <code>null</code> since index partition moves are not
      * supported.
      */
+    @Override
     public StaleLocatorReason getIndexPartitionGone(String name) {
         
         return null;
@@ -3525,6 +3542,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
     /*
      * global row store.
      */
+    @Override
     public SparseRowStore getGlobalRowStore() {
 
         return getGlobalRowStoreHelper().getGlobalRowStore();
@@ -3541,6 +3559,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
 //     * @return The global row store view -or- <code>null</code> if no view
 //     *         exists as of that timestamp.
 //     */
+    @Override
     public SparseRowStore getGlobalRowStore(final long timestamp) {
 
         return getGlobalRowStoreHelper().get(timestamp);
@@ -3591,6 +3610,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
      * Note: An atomic reference provides us with a "lock" object which doubles
      * as a reference. We are not relying on its CAS properties.
      */
+    @Override
     public BigdataFileSystem getGlobalFileSystem() {
 
         GlobalFileSystemHelper t = globalFileSystemHelper.get();
@@ -3623,6 +3643,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
     }
     final private AtomicReference<GlobalFileSystemHelper> globalFileSystemHelper = new AtomicReference<GlobalFileSystemHelper>();
 
+    @Override
     protected void discardCommitters() {
 
         super.discardCommitters();
@@ -3651,6 +3672,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
 
     }
     
+    @Override
     public TemporaryStore getTempStore() {
         
         return tempStoreFactory.getTempStore();
@@ -3658,6 +3680,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
     }
     private final TemporaryStoreFactory tempStoreFactory;
 
+    @Override
     public IResourceLocator<?> getResourceLocator() {
 
         assertOpen();
@@ -3667,6 +3690,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
     }
     private final IResourceLocator<?> resourceLocator;
     
+    @Override
     public IResourceLockService getResourceLockService() {
         
         assertOpen();
@@ -3676,6 +3700,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
     }
     private final ResourceLockService resourceLockManager;
 
+    @Override
     public ExecutorService getExecutorService() {
         
         assertOpen();
@@ -3716,7 +3741,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
      * 
      * @see PlatformStatsPlugIn
      */
-    protected AbstractStatisticsCollector getPlatformStatisticsCollector() {
+    public AbstractStatisticsCollector getPlatformStatisticsCollector() {
 
         final IPlugIn<Journal, AbstractStatisticsCollector> plugin = pluginPlatformStats
                 .get();
@@ -3728,6 +3753,17 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
 
         return t;
 
+    }
+
+    public Object getGangliaService() {
+
+        final IPlugIn<Journal, ?> plugin = pluginGanglia.get();
+
+        if (plugin == null)
+            return null;
+
+        return plugin.getService();
+        
     }
     
     /**
@@ -3774,6 +3810,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
         private StartDeferredTasksTask() {
         }
 
+        @Override
         public void run() {
 
             try {
@@ -3864,6 +3901,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
 
     } // class StartDeferredTasks
 
+    @Override
     public ScheduledFuture<?> addScheduledTask(final Runnable task,
             final long initialDelay, final long delay, final TimeUnit unit) {
 
@@ -3885,6 +3923,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
 	 * 
 	 * @see Options#COLLECT_PLATFORM_STATISTICS
 	 */
+    @Override
     final public boolean getCollectPlatformStatistics() {
 		return Boolean.valueOf(properties.getProperty(
 				Options.COLLECT_PLATFORM_STATISTICS,
@@ -3896,6 +3935,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
 	 * 
 	 * @see Options#COLLECT_QUEUE_STATISTICS
 	 */
+    @Override
 	final public boolean getCollectQueueStatistics() {
 		return Boolean.valueOf(properties.getProperty(
 				Options.COLLECT_QUEUE_STATISTICS,
@@ -3907,6 +3947,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
 	 * 
 	 * @see Options#HTTPD_PORT
 	 */
+    @Override
 	final public int getHttpdPort() {
 		return Integer.valueOf(properties.getProperty(Options.HTTPD_PORT,
 				Options.DEFAULT_HTTPD_PORT));
@@ -3930,6 +3971,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
      */
     final private ConcurrentHashMap<String/* name */, BTreeCounters> indexCounters = new ConcurrentHashMap<String, BTreeCounters>();
 
+    @Override
     public BTreeCounters getIndexCounters(final String name) {
 
         if (name == null)

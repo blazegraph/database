@@ -55,8 +55,11 @@ public class Depends {
 
     private static class OrderByName implements Comparator<Dependency> {
 
-        public int compare(Dependency o1, Dependency o2) {
+        @Override
+        public int compare(final Dependency o1, final Dependency o2) {
+
             return o1.getName().compareTo(o2.getName());
+
         }
         
     }
@@ -93,18 +96,22 @@ public class Depends {
 
         }
 
+        @Override
         final public String getName() {
             return component;
         }
 
+        @Override
         final public String projectURL() {
             return projectURL;
         }
 
+        @Override
         final public String licenseURL() {
             return licenseURL;
         }
         
+        @Override
         public String toString() {
             
             return "{name=" + component + ", project=" + projectURL
@@ -257,7 +264,19 @@ public class Depends {
     
     private final static Dep servletApi = new ApacheDep("servlet-api",
             "http://tomcat.apache.org");
-    
+
+    /**
+     * Dual licensed under apache 2.0 and LGPL 2.1.  We use the apache 2.0 
+     * license.
+     */
+    private final static Dep jacksonCore = new Dep("jackson-core", 
+            "http://wiki.fasterxml.com/JacksonHome",
+            "http://www.apache.org/licenses/LICENSE-2.0.html");
+
+    private final static Dep blueprintsCore = new Dep("blueprints-core", 
+            "https://github.com/tinkerpop/blueprints",
+            "https://github.com/tinkerpop/blueprints/blob/master/LICENSE.txt");
+
     static private final Dep[] depends;
     static {
         depends = new Dep[] { //
@@ -276,6 +295,7 @@ public class Depends {
             apacheHttpClientCache,
             apacheHttpCore,
             apacheHttpMime,
+            // webapp
 //            cweb,//
             slf4j,//
             sesame,//
@@ -284,6 +304,8 @@ public class Depends {
             nanohttp,//
             jetty,//
             servletApi,//
+            jacksonCore,//
+            blueprintsCore,//
             bigdataGanglia,//
             // scale-out
             jini,//

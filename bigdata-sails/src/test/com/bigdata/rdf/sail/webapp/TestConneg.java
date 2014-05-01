@@ -33,6 +33,8 @@ import org.openrdf.query.resultio.BooleanQueryResultFormat;
 import org.openrdf.query.resultio.TupleQueryResultFormat;
 import org.openrdf.rio.RDFFormat;
 
+import com.bigdata.rdf.rio.json.BigdataSPARQLResultsJSONParserFactory;
+
 /**
  * Test suite for content negotiation helper class.
  * 
@@ -41,6 +43,13 @@ import org.openrdf.rio.RDFFormat;
  */
 public class TestConneg extends TestCase2 {
 
+	
+//	static {
+//		
+//		new BigdataSPARQLResultsJSONParserFactory();
+//		
+//	}
+	
     /**
      * 
      */
@@ -68,7 +77,11 @@ public class TestConneg extends TestCase2 {
 
             assertEquals(format.getName(), format, util.getRDFFormat());
 
-            assertNull(format.getName(), util.getTupleQueryResultFormat());
+            if (!format.getName().equals("JSON")) {
+            
+            	assertNull(format.getName(), util.getTupleQueryResultFormat());
+            	
+            }
 
             assertSameArray(new ConnegScore[] {//
                     new ConnegScore(1f, format) },//
@@ -90,8 +103,12 @@ public class TestConneg extends TestCase2 {
 
             final ConnegUtil util = new ConnegUtil(format.getDefaultMIMEType());
 
-            assertNull(format.getName(), util.getRDFFormat());
+            if (!format.getName().equals("SPARQL/JSON")) {
+                
+            	assertNull(format.getName(), util.getRDFFormat());
 
+            }
+            
             assertEquals(format.getName(), format,
                     util.getTupleQueryResultFormat());
 
@@ -152,7 +169,11 @@ public class TestConneg extends TestCase2 {
 
             final ConnegUtil util = new ConnegUtil(format.getDefaultMIMEType());
 
-            assertNull(format.getName(), util.getRDFFormat());
+            if (!format.getName().equals("SPARQL/JSON")) {
+                
+            	assertNull(format.getName(), util.getRDFFormat());
+            	
+            }
 
             assertEquals(format.getName(), format,
                     util.getBooleanQueryResultFormat());

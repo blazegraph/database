@@ -42,9 +42,13 @@ import com.bigdata.rdf.internal.ILexiconConfiguration;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVUtility;
 import com.bigdata.rdf.internal.VTE;
+import com.bigdata.rdf.internal.impl.AbstractIV;
 import com.bigdata.rdf.internal.impl.AbstractInlineIV;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataBNode;
+import com.bigdata.rdf.model.BigdataResource;
+import com.bigdata.rdf.model.BigdataURI;
+import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.spo.ISPO;
@@ -100,6 +104,7 @@ public class SidIV<V extends BigdataBNode> extends AbstractInlineIV<V, ISPO>
 	 */
 	private transient V bnode;
 
+	@Override
     public IV<V, ISPO> clone(final boolean clearCache) {
 
         final SidIV<V> tmp = new SidIV<V>(spo);
@@ -135,9 +140,23 @@ public class SidIV<V extends BigdataBNode> extends AbstractInlineIV<V, ISPO>
         
     }
 
-	/**
+
+    /**
+     * Return the <code>flags</code> byte for a {@link SidIV}. 
+     */
+    public static final byte toFlags() {
+        /*
+         * Note: XSDBoolean happens to be assigned the code value of 0, which is
+         * the value we want when the data type enumeration will be ignored.
+         */
+        return AbstractIV.toFlags(VTE.STATEMENT, true/* inline */,
+                false/* extension */, DTE.XSDBoolean);
+    }
+
+    /**
 	 * Returns the inline spo.
 	 */
+	@Override
 	public ISPO getInlineValue() throws UnsupportedOperationException {
 		return spo;
 	}
@@ -146,12 +165,23 @@ public class SidIV<V extends BigdataBNode> extends AbstractInlineIV<V, ISPO>
 	 * Returns the bnode representation of this IV, useful for serialization
 	 * formats such as RDF/XML.  See {@link #bnodeId()}.
 	 */
+    @SuppressWarnings("unchecked")
+    @Override
     public V asValue(final LexiconRelation lex) {
-    	if (bnode == null) {
+        if (bnode == null) {
 	        bnode = (V) lex.getValueFactory().createBNode(getID());
 	        bnode.setIV(this);
 	        bnode.setStatementIdentifier(true);
-    	}
+	        
+	        final BigdataResource c = spo.c() != null ?
+	        		(BigdataResource) spo.c().asValue(lex) : null;
+	        		
+	        bnode.setStatement(lex.getValueFactory().createStatement(
+	        		(BigdataResource) spo.s().asValue(lex), 
+	        		(BigdataURI) spo.p().asValue(lex), 
+	        		(BigdataValue) spo.o().asValue(lex), 
+	        		c));
+        }
         return bnode;
     }
 
@@ -159,10 +189,12 @@ public class SidIV<V extends BigdataBNode> extends AbstractInlineIV<V, ISPO>
      * Return the byte length for the byte[] encoded representation of this
      * internal value.  Depends on the byte length of the encoded inline spo.
      */
+    @Override
 	public int byteLength() {
 		return 1 + key().length;
 	}
 
+	@Override
 	public String toString() {
 		return "Sid("+toString(spo)+")";
 	}
@@ -177,6 +209,7 @@ public class SidIV<V extends BigdataBNode> extends AbstractInlineIV<V, ISPO>
         		SPO.toString(spo.o()));
 	}
 
+    @Override
 	public int hashCode() {
 		return spo.hashCode();
 	}
@@ -198,11 +231,13 @@ public class SidIV<V extends BigdataBNode> extends AbstractInlineIV<V, ISPO>
 		final int signum = key.length > 0 ? 1 : 0;
 		final BigInteger bi = new BigInteger(signum, key);
 		return 's' + bi.toString();
+//		return toString();
 	}
 
 	/**
 	 * Two {@link SidIV} are equal if their (s,p,o) IVs are equal.
 	 */
+    @Override
 	public boolean equals(final Object o) {
         if (this == o)
             return true;
@@ -218,7 +253,7 @@ public class SidIV<V extends BigdataBNode> extends AbstractInlineIV<V, ISPO>
         return false;
 	}
 
-	public int _compareTo(IV o) {
+	public int _compareTo(final IV o) {
 
 	    /*
 	     * Note: This works, but it might be more expensive.
@@ -298,7 +333,8 @@ public class SidIV<V extends BigdataBNode> extends AbstractInlineIV<V, ISPO>
             this.key = iv.key();
         }
         
-        public void readExternal(ObjectInput in) throws IOException,
+        @Override
+        public void readExternal(final ObjectInput in) throws IOException,
                 ClassNotFoundException {
 //            flags = in.readByte();
             final int nbytes = LongPacker.unpackInt(in);
@@ -306,7 +342,8 @@ public class SidIV<V extends BigdataBNode> extends AbstractInlineIV<V, ISPO>
             in.readFully(key);
         }
 
-        public void writeExternal(ObjectOutput out) throws IOException {
+        @Override
+        public void writeExternal(final ObjectOutput out) throws IOException {
 //            out.writeByte(flags);
             LongPacker.packLong(out, key.length);
             out.write(key);
@@ -350,6 +387,5 @@ public class SidIV<V extends BigdataBNode> extends AbstractInlineIV<V, ISPO>
 		return false;
 		
 	}
-
 
 }

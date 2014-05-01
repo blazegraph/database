@@ -30,11 +30,8 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.io.PrintWriter;
 import java.io.Reader;
 import java.net.URL;
-import java.net.URLConnection;
-import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Properties;
@@ -47,19 +44,14 @@ import org.apache.http.conn.ClientConnectionManager;
 import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.log4j.Logger;
 import org.eclipse.jetty.server.Server;
-import org.openrdf.model.Resource;
-import org.openrdf.model.URI;
 import org.openrdf.model.ValueFactory;
 import org.openrdf.repository.RepositoryException;
 import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFParseException;
 
-import com.bigdata.gom.gpo.IGPO;
-import com.bigdata.gom.gpo.ILinkSet;
+import com.bigdata.BigdataStatics;
 import com.bigdata.gom.om.IObjectManager;
 import com.bigdata.gom.om.NanoSparqlObjectManager;
-import com.bigdata.gom.om.ObjectManager;
-import com.bigdata.gom.om.ObjectMgrModel;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.ITx;
@@ -192,7 +184,7 @@ public class RemoteGOMTestCase extends TestCase implements IGOMProxy  {
 
         m_server.start();
 
-        final int port = m_server.getConnectors()[0].getLocalPort();
+        final int port = NanoSparqlServer.getLocalPort(m_server);
 
         final String hostAddr = NicUtil.getIpAddress("default.nic", "default",
                 true/* loopbackOk */);
@@ -203,7 +195,8 @@ public class RemoteGOMTestCase extends TestCase implements IGOMProxy  {
 
         }
 
-        m_serviceURL = new URL("http", hostAddr, port, "/sparql"/* file */)
+        m_serviceURL = new URL("http", hostAddr, port,
+                BigdataStatics.getContextPath() + "/sparql"/* file */)
                 .toExternalForm();
 
         // final HttpClient httpClient = new DefaultHttpClient();

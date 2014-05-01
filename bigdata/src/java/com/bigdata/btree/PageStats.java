@@ -128,7 +128,7 @@ abstract public class PageStats extends BaseIndexStats {
         sb.append(",maxLeafBytes=" + maxLeafBytes);
         sb.append(",bytesPerNode=" + getBytesPerNode());
         sb.append(",bytesPerLeaf=" + getBytesPerLeaf());
-        sb.append(",nerros=" + nerrors);
+        sb.append(",nerrors=" + nerrors);
         final long npages = (nleaves + nnodes);
         for (int i = 0; i < SLOT_SIZES.length; i++) {
             final long slotsThisSize = histogram[i];

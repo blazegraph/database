@@ -260,7 +260,15 @@ abstract public class AbstractChunkedResolverator<E,F,S> implements ICloseableIt
                         throw new RuntimeException(t);
                     }
                     
-                    assert converted.length == chunk.length;
+                    /**
+                     * Note: This is no longer true. Some conversions can now
+                     * expand or reduce the size of the chunk.
+                     * 
+                     * @see <a href="http://trac.bigdata.com/ticket/866" >
+                     *      Efficient batch remove of a collection of triple
+                     *      patterns </a>
+                     */
+//                    assert converted.length == chunk.length;
                     
                     // Note: Throws BufferClosedException if closed.
                     buffer.add(converted);

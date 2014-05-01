@@ -216,6 +216,14 @@ public class HAStatusServletUtil {
                         + quorumService.getLogicalServiceZPath()).node("br")
                         .close();
 
+                p.text("PlatformStatsPlugIn="
+                        + (journal.getPlatformStatisticsCollector() == null ? "N/A"
+                                : "Running")).node("br").close();
+
+                p.text("GangliaPlugIn="
+                        + (journal.getGangliaService() == null ? "N/A"
+                                : "Running")).node("br").close();
+
                 // Note: This is the *local* value of getHAStatus().
                 // Note: The HAReady token reflects whether or not the service
                 // is
