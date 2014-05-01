@@ -622,6 +622,12 @@ public interface IPredicate<E> extends BOp, Cloneable, Serializable {
      * 
      * @param bindingSet
      *            The binding set.
+     * 
+     * @return The as-bound {@link IPredicate} -or- <code>null</code> if the
+     *         {@link IPredicate} can not be unified with the
+     *         {@link IBindingSet}.
+     * 
+     * @see #815 (RDR query does too much work)
      */
     public IPredicate<E> asBound(IBindingSet bindingSet);
 

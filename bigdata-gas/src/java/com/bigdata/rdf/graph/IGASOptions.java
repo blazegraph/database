@@ -16,23 +16,14 @@
 package com.bigdata.rdf.graph;
 
 import org.openrdf.model.Statement;
-import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 
-import cutthecrap.utils.striterators.IStriterator;
+import com.bigdata.rdf.graph.analytics.CC;
+import com.bigdata.rdf.graph.impl.util.GASRunnerBase;
 
 /**
  * Interface for options that are understood by the {@link IGASEngine} and which
  * may be declared by the {@link IGASProgram}.
- * 
- * TODO Add option to order the vertices to provide a serializable execution
- * plan (like GraphChi). I believe that this reduces to computing a DAG over the
- * frontier before executing the GATHER and then executing the frontier such
- * that the parallel execution is constrained by arcs in the DAG that do not
- * have mutual dependencies. This is really an option that would be implemented
- * by the {@link IGASContext}, which would have to place a partial ordering over
- * the vertices in the frontier and then process the frontier with limited
- * parallelism based on that partial ordering.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
@@ -51,12 +42,18 @@ public interface IGASOptions<VS, ES, ST> {
      * sample all vertices regardless of their edges, specify
      * {@value EdgesEnum#NoEdges}. To require that each vertex has at least one
      * in-edge and one out-edge, specify {@link EdgesEnum#AllEdges}.
+     * 
+     * FIXME This should be moved into {@link GASRunnerBase}. The only class
+     * that customizes this is {@link CC}. (For {@link CC} we need to put all
+     * vertices into the frontier, even those without edges.)
      */
     EdgesEnum getSampleEdgesFilter();
     
     /**
-     * Return the set of edges to which the GATHER is applied -or-
-     * {@link EdgesEnum#NoEdges} to skip the GATHER phase.
+     * Return the set of edges to which the GATHER is applied for a
+     * <em>directed</em> graph -or- {@link EdgesEnum#NoEdges} to skip the GATHER
+     * phase. This will be interpreted based on the value reported by 
+     * {@link IGASContext#isDirectedTraversal()}.
      * 
      * TODO We may need to set dynamically when visting the vertex in the
      * frontier rather than having it be a one-time property of the vertex
@@ -65,8 +62,10 @@ public interface IGASOptions<VS, ES, ST> {
     EdgesEnum getGatherEdges();
 
     /**
-     * Return the set of edges to which the SCATTER is applied -or-
-     * {@link EdgesEnum#NoEdges} to skip the SCATTER phase.
+     * Return the set of edges to which the SCATTER is applied for a
+     * <em>directed</em> graph -or- {@link EdgesEnum#NoEdges} to skip the
+     * SCATTER phase. This will be interpreted based on the value reported by
+     * {@link IGASContext#isDirectedTraversal()}.
      */
     EdgesEnum getScatterEdges();
 
@@ -86,40 +85,4 @@ public interface IGASOptions<VS, ES, ST> {
      */
     Factory<Statement, ES> getEdgeStateFactory();
 
-    /**
-     * Return non-<code>null</code> iff there is a single link type to be
-     * visited. This corresponds to a view of the graph as sparse connectivity
-     * matrix. The {@link IGASEngine} can optimize traversal patterns using the
-     * <code>POS</code> index.
-     * <p>
-     * Note: When this option is used, the scatter and gather will not visit the
-     * property set for the vertex. The graph is treated as if it were an
-     * unattributed graph and only mined for the connectivity data.
-     * 
-     * @return The {@link Value} for the predicate that identifies the desired
-     *         link type (there can be many types of links - the return value
-     *         specifies which attribute is of interest).
-     * 
-     * @see #getLinkAttribType()
-     */
-    URI getLinkType();
-
-    /**
-     * Hook to impose a constraint on the visited edges and/or property values.
-     * 
-     * @param itr
-     *            The iterator visiting those edges and/or property values.
-     * 
-     * @return Either the same iterator or a constrained iterator.
-     * 
-     *         TODO Rename as constrainEdgeFilter or even split into a
-     *         constrainGatherFilter and a constraintScatterFilter.
-     * 
-     *         FIXME APPLY : If we need access to the vertex property values in
-     *         APPLY (which we probably do, at least optionally), then there
-     *         should be a similar method to decide whether the property values
-     *         for the vertex are made available during the APPLY.
-     */
-    IStriterator constrainFilter(IGASContext<VS, ES, ST> ctx, IStriterator eitr);
-    
 }

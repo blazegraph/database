@@ -43,6 +43,8 @@ import java.util.UUID;
 import org.apache.log4j.Logger;
 import org.apache.system.SystemUtil;
 
+import com.bigdata.Banner;
+import com.bigdata.BigdataStatics;
 import com.bigdata.LRUNexus;
 import com.bigdata.counters.httpd.CounterSetHTTPD;
 import com.bigdata.counters.linux.StatisticsCollectorForLinux;
@@ -81,9 +83,22 @@ abstract public class AbstractStatisticsCollector implements IStatisticsCollecto
     /** The path prefix under which all counters for this host are found. */
     static final public String hostPathPrefix;
 
+    /**
+     * This static code block is responsible obtaining the canonical hostname.
+     * 
+     * @see <a href="http://trac.bigdata.com/ticket/886" >Provide workaround for
+     *      bad reverse DNS setups</a>
+     */
     static {
     
-		String s;
+		String s = System.getProperty(BigdataStatics.HOSTNAME);
+        if (s != null) {
+            // Trim whitespace.
+            s = s.trim();
+        }
+        if (s != null && s.length() != 0) {
+            log.warn("Hostname override: hostname=" + s);
+        } else {
 		try {
 			/*
 			 * Note: This should be the host *name* NOT an IP address of a
@@ -96,6 +111,7 @@ abstract public class AbstractStatisticsCollector implements IStatisticsCollecto
 			log.error("Could not resolve name for host: " + t);
 			s = NicUtil.getIpAddressByLocalHost();
 			log.warn("Falling back to " + s);
+		}
 		}
         
         fullyQualifiedHostName = s;
@@ -754,7 +770,7 @@ abstract public class AbstractStatisticsCollector implements IStatisticsCollecto
      *             if no implementation is available for your operating system.
      */
     public static void main(final String[] args) throws InterruptedException {
-
+        Banner.banner();
         final int DEFAULT_COUNT = 10;
         final int nargs = args.length;
         final int interval;

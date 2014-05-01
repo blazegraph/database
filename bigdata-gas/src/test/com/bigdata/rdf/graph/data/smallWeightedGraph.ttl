@@ -1,0 +1,41 @@
+# A graph using the RDR syntax to express link weights.
+#
+@prefix bd: <http://www.bigdata.com/> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix foaf: <http://xmlns.com/foaf/0.1/> .
+
+  bd:1 foaf:knows bd:2 .
+<<bd:1 foaf:knows bd:2 >> bd:weight "100"^^xsd:int .
+
+# Note: This uses a different link type. if the link type constraint is
+# not respected, then the hops and weighted distance between (1) and
+# (5) will be wrong (the hops will become 1 instead of 2, the weighted
+# distance will be 100-23=77 less than expected.)
+  bd:1 foaf:knows2 bd:5 .
+<<bd:1 foaf:knows2 bd:5 >> bd:weight "13"^^xsd:int .
+
+# This vertex property should be ignored by traversal if the test sets up
+# a constraint that only "links" are visited by the GAS traversal.
+  bd:1 rdf:label "blue" .
+
+# Note: This uses a different link attribute type for the weight.  if the
+# link attribute type is used and not restricted to bd:weight2, then this
+# link will be "visible" and the weighted distance between (1) and (2) will
+# change.
+#<<bd:1 foaf:knows bd:2 >> bd:weight2 "7"^^xsd:int .
+
+  bd:1 foaf:knows bd:3 .
+<<bd:1 foaf:knows bd:3 >> bd:weight "100"^^xsd:int .
+
+  bd:2 foaf:knows bd:4 .
+<<bd:2 foaf:knows bd:4 >> bd:weight  "50"^^xsd:int .
+
+  bd:3 foaf:knows bd:4 .
+<<bd:3 foaf:knows bd:4 >> bd:weight "100"^^xsd:int .
+
+  bd:3 foaf:knows bd:5 .
+<<bd:3 foaf:knows bd:5 >> bd:weight "100"^^xsd:int .
+
+  bd:4 foaf:knows bd:5 .
+<<bd:4 foaf:knows bd:5 >> bd:weight  "25"^^xsd:int .

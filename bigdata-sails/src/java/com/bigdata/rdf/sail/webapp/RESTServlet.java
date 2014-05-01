@@ -30,6 +30,7 @@ import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import org.apache.log4j.Logger;
 import org.openrdf.model.URI;
 import org.openrdf.model.impl.URIImpl;
 
@@ -42,8 +43,8 @@ import com.bigdata.rdf.sail.webapp.client.MiniMime;
  */
 public class RESTServlet extends BigdataRDFServlet {
 
-//    private static final transient Logger log = Logger
-//            .getLogger(RESTServlet.class);
+    private static final transient Logger log = Logger
+            .getLogger(RESTServlet.class);
 
     /**
      * 
@@ -57,6 +58,8 @@ public class RESTServlet extends BigdataRDFServlet {
     private InsertServlet m_insertServlet;
     private DeleteServlet m_deleteServlet;
     private UpdateServlet m_updateServlet;
+    private WorkbenchServlet m_workbenchServlet;
+    
     /**
      * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/584">
      *      DESCRIBE CACHE </a>
@@ -80,12 +83,14 @@ public class RESTServlet extends BigdataRDFServlet {
         m_updateServlet = new UpdateServlet();
         m_deleteServlet = new DeleteServlet();
         m_describeServlet = new DescribeCacheServlet();
+        m_workbenchServlet = new WorkbenchServlet();
 
         m_queryServlet.init(getServletConfig());
         m_insertServlet.init(getServletConfig());
         m_updateServlet.init(getServletConfig());
         m_deleteServlet.init(getServletConfig());
         m_describeServlet.init(getServletConfig());
+        m_workbenchServlet.init(getServletConfig());
         
     }
     
@@ -120,6 +125,11 @@ public class RESTServlet extends BigdataRDFServlet {
             m_describeServlet = null;
         }
 
+        if (m_workbenchServlet != null) {
+            m_workbenchServlet.destroy();
+            m_workbenchServlet = null;
+        }
+
         super.destroy();
         
     }
@@ -128,6 +138,9 @@ public class RESTServlet extends BigdataRDFServlet {
     protected void doGet(final HttpServletRequest req,
             final HttpServletResponse resp) throws IOException {
 
+        if (log.isInfoEnabled())
+            log.info(req.toString());
+        
         /*
          * Look for linked data GET requests.
          * 
@@ -192,7 +205,10 @@ public class RESTServlet extends BigdataRDFServlet {
     protected void doPost(final HttpServletRequest req,
             final HttpServletResponse resp) throws IOException {
     	
-		if (req.getParameter(QueryServlet.ATTR_QUERY) != null
+        if (log.isInfoEnabled())
+            log.info(req.toString());
+
+        if (req.getParameter(QueryServlet.ATTR_QUERY) != null
                 || req.getParameter(QueryServlet.ATTR_UPDATE) != null
                 || req.getParameter(QueryServlet.ATTR_UUID) != null
                 || req.getParameter(QueryServlet.ATTR_ESTCARD) != null
@@ -222,7 +238,11 @@ public class RESTServlet extends BigdataRDFServlet {
 
             buildResponse(resp, HTTP_OK, MIME_TEXT_PLAIN);
             
-        } else if(req.getParameter("uri") != null) {
+        } else if (req.getParameter(WorkbenchServlet.ATTR_WORKBENCH) != null) {
+        	
+        	m_workbenchServlet.doPost(req, resp);
+        	
+        } else if (req.getParameter("uri") != null) {
 
             // INSERT via w/ URIs
             m_insertServlet.doPost(req, resp);
@@ -236,9 +256,14 @@ public class RESTServlet extends BigdataRDFServlet {
 
 	}
 
-	static boolean hasMimeType(final HttpServletRequest req, String mimeType) {
-		String contentType = req.getContentType();
-		return contentType != null &&  mimeType.equals(new MiniMime(contentType).getMimeType());
+    static boolean hasMimeType(final HttpServletRequest req,
+            final String mimeType) {
+
+        final String contentType = req.getContentType();
+        
+        return contentType != null
+                && mimeType.equals(new MiniMime(contentType).getMimeType());
+        
 	}
 
     /**
@@ -251,6 +276,9 @@ public class RESTServlet extends BigdataRDFServlet {
     protected void doPut(final HttpServletRequest req,
             final HttpServletResponse resp) throws IOException {
 
+        if (log.isInfoEnabled())
+            log.info(req.toString());
+
         m_updateServlet.doPut(req, resp);
 
     }
@@ -261,6 +289,9 @@ public class RESTServlet extends BigdataRDFServlet {
     @Override
     protected void doDelete(final HttpServletRequest req,
             final HttpServletResponse resp) throws IOException {
+
+        if (log.isInfoEnabled())
+            log.info(req.toString());
 
         m_deleteServlet.doDelete(req, resp);
 

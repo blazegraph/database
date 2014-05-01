@@ -421,31 +421,38 @@ public class BigdataNTriplesParser extends RDFParserBase {
 			// Create statement.
 			BigdataStatement st = (BigdataStatement) createStatement(
 					state.subject, state.predicate, state.object);
-			// Resolve against LRU map to blank node for statement.
-			BigdataBNode sid = sids.get(st);
-			if (sid != null) {
-				state.lastSID = sid;
-			} else {
-				/*
-				 * Not found.
-				 * 
-				 * TODO The use of the sid bnode in the context position should
-				 * go away when we migrate to sids support in both triples and
-				 * quads mode.
-				 */
-				// New blank node for "sid" of this statement.
-				state.lastSID = sid = (BigdataBNode) createBNode();
-				// New statement using that "sid" as its context position.
-				st = getValueFactory().createStatement(state.subject,
-						state.predicate, state.object, sid);
-				// cache it.
-				sids.put(st,sid);
-				// mark this blank node as a "sid".
-				// st.setStatementIdentifier(true);
-				((BigdataBNodeImpl) sid).setStatement(st);
-				// new statement so pass to the call back interface.
-				rdfHandler.handleStatement(st);
-			}
+			
+			// add the RDR statement inside the << >>.
+			rdfHandler.handleStatement(st);
+			
+			state.lastSID = ((BigdataValueFactory) valueFactory).createBNode(st);
+			
+//			// Resolve against LRU map to blank node for statement.
+//			BigdataBNode sid = sids.get(st);
+//			if (sid != null) {
+//				state.lastSID = sid;
+//			} else {
+//				/*
+//				 * Not found.
+//				 * 
+//				 * TODO The use of the sid bnode in the context position should
+//				 * go away when we migrate to sids support in both triples and
+//				 * quads mode.
+//				 */
+//				// New blank node for "sid" of this statement.
+//				state.lastSID = sid = (BigdataBNode) createBNode();
+//				// New statement using that "sid" as its context position.
+//				st = getValueFactory().createStatement(state.subject,
+//						state.predicate, state.object, sid);
+//				// cache it.
+//				sids.put(st,sid);
+//				// mark this blank node as a "sid".
+//				// st.setStatementIdentifier(true);
+//				((BigdataBNodeImpl) sid).setStatement(st);
+//				// new statement so pass to the call back interface.
+//				rdfHandler.handleStatement(st);
+//			}
+			
 		} else {
 			// simple statement (original code path).
 			final Statement st = createStatement(
@@ -453,7 +460,7 @@ public class BigdataNTriplesParser extends RDFParserBase {
 			rdfHandler.handleStatement(st);
 		}
 
-		state.clear();
+//		state.clear();
 //		subject = null;
 //		predicate = null;
 //		object = null;

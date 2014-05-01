@@ -15,26 +15,27 @@
 */
 package com.bigdata.rdf.graph.analytics;
 
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.openrdf.model.Statement;
 import org.openrdf.model.Value;
+import org.openrdf.model.ValueFactory;
 
+import com.bigdata.rdf.graph.BinderBase;
 import com.bigdata.rdf.graph.EdgesEnum;
 import com.bigdata.rdf.graph.Factory;
 import com.bigdata.rdf.graph.FrontierEnum;
+import com.bigdata.rdf.graph.IBinder;
+import com.bigdata.rdf.graph.IBindingExtractor;
 import com.bigdata.rdf.graph.IGASContext;
 import com.bigdata.rdf.graph.IGASScheduler;
 import com.bigdata.rdf.graph.IGASState;
-import com.bigdata.rdf.graph.IReducer;
+import com.bigdata.rdf.graph.IPredecessor;
 import com.bigdata.rdf.graph.impl.BaseGASProgram;
-
-import cutthecrap.utils.striterators.IStriterator;
 
 /**
  * Breadth First Search (BFS) is an iterative graph traversal primitive. The
@@ -44,7 +45,8 @@ import cutthecrap.utils.striterators.IStriterator;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
-public class BFS extends BaseGASProgram<BFS.VS, BFS.ES, Void> {
+public class BFS extends BaseGASProgram<BFS.VS, BFS.ES, Void> implements
+        IPredecessor<BFS.VS, BFS.ES, Void> {
 
 //    private static final Logger log = Logger.getLogger(BFS.class);
     
@@ -63,7 +65,13 @@ public class BFS extends BaseGASProgram<BFS.VS, BFS.ES, Void> {
          * scheduled.
          */
         private final AtomicInteger depth = new AtomicInteger(-1);
-
+        
+        /**
+         * The predecessor is the first source vertex to visit a given target
+         * vertex.
+         */
+        private final AtomicReference<Value> predecessor = new AtomicReference<Value>();
+        
         /**
          * The depth at which this vertex was first visited (origin ZERO) and
          * <code>-1</code> if the vertex has not been visited.
@@ -75,6 +83,15 @@ public class BFS extends BaseGASProgram<BFS.VS, BFS.ES, Void> {
         }
 
         /**
+         * Return the first vertex to discover this vertex during BFS traversal.
+         */
+        public Value predecessor() {
+
+            return predecessor.get();
+            
+        }
+
+        /**
          * Note: This marks the vertex at the current traversal depth.
          * 
          * @return <code>true</code> if the vertex was visited for the first
@@ -82,8 +99,9 @@ public class BFS extends BaseGASProgram<BFS.VS, BFS.ES, Void> {
          *         first visited the vertex (this helps to avoid multiple
          *         scheduling of a vertex).
          */
-        public boolean visit(final int depth) {
+        public boolean visit(final int depth, final Value predecessor) {
             if (this.depth.compareAndSet(-1/* expect */, depth/* newValue */)) {
+                this.predecessor.set(predecessor);
                 // Scheduled by this thread.
                 return true;
             }
@@ -158,27 +176,14 @@ public class BFS extends BaseGASProgram<BFS.VS, BFS.ES, Void> {
     }
 
     /**
-     * {@inheritDoc}
-     * <p>
-     * Overridden to only visit the edges of the graph.
-     */
-    @Override
-    public IStriterator constrainFilter(
-            final IGASContext<BFS.VS, BFS.ES, Void> ctx, final IStriterator itr) {
-
-        return itr.addFilter(getEdgeOnlyFilter(ctx));
-
-    }
-
-    /**
      * Not used.
      */
     @Override
     public void initVertex(final IGASContext<BFS.VS, BFS.ES, Void> ctx,
             final IGASState<BFS.VS, BFS.ES, Void> state, final Value u) {
 
-        state.getState(u).visit(0);
-        
+        state.getState(u).visit(0, null/* predecessor */);
+
     }
     
     /**
@@ -236,17 +241,19 @@ public class BFS extends BaseGASProgram<BFS.VS, BFS.ES, Void> {
             final IGASScheduler sch, final Value u, final Statement e) {
 
         // remote vertex state.
-        final VS otherState = state.getState(e.getObject());
+        final Value v = state.getOtherVertex(u, e);
+        final VS otherState = state.getState(v);
+//        final VS otherState = state.getState(e.getObject()/* v */);
 
         // visit.
-        if (otherState.visit(state.round() + 1)) {
+        if (otherState.visit(state.round() + 1, u/* predecessor */)) {
 
             /*
              * This is the first visit for the remote vertex. Add it to the
              * schedule for the next iteration.
              */
 
-            sch.schedule(e.getObject());
+            sch.schedule(v);
 
         }
 
@@ -260,117 +267,251 @@ public class BFS extends BaseGASProgram<BFS.VS, BFS.ES, Void> {
     }
 
     /**
-     * Reduce the active vertex stat, returning a histogram reporting the #of
-     * vertices at each distance from the starting vertex. There will always be
-     * one vertex at depth zero - this is the starting vertex. For each
-     * successive depth, the #of vertices that were labeled at that depth is
-     * reported. This is essentially the same as reporting the size of the
-     * frontier in each round of the traversal, but the histograph is reported
-     * based on the vertex state.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
-     *         Thompson</a>
-     * 
-     *         TODO Do another reducer that reports the actual BFS tree rather
-     *         than a histogram. For each depth, it needs to have the set of
-     *         vertices that are at that number of hops from the starting
-     *         vertex. So, there is an outer map from depth to set. The inner
-     *         set should also be concurrent if we allow concurrent reduction of
-     *         the activated vertex state.
+     * {@inheritDoc}
+     * <p>
+     * <dl>
+     * <dt>{@value Bindings#DEPTH}</dt>
+     * <dd>The depth at which the vertex was first encountered during traversal.
+     * </dd>
+     * <dt>{@value Bindings#PREDECESSOR}</dt>
+     * <dd>The predecessor is the first vertex that discovers a given vertex
+     * during traversal.</dd>
+     * </dl>
      */
-    protected static class HistogramReducer implements
-            IReducer<VS, ES, Void, Map<Integer, AtomicLong>> {
-
-        private final ConcurrentHashMap<Integer, AtomicLong> values = new ConcurrentHashMap<Integer, AtomicLong>();
-
-        @Override
-        public void visit(final IGASState<VS, ES, Void> state, final Value u) {
-
-            final VS us = state.getState(u);
-
-            if (us != null) {
-
-                final Integer depth = Integer.valueOf(us.depth());
-
-                AtomicLong newval = values.get(depth);
-
-                if (newval == null) {
-
-                    final AtomicLong oldval = values.putIfAbsent(depth,
-                            newval = new AtomicLong());
-
-                    if (oldval != null) {
-
-                        // lost data race.
-                        newval = oldval;
-
-                    }
-
-                }
-
-                newval.incrementAndGet();
-
-            }
-
-        }
-
-        @Override
-        public Map<Integer, AtomicLong> get() {
-
-            return Collections.unmodifiableMap(values);
-            
-        }
-        
-    }
-    
     @Override
-    public void after(final IGASContext<BFS.VS, BFS.ES, Void> ctx) {
+    public List<IBinder<BFS.VS, BFS.ES, Void>> getBinderList() {
 
-        final HistogramReducer r = new HistogramReducer();
-        
-        ctx.getGASState().reduce(r);
+        final List<IBinder<BFS.VS, BFS.ES, Void>> tmp = super.getBinderList();
 
-        class NV implements Comparable<NV> {
-            public final int n;
-            public final long v;
-            public NV(final int n, final long v) {
-                this.n = n;
-                this.v = v;
-            }
+        tmp.add(new BinderBase<BFS.VS, BFS.ES, Void>() {
+            
             @Override
-            public int compareTo(final NV o) {
-                if (o.n > this.n)
-                    return -1;
-                if (o.n < this.n)
-                    return 1;
-                return 0;
+            public int getIndex() {
+                return Bindings.DEPTH;
             }
-        }
+            
+            @Override
+            public Value bind(final ValueFactory vf,
+                    final IGASState<BFS.VS, BFS.ES, Void> state, final Value u) {
 
-        final Map<Integer, AtomicLong> h = r.get();
+                return vf.createLiteral(state.getState(u).depth.get());
 
-        final NV[] a = new NV[h.size()];
+            }
+            
+        });
 
-        int i = 0;
+        tmp.add(new BinderBase<BFS.VS, BFS.ES, Void>() {
+            
+            @Override
+            public int getIndex() {
+                return Bindings.PREDECESSOR;
+            }
+            
+            @Override
+            public Value bind(final ValueFactory vf,
+                    final IGASState<BFS.VS, BFS.ES, Void> state, final Value u) {
 
-        for (Map.Entry<Integer, AtomicLong> e : h.entrySet()) {
+                return state.getState(u).predecessor.get();
 
-            a[i++] = new NV(e.getKey().intValue(), e.getValue().get());
+            }
 
-        }
+        });
 
-        Arrays.sort(a);
-
-        System.out.println("distance, frontierSize, sumFrontierSize");
-        long sum = 0L;
-        for (NV t : a) {
-
-            System.out.println(t.n + ", " + t.v + ", " + sum);
-
-            sum += t.v;
-
-        }
+        return tmp;
 
     }
+
+    /**
+     * Additional {@link IBindingExtractor.IBinder}s exposed by {@link BFS}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     */
+    public interface Bindings extends BaseGASProgram.Bindings {
+        
+        /**
+         * The depth at which the vertex was visited.
+         */
+        int DEPTH = 1;
+        
+        /**
+         * The BFS predecessor is the first vertex to discover a given vertex.
+         * 
+         */
+        int PREDECESSOR = 2;
+        
+    }
+
+//    /**
+//     * Reduce the active vertex state, returning a histogram reporting the #of
+//     * vertices at each distance from the starting vertex. There will always be
+//     * one vertex at depth zero - this is the starting vertex. For each
+//     * successive depth, the #of vertices that were labeled at that depth is
+//     * reported. This is essentially the same as reporting the size of the
+//     * frontier in each round of the traversal, but the histograph is reported
+//     * based on the vertex state.
+//     * 
+//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+//     *         Thompson</a>
+//     */
+//    protected static class HistogramReducer implements
+//            IReducer<VS, ES, Void, Map<Integer, AtomicLong>> {
+//
+//        private final ConcurrentHashMap<Integer, AtomicLong> values = new ConcurrentHashMap<Integer, AtomicLong>();
+//
+//        @Override
+//        public void visit(final IGASState<VS, ES, Void> state, final Value u) {
+//
+//            final VS us = state.getState(u);
+//
+//            if (us != null) {
+//
+//                final Integer depth = Integer.valueOf(us.depth());
+//
+//                AtomicLong newval = values.get(depth);
+//
+//                if (newval == null) {
+//
+//                    final AtomicLong oldval = values.putIfAbsent(depth,
+//                            newval = new AtomicLong());
+//
+//                    if (oldval != null) {
+//
+//                        // lost data race.
+//                        newval = oldval;
+//
+//                    }
+//
+//                }
+//
+//                newval.incrementAndGet();
+//
+//            }
+//
+//        }
+//
+//        @Override
+//        public Map<Integer, AtomicLong> get() {
+//
+//            return Collections.unmodifiableMap(values);
+//            
+//        }
+//        
+//    }
+
+    /*
+     * TODO Do this in parallel for each specified target vertex.
+     */
+    @Override
+    public void prunePaths(final IGASContext<VS, ES, Void> ctx,
+            final Value[] targetVertices) {
+
+        if (ctx == null)
+            throw new IllegalArgumentException();
+
+        if (targetVertices == null)
+            throw new IllegalArgumentException();
+        
+        final IGASState<BFS.VS, BFS.ES, Void> gasState = ctx.getGASState();
+
+        final Set<Value> retainSet = new HashSet<Value>();
+
+        for (Value v : targetVertices) {
+
+            if (!gasState.isVisited(v)) {
+
+                // This target was not reachable.
+                continue;
+
+            }
+
+            /*
+             * Walk the precessors back to a starting vertex.
+             */
+            Value current = v;
+
+            while (current != null) {
+
+                retainSet.add(current);
+
+                final BFS.VS currentState = gasState.getState(current);
+
+                final Value predecessor = currentState.predecessor();
+
+                current = predecessor;
+
+            }
+            
+        } // next target vertex.
+        
+        gasState.retainAll(retainSet);
+        
+    }
+
+//    @Override
+//    public <T> IReducer<VS, ES, Void, T> getDefaultAfterOp() {
+//
+//        class NV implements Comparable<NV> {
+//            public final int n;
+//            public final long v;
+//            public NV(final int n, final long v) {
+//                this.n = n;
+//                this.v = v;
+//            }
+//            @Override
+//            public int compareTo(final NV o) {
+//                if (o.n > this.n)
+//                    return -1;
+//                if (o.n < this.n)
+//                    return 1;
+//                return 0;
+//            }
+//        }
+//
+//        final IReducer<VS, ES, Void, T> outerReducer = new IReducer<VS, ES, Void, T>() {
+//
+//            final HistogramReducer innerReducer = new HistogramReducer();
+//
+//            @Override
+//            public void visit(IGASState<VS, ES, Void> state, Value u) {
+//
+//                innerReducer.visit(state, u);
+//                
+//            }
+//
+//            @Override
+//            public T get() {
+//                
+//                final Map<Integer, AtomicLong> h = innerReducer.get();
+//
+//                final NV[] a = new NV[h.size()];
+//
+//                int i = 0;
+//
+//                for (Map.Entry<Integer, AtomicLong> e : h.entrySet()) {
+//
+//                    a[i++] = new NV(e.getKey().intValue(), e.getValue().get());
+//
+//                }
+//
+//                Arrays.sort(a);
+//
+//                System.out.println("distance, frontierSize, sumFrontierSize");
+//                long sum = 0L;
+//                for (NV t : a) {
+//
+//                    System.out.println(t.n + ", " + t.v + ", " + sum);
+//
+//                    sum += t.v;
+//
+//                }
+//
+//                return null;
+//            }
+//            
+//        };
+//        
+//        return outerReducer;
+//
+//    }
 
 }

@@ -146,6 +146,11 @@ public class QueryServlet extends BigdataRDFServlet {
     protected void doPost(final HttpServletRequest req,
             final HttpServletResponse resp) throws IOException {
 
+        /*
+         * Note: HALoadBalancerServlet MUST be maintained if idempotent methods
+         * are added to doPost() in order to ensure that they are load balanced
+         * rather than always directed to the quorum leader.
+         */
 
         if (req.getParameter(ATTR_UPDATE) != null) {
             
@@ -255,29 +260,9 @@ public class QueryServlet extends BigdataRDFServlet {
             return;
         }
 
-        /*
-         * Figure out the service end point.
-         * 
-         * Note: This code to figure out the service end point is a hack. It
-         * tends to work for the special case of ServiceDescription because
-         * there is an identity between the request URL and the service end
-         * point in this special case.
-         */
-        
-        final String serviceURI;
-        {
-            
-            final StringBuffer sb = req.getRequestURL();
-
-            final int indexOf = sb.indexOf("?");
-
-            if (indexOf == -1) {
-                serviceURI = sb.toString();
-            } else {
-                serviceURI = sb.substring(0, indexOf);
-            }
-
-        }
+        // The serviceURIs for this graph.
+        final String[] serviceURI = BigdataServlet.getServiceURIs(
+                getServletContext(), req);
 
         /*
          * TODO Resolve the SD class name and ctor via a configuration property
@@ -316,7 +301,7 @@ public class QueryServlet extends BigdataRDFServlet {
     private void doUpdate(final HttpServletRequest req,
             final HttpServletResponse resp) throws IOException {
 
-        if (!isWritable(req, resp)) {
+        if (!isWritable(getServletContext(), req, resp)) {
             // Service must be writable.
             return;
         }
@@ -416,7 +401,7 @@ public class QueryServlet extends BigdataRDFServlet {
     void doQuery(final HttpServletRequest req, final HttpServletResponse resp)
             throws IOException {
 
-        if (!isReadable(req, resp)) {
+        if (!isReadable(getServletContext(), req, resp)) {
             // HA Quorum in use, but quorum is not met.
             return;
         }
@@ -1030,7 +1015,7 @@ public class QueryServlet extends BigdataRDFServlet {
     private void doEstCard(final HttpServletRequest req,
             final HttpServletResponse resp) throws IOException {
 
-        if (!isReadable(req, resp)) {
+        if (!isReadable(getServletContext(), req, resp)) {
             // HA Quorum in use, but quorum is not met.
             return;
         }
@@ -1127,7 +1112,7 @@ public class QueryServlet extends BigdataRDFServlet {
     private void doContexts(final HttpServletRequest req,
             final HttpServletResponse resp) throws IOException {
 
-        if (!isReadable(req, resp)) {
+        if (!isReadable(getServletContext(), req, resp)) {
             // HA Quorum in use, but quorum is not met.
             return;
         }
@@ -1193,7 +1178,7 @@ public class QueryServlet extends BigdataRDFServlet {
     private void doShardReport(final HttpServletRequest req,
             final HttpServletResponse resp) throws IOException {
 
-        if (!isReadable(req, resp)) {
+        if (!isReadable(getServletContext(), req, resp)) {
             // HA Quorum in use, but quorum is not met.
             return;
         }

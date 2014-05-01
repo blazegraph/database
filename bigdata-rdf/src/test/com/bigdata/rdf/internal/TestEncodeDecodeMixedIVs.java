@@ -527,17 +527,17 @@ public class TestEncodeDecodeMixedIVs extends AbstractEncodeDecodeKeysTestCase {
                     final SPO spo10 = new SPO(s2, p2, o1, StatementEnum.Explicit);
                     final SPO spo11 = new SPO(s2, p2, o2, StatementEnum.Explicit);
                     final SPO spo12 = new SPO(s2, p2, o3, StatementEnum.Explicit);
-                    spo1.setStatementIdentifier(true);
-                    spo2.setStatementIdentifier(true);
-                    spo3.setStatementIdentifier(true);
-                    spo6.setStatementIdentifier(true);
+//                    spo1.setStatementIdentifier(true);
+//                    spo2.setStatementIdentifier(true);
+//                    spo3.setStatementIdentifier(true);
+//                    spo6.setStatementIdentifier(true);
                     final SPO spo13 = new SPO(spo1.getStatementIdentifier(), p1, o1,
                             StatementEnum.Explicit);
                     final SPO spo14 = new SPO(spo2.getStatementIdentifier(), p2, o2,
                             StatementEnum.Explicit);
                     final SPO spo15 = new SPO(s1, p1, spo3.getStatementIdentifier(),
                             StatementEnum.Explicit);
-                    spo15.setStatementIdentifier(true);
+//                    spo15.setStatementIdentifier(true);
                     final SPO spo16 = new SPO(s1, p1, spo6.getStatementIdentifier(),
                             StatementEnum.Explicit);
                     final SPO spo17 = new SPO(spo1.getStatementIdentifier(), p1, spo15

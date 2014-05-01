@@ -85,6 +85,8 @@ public interface BigdataValueFactory extends ValueFactory {
     BigdataBNode createBNode();
 
     BigdataBNode createBNode(String id);
+    
+    BigdataBNode createBNode(BigdataStatement stmt);
 
     BigdataLiteral createLiteral(String label);
 

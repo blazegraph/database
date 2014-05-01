@@ -95,6 +95,7 @@ import com.bigdata.rdf.internal.IDatatypeURIResolver;
 import com.bigdata.rdf.internal.IExtension;
 import com.bigdata.rdf.internal.IExtensionFactory;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.NotMaterializedException;
 import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.internal.constraints.RangeBOp;
 import com.bigdata.rdf.internal.impl.BlobIV;
@@ -165,6 +166,7 @@ import com.bigdata.service.IBigdataFederation;
 import com.bigdata.sparse.GlobalRowStoreUtil;
 import com.bigdata.striterator.ChunkedArrayIterator;
 import com.bigdata.striterator.ChunkedConvertingIterator;
+import com.bigdata.striterator.ChunkedWrappedIterator;
 import com.bigdata.striterator.DelegateChunkedIterator;
 import com.bigdata.striterator.EmptyChunkedIterator;
 import com.bigdata.striterator.IChunkedIterator;
@@ -2706,6 +2708,34 @@ abstract public class AbstractTripleStore extends
         return asStatementIterator(getAccessPath(s, p, o, c).iterator());
 
     }
+    
+    /**
+     * Efficient batched, streaming resolution of triple patterns to statements
+     * spanned by those triple patterns that are present in the data.
+     * <p>
+     * Note: If the input contains triple patterns that have a high cardinality
+     * in the data, then a large number of statements may be returned.
+     * 
+     * @param triplePatterns
+     *            A collection of triple patterns or fully bound statements. If
+     *            this collection contains triple patterns that have a high
+     *            cardinality in the data, then a large number of statements may
+     *            be returned.
+     * 
+     * @return An iterator from which the materialized statements spanned by
+     *         those triple patterns may be read.
+     * 
+     * @see <a href="http://trac.bigdata.com/ticket/866" > Efficient batch
+     *      remove of a collection of triple patterns </a>
+     */
+    public BigdataStatementIterator getStatements(
+            final IChunkedOrderedIterator<BigdataTriplePattern> triplePatterns) {
+
+        return asStatementIterator(new ChunkedWrappedIterator<ISPO>(
+                new BigdataTriplePatternMaterializer(this, triplePatterns)
+                        .start(getExecutorService())));
+
+    }
 
     final public BigdataValue asValue(final Value value) {
 
@@ -3246,12 +3276,18 @@ abstract public class AbstractTripleStore extends
 //        
 //        }
 
-        final BigdataValue v = getTerm(iv);
-
-        if (v == null)
-            return "<NOT_FOUND#" + iv + ">";
-
-        final String s = (v instanceof URI ? abbrev((URI) v) : v.toString());
+        String s = "";
+        
+        try {
+	        
+        	final BigdataValue v = getTerm(iv);
+	
+	        if (v == null)
+	            return "<NOT_FOUND#" + iv + ">";
+	
+	        s = (v instanceof URI ? abbrev((URI) v) : v.toString());
+	        
+        } catch (NotMaterializedException ex) { }
 
         return s + ("(" + iv + ")");
 
@@ -3904,19 +3940,19 @@ abstract public class AbstractTripleStore extends
 //                     */
 //                    lexiconRelation.addStatementIdentifiers(a, numStmts);
 
-                    /*
-                     * No more statement identifiers in the lexicon - they are
-                     * now inlined directly into the statement indices using
-                     * the SidIV class.
-                     * 
-                     * Mark explicit statements as "sidable". The actual sid
-                     * will be produced on-demand to reduce heap pressure.
-                     */
-                    for (ISPO spo : a) {
-                    	if (spo.isExplicit()) {
-                    		spo.setStatementIdentifier(true);
-                    	}
-                    }
+//                    /*
+//                     * No more statement identifiers in the lexicon - they are
+//                     * now inlined directly into the statement indices using
+//                     * the SidIV class.
+//                     * 
+//                     * Mark explicit statements as "sidable". The actual sid
+//                     * will be produced on-demand to reduce heap pressure.
+//                     */
+//                    for (ISPO spo : a) {
+//                    	if (spo.isExplicit()) {
+//                    		spo.setStatementIdentifier(true);
+//                    	}
+//                    }
 
                     statementIdentifierTime = System.currentTimeMillis()
                             - begin;

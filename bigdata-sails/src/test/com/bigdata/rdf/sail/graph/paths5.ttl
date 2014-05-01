@@ -1,0 +1,24 @@
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix bd: <http://www.bigdata.com/rdf#> .
+@prefix : <:> .
+
+:target :edge :a .
+:a :edge :b .
+:b :edge :c .
+
+:target :edge :c .
+:c :edge :d .
+:d :edge :e .
+
+:target :edge :f .
+:f :edge :g .
+:g :edge :h .
+:h :edge :i .
+
+:target :edge :j .
+:j :edge :k .
+:k :edge :l .
+:l :edge :m .
+:m :edge :n .
+
+

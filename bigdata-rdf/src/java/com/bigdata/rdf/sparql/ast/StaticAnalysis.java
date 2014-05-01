@@ -1547,7 +1547,11 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
     /**
      * Report "MUST" bound bindings projected by the SERVICE. This involves
      * checking the graph pattern reported by
-     * {@link ServiceNode#getGraphPattern()} .
+     * {@link ServiceNode#getGraphPattern()}.
+     * <p>
+     * Note: If the SERVICE URI is a variable, then it can only become bound
+     * through some other operation. If the SERVICE variable never becomes
+     * bound, then the SERVICE call can not run.
      */
     // MUST : ServiceNode
     public Set<IVariable<?>> getDefinitelyProducedBindings(

@@ -163,7 +163,7 @@ public class RemoteRepository {
      * @see #setQueryMethod(String)
      */
     static public final String DEFAULT_QUERY_METHOD = "POST";
-    
+
     /**
      * The name of the system property that may be used to specify the maximum
      * length (in characters) for a requestURL associated with an HTTP GET
@@ -174,7 +174,7 @@ public class RemoteRepository {
      */
     static public final String MAX_REQUEST_URL_LENGTH = RemoteRepository.class
             .getName() + ".maxRequestURLLength";
-
+    
     /**
      * The default maximum limit on a requestURL before the request is converted
      * into a POST using a <code>application/x-www-form-urlencoded</code>
@@ -185,7 +185,19 @@ public class RemoteRepository {
      * having a request URL that is 2000 characters long should go through with
      * a GET. 1000 is a safe value but it could reduce http caching.
      */
-    static private final int DEFAULT_MAX_REQUEST_URL_LENGTH = 1000;
+    static public final int DEFAULT_MAX_REQUEST_URL_LENGTH = 1000;
+    
+    /**
+     * When <code>true</code>, the REST API methods will use the load balancer
+     * aware requestURLs. The load balancer has essentially zero cost when not
+     * using HA, so it is recommended to always specify <code>true</code>. When
+     * <code>false</code>, the REST API methods will NOT use the load balancer
+     * aware requestURLs.
+     * 
+     * @see <a href="http://wiki.bigdata.com/wiki/index.php/HALoadBalancer">
+     *      HALoadBalancer </a>
+     */
+    protected final boolean useLBS;
     
     /**
      * The service end point for the default data set.
@@ -278,6 +290,14 @@ public class RemoteRepository {
 
     }
     
+    public RemoteRepository(final String sparqlEndpointURL,
+            final HttpClient httpClient, final Executor executor) {
+
+        // FIXME Should default useLBS:=true. it is basically free.
+        this(sparqlEndpointURL, false/* useLBS */, httpClient, executor);
+
+    }
+
     /**
      * Create a connection to a remote repository. A typical invocation looks
      * like:
@@ -299,15 +319,25 @@ public class RemoteRepository {
      * 
      * @param sparqlEndpointURL
      *            The SPARQL http end point for the data set.
+     * @param useLBS
+     *            When <code>true</code>, the REST API methods will use the load
+     *            balancer aware requestURLs. The load balancer has essentially
+     *            zero cost when not using HA, so it is recommended to always
+     *            specify <code>true</code>. When <code>false</code>, the REST
+     *            API methods will NOT use the load balancer aware requestURLs.
      * @param httpClient
      *            The {@link HttpClient}.
      * @param executor
      *            The thread pool for processing HTTP responses.
      * 
+     * @see RemoteRepositoryManager
      * @see DefaultClientConnectionManagerFactory
+     * @see <a href="http://wiki.bigdata.com/wiki/index.php/HALoadBalancer">
+     *      HALoadBalancer </a>
      */
     public RemoteRepository(final String sparqlEndpointURL,
-            final HttpClient httpClient, final Executor executor) {
+            final boolean useLBS, final HttpClient httpClient,
+            final Executor executor) {
         
         if (sparqlEndpointURL == null)
             throw new IllegalArgumentException();
@@ -318,6 +348,8 @@ public class RemoteRepository {
         if (executor == null)
             throw new IllegalArgumentException();
 
+        this.useLBS = useLBS;
+        
         this.sparqlEndpointURL = sparqlEndpointURL;
 
         this.httpClient = httpClient;
@@ -329,13 +361,14 @@ public class RemoteRepository {
                 Integer.toString(DEFAULT_MAX_REQUEST_URL_LENGTH))));
         
         setQueryMethod(System.getProperty(QUERY_METHOD, DEFAULT_QUERY_METHOD));
-
+        
     }
 
     @Override
     public String toString() {
 
-        return super.toString() + "{sparqlEndpoint=" + sparqlEndpointURL + "}";
+        return super.toString() + "{sparqlEndpoint=" + sparqlEndpointURL
+                + ", useLBS=" + useLBS + "}";
 
     }
 
@@ -346,6 +379,52 @@ public class RemoteRepository {
         
         return sparqlEndpointURL;
         
+    }
+    
+    /**
+     * Set incremental truth maintenance to either true or false on the server.
+     */
+    public void setTruthMaintenance(final boolean tm) throws Exception {
+    	
+        final ConnectOptions opts = newConnectOptions();
+
+        opts.addRequestParam("truthMaintenance", String.valueOf(tm));
+
+        checkResponseCode(doConnect(opts));
+
+    }
+
+    /**
+     * Compute database at once closure on the server and do a commit.
+     */
+    public long doClosure() throws Exception {
+    	
+        final ConnectOptions opts = newConnectOptions();
+
+        opts.addRequestParam("doClosure");
+
+        HttpResponse response = null;
+        try {
+            
+            opts.setAcceptHeader(ConnectOptions.MIME_APPLICATION_XML);
+            
+            checkResponseCode(response = doConnect(opts));
+            
+            final MutationResult result = mutationResults(response);
+            
+            return result.mutationCount;
+            
+        } finally {
+            
+            try {
+                
+                if (response != null)
+                    EntityUtils.consume(response.getEntity());
+                
+            } catch (Exception ex) { }
+            
+        }
+    	
     }
     
     /**
@@ -1352,8 +1431,44 @@ public class RemoteRepository {
         /*
          * Generate the fully formed and encoded URL.
          */
+        // The requestURL (w/o URL query parameters).
+        final String requestURL;
+        if (useLBS) {
+            /*
+             * Use the HA load balancer.
+             * 
+             * FIXME Configure ContextPath, but NOT with BigdataStatics since
+             * that will drag in code outside of this package. Instead, make
+             * this a System property or constructor property or parse it out of
+             * the request URL.
+             * 
+             * FIXME Actually, the situation is a bit worse. The ContextPath
+             * might not appear in the public version of the URL. If it does
+             * not, then we won't be able to use the load balancer....
+             */
+            // The WebApp ContextPath.
+            final String CONTEXT_PATH = "/bigdata";
+            // Index of the WebApp ContextPath (/bigdata) in the serviceURL.
+            final int startContextPath = opts.serviceURL.indexOf(CONTEXT_PATH);
+            // Index of the last character in the context path.
+            final int endContextPath = startContextPath + CONTEXT_PATH.length();
+            // The base URL (up to and including the context path).
+            final String baseURL = opts.serviceURL.substring(0, endContextPath);
+            // Everything after that baseURL.
+            final String rest = opts.serviceURL.substring(endContextPath);
+            if (opts.update) {
+                // Request should be proxied to the leader.
+                requestURL = baseURL + "/LBS/leader" + rest;
+            } else {
+                // Request should be load balanced over the services.
+                requestURL = baseURL + "/LBS/read" + rest;
+            }
+        } else {
+            // Use the URL as given.
+            requestURL = opts.serviceURL;
+        }
         
-        final StringBuilder urlString = new StringBuilder(opts.serviceURL);
+        final StringBuilder urlString = new StringBuilder(requestURL);
 
         ConnectOptions.addQueryParams(urlString, opts.requestParams);
 
@@ -1370,7 +1485,7 @@ public class RemoteRepository {
              */
 
             urlString.setLength(0);
-            urlString.append(opts.serviceURL);
+            urlString.append(requestURL);
 
             opts.entity = ConnectOptions.getFormEntity(opts.requestParams);
 
@@ -1387,7 +1502,7 @@ public class RemoteRepository {
             opts.method = "POST";
 
             urlString.setLength(0);
-            urlString.append(opts.serviceURL);
+            urlString.append(requestURL);
 
             opts.entity = ConnectOptions.getFormEntity(opts.requestParams);
             
@@ -1395,7 +1510,7 @@ public class RemoteRepository {
 
         if (log.isDebugEnabled()) {
             log.debug("*** Request ***");
-            log.debug(sparqlEndpointURL);
+            log.debug(requestURL);
             log.debug(opts.method);
             log.debug("query=" + opts.getRequestParam("query"));
             log.debug(urlString.toString());
@@ -1493,7 +1608,7 @@ public class RemoteRepository {
 
     }
     
-    static protected HttpUriRequest newRequest(final String uri,
+    static public HttpUriRequest newRequest(final String uri,
             final String method) {
         if (method.equals("GET")) {
             return new HttpGet(uri);
@@ -1543,6 +1658,7 @@ public class RemoteRepository {
         
     }
 
+    // TODO EntityUtils.toString(response.getEntity())?
     protected static String getResponseBody(final HttpResponse response)
             throws IOException {
 
@@ -2222,6 +2338,8 @@ public class RemoteRepository {
         final ConnectOptions opts = newConnectOptions(sparqlEndpointURL);
 
         opts.method = getQueryMethod();
+        
+        opts.update = false;
 
         return opts;
 
@@ -2236,6 +2354,8 @@ public class RemoteRepository {
         final ConnectOptions opts = newConnectOptions(sparqlEndpointURL);
         
         opts.method = "POST";
+        
+        opts.update = true;
         
         return opts;
 

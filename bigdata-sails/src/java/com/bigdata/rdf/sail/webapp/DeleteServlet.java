@@ -74,7 +74,7 @@ public class DeleteServlet extends BigdataRDFServlet {
 	protected void doDelete(final HttpServletRequest req,
 			final HttpServletResponse resp) throws IOException {
 
-        if (!isWritable(req, resp)) {
+        if (!isWritable(getServletContext(), req, resp)) {
             // Service must be writable.
             return;
         }
@@ -234,7 +234,7 @@ public class DeleteServlet extends BigdataRDFServlet {
     protected void doPost(final HttpServletRequest req,
             final HttpServletResponse resp) throws IOException {
 
-        if (!isWritable(req, resp)) {
+        if (!isWritable(getServletContext(), req, resp)) {
             // Service must be writable.
             return;
         }

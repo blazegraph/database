@@ -1,0 +1,109 @@
+#!/bin/bash
+
+# init.d style script for bigdata HA services.  The script can be used
+# to 'start' or 'stop' services.
+#
+# Environment:
+#
+# binDir   - The directory containing the installed scripts.
+# pidFile  - The pid is written on this file.
+#
+# Misc.
+# 
+# See http://tldp.org/LDP/abs/html/index.html
+#
+# Note: Blank lines are significant in shell scripts.
+#
+# Note: Children must do "exit 0" to indicate success.
+#
+# Note: Convert DOS cr-lf to unix style in emacs: C-x RET f then unix 
+
+# Source function library (just used for 'action').  If you don't have this
+# it SHOULD automatically use the inline definition for "action()".
+
+#
+# the following template line will be replaced by a deployer application (e.g. brew, chef)
+#
+export INSTALL_TYPE="<%= INSTALL_TYPE %>"
+export BD_HOME="<%= BD_HOME %>"
+pidFile=${BD_HOME}/var/lock/pid
+binDir=${BD_HOME}/bin
+
+
+#
+# See how we were called.
+#
+case "$1" in
+    start)
+#
+# Start the ServiceStarter and child services if not running.
+#
+	if [ -f "$pidFile" ]; then
+	    read pid < "$pidFile"
+	    pidno=$( ps ax | grep $pid | awk '{ print $1 }' | grep $pid )
+	    if [ -z "$pidno" ]; then
+# The process has died so remove the old pid file.
+		echo $"`date` : `hostname` : $pid died?"
+		rm -f "$pidFile"
+	    fi
+	fi
+	if [ ! -f "$pidFile" ]; then
+		echo -ne $"`date` : `hostname` : bringing bigdata services up ... "
+		$binDir/startNSS
+		echo "done!"
+	else
+            echo $"`date` : `hostname` : running as $pid"
+	fi 
+        ;;
+    stop)
+#
+# Stop the ServiceStarter and all child services.
+#
+	if [ -f "$pidFile" ]; then
+	    read pid < "$pidFile"
+	    pidno=$( ps ax | grep $pid | awk '{ print $1 }' | grep $pid )
+	    if [ -z "$pidno" ]; then
+# The process has died so remove the old pid file.
+		echo $"`date` : `hostname` : $pid died?"
+		rm -f "$pidFile"
+	    else
+		echo -ne $"`date` : `hostname` : bringing bigdata service down ... "
+		kill $pid
+		rm -f "$pidFile"
+		echo "done!"
+	    fi
+	fi
+        ;;
+    status)
+#
+# Report status for the ServicesManager (up or down).
+#
+	if [ -f "$pidFile" ]; then
+	    read pid < "$pidFile"
+	    pidno=$( ps ax | grep $pid | awk '{ print $1 }' | grep $pid )
+	    if [ -z "$pidno" ]; then
+		echo $"`date` : `hostname` : process died? pid=$pid."
+	    else
+		echo $"`date` : `hostname` : running as $pid."
+	    fi
+	else
+	    echo $"`date` : `hostname` : not running."
+	fi
+	;;
+#
+# Simply stop then start.
+#
+    restart)
+	$0 stop
+	$0 start
+	;;
+    *)
+#
+# Usage
+#
+	me=`basename $0`
+        echo $"Usage: $0 {start|stop|status|restart}"
+        exit 1
+esac
+
+exit 0

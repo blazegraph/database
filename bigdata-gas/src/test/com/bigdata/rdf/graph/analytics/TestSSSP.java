@@ -70,13 +70,13 @@ public class TestSSSP extends AbstractSailGraphTestCase {
                 // Converge.
                 gasContext.call();
 
-                assertEquals(0, gasState.getState(p.getMike()).dist());
+                assertEquals(0.0, gasState.getState(p.getMike()).dist());
 
-                assertEquals(1, gasState.getState(p.getFoafPerson()).dist());
+                assertEquals(1.0, gasState.getState(p.getFoafPerson()).dist());
 
-                assertEquals(1, gasState.getState(p.getBryan()).dist());
+                assertEquals(1.0, gasState.getState(p.getBryan()).dist());
 
-                assertEquals(2, gasState.getState(p.getMartyn()).dist());
+                assertEquals(2.0, gasState.getState(p.getMartyn()).dist());
 
             } finally {
 

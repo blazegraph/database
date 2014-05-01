@@ -60,17 +60,17 @@ public class TestAll extends TestCase {
 
         final TestSuite suite = new TestSuite("Bigdata RDF/XML extension");
 
-        suite.addTestSuite(TestRDFXMLParserFactory.class);
-
-        suite.addTestSuite(TestRDFXMLWriterFactory.class);
-
-        try {
-            suite.addTest(RDFXMLParserTest.suite());
-        } catch (Exception ex) {
-            log.error(ex, ex);
-        }
-
-        suite.addTestSuite(RDFXMLWriterTest.class);
+//        suite.addTestSuite(TestRDFXMLParserFactory.class);
+//
+//        suite.addTestSuite(TestRDFXMLWriterFactory.class);
+//
+//        try {
+//            suite.addTest(RDFXMLParserTest.suite());
+//        } catch (Exception ex) {
+//            log.error(ex, ex);
+//        }
+//
+//        suite.addTestSuite(RDFXMLWriterTest.class);
 
         return suite;
 

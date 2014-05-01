@@ -72,6 +72,7 @@ import org.openrdf.rio.RDFWriter;
 import org.openrdf.rio.RDFWriterRegistry;
 import org.openrdf.sail.SailException;
 
+import com.bigdata.BigdataStatics;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.counters.CAT;
@@ -164,7 +165,8 @@ public class BigdataRDFContext extends BigdataBaseContext {
      * 
      * @see #XSL_STYLESHEET
      */
-    protected static final String DEFAULT_XSL_STYLESHEET = "result-to-html.xsl";
+    protected static final String DEFAULT_XSL_STYLESHEET = BigdataStatics
+            .getContextPath() + "/html/result-to-html.xsl";
     
     /**
      * URL Query parameter used to request an incremental XHTML representation
@@ -1995,7 +1997,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
                  * XSL style sheet directive.
                  */
                 mimeType = BigdataServlet.MIME_APPLICATION_XML;
-                charset = Charset.forName("UTF-8");
+                charset = Charset.forName(BigdataRDFServlet.UTF8);
                 fileExt = "xml";
             } else {
                 mimeType = format.getDefaultMIMEType();
@@ -2235,9 +2237,6 @@ public class BigdataRDFContext extends BigdataBaseContext {
         // the triple store namespaces.
 		final List<String> namespaces = new LinkedList<String>();
 
-		if (log.isInfoEnabled())
-		    log.info("getNamespaces for " + timestamp);
-
 		final SparseRowStore grs = getIndexManager().getGlobalRowStore(
 				timestamp);
 
@@ -2290,9 +2289,6 @@ public class BigdataRDFContext extends BigdataBaseContext {
 			}
 
 		}
-
-//        if (log.isInfoEnabled())
-//            log.info("getNamespaces returning " + namespaces.size());
 
 		return namespaces;
 

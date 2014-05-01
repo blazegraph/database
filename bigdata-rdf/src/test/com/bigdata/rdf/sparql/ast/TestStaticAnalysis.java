@@ -270,6 +270,70 @@ public class TestStaticAnalysis extends AbstractASTEvaluationTestCase {
     }
 
     /**
+     * Unit test of static analysis for a SERVICE call.
+     * 
+     * @see <a href="http://trac.bigdata.com/ticket/816" > Wildcard projection
+     *      ignores variables inside a SERVICE call </a>
+     */
+    public void test_static_analysis05()
+            throws MalformedQueryException {
+
+        final String queryStr = "" +
+                "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> \n"+
+                "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#> \n"+
+                "PREFIX foaf: <http://xmlns.com/foaf/0.1/> \n"+
+                "select ?x (12 as ?y)\n" +
+                " where {\n" +
+                "    service ?uri {\n" +
+                "      ?x rdf:type foaf:Person .\n" +
+                "      ?x rdfs:label ?z .\n" +
+                "    }\n" +
+                "}";
+
+        final QueryRoot queryRoot = new Bigdata2ASTSPARQLParser(store)
+                .parseQuery2(queryStr, baseURI).getOriginalAST();
+        
+        final StaticAnalysis sa = new StaticAnalysis(queryRoot);
+        
+        final Set<IVariable<?>> expectedProjected = new LinkedHashSet<IVariable<?>>();
+        
+        expectedProjected.add(Var.var("x"));
+        expectedProjected.add(Var.var("y"));
+        
+        assertEquals(expectedProjected, sa.getDefinitelyProducedBindings(queryRoot));
+
+        // The spanned variables includes the SERVICE URI (if it is a variable).
+        {
+
+            final Set<IVariable<?>> expectedWhereClause = new LinkedHashSet<IVariable<?>>();
+
+            expectedWhereClause.add(Var.var("uri"));
+            expectedWhereClause.add(Var.var("x"));
+            expectedWhereClause.add(Var.var("z"));
+
+            assertEquals(expectedWhereClause, sa.getSpannedVariables(
+                    queryRoot.getWhereClause(),
+                    new LinkedHashSet<IVariable<?>>()));
+        }
+
+        // The definitely bound variables does NOT include the SERVICE URI. When
+        // that is a variable it needs to become bound through other means.
+        {
+
+            final Set<IVariable<?>> expectedWhereClause = new LinkedHashSet<IVariable<?>>();
+
+            expectedWhereClause.add(Var.var("x"));
+            expectedWhereClause.add(Var.var("z"));
+
+            assertEquals(expectedWhereClause, sa.getDefinitelyProducedBindings(
+                    queryRoot.getWhereClause(),
+                    new LinkedHashSet<IVariable<?>>(), true/* recursive */));
+
+        }
+
+    }
+
+    /**
      * Unit test for computing the join variables for a named subquery based on
      * the analysis of the bindings which MUST be produced by the subquery and
      * those which MUST be bound on entry into the group in which the subquery

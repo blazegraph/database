@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata;
 
+import com.bigdata.counters.AbstractStatisticsCollector;
 import com.bigdata.jini.start.process.ProcessHelper;
 
 /**
@@ -45,6 +46,20 @@ public class BigdataStatics {
      */
     public static final boolean debug = Boolean.getBoolean("com.bigdata.debug");
 
+    /**
+     * The name of an environment variable whose value will be used as the
+     * canoncial host name for the host running this JVM. This information is
+     * used by the {@link AbstractStatisticsCollector}, which is responsible for
+     * obtaining and reporting the canonical hostname for the {@link Banner} and
+     * other purposes.
+     * 
+     * @see AbstractStatisticsCollector
+     * @see Banner
+     * @see <a href="http://trac.bigdata.com/ticket/886" >Provide workaround for
+     *      bad reverse DNS setups</a>
+     */
+    public static final String HOSTNAME = "com.bigdata.hostname";
+    
     /**
      * The #of lines of output from a child process which will be echoed onto
      * {@link System#out} when that child process is executed. This makes it
@@ -80,5 +95,19 @@ public class BigdataStatics {
      */
     public static final boolean runKnownBadTests = Boolean
             .getBoolean("com.bigdata.runKnownBadTests");
+
+    /**
+     * Return the web application context path for the default deployment of the
+     * bigdata web application.
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/730" >
+     *      Allow configuration of embedded NSS jetty server using jetty-web.xml
+     *      </a>
+     */
+    public static final String getContextPath() {
+
+        return "/bigdata";
+        
+    }
     
 }

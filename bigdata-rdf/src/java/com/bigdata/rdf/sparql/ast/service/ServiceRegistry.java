@@ -10,6 +10,7 @@ import org.apache.http.conn.ClientConnectionManager;
 import org.openrdf.model.URI;
 import org.openrdf.model.impl.URIImpl;
 
+import com.bigdata.rdf.graph.impl.bd.GASService;
 import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.cache.DescribeServiceFactory;
 import com.bigdata.rdf.sparql.ast.eval.SampleServiceFactory;
@@ -112,6 +113,9 @@ public class ServiceRegistry {
 
         }
         
+        // The Gather-Apply-Scatter RDF Graph Mining service.
+        add(GASService.Options.SERVICE_KEY, new GASService());
+
     }
 
     /**
@@ -141,7 +145,15 @@ public class ServiceRegistry {
         return defaultServiceFactoryRef.get();
         
     }
-    
+
+    /**
+     * Register a service.
+     * 
+     * @param serviceURI
+     *            The service URI.
+     * @param factory
+     *            The factory to execute calls against that service.
+     */
     public final void add(final URI serviceURI, final ServiceFactory factory) {
 
         synchronized (this) {

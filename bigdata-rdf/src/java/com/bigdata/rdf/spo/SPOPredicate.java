@@ -26,6 +26,7 @@ package com.bigdata.rdf.spo;
 import java.util.Map;
 
 import com.bigdata.bop.BOp;
+import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IVariableOrConstant;
@@ -33,6 +34,7 @@ import com.bigdata.bop.NV;
 import com.bigdata.bop.ap.Predicate;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.impl.bnode.SidIV;
+import com.bigdata.rdf.sparql.ast.FilterNode;
 import com.bigdata.relation.rule.IAccessPathExpander;
 
 /**
@@ -353,6 +355,80 @@ public class SPOPredicate extends Predicate<ISPO> {
     @Override
     public SPOPredicate asBound(final IBindingSet bindingSet) {
 
+    	final IVariable<?> sidVar = sid();
+    	
+    	if (sidVar != null && bindingSet.isBound(sidVar)) {
+    		
+    		final Object obj = bindingSet.get(sidVar).get();
+    		
+    		// prior predicate bound something other than a sid to a sid var
+    		if (obj instanceof SidIV == false) {
+    			
+    			// inconsistent
+    			return null;
+    			
+    		}
+    		
+    		final SidIV sidIV = (SidIV) obj;
+    		
+    		final ISPO spo = sidIV.getInlineValue();
+    		
+    		final IV s = spo.s();
+    		
+    		final IV p = spo.p();
+    		
+    		final IV o = spo.o();
+    		
+    		// TODO implement RDR in quads mode
+//    		final IV c = spo.c();
+    		
+    		if (this.s().isConstant() && !this.s().get().equals(s)) {
+    			
+    			// inconsistent
+    			return null;
+    			
+    		} else if (this.s().isVar()) {
+    			
+    			bindingSet.set((IVariable) this.s(), new Constant<IV>(s)); 
+    			
+    		}
+    		
+    		if (this.p().isConstant() && !this.p().get().equals(p)) {
+    			
+    			// inconsistent
+    			return null;
+    			
+    		} else if (this.p().isVar()) {
+    			
+    			bindingSet.set((IVariable) this.p(), new Constant<IV>(p)); 
+    			
+    		}
+    		
+    		if (this.o().isConstant() && !this.o().get().equals(o)) {
+    			
+    			// inconsistent
+    			return null;
+    			
+    		} else if (this.o().isVar()) {
+    			
+    			bindingSet.set((IVariable) this.o(), new Constant<IV>(o)); 
+    			
+    		}
+    		
+    		// TODO implement RDR in quads mode
+//    		if (this.c().isConstant() && !this.c().get().equals(c)) {
+//    			
+//    			// inconsistent
+//    			return null;
+//    			
+//    		} else if (this.c().isVar()) {
+//    			
+//    			bindingSet.set((IVariable) this.c(), new Constant<IV>(c)); 
+//    			
+//    		}
+
+    	}
+    	
         return (SPOPredicate) new SPOPredicate(argsCopy(), annotationsRef())
                 ._asBound(bindingSet);
 

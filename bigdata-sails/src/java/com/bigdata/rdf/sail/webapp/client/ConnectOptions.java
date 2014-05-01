@@ -56,6 +56,15 @@ public class ConnectOptions {
     /** The HTTP method (GET, POST, etc). */
     public String method = "POST";
 
+    /**
+     * When <code>true</code>, the request is a non-idempotent operation (an
+     * UPDATE request or some kind) and must be directed to the leader for HA.
+     * When <code>false</code>, the request is an idempotent operation and
+     * should be load balanced over the available service for HA. This option
+     * is ignored for non-HA requests.
+     */
+    public boolean update;
+    
 //    /**
 //     * The accept header (NO DEFAULT).
 //     */

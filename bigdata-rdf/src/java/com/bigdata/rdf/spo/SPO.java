@@ -78,15 +78,18 @@ public class SPO implements ISPO, java.io.Serializable {
     @SuppressWarnings("rawtypes")
     public final IV o;
 
+    /** The internal value for the context position. */
+    @SuppressWarnings("rawtypes")
+    private final IV c;
+    
     /**
-     * The context position or statement identifier (optional).
+     * The statement identifier (optional).
      * <p>
-     * Note: this is not final since, for SIDs mode, we have to set it lazily
-     * when adding an {@link SPO} to the database.
+     * Note: this is not final since we create it only on demand.
      */
     @SuppressWarnings("rawtypes")
-    private IV c = null;
-
+    private IV sid = null;
+    
 //    /**
 //     * Statement type (inferred, explicit, or axiom).
 //     */
@@ -141,10 +144,10 @@ public class SPO implements ISPO, java.io.Serializable {
 	 */
     private static int OVERRIDE_BIT = 5;
 
-    /**
-	 * Denotes which bit to find the sidable flag within the {@link #flags}.
-	 */
-    private static int SIDABLE_BIT = 6;
+//    /**
+//	 * Denotes which bit to find the sidable flag within the {@link #flags}.
+//	 */
+//    private static int SIDABLE_BIT = 6;
 	
 	
     @Override
@@ -154,7 +157,7 @@ public class SPO implements ISPO, java.io.Serializable {
         case 0: return s;
         case 1: return p;
         case 2: return o;
-        case 3: return c();
+        case 3: return c;
         default: throw new IllegalArgumentException();
         }
     }
@@ -180,49 +183,44 @@ public class SPO implements ISPO, java.io.Serializable {
     @Override
     @SuppressWarnings("rawtypes")
     final public IV c() {
-    	
-    	// lazy instantiate the sid if necessary
-    	if (c == null && sidable()) {
-    		c = new SidIV(this);
-    	}
-    	
         return c;
-        
     }
 
-    @Override
-    public final void setStatementIdentifier(final boolean sid) {
-
-        if (sid && type() != StatementEnum.Explicit) {
-
-            // Only allowed for explicit statements.
-            throw new IllegalStateException();
-
-        }
-
-        sidable(sid);
-
-        // clear the current value for c
-        this.c = null;
-
-    }
+//    @Override
+//    public final void setStatementIdentifier(final boolean sid) {
+//
+//        if (sid && type() != StatementEnum.Explicit) {
+//
+//            // Only allowed for explicit statements.
+//            throw new IllegalStateException();
+//
+//        }
+//
+//        sidable(sid);
+//
+//        // clear the current value for c
+//        this.sid = null;
+//
+//    }
 
     @SuppressWarnings("rawtypes")
     public final IV getStatementIdentifier() {
 
-    	if (!sidable())
-             throw new IllegalStateException("No statement identifier: "
-                    + toString());
-
-    	// will lazy instantiate the sid
-        return c();
+    	// lazy instantiate the sid if necessary
+    	if (sid == null && type() == StatementEnum.Explicit) {
+    		
+    		sid = new SidIV(this);
+    		
+    	}
+    	
+        return sid;
 
     }
 
     @Override
     final public boolean hasStatementIdentifier() {
         
-        return sidable();
+        return type() == StatementEnum.Explicit;
         
     }
     
@@ -253,6 +251,7 @@ public class SPO implements ISPO, java.io.Serializable {
         this.s = s;
         this.p = p;
         this.o = o;
+        this.c = null;
         type(null);
         
     }
@@ -295,6 +294,7 @@ public class SPO implements ISPO, java.io.Serializable {
         this.s = s;
         this.p = p;
         this.o = o;
+        this.c = null;
         type(type);
         
     }
@@ -809,19 +809,19 @@ public class SPO implements ISPO, java.io.Serializable {
 		flags = Bits.set(flags, OVERRIDE_BIT, override);
 	}
 	
-	/**
-	 * Sidable is hiding in the 6 bit of the flags.
-	 */
-	private boolean sidable() {
-		return Bits.get(flags, SIDABLE_BIT);
-	}
-	
-	/**
-	 * Sidable is hiding in the 6 bit of the flags.
-	 */
-	private void sidable(final boolean sidable) {
-		flags = Bits.set(flags, SIDABLE_BIT, sidable);
-	}
+//	/**
+//	 * Sidable is hiding in the 6 bit of the flags.
+//	 */
+//	private boolean sidable() {
+//		return Bits.get(flags, SIDABLE_BIT);
+//	}
+//	
+//	/**
+//	 * Sidable is hiding in the 6 bit of the flags.
+//	 */
+//	private void sidable(final boolean sidable) {
+//		flags = Bits.set(flags, SIDABLE_BIT, sidable);
+//	}
 
     /**
      * {@inheritDoc}

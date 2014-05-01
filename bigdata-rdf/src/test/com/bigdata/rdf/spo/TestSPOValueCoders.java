@@ -142,7 +142,7 @@ public class TestSPOValueCoders extends TestCase2 {
                         StatementEnum.Explicit);
                 
 //                spo.setStatementIdentifier(getSID());
-                spo.setStatementIdentifier(true);
+//                spo.setStatementIdentifier(true);
                 
             } else if (inference) {
                
@@ -163,7 +163,7 @@ public class TestSPOValueCoders extends TestCase2 {
 
                     // explicit statement with SID.
 //                    spo.setStatementIdentifier(getSID());
-                	spo.setStatementIdentifier(true);
+//                	spo.setStatementIdentifier(true);
 
                 }
                 

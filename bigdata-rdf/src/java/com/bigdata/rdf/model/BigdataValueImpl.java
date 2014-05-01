@@ -48,7 +48,7 @@ public abstract class BigdataValueImpl implements BigdataValue {
 
 	private volatile transient BigdataValueFactory valueFactory;
 
-    private volatile IV iv;
+    protected volatile IV iv;
 
     public final BigdataValueFactory getValueFactory() {
         
@@ -115,7 +115,7 @@ public abstract class BigdataValueImpl implements BigdataValue {
 
     }
 
-    final public IV getIV() {
+    public IV getIV() {
 
         return iv;
         

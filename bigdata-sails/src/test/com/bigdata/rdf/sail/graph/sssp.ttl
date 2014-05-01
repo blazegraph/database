@@ -1,0 +1,14 @@
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix bd: <http://www.bigdata.com/rdf#> .
+@prefix : <:> .
+
+# target1: 3 hops, cost = 1.5
+<<:source :edge :a>> :cost "0.5"^^xsd:float .
+<<:a :edge :b>> :cost "0.5"^^xsd:float .
+<<:b :edge :target1>> :cost "0.5"^^xsd:float .
+
+# target2: 4 hops, cost = 1.0
+<<:source :edge :c>> :cost "0.25"^^xsd:float .
+<<:c :edge :d>> :cost "0.25"^^xsd:float .
+<<:d :edge :e>> :cost "0.25"^^xsd:float .
+<<:e :edge :target2>> :cost "0.25"^^xsd:float .

@@ -89,6 +89,10 @@ public class BNodeContextFactory implements BigdataValueFactory {
         return valueFactory.createBNode(id);
     }
 
+	public BigdataBNode createBNode(BigdataStatement stmt) {
+        return valueFactory.createBNode(stmt);
+    }
+
 	public BigdataLiteral createLiteral(boolean arg0) {
         return valueFactory.createLiteral(arg0);
     }
