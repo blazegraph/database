@@ -356,6 +356,16 @@ public class GASState<VS, ES, ST> implements IGASState<VS, ES, ST> {
      * solution would be to drop them onto stripped lists at the same time that
      * they are first inserted into the CHM. I could then read over those
      * striped lists in parallel during the reduction.
+     * <p>
+     * The IReducer should run with parallel threads. This is a huge serial
+     * bottleneck right now. Fixing this will require a data structure with a
+     * parallel iterator, not the CHM. See
+     * http://stackoverflow.com/questions/20164690
+     * /using-scalas-parhashmap-in-javas-project-instead-of-concurrenthashmap
+     * <p>
+     * It seems like the short term solution would be to drop them onto striped
+     * lists at the same time that they are first inserted into the CHM. I could
+     * then read over those striped lists in parallel during the reduction.
      */
     @Override
     public <T> T reduce(final IReducer<VS, ES, ST, T> op) {
