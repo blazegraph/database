@@ -21,7 +21,7 @@
 
       <div id="tab-selector">
         <a data-target="query" class="active">Query</a>
-        <a data-target="load">Load</a>
+        <a data-target="update">Update</a>
         <a data-target="explore">Explore</a>
         <a data-target="status">Status</a>
         <a data-target="performance">Performance</a>
@@ -29,7 +29,7 @@
         <p>Current namespace: <span id="current-namespace"></span></p>
       </div>
 
-      <div class="tab" id="load-tab">
+      <div class="tab" id="update-tab">
 
         <div class="box">
 
@@ -37,14 +37,14 @@
           </div>
 
           <div>
-            <div id="load-errors"></div>
-            <textarea id="load-box" placeholder="(Type in or drag a file containing RDF data, a SPARQL update or a file path or URL)"></textarea>
+            <div id="update-errors"></div>
+            <textarea id="update-box" placeholder="(Type in or drag a file containing RDF data, a SPARQL update or a file path or URL)"></textarea>
           </div>
           <p id="large-file-message">Your file <span id="filename"></span> is too large to display here, but will be uploaded as normal. <a href="#" id="clear-file">Remove file</a></p>
           <p>
-            <input type="file" id="load-file"><br>
-            <label for="load-type">Type:</label>
-            <select id="load-type">
+            <input type="file" id="update-file"><br>
+            <label for="update-type">Type:</label>
+            <select id="update-type">
               <option value="sparql" selected="selected">SPARQL Update</option>
               <option value="rdf">RDF Data</option>
               <option value="path">File Path or URL</option>
@@ -62,16 +62,16 @@
             </select>
           </p>
           <hr class="shadow">
-          <button id="load-load">Load</button>
+          <button id="update-update">Update</button>
 
         </div>
 
-        <div class="box" id="load-response">
+        <div class="box" id="update-response">
           <pre></pre>
         </div>
 
-        <div class="box" id="load-clear-container">
-          <button id="load-clear">Clear output</button>
+        <div class="box" id="update-clear-container">
+          <button id="update-clear">Clear output</button>
         </div>
 
       </div>
@@ -96,7 +96,7 @@
 
             <hr class="shadow">
 
-            <div id="load-buttons">
+            <div id="update-buttons">
               <input type="submit" value="Execute">
               <input type="reset" value="Clear">
             </div>
