@@ -59,7 +59,7 @@ if [ -z "${JETTY_XML}" ]; then
    export JETTY_XML="${INSTALL_DIR}/var/jetty/jetty.xml"
 fi
 if [ -z "${JETTY_RESOURCE_BASE}" ]; then
-   export JETTY_RESOURCE_BASE="${INSTALL_DIR}/var/jetty/html"
+   export JETTY_RESOURCE_BASE="${INSTALL_DIR}/var/jetty"
 fi
 if [ -z "${GROUPS}" ]; then
     export GROUPS="$FEDNAME"
