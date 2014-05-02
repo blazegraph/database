@@ -30,6 +30,7 @@ import com.bigdata.ha.QuorumService;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.jini.ha.HAJournal;
 import com.bigdata.quorum.Quorum;
+import com.bigdata.rdf.sail.webapp.IHARequestURIRewriter;
 
 /**
  * Helper class caches metadata about an {@link HAGlue} service.
@@ -42,25 +43,109 @@ import com.bigdata.quorum.Quorum;
  */
 public class ServiceScore {
 
-    final public UUID serviceUUID;
-    public HAGlue haGlue;
-    public String hostname;
-    public int port;
     /**
-     * The {@link #requestURL} is assigned IFF everything succeeds. This is what
-     * we will use to proxy a request to the service having the {@link UUID}
-     * given to the constuctor.
+     * The service {@link UUID} for the remote service.
      * 
-     * Note: This needs to be a URL, not just a relative path. At least with the
-     * rewriteURI() code in the outer class. Otherwise you get an NPE.
+     * @see HAGlue#getServiceUUID()
      */
-    public String requestURL;
+    final private UUID serviceUUID;
+    
+    /**
+     * The {@link HAGlue} interface for the remote service.
+     */
+    private HAGlue haGlue;
+    
+    /**
+     * The hostname for the remote service.
+     * 
+     * @see HAGlue#getHostname()
+     */
+    private String hostname;
+    
+    /**
+     * The port for the NSS on the remote service.
+     * 
+     * @see HAGlue#getNSSPort()
+     */
+    private int port;
+    
+    /**
+     * The constructed Request-URL for the root of the servlet context for the
+     * NSS on the remote service -or- <code>null</code> if anything goes wrong.
+     */
+    private String requestURI;
+    
+    /**
+     * The service {@link UUID} for the remote service.
+     * 
+     * @see HAGlue#getServiceUUID()
+     */
+    public UUID getServiceUUID() {
 
+        return serviceUUID;
+        
+    }
+
+    /**
+     * The hostname for the remote service -or- <code>null</code> if something
+     * goes wrong.
+     * 
+     * @see HAGlue#getHostname()
+     */
+    public String getHostname() {
+
+        return hostname;
+        
+    }
+
+    /**
+     * The port for the NSS on the remote service.
+     * 
+     * @see HAGlue#getNSSPort()
+     */
+    public int getPort() {
+       
+        return port;
+        
+    }
+    
+    /**
+     * The {@link #requestURI} for the root of the web application on the target
+     * host. This is assigned IFF everything succeeds. This is what we will use
+     * to proxy a request to the service having the {@link UUID} given to the
+     * constructor.
+     * <p>
+     * Note: This needs to be a URL, not just a relative path. Otherwise you get
+     * an NPE.
+     * <p>
+     * This is formed as:
+     * 
+     * <pre>
+     * requestURL = &quot;http://&quot; + hostname + &quot;:&quot; + port + contextPath;
+     * </pre>
+     * 
+     * The <code>hostname</code> is obtained from {@link HAGlue#getHostname()}.
+     * <p>
+     * The <code>port</code> is obtained from {@link HAGlue#getNSSPort()}.
+     * 
+     * TODO How do we configured the protocol for the remote NSS instance? This
+     * code assumes that it is <code>http</code>, but <code>https</code> is also
+     * possible. This could be handled by an {@link IHARequestURIRewriter} but
+     * maybe the {@link HAGlue} interface should be declaring this too?
+     */
+    public String getRequestURI() {
+
+        return requestURI;
+        
+    }
+    
     @Override
     public String toString() {
+        
         return getClass().getName() + "{serviceUUID=" + serviceUUID
-                + ", hostname=" + hostname + ", port=" + port + ", requestURL="
-                + requestURL + "}";
+                + ", hostname=" + hostname + ", port=" + port + ", requestURI="
+                + requestURI + "}";
+        
     }
 
     public ServiceScore(final IIndexManager indexManager,
@@ -97,7 +182,7 @@ public class ServiceScore {
         {
             QuorumService<HAGlue> t;
             try {
-                t = (QuorumService) quorum.getClient();
+                t = (QuorumService<HAGlue>) quorum.getClient();
             } catch (IllegalStateException ex) {
                 // Note: Not available (quorum.start() not called).
                 return;
@@ -113,7 +198,8 @@ public class ServiceScore {
         }
 
         /*
-         * TODO The hostname and port are RMIs. Use a smart proxy.
+         * TODO The hostname and port are RMIs. Use a smart proxy for HAGlue. Or
+         * consult a cache of existing ServiceScore objects.
          */
         try {
             hostname = haGlue.getHostname();
@@ -124,7 +210,7 @@ public class ServiceScore {
         }
 
         // The default URL for that host.
-        requestURL = "http://" + hostname + ":" + port + contextPath;
+        requestURI = "http://" + hostname + ":" + port + contextPath;
 
     }
 

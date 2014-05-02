@@ -573,7 +573,7 @@ public class GangliaLBSPolicy extends AbstractLBSPolicy {
             for (ServiceScore serviceScore : serviceScores) {
                 if (serviceScore == null) // should never be null.
                     continue;
-                tmp.add(serviceScore.hostname);
+                tmp.add(serviceScore.getHostname());
             }
             hosts = tmp.toArray(new String[tmp.size()]);
         }
@@ -600,7 +600,7 @@ public class GangliaLBSPolicy extends AbstractLBSPolicy {
                 ServiceScore theServiceScore = serviceScores[j];
 
                 if (theHostReport.getHostName()
-                        .equals(theServiceScore.hostname)) {
+                        .equals(theServiceScore.getHostname())) {
 
                     // Found service on this host.
                     foundServiceOnHost = true;
@@ -688,10 +688,10 @@ public class GangliaLBSPolicy extends AbstractLBSPolicy {
                 if (tmp == null) // should never happen.
                     continue;
 
-                if (tmp.requestURL == null) // can't proxy.
+                if (tmp.getRequestURI() == null) // can't proxy.
                     continue;
 
-                if (hostScore.hostname.equals(tmp.hostname)) {
+                if (hostScore.hostname.equals(tmp.getHostname())) {
 
                     // Found a joined service on that host.
                     foundServices.add(tmp);
@@ -719,7 +719,7 @@ public class GangliaLBSPolicy extends AbstractLBSPolicy {
 
         final ServiceScore serviceScore = foundServices.get(n);
 
-        return serviceScore.requestURL;
+        return serviceScore.getRequestURI();
 
     }
 

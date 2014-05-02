@@ -63,9 +63,14 @@ import com.bigdata.rdf.sail.webapp.IHALoadBalancerPolicy;
  *         {@link AbstractQuorum#terminate()}. This happens any time the
  *         {@link HAJournalServer} goes into the error state. When this occurs,
  *         we stop getting {@link QuorumEvent}s and the policy stops being
- *         responsive. We probably need to either NOT clear the quorum listener
- *         and/or add an event type that is sent when {@link Quorum#terminate()}
- *         is called.
+ *         responsive (it can not proxy the request to a service that is still
+ *         up because it does not know what services are up, or maybe it just
+ *         can not learn if services go down).
+ *         <p>
+ *         We probably need to either NOT clear the quorum listener and/or add
+ *         an event type that is sent when {@link Quorum#terminate()} is called
+ *         and/or use our own listener (independent of the HAJournalServer,
+ *         which would require us to use an HAClient).
  */
 abstract public class AbstractLBSPolicy implements IHALoadBalancerPolicy,
         QuorumListener, Serializable {
@@ -184,7 +189,7 @@ abstract public class AbstractLBSPolicy implements IHALoadBalancerPolicy,
             if (quorum != null) {
                 try {
                     // Note: This is the *local* HAGlueService.
-                    quorumService = (QuorumService) quorum.getClient();
+                    quorumService = (QuorumService<HAGlue>) quorum.getClient();
                     token = quorum.token();
                     isLeader = quorumService.isLeader(token);
                     isQuorumMet = token != Quorum.NO_QUORUM;
@@ -299,10 +304,10 @@ abstract public class AbstractLBSPolicy implements IHALoadBalancerPolicy,
 
         for (ServiceScore s : services) {
 
-            if (s.serviceUUID.equals(leaderId)) {
+            if (s.getServiceUUID().equals(leaderId)) {
 
                 // Found it. Proxy if the serviceURL is defined.
-                return s.requestURL;
+                return s.getRequestURI();
 
             }
 
@@ -330,7 +335,7 @@ abstract public class AbstractLBSPolicy implements IHALoadBalancerPolicy,
 
         for (ServiceScore s : services) {
 
-            if (s.serviceUUID.equals(serviceIDRef.get())) {
+            if (s.getServiceUUID().equals(serviceIDRef.get())) {
 
                 // Found it.
                 return s;
@@ -368,7 +373,7 @@ abstract public class AbstractLBSPolicy implements IHALoadBalancerPolicy,
 
         for (ServiceScore s : services) {
 
-            if (hostname.equals(s.hostname)) {
+            if (hostname.equals(s.getHostname())) {
 
                 // Found it.
                 return s;
@@ -462,12 +467,14 @@ abstract public class AbstractLBSPolicy implements IHALoadBalancerPolicy,
             try {
 
                 /*
-                 * TODO Scan the existing table before doing an RMI to the
-                 * service. We only need to do the RMI for a new service, not
-                 * one in the table.
-                 * 
-                 * TODO A services HashMap<UUID,HAGlueScore> would be much more
-                 * efficient than a table. If we use a CHM, then we can do this
+                 * TODO We only need to do this when a service enters the
+                 * quorum, but we already have the information on hand for all
+                 * services except the one that is entering. To reduce overhead
+                 * and RMI calls, we should scan the existing table before doing
+                 * an RMI to the service. We only need to do the RMI for a new
+                 * service, not one in the table. A services
+                 * HashMap<UUID,HAGlueScore> would be much more efficient than a
+                 * table for this scan. If we use a CHM, then we can do this
                  * purely asynchronously as the HAGlue services enter (or leave)
                  * the set of joined services.
                  */
