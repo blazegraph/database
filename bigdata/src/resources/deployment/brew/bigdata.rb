@@ -1,44 +1,28 @@
-require 'formula'
-
-# Documentation: https://github.com/mxcl/homebrew/wiki/Formula-Cookbook
-#                /usr/local/Library/Contributions/example-formula.rb
-# PLEASE REMOVE ALL GENERATED COMMENTS BEFORE SUBMITTING YOUR PULL REQUEST!
+require "formula"
 
 class Bigdata < Formula
-  homepage 'http://bigdata.com/blog/'
-  url 'http://bigdata.com/deploy/bigdata-1.3.0.tgz'
-  sha1 'a395a243a2746ce47cf8893f2207fd2e0de4a9c1'
+  homepage "http://bigdata.com/blog/"
+  url "http://bigdata.com/deploy/bigdata-1.3.0.tgz"
+  sha1 "c22fa05df965019b3132161507ce0e77a4a1f6e2"
 
   def install
-    prefix.install Dir['*']
-  end
+    prefix.install "doc"
+    prefix.install "var"
+    prefix.install "bin"
+    libexec.install "lib"
 
-  def caveats; <<-EOS.undent
-     After launching, visit the Bigdata Workbench at: 
+    # Set the installation path as the root for the bin scripts:
+    inreplace "#{bin}/bigdata", "<%= BD_HOME %>", prefix
+    inreplace "#{bin}/bigdata", "<%= INSTALL_TYPE %>", "BREW"
 
-       http://localhost:8080/bigdata
+    # Set the Jetty root as the resourceBase in the jetty.xml file:
+    inreplace "#{prefix}/var/jetty/etc/jetty.xml", "<%= JETTY_DIR %>", "#{prefix}/var/jetty"
 
-     "bigdata" command synopis:
-     -------------------------
+    # Set the installation path as the root for bigdata.jnl file location (<bigdata_home>/data):
+    inreplace "#{prefix}/var/jetty/WEB-INF/RWStore.properties", "<%= BD_HOME %>", prefix
 
-     Start the server:
-
-          % bigdata start
-
-     Stop the server:
-
-          % bigdata stop
-
-     Restart the server:
-
-          % bigdata restart
-
-     To tune the server configuration, edit the "#{var}/jetty/WEB-INF/RWStore.properties" file.
-
-     Further documentation:
-	
-          #{doc}
-    EOS
+    # Set the installation path as the root for log files (<bigdata_home>/log):
+    inreplace "#{prefix}/var/jetty/WEB-INF/classes/log4j.properties", "<%= BD_HOME %>", prefix
   end
 
   plist_options :startup => 'true', :manual => 'bigdata start'
