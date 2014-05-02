@@ -448,6 +448,18 @@ $('#query-box').bind('keydown', 'ctrl+return', function(e) { e.preventDefault();
                .on('input propertychange', function() { $('#query-errors').hide(); });
 $('#query-form').submit(submitQuery);
 
+$('#query-explain').change(function() {
+   if(!this.checked) {
+      $('#query-details').prop('checked', false);
+   }
+});
+
+$('#query-details').change(function() {
+   if(this.checked) {
+      $('#query-explain').prop('checked', true);
+   }
+});
+
 function submitQuery(e) {
    e.preventDefault();
 
@@ -468,7 +480,7 @@ function submitQuery(e) {
    if($('#query-explain').is(':checked')) {
       settings = {
          type: 'POST',
-         data: $(this).serialize() + '&explain=details',
+         data: $(this).serialize() + '&explain=' + ($('#query-details').is(':checked') ? 'details' : 'true'),
          dataType: 'html',
          success: showQueryExplanation,
          error: queryResultsError
