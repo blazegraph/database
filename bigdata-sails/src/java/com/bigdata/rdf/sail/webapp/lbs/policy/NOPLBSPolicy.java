@@ -33,20 +33,13 @@ import com.bigdata.rdf.sail.webapp.lbs.AbstractLBSPolicy;
 
 /**
  * This policy proxies all requests for update operations to the leader but
- * forwards read requests to the local service. Thus, it does not provide a load
- * balancing strategy, but it does allow update requests to be directed to any
+ * forwards read requests to the local service. Thus, it DOES NOT provide a load
+ * balancing strategy, but it DOES allow update requests to be directed to any
  * service in an non-HA aware manner. This policy can be combined with an
  * external round-robin strategy to load balance the read-requests over the
  * cluster.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * 
- *         TODO A service that is not joined with the met quorum can not answer
- *         a read-request. In order to be generally useful (and not just as a
- *         debugging policy), we need to proxy a read-request when this service
- *         is not joined with the met quorum. If there is no met quorum, then we
- *         can just forward the request to the local service and it will report
- *         the NoQuorum error.
  */
 public class NOPLBSPolicy extends AbstractLBSPolicy {
 

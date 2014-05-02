@@ -24,12 +24,9 @@ package com.bigdata.rdf.sail.webapp;
 
 import java.io.IOException;
 
-import javax.servlet.ServletConfig;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-
-import com.bigdata.journal.IIndexManager;
 
 /**
  * Load balancer policy interface.
@@ -39,22 +36,7 @@ import com.bigdata.journal.IIndexManager;
  * @see HALoadBalancerServlet
  * @see <a href="http://trac.bigdata.com/ticket/624">HA Load Balancer</a>
  */
-public interface IHALoadBalancerPolicy {
-
-    /**
-     * Initialize the load balancer policy.
-     * 
-     * @param servletConfig
-     * @param indexManager
-     */
-    void init(ServletConfig servletConfig, IIndexManager indexManager)
-            throws ServletException;
-
-    /**
-     * Destroy the load balancer policy (stop any asynchronous processing,
-     * release any resources).
-     */
-    void destroy();
+public interface IHALoadBalancerPolicy extends IHAPolicyLifeCycle {
 
     /**
      * Invoked for each request. If the response is not committed, then it will

@@ -105,12 +105,12 @@ public class RoundRobinLBSPolicy extends AbstractLBSPolicy {
             if (serviceScore == null)
                 continue;
 
-            if (serviceScore.hostname == null) {
+            if (serviceScore.getHostname() == null) {
                 // Can't use if no hostname.
                 continue;
             }
 
-            if (serviceScore.requestURL == null) {
+            if (serviceScore.getRequestURI() == null) {
                 // Can't use if no requestURL.
                 continue;
             }
@@ -127,7 +127,7 @@ public class RoundRobinLBSPolicy extends AbstractLBSPolicy {
 
         }
 
-        return serviceScore.requestURL;
+        return serviceScore.getRequestURI();
 
     }
 

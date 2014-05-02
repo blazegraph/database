@@ -756,7 +756,20 @@ public class HAJournalServer extends AbstractServer {
             final Quorum<HAGlue, QuorumService<HAGlue>> quorum = (Quorum) new ZKQuorumImpl<HAGlue, HAQuorumService<HAGlue, HAJournal>>(
                     replicationFactor);
 
-            // The HAJournal.
+            /**
+             * The HAJournal.
+             * 
+             * FIXME This step can block for a long time if we have a lot of
+             * HALogs to scan. While it blocks, the REST API (including the LBS)
+             * is down. This means that client requests to the service end point
+             * can not be proxied to a service that is online. The problem is
+             * the interaction with the BigdataRDFServletContextListener which
+             * needs to (a) set the IIndexManager on the ServletContext; and (b)
+             * initiate the default KB create (if it is the quorum leader).
+             * 
+             * @see <a href="http://trac.bigdata.com/ticket/775" > HAJournal
+             *      start() (optimization) </a>
+             */
             this.journal = newHAJournal(this, config, quorum);
             
         }
