@@ -229,12 +229,12 @@ hr {
    margin: 20px auto;
 }
 
-#load-load {
+#update-update {
    margin: 0 auto;
    display: block;
 }
 
-#load-buttons {
+#update-buttons {
    text-align: center;
 }
 
@@ -250,7 +250,7 @@ hr {
    border: none;
 }
 
-#advanced-features, #query-response, #query-pagination, #query-explanation, #query-export-container, #load-response, #load-clear-container, #explore-results, #namespace-properties {
+#advanced-features, #query-response, #query-pagination, #query-explanation, #query-export-container, #update-response, #update-clear-container, #explore-results, #namespace-properties {
    display: none;
 }
 
@@ -271,7 +271,7 @@ pre {
    float: right;
 }
 
-#load-box, #query-box {
+#update-box, #query-box {
    background-color: transparent;
    padding: 2px;
    border-width: 1px;
@@ -279,13 +279,13 @@ pre {
 }
 
 /* these should have the same typography so the error highlighting matches up with the query text */
-#load-box, #load-errors, #query-box, #query-errors {
+#update-box, #update-errors, #query-box, #query-errors {
    font-family: sans-serif;
    font-size: 90%;
    line-height: normal;
 }
 
-#load-errors, #query-errors {
+#update-errors, #query-errors {
    position: absolute;
    z-index: -1;
    padding: 8px 3px;
@@ -349,7 +349,7 @@ pre {
    text-align: right;
 }
 
-#load-clear-container {
+#update-clear-container {
    text-align: right;
 }
 

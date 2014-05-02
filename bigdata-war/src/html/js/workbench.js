@@ -220,7 +220,7 @@ $('.namespace-shortcuts li').click(function() {
 });
 
 
-/* Load */
+/* Update */
 
 function handleDragOver(e) {
    e.stopPropagation();
@@ -248,38 +248,38 @@ function handleFile(e) {
    // if file is too large, tell user to supply local path
    if(f.size > 1048576 * 100) {
       alert('File too large, enter local path to file');
-      $('#load-box').val('/path/to/' + f.name);
+      $('#update-box').val('/path/to/' + f.name);
       setType('path');
-      $('#load-box').prop('disabled', false)
+      $('#update-box').prop('disabled', false)
       $('#large-file-message, #clear-file').hide();
    } else {
       var fr = new FileReader();
       fr.onload = function(e2) {
          if(f.size > 10240) {
             // do not use textarea
-            $('#load-box').prop('disabled', true)
+            $('#update-box').prop('disabled', true)
             $('#filename').html(f.name);
             $('#large-file-message, #clear-file').show()
-            $('#load-box').val('');
+            $('#update-box').val('');
             FILE_CONTENTS = e2.target.result;
          } else {
             // display file contents in the textarea
             clearFile();
-            $('#load-box').val(e2.target.result);
+            $('#update-box').val(e2.target.result);
          }
          guessType(f.name.split('.').pop().toLowerCase(), e2.target.result);
       };
       fr.readAsText(f);
    }
 
-   $('#load-file').val('');
+   $('#update-file').val('');
 }
 
 function clearFile(e) {
    if(e) {
       e.preventDefault();
    }
-   $('#load-box').prop('disabled', false)
+   $('#update-box').prop('disabled', false)
    $('#large-file-message, #clear-file').hide()
    FILE_CONTENTS = null;
 }
@@ -332,7 +332,7 @@ function handlePaste(e) {
 }
 
 function setType(type, format) {
-   $('#load-type').val(type);
+   $('#update-type').val(type);
    if(type == 'rdf') {
       $('#rdf-type').val(format);
    }
@@ -364,28 +364,28 @@ var rdf_content_types = {'n-quads': 'text/x-nquads',
 
 var sparql_update_commands = ['INSERT', 'DELETE'];
 
-$('#load-file').change(handleFile);
-$('#load-box').on('dragover', handleDragOver)
+$('#update-file').change(handleFile);
+$('#update-box').on('dragover', handleDragOver)
    .on('drop', handleFile)
    .on('paste', handlePaste)
-   .on('input propertychange', function() { $('#load-errors').hide(); })
-   .bind('keydown', 'ctrl+return', submitLoad);
+   .on('input propertychange', function() { $('#update-errors').hide(); })
+   .bind('keydown', 'ctrl+return', submitUpdate);
 $('#clear-file').click(clearFile);
 
-$('#load-load').click(submitLoad);
+$('#update-update').click(submitUpdate);
 
-function submitLoad(e) {
+function submitUpdate(e) {
    e.preventDefault();
 
    var settings = {
       type: 'POST',
-      data: FILE_CONTENTS == null ? $('#load-box').val() : FILE_CONTENTS,
+      data: FILE_CONTENTS == null ? $('#update-box').val() : FILE_CONTENTS,
       success: updateResponseXML,
       error: updateResponseError
    }
 
    // determine action based on type
-   switch($('#load-type').val()) {
+   switch($('#update-type').val()) {
       case 'sparql':
          settings.data = 'update=' + encodeURIComponent(settings.data);
          settings.success = updateResponseHTML;
@@ -407,15 +407,15 @@ function submitLoad(e) {
          break;
    }
 
-   $('#load-response').show();
-   $('#load-response pre').html('Data loading...');   
+   $('#update-response').show();
+   $('#update-response pre').html('Data loading...');   
 
    $.ajax(NAMESPACE_URL, settings);
 }
 
-$('#load-clear').click(function() {
-   $('#load-response, #load-clear').hide();
-   $('#load-response pre').text('');
+$('#update-clear').click(function() {
+   $('#update-response, #update-clear').hide();
+   $('#update-response pre').text('');
 });
 
 $('#advanced-features-toggle').click(function() {
@@ -424,21 +424,21 @@ $('#advanced-features-toggle').click(function() {
 });
 
 function updateResponseHTML(data) {
-   $('#load-response, #load-clear').show();
-   $('#load-response pre').html(data);
+   $('#update-response, #update-clear').show();
+   $('#update-response pre').html(data);
 }
 
 function updateResponseXML(data) {
    var modified = data.childNodes[0].attributes['modified'].value;
    var milliseconds = data.childNodes[0].attributes['milliseconds'].value;
-   $('#load-response, #load-clear').show();
-   $('#load-response pre').text('Modified: ' + modified + '\nMilliseconds: ' + milliseconds);
+   $('#update-response, #update-clear').show();
+   $('#update-response pre').text('Modified: ' + modified + '\nMilliseconds: ' + milliseconds);
 }
 
 function updateResponseError(jqXHR, textStatus, errorThrown) {
-   $('#load-response, #load-clear').show();
-   $('#load-response pre').text('Error! ' + textStatus + ' ' + jqXHR.statusText);
-   highlightError(jqXHR.statusText, 'load');
+   $('#update-response, #update-clear').show();
+   $('#update-response pre').text('Error! ' + textStatus + ' ' + jqXHR.statusText);
+   highlightError(jqXHR.statusText, 'update');
 }
 
 
