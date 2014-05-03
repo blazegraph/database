@@ -23,25 +23,29 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.rdf.sparql.ast.optimizers;
 
-import java.util.HashMap;
-import java.util.Map;
 
 import org.openrdf.model.impl.URIImpl;
 import org.openrdf.query.algebra.StatementPattern.Scope;
 
 import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.IValueExpression;
+import com.bigdata.bop.IVariable;
 import com.bigdata.bop.ModifiableBOpBase;
+import com.bigdata.journal.ITx;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.constraints.IsBoundBOp;
+import com.bigdata.rdf.internal.constraints.OrBOp;
 import com.bigdata.rdf.sparql.ast.ASTBase;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.AbstractASTEvaluationTestCase;
 import com.bigdata.rdf.sparql.ast.ArbitraryLengthPathNode;
 import com.bigdata.rdf.sparql.ast.AssignmentNode;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
+import com.bigdata.rdf.sparql.ast.ExistsNode;
 import com.bigdata.rdf.sparql.ast.FilterNode;
 import com.bigdata.rdf.sparql.ast.FunctionNode;
 import com.bigdata.rdf.sparql.ast.FunctionRegistry;
+import com.bigdata.rdf.sparql.ast.GlobalAnnotations;
 import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
 import com.bigdata.rdf.sparql.ast.GroupMemberNodeBase;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
@@ -50,6 +54,7 @@ import com.bigdata.rdf.sparql.ast.IValueExpressionNode;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueryInclude;
 import com.bigdata.rdf.sparql.ast.NamedSubqueryRoot;
+import com.bigdata.rdf.sparql.ast.NotExistsNode;
 import com.bigdata.rdf.sparql.ast.PathNode;
 import com.bigdata.rdf.sparql.ast.ValueExpressionNode;
 import com.bigdata.rdf.sparql.ast.PathNode.*;
@@ -60,11 +65,14 @@ import com.bigdata.rdf.sparql.ast.QueryBase;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryType;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
+import com.bigdata.rdf.sparql.ast.SubqueryRoot;
 import com.bigdata.rdf.sparql.ast.TermNode;
 import com.bigdata.rdf.sparql.ast.UnionNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
+import com.bigdata.rdf.sparql.ast.eval.AST2BOpUtility;
 import com.bigdata.rdf.sparql.ast.service.ServiceNode;
+import com.bigdata.rdf.spo.SPOKeyOrder;
 
 public abstract class AbstractOptimizerTestCase extends AbstractASTEvaluationTestCase {
 
@@ -177,6 +185,7 @@ public abstract class AbstractOptimizerTestCase extends AbstractASTEvaluationTes
 		private VarNode rightVar;
 		private VarNode leftVar;
 		int varCount = 0;
+		private GlobalAnnotations globals = new GlobalAnnotations(getName(), ITx.READ_COMMITTED);
 
 		private IV iv(String id) {
 			return makeIV(new URIImpl("http://example/" + id));
@@ -215,6 +224,19 @@ public abstract class AbstractOptimizerTestCase extends AbstractASTEvaluationTes
 		protected QueryRoot select(VarNode varNode, JoinGroupNode where,
 				HelperFlag... flags) {
 			return select(new VarNode[] { varNode }, where, flags);
+		}
+		
+		protected SubqueryRoot ask(VarNode varNode, JoinGroupNode where) {
+
+			final SubqueryRoot rslt = new SubqueryRoot(QueryType.ASK);
+            final ProjectionNode projection = new ProjectionNode();
+            varNode.setAnonymous(true);
+            rslt.setProjection(projection);
+            projection.addProjectionExpression(new AssignmentNode(varNode, varNode));
+            rslt.setWhereClause(where);
+            rslt.setAskVar(toValueExpression(varNode));
+            
+			return rslt;
 		}
 
 		protected NamedSubqueryRoot namedSubQuery(String name, VarNode varNode,
@@ -438,6 +460,31 @@ public abstract class AbstractOptimizerTestCase extends AbstractASTEvaluationTes
 
 		protected AssignmentNode bind(IValueExpressionNode valueNode, VarNode varNode) {
 			return new AssignmentNode(varNode, valueNode);
+		}
+		
+		protected FunctionNode or(ValueExpressionNode v1, ValueExpressionNode v2) {
+			
+			FunctionNode rslt = FunctionNode.OR(v1, v2);
+			rslt.setValueExpression(new OrBOp(v1.getValueExpression(),v2.getValueExpression()));
+			return rslt;
+		}
+		
+		protected ExistsNode exists(VarNode v, GraphPatternGroup<IGroupMemberNode> jg) {
+			v.setAnonymous(true);
+			ExistsNode existsNode = new ExistsNode(v, jg);
+			existsNode.setValueExpression(toValueExpression(v));
+			return existsNode;
+		}
+
+		private IVariable<? extends IV> toValueExpression(VarNode v) {
+			return (IVariable<? extends IV>) AST2BOpUtility.toVE(globals, v);
+		}
+
+		private IValueExpression<? extends IV> toValueExpression(FunctionNode n) {
+			return AST2BOpUtility.toVE(globals, n);
+		}
+		protected NotExistsNode notExists(VarNode v, GraphPatternGroup<IGroupMemberNode> jg) {
+			return new NotExistsNode(v, jg);
 		}
 	}
 
