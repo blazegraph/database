@@ -171,7 +171,7 @@ public class FunctionNode extends ValueExpressionNode {
      */
 
     /**
-     * Return <code>t1 AND t2</code> (aka EQ).
+     * Return <code>t1 AND t2</code>.
      */
     static public FunctionNode AND(final ValueExpressionNode t1,
             final ValueExpressionNode t2) {
@@ -182,7 +182,7 @@ public class FunctionNode extends ValueExpressionNode {
     }
 
     /**
-     * Return <code>t1 OR t2</code> (aka EQ).
+     * Return <code>t1 OR t2</code>.
      */
     static public FunctionNode OR(final ValueExpressionNode t1,
             final ValueExpressionNode t2) {
