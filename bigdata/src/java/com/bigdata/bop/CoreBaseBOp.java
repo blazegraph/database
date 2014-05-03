@@ -363,7 +363,7 @@ abstract public class CoreBaseBOp implements BOp {
             if(v1 == v2)
                 continue;
 
-            if (v1 != null && v2 == null)
+            if (v1 == null || v2 == null)
                 return false;
 
             if (v1.getClass().isArray()) {
