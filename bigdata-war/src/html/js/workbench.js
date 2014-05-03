@@ -1063,12 +1063,9 @@ function getStatus(e) {
 }
 
 function getStatusNumbers(data) {
-      var accepted = data.text().match(/Accepted query count=(\d+)/)[1];
-      var running = data.text().match(/Running query count=(\d+)/)[1];
-      var numbers = $(data).find('pre')[0].textContent;
-      $('#accepted-query-count').html(accepted);
-      $('#running-query-count').html(running);
-      $('#status-numbers').html(numbers);
+   $('#status-text').html(data);
+   $('#status-text a').eq(1).click(function(e) { e.preventDefault(); showQueries(false); return false; });
+   $('#status-text a').eq(2).click(function(e) { e.preventDefault(); showQueries(true); return false; });
 }
 
 $('#show-queries').click(function(e) {
@@ -1100,6 +1097,10 @@ function showQueries(details) {
          e = $(e);
          // get numbers string, which includes cancel link
          var form = e.next();
+         // HA mode has h1 before running queries
+         if(form[0].tagName != 'FORM') {
+            return;
+         }
          var numbers = form.find('p')[0].textContent;
          // remove cancel link
          numbers = numbers.substring(0, numbers.lastIndexOf(','));
