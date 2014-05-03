@@ -715,8 +715,8 @@ function showQueryExplanation(data) {
 
 function queryResultsError(jqXHR, textStatus, errorThrown) {
    $('#query-response, #query-export-container').show();
-   $('#query-response').text('Error! ' + textStatus + ' ' + jqXHR.statusText);
-   highlightError(jqXHR.statusText, 'query');
+   $('#query-response').text('Error! ' + textStatus + ' ' + jqXHR.responseText);
+   highlightError(jqXHR.responseText, 'query');
 }
 
 function highlightError(description, pane) {
