@@ -178,7 +178,12 @@ abstract public class QueryBase extends QueryNodeBase implements
     public void setConstruct(final ConstructNode construct) {
 
         setProperty(Annotations.CONSTRUCT, construct);
-		setQueryType(QueryType.CONSTRUCT);
+        
+        if (construct != null) {
+        	
+		   setQueryType(QueryType.CONSTRUCT);
+		   
+        }
         
     }
     
