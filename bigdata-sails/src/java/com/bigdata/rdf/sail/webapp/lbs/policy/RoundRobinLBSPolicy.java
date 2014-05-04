@@ -42,6 +42,15 @@ public class RoundRobinLBSPolicy extends AbstractLBSPolicy {
      */
     private static final long serialVersionUID = 1L;
 
+    @Override
+    protected void toString(final StringBuilder sb) {
+
+        super.toString(sb);
+        
+        sb.append(",nextService=" + nextService.get());
+
+    }
+
     /**
      * {@inheritDoc}
      * <p>
@@ -52,7 +61,7 @@ public class RoundRobinLBSPolicy extends AbstractLBSPolicy {
     @Override
     public String getReaderURL(final HttpServletRequest request) {
 
-        final ServiceScore[] serviceScores = this.serviceTable.get();
+        final ServiceScore[] serviceScores = this.serviceTableRef.get();
 
         if (serviceScores == null) {
 

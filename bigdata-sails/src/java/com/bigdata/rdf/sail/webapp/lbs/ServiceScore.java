@@ -50,10 +50,10 @@ public class ServiceScore {
      */
     final private UUID serviceUUID;
     
-    /**
-     * The {@link HAGlue} interface for the remote service.
-     */
-    private HAGlue haGlue;
+//    /**
+//     * The {@link HAGlue} interface for the remote service.
+//     */
+//    private HAGlue haGlue;
     
     /**
      * The hostname for the remote service.
@@ -190,6 +190,7 @@ public class ServiceScore {
             quorumService = t;
         }
 
+        final HAGlue haGlue;
         try {
             haGlue = quorumService.getService(serviceUUID);
         } catch (IllegalArgumentException ex) {

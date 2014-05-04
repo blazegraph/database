@@ -22,6 +22,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.rdf.sail.webapp.lbs.policy.ganglia;
 
+import java.util.Arrays;
+
 import com.bigdata.rdf.sail.webapp.lbs.HostScore;
 
 /**
@@ -51,4 +53,13 @@ public class HostTable {
         this.hostScores = hostScores;
     }
 
+    @Override
+    public String toString() {
+        
+        return "HostTable{this=" + thisHost + ",hostScores="
+                + (hostScores == null ? "N/A" : Arrays.toString(hostScores))
+                + "}";
+
+    }
+    
 }

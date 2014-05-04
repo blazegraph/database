@@ -25,6 +25,7 @@ package com.bigdata.rdf.sail.webapp.lbs;
 import java.io.IOException;
 import java.io.Serializable;
 import java.lang.ref.WeakReference;
+import java.util.Arrays;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -110,9 +111,48 @@ abstract public class AbstractLBSPolicy implements IHALoadBalancerPolicy,
      * then we do not know how to reach that service and can not proxy the
      * request.
      */
-    protected final AtomicReference<ServiceScore[]> serviceTable = new AtomicReference<ServiceScore[]>(
+    protected final AtomicReference<ServiceScore[]> serviceTableRef = new AtomicReference<ServiceScore[]>(
             null);
 
+    /**
+     * Note: implementation is non-blocking!
+     */
+    @Override
+    public String toString() {
+
+        final ServiceScore[] serviceTable = serviceTableRef.get();
+
+        final String tmp;
+        if (serviceTable != null) {
+            tmp = Arrays.toString(serviceTable);
+        } else {
+            tmp = "N/A";
+        }
+
+        final StringBuilder sb = new StringBuilder(256);
+
+        sb.append(this.getClass().getName());
+        sb.append("{contextPath=" + contextPath.get());
+        sb.append(",journal=" + journalRef.get());
+        sb.append(",serviceID=" + serviceIDRef.get());
+        sb.append(",services=" + tmp);
+        toString(sb); // extension hook
+        sb.append("}");
+
+        return sb.toString();
+
+    }
+
+    /**
+     * Extension hook for {@link #toString()} - implementation MUST NOT block.
+     * 
+     * @param sb
+     *            Buffer where you can write additional state.
+     */
+    protected void toString(final StringBuilder sb) {
+        
+    }
+    
     /**
      * Return the cached reference to the {@link HAJournal}.
      * 
@@ -137,7 +177,7 @@ abstract public class AbstractLBSPolicy implements IHALoadBalancerPolicy,
 
         journalRef.set(null);
 
-        serviceTable.set(null);
+        serviceTableRef.set(null);
 
     }
 
@@ -293,7 +333,7 @@ abstract public class AbstractLBSPolicy implements IHALoadBalancerPolicy,
          * proxy the request at this time.
          */
 
-        final ServiceScore[] services = serviceTable.get();
+        final ServiceScore[] services = serviceTableRef.get();
 
         if (services == null) {
 
@@ -324,7 +364,7 @@ abstract public class AbstractLBSPolicy implements IHALoadBalancerPolicy,
      */
     protected ServiceScore getLocalServiceScore() {
 
-        final ServiceScore[] services = serviceTable.get();
+        final ServiceScore[] services = serviceTableRef.get();
 
         if (services == null) {
 
@@ -362,7 +402,7 @@ abstract public class AbstractLBSPolicy implements IHALoadBalancerPolicy,
         if (hostname == null)
             throw new IllegalArgumentException();
 
-        final ServiceScore[] services = serviceTable.get();
+        final ServiceScore[] services = serviceTableRef.get();
 
         if (services == null) {
 
@@ -403,12 +443,12 @@ abstract public class AbstractLBSPolicy implements IHALoadBalancerPolicy,
     }
 
     /**
-     * Conditionally update the {@link #serviceTable} iff it does not exist or
+     * Conditionally update the {@link #serviceTableRef} iff it does not exist or
      * is empty.
      */
     protected void conditionallyUpdateServiceTable() {
 
-        final ServiceScore[] services = serviceTable.get();
+        final ServiceScore[] services = serviceTableRef.get();
 
         if (services == null || services.length == 0) {
 
@@ -429,7 +469,7 @@ abstract public class AbstractLBSPolicy implements IHALoadBalancerPolicy,
              * this logic if the table does not exist and we get a barrage of
              * requests.
              */
-            synchronized (serviceTable) {
+            synchronized (serviceTableRef) {
 
                 updateServiceTable();
 
@@ -442,7 +482,7 @@ abstract public class AbstractLBSPolicy implements IHALoadBalancerPolicy,
     /**
      * Update the per-service table.
      * 
-     * @see #serviceTable
+     * @see #serviceTableRef
      */
     protected void updateServiceTable() {
 
@@ -499,7 +539,7 @@ abstract public class AbstractLBSPolicy implements IHALoadBalancerPolicy,
         if (log.isInfoEnabled())
             log.info("Updated servicesTable: #services=" + serviceScores.length);
 
-        this.serviceTable.set(serviceScores);
+        this.serviceTableRef.set(serviceScores);
 
     }
 
