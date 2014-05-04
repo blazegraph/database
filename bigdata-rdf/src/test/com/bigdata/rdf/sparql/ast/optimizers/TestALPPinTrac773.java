@@ -32,7 +32,6 @@ import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.sparql.ast.ArbitraryLengthPathNode;
 import com.bigdata.rdf.sparql.ast.GroupMemberNodeBase;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
-import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
@@ -140,16 +139,7 @@ public class TestALPPinTrac773 extends AbstractOptimizerTestCase {
 	@Override
 	IASTOptimizer newOptimizer() {
 		return new ASTOptimizerList(
-				new ASTPropertyPathOptimizer() {
-					private int counter = 0;
-
-					@Override
-				    protected VarNode anonVar(final String anon) {
-				        VarNode v = new VarNode(anon+counter++);
-				        v.setAnonymous(true);
-				        return v;
-				    }
-				},
+				new ASTPropertyPathOptimizerInTest(),
 				new ASTRangeCountOptimizer(){
 					@Override
 
