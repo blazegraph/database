@@ -139,7 +139,7 @@
    <async-supported>true</async-supported>
    <init-param>
       <param-name>policy</param-name>
-      <param-value>com.bigdata.rdf.sail.webapp.lbs.policy.RoundRobinLBSPolicy</param-value>
+      <param-value>com.bigdata.rdf.sail.webapp.lbs.policy.ganglia.GangliaLBSPolicy</param-value>
       <description>
       The load balancer policy. This must be an instance of the
       IHALoadBalancerPolicy interface.  A default policy (NOPLBSPolicy) is
@@ -151,15 +151,23 @@
       
       The following policies are pre-defined:
       
-      com.bigdata.rdf.sail.webapp.lbs.policy.NOPLBSPolicy - Does not load balance read requests.
+      com.bigdata.rdf.sail.webapp.lbs.policy.NOPLBSPolicy:
       
-      com.bigdata.rdf.sail.webapp.lbs.policy.RoundRobinLBSPolicy - Round robin for read requests.
+         Does not load balance read requests.
       
-      com.bigdata.rdf.sail.webapp.lbs.policy.GangliaLBSPolicy - Load based proxying for read requests using ganglia. 
+      com.bigdata.rdf.sail.webapp.lbs.policy.RoundRobinLBSPolicy:
       
-      Some policies can be configured using additional init-param elements
-      that they understand. See the javadoc for the individual policies for
-      more information.
+         Round robin for read requests.
+      
+      com.bigdata.rdf.sail.webapp.lbs.policy.ganglia.GangliaLBSPolicy:
+      
+         Load based proxying for read requests using ganglia. Either gmond
+         must be installed on each node or the embedded GangliaService must
+         be enabled such that performance metrics are collected and reported.
+      
+      Some of these policies can be further configured using additional
+      init-param elements that they understand. See the javadoc for the
+      individual policies for more information.
       </description>
    </init-param>
   </servlet>
