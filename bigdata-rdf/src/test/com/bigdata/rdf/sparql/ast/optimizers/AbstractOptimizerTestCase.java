@@ -488,6 +488,17 @@ public abstract class AbstractOptimizerTestCase extends AbstractASTEvaluationTes
 		}
 	}
 
+	protected static final class ASTPropertyPathOptimizerInTest extends ASTPropertyPathOptimizer {
+			private int counter = 0;
+	
+			@Override
+			protected VarNode anonVar(final String anon) {
+			    VarNode v = new VarNode(anon+counter++);
+			    v.setAnonymous(true);
+			    return v;
+			}
+		}
+
 	public AbstractOptimizerTestCase(String name) {
 		super(name);
 	}

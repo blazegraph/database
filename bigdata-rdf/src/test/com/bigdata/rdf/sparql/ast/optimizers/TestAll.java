@@ -111,6 +111,8 @@ public class TestAll extends TestCase {
 
         // Unit tests for enforcing bottom-up evaluation semantics.
         suite.addTestSuite(TestASTBottomUpOptimizer.class);
+        
+        suite.addTestSuite(TestASTPropertyPathOptimizer.class);
 
         // Unit tests for the BIGDATA "SEARCH" service optimizer.
         suite.addTestSuite(TestASTSearchOptimizer.class);
