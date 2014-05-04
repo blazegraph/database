@@ -139,7 +139,7 @@
    <async-supported>true</async-supported>
    <init-param>
       <param-name>policy</param-name>
-      <param-value>com.bigdata.rdf.sail.webapp.lbs.policy.ganglia.GangliaLBSPolicy</param-value>
+      <param-value>com.bigdata.rdf.sail.webapp.lbs.policy.RoundRobinLBSPolicy</param-value>
       <description>
       The load balancer policy. This must be an instance of the
       IHALoadBalancerPolicy interface.  A default policy (NOPLBSPolicy) is
