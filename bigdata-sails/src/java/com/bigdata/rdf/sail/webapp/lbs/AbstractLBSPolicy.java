@@ -468,6 +468,9 @@ abstract public class AbstractLBSPolicy implements IHALoadBalancerPolicy,
              * Note: Synchronization here is used to ensure only one thread runs
              * this logic if the table does not exist and we get a barrage of
              * requests.
+             * 
+             * TODO This does not sufficiently prevent against duplicate work
+             * for non-conditional service table update paths.
              */
             synchronized (serviceTableRef) {
 
