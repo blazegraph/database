@@ -26,5 +26,11 @@ public interface IValueExpression<E> extends BOp, Serializable {
      *             <code>null</code>.
      */
     E get(IBindingSet bindingSet);
+    /**
+	 * A string representation of a recursive structure with pretty-print indent.
+	 * @param indent
+	 * @return
+	 */
+    String toString(int indent);
     
 }

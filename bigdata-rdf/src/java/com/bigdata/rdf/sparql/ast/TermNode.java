@@ -88,5 +88,10 @@ public abstract class TermNode extends ValueExpressionNode {
     	return null;
 
     }
+
+	@Override
+	public String toString(int i) {
+		return toShortString();
+	}
     
 }

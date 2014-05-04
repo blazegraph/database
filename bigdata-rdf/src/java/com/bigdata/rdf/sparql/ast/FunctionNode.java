@@ -2,6 +2,7 @@ package com.bigdata.rdf.sparql.ast;
 
 import java.io.Serializable;
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.Map;
 
 import org.openrdf.model.URI;
@@ -9,6 +10,7 @@ import org.openrdf.model.URI;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.NV;
+import com.bigdata.bop.BOp.Annotations;
 
 /**
  * AST node for anything which is neither a constant nor a variable, including
@@ -295,4 +297,35 @@ public class FunctionNode extends ValueExpressionNode {
 
     }
 
+
+    /**
+     * Provides a pretty print representation with recursive descent.
+     */
+	@Override
+	public String toString(int i) {
+
+        final StringBuilder sb = new StringBuilder();
+        sb.append(getClass().getSimpleName());
+        final Integer bopId = (Integer) getProperty(Annotations.BOP_ID);
+        if (bopId != null) {
+            sb.append("[" + bopId + "]");
+        }
+        sb.append("(");
+        int nwritten = 0;
+        final Iterator<BOp> itr = argIterator();
+        while(itr.hasNext()) {
+            final BOp t = itr.next();
+            if (nwritten > 0)
+                sb.append(',');
+            if (t == null) {
+                sb.append("<null>");
+            } else {
+                sb.append(((IValueExpressionNode)t).toString(i+1));
+            }
+            nwritten++;
+        }
+        sb.append(")");
+        annotationsToString(sb, i);
+        return sb.toString();
+	}
 }

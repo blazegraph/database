@@ -211,6 +211,24 @@ public interface BOp extends Cloneable, Serializable, IPropertySet {
      */
     boolean isController();
     
+    /**
+     * The contract of this method at this level is under-specified.
+     * Sub-classes may choose between:
+     * 
+     * - return a string representation of the object, similar to the use of {@link #toString()}
+     * 
+     * Or:
+     * 
+     * - return a pretty-print representation of the object with indent
+     * 
+     * Note that the former contract may or may not include recursive descent through a tree-like
+     * object, whereas the latter almost certainly does.
+     * 
+     * @param indent
+     * @return
+     */
+    String toString(final int indent);
+    
 	/**
 	 * Interface declaring well known annotations.
 	 * <p>

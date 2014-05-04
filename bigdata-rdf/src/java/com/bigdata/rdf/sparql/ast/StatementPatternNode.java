@@ -574,7 +574,7 @@ public class StatementPatternNode extends
         if (getQueryHints() != null && !getQueryHints().isEmpty()) {
             sb.append("\n");
             sb.append(indent(indent + 1));
-            sb.append(Annotations.QUERY_HINTS);
+            shortenName(sb, Annotations.QUERY_HINTS);
             sb.append("=");
             sb.append(getQueryHints().toString());
         }
@@ -586,7 +586,7 @@ public class StatementPatternNode extends
         if (rangeCount != null) {
             sb.append("\n");
             sb.append(indent(indent + 1));
-            sb.append(AST2BOpBase.Annotations.ESTIMATED_CARDINALITY);
+            shortenName(sb, AST2BOpBase.Annotations.ESTIMATED_CARDINALITY);
             sb.append("=");
             sb.append(rangeCount.toString());
         }
@@ -594,7 +594,7 @@ public class StatementPatternNode extends
         if (keyOrder != null) {
             sb.append("\n");
             sb.append(indent(indent + 1));
-            sb.append(AST2BOpBase.Annotations.ORIGINAL_INDEX);
+            shortenName(sb, AST2BOpBase.Annotations.ORIGINAL_INDEX);
             sb.append("=");
             sb.append(keyOrder.toString());
         }
