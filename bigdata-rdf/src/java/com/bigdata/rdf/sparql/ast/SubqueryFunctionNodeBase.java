@@ -32,6 +32,7 @@ import java.util.Map;
 import org.openrdf.model.URI;
 
 import com.bigdata.bop.BOp;
+import com.bigdata.bop.IValueExpression;
 
 /**
  * A special function node for modeling value expression nodes which are
@@ -118,5 +119,10 @@ abstract public class SubqueryFunctionNodeBase extends FunctionNode implements
         setProperty(Annotations.GRAPH_PATTERN, graphPattern);
 
     }
+
+    @Override
+	protected void annotationValueToString(final StringBuilder sb, final BOp val, int i) {
+		sb.append(val.toString(i));
+	}
 
 }

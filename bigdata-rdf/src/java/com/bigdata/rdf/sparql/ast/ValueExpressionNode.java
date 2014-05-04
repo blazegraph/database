@@ -12,7 +12,7 @@ import com.bigdata.rdf.internal.IV;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class ValueExpressionNode extends ASTBase implements
+public abstract class ValueExpressionNode extends ASTBase implements
         IValueExpressionNode {
 
 	/**

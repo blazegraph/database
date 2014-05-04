@@ -34,4 +34,11 @@ public interface IValueExpressionNode {
 	 */
 	void invalidate();
 	
+	/**
+	 * A string representation of a recursive structure with pretty-print indent.
+	 * @param indent
+	 * @return
+	 */
+	String toString(final int indent);
+	
 }

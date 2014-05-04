@@ -156,9 +156,44 @@ abstract public class CoreBaseBOp implements BOp {
         return sb.toString();
 
     }
+    
+    /**
+     * Append a name to a string buffer, possibly shortening the name.
+     * The current algorithm for name shortening is to take the end of the name
+     * after the pen-ultimate '.'.
+     * @param sb
+     * @param longishName
+     */
+    protected void shortenName(final StringBuilder sb, final String longishName) {
+    	int lastDot = longishName.lastIndexOf('.');
+    	if (lastDot != -1) {
+    		int lastButOneDot = longishName.lastIndexOf('.', lastDot - 1);
+    		sb.append(longishName.substring(lastButOneDot + 1));
+    		return;
+    	}
+    	sb.append(longishName);
+    }
 
+    /**
+     * Add a string representation of annotations into a string builder.
+     * By default this is a non-recursive operation, however
+     * subclasses may override {@link #annotationValueToString(StringBuilder, BOp, int)}
+     * in order to make this recursive.
+     * @param sb
+     */
     protected void annotationsToString(final StringBuilder sb) {
-        final Map<String,Object> annotations = annotations();
+        annotationsToString(sb, 0);
+    }
+
+    /**
+     * Add a string representation of annotations into a string builder.
+     * By default this is a non-recursive operation, however
+     * subclasses may override {@link #annotationValueToString(StringBuilder, BOp, int)}
+     * in order to make this recursive.
+     * @param sb
+     */
+	protected void annotationsToString(final StringBuilder sb, final int indent) {
+		final Map<String,Object> annotations = annotations();
         if (!annotations.isEmpty()) {
             sb.append("[");
             boolean first = true;
@@ -169,20 +204,35 @@ abstract public class CoreBaseBOp implements BOp {
                     sb.append(", ");
                 final String key = e.getKey();
                 final Object val = e.getValue();
+                shortenName(sb, key);
+                sb.append("=");
                 if (val != null && val.getClass().isArray()) {
-                    sb.append(key + "=" + Arrays.toString((Object[]) val));
+                    sb.append(Arrays.toString((Object[]) val));
                 } else if (key.equals(IPredicate.Annotations.FLAGS)) {
-                    sb.append(key + "=" + Tuple.flagString((Integer) val));
+                    sb.append(Tuple.flagString((Integer) val));
                 } else if( val instanceof BOp) {
-                    sb.append(key + "=" + ((BOp) val).toShortString());
+                    annotationValueToString(sb, (BOp)val, indent);
                 } else {
-                    sb.append(key + "=" + val);
+                    sb.append(val);
                 }
                 first = false;
             }
             sb.append("]");
         }
-    }
+	}
+
+    /**
+     * Add a string representation of a BOp annotation value into a string builder.
+     * By default this is a non-recursive operation, however
+     * subclasses may override and give a recursive definition, which should respect
+     * the given indent.
+     * @param sb The destination buffer
+     * @param val The BOp to serialize
+     * @param indent An indent to use if a recursive approach is chosen.
+     */
+	protected void annotationValueToString(final StringBuilder sb, final BOp val, final int indent) {
+		sb.append(val.toString());
+	}
     
     @Override
     final public Object getRequiredProperty(final String name) {
@@ -441,6 +491,26 @@ abstract public class CoreBaseBOp implements BOp {
 
     }
 
+    /**
+     * The contract of this method at this level is under-specified.
+     * Sub-classes may choose between:
+     * 
+     * - return a string representation of the object, similar to the use of {@link #toString()}
+     * 
+     * Or:
+     * 
+     * - return a pretty-print representation of the object with indent
+     * 
+     * Note that the former contract may or may not include recursive descent through a tree-like
+     * object, whereas the latter almost certainly does.
+     * 
+     * @param indent
+     * @return
+     */
+	public String toString(int indent) {
+		return toString();
+	}
+	
     private static final transient String ws = "                                                                                                                                                                                                                                                                                                                                                                                                                                    ";
 
 }
