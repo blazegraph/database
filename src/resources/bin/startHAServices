@@ -81,6 +81,7 @@ export HA_OPTS="\
  -DLOCATORS=${LOCATORS}\
  -DZK_SERVERS=${ZK_SERVERS}\
  -DHA_PORT=${HA_PORT}\
+ "-Dcom.bigdata.hostname=${BIGDATA_HOSTNAME}\
  "-Djetty.port=${JETTY_PORT}"\
  "-Djetty.resourceBase=${JETTY_RESOURCE_BASE}"\
  "-DJETTY_XML=${JETTY_XML}"\
