@@ -217,7 +217,7 @@ public class HALoadBalancerServlet extends ProxyServlet {
      * @param newValue
      *            The new value (required).
      */
-    public void setPolicy(final IHALoadBalancerPolicy newValue) {
+    public void setLBSPolicy(final IHALoadBalancerPolicy newValue) {
 
         if (newValue == null)
             throw new IllegalArgumentException();
@@ -227,6 +227,15 @@ public class HALoadBalancerServlet extends ProxyServlet {
         
         setHAPolicy(newValue, policyRef);
        
+    }
+    
+    /**
+     * Return the current {@link IHALoadBalancerPolicy}.
+     */
+    public IHALoadBalancerPolicy getLBSPolicy() {
+        
+        return policyRef.get();
+        
     }
     
     /**
@@ -372,7 +381,7 @@ public class HALoadBalancerServlet extends ProxyServlet {
                     InitParams.DEFAULT_POLICY);
 
             // Set the as-configured policy.
-            setPolicy(policy);
+            setLBSPolicy(policy);
 
         }
         {
@@ -478,9 +487,25 @@ public class HALoadBalancerServlet extends ProxyServlet {
         
     }
 
-    public static void setPolicy(final ServletContext servletContext,
-            final IHALoadBalancerPolicy policy) {
+    /**
+     * Set the current {@link IHALoadBalancerPolicy} for all
+     * {@link HALoadBalancerServlet} instances for the caller specified
+     * {@link ServletContext}.
+     * 
+     * @param servletContext
+     *            The {@link ServletContext}.
+     * @param newValue
+     *            The new {@link IHALoadBalancerPolicy}.
+     *            
+     * @throws IllegalArgumentException
+     *             if the new policy is <code>null</code>.
+     */
+    public static void setLBSPolicy(final ServletContext servletContext,
+            final IHALoadBalancerPolicy newValue) {
 
+        if (newValue == null)
+            throw new IllegalArgumentException();
+        
         final HALoadBalancerServlet[] servlets = getServlets(servletContext);
 
         if (servlets == null || servlets.length == 0) {
@@ -492,10 +517,44 @@ public class HALoadBalancerServlet extends ProxyServlet {
 
         for (HALoadBalancerServlet servlet : servlets) {
 
-            servlet.setPolicy(policy);
+            servlet.setLBSPolicy(newValue);
 
         }
 
+    }
+
+    /**
+     * Return the {@link IHALoadBalancerPolicy}s that are in force for the
+     * active {@link HALoadBalancerServlet} instances.
+     * 
+     * @param servletContext
+     *            The {@link ServletContext}.
+     *            
+     * @return The {@link IHALoadBalancerPolicy}[] -or- <code>null</code> if
+     *         there are no {@link HALoadBalancerServlet}s.
+     */
+    public static IHALoadBalancerPolicy[] getLBSPolicy(
+            final ServletContext servletContext) {
+
+        final HALoadBalancerServlet[] servlets = getServlets(servletContext);
+
+        if (servlets == null || servlets.length == 0) {
+         
+            // None running.
+            return null;
+
+        }
+
+        final IHALoadBalancerPolicy[] a = new IHALoadBalancerPolicy[servlets.length];
+
+        for (int i = 0; i < servlets.length; i++) {
+
+            a[i] = servlets[i].getLBSPolicy();
+
+        }
+
+        return a;
+        
     }
     
     /**

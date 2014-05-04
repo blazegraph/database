@@ -30,6 +30,7 @@ import java.net.InetSocketAddress;
 import java.security.DigestException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
@@ -283,7 +284,17 @@ public class HAStatusServletUtil {
                 p.text("Service: restorePolicy="
                         + journal.getSnapshotManager().getRestorePolicy())
                         .node("br").close();
-                
+
+                // LBS policy
+                {
+
+                    final IHALoadBalancerPolicy[] a = HALoadBalancerServlet
+                            .getLBSPolicy(req.getServletContext());
+                    
+                    p.text("Service: LBSPolicy="
+                            + (a == null ? "N/A" : Arrays.toString(a)))
+                            .node("br").close();
+                }
 //                if(true) {
 //                    /*
 //                     * HABackup: disable this code block. It is for
