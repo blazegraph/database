@@ -59,19 +59,6 @@ import com.bigdata.rdf.sail.webapp.IHALoadBalancerPolicy;
  * services (especially the requestURL at which they will respond).
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * 
- *         FIXME The {@link QuorumListener} is unregistered by
- *         {@link AbstractQuorum#terminate()}. This happens any time the
- *         {@link HAJournalServer} goes into the error state. When this occurs,
- *         we stop getting {@link QuorumEvent}s and the policy stops being
- *         responsive (it can not proxy the request to a service that is still
- *         up because it does not know what services are up, or maybe it just
- *         can not learn if services go down).
- *         <p>
- *         We probably need to either NOT clear the quorum listener and/or add
- *         an event type that is sent when {@link Quorum#terminate()} is called
- *         and/or use our own listener (independent of the HAJournalServer,
- *         which would require us to use an HAClient).
  */
 abstract public class AbstractLBSPolicy implements IHALoadBalancerPolicy,
         QuorumListener, Serializable {
@@ -431,6 +418,27 @@ abstract public class AbstractLBSPolicy implements IHALoadBalancerPolicy,
      * {@inheritDoc}
      * <p>
      * The services table is updated if a services joins or leaves the quorum.
+     * 
+     * FIXME The {@link QuorumListener} is unregistered by
+     * {@link AbstractQuorum#terminate()}. This happens any time the
+     * {@link HAJournalServer} goes into the error state. When this occurs, we
+     * stop getting {@link QuorumEvent}s and the policy stops being responsive
+     * (it can not proxy the request to a service that is still up because it
+     * does not know what services are up, or maybe it just can not learn if
+     * services go down).
+     * <p>
+     * We probably need to either NOT clear the quorum listener and/or add an
+     * event type that is sent when {@link Quorum#terminate()} is called and/or
+     * use our own listener (independent of the HAJournalServer, which would
+     * require us to use an HAClient).
+     * <p>
+     * This should be robust even when the HAQuorumService is not running. We do
+     * not want to be unable to proxy to another service just because this one
+     * is going through an error state. Would it make more sense to have a 2nd
+     * Quorum object for this purpose - one that is not started and stopped by
+     * the HAJournalServer?
+     * 
+     * @see http://trac.bigdata.com/ticket/775 (HAJournal start() delay)
      */
     @Override
     public void notify(final QuorumEvent e) {
@@ -456,14 +464,6 @@ abstract public class AbstractLBSPolicy implements IHALoadBalancerPolicy,
              * Ensure that the service table exists (more correctly, attempt to
              * populate it, but we can only do that if the HAQuorumService is
              * running.)
-             * 
-             * FIXME This should be robust even when the HAQuorumService is not
-             * running. We do not want to be unable to proxy to another service
-             * just because this one is going through an error state. Would it
-             * make more sense to have a 2nd Quorum object for this purpose -
-             * one that is not started and stopped by the HAJournalServer?
-             * 
-             * @see http://trac.bigdata.com/ticket/775 (HAJournal start() delay)
              * 
              * Note: Synchronization here is used to ensure only one thread runs
              * this logic if the table does not exist and we get a barrage of
@@ -500,8 +500,13 @@ abstract public class AbstractLBSPolicy implements IHALoadBalancerPolicy,
 
         /*
          * If there is an existing service table, then we search it for an
-         * existing definition for a service. This let's avoid doing an RMI to
-         * a Service that is already defined in the current service table.
+         * existing definition for a service. This let's avoid doing an RMI to a
+         * Service that is already defined in the current service table.
+         * 
+         * Note: We need to hold all discovered services in a map if we want to
+         * keep the statistics [nrequests] across leave/joins. Right now, a
+         * service leave followed by a join will cause a new ServiceScore and
+         * that will reset the counters to zero.
          */
         final ServiceScore[] oldTable = serviceTableRef.get();
         

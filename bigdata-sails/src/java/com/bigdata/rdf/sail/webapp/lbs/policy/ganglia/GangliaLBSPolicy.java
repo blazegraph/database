@@ -771,6 +771,9 @@ public class GangliaLBSPolicy extends AbstractLBSPolicy {
 
         final ServiceScore serviceScore = foundServices.get(n);
 
+        // track #of requests to each service.
+        serviceScore.nrequests.increment();
+        
         return serviceScore.getRequestURI();
 
     }
