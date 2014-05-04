@@ -498,26 +498,43 @@ abstract public class AbstractLBSPolicy implements IHALoadBalancerPolicy,
 
         final UUID[] joined = quorum.getJoined();
 
+        /*
+         * If there is an existing service table, then we search it for an
+         * existing definition for a service. This let's avoid doing an RMI to
+         * a Service that is already defined in the current service table.
+         */
+        final ServiceScore[] oldTable = serviceTableRef.get();
+        
         final ServiceScore[] serviceScores = new ServiceScore[joined.length];
 
         for (int i = 0; i < joined.length; i++) {
 
             final UUID serviceId = joined[i];
 
+            if (oldTable != null) {
+
+                // Check old service table before doing RMI.
+                for (int j = 0; j < oldTable.length; j++) {
+
+                    final ServiceScore oldScore = oldTable[j];
+
+                    if (oldScore != null
+                            && serviceId.equals(oldScore.getServiceUUID())) {
+
+                        // Found existing declaration for this service.
+                        serviceScores[i] = oldTable[j];
+
+                        break;
+
+                    }
+
+                }
+
+            }
+
             try {
 
-                /*
-                 * TODO We only need to do this when a service enters the
-                 * quorum, but we already have the information on hand for all
-                 * services except the one that is entering. To reduce overhead
-                 * and RMI calls, we should scan the existing table before doing
-                 * an RMI to the service. We only need to do the RMI for a new
-                 * service, not one in the table. A services
-                 * HashMap<UUID,HAGlueScore> would be much more efficient than a
-                 * table for this scan. If we use a CHM, then we can do this
-                 * purely asynchronously as the HAGlue services enter (or leave)
-                 * the set of joined services.
-                 */
+                // Do RMI to create declaration for this service.
                 serviceScores[i] = new ServiceScore(journal, contextPath.get(),
                         serviceId);
 
