@@ -28,6 +28,8 @@ import java.util.Comparator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Random;
+import java.util.concurrent.CancellationException;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
@@ -169,16 +171,20 @@ public class GangliaLBSPolicy extends AbstractLBSPolicy {
     }
 
     /**
+     * Place into descending order by load_one.
+     * <p>
+     * Note: We do not rely on the ordering imposed by this comparator. Instead,
+     * we filter the hosts for those that correspond to the joined services in
+     * the met quorum, compute a score for each such host, and then normalize
+     * those scores.
+     */
+    private final static Comparator<IHostReport> comparator = new HostReportComparator(
+            "load_one", false/* asc */);
+
+    /**
      * @see InitParams#LOCAL_FORWARD_THRESHOLD
      */
     private final AtomicReference<Double> localForwardThresholdRef = new AtomicReference<Double>();
-
-    /**
-     * The rule used to score the {@link IHostReport}s.
-     * 
-     * @see InitParams#HOST_SCORING_RULE
-     */
-    private IHostScoringRule scoringRule;
 
     /**
      * The set of metrics that we are requesting in the ganglia host reports.
@@ -188,15 +194,11 @@ public class GangliaLBSPolicy extends AbstractLBSPolicy {
     private String[] reportOn;
 
     /**
-     * Place into descending order by load_one.
-     * <p>
-     * Note: We do not rely on the ordering imposed by this comparator. Instead,
-     * we filter the hosts for those that correspond to the joined services in
-     * the met quorum, compute a score for each such host, and then normalize
-     * those scores.
+     * The rule used to score the {@link IHostReport}s.
+     * 
+     * @see InitParams#HOST_SCORING_RULE
      */
-    private final Comparator<IHostReport> comparator = new HostReportComparator(
-            "load_one", false/* asc */);
+    private final AtomicReference<IHostScoringRule> scoringRuleRef = new AtomicReference<IHostScoringRule>();
 
     /**
      * Random number generator used to load balance the read-requests.
@@ -206,7 +208,7 @@ public class GangliaLBSPolicy extends AbstractLBSPolicy {
     /**
      * The ganglia service - it must be configured at least as a listener.
      */
-    private GangliaService gangliaService;
+    private final AtomicReference<GangliaService> gangliaServiceRef = new AtomicReference<GangliaService>();
 
     /**
      * The {@link Future} of a task that periodically queries the ganglia peer
@@ -221,6 +223,47 @@ public class GangliaLBSPolicy extends AbstractLBSPolicy {
      */
     private final AtomicReference<HostTable> hostTableRef = new AtomicReference<HostTable>(
             null);
+
+    @Override
+    protected void toString(final StringBuilder sb) {
+
+        super.toString(sb);
+
+        sb.append(",localForwardThreshold=" + localForwardThresholdRef.get());
+
+        sb.append(",reportOn=" + Arrays.toString(reportOn));
+
+        sb.append(",scoringRule=" + scoringRuleRef.get());
+
+        sb.append(",gangliaService=" + gangliaServiceRef.get());
+
+        sb.append(",hostTable=" + hostTableRef.get());
+        
+        {
+            final ScheduledFuture<?> tmp = scheduledFuture;
+            final boolean futureIsDone = tmp == null ? true : tmp.isDone();
+            sb.append(",scheduledFuture="
+                    + (tmp == null ? "N/A"
+                            : (futureIsDone ? "done" : "running")));
+            if (futureIsDone && tmp != null) {
+                // Check for error.
+                Throwable cause = null;
+                try {
+                    tmp.get();
+                } catch (CancellationException ex) {
+                    cause = ex;
+                } catch (ExecutionException ex) {
+                    cause = ex;
+                } catch (InterruptedException ex) {
+                    cause = ex;
+                }
+                if (cause != null) {
+                    sb.append("(cause=" + cause + ")");
+                }
+            }
+        }
+
+    }
 
     // @SuppressWarnings("unchecked")
     @Override
@@ -240,9 +283,9 @@ public class GangliaLBSPolicy extends AbstractLBSPolicy {
                     + PlatformStatsPlugIn.class.getName());
         }
 
-        gangliaService = (GangliaService) journal.getGangliaService();
+        gangliaServiceRef.set((GangliaService) journal.getGangliaService());
 
-        if (gangliaService == null) {
+        if (gangliaServiceRef.get() == null) {
             // LBS requires ganglia to load balance requests.
             throw new ServletException("LBS requires "
                     + GangliaPlugIn.class.getName());
@@ -255,7 +298,8 @@ public class GangliaLBSPolicy extends AbstractLBSPolicy {
 
             if (s == null) {
 
-                this.reportOn = gangliaService.getDefaultHostReportOn();
+                this.reportOn = gangliaServiceRef.get()
+                        .getDefaultHostReportOn();
 
             } else {
 
@@ -293,13 +337,13 @@ public class GangliaLBSPolicy extends AbstractLBSPolicy {
 
         {
 
-            scoringRule = HALoadBalancerServlet.newInstance(servletConfig,
+            scoringRuleRef.set(HALoadBalancerServlet.newInstance(servletConfig,
                     IHostScoringRule.class, InitParams.HOST_SCORING_RULE,
-                    InitParams.DEFAULT_HOST_SCORING_RULE);
+                    InitParams.DEFAULT_HOST_SCORING_RULE));
 
             if (log.isInfoEnabled())
                 log.info(InitParams.HOST_SCORING_RULE + "="
-                        + scoringRule.getClass().getName());
+                        + scoringRuleRef.getClass().getName());
 
         }
 
@@ -351,7 +395,7 @@ public class GangliaLBSPolicy extends AbstractLBSPolicy {
 
         reportOn = null;
 
-        gangliaService = null;
+        gangliaServiceRef.set(null);
 
         if (scheduledFuture != null) {
 
@@ -429,14 +473,18 @@ public class GangliaLBSPolicy extends AbstractLBSPolicy {
      */
     private void updateHostTable() {
 
+        final GangliaService gangliaService = gangliaServiceRef.get();
+        
         // Snapshot of the per service scores.
-        final ServiceScore[] serviceScores = serviceTable.get();
+        final ServiceScore[] serviceScores = serviceTableRef.get();
 
-        if (serviceScores == null || serviceScores.length == 0) {
+        if (gangliaService == null || serviceScores == null
+                || serviceScores.length == 0) {
 
             /*
-             * If there are no joined services then we do not have any host
-             * scores for those services.
+             * No ganglia?
+             * 
+             * No joined services?
              */
 
             // clear the host table.
@@ -447,7 +495,8 @@ public class GangliaLBSPolicy extends AbstractLBSPolicy {
         }
 
         // Obtain the host reports for those services.
-        final IHostReport[] hostReport = getHostReportForKnownServices(serviceScores);
+        final IHostReport[] hostReport = getHostReportForKnownServices(
+                gangliaService, serviceScores);
 
         /*
          * Compute the per-host scores and the total score across those hosts.
@@ -459,6 +508,8 @@ public class GangliaLBSPolicy extends AbstractLBSPolicy {
 
         double totalScore = 0d;
 
+        final IHostScoringRule scoringRule = scoringRuleRef.get();
+        
         for (int i = 0; i < hostReport.length; i++) {
 
             final IHostReport theHostScore = hostReport[i];
@@ -562,6 +613,7 @@ public class GangliaLBSPolicy extends AbstractLBSPolicy {
      * @return A dense array of {@link IHostReport}s for our services.
      */
     private IHostReport[] getHostReportForKnownServices(
+            final GangliaService gangliaService,
             final ServiceScore[] serviceScores) {
 
         /*
@@ -647,7 +699,7 @@ public class GangliaLBSPolicy extends AbstractLBSPolicy {
 
         }
 
-        final ServiceScore[] services = serviceTable.get();
+        final ServiceScore[] services = serviceTableRef.get();
 
         if (services == null) {
 
