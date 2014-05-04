@@ -439,7 +439,7 @@ public class GangliaLBSPolicy extends AbstractLBSPolicy {
              * request on a service start.
              */
 
-            synchronized (hostTable) {
+            synchronized (hostTableRef) {
 
                 // Ensure that the host table exists.
                 updateHostTable();
