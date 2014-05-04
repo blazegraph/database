@@ -137,6 +137,31 @@
    <servlet-class>com.bigdata.rdf.sail.webapp.HALoadBalancerServlet</servlet-class>
    <load-on-startup>1</load-on-startup>
    <async-supported>true</async-supported>
+   <init-param>
+      <param-name>policy</param-name>
+      <param-value>com.bigdata.rdf.sail.webapp.lbs.policy.RoundRobinLBSPolicy</param-value>
+      <description>
+      The load balancer policy. This must be an instance of the
+      IHALoadBalancerPolicy interface.  A default policy (NOPLBSPolicy) is
+      used when no value is specified. 
+      
+      The policies differ ONLY in how they handle READ requests. All policies
+      proxy updates to the leader. If you do not want update proxying, then 
+      use a URL that does not address the HALoadBalancerServlet.
+      
+      The following policies are pre-defined:
+      
+      com.bigdata.rdf.sail.webapp.lbs.policy.NOPLBSPolicy - Does not load balance read requests.
+      
+      com.bigdata.rdf.sail.webapp.lbs.policy.RoundRobinLBSPolicy - Round robin for read requests.
+      
+      com.bigdata.rdf.sail.webapp.lbs.policy.GangliaLBSPolicy - Load based proxying for read requests using ganglia. 
+      
+      Some policies can be configured using additional init-param elements
+      that they understand. See the javadoc for the individual policies for
+      more information.
+      </description>
+   </init-param>
   </servlet>
   <servlet-mapping>
     <servlet-name>Load Balancer</servlet-name>

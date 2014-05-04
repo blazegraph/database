@@ -4649,7 +4649,7 @@ public class HAJournalServer extends AbstractServer {
         if (log.isInfoEnabled())
             log.info("Will set LBS: wac=" + wac + ", policy: " + policy);
 
-        HALoadBalancerServlet.setPolicy(wac.getServletContext(), policy);
+        HALoadBalancerServlet.setLBSPolicy(wac.getServletContext(), policy);
 
     }
     
