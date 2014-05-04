@@ -676,7 +676,8 @@ public class GangliaLBSPolicy extends AbstractLBSPolicy {
 
         }
 
-        log.warn("hostReport=" + hostReportList);
+        if (log.isInfoEnabled())
+            log.info("hostReport=" + hostReportList);
 
         // A dense list of host reports for our services.
         return hostReportList.toArray(new IHostReport[nhostsWithService]);
