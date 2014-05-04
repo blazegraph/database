@@ -136,6 +136,9 @@ public class RoundRobinLBSPolicy extends AbstractLBSPolicy {
 
         }
 
+        // track #of requests to each service.
+        serviceScore.nrequests.increment();
+        
         return serviceScore.getRequestURI();
 
     }

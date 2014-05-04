@@ -25,6 +25,7 @@ package com.bigdata.rdf.sail.webapp.lbs;
 import java.io.IOException;
 import java.util.UUID;
 
+import com.bigdata.counters.CAT;
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.QuorumService;
 import com.bigdata.journal.IIndexManager;
@@ -138,14 +139,19 @@ public class ServiceScore {
         return requestURI;
         
     }
+
+    /**
+     * The #of requests that have been directed to this service.
+     */
+    public final CAT nrequests = new CAT();
     
     @Override
     public String toString() {
         
         return getClass().getName() + "{serviceUUID=" + serviceUUID
                 + ", hostname=" + hostname + ", port=" + port + ", requestURI="
-                + requestURI + "}";
-        
+                + requestURI + ", nrequests=" + nrequests.get() + "}";
+
     }
 
     public ServiceScore(final IIndexManager indexManager,
