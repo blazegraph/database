@@ -242,6 +242,9 @@ public class HAStatusServletUtil {
                             .close();
                     p.text("Service: path=" + quorumService.getServiceDir())
                             .node("br").close();
+                    p.text("Service: proxy="
+                            + journal.getHAJournalServer().getProxy())
+                            .node("br").close();
 
                 }
 

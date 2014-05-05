@@ -625,8 +625,12 @@ public class GangliaLBSPolicy extends AbstractLBSPolicy {
             for (ServiceScore serviceScore : serviceScores) {
                 if (serviceScore == null) // should never be null.
                     continue;
-                tmp.add(serviceScore.getHostname());
+                final String hostname = serviceScore.getHostname();
+                if (hostname == null) // should never be null.
+                    continue;
+                tmp.add(hostname);
             }
+            // dense array of hosts names for services.
             hosts = tmp.toArray(new String[tmp.size()]);
         }
 
