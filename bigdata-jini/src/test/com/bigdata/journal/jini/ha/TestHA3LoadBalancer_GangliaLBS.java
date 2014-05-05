@@ -23,7 +23,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.journal.jini.ha;
 
-import com.bigdata.rdf.sail.webapp.IHALoadBalancerPolicy;
+import com.bigdata.rdf.sail.webapp.lbs.IHALoadBalancerPolicy;
 import com.bigdata.rdf.sail.webapp.lbs.policy.ganglia.GangliaLBSPolicy;
 
 /**

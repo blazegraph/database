@@ -44,6 +44,7 @@ import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.quorum.AbstractQuorum;
 import com.bigdata.rdf.sail.webapp.client.IMimeTypes;
+import com.bigdata.rdf.sail.webapp.lbs.IHALoadBalancerPolicy;
 
 /**
  * Useful glue for implementing service actions, but does not directly implement

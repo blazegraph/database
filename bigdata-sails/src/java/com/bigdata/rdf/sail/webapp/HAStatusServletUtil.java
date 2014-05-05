@@ -64,6 +64,7 @@ import com.bigdata.quorum.Quorum;
 import com.bigdata.quorum.zk.ZKQuorumClient;
 import com.bigdata.quorum.zk.ZKQuorumImpl;
 import com.bigdata.rdf.sail.webapp.StatusServlet.DigestEnum;
+import com.bigdata.rdf.sail.webapp.lbs.IHALoadBalancerPolicy;
 import com.bigdata.zookeeper.DumpZookeeper;
 
 /**

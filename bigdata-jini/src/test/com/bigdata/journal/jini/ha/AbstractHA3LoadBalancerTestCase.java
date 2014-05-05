@@ -37,9 +37,9 @@ import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.jini.ha.HAJournalServer.HAQuorumService;
 import com.bigdata.journal.jini.ha.HAJournalTest.HAGlueTest;
 import com.bigdata.rdf.sail.webapp.HALoadBalancerServlet;
-import com.bigdata.rdf.sail.webapp.IHALoadBalancerPolicy;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository.RemoveOp;
+import com.bigdata.rdf.sail.webapp.lbs.IHALoadBalancerPolicy;
 
 /**
  * Test suite for the HA load balancer.

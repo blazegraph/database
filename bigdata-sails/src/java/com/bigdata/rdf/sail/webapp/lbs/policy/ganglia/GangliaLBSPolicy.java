@@ -52,9 +52,9 @@ import com.bigdata.journal.PlatformStatsPlugIn;
 import com.bigdata.journal.jini.ha.HAJournal;
 import com.bigdata.journal.jini.ha.HAJournalServer;
 import com.bigdata.rdf.sail.webapp.HALoadBalancerServlet;
-import com.bigdata.rdf.sail.webapp.IHALoadBalancerPolicy;
 import com.bigdata.rdf.sail.webapp.lbs.AbstractLBSPolicy;
 import com.bigdata.rdf.sail.webapp.lbs.HostScore;
+import com.bigdata.rdf.sail.webapp.lbs.IHALoadBalancerPolicy;
 import com.bigdata.rdf.sail.webapp.lbs.ServiceScore;
 import com.bigdata.util.InnerCause;
 

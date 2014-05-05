@@ -31,7 +31,6 @@ import com.bigdata.ha.QuorumService;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.jini.ha.HAJournal;
 import com.bigdata.quorum.Quorum;
-import com.bigdata.rdf.sail.webapp.IHARequestURIRewriter;
 
 /**
  * Helper class caches metadata about an {@link HAGlue} service.
