@@ -97,7 +97,7 @@ dependencies.
       <fastutil.version>5.1.5</fastutil.version>
       <dsiutils.version>1.0.6-020610</dsiutils.version>
       <lgplutils.version>1.0.7-270114</lgplutils.version>
-      <bigdata.ganglia.version>1.0.1</bigdata.ganglia.version>
+      <bigdata.ganglia.version>1.0.2</bigdata.ganglia.version>
       <jackson.version>2.2.3</jackson.version>
     </properties>
     <!-- TODO Can we declare the versions of the dependencies here as
@@ -364,11 +364,11 @@ mvn deploy:deploy-file \
 mvn deploy:deploy-file \
    -DgroupId=com.bigdata \
    -DartifactId=bigdata-ganglia \
-   -Dversion=1.0.1 \
+   -Dversion=1.0.2 \
    -Dpackaging=jar \
    -DrepositoryId=bigdata.releases \
    -Durl=scpexe://www.systap.com/srv/www/htdocs/systap.com/maven/releases/ \
-   -Dfile=bigdata/lib/bigdata-ganglia-1.0.1.jar
+   -Dfile=bigdata/lib/bigdata-ganglia-1.0.2.jar
         -->
            <groupId>com.bigdata</groupId>
            <artifactId>bigdata-ganglia</artifactId>
