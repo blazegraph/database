@@ -2464,6 +2464,17 @@ ${postInstallMessage}</echo>
 </java>
 </target>
 
+	<target name="start" depends="compile" description="Start the Bigdata Server.">
+	    <java classname="com.bigdata.rdf.sail.webapp.NanoSparqlServer" failonerror="true" fork="true" logerror="true">
+	        <classpath refid="runtime.classpath" />
+	    	<jvmarg value="-server"/>
+	    	<jvmarg value="-Xmx1G"/>
+	    	<jvmarg value="-Dlog4j.configuration=bigdata-war/src/WEB-INF/classes/log4j.properties"/>
+	    	<arg value="9999"/>
+	    	<arg value="kb"/>
+	    	<arg value="bigdata-war/src/WEB-INF/RWStore.properties"/>
+	    </java>
+	</target>
 
 
 </project>
