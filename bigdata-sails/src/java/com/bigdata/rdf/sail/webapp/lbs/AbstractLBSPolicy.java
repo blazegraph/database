@@ -51,7 +51,6 @@ import com.bigdata.quorum.QuorumEvent;
 import com.bigdata.quorum.QuorumListener;
 import com.bigdata.rdf.sail.webapp.BigdataServlet;
 import com.bigdata.rdf.sail.webapp.HALoadBalancerServlet;
-import com.bigdata.rdf.sail.webapp.IHALoadBalancerPolicy;
 
 /**
  * Abstract base class establishes a listener for quorum events, tracks the
