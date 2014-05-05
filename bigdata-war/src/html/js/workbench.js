@@ -198,6 +198,7 @@ NAMESPACE_SHORTCUTS = {
    'owl': 'http://www.w3.org/2002/07/owl#',
    'bd': 'http://www.bigdata.com/rdf#',
    'bds': 'http://www.bigdata.com/rdf/search#',
+   'gas': 'http://www.bigdata.com/rdf/gas#',
    'foaf': 'http://xmlns.com/foaf/0.1/',
    'hint': 'http://www.bigdata.com/queryHints#',
    'dc': 'http://purl.org/dc/elements/1.1/',
