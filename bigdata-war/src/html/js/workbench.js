@@ -206,7 +206,10 @@ NAMESPACE_SHORTCUTS = {
 
 $('.namespace-shortcuts').html('<ul>');
 for(var ns in NAMESPACE_SHORTCUTS) {
-   $('.namespace-shortcuts ul').append('<li data-ns="prefix ' + ns + ': <' + NAMESPACE_SHORTCUTS[ns] + '>">' + ns.toUpperCase() + '</li>');
+   // cannot use data-ns attribute on li, as jQuery mangles namespaces that don't end with #, adding </li> to them
+   var li = $('<li>' + ns.toUpperCase() + '</li>');
+   li.data('ns', 'prefix ' + ns + ': <' + NAMESPACE_SHORTCUTS[ns] + '>');
+   li.appendTo('.namespace-shortcuts ul');
 }
 
 $('.namespace-shortcuts li').click(function() {
