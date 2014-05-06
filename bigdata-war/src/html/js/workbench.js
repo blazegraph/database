@@ -310,7 +310,7 @@ function identify(text, considerPath) {
       // when file:// is present, Windows paths must use / and may include a :
       // http[s]:// is mandatory for HTTP paths
       var unix = /^(file:\/\/)?((\/[^\/]+)+)$/;
-      var windows = /^((file:\/\/)([A-Za-z]:?([\/][^\/\\]+)+))|([A-Za-z]:([\\\/][^\\\/]+)+)$/;
+      var windows = /^(((file:\/\/)([A-Za-z]:?([\/][^\/\\]+)+))|([A-Za-z]:([\\\/][^\\\/]+)+))$/;
       var http = /^https?:\/((\/[^\/]+)+)$/;
       if(unix.test(text.trim()) || windows.test(text.trim()) || http.test(text.trim())) {
          return 'path';
@@ -374,7 +374,7 @@ var rdf_content_types = {'n-quads': 'text/x-nquads',
                          'trix': 'application/trix',
                          'turtle': 'application/x-turtle'};
 
-var sparql_update_commands = ['INSERT', 'DELETE'];
+var sparql_update_commands = ['INSERT', 'DELETE', 'LOAD', 'CLEAR'];
 
 $('#update-file').change(handleFile);
 $('#update-box').on('dragover', handleDragOver)
