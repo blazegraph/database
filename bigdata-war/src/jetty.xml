@@ -31,6 +31,46 @@
       <Set name="detailedDump">false</Set>
     </Get>
 
+	<!-- =========================================================== -->
+	<!-- Get the platform mbean server                               -->
+	<!-- =========================================================== -->
+	<Call id="MBeanServer" class="java.lang.management.ManagementFactory"
+	  name="getPlatformMBeanServer" />
+	
+	<!-- =========================================================== -->
+	<!-- Initialize the Jetty MBean container                        -->
+	<!-- =========================================================== -->
+	<Call name="addBean">
+	  <Arg>
+	    <New id="MBeanContainer" class="org.eclipse.jetty.jmx.MBeanContainer">
+	      <Arg>
+	        <Ref refid="MBeanServer" />
+	      </Arg>
+	    </New>
+	  </Arg>
+	</Call>
+	
+	<!-- Add the static log to the MBean server. -->
+	<Call name="addBean">
+	  <Arg>
+	    <New class="org.eclipse.jetty.util.log.Log" />
+	  </Arg>
+	</Call>
+
+	<!-- For remote MBean access (optional) --> 
+	<New id="ConnectorServer" class="org.eclipse.jetty.jmx.ConnectorServer">
+	  <Arg>
+	    <New class="javax.management.remote.JMXServiceURL">
+	      <Arg type="java.lang.String">rmi</Arg>
+	      <Arg type="java.lang.String" />
+	      <Arg type="java.lang.Integer"><SystemProperty name="jetty.jmxrmiport" default="1090"/></Arg>
+	      <Arg type="java.lang.String">/jndi/rmi://<SystemProperty name="jetty.jmxrmihost" default="localhost"/>:<SystemProperty name="jetty.jmxrmiport" default="1099"/>/jmxrmi</Arg>
+	    </New>
+	  </Arg>
+	  <Arg>org.eclipse.jetty.jmx:name=rmiconnectorserver</Arg>
+	  <Call name="start" />
+	</New>
+ 
     <!-- =========================================================== -->
     <!-- Http Configuration.                                         -->
     <!-- This is a common configuration instance used by all         -->
@@ -88,7 +128,7 @@
            <Item>
             <!-- This is the bigdata web application. -->
             <New id="WebAppContext" class="org.eclipse.jetty.webapp.WebAppContext">
-				<Set name="resourceBase">
+				<Set name="war">
                <!-- The location of the top-level of the bigdata webapp. -->
 					<SystemProperty name="jetty.resourceBase" default="bigdata-war/src" />
 				</Set>
@@ -98,30 +138,11 @@
             <Set name="extractWAR">false</Set>
             </New>
            </Item>
-           <Item>
-            <!-- This appears to be necessary in addition to the above.   -->
-            <!-- Without this, it will not resolve http://localhost:8080/ --> 
-            <!-- and can fail to deliver some of the static content.      -->
-            <New id="ResourceHandler" class="org.eclipse.jetty.server.handler.ResourceHandler">
-            <Set name="resourceBase">
-               <!-- The location of the top-level of the bigdata webapp. -->
-               <SystemProperty name="jetty.resourceBase" default="bigdata-war/src" />
-            </Set>
-            <Set name="welcomeFiles">
-             <Array type="java.lang.String">
-              <Item>html/index.html</Item>
-             </Array>
-            </Set>
-            </New>
-           </Item>
-           <!-- <Item>
-            <New id="DefaultHandler" class="org.eclipse.jetty.server.handler.DefaultHandler"></New>
-           </Item> -->
          </Array>
         </Set>
       </New>
     </Set>
-    
+      
     <!-- =========================================================== -->
     <!-- extra server options                                        -->
     <!-- =========================================================== -->
