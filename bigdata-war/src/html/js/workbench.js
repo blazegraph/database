@@ -340,6 +340,14 @@ function setType(type, format) {
    if(type == 'rdf') {
       $('#rdf-type').val(format);
    }
+   showUpdateOptions(type);
+}
+
+$('#update-type').change(function() { showUpdateOptions(this.value) });
+
+function showUpdateOptions(type) {
+   $('#rdf-type, label[for="rdf-type"]').attr('disabled', type != 'rdf');
+   $('#update-tab .advanced-features input').attr('disabled', type != 'sparql');
 }
 
 // .xml is used for both RDF and TriX, assume it's RDF
@@ -379,7 +387,13 @@ $('#clear-file').click(clearFile);
 $('#update-update').click(submitUpdate);
 
 function submitUpdate(e) {
+   // Updates are submitted as a regular form for SPARQL updates in monitor mode, and via AJAX for non-monitor SPARQL, RDF & file path updates.
+   // When submitted as a regular form, the output is sent to an iframe. This is to allow monitor mode to work.
+   // jQuery only gives us data when the request is complete, so we wouldn't see monitor results as they come in.
+
    e.preventDefault();
+
+   $('#update-response').show();
 
    var settings = {
       type: 'POST',
@@ -391,7 +405,25 @@ function submitUpdate(e) {
    // determine action based on type
    switch($('#update-type').val()) {
       case 'sparql':
+         // see if monitor mode is on
+         if($('#update-monitor').is(':checked')) {
+            // create form and submit it, sending output to the iframe
+            var form = $('<form method="POST" target="update-response-container">')
+               .attr('action', NAMESPACE_URL)
+               .append($('<input name="update">').val(settings.data))
+               .append('<input name="monitor" value="true">');
+            if($('#update-analytic').is(':checked')) {
+               form.append('<input name="analytic" value="true">')
+            }
+            form.submit();
+            $('#update-response iframe, #update-clear-container').show();
+            $('#update-response pre').hide();
+            return;
+         }
          settings.data = 'update=' + encodeURIComponent(settings.data);
+         if($('#update-analytic').is(':checked')) {
+            settings.data += '&analytic=true';
+         }
          settings.success = updateResponseHTML;
          break;
       case 'rdf':
@@ -411,36 +443,39 @@ function submitUpdate(e) {
          break;
    }
 
-   $('#update-response').show();
-   $('#update-response pre').html('Data loading...');   
+   $('#update-response pre').show().html('Data loading...');   
 
    $.ajax(NAMESPACE_URL, settings);
 }
 
 $('#update-clear').click(function() {
-   $('#update-response, #update-clear').hide();
+   $('#update-response, #update-clear-container').hide();
    $('#update-response pre').text('');
+   $('#update-response iframe').attr('src', 'about:blank');
 });
 
-$('#advanced-features-toggle').click(function() {
-   $('#advanced-features').toggle();
+$('.advanced-features-toggle').click(function() {
+   $(this).next('.advanced-features').toggle();
    return false;
 });
 
 function updateResponseHTML(data) {
-   $('#update-response, #update-clear').show();
+   $('#update-response, #update-clear-container').show();
+   $('#update-response iframe').attr('src', 'about:blank').hide();
    $('#update-response pre').html(data);
 }
 
 function updateResponseXML(data) {
    var modified = data.childNodes[0].attributes['modified'].value;
    var milliseconds = data.childNodes[0].attributes['milliseconds'].value;
-   $('#update-response, #update-clear').show();
+   $('#update-response, #update-clear-container').show();
+   $('#update-response iframe').attr('src', 'about:blank').hide();
    $('#update-response pre').text('Modified: ' + modified + '\nMilliseconds: ' + milliseconds);
 }
 
 function updateResponseError(jqXHR, textStatus, errorThrown) {
-   $('#update-response, #update-clear').show();
+   $('#update-response, #update-clear-container').show();
+   $('#update-response iframe').attr('src', 'about:blank').hide();
    $('#update-response pre').text('Error! ' + textStatus + ' ' + jqXHR.statusText);
    highlightError(jqXHR.statusText, 'update');
 }

@@ -50,7 +50,7 @@
               <option value="path">File Path or URL</option>
             </select>
             <label for="rdf-type">Format:</label>
-            <select id="rdf-type">
+            <select id="rdf-type" disabled>
               <option value="n-quads">N-Quads</option>
               <option value="n-triples">N-Triples</option>
               <option value="n3">Notation3</option>
@@ -61,6 +61,11 @@
               <option value="turtle">Turtle</option>
             </select>
           </p>
+          <a href="#" class="advanced-features-toggle">Advanced features</a>
+          <div class="advanced-features">
+            <input type="checkbox" id="update-analytic"> <label for="update-analytic">Analytic</label>
+            <input type="checkbox" id="update-monitor"> <label for="update-monitor">Monitor</label>
+          </div>
           <hr class="shadow">
           <button id="update-update">Update</button>
 
@@ -68,6 +73,7 @@
 
         <div class="box" id="update-response">
           <pre></pre>
+          <iframe name="update-response-container"></iframe>
         </div>
 
         <div class="box" id="update-clear-container">
@@ -86,9 +92,9 @@
             <div id="query-errors"></div>
             <textarea id="query-box" name="query" placeholder="(Input a SPARQL query)"></textarea>
 
-            <a href="#" id="advanced-features-toggle">Advanced features</a>
+            <a href="#" class="advanced-features-toggle">Advanced features</a>
 
-            <div id="advanced-features">
+            <div class="advanced-features">
               <input type="checkbox" id="query-explain"> <label for="query-explain">Explain</label>
               <input type="checkbox" id="query-details"> <label for="query-explain">(Details)</label>
               <input type="checkbox" name="analytic" value="true" id="query-analytic"> <label for="query-analytic">Analytic</label>
