@@ -80,6 +80,7 @@ export HA_OPTS="\
  -DGROUPS=${GROUPS}\
  -DLOCATORS=${LOCATORS}\
  -DZK_SERVERS=${ZK_SERVERS}\
+ -DRMI_PORT=${RMI_PORT}\
  -DHA_PORT=${HA_PORT}\
  "-Dcom.bigdata.hostname=${BIGDATA_HOSTNAME}"\
  "-Djetty.port=${JETTY_PORT}"\

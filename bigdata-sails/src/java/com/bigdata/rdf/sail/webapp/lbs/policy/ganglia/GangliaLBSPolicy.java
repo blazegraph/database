@@ -717,7 +717,12 @@ public class GangliaLBSPolicy extends AbstractLBSPolicy {
          * Stochastically select the target host based on the current host
          * workload.
          * 
-         * We need to ignore any host that is not joined with the met quorum....
+         * Note: We need to ignore any host that is not joined with the met
+         * quorum....
+         * 
+         * Note: The host is selected with a probability that is INVERSELY
+         * proportional to normalized host load. If the normalized host load is
+         * .75, then the host is selected with a probability of .25.
          */
 
         final double d = rand.nextDouble();
@@ -726,13 +731,13 @@ public class GangliaLBSPolicy extends AbstractLBSPolicy {
         final List<ServiceScore> foundServices = new LinkedList<ServiceScore>();
         for (int i = 0; i < hostScores.length; i++) {
             hostScore = hostScores[i];
-            sum += hostScore.score;
+            sum += 1d - hostScore.score; // Note: Choice is inversely proportional to normalized workload!
             if (hostScore.hostname == null) // can't use w/o hostname.
                 continue;
             if (d > sum) // scan further.
                 continue;
             /*
-             * We found a host having a position in the cumultive ordering of
+             * We found a host having a position in the cumulative ordering of
              * the normalized host workloads that is GTE to the random number.
              * Now we need to find one (or more) service(s) on that host.
              * 

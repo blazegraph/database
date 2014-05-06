@@ -38,6 +38,7 @@ export GROUPS="$FEDNAME"
 
 # All of these have defaults. Override as necessary.
 #export REPLICATION_FACTOR=3
+#export RMI_PORT=9080
 #export HA_PORT=9090
 #export JETTY_PORT=8080
 #export JETTY_XML=var/jetty/WEB-INF/jetty.xml
