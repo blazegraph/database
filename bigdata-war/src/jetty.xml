@@ -40,6 +40,7 @@
 	<!-- =========================================================== -->
 	<!-- Initialize the Jetty MBean container                        -->
 	<!-- =========================================================== -->
+	<!-- Note: This breaks CI if it is enabled
 	<Call name="addBean">
 	  <Arg>
 	    <New id="MBeanContainer" class="org.eclipse.jetty.jmx.MBeanContainer">
@@ -48,16 +49,16 @@
 	      </Arg>
 	    </New>
 	  </Arg>
-	</Call>
+	</Call>-->
 	
-	<!-- Add the static log to the MBean server. -->
+	<!-- Add the static log to the MBean server. 
 	<Call name="addBean">
 	  <Arg>
 	    <New class="org.eclipse.jetty.util.log.Log" />
 	  </Arg>
-	</Call>
+	</Call>-->
 
-	<!-- For remote MBean access (optional) --> 
+	<!-- For remote MBean access (optional)  
 	<New id="ConnectorServer" class="org.eclipse.jetty.jmx.ConnectorServer">
 	  <Arg>
 	    <New class="javax.management.remote.JMXServiceURL">
@@ -69,7 +70,7 @@
 	  </Arg>
 	  <Arg>org.eclipse.jetty.jmx:name=rmiconnectorserver</Arg>
 	  <Call name="start" />
-	</New>
+	</New>-->
  
     <!-- =========================================================== -->
     <!-- Http Configuration.                                         -->
