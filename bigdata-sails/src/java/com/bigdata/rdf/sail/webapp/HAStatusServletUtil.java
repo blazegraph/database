@@ -42,6 +42,7 @@ import org.apache.log4j.Logger;
 import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.ZooKeeper;
 
+import com.bigdata.BigdataStatics;
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.HAStatusEnum;
 import com.bigdata.ha.QuorumService;
@@ -728,7 +729,13 @@ public class HAStatusServletUtil {
 
                     final int pipelineIndex = indexOf(serviceId, pipeline);
 
-                    final String nssUrl = "http://" + hostname + ":" + nssPort;
+                    /*
+                     * TODO This assumes that the context path at the remote
+                     * service is the same as the context path for the local
+                     * service.
+                     */
+                    final String nssUrl = "http://" + hostname + ":" + nssPort
+                            + BigdataStatics.getContextPath();
 
                     // hyper link to NSS service.
                     p.node("a").attr("href", nssUrl).text(nssUrl).close();
