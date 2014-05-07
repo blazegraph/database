@@ -544,7 +544,7 @@ c.b.s.C.analyzer.en.like=eng
 			final Class<? extends Analyzer> cls = getAnalyzerClass();
             
             if (hasConstructor(cls, Version.class, Set.class)) {
-            	
+
             	// RussianAnalyzer is missing any way to access stop words.
             	if (RussianAnalyzer.class.equals(cls) && useDefaultStopWords()) {
             		return new AnalyzerPair(languageRange, new RussianAnalyzer(Version.LUCENE_CURRENT, Collections.EMPTY_SET), new RussianAnalyzer(Version.LUCENE_CURRENT));
