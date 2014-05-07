@@ -27,9 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata;
 
-import com.bigdata.counters.AbstractStatisticsCollector;
-import com.bigdata.jini.start.process.ProcessHelper;
-
 /**
  * A class for those few statics that it makes sense to reference from other
  * places.
@@ -49,29 +46,31 @@ public class BigdataStatics {
     /**
      * The name of an environment variable whose value will be used as the
      * canoncial host name for the host running this JVM. This information is
-     * used by the {@link AbstractStatisticsCollector}, which is responsible for
-     * obtaining and reporting the canonical hostname for the {@link Banner} and
-     * other purposes.
+     * used by the {@link com.bigdata.counters.AbstractStatisticsCollector},
+     * which is responsible for obtaining and reporting the canonical hostname
+     * for the {@link Banner} and other purposes.
      * 
-     * @see AbstractStatisticsCollector
-     * @see Banner
+     * @see com.bigdata.counters.AbstractStatisticsCollector
+     * @see com.bigdata.Banner
+     * @see com.bigdata.ganglia.GangliaService#HOSTNAME
      * @see <a href="http://trac.bigdata.com/ticket/886" >Provide workaround for
      *      bad reverse DNS setups</a>
      */
     public static final String HOSTNAME = "com.bigdata.hostname";
-    
+
     /**
      * The #of lines of output from a child process which will be echoed onto
      * {@link System#out} when that child process is executed. This makes it
      * easy to track down why a child process dies during service start. If you
      * want to see all output from the child process, then you should set the
-     * log level for the {@link ProcessHelper} class to INFO.
+     * log level for the {@link com.bigdata.jini.start.process.ProcessHelper}
+     * class to INFO.
      * <p>
-     * Note: This needs to be more than the length of the {@link Banner} output
-     * in order for anything related to the process behavior to be echoed on
-     * {@link System#out}.
+     * Note: This needs to be more than the length of the
+     * {@link com.bigdata.Banner} output in order for anything related to the
+     * process behavior to be echoed on {@link System#out}.
      * 
-     * @see ProcessHelper
+     * @see com.bigdata.jini.start.process.ProcessHelper
      */
     public static int echoProcessStartupLineCount = 30;//Integer.MAX_VALUE;//100
 
