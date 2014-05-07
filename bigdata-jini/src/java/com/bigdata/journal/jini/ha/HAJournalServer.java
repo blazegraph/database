@@ -4549,6 +4549,13 @@ public class HAJournalServer extends AbstractServer {
             // Start the server.
             jettyServer.start();
 
+            if (Boolean.getBoolean("jetty.dump.start")) {
+
+                // Support the jetty dump-after-start semantics.
+                log.warn(jettyServer.dump());
+            
+            }
+            
             /*
              * Report *an* effective URL of this service.
              * 

@@ -2137,6 +2137,13 @@ public abstract class AbstractHA3JournalServerTestCase extends
         private final String serviceName;
         private final UUID serviceId;
         private final int jettyPort;
+        /**
+         * The value of this environment variable is passed down. You can set
+         * this environment variable to force jetty to dump its internal start
+         * after start.
+         */
+        private final boolean jettyDumpStart = Boolean
+                .getBoolean("jetty.dump.start");
 //        private final File serviceDir;
         private final String[] args;
         
@@ -2230,6 +2237,12 @@ public abstract class AbstractHA3JournalServerTestCase extends
             private final String JETTY_RESOURCE_BASE = "jetty.resourceBase";
             
             /**
+             * Used to override the <code>jetty.dump.start</code> environment
+             * property.
+             */
+            private final String TEST_JETTY_DUMP_START = "jetty.dump.start";
+
+            /**
              * The absolute effective path of the service directory. This is
              * overridden on the {@link #TEST_SERVICE_DIR} environment variable
              * and in the deployed HAJournal.config file in order to have the
@@ -2276,6 +2289,9 @@ public abstract class AbstractHA3JournalServerTestCase extends
 
                 // Override the location of the webapp as deployed.
                 cmds.add("-D" + JETTY_RESOURCE_BASE + "=\".\"");
+
+                // Override the jetty.dump.start.
+                cmds.add("-D" + TEST_JETTY_DUMP_START + "=" + jettyDumpStart);
 
                 super.addCommandArgs(cmds);
                 
