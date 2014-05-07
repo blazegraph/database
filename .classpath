@@ -86,10 +86,10 @@
 	<classpathentry exported="true" kind="lib" path="bigdata/lib/jetty/jetty-proxy-9.1.4.v20140401.jar" sourcepath="/Users/bryan/Downloads/org.eclipse.jetty.project-jetty-9.1.4.v20140401"/>
 	<classpathentry exported="true" kind="lib" path="bigdata/lib/jetty/jetty-rewrite-9.1.4.v20140401.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata/lib/jetty/jetty-security-9.1.4.v20140401.jar"/>
-	<classpathentry exported="true" kind="lib" path="bigdata/lib/jetty/jetty-server-9.1.4.v20140401.jar"/>
+	<classpathentry exported="true" kind="lib" path="bigdata/lib/jetty/jetty-server-9.1.4.v20140401.jar" sourcepath="/Users/bryan/Downloads/org.eclipse.jetty.project-jetty-9.1.4.v20140401"/>
 	<classpathentry exported="true" kind="lib" path="bigdata/lib/jetty/jetty-servlet-9.1.4.v20140401.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata/lib/jetty/jetty-util-9.1.4.v20140401.jar"/>
-	<classpathentry exported="true" kind="lib" path="bigdata/lib/jetty/jetty-webapp-9.1.4.v20140401.jar"/>
+	<classpathentry exported="true" kind="lib" path="bigdata/lib/jetty/jetty-webapp-9.1.4.v20140401.jar" sourcepath="/Users/bryan/Downloads/org.eclipse.jetty.project-jetty-9.1.4.v20140401"/>
 	<classpathentry exported="true" kind="lib" path="bigdata/lib/jetty/jetty-xml-9.1.4.v20140401.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata-sails/lib/jackson-core-2.2.3.jar"/>
 	<classpathentry kind="output" path="bin"/>

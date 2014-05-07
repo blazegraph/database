@@ -1452,27 +1452,50 @@ public class GangliaService implements Runnable, IGangliaMetricsReporter {
 
 	}
 
-	/**
-	 * The name for this host.
-	 */
-	public static final String getCanonicalHostName() {
-		String s;
-		try {
-			/*
-			 * Note: This should be the host *name* NOT an IP address of a
-			 * preferred Ethernet adaptor.
-			 */
-			s = InetAddress.getLocalHost().getCanonicalHostName();
-		} catch (Throwable t) {
-			log.warn("Could not resolve canonical name for host: " + t);
-		}
-		try {
-			s = InetAddress.getLocalHost().getHostName();
-		} catch (Throwable t) {
-			log.warn("Could not resolve name for host: " + t);
-			s = "localhost";
-		}
-		return s;
+    /**
+     * The name of an environment variable whose value will be used as the
+     * canoncial host name for the host running this JVM. This information is
+     * used by the {@link GangliaService}, which is responsible for obtaining
+     * and reporting the canonical hostname for host metrics reporting.
+     * 
+     * @see <a href="http://trac.bigdata.com/ticket/886" >Provide workaround for
+     *      bad reverse DNS setups</a>
+     */
+    public static final String HOSTNAME = "com.bigdata.hostname";
+
+    /**
+     * The name for this host.
+     * 
+     * @see #HOSTNAME
+     * @see <a href="http://trac.bigdata.com/ticket/886" >Provide workaround for
+     *      bad reverse DNS setups</a>
+     */
+    public static final String getCanonicalHostName() {
+        String s = System.getProperty(HOSTNAME);
+        if (s != null) {
+            // Trim whitespace.
+            s = s.trim();
+        }
+        if (s != null && s.length() != 0) {
+            log.warn("Hostname override: hostname=" + s);
+        } else {
+            try {
+                /*
+                 * Note: This should be the host *name* NOT an IP address of a
+                 * preferred Ethernet adaptor.
+                 */
+                s = InetAddress.getLocalHost().getCanonicalHostName();
+            } catch (Throwable t) {
+                log.warn("Could not resolve canonical name for host: " + t);
+            }
+            try {
+                s = InetAddress.getLocalHost().getHostName();
+            } catch (Throwable t) {
+                log.warn("Could not resolve name for host: " + t);
+                s = "localhost";
+            }
+        }
+        return s;
 	}
 
 	/**
