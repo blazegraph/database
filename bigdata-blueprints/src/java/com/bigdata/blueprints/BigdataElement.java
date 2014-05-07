@@ -1,70 +1,134 @@
+/**
+Copyright (C) SYSTAP, LLC 2006-2014.  All rights reserved.
+
+Contact:
+     SYSTAP, LLC
+     4501 Tower Road
+     Greensboro, NC 27410
+     licenses@bigdata.com
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; version 2 of the License.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+*/
 package com.bigdata.blueprints;
 
-import sun.reflect.generics.reflectiveObjects.NotImplementedException;
-
-import java.util.HashMap;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Set;
 
-import org.openrdf.model.vocabulary.RDFS;
+import org.openrdf.model.Literal;
+import org.openrdf.model.URI;
+
 import com.tinkerpop.blueprints.Element;
 
-public class BigdataElement implements Element {
+/**
+ * Base class for {@link BigdataVertex} and {@link BigdataEdge}.  Handles
+ * property-related methods.
+ * 
+ * @author mikepersonick
+ *
+ */
+public abstract class BigdataElement implements Element {
 
-	protected String id = null; // must be a URI
+	private static final List<String> blacklist = Arrays.asList(new String[] {
+		"id", ""	
+	});
 	
-	// implied here is that the properties exist in the graph store, we would need a 2nd property setter
-	private HashMap<String,String> properties = new HashMap<String,String>();
-	// properties that we will be deleting from the store
-	private HashMap<String,String> removedProperties = new HashMap<String,String>(); 
-	// properties that we will be adding to the store
-	private HashMap<String,String> addedProperties = new HashMap<String,String>(); 
+	protected final URI uri;
+	protected final BigdataGraph graph;
 	
-	public BigdataElement(String id) {
-		this.id = id;
+	public BigdataElement(final URI uri, final BigdataGraph graph) {
+		this.uri = uri;
+		this.graph = graph;
 	}
 	
-	public BigdataElement(String id, String label) {
-		this.id = id;
-		setProperty( RDFS.LABEL.toString(), label );
-	}
-
+	@Override
 	@SuppressWarnings("unchecked")
-	public <T> T getProperty(String key) {
-		return (T) properties.get(key);
+	public <T> T getProperty(final String property) {
+		
+		final URI p = graph.factory.toPropertyURI(property);
+		
+		return (T) graph.getProperty(uri, p);
+		
 	}
-	
+
+	@Override
 	public Set<String> getPropertyKeys() {
-		Set<String> keys = properties.keySet();
-		keys.addAll( addedProperties.keySet() );
-		return keys;
-	}
-	
-	public void setProperty(String key, Object value) {
-		addedProperties.put(key,(String)value );
-		properties.put(key, (String)value);
-	}
-	
-	@SuppressWarnings("unchecked")
-	public <T> T removeProperty(String key) {
-		removedProperties.put(key, key);
-		return (T) properties.remove(key);
-	}
-	
-	public void remove() {
-		// delete from graph
-		throw new NotImplementedException();
+		
+		return graph.getPropertyKeys(uri);
+		
 	}
 
-	public Object getId() {
-		return id;
+	@Override
+	@SuppressWarnings("unchecked")
+	public <T> T removeProperty(final String property) {
+
+		final URI p = graph.factory.toPropertyURI(property);
+		
+		return (T) graph.removeProperty(uri, p);
+		
 	}
-	
+
+	@Override
+	public void setProperty(final String property, final Object val) {
+
+		if (property == null || blacklist.contains(property)) {
+			throw new IllegalArgumentException();
+		}
+		
+		final URI p = graph.factory.toPropertyURI(property);
+		
+		final Literal o = graph.factory.toLiteral(val);
+		
+		graph.setProperty(uri, p, o);
+
+	}
+
+	@Override
+	public int hashCode() {
+		final int prime = 31;
+		int result = 1;
+		result = prime * result + ((graph == null) ? 0 : graph.hashCode());
+		result = prime * result + ((uri == null) ? 0 : uri.hashCode());
+		return result;
+	}
+
+	@Override
 	public boolean equals(Object obj) {
-		return obj.toString().equals(this.toString());
+		if (this == obj)
+			return true;
+		if (obj == null)
+			return false;
+		if (getClass() != obj.getClass())
+			return false;
+		BigdataElement other = (BigdataElement) obj;
+		if (graph == null) {
+			if (other.graph != null)
+				return false;
+		} else if (!graph.equals(other.graph))
+			return false;
+		if (uri == null) {
+			if (other.uri != null)
+				return false;
+		} else if (!uri.equals(other.uri))
+			return false;
+		return true;
 	}
-	
-	public String getLabel() {
-		return getProperty( RDFS.LABEL.toString() );
-	}
+
+	@Override
+    public String toString() {
+        return uri.toString();
+    }
+
 
 }

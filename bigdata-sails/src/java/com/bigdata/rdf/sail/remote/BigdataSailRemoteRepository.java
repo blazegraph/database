@@ -122,7 +122,8 @@ public class BigdataSailRemoteRepository implements Repository {
 	}
 
 	@Override
-	public RepositoryConnection getConnection() throws RepositoryException {
+	public BigdataSailRemoteRepositoryConnection getConnection() 
+	        throws RepositoryException {
 		
 		return new BigdataSailRemoteRepositoryConnection(this);
 		

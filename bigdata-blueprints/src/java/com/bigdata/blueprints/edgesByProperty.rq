@@ -1,0 +1,10 @@
+construct {
+  ?from ?edge ?to .
+}
+where {
+  # ?prop and ?val should be bound coming in
+  ?edge ?prop ?val .
+  
+  # then fetch the head and tail
+  ?from ?edge ?to .
+}

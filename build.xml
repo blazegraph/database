@@ -65,6 +65,9 @@ See 'deploy-artifact' (binary artifact: REL.${version}.tgz).
       <fileset dir="${bigdata.dir}/bigdata-gom/lib">
          <include name="**/*.jar" />
       </fileset>
+      <fileset dir="${bigdata.dir}/bigdata-blueprints/lib">
+         <include name="**/*.jar" />
+      </fileset>
 		<!--
 		<fileset dir="${bigdata.dir}/ctc-striterator/lib">
 			<include name="**/*.jar" />
@@ -228,6 +231,7 @@ public class BuildInfo {
 			<src path="${bigdata.dir}/bigdata/src/java" />
 			<src path="${bigdata.dir}/bigdata-jini/src/java" />
          <src path="${bigdata.dir}/bigdata-rdf/src/java" />
+            <src path="${bigdata.dir}/bigdata-blueprints/src/java" />
 			<src path="${bigdata.dir}/bigdata-sails/src/java" />
          <src path="${bigdata.dir}/bigdata-gom/src/java" />
          <src path="${bigdata.dir}/bigdata-ganglia/src/java" />
@@ -260,6 +264,10 @@ public class BuildInfo {
 				<exclude name="**/*.java" />
 				<exclude name="**/package.html" />
 			</fileset>
+            <fileset dir="${bigdata.dir}/bigdata-blueprints/src/java">
+                <exclude name="**/*.java" />
+                <exclude name="**/package.html" />
+            </fileset>
          <fileset dir="${bigdata.dir}/bigdata-gom/src/java">
             <exclude name="**/*.java" />
             <exclude name="**/package.html" />
@@ -313,6 +321,7 @@ public class BuildInfo {
             <fileset dir="${bigdata.dir}/bigdata-gom/src/java" />
             <fileset dir="${bigdata.dir}/bigdata-gom/src/samples" />
             <fileset dir="${bigdata.dir}/ctc-striterators/src/java" />
+            <fileset dir="${bigdata.dir}/bigdata-blueprints/src/java" />
         </jar>
     </target>
 
@@ -406,7 +415,8 @@ public class BuildInfo {
 			<packageset dir="${bigdata.dir}/bigdata-rdf/src/samples" />
 			<packageset dir="${bigdata.dir}/bigdata-sails/src/java" />
 			<packageset dir="${bigdata.dir}/bigdata-sails/src/samples" />
-         <packageset dir="${bigdata.dir}/bigdata-gom/src/java" />
+            <packageset dir="${bigdata.dir}/bigdata-blueprints/src/java" />
+            <packageset dir="${bigdata.dir}/bigdata-gom/src/java" />
          <packageset dir="${bigdata.dir}/bigdata-gom/src/samples" />
          <packageset dir="${bigdata.dir}/bigdata-gas/src/java" />
 			<packageset dir="${bigdata.dir}/ctc-striterators/src/java" />
@@ -449,6 +459,9 @@ public class BuildInfo {
    <fileset dir="${bigdata.dir}/bigdata-gom/lib">
       <include name="**/*.jar" />
    </fileset>
+    <fileset dir="${bigdata.dir}/bigdata-blueprints/lib">
+        <include name="**/*.jar" />
+    </fileset>
      </copy>
      <!-- Do NOT flatten the jini jars. We need the to preserve the -->
      <!-- lib, lib-dl, and lib-ext distinctions.                    -->
@@ -558,6 +571,7 @@ public class BuildInfo {
 		  <fileset dir="${bigdata.dir}/bigdata" includes="LEGAL/*"/>
 		  <fileset dir="${bigdata.dir}/bigdata-rdf" includes="LEGAL/*"/>
 		  <fileset dir="${bigdata.dir}/bigdata-sails" includes="LEGAL/*"/>
+		  <fileset dir="${bigdata.dir}/bigdata-blueprints" includes="LEGAL/*"/>
         <fileset dir="${bigdata.dir}/bigdata-gom" includes="LEGAL/*"/>
 		  <fileset dir="${bigdata.dir}/bigdata-jini" includes="LEGAL/*"/>
 		  <!-- bigdata jar plus some dependencies as filtered by autojar.
@@ -934,6 +948,7 @@ ${postInstallMessage}</echo>
       <property name="bigdata-rdf.lib" location="${bigdata.dir}/bigdata-rdf/lib" />
       <property name="bigdata-sails.lib" location="${bigdata.dir}/bigdata-sails/lib" />
       <property name="bigdata-gom.lib" location="${bigdata.dir}/bigdata-gom/lib" />
+      <property name="bigdata-blueprints.lib" location="${bigdata.dir}/bigdata-blueprints/lib" />
       <property name="bigdata-jetty.lib" location="${bigdata.dir}/bigdata/lib/jetty" />
       <property name="bigdata-http.lib" location="${bigdata.dir}/bigdata-sails/lib/httpcomponents" />
       <property name="bigdata-zookeeper.lib" location="${bigdata.dir}/bigdata-jini/lib/apache" />
@@ -975,6 +990,10 @@ ${postInstallMessage}</echo>
 
       <!-- GOM library -->
       <!-- Note: Nothing yet for GOM -->
+
+      <!-- Blueprints library -->
+      <copy file="${bigdata-blueprints.lib}/blueprints-core-${blueprints.version}.jar"
+            tofile="${dist.lib}/blueprints-core.jar" />
 
       <!-- jetty library -->
      <copy file="${bigdata-jetty.lib}/jetty-continuation-${jetty.version}.jar"
@@ -1387,6 +1406,9 @@ ${postInstallMessage}</echo>
       <copy toDir="${build.dir}/bigdata-gom/src">
         <fileset dir="${bigdata.dir}/bigdata-gom/src" />
       </copy>
+      <copy toDir="${build.dir}/bigdata-blueprints/src">
+        <fileset dir="${bigdata.dir}/bigdata-blueprints/src" />
+      </copy>
       <copy toDir="${build.dir}/bigdata-war/src">
         <fileset dir="${bigdata.dir}/bigdata-war/src" />
       </copy>
@@ -1424,6 +1446,11 @@ ${postInstallMessage}</echo>
       <copy toDir="${build.dir}/bigdata-sails/lib">
         <fileset dir="${bigdata.dir}/bigdata-sails/lib" />
       </copy>
+      <mkdir dir="${build.dir}/bigdata-blueprints/lib" />
+      <copy toDir="${build.dir}/bigdata-blueprints/lib">
+        <fileset dir="${bigdata.dir}/bigdata-blueprints/lib" />
+      </copy>
+
 
       <mkdir dir="${build.dir}/src" />
       <mkdir dir="${build.dir}/src/resources" />
@@ -1478,6 +1505,7 @@ ${postInstallMessage}</echo>
           <include name="bigdata-rdf/src/**" />
           <include name="bigdata-sails/src/**" />
           <include name="bigdata-gom/src/**" />
+          <include name="bigdata-blueprints/src/**" />
           <include name="bigdata-war/src/**" />
           <include name="ctc-striterators/src/**" />
           <include name="lgpl-utils/src/**" />
@@ -1488,6 +1516,7 @@ ${postInstallMessage}</echo>
           <include name="bigdata-rdf/lib/**" />
           <include name="bigdata-sails/lib/**" />
           <include name="bigdata-gom/lib/**" />
+          <include name="bigdata-blueprints/lib/**" />
           <include name="src/**" />
           <exclude name="classes/**" />
           <exclude name="${version}.jar" />
@@ -1549,6 +1578,7 @@ ${postInstallMessage}</echo>
           <include name="bigdata-rdf/LEGAL/*" />
           <include name="bigdata-sails/LEGAL/*" />
           <include name="bigdata-gom/LEGAL/*" />
+          <include name="bigdata-blueprints/LEGAL/*" />
         </fileset>
       </copy>
 
@@ -1747,6 +1777,8 @@ ${postInstallMessage}</echo>
       <property name="sesame-sparql-test.jar" location="${bigdata-sails.lib}/sesame-sparql-testsuite-${sesame.version}.jar" />
       <property name="sesame-store-test.jar" location="${bigdata-sails.lib}/sesame-store-testsuite-${sesame.version}.jar" />
       <property name="sesame-rio-test.jar" location="${bigdata-sails.lib}/sesame-rio-testsuite-${sesame.version}.jar" />
+      <property name="blueprints-test.jar" location="${bigdata-blueprints.lib}/blueprints-test-${blueprints.version}.jar" />
+      <property name="jettison.jar" location="${bigdata-blueprints.lib}/jettison-${jettison.version}.jar" />
 
       <property name="classes.test.dir" location="${classes.dir}/test" />
       <mkdir dir="${classes.test.dir}" />
@@ -1757,7 +1789,7 @@ ${postInstallMessage}</echo>
 
     	<!-- TODO ${path.separator}${dist.lib}/bigdata-gas.jar -->
       <property name="javac.test.classpath"
-         value="${classes.dir}${path.separator}${junit.jar}${path.separator}${junit-ext.jar}${path.separator}${sesame-sparql-test.jar}${path.separator}${sesame-store-test.jar}${path.separator}${sesame-rio-test.jar}${path.separator}${dist.lib}/classserver.jar${path.separator}${dist.lib}/highscalelib.jar${path.separator}${dist.lib}/dsiutils.jar${path.separator}${dist.lib}/lgplutils.jar${path.separator}${dist.lib}/fastutil.jar${path.separator}${dist.lib}/bigdata-ganglia.jar${path.separator}${dist.lib}/icu4j.jar${path.separator}${dist.lib}/icu4j-charset.jar${path.separator}${dist.lib}/log4j.jar${path.separator}${dist.lib}/lucene-analyzer.jar${path.separator}${dist.lib}/lucene-core.jar${path.separator}${path.separator}${dist.lib}/openrdf-sesame.jar${path.separator}${dist.lib}/slf4j.jar${path.separator}${dist.lib}/jsk-lib.jar${path.separator}${dist.lib}/jsk-platform.jar${path.separator}${dist.lib}/nxparser.jar${path.separator}${dist.lib}/zookeeper.jar${path.separator}${dist.lib}/jetty-continuation.jar${path.separator}${dist.lib}/jetty-http.jar${path.separator}${dist.lib}/jetty-io.jar${path.separator}${dist.lib}/jetty-jmx.jar${path.separator}${dist.lib}/jetty-jndi.jar${path.separator}${dist.lib}/jetty-server.jar${path.separator}${dist.lib}/jetty-util.jar${path.separator}${dist.lib}/jetty-webapp.jar${path.separator}${dist.lib}/jetty-servlet.jar${path.separator}${dist.lib}/jetty-security.jar${path.separator}${dist.lib}/jetty-xml.jar${path.separator}${dist.lib}/jetty-rewrite.jar${path.separator}${dist.lib}/jetty-client.jar${path.separator}${dist.lib}/jetty-proxy.jar${path.separator}${dist.lib}/servlet-api.jar${path.separator}${dist.lib}/commons-codec.jar${path.separator}${dist.lib}/commons-fileupload.jar${path.separator}${dist.lib}/commons-io.jar${path.separator}${dist.lib}/commons-logging.jar${path.separator}${dist.lib}/httpclient.jar${path.separator}${dist.lib}/httpclient-cache.jar${path.separator}${dist.lib}/httpcore.jar${path.separator}${dist.lib}/httpmime.jar" />
+         value="${classes.dir}${path.separator}${junit.jar}${path.separator}${junit-ext.jar}${path.separator}${sesame-sparql-test.jar}${path.separator}${sesame-store-test.jar}${path.separator}${sesame-rio-test.jar}${path.separator}${dist.lib}/classserver.jar${path.separator}${dist.lib}/highscalelib.jar${path.separator}${dist.lib}/dsiutils.jar${path.separator}${dist.lib}/lgplutils.jar${path.separator}${dist.lib}/fastutil.jar${path.separator}${dist.lib}/bigdata-ganglia.jar${path.separator}${dist.lib}/icu4j.jar${path.separator}${dist.lib}/icu4j-charset.jar${path.separator}${dist.lib}/log4j.jar${path.separator}${dist.lib}/lucene-analyzer.jar${path.separator}${dist.lib}/lucene-core.jar${path.separator}${path.separator}${dist.lib}/openrdf-sesame.jar${path.separator}${dist.lib}/slf4j.jar${path.separator}${dist.lib}/jsk-lib.jar${path.separator}${dist.lib}/jsk-platform.jar${path.separator}${dist.lib}/nxparser.jar${path.separator}${dist.lib}/zookeeper.jar${path.separator}${dist.lib}/jetty-continuation.jar${path.separator}${dist.lib}/jetty-http.jar${path.separator}${dist.lib}/jetty-io.jar${path.separator}${dist.lib}/jetty-jmx.jar${path.separator}${dist.lib}/jetty-jndi.jar${path.separator}${dist.lib}/jetty-server.jar${path.separator}${dist.lib}/jetty-util.jar${path.separator}${dist.lib}/jetty-webapp.jar${path.separator}${dist.lib}/jetty-servlet.jar${path.separator}${dist.lib}/jetty-security.jar${path.separator}${dist.lib}/jetty-xml.jar${path.separator}${dist.lib}/jetty-rewrite.jar${path.separator}${dist.lib}/jetty-client.jar${path.separator}${dist.lib}/jetty-proxy.jar${path.separator}${dist.lib}/servlet-api.jar${path.separator}${dist.lib}/commons-codec.jar${path.separator}${dist.lib}/commons-fileupload.jar${path.separator}${dist.lib}/commons-io.jar${path.separator}${dist.lib}/commons-logging.jar${path.separator}${dist.lib}/httpclient.jar${path.separator}${dist.lib}/httpclient-cache.jar${path.separator}${dist.lib}/httpcore.jar${path.separator}${dist.lib}/httpmime.jar${path.separator}${dist.lib}/blueprints-core.jar${path.separator}${blueprints-test.jar}${path.separator}${jettison.jar}" />
          	
     	<echo>javac
 </echo>
@@ -1803,6 +1835,7 @@ ${postInstallMessage}</echo>
         <src path="${bigdata.dir}/bigdata-rdf/src/test" />
         <src path="${bigdata.dir}/bigdata-sails/src/test" />
         <src path="${bigdata.dir}/bigdata-gom/src/test" />
+        <src path="${bigdata.dir}/bigdata-blueprints/src/test" />
         <src path="${bigdata.dir}/bigdata-gas/src/test" />
         <src path="${bigdata.dir}/bigdata-ganglia/src/test" />
         <src path="${bigdata.dir}/ctc-striterators/src/test" />
@@ -1858,6 +1891,9 @@ ${postInstallMessage}</echo>
           <exclude name="**/*.java" />
         </fileset>
         <fileset dir="${bigdata.dir}/bigdata-jini/src/test">
+          <exclude name="**/*.java" />
+        </fileset>
+        <fileset dir="${bigdata.dir}/bigdata-blueprints/src/test">
           <exclude name="**/*.java" />
         </fileset>
       	
@@ -2473,7 +2509,7 @@ ${postInstallMessage}</echo>
 </java>
 </target>
 
-	<target name="start" depends="compile" description="Start the Bigdata Server.">
+	<target name="start-bigdata" depends="compile" description="Start the Bigdata Server.">
 	    <java classname="com.bigdata.rdf.sail.webapp.NanoSparqlServer" failonerror="true" fork="true" logerror="true">
 	        <classpath refid="runtime.classpath" />
 	    	<jvmarg value="-server"/>
@@ -2485,5 +2521,87 @@ ${postInstallMessage}</echo>
 	    </java>
 	</target>
 
-
+    <target name="fetch-gremlin" depends="prepare,compile,jar">
+        <echo>Installing Gremlin...</echo>
+        <get 
+            src="http://www.tinkerpop.com/downloads/gremlin/gremlin-groovy-2.5.0.zip"
+            dest="${build.dir}/gremlin-groovy-2.5.0.zip"/>
+        <unzip src="${build.dir}/gremlin-groovy-2.5.0.zip" dest="${build.dir}/"/>
+        <delete file="${build.dir}/gremlin-groovy-2.5.0.zip"/>
+    </target>
+	
+    <target name="install-gremlin" depends="prepare,compile,jar">
+        <delete>
+            <fileset dir="${build.dir}/gremlin-groovy-2.5.0/lib">
+                <include name="blueprints-graph-sail-2.5.0.jar"/>
+                <include name="blueprints-sail-graph-2.5.0.jar"/>
+                <include name="jsonld-java-0.3.jar"/>
+                <include name="jsonld-java-sesame-0.3.jar"/>
+                <include name="linked-data-sail-1.1.jar"/>
+                <include name="repository-sail-1.8.jar"/>
+                <include name="semargl-core-0.4.jar"/>
+                <include name="semargl-rdf-0.4.jar"/>
+                <include name="semargl-rdfa-0.4.jar"/>
+                <include name="semargl-sesame-0.4.jar"/>
+                <include name="sesame-http-client-2.7.10.jar"/>
+                <include name="sesame-http-protocol-2.7.10.jar"/>
+                <include name="sesame-model-2.7.10.jar"/>
+                <include name="sesame-query-2.7.10.jar"/>
+                <include name="sesame-queryalgebra-evaluation-2.7.10.jar"/>
+                <include name="sesame-queryalgebra-model-2.7.10.jar"/>
+                <include name="sesame-queryparser-api-2.7.10.jar"/>
+                <include name="sesame-queryparser-serql-2.7.10.jar"/>
+                <include name="sesame-queryparser-sparql-2.7.10.jar"/>
+                <include name="sesame-queryresultio-api-2.7.10.jar"/>
+                <include name="sesame-queryresultio-sparqlxml-2.7.10.jar"/>
+                <include name="sesame-repository-api-2.7.10.jar"/>
+                <include name="sesame-repository-sparql-2.7.10.jar"/>
+                <include name="sesame-rio-api-2.7.10.jar"/>
+                <include name="sesame-rio-binary-2.7.10.jar"/>
+                <include name="sesame-rio-datatypes-2.7.10.jar"/>
+                <include name="sesame-rio-languages-2.7.10.jar"/>
+                <include name="sesame-rio-n3-2.7.10.jar"/>
+                <include name="sesame-rio-nquads-2.7.10.jar"/>
+                <include name="sesame-rio-ntriples-2.7.10.jar"/>
+                <include name="sesame-rio-rdfjson-2.7.10.jar"/>
+                <include name="sesame-rio-rdfxml-2.7.10.jar"/>
+                <include name="sesame-rio-trig-2.7.10.jar"/>
+                <include name="sesame-rio-trix-2.7.10.jar"/>
+                <include name="sesame-rio-turtle-2.7.10.jar"/>
+                <include name="sesame-sail-api-2.7.10.jar"/>
+                <include name="sesame-sail-inferencer-2.7.10.jar"/>
+                <include name="sesame-sail-memory-2.7.10.jar"/>
+                <include name="sesame-sail-nativerdf-2.7.10.jar"/>
+                <include name="sesame-util-2.7.10.jar"/>
+                <include name="bigdata-*.jar"/>
+            </fileset>
+        </delete>
+        <copy toDir="${build.dir}/gremlin-groovy-2.5.0/lib" flatten="true">
+            <fileset dir="${bigdata.dir}/bigdata-rdf/lib">
+                <include name="openrdf-sesame-${sesame.version}-onejar.jar" />
+            </fileset>
+            <fileset dir="${bigdata.dir}/bigdata-sails/lib/httpcomponents">
+                <include name="httpmime-${apache.httpmime.version}.jar" />
+            </fileset>
+            <fileset dir="${build.dir}">
+                <include name="${version}.jar" />
+            </fileset>
+        </copy>
+        <chmod file="${build.dir}/gremlin-groovy-2.5.0/bin/gremlin.sh" perm="+x"/>
+        <echo>Gremlin installation complete.
+0. Make sure the bigdata server is running:
+   > ant start-bigdata
+1. Start the gremlin console:
+   > ./${build.dir}/gremlin-groovy-2.5.0/bin/gremlin.sh
+2. Connect to the bigdata server:
+   > g = com.bigdata.blueprints.BigdataGraphFactory.connect("http://localhost:9999/bigdata")
+3. Don't forget to shut down the connection when you're done:
+   > g.shutdown()
+        </echo>
+        
+    </target>
+    	
+	<target name="gremlin" depends="fetch-gremlin,install-gremlin">
+	</target>
+	
 </project>
