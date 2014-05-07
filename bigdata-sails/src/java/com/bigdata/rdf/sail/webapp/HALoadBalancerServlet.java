@@ -79,7 +79,7 @@ import com.bigdata.util.StackInfoReport;
  * followers in a manner that reflects the CPU, IO Wait, and GC Time associated
  * with each service.
  * <p>
- * The {@link PlatformStatsPlugIn}Ê and {@link GangliaPlugIn} MUST be enabled
+ * The {@link PlatformStatsPlugIn} and {@link GangliaPlugIn} MUST be enabled
  * for the default load balancer policy to operate. It depends on those plugins
  * to maintain a model of the load on the HA replication cluster. The
  * GangliaPlugIn should be run only as a listener if you are are running the
