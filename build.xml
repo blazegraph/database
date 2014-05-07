@@ -394,6 +394,7 @@ public class BuildInfo {
 			    overview="${bigdata.dir}/overview.html"
 			 windowtitle="bigdata&#174; v${build.ver}"
 			classpathref="build.classpath"
+			encoding="utf-8"
 			private="false"
 			>
 			<arg value="-J-Xmx1000m" />
