@@ -381,50 +381,98 @@ public class RemoteRepository {
         
     }
     
+//    /**
+//     * Set incremental truth maintenance to either true or false on the server.
+//     */
+//    public void setTruthMaintenance(final boolean tm) throws Exception {
+//    	
+//        final ConnectOptions opts = newConnectOptions();
+//
+//        opts.addRequestParam("truthMaintenance", String.valueOf(tm));
+//
+//        checkResponseCode(doConnect(opts));
+//
+//    }
+//
+//    /**
+//     * Compute database at once closure on the server and do a commit.
+//     */
+//    public long doClosure() throws Exception {
+//    	
+//        final ConnectOptions opts = newConnectOptions();
+//
+//        opts.addRequestParam("doClosure");
+//
+//        HttpResponse response = null;
+//        try {
+//            
+//            opts.setAcceptHeader(ConnectOptions.MIME_APPLICATION_XML);
+//            
+//            checkResponseCode(response = doConnect(opts));
+//            
+//            final MutationResult result = mutationResults(response);
+//            
+//            return result.mutationCount;
+//            
+//        } finally {
+//            
+//            try {
+//                
+//                if (response != null)
+//                    EntityUtils.consume(response.getEntity());
+//                
+//            } catch (Exception ex) { }
+//            
+//        }
+//    	
+//    }
+    
     /**
-     * Set incremental truth maintenance to either true or false on the server.
+     * Post a GraphML file to the blueprints layer of the remote bigdata instance.
      */
-    public void setTruthMaintenance(final boolean tm) throws Exception {
-    	
+    public long postGraphML(final String path) throws Exception {
+        
         final ConnectOptions opts = newConnectOptions();
 
-        opts.addRequestParam("truthMaintenance", String.valueOf(tm));
-
-        checkResponseCode(doConnect(opts));
-
-    }
-
-    /**
-     * Compute database at once closure on the server and do a commit.
-     */
-    public long doClosure() throws Exception {
-    	
-        final ConnectOptions opts = newConnectOptions();
-
-        opts.addRequestParam("doClosure");
+        opts.addRequestParam("blueprints");
 
         HttpResponse response = null;
         try {
+
+            final File file = new File(path);
+            
+            if (!file.exists()) {
+                throw new RuntimeException("cannot locate file: " + file.getAbsolutePath());
+            }
+            
+            final byte[] data = IOUtil.readBytes(file);
+            
+            final ByteArrayEntity entity = new ByteArrayEntity(data);
+
+            entity.setContentType("application/graphml+xml");
+            
+            opts.entity = entity;
             
             opts.setAcceptHeader(ConnectOptions.MIME_APPLICATION_XML);
-            
+
             checkResponseCode(response = doConnect(opts));
-            
+
             final MutationResult result = mutationResults(response);
-            
+
             return result.mutationCount;
-            
+
         } finally {
-            
+
             try {
-                
+
                 if (response != null)
                     EntityUtils.consume(response.getEntity());
-                
-            } catch (Exception ex) { }
-            
+
+            } catch (Exception ex) {
+            }
+
         }
-    	
+        
     }
     
     /**

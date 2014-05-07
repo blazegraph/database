@@ -1,0 +1,9 @@
+construct {
+  ?vertex ?p ?o .
+}
+where {
+  ?vertex ?p ?o .
+}
+bindings ?vertex { 
+_xx_BINDINGS_xx_ 
+} 

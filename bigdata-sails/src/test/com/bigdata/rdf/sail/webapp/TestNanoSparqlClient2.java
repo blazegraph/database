@@ -70,6 +70,8 @@ public class TestNanoSparqlClient2<S extends IIndexManager> extends
     	final URI systap = new URIImpl("bd:/sytap");
     	// 
     	
+    	System.err.println(m_serviceURL);
+    	
     	final Graph ontology = new GraphImpl();
     	ontology.add(person, RDFS.SUBCLASSOF, entity);
     	ontology.add(company, RDFS.SUBCLASSOF, entity);
@@ -78,7 +80,7 @@ public class TestNanoSparqlClient2<S extends IIndexManager> extends
     	
     	{ // batch 1
     		
-        	m_repo.setTruthMaintenance(false);
+//        	m_repo.setTruthMaintenance(false);
         	
         	final Graph data = new GraphImpl();
         	data.add(mike, RDF.TYPE, person);
@@ -86,24 +88,24 @@ public class TestNanoSparqlClient2<S extends IIndexManager> extends
         	
     		m_repo.add(new AddOp(data));
     	
-    		m_repo.doClosure();
-    		
-    		m_repo.setTruthMaintenance(true);
+//    		m_repo.doClosure();
+//    		
+//    		m_repo.setTruthMaintenance(true);
     		
     	}
     	
     	{ // batch 2
     		
-        	m_repo.setTruthMaintenance(false);
+//        	m_repo.setTruthMaintenance(false);
         	
         	final Graph data = new GraphImpl();
         	data.add(systap, RDF.TYPE, company);
         	
     		m_repo.add(new AddOp(data));
     	
-    		m_repo.doClosure();
-    		
-    		m_repo.setTruthMaintenance(true);
+//    		m_repo.doClosure();
+//    		
+//    		m_repo.setTruthMaintenance(true);
     		
     	}
     	

@@ -1,0 +1,9 @@
+construct {
+  ?from ?edge ?to .
+}
+where {
+  ?edge rdf:type bd:Edge .
+  ?from ?edge ?to .
+  ?edge rdfs:label ?label .
+  filter (?label in ("x", "y", "z")) . 
+}

@@ -1,0 +1,11 @@
+construct {
+  ?from ?edge ?to .
+  ?edge ?p ?o .
+}
+where {
+  ?from ?edge ?to .
+  ?edge ?p ?o .
+}
+bindings ?edge { 
+_xx_BINDINGS_xx_ 
+} 
