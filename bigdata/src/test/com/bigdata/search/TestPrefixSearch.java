@@ -46,7 +46,7 @@ import com.bigdata.rdf.lexicon.ITextIndexer.FullTextQuery;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestPrefixSearch extends ProxyTestCase<IIndexManager> {
+public class TestPrefixSearch extends AbstractSearchTest {
 
     /**
      * 
@@ -74,16 +74,8 @@ public class TestPrefixSearch extends ProxyTestCase<IIndexManager> {
         final TimeUnit unit = TimeUnit.MILLISECONDS;
         final String regex = null;
 
-        final Properties properties = getProperties();
-        
-        final IIndexManager indexManager = getStore(properties);
+        init();
 
-        try {
-
-            final String NAMESPACE = "test";
-
-            final FullTextIndex<Long> ndx = new FullTextIndex<Long>(indexManager,
-                    NAMESPACE, ITx.UNISOLATED, properties);
 
             /*
              * Index document(s).
@@ -93,7 +85,6 @@ public class TestPrefixSearch extends ProxyTestCase<IIndexManager> {
             final String languageCode = "EN";
             {
 
-                ndx.create();
 
                 final TokenBuffer<Long> buffer = new TokenBuffer<Long>(2, ndx);
 
@@ -283,11 +274,6 @@ public class TestPrefixSearch extends ProxyTestCase<IIndexManager> {
 
             }
 
-        } finally {
-
-            indexManager.destroy();
-
-        }
 
     }
 
