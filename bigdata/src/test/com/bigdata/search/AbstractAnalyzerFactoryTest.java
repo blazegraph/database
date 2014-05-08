@@ -57,7 +57,7 @@ public abstract class AbstractAnalyzerFactoryTest extends AbstractSearchTest {
 			String text, 
 			String spaceSeparated)  throws IOException {
 		compareTokenStream(getAnalyzer(lang, stopWordsSignificant), text,
-				spaceSeparated.split(" "));
+				spaceSeparated.split(" ")); //$NON-NLS-1$
 		}
 	private void compareTokenStream(Analyzer a, String text, String expected[]) throws IOException {
 		TokenStream s = a.tokenStream(null, new StringReader(text));
@@ -73,20 +73,20 @@ public abstract class AbstractAnalyzerFactoryTest extends AbstractSearchTest {
 	
 
     public void testEnglishFilterStopWords() throws IOException {
-    	for (String lang: new String[]{ "eng", null, "" }) {
+    	for (String lang: new String[]{ "eng", null, "" }) { //$NON-NLS-1$ //$NON-NLS-2$
     	    comparisonTest(lang,
     			true,
-    			"The test to end all tests! Forever.",
-    			"test end all tests forever"
+    			"The test to end all tests! Forever.", //$NON-NLS-1$
+    			"test end all tests forever" //$NON-NLS-1$
     			);
     	}
     }
     public void testEnglishNoFilter() throws IOException {
-    	for (String lang: new String[]{ "eng", null, "" }) {
+    	for (String lang: new String[]{ "eng", null, "" }) { //$NON-NLS-1$ //$NON-NLS-2$
     	    comparisonTest(lang,
     			false,
-    			"The test to end all tests! Forever.",
-    			"the test to end all tests forever"
+    			"The test to end all tests! Forever.", //$NON-NLS-1$
+    			"the test to end all tests forever" //$NON-NLS-1$
     			);
     	}
     }
@@ -95,11 +95,11 @@ public abstract class AbstractAnalyzerFactoryTest extends AbstractSearchTest {
     // 'de' is more standard, but the DefaultAnalyzerFactory does not
     // implement 'de' correctly.
     public void testGermanFilterStopWords() throws IOException {
-    	comparisonTest("ger",
+    	comparisonTest("ger", //$NON-NLS-1$
     			true,
-    			"Hanoi - Im Streit um die Vorherrschaft im Südchinesischen Meer ist es zu einer " +
-    			"erneuten Auseinandersetzung gekommen:",
-    			"hanoi strei um vorherrschaf sudchinesisch meer zu erneu auseinandersetzung gekomm"
+    			NonEnglishExamples.getString("AbstractAnalyzerFactoryTest.10") + //$NON-NLS-1$
+    			NonEnglishExamples.getString("AbstractAnalyzerFactoryTest.11"), //$NON-NLS-1$
+    			NonEnglishExamples.getString("AbstractAnalyzerFactoryTest.12") //$NON-NLS-1$
     			);
     	
     }
@@ -108,56 +108,54 @@ public abstract class AbstractAnalyzerFactoryTest extends AbstractSearchTest {
     // 'ru' is more standard, but the DefaultAnalyzerFactory does not
     // implement 'ru' correctly.
     public void testRussianFilterStopWords() throws IOException {
-    	comparisonTest("rus",
+    	comparisonTest("rus", //$NON-NLS-1$
     			true,
 				// I hope this is not offensive text.
-			"Они ответственны полностью и за ту, и за другую трагедию. " +
-		    "Мы уже получили данные от сочувствующих нам офицеров СБУ.",
-    			"ответствен полност ту друг трагед получ дан сочувств нам офицер сбу"
+			NonEnglishExamples.getString("AbstractAnalyzerFactoryTest.14") + //$NON-NLS-1$
+		    NonEnglishExamples.getString("AbstractAnalyzerFactoryTest.15"), //$NON-NLS-1$
+    			NonEnglishExamples.getString("AbstractAnalyzerFactoryTest.16") //$NON-NLS-1$
     			);
     	
     }
     public void testGermanNoStopWords() throws IOException {
-    	comparisonTest("ger",
+    	comparisonTest("ger", //$NON-NLS-1$
     			false,
-    			"Hanoi - Im Streit um die Vorherrschaft im Südchinesischen Meer ist es zu einer " +
-    			"erneuten Auseinandersetzung gekommen:",
-    			"hanoi im strei um die vorherrschaf im sudchinesisch meer ist es zu ein erneu auseinandersetzung gekomm"
+    			NonEnglishExamples.getString("AbstractAnalyzerFactoryTest.18") + //$NON-NLS-1$
+    			NonEnglishExamples.getString("AbstractAnalyzerFactoryTest.19"), //$NON-NLS-1$
+    			NonEnglishExamples.getString("AbstractAnalyzerFactoryTest.20") //$NON-NLS-1$
     			);
     	
     }
     public void testRussianNoStopWords() throws IOException {
-    	comparisonTest("rus",
+    	comparisonTest("rus", //$NON-NLS-1$
     			false,
-				// I hope this is not offensive text.
-    			"Они ответственны полностью и за ту, и за другую трагедию. " +
-    		    "Мы уже получили данные от сочувствующих нам офицеров СБУ.",
-    			"он ответствен полност и за ту и за друг трагед мы уж получ дан от сочувств нам офицер сбу"
+    			NonEnglishExamples.getString("AbstractAnalyzerFactoryTest.22") + //$NON-NLS-1$
+    		    NonEnglishExamples.getString("AbstractAnalyzerFactoryTest.23"), //$NON-NLS-1$
+    			NonEnglishExamples.getString("AbstractAnalyzerFactoryTest.24") //$NON-NLS-1$
     			);
     	
     }
     public void testJapanese() throws IOException {
     	for (boolean filterStopWords: new Boolean[]{true, false}) {
-    	comparisonTest("jpn",
+    	comparisonTest("jpn", //$NON-NLS-1$
       filterStopWords,
-		// I hope this is not offensive text.
-	"高林純示 生態学研究センター教授らの研究グループと松井健二 山口大学医学系研究科（農学系）教授らの研究グループは、",
-    "高林 林純 純示 生態 態学 学研 研究 究セ セン ンタ ター ー教 教授 授ら らの の研 研究 究グ グル ルー " +
-	"ープ プと と松 松井 井健 健二 山口 口大 大学 学医 医学 学系 系研 " +
-    "研究 究科 農学 学系 教授 授ら らの の研 研究 究グ グル ルー ープ プは");
+	NonEnglishExamples.getString("AbstractAnalyzerFactoryTest.26"), //$NON-NLS-1$
+    NonEnglishExamples.getString("AbstractAnalyzerFactoryTest.27") + //$NON-NLS-1$
+	NonEnglishExamples.getString("AbstractAnalyzerFactoryTest.28") + //$NON-NLS-1$
+    NonEnglishExamples.getString("AbstractAnalyzerFactoryTest.29")); //$NON-NLS-1$
     	}
     }
     public void testConfiguredLanguages() {
-    	checkConfig("BrazilianAnalyzer", "por", "pt");
-        checkConfig("ChineseAnalyzer", "zho", "chi", "zh");
-        checkConfig("CJKAnalyzer", "jpn", "ja", "kor", "ko");
-        checkConfig("CzechAnalyzer", "ces", "cze", "cs");
-        checkConfig("DutchAnalyzer", "dut", "nld", "nl");
-        checkConfig("GermanAnalyzer", "deu", "ger", "de");
-        checkConfig("GreekAnalyzer", "gre", "ell", "el");
-        checkConfig("RussianAnalyzer", "rus", "ru");
-        checkConfig("ThaiAnalyzer", "th", "tha");
-        checkConfig("StandardAnalyzer", "en", "eng", "", null);
+    	checkConfig("BrazilianAnalyzer", "por", "pt"); //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$
+        checkConfig("ChineseAnalyzer", "zho", "chi", "zh"); //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$ //$NON-NLS-4$
+        checkConfig("CJKAnalyzer", "jpn", "ja", "kor", "ko"); //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$ //$NON-NLS-4$ //$NON-NLS-5$
+        checkConfig("CzechAnalyzer", "ces", "cze", "cs"); //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$ //$NON-NLS-4$
+        checkConfig("DutchAnalyzer", "dut", "nld", "nl"); //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$ //$NON-NLS-4$
+        checkConfig("GermanAnalyzer", "deu", "ger", "de"); //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$ //$NON-NLS-4$
+        checkConfig("GreekAnalyzer", "gre", "ell", "el"); //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$ //$NON-NLS-4$
+        checkConfig("RussianAnalyzer", "rus", "ru"); //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$
+        checkConfig("ThaiAnalyzer", "th", "tha"); //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$
+        checkConfig("StandardAnalyzer", "en", "eng", "", null); //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$ //$NON-NLS-4$
     }
 
 	private void checkConfig(String classname, String ...langs) {
@@ -166,7 +164,7 @@ public abstract class AbstractAnalyzerFactoryTest extends AbstractSearchTest {
 //			if (lang != null && lang.length()==3)
 			{
 			assertEquals(classname, getAnalyzer(lang,true).getClass().getSimpleName());
-			assertEquals(classname, getAnalyzer(lang+"-x-foobar",true).getClass().getSimpleName());
+			assertEquals(classname, getAnalyzer(lang+NonEnglishExamples.getString("AbstractAnalyzerFactoryTest.0"),true).getClass().getSimpleName()); //$NON-NLS-1$
 			}
 		}
 		
