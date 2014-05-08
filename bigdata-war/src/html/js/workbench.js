@@ -2,7 +2,11 @@ $(function() {
 
 // global variables
 var DEFAULT_NAMESPACE, NAMESPACE, NAMESPACE_URL, NAMESPACES_READY, NAMESPACE_SHORTCUTS, FILE_CONTENTS, QUERY_RESULTS;
+var QUERY_EDITOR, UPDATE_EDITOR;
 var PAGE_SIZE = 50, TOTAL_PAGES, CURRENT_PAGE;
+
+// debug to access closure variables
+$('html, textarea, select').bind('keydown', 'ctrl+d', function() { debugger; });
 
 /* Modal functions */
 
@@ -44,6 +48,11 @@ function showTab(tab, nohash) {
    $('a[data-target=' + tab + ']').addClass('active');
    if(!nohash && window.location.hash.substring(1).indexOf(tab) != 0) {
       window.location.hash = tab;
+   }
+   if(tab == 'query') {
+      QUERY_EDITOR.refresh();
+   } else if(tab == 'update') {
+      UPDATE_EDITOR.refresh();
    }
 }
 
@@ -386,6 +395,8 @@ $('#clear-file').click(clearFile);
 
 $('#update-update').click(submitUpdate);
 
+UPDATE_EDITOR = CodeMirror.fromTextArea($('#update-box')[0], {lineNumbers: true});
+
 function submitUpdate(e) {
    // Updates are submitted as a regular form for SPARQL updates in monitor mode, and via AJAX for non-monitor SPARQL, RDF & file path updates.
    // When submitted as a regular form, the output is sent to an iframe. This is to allow monitor mode to work.
@@ -397,7 +408,7 @@ function submitUpdate(e) {
 
    var settings = {
       type: 'POST',
-      data: FILE_CONTENTS == null ? $('#update-box').val() : FILE_CONTENTS,
+      data: FILE_CONTENTS == null ? UPDATE_EDITOR.getValue() : FILE_CONTENTS,
       success: updateResponseXML,
       error: updateResponseError
    }
@@ -499,8 +510,13 @@ $('#query-details').change(function() {
    }
 });
 
+QUERY_EDITOR = CodeMirror.fromTextArea($('#query-box')[0], {lineNumbers: true});
+
 function submitQuery(e) {
    e.preventDefault();
+
+   // transfer CodeMirror content to textarea
+   QUERY_EDITOR.save();
 
    var settings = {
       type: 'POST',

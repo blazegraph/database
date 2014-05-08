@@ -7,6 +7,7 @@
     <!-- meta charset="utf-8" -->
     <meta http-equiv="Content-Type" content="text/html;charset=utf-8" >
     <title>Bigdata Workbench</title>
+    <link rel="stylesheet" href="/bigdata/html/css/vendor/codemirror.css">
     <link rel="stylesheet" href="/bigdata/html/css/style.css">
     <!-- junit test marker: index.html -->
   </head>
@@ -36,8 +37,7 @@
           <div class="namespace-shortcuts">
           </div>
 
-          <div>
-            <div id="update-errors"></div>
+          <div id="update-box-container">
             <textarea id="update-box" placeholder="(Type in or drag a file containing RDF data, a SPARQL update or a file path or URL)"></textarea>
           </div>
           <p id="large-file-message">Your file <span id="filename"></span> is too large to display here, but will be uploaded as normal. <a href="#" id="clear-file">Remove file</a></p>
@@ -89,7 +89,6 @@
           </div>
 
           <form id="query-form">
-            <div id="query-errors"></div>
             <textarea id="query-box" name="query" placeholder="(Input a SPARQL query)"></textarea>
 
             <a href="#" class="advanced-features-toggle">Advanced features</a>
@@ -220,6 +219,8 @@
     <script src="//ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
     <script>window.jQuery || document.write('<script src="/bigdata/html/js/vendor/jquery.min.js"><\/script>')</script>
     <script src="/bigdata/html/js/vendor/jquery.hotkeys.js"></script>
+    <script src="/bigdata/html/js/vendor/codemirror.js"></script>
+    <script src="/bigdata/html/js/vendor/cm-addons/placeholder.js"></script>
     <script src="/bigdata/html/js/workbench.js"></script>
   </body>
 </html>
