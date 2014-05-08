@@ -2530,7 +2530,7 @@ ${postInstallMessage}</echo>
         <delete file="${build.dir}/gremlin-groovy-2.5.0.zip"/>
     </target>
 	
-    <target name="install-gremlin" depends="prepare,compile,jar">
+    <target name="install-gremlin" depends="prepare,compile,jar,bundle">
         <delete>
             <fileset dir="${build.dir}/gremlin-groovy-2.5.0/lib">
                 <include name="blueprints-graph-sail-2.5.0.jar"/>
@@ -2577,11 +2577,16 @@ ${postInstallMessage}</echo>
             </fileset>
         </delete>
         <copy toDir="${build.dir}/gremlin-groovy-2.5.0/lib" flatten="true">
+        	<!--
             <fileset dir="${bigdata.dir}/bigdata-rdf/lib">
                 <include name="openrdf-sesame-${sesame.version}-onejar.jar" />
             </fileset>
             <fileset dir="${bigdata.dir}/bigdata-sails/lib/httpcomponents">
                 <include name="httpmime-${apache.httpmime.version}.jar" />
+            </fileset>
+            -->
+            <fileset dir="${build.dir}/lib">
+                <include name="*.jar" />
             </fileset>
             <fileset dir="${build.dir}">
                 <include name="${version}.jar" />
@@ -2594,9 +2599,10 @@ ${postInstallMessage}</echo>
 1. Start the gremlin console:
    > ./${build.dir}/gremlin-groovy-2.5.0/bin/gremlin.sh
 2. Connect to the bigdata server:
-   > g = com.bigdata.blueprints.BigdataGraphFactory.connect("http://localhost:9999/bigdata")
+   gremlin> import com.bigdata.blueprints.*
+   gremlin> g = BigdataGraphFactory.connect("http://localhost:9999")
 3. Don't forget to shut down the connection when you're done:
-   > g.shutdown()
+   gremlin> g.shutdown()
         </echo>
         
     </target>

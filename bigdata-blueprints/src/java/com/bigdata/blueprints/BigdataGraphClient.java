@@ -80,8 +80,9 @@ public class BigdataGraphClient extends BigdataGraph {
     /**
      * Post a GraphML file to the remote server. (Bulk-upload operation.)
      */
-    public long postGraphML(final String file) throws Exception {
-        return this.repo.getRemoteRepository().postGraphML(file);
+    @Override
+    public void loadGraphML(final String file) throws Exception {
+        this.repo.getRemoteRepository().postGraphML(file);
     }
     
     /**
