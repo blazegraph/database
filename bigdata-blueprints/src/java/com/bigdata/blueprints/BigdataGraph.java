@@ -54,6 +54,7 @@ import com.tinkerpop.blueprints.Graph;
 import com.tinkerpop.blueprints.GraphQuery;
 import com.tinkerpop.blueprints.Vertex;
 import com.tinkerpop.blueprints.util.DefaultGraphQuery;
+import com.tinkerpop.blueprints.util.io.graphml.GraphMLReader;
 
 /**
  * A base class for a Blueprints wrapper around a bigdata back-end.
@@ -93,6 +94,13 @@ public abstract class BigdataGraph implements Graph {
 	    return getClass().getSimpleName().toLowerCase();
 	}
 	
+    /**
+     * Post a GraphML file to the remote server. (Bulk-upload operation.)
+     */
+    public void loadGraphML(final String file) throws Exception {
+        GraphMLReader.inputGraph(this, file);
+    }
+    
 	protected abstract RepositoryConnection cxn() throws Exception;
 	
 //	public BigdataSailRepositoryConnection getConnection() {
