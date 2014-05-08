@@ -8,11 +8,11 @@ import com.bigdata.journal.ITx;
 import com.bigdata.journal.ProxyTestCase;
 
 public abstract class AbstractSearchTest  extends ProxyTestCase<IIndexManager>  {
-    String NAMESPACE;  
-    IIndexManager indexManager;
-    FullTextIndex<Long> ndx;
-    IndexMetadata indexMetadata;
-    Properties properties;
+    private String namespace;  
+    private IIndexManager indexManager;
+    private FullTextIndex<Long> ndx;
+    private IndexMetadata indexMetadata;
+    private Properties properties;
     
     public AbstractSearchTest() {
 	}
@@ -22,13 +22,13 @@ public abstract class AbstractSearchTest  extends ProxyTestCase<IIndexManager>  
 	}
 
 	void init(String ...propertyValuePairs) {
-        NAMESPACE = getName(); 
+        namespace = getName(); 
         properties = getProperties();
         for (int i=0; i<propertyValuePairs.length; ) {
         	properties.setProperty(propertyValuePairs[i++], propertyValuePairs[i++]);
         }
         indexManager = getStore();
-        ndx = new FullTextIndex<Long>(indexManager, NAMESPACE, ITx.UNISOLATED, properties);
+        ndx = new FullTextIndex<Long>(indexManager, namespace, ITx.UNISOLATED, properties);
         ndx.create();
         indexMetadata = ndx.getIndex().getIndexMetadata();
     }
@@ -37,6 +37,32 @@ public abstract class AbstractSearchTest  extends ProxyTestCase<IIndexManager>  
         indexManager.destroy();
 		super.tearDown();
 	}
+
+	String getNamespace() {
+		return namespace;
+	}
+
+	IIndexManager getIndexManager() {
+		return indexManager;
+	}
+
+	void setIndexManager(IIndexManager indexManager) {
+		this.indexManager = indexManager;
+	}
+
+	FullTextIndex<Long> getNdx() {
+		return ndx;
+	}
+
+	IndexMetadata getIndexMetadata() {
+		return indexMetadata;
+	}
+
+
+	Properties getSearchProperties() {
+		return properties;
+	}
+
 
 
 }

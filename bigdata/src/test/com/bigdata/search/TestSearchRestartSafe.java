@@ -112,12 +112,12 @@ public class TestSearchRestartSafe extends AbstractSearchTest {
         final String languageCode = "EN";
         {
 
-            final TokenBuffer<Long> buffer = new TokenBuffer<Long>(2, ndx);
+            final TokenBuffer<Long> buffer = new TokenBuffer<Long>(2, getNdx());
 
-            ndx.index(buffer, docId, fieldId, languageCode,
+            getNdx().index(buffer, docId, fieldId, languageCode,
                     new StringReader(text));
 
-            ndx.index(buffer, docId + 1, fieldId, languageCode,
+            getNdx().index(buffer, docId + 1, fieldId, languageCode,
                     new StringReader("The slow brown cow"));
 
             buffer.flush();
@@ -127,8 +127,8 @@ public class TestSearchRestartSafe extends AbstractSearchTest {
         /* Search w/o restart. */
         {
 
-            ndx = new FullTextIndex<Long>(indexManager,
-                    NAMESPACE, ITx.UNISOLATED, properties);
+        	final FullTextIndex<Long> ndx = new FullTextIndex<Long>(getIndexManager(),
+                    getNamespace(), ITx.UNISOLATED, getSearchProperties());
 
             final Hiterator<?> itr = 
 //                    ndx.search(
@@ -160,13 +160,13 @@ public class TestSearchRestartSafe extends AbstractSearchTest {
         /*
          * Shutdown and restart.
          */
-        indexManager = reopenStore(indexManager);
+        setIndexManager(reopenStore(getIndexManager()));
 
         /* Search with restart. */
         {
+        	final FullTextIndex<Long> ndx = new FullTextIndex<Long>(getIndexManager(), getNamespace(), 
+        			ITx.UNISOLATED, getSearchProperties());
 
-            ndx = new FullTextIndex<Long>(
-                    indexManager, NAMESPACE, ITx.UNISOLATED, properties);
 
             final Hiterator<?> itr = // ndx.search(text, languageCode);
                 ndx.search(new FullTextQuery(text,
