@@ -117,7 +117,7 @@ public class TestKeyBuilder extends AbstractSearchTest {
         // Use English.
                 KeyBuilder.Options.USER_LANGUAGE, "en");
             
-            final FullTextIndexTupleSerializer<Long> tupleSer = (FullTextIndexTupleSerializer<Long>) indexMetadata
+            final FullTextIndexTupleSerializer<Long> tupleSer = (FullTextIndexTupleSerializer<Long>) getIndexMetadata()
                     .getTupleSerializer();
             
             if(log.isInfoEnabled())
@@ -131,13 +131,13 @@ public class TestKeyBuilder extends AbstractSearchTest {
 //                    ((DefaultKeyBuilderFactory) tupleSer.getKeyBuilderFactory())
 //                            .getLocale().getLanguage());
             
-            doKeyOrderTest(ndx, -1L/* docId */, 0/* fieldId */, true/* fieldsEnabled */);
-            doKeyOrderTest(ndx, 0L/* docId */,  0/* fieldId */, true/* fieldsEnabled */);
-            doKeyOrderTest(ndx, 1L/* docId */, 12/* fieldId */, true/* fieldsEnabled */);
+            doKeyOrderTest(getNdx(), -1L/* docId */, 0/* fieldId */, true/* fieldsEnabled */);
+            doKeyOrderTest(getNdx(), 0L/* docId */,  0/* fieldId */, true/* fieldsEnabled */);
+            doKeyOrderTest(getNdx(), 1L/* docId */, 12/* fieldId */, true/* fieldsEnabled */);
 
-            doKeyOrderTest(ndx, -1L/* docId */, 0/* fieldId */, false/* fieldsEnabled */);
-            doKeyOrderTest(ndx, 0L/* docId */, 0/* fieldId */, false/* fieldsEnabled */);
-            doKeyOrderTest(ndx, 1L/* docId */, 0/* fieldId */, false/* fieldsEnabled */);
+            doKeyOrderTest(getNdx(), -1L/* docId */, 0/* fieldId */, false/* fieldsEnabled */);
+            doKeyOrderTest(getNdx(), 0L/* docId */, 0/* fieldId */, false/* fieldsEnabled */);
+            doKeyOrderTest(getNdx(), 1L/* docId */, 0/* fieldId */, false/* fieldsEnabled */);
             
     }
 

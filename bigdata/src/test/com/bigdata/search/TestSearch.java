@@ -124,10 +124,10 @@ public class TestSearch extends AbstractSearchTest {
              */
             long docId = 1;
             final int fieldId = 0;
-            final TokenBuffer<Long> buffer = new TokenBuffer<Long>(docs.length, ndx);
+            final TokenBuffer<Long> buffer = new TokenBuffer<Long>(docs.length, getNdx());
             for (String s : docs) {
 
-                ndx.index(buffer, Long.valueOf(docId++), fieldId,
+                getNdx().index(buffer, Long.valueOf(docId++), fieldId,
                         languageCode, new StringReader(s));
 
             }
@@ -141,7 +141,7 @@ public class TestSearch extends AbstractSearchTest {
 
             final String query = "child proofing";
 
-            final Hiterator<Hit<Long>> itr = ndx.search(new FullTextQuery(
+            final Hiterator<Hit<Long>> itr = getNdx().search(new FullTextQuery(
             		query,
                     languageCode, prefixMatch, regex, 
                     matchAllTerms, false/* matchExact*/, 
