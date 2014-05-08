@@ -28,6 +28,8 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Properties;
 
+import org.openrdf.repository.Repository;
+
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.Journal;
 import com.bigdata.rdf.axioms.NoAxioms;
@@ -67,7 +69,7 @@ public class BigdataSailFactory {
         RDR,
         
         /**
-         * Text index on or off.  On by default.
+         * Text index on or off.  Off by default.
          */
         TextIndex,
         
