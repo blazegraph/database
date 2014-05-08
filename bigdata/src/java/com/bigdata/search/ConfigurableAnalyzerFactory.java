@@ -126,7 +126,7 @@ import com.bigdata.btree.keys.KeyBuilder;
 public class ConfigurableAnalyzerFactory implements IAnalyzerFactory {
 	final private static transient Logger log = Logger.getLogger(ConfigurableAnalyzerFactory.class);
 
-	private static class LanguageRange implements Comparable<LanguageRange> {
+	static class LanguageRange implements Comparable<LanguageRange> {
 		
 		private final String range[];
 		private final String full;
@@ -172,6 +172,10 @@ public class ConfigurableAnalyzerFactory implements IAnalyzerFactory {
 		@Override 
 		public int hashCode() {
 			return full.hashCode();
+		}
+		
+		public boolean extendedFilterMatch(String langTag) {
+			return extendedFilterMatch(langTag.toLowerCase(Locale.ROOT).split("-"));
 		}
 
 		// See RFC 4647, 3.3.2

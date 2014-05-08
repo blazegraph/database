@@ -72,6 +72,8 @@ public class TestAll extends TestCase {
 
         // search backed by EDS.
         suite.addTest(proxySuite(new TestEDS("EDS Search"),"EDS"));
+        
+        suite.addTestSuite(TestLanguageRange.class);
 
         return suite;
 
