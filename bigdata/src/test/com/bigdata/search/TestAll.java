@@ -104,6 +104,14 @@ public class TestAll extends TestCase {
         
         // test verifies search index is restart safe.
         suite.addTestSuite(TestSearchRestartSafe.class);
+        
+        // Check behavior of DefaultAnalyzerFactory, see also trac 915
+        suite.addTestSuite(TestDefaultAnalyzerFactory.class);
+        
+        // Check default behavior of ConfigurableAnalyzerFactory
+        // which is intended to be the same as the intended
+        // behavior of DefaultAnalyzerFactory
+        suite.addTestSuite(TestConfigurableAsDefaultAnalyzerFactory.class);
 
         return suite;
     }
