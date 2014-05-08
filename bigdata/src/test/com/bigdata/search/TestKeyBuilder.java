@@ -93,6 +93,10 @@ public class TestKeyBuilder extends AbstractSearchTest {
         return keyBuilder;
         
     }
+
+	IndexMetadata getIndexMetadata() {
+		return getNdx().getIndex().getIndexMetadata();
+	}
     private IKeyBuilder keyBuilder;
     
     /**

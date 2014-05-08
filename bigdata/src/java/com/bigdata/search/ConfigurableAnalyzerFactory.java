@@ -547,7 +547,7 @@ c.b.s.C.analyzer.en.like=eng
 
             	// RussianAnalyzer is missing any way to access stop words.
             	if (RussianAnalyzer.class.equals(cls) && useDefaultStopWords()) {
-            		return new AnalyzerPair(languageRange, new RussianAnalyzer(Version.LUCENE_CURRENT, Collections.EMPTY_SET), new RussianAnalyzer(Version.LUCENE_CURRENT));
+            		return new AnalyzerPair(languageRange, new RussianAnalyzer(Version.LUCENE_CURRENT), new RussianAnalyzer(Version.LUCENE_CURRENT, Collections.EMPTY_SET));
             	}
             	return new VersionSetAnalyzerPair(this, cls);
             }
@@ -612,7 +612,8 @@ c.b.s.C.analyzer.en.like=eng
      */
     private static final int MAX_LANG_CACHE_SIZE = 500;
     		
-    private final String defaultLanguage;
+    private String defaultLanguage;
+    private final FullTextIndex<?> fullTextIndex;
     
     
     public ConfigurableAnalyzerFactory(final FullTextIndex<?> fullTextIndex) {
@@ -621,9 +622,9 @@ c.b.s.C.analyzer.en.like=eng
         if (fullTextIndex == null)
             throw new IllegalArgumentException();
         
-        defaultLanguage = getDefaultLanguage(fullTextIndex);
+        this.fullTextIndex = fullTextIndex;
         
-        final Properties properties = initProperties(fullTextIndex);
+        final Properties properties = initProperties();
         
         final Map<String, ConfigOptionsToAnalyzer> analyzers = new HashMap<String, ConfigOptionsToAnalyzer>();
         
@@ -686,6 +687,12 @@ c.b.s.C.analyzer.en.like=eng
 			
 		}
 	}
+	private String getDefaultLanguage() {
+		if (defaultLanguage == null) {
+            defaultLanguage = getDefaultLanguage(fullTextIndex);
+		}
+		return defaultLanguage;
+	}
 
 	private static boolean hasConstructor(Class<? extends Analyzer> cls, Class<?> ... parameterTypes) {
 		return getConstructor(cls, parameterTypes) != null;
@@ -731,7 +738,7 @@ c.b.s.C.analyzer.en.like=eng
 		
 	}
 
-	protected Properties initProperties(final FullTextIndex<?> fullTextIndex) {
+	protected Properties initProperties() {
 		final Properties parentProperties = fullTextIndex.getProperties();
         Properties myProps;
         if (Boolean.getBoolean(parentProperties.getProperty(Options.INCLUDE_DEFAULTS, Options.DEFAULT_INCLUDE_DEFAULTS))) {
@@ -773,7 +780,8 @@ c.b.s.C.analyzer.en.like=eng
 	public Analyzer getAnalyzer(String languageCode, boolean filterStopwords) {
 		
 		if (languageCode == null || languageCode.equals("")) {
-			languageCode = defaultLanguage;
+			
+			languageCode = getDefaultLanguage();
 		}
 		
 		AnalyzerPair pair = langTag2AnalyzerPair.get(languageCode);
