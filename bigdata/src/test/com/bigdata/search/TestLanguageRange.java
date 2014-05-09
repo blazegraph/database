@@ -26,9 +26,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.search;
 
-import com.bigdata.search.ConfigurableAnalyzerFactory.LanguageRange;
-
 import junit.framework.TestCase2;
+
+import com.bigdata.search.ConfigurableAnalyzerFactory.LanguageRange;
 
 public class TestLanguageRange extends TestCase2 {
 

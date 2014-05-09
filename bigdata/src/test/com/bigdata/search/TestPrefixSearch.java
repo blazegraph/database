@@ -29,12 +29,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.search;
 
 import java.io.StringReader;
-import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 
-import com.bigdata.journal.IIndexManager;
-import com.bigdata.journal.ITx;
-import com.bigdata.journal.ProxyTestCase;
 import com.bigdata.rdf.lexicon.ITextIndexer.FullTextQuery;
 
 /**

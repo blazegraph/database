@@ -33,13 +33,9 @@ import java.util.Properties;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.ITupleSerializer;
 import com.bigdata.btree.IndexMetadata;
-import com.bigdata.btree.keys.DefaultKeyBuilderFactory;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.btree.keys.StrengthEnum;
-import com.bigdata.journal.IIndexManager;
-import com.bigdata.journal.ITx;
-import com.bigdata.journal.ProxyTestCase;
 import com.bigdata.search.FullTextIndex.Options;
 
 /**
