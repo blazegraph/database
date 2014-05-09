@@ -33,9 +33,6 @@ import java.util.Iterator;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 
-import com.bigdata.journal.IIndexManager;
-import com.bigdata.journal.ITx;
-import com.bigdata.journal.ProxyTestCase;
 import com.bigdata.rdf.lexicon.ITextIndexer.FullTextQuery;
 
 /**
