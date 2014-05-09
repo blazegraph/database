@@ -1081,7 +1081,7 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
      */
 
     // MUST : JOIN GROUP
-    private Set<IVariable<?>> getDefinitelyProducedBindings(
+    Set<IVariable<?>> getDefinitelyProducedBindings(
             final JoinGroupNode node, final Set<IVariable<?>> vars,
             final boolean recursive) {
         // Note: always report what is bound when we enter a group. The caller
