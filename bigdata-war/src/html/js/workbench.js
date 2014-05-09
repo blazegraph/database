@@ -510,7 +510,7 @@ $('#query-details').change(function() {
    }
 });
 
-QUERY_EDITOR = CodeMirror.fromTextArea($('#query-box')[0], {lineNumbers: true});
+QUERY_EDITOR = CodeMirror.fromTextArea($('#query-box')[0], {lineNumbers: true, mode: 'sparql'});
 
 function submitQuery(e) {
    e.preventDefault();
