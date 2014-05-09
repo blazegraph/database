@@ -51,7 +51,7 @@ import com.bigdata.rdf.sparql.ast.ssets.ISolutionSetManager;
  * @version $Id: StaticAnalysis_CanJoin.java 5378 2011-10-20 20:37:08Z
  *          thompsonbry $
  */
-public class StaticAnalysis_CanJoin extends StaticAnalysisBase {
+public abstract class StaticAnalysis_CanJoin extends StaticAnalysisBase {
 
     private static final Logger log = Logger.getLogger(StaticAnalysis.class);
 
@@ -392,12 +392,16 @@ public class StaticAnalysis_CanJoin extends StaticAnalysisBase {
             // the constraints for the current predicate in the join path.
             final List<FilterNode> constraints = new LinkedList<FilterNode>();
             
-            /*
-             * Visit the variables used by the predicate (and bound by it since
-             * it is not an optional predicate) and add them into the total set
-             * of variables which are bound at this point in the join path.
-             */
-            getSpannedVariables((BOp) p, boundVars);
+            
+//            /*
+//             * Visit the variables used by the predicate (and bound by it since
+//             * it is not an optional predicate) and add them into the total set
+//             * of variables which are bound at this point in the join path.
+//             */
+//            getSpannedVariables((BOp) p, boundVars);
+            // above does not work if p is a Union nor, I suspect, a Minus - jjc
+            // tring this next line as an alternative - jjc.
+            getDefinitelyProducedBindings(p, boundVars, true);
 
             if (joinGraphConstraints != null) {
 
@@ -479,5 +483,43 @@ public class StaticAnalysis_CanJoin extends StaticAnalysisBase {
         return ret;
         
     }    
+    
+    /**
+     * Return the set of variables which MUST be bound for solutions after the
+     * evaluation of this group. A group will produce "MUST" bindings for
+     * variables from its statement patterns and a LET based on an expression
+     * whose variables are known bound.
+     * <p>
+     * The returned collection reflects "bottom-up" evaluation semantics. This
+     * method does NOT consider variables which are already bound on entry to
+     * the group.
+     * <p>
+     * Note: When invoked for an OPTIONAL or MINUS join group, the variables
+     * which would become bound during the evaluation of the join group are
+     * reported. Caller's who wish to NOT have variables reported for OPTIONAL
+     * or MINUS groups MUST NOT invoke this method for those groups.
+     * <p>
+     * Note: The recursive analysis does not throw out variables when part of
+     * the tree will provably fail to bind anything. It is the role of query
+     * optimizers to identify those situations and prune the AST appropriately.
+     * <p>
+     * The class hierarchy is a little untidy at this point.
+     * This method is defined in the only subclass of this abstract class.
+     * Initially it was thought to not be needed here.
+     * 
+     * @param node
+     *            The node to be analyzed.
+     * @param vars
+     *            Where to store the "MUST" bound variables.
+     * @param recursive
+     *            When <code>true</code>, the child groups will be recursively
+     *            analyzed. When <code>false</code>, only <i>this</i> group will
+     *            be analyzed.
+     * 
+     * @return The argument.
+     */
+    public abstract Set<IVariable<?>> getDefinitelyProducedBindings(
+            final IBindingProducerNode node, final Set<IVariable<?>> vars,
+            final boolean recursive);
 
 }
