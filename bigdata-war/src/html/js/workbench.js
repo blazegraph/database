@@ -349,14 +349,29 @@ function setType(type, format) {
    if(type == 'rdf') {
       $('#rdf-type').val(format);
    }
-   showUpdateOptions(type);
+   setUpdateSettings(type);
 }
 
-$('#update-type').change(function() { showUpdateOptions(this.value) });
+$('#update-type').change(function() { setUpdateSettings(this.value); });
+$('#rdf-type').change(function() { setUpdateMode('rdf'); });
 
-function showUpdateOptions(type) {
+function setUpdateSettings(type) {
    $('#rdf-type, label[for="rdf-type"]').attr('disabled', type != 'rdf');
    $('#update-tab .advanced-features input').attr('disabled', type != 'sparql');
+   setUpdateMode(type);
+}
+
+function setUpdateMode(type) {
+   var mode = '';
+   if(type == 'sparql') {
+      mode = 'sparql';
+   } else if(type == 'rdf') {
+      type = $('#rdf-type').val();
+      if(type in rdf_modes) {
+         mode = rdf_modes[type];
+      }
+   }
+   UPDATE_EDITOR.setOption('mode', mode);
 }
 
 // .xml is used for both RDF and TriX, assume it's RDF
@@ -383,6 +398,9 @@ var rdf_content_types = {'n-quads': 'text/x-nquads',
                          'trix': 'application/trix',
                          'turtle': 'application/x-turtle'};
 
+// key is value of RDF type selector, value is name of CodeMirror mode
+var rdf_modes = {'n-triples': 'ntriples', 'rdf/xml': 'xml', 'json': 'json', 'turtle': 'turtle'};
+
 var sparql_update_commands = ['INSERT', 'DELETE', 'LOAD', 'CLEAR'];
 
 $('#update-file').change(handleFile);
@@ -395,7 +413,7 @@ $('#clear-file').click(clearFile);
 
 $('#update-update').click(submitUpdate);
 
-UPDATE_EDITOR = CodeMirror.fromTextArea($('#update-box')[0], {lineNumbers: true});
+UPDATE_EDITOR = CodeMirror.fromTextArea($('#update-box')[0], {lineNumbers: true, mode: 'sparql'});
 
 function submitUpdate(e) {
    // Updates are submitted as a regular form for SPARQL updates in monitor mode, and via AJAX for non-monitor SPARQL, RDF & file path updates.
