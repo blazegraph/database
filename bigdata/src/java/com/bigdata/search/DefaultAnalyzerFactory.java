@@ -29,7 +29,6 @@ package com.bigdata.search;
 
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
@@ -52,11 +51,21 @@ import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
 
 /**
- * Default implementation registers a bunch of {@link Analyzer}s for various
- * language codes and then serves the appropriate {@link Analyzer} based on
- * the specified language code.
+ * This is the default implementation but should be regarded as legacy since
+ * it fails to use the correct {@link Analyzer} for almost all languages (other than
+ * English). It uses the correct natural language analyzer only for literals tagged with
+ * certain three letter ISO 639 codes:
+ * "por", "deu", "ger", "zho", "chi", "jpn", "kor", "ces", "cze", "dut", "nld", "gre", "ell",
+ * "fra", "fre", "rus" and "tha". All other tags are treated as English.
+ * These codes do not work if they are used with subtags, e.g. "ger-AT" is treated as English.
+ * No two letter code, other than "en" works correctly: note that the W3C and 
+ * IETF recommend the use of the two letter forms instead of the three letter forms.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * @deprecated Using {@link ConfigurableAnalyzerFactory} with 
+ *    the {@link ConfigurableAnalyzerFactory.Options#NATURAL_LANGUAGE_SUPPORT} 
+ *    uses the appropriate natural language analyzers for the two letter codes
+ *    and for tags which include sub-tags.
  * @version $Id$
  */
 public class DefaultAnalyzerFactory implements IAnalyzerFactory {
