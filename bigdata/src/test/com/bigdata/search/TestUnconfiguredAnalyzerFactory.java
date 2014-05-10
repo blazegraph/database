@@ -26,25 +26,25 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.search;
 
-public class TestConfigurableAsDefaultAnalyzerFactory extends AbstractDefaultAnalyzerFactoryTest {
+public class TestUnconfiguredAnalyzerFactory extends AbstractAnalyzerFactoryTest {
 
-	public TestConfigurableAsDefaultAnalyzerFactory() {
+	public TestUnconfiguredAnalyzerFactory() {
 	}
 
-	public TestConfigurableAsDefaultAnalyzerFactory(String arg0) {
+	public TestUnconfiguredAnalyzerFactory(String arg0) {
 		super(arg0);
 	}
 
 	@Override
 	String[] getExtraProperties() {
-		return new String[]{FullTextIndex.Options.ANALYZER_FACTORY_CLASS, ConfigurableAnalyzerFactory.class.getName(),
-				ConfigurableAnalyzerFactory.Options.NATURAL_LANGUAGE_SUPPORT, "true"
+		return new String[]{
+			FullTextIndex.Options.ANALYZER_FACTORY_CLASS, ConfigurableAnalyzerFactory.class.getName(),
 		};
 	}
-
-	@Override
-	boolean isBroken() {
-		return false;
-	}
+	
+    public void testConfiguredLanguages() {
+    	checkConfig("StandardAnalyzer", "por", "pt", "zho", "chi", "zh", "jpn", "ja", "kor", "ko", "ces", "cze", "cs", "dut", "nld", "nl", 
+    			"deu", "ger", "de", "gre", "ell", "el", "rus", "ru", "th", "tha", "en", "eng", "", null);
+    }
 
 }

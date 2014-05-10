@@ -114,6 +114,8 @@ public class TestAll extends TestCase {
         // which is intended to be the same as the intended
         // behavior of DefaultAnalyzerFactory
         suite.addTestSuite(TestConfigurableAsDefaultAnalyzerFactory.class);
+        suite.addTestSuite(TestConfigurableAnalyzerFactory.class);
+        suite.addTestSuite(TestUnconfiguredAnalyzerFactory.class);
 
         return suite;
     }

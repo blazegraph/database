@@ -66,6 +66,7 @@ import com.bigdata.btree.keys.KeyBuilder;
  * Supported classes included all the natural language specific classes from Lucene, and also:
  * <ul>
  * <li>{@link PatternAnalyzer}
+ * <li>{@link TermCompletionAnalyzer}
  * <li>{@link KeywordAnalyzer}
  * <li>{@link SimpleAnalyzer}
  * <li>{@link StopAnalyzer}
@@ -76,7 +77,6 @@ import com.bigdata.btree.keys.KeyBuilder;
  * <ul>
  * <li>no arguments
  * <li>{@link Version}
- * <li>{@link Set} (of strings, the stop words)
  * <li>{@link Version}, {@link Set}
  * </ul>
  * is usable. If the class has a static method named <code>getDefaultStopSet()</code> then this is assumed
@@ -89,19 +89,17 @@ import com.bigdata.btree.keys.KeyBuilder;
  * abbreviate to <code>c.b.s.C</code> in this documentation. 
  * Properties from {@link Options} apply to the factory.
  * <p>
- * 
- * If there are no such properties at all then the property {@link Options#INCLUDE_DEFAULTS} is set to true,
- * and the behavior of this class is the same as the legacy {@link DefaultAnalyzerFactory}.
- * <p>
  * Other properties, from {@link AnalyzerOptions} start with
  * <code>c.b.s.C.analyzer.<em>language-range</em></code> where <code><em>language-range</em></code> conforms
- * with the extended language range construct from RFC 4647, section 2.2. These are used to specify 
- * an analyzer for the given language range.
+ * with the extended language range construct from RFC 4647, section 2.2. 
+ * There is an issue that bigdata does not allow '*' in property names, and we use the character '_' to
+ * substitute for '*' in extended language ranges in property names.
+ * These are used to specify an analyzer for the given language range.
  * <p>
  * If no analyzer is specified for the language range <code>*</code> then the {@link StandardAnalyzer} is used.
  * <p>
  * Given any specific language, then the analyzer matching the longest configured language range, 
- * measured in number of subtags is used {@link #getAnalyzer(String, boolean)} 
+ * measured in number of subtags is returned by {@link #getAnalyzer(String, boolean)} 
  * In the event of a tie, the alphabetically first language range is used.
  * The algorithm to find a match is "Extended Filtering" as defined in section 3.3.2 of RFC 4647.
  * <p>
@@ -113,11 +111,13 @@ import com.bigdata.btree.keys.KeyBuilder;
  * <dd>This uses whitespace to tokenize</dd>
  * <dt>{@link PatternAnalyzer}</dt>
  * <dd>This uses a regular expression to tokenize</dd>
+ * <dt>{@link TermCompletionAnalyzer}</dt>
+ * <dd>This uses up to three regular expressions to specify multiple tokens for each word, to address term completion use cases.</dd>
  * <dt>{@link EmptyAnalyzer}</dt>
  * <dd>This suppresses the functionality, by treating every expression as a stop word.</dd>
  * </dl>
  * there are in addition the language specific analyzers that are included
- * by using the option {@link Options#INCLUDE_DEFAULTS}
+ * by using the option {@link Options#NATURAL_LANGUAGE_SUPPORT}
  * 
  * 
  * @author jeremycarroll
@@ -126,11 +126,26 @@ import com.bigdata.btree.keys.KeyBuilder;
 public class ConfigurableAnalyzerFactory implements IAnalyzerFactory {
 	final private static transient Logger log = Logger.getLogger(ConfigurableAnalyzerFactory.class);
 
-	static class LanguageRange implements Comparable<LanguageRange> {
+	/**
+	 * This is an implementation of RFC 4647 language range,
+	 * targetted at the specific needs within bigdata, and only
+	 * supporting the extended filtering specified in section 3.3.2
+	 * <p>
+	 * Language ranges are comparable so that
+	 * sorting an array and then matching a language tag against each
+	 * member of the array in sequence will give the longest match.
+	 * i.e. the longer ranges come first.
+	 * @author jeremycarroll
+	 *
+	 */
+	public static class LanguageRange implements Comparable<LanguageRange> {
 		
 		private final String range[];
 		private final String full;
-
+		/**
+		 * Note range must be in lower case, this is not verified.
+		 * @param range
+		 */
 		public LanguageRange(String range) {
 			this.range = range.split("-");
 			full = range;
@@ -174,12 +189,22 @@ public class ConfigurableAnalyzerFactory implements IAnalyzerFactory {
 			return full.hashCode();
 		}
 		
+		/**
+		 * This implements the algoirthm of section 3.3.2 of RFC 4647
+		 * as modified with the observation about private use tags
+		 * in <a href="http://lists.w3.org/Archives/Public/www-international/2014AprJun/0084">
+		 * this message</a>.
+		 * 
+		 * 
+		 * @param langTag The RFC 5646 Language tag in lower case
+		 * @return The result of the algorithm
+		 */
 		public boolean extendedFilterMatch(String langTag) {
 			return extendedFilterMatch(langTag.toLowerCase(Locale.ROOT).split("-"));
 		}
 
 		// See RFC 4647, 3.3.2
-		public boolean extendedFilterMatch(String[] language) {
+		boolean extendedFilterMatch(String[] language) {
 			// RFC 4647 step 2
 			if (!matchSubTag(language[0], range[0])) {
 				return false;
@@ -227,13 +252,14 @@ public class ConfigurableAnalyzerFactory implements IAnalyzerFactory {
      */
     public interface Options {
     	/**
-    	 * By setting this option to true, then the behavior of the legacy {@link DefaultAnalyzerFactory}
-    	 * is added, and may be overridden by the settings of the user.
+    	 * By setting this option to true, then all the known Lucene Analyzers for natural
+    	 * languages are used for a range of language tags.
+    	 * These settings may then be overridden by the settings of the user.
     	 * Specifically the following properties are loaded, prior to loading the
     	 * user's specification (with <code>c.b.s.C</code> expanding to 
     	 * <code>com.bigdata.search.ConfigurableAnalyzerFactory</code>)
 <pre>
-c.b.s.C.analyzer.*.like=eng
+c.b.s.C.analyzer._.like=eng
 c.b.s.C.analyzer.por.analyzerClass=org.apache.lucene.analysis.br.BrazilianAnalyzer
 c.b.s.C.analyzer.pt.like=por
 c.b.s.C.analyzer.zho.analyzerClass=org.apache.lucene.analysis.cn.ChineseAnalyzer
@@ -265,18 +291,13 @@ c.b.s.C.analyzer.en.like=eng
     	 * 
     	 * 
     	 */
-        String INCLUDE_DEFAULTS = ConfigurableAnalyzerFactory.class.getName() + ".includeDefaults";
+        String NATURAL_LANGUAGE_SUPPORT = ConfigurableAnalyzerFactory.class.getName() + ".naturalLanguageSupport";
         /**
          * This is the prefix to all properties configuring the individual analyzers.
          */
         String ANALYZER = ConfigurableAnalyzerFactory.class.getName() + ".analyzer.";
-/**
- * If there is no configuration at all, then the defaults are included,
- * but any configuration at all totally replaces the defaults, unless 
- * {@link #INCLUDE_DEFAULTS}
- * is explicitly set to true.
- */
-        String DEFAULT_INCLUDE_DEFAULTS = "false";
+
+        String DEFAULT_NATURAL_LANGUAGE_SUPPORT = "false";
     }
     /**
      * Options understood by analyzers created by {@link ConfigurableAnalyzerFactory}.
@@ -286,7 +307,9 @@ c.b.s.C.analyzer.en.like=eng
     	/**
     	 * If specified this is the fully qualified name of a subclass of {@link Analyzer}
     	 * that has appropriate constructors.
-    	 * Either this or {@link #LIKE} or {@link #PATTERN} must be specified for each language range.
+    	 * This is set implicitly if some of the options below are selected (for example {@link #PATTERN}).
+    	 * For each configured language range, if it is not set, either explicitly or implicitly, then 
+    	 * {@link #LIKE}  must be specified.
     	 */
         String ANALYZER_CLASS = "analyzerClass";
         
@@ -326,16 +349,52 @@ c.b.s.C.analyzer.en.like=eng
         
         String STOPWORDS_VALUE_NONE = "none";
         /**
-         * If this property is present then the analyzer being used is a
-         * {@link PatternAnalyzer} and the value is the pattern to use.
+         * The value of the pattern parameter to
+         * {@link PatternAnalyzer#PatternAnalyzer(Version, Pattern, boolean, Set)} 
          * (Note the {@link Pattern#UNICODE_CHARACTER_CLASS} flag is enabled).
          * It is an error if a different analyzer class is specified.
          */
-        String PATTERN = ".pattern";
+        String PATTERN = "pattern";
+        /**
+         * The value of the wordBoundary parameter to
+         * {@link TermCompletionAnalyzer#TermCompletionAnalyzer(Pattern, Pattern, Pattern, boolean)} 
+         * (Note the {@link Pattern#UNICODE_CHARACTER_CLASS} flag is enabled).
+         * It is an error if a different analyzer class is specified.
+         */
+        String WORD_BOUNDARY = "wordBoundary";
+        /**
+         * The value of the subWordBoundary parameter to
+         * {@link TermCompletionAnalyzer#TermCompletionAnalyzer(Pattern, Pattern, Pattern, boolean)} 
+         * (Note the {@link Pattern#UNICODE_CHARACTER_CLASS} flag is enabled).
+         * It is an error if a different analyzer class is specified.
+         */
+        String SUB_WORD_BOUNDARY = "subWordBoundary";
+        /**
+         * The value of the softHyphens parameter to
+         * {@link TermCompletionAnalyzer#TermCompletionAnalyzer(Pattern, Pattern, Pattern, boolean)} 
+         * (Note the {@link Pattern#UNICODE_CHARACTER_CLASS} flag is enabled).
+         * It is an error if a different analyzer class is specified.
+         */
+        String SOFT_HYPHENS = "softHyphens";
+        /**
+         * The value of the alwaysRemoveSoftHypens parameter to
+         * {@link TermCompletionAnalyzer#TermCompletionAnalyzer(Pattern, Pattern, Pattern, boolean)} 
+         * (Note the {@link Pattern#UNICODE_CHARACTER_CLASS} flag is enabled).
+         * It is an error if a different analyzer class is specified.
+         */
+        String ALWAYS_REMOVE_SOFT_HYPHENS = "alwaysRemoveSoftHyphens";
+        
+        boolean DEFAULT_ALWAYS_REMOVE_SOFT_HYPHENS = false;
+
+        /**
+         * The default sub-word boundary is a pattern that never matches,
+         * i.e. there are no sub-word boundaries.
+         */
+		Pattern DEFAULT_SUB_WORD_BOUNDARY = Pattern.compile("(?!)");
     	
     }
 
-	private static final String DEFAULT_PROPERTIES =  
+	private static final String ALL_LUCENE_NATURAL_LANGUAGES =  
 			"com.bigdata.search.ConfigurableAnalyzerFactory.analyzer.*.like=eng\n" +
 		    "com.bigdata.search.ConfigurableAnalyzerFactory.analyzer.por.analyzerClass=org.apache.lucene.analysis.br.BrazilianAnalyzer\n" +
 		    "com.bigdata.search.ConfigurableAnalyzerFactory.analyzer.pt.like=por\n" +
@@ -365,10 +424,39 @@ c.b.s.C.analyzer.en.like=eng
 		    "com.bigdata.search.ConfigurableAnalyzerFactory.analyzer.eng.analyzerClass=org.apache.lucene.analysis.standard.StandardAnalyzer\n" +
 		    "com.bigdata.search.ConfigurableAnalyzerFactory.analyzer.en.like=eng\n";
 
+	private static final String LUCENE_STANDARD_ANALYZER = 
+			"com.bigdata.search.ConfigurableAnalyzerFactory.analyzer.*.analyzerClass=org.apache.lucene.analysis.standard.StandardAnalyzer\n";
+
+	/**
+	 * This comment describes the implementation of {@link ConfigurableAnalyzerFactory}.
+	 * The only method in the interface is {@link ConfigurableAnalyzerFactory#getAnalyzer(String, boolean)},
+	 * a map is used from language tag to {@link AnalyzerPair}, where the pair contains
+	 * an {@link Analyzer} both with and without stopwords configured (some times these two analyzers are identical,
+	 * if, for example, stop words are not supported or not required).
+	 * <p>
+	 * If there is no entry for the language tag in the map {@link ConfigurableAnalyzerFactory#langTag2AnalyzerPair},
+	 * then one is created, by walking down the array {@link ConfigurableAnalyzerFactory#config} of AnalyzerPairs
+	 * until a matching one is found.
+	 * <p>
+	 * The bulk of the code in this class is invoked from the constructor in order to set up this 
+	 *  {@link ConfigurableAnalyzerFactory#config} array. For example, all of the subclasses of {@link AnalyzerPair}s,
+	 *  are simply to call the appropriate constructor in the appropriate way: the difficulty is that many subclasses
+	 *  of {@link Analyzer} have constructors with different signatures, and our code needs to navigate each sort.
+	 * @author jeremycarroll
+	 *
+	 */
 	private static class AnalyzerPair implements Comparable<AnalyzerPair>{
-		private final LanguageRange range;
+		final LanguageRange range;
 		private final Analyzer withStopWords;
 		private final Analyzer withoutStopWords;
+		
+		public Analyzer getAnalyzer(boolean filterStopwords) {
+			return filterStopwords ? withStopWords : withoutStopWords;
+		}
+		
+		public boolean extendedFilterMatch(String[] language) {
+			return range.extendedFilterMatch(language);
+		}
 		
     	AnalyzerPair(String range, Analyzer withStopWords, Analyzer withOutStopWords) {
     		this.range = new LanguageRange(range);
@@ -376,22 +464,27 @@ c.b.s.C.analyzer.en.like=eng
     		this.withoutStopWords = withOutStopWords;
     	}
     	
+    	/**
+    	 * This clone constructor implements {@link AnalyzerOptions#LIKE}.
+    	 * @param range
+    	 * @param copyMe
+    	 */
     	AnalyzerPair(String range, AnalyzerPair copyMe) {
     		this.range = new LanguageRange(range);
     		this.withStopWords = copyMe.withStopWords;
     		this.withoutStopWords = copyMe.withoutStopWords;
-    		
     	}
-
-		public Analyzer getAnalyzer(boolean filterStopwords) {
-			return filterStopwords ? withStopWords : withoutStopWords;
-		}
-		@Override
-		public String toString() {
-			return range.full + "=(" + withStopWords.getClass().getSimpleName() +")";
-		}
 		
-		
+    	/**
+    	 * If we have a constructor, with arguments including a populated
+    	 * stop word set, then we can use it to make both the withStopWords
+    	 * analyzer, and the withoutStopWords analyzer.
+    	 * @param range
+    	 * @param cons A Constructor including a {@link java.util.Set} argument
+    	 *  for the stop words.
+    	 * @param params The arguments to pass to the constructor including a populated stopword set.
+    	 * @throws Exception
+    	 */
     	AnalyzerPair(String range, Constructor<? extends Analyzer> cons, Object ... params) throws Exception {
     		this(range, cons.newInstance(params), cons.newInstance(useEmptyStopWordSet(params)));
     	}
@@ -409,38 +502,52 @@ c.b.s.C.analyzer.en.like=eng
 			}
 			return rslt;
 		}
+
+		@Override
+		public String toString() {
+			return range.full + "=(" + withStopWords.getClass().getSimpleName() +")";
+		}
+		
 		@Override
 		public int compareTo(AnalyzerPair o) {
 			return range.compareTo(o.range);
 		}
-
-		public boolean extendedFilterMatch(String[] language) {
-			return range.extendedFilterMatch(language);
-		}
 	}
 	
 
+	/**
+	 * Used for Analyzer classes with a constructor with signature (Version, Set).
+	 * @author jeremycarroll
+	 *
+	 */
 	private static class VersionSetAnalyzerPair extends AnalyzerPair {
 		public VersionSetAnalyzerPair(ConfigOptionsToAnalyzer lro,
 				Class<? extends Analyzer> cls) throws Exception {
 			super(lro.languageRange, getConstructor(cls, Version.class, Set.class), Version.LUCENE_CURRENT, lro.getStopWords());
 		}
 	}
-	
-	private static class VersionAnalyzerPair extends AnalyzerPair {
 
+	/**
+	 * Used for Analyzer classes which do not support stopwords and have a constructor with signature (Version).
+	 * @author jeremycarroll
+	 *
+	 */
+	private static class VersionAnalyzerPair extends AnalyzerPair {
 		public VersionAnalyzerPair(String range, Class<? extends Analyzer> cls) throws Exception {
 			super(range, getConstructor(cls, Version.class).newInstance(Version.LUCENE_CURRENT));
 		}
 	}
 	
-	
+	/**
+	 * Special case code for {@link PatternAnalyzer}
+	 * @author jeremycarroll
+	 *
+	 */
     private static class PatternAnalyzerPair extends AnalyzerPair {
-
-		public PatternAnalyzerPair(ConfigOptionsToAnalyzer lro, String pattern) throws Exception {
+		public PatternAnalyzerPair(ConfigOptionsToAnalyzer lro, Pattern pattern) throws Exception {
 			super(lro.languageRange, getConstructor(PatternAnalyzer.class,Version.class,Pattern.class,Boolean.TYPE,Set.class), 
 				Version.LUCENE_CURRENT, 
-				Pattern.compile(pattern, Pattern.UNICODE_CHARACTER_CLASS),
+				pattern,
 				true,
 				lro.getStopWords());
 		}
@@ -451,6 +558,16 @@ c.b.s.C.analyzer.en.like=eng
 	 * This class is initialized with the config options, using the {@link #setProperty(String, String)}
 	 * method, for a particular language range and works out which pair of {@link Analyzer}s
 	 * to use for that language range.
+	 * <p>
+	 * Instances of this class are only alive during the execution of 
+	 * {@link ConfigurableAnalyzerFactory#ConfigurableAnalyzerFactory(FullTextIndex)},
+	 * the life-cycle is:
+	 * <ol>
+	 * <li>The relveant config properties are applied, and are used to populate the fields.
+	 * <li>The fields are validated
+	 * <li>An {@link AnalyzerPair} is constructed
+	 * </ol>
+	 * 
 	 * @author jeremycarroll
 	 *
 	 */
@@ -459,9 +576,13 @@ c.b.s.C.analyzer.en.like=eng
     	String like;
     	String className;
     	String stopwords;
-    	String pattern;
+    	Pattern pattern;
     	final String languageRange;
     	AnalyzerPair result;
+		Pattern wordBoundary;
+		Pattern subWordBoundary;
+		Pattern softHyphens;
+		Boolean alwaysRemoveSoftHyphens;
 
 		public ConfigOptionsToAnalyzer(String languageRange) {
 			this.languageRange = languageRange;
@@ -474,7 +595,7 @@ c.b.s.C.analyzer.en.like=eng
 		 */
 		public Set<?> getStopWords() {
 			
-			if (AnalyzerOptions.STOPWORDS_VALUE_NONE.equals(stopwords)) 
+			if (doNotUseStopWords()) 
 				return Collections.EMPTY_SET;
 			
 			if (useDefaultStopWords()) {
@@ -482,6 +603,10 @@ c.b.s.C.analyzer.en.like=eng
 			}
 			
 			return getStopWordsForClass(stopwords);
+		}
+
+		boolean doNotUseStopWords() {
+			return AnalyzerOptions.STOPWORDS_VALUE_NONE.equals(stopwords) || (stopwords == null && pattern != null);
 		}
 
 		protected Set<?> getStopWordsForClass(String clazzName) {
@@ -500,9 +625,13 @@ c.b.s.C.analyzer.en.like=eng
 		}
 
 		protected boolean useDefaultStopWords() {
-			return stopwords == null || AnalyzerOptions.STOPWORDS_VALUE_DEFAULT.equals(stopwords);
+			return ( stopwords == null && pattern == null ) || AnalyzerOptions.STOPWORDS_VALUE_DEFAULT.equals(stopwords);
 		}
 
+		/**
+		 * The first step in the life-cycle, used to initialize the fields.
+		 * @return true if the property was recognized.
+		 */
 		public boolean setProperty(String shortProperty, String value) {
 			if (shortProperty.equals(AnalyzerOptions.LIKE) ) {
 				like = value;
@@ -511,13 +640,24 @@ c.b.s.C.analyzer.en.like=eng
 			} else if (shortProperty.equals(AnalyzerOptions.STOPWORDS) ) {
 				stopwords = value;
 			} else if (shortProperty.equals(AnalyzerOptions.PATTERN) ) {
-				pattern = value;
+				pattern = Pattern.compile(value,Pattern.UNICODE_CHARACTER_CLASS);
+			} else if (shortProperty.equals(AnalyzerOptions.WORD_BOUNDARY) ) {
+				wordBoundary = Pattern.compile(value,Pattern.UNICODE_CHARACTER_CLASS);
+			} else if (shortProperty.equals(AnalyzerOptions.SUB_WORD_BOUNDARY) ) {
+				subWordBoundary = Pattern.compile(value,Pattern.UNICODE_CHARACTER_CLASS);
+			} else if (shortProperty.equals(AnalyzerOptions.SOFT_HYPHENS) ) {
+				softHyphens = Pattern.compile(value,Pattern.UNICODE_CHARACTER_CLASS);
+			} else if (shortProperty.equals(AnalyzerOptions.ALWAYS_REMOVE_SOFT_HYPHENS) ) {
+				alwaysRemoveSoftHyphens = Boolean.valueOf(value);
 			} else {
 			   return false;
 			}
 			return true;
 		}
 
+		/**
+		 * The second phase of the life-cycle, used for sanity checking.
+		 */
 		public void validate() {
 			if (pattern != null ) {
 				if ( className != null && className != PatternAnalyzer.class.getName()) {
@@ -525,6 +665,27 @@ c.b.s.C.analyzer.en.like=eng
 				}
 				className = PatternAnalyzer.class.getName();
 			}
+			if (this.wordBoundary != null  ) {
+				if ( className != null && className != TermCompletionAnalyzer.class.getName()) {
+					throw new RuntimeException("Bad Option: Language range "+languageRange + " with pattern propety for class "+ className);
+				}
+				className = TermCompletionAnalyzer.class.getName();
+				
+				if ( subWordBoundary == null ) {
+					subWordBoundary = AnalyzerOptions.DEFAULT_SUB_WORD_BOUNDARY;
+				}
+				if ( alwaysRemoveSoftHyphens != null && softHyphens == null ) {
+					throw new RuntimeException("Bad option: Language range "+languageRange + ": must specify softHypens when setting alwaysRemoveSoftHyphens");		
+				}
+				if (softHyphens != null && alwaysRemoveSoftHyphens == null) {
+					alwaysRemoveSoftHyphens = AnalyzerOptions.DEFAULT_ALWAYS_REMOVE_SOFT_HYPHENS;
+				}
+				
+			} else if ( subWordBoundary != null || softHyphens != null || alwaysRemoveSoftHyphens != null ||
+					TermCompletionAnalyzer.class.getName().equals(className) ) {
+				throw new RuntimeException("Bad option: Language range "+languageRange + ": must specify wordBoundary for TermCompletionAnalyzer");
+			}
+			
 			if (PatternAnalyzer.class.getName().equals(className) && pattern == null ) {
 				throw new RuntimeException("Bad Option: Language range "+languageRange + " must specify pattern for PatternAnalyzer.");
 			}
@@ -537,21 +698,45 @@ c.b.s.C.analyzer.en.like=eng
 			
 		}
 		
+		/**
+		 * The third and final phase of the life-cyle used for identifying
+		 * the AnalyzerPair.
+		 */
 		private AnalyzerPair construct() throws Exception {
 			if (className == null) {
 				return null;
 			}
 			if (pattern != null) {
 				return new PatternAnalyzerPair(this, pattern);
-						
-			} 
+			}
+			if (softHyphens != null) {
+				return new AnalyzerPair(
+						languageRange,
+						new TermCompletionAnalyzer(
+								wordBoundary, 
+								subWordBoundary, 
+								softHyphens, 
+								alwaysRemoveSoftHyphens));
+			}
+			if (wordBoundary != null) {
+				return new AnalyzerPair(
+						languageRange,
+						new TermCompletionAnalyzer(
+								wordBoundary, 
+								subWordBoundary));
+			}
 			final Class<? extends Analyzer> cls = getAnalyzerClass();
             
             if (hasConstructor(cls, Version.class, Set.class)) {
 
             	// RussianAnalyzer is missing any way to access stop words.
-            	if (RussianAnalyzer.class.equals(cls) && useDefaultStopWords()) {
-            		return new AnalyzerPair(languageRange, new RussianAnalyzer(Version.LUCENE_CURRENT), new RussianAnalyzer(Version.LUCENE_CURRENT, Collections.EMPTY_SET));
+            	if (RussianAnalyzer.class.equals(cls)) {
+            		if (useDefaultStopWords()) {
+            		    return new AnalyzerPair(languageRange, new RussianAnalyzer(Version.LUCENE_CURRENT), new RussianAnalyzer(Version.LUCENE_CURRENT, Collections.EMPTY_SET));
+            		}
+            		if (doNotUseStopWords()) {
+            		    return new AnalyzerPair(languageRange,  new RussianAnalyzer(Version.LUCENE_CURRENT, Collections.EMPTY_SET));	
+            		}
             	}
             	return new VersionSetAnalyzerPair(this, cls);
             }
@@ -567,6 +752,29 @@ c.b.s.C.analyzer.en.like=eng
             	return new AnalyzerPair(languageRange, cls.newInstance());
             }
             throw new RuntimeException("Bad option: cannot find constructor for class " + className + " for language range " + languageRange);
+		}
+
+		/**
+		 * Also part of the third phase of the life-cycle, following the {@link AnalyzerOptions#LIKE}
+		 * properties.
+		 * @param depth
+		 * @param max
+		 * @param analyzers
+		 * @return
+		 */
+		AnalyzerPair followLikesToAnalyzerPair(int depth, int max,
+				Map<String, ConfigOptionsToAnalyzer> analyzers) {
+			if (result == null) {
+				if (depth == max) {
+					throw new RuntimeException("Bad configuration: - 'like' loop for language range " + languageRange);
+				}
+				ConfigOptionsToAnalyzer next = analyzers.get(like);
+				if (next == null) {
+					throw new RuntimeException("Bad option: - 'like' not found for language range " + languageRange+ " (not found: '"+ like +"')");	
+				}
+				result = new AnalyzerPair(languageRange, next.followLikesToAnalyzerPair(depth+1, max, analyzers));
+			}
+			return result;
 		}
 
 		protected Class<? extends Analyzer> getAnalyzerClass() {
@@ -587,22 +795,6 @@ c.b.s.C.analyzer.en.like=eng
 		void setAnalyzerPair(AnalyzerPair ap) {
 			result = ap;
 		}
-
-		AnalyzerPair followLikesToAnalyzerPair(int depth, int max,
-				Map<String, ConfigOptionsToAnalyzer> analyzers) {
-			if (result == null) {
-				if (depth == max) {
-					throw new RuntimeException("Bad configuration: - 'like' loop for language range " + languageRange);
-				}
-				ConfigOptionsToAnalyzer next = analyzers.get(like);
-				if (next == null) {
-					throw new RuntimeException("Bad option: - 'like' not found for language range " + languageRange+ " (not found: '"+ like +"')");	
-				}
-				result = new AnalyzerPair(languageRange, next.followLikesToAnalyzerPair(depth+1, max, analyzers));
-			}
-			return result;
-		}
-
 	}
     
     private final AnalyzerPair config[];
@@ -615,12 +807,19 @@ c.b.s.C.analyzer.en.like=eng
      * strategy so the code will still work on the {@link #MAX_LANG_CACHE_SIZE}+1 th entry.
      */
     private static final int MAX_LANG_CACHE_SIZE = 500;
+
     		
     private String defaultLanguage;
     private final FullTextIndex<?> fullTextIndex;
     
     
+    /**
+     * Builds a new ConfigurableAnalyzerFactory.
+     * @param fullTextIndex
+     */
     public ConfigurableAnalyzerFactory(final FullTextIndex<?> fullTextIndex) {
+    	// A description of the operation of this method is found on AnalyzerPair and
+    	// ConfigOptionsToAnalyzer.
     	// despite our name, we actually make all the analyzers now, and getAnalyzer method is merely a lookup.
 
         if (fullTextIndex == null)
@@ -717,9 +916,9 @@ c.b.s.C.analyzer.en.like=eng
 		while (en.hasMoreElements()) {
 			
 			String prop = (String)en.nextElement();
-			if (prop.equals(Options.INCLUDE_DEFAULTS)) continue;
+			if (prop.equals(Options.NATURAL_LANGUAGE_SUPPORT)) continue;
 			if (prop.startsWith(Options.ANALYZER)) {
-				String languageRangeAndProperty[] = prop.substring(Options.ANALYZER.length()).split("[.]");
+				String languageRangeAndProperty[] = prop.substring(Options.ANALYZER.length()).replaceAll("_","*").split("[.]");
 				if (languageRangeAndProperty.length == 2) {
 
 					String languageRange = languageRangeAndProperty[0].toLowerCase(Locale.US);  // Turkish "I" could create a problem
@@ -745,25 +944,29 @@ c.b.s.C.analyzer.en.like=eng
 	protected Properties initProperties() {
 		final Properties parentProperties = fullTextIndex.getProperties();
         Properties myProps;
-        if (Boolean.getBoolean(parentProperties.getProperty(Options.INCLUDE_DEFAULTS, Options.DEFAULT_INCLUDE_DEFAULTS))) {
-        	myProps = defaultProperties();
-        } else {
+        if (Boolean.valueOf(parentProperties.getProperty(
+        		Options.NATURAL_LANGUAGE_SUPPORT, 
+        		Options.DEFAULT_NATURAL_LANGUAGE_SUPPORT))) {
+        	
+        	myProps = loadPropertyString(ALL_LUCENE_NATURAL_LANGUAGES);
+        	
+        } else  if (hasPropertiesForStarLanguageRange(parentProperties)){
+        	
         	myProps = new Properties();
+        	
+        } else {
+        	
+        	myProps = loadPropertyString(LUCENE_STANDARD_ANALYZER);
         }
         
         copyRelevantProperties(fullTextIndex.getProperties(), myProps);
-        
-        if (myProps.isEmpty()) {
-        	return defaultProperties();
-        } else {
-		    return myProps;
-        }
+        return myProps;
 	}
 
-	protected Properties defaultProperties() {
+	Properties loadPropertyString(String props) {
 		Properties rslt = new Properties();
 		try {
-			rslt.load(new StringReader(DEFAULT_PROPERTIES));
+			rslt.load(new StringReader(props));
 		} catch (IOException e) {
 			throw new RuntimeException("Impossible - well clearly not!", e);
 		}
@@ -780,6 +983,17 @@ c.b.s.C.analyzer.en.like=eng
 		}
 	}
 
+    private boolean hasPropertiesForStarLanguageRange(Properties from) {
+		Enumeration<?> en = from.propertyNames();
+		while (en.hasMoreElements()) {
+			String prop = (String)en.nextElement();
+			if (prop.startsWith(Options.ANALYZER+"_.") 
+					|| prop.startsWith(Options.ANALYZER+"*.")) {
+				return true;
+			}
+		}
+		return false;
+	}
 	@Override
 	public Analyzer getAnalyzer(String languageCode, boolean filterStopwords) {
 		
