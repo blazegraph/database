@@ -93,7 +93,7 @@ public class TestConfigurableAnalyzerFactory extends AbstractAnalyzerFactoryTest
 		myProps[i+2] = FullTextIndex.Options.ANALYZER_FACTORY_CLASS;
 		myProps[i+3] = ConfigurableAnalyzerFactory.class.getName();
 		try {
-		   this.createFullTextIndex("test-in-error"+getName(), myProps);
+		   this.createFullTextIndex("test-in-error"+getName(), myProps).getAnalyzer("en",true);
 		}
 		catch (RuntimeException e) {
 			Throwable t = e;
