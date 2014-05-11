@@ -28,7 +28,7 @@ package com.bigdata.search;
 
 import junit.framework.TestCase2;
 
-import com.bigdata.search.ConfigurableAnalyzerFactory.LanguageRange;
+import com.bigdata.search.LanguageRange;
 
 public class TestLanguageRange extends TestCase2 {
 

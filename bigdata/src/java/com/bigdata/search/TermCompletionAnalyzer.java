@@ -170,16 +170,7 @@ public class TermCompletionAnalyzer extends Analyzer {
 		
 		public TermCompletionTokenStream(StringReader reader) {
 		    termAtt = addAttribute(TermAttribute.class);
-			try {
-				reader.mark(Integer.MAX_VALUE);
-				int length = (int) reader.skip(Integer.MAX_VALUE);
-				reader.reset();
-				char fileContent[] = new char[length];
-				reader.read(fileContent);
-				words = wordBoundary.split(new String(fileContent));
-			} catch (IOException e) {
-				throw new RuntimeException("Impossible",e);
-			}
+			words = wordBoundary.split(getStringReaderContents(reader));
 		}
 		
 		@Override
@@ -244,5 +235,18 @@ public class TermCompletionAnalyzer extends Analyzer {
 		}
 
 	}
-	
+
+	static String getStringReaderContents(StringReader reader) {
+		try {
+			reader.mark(Integer.MAX_VALUE);
+			int length = (int) reader.skip(Integer.MAX_VALUE);
+			reader.reset();
+			char fileContent[] = new char[length];
+			reader.read(fileContent);
+			reader.reset();
+			return new String(fileContent);
+		} catch (IOException e) {
+			throw new RuntimeException("Impossible",e);
+		}
+	}
 }
