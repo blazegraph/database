@@ -56,11 +56,19 @@ function showTab(tab, nohash) {
    }
 }
 
+function moveTabLeft() {
+   moveTab(false);
+}
+
+function moveTabRight() {
+   moveTab(true);
+}
+
 function moveTab(next) {
    // get current position
    var current = $('#tab-selector .active');
    if(next) {
-      if(current.next().length) {
+      if(current.next('a').length) {
          current.next().click();
       } else {
          $('#tab-selector a:first').click();
@@ -75,8 +83,8 @@ function moveTab(next) {
 }
 
 // these should be , and . but Hotkeys views those keypresses as these characters
-$('html, textarea, select').bind('keydown', 'ctrl+¼', function() { moveTab(false); });
-$('html, textarea, select').bind('keydown', 'ctrl+¾', function() { moveTab(true); });
+$('html, textarea, select').bind('keydown', 'ctrl+¼', moveTabLeft);
+$('html, textarea, select').bind('keydown', 'ctrl+¾', moveTabRight);
 
 /* Namespaces */
 
@@ -407,20 +415,23 @@ $('#update-file').change(handleFile);
 $('#update-box').on('dragover', handleDragOver)
    .on('drop', handleFile)
    .on('paste', handlePaste)
-   .on('input propertychange', function() { $('#update-errors').hide(); })
-   .bind('keydown', 'ctrl+return', submitUpdate);
+   .on('input propertychange', function() { $('#update-errors').hide(); });
 $('#clear-file').click(clearFile);
 
 $('#update-update').click(submitUpdate);
 
-UPDATE_EDITOR = CodeMirror.fromTextArea($('#update-box')[0], {lineNumbers: true, mode: 'sparql'});
+UPDATE_EDITOR = CodeMirror.fromTextArea($('#update-box')[0], {lineNumbers: true, mode: 'sparql',
+   extraKeys: {'Ctrl-Enter': submitUpdate, 'Ctrl-,': moveTabLeft, 'Ctrl-.': moveTabRight}
+});
 
 function submitUpdate(e) {
    // Updates are submitted as a regular form for SPARQL updates in monitor mode, and via AJAX for non-monitor SPARQL, RDF & file path updates.
    // When submitted as a regular form, the output is sent to an iframe. This is to allow monitor mode to work.
    // jQuery only gives us data when the request is complete, so we wouldn't see monitor results as they come in.
 
-   e.preventDefault();
+   try {
+      e.preventDefault();
+   } catch(e) {}
 
    $('#update-response').show();
 
@@ -512,8 +523,7 @@ function updateResponseError(jqXHR, textStatus, errorThrown) {
 
 /* Query */
 
-$('#query-box').bind('keydown', 'ctrl+return', function(e) { e.preventDefault(); $('#query-form').submit(); })
-               .on('input propertychange', function() { $('#query-errors').hide(); });
+$('#query-box').on('input propertychange', function() { $('#query-errors').hide(); });
 $('#query-form').submit(submitQuery);
 
 $('#query-explain').change(function() {
@@ -528,17 +538,21 @@ $('#query-details').change(function() {
    }
 });
 
-QUERY_EDITOR = CodeMirror.fromTextArea($('#query-box')[0], {lineNumbers: true, mode: 'sparql'});
+QUERY_EDITOR = CodeMirror.fromTextArea($('#query-box')[0], {lineNumbers: true, mode: 'sparql',
+   extraKeys: {'Ctrl-Enter': submitQuery, 'Ctrl-,': moveTabLeft, 'Ctrl-.': moveTabRight}
+});
 
 function submitQuery(e) {
-   e.preventDefault();
+   try {
+      e.preventDefault();
+   } catch(e) {}
 
    // transfer CodeMirror content to textarea
    QUERY_EDITOR.save();
 
    var settings = {
       type: 'POST',
-      data: $(this).serialize(),
+      data: $('#query-form').serialize(),
       headers: { 'Accept': 'application/sparql-results+json, application/rdf+xml' },
       success: showQueryResults,
       error: queryResultsError
@@ -553,7 +567,7 @@ function submitQuery(e) {
    if($('#query-explain').is(':checked')) {
       settings = {
          type: 'POST',
-         data: $(this).serialize() + '&explain=' + ($('#query-details').is(':checked') ? 'details' : 'true'),
+         data: $('#query-form').serialize() + '&explain=' + ($('#query-details').is(':checked') ? 'details' : 'true'),
          dataType: 'html',
          success: showQueryExplanation,
          error: queryResultsError
