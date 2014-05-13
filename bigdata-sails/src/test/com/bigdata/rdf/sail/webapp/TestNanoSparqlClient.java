@@ -251,7 +251,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
 
             entity = response.getEntity();
             
-            final String content = EntityUtils.toString(response.getEntity());
+            final String content = EntityUtils.toString(entity);
             
             return content;
             
@@ -260,6 +260,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
             try {
                 EntityUtils.consume(entity);
             } catch (IOException ex) {
+                log.warn(ex, ex);
             }
 
         }

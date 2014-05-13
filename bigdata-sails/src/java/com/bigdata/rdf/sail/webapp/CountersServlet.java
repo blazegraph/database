@@ -217,7 +217,14 @@ public class CountersServlet extends BigdataServlet {
 
         resp.setStatus(HTTP_OK);
 
-        resp.setContentType(mimeType + "; charset='" + charset + "'");
+        resp.setContentType(mimeType);
+
+        if (format.hasCharset()) {
+
+            // Note: Binary encodings do not specify charset.
+            resp.setCharacterEncoding(format.getCharset().name());
+
+        }
 
         /*
          * Sets the cache behavior -- the data should be good for up to 60
