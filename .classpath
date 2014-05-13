@@ -76,7 +76,7 @@
 	<classpathentry exported="true" kind="lib" path="bigdata-sails/lib/httpcomponents/commons-fileupload-1.2.2.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata-sails/lib/httpcomponents/commons-io-2.1.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata/lib/apache/log4j-1.2.17.jar"/>
-	<classpathentry exported="true" kind="lib" path="bigdata-rdf/lib/openrdf-sesame-2.6.10-onejar.jar"/>
+	<classpathentry exported="true" kind="lib" path="bigdata-rdf/lib/openrdf-sesame-2.6.10-onejar.jar" sourcepath="/Users/bryan/Documents/workspace/org.openrdf.sesame-2.6.10"/>
 	<classpathentry exported="true" kind="lib" path="bigdata-rdf/lib/sesame-rio-testsuite-2.6.10.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata-sails/lib/sesame-sparql-testsuite-2.6.10.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata-sails/lib/sesame-store-testsuite-2.6.10.jar"/>

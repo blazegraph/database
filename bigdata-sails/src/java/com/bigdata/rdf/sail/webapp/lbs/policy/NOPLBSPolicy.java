@@ -73,7 +73,7 @@ public class NOPLBSPolicy extends AbstractLBSPolicy {
      * Note: This method is not invoked.
      */
     @Override
-    public String getReaderURL(final HttpServletRequest req) {
+    public String getReaderURI(final HttpServletRequest req) {
 
         throw new UnsupportedOperationException();
 

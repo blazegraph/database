@@ -52,7 +52,6 @@ import java.util.regex.Pattern;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-
 import org.apache.log4j.Logger;
 
 import com.bigdata.counters.History;
@@ -343,6 +342,70 @@ public class URLQueryModel {
      */
     final public File file;
     
+    @Override
+    public String toString() {
+        
+        final StringBuilder sb = new StringBuilder();
+        
+        sb.append(URLQueryModel.class.getName());
+
+        sb.append("{uri=" + uri);
+        
+        sb.append(",params=" + params);
+        
+        sb.append(",path=" + path);
+        
+        sb.append(",depth=" + depth);
+        
+        sb.append(",reportType=" + reportType);
+
+        sb.append(",mimeType=" + mimeType);
+
+        sb.append(",pattern=" + pattern);
+        
+        sb.append(",category="
+                + (category == null ? "N/A" : Arrays.toString(category)));
+        
+        sb.append(",period=" + period);
+        
+        sb.append(",[fromTime=" + fromTime);
+        
+        sb.append(",toTime=" + toTime + "]");
+
+        sb.append(",flot=" + flot);
+
+        if (eventOrderBy != null) {
+            sb.append(",eventOrderBy=[");
+            boolean first = true;
+            for (Field f : eventOrderBy) {
+                if (!first)
+                    sb.append(",");
+                sb.append(f.getName());
+                first = false;
+            }
+            sb.append("]");
+        }
+
+        if (eventFilters != null && !eventFilters.isEmpty()) {
+            sb.append(",eventFilters{");
+            boolean first = true;
+            for (Map.Entry<Field, Pattern> e : eventFilters.entrySet()) {
+                if (!first)
+                    sb.append(",");
+                sb.append(e.getKey().getName());
+                sb.append("=");
+                sb.append(e.getValue());
+                first = false;
+            }
+            sb.append("}");
+        }
+
+        sb.append("}");
+
+        return sb.toString();
+        
+    }
+    
     /**
      * Factory for {@link NanoHTTPD} integration.
      * 
@@ -396,7 +459,10 @@ public class URLQueryModel {
      * 
      * @param service
      *            The service object IFF one was specified when
-     *            {@link CounterSetHTTPD} was started.
+     *            {@link CounterSetHTTPD} was started. If this implements the
+     *            {@link IEventReportingService} interface, then events can also
+     *            be requested.
+     * 
      * @param req
      *            The request.
      * @param resp
@@ -412,7 +478,7 @@ public class URLQueryModel {
         
         final LinkedHashMap<String, Vector<String>> params = new LinkedHashMap<String, Vector<String>>();
 
-        @SuppressWarnings("unchecked")
+//        @SuppressWarnings("unchecked")
         final Enumeration<String> enames = req.getParameterNames();
 
         while (enames.hasMoreElements()) {

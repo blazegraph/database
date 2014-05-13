@@ -137,6 +137,7 @@ abstract public class AbstractStatisticsCollector implements IStatisticsCollecto
      * The interval in seconds at which the counter values are read from the
      * host platform.
      */
+    @Override
     public int getInterval() {
 
         return interval;
@@ -225,8 +226,15 @@ abstract public class AbstractStatisticsCollector implements IStatisticsCollecto
      * <p>
      * Note: Subclasses MUST extend this method to initialize their own
      * counters.
+     * 
+     * TODO Why does this use the older <code>synchronized</code> pattern with a
+     * shared {@link #countersRoot} object rather than returning a new object
+     * per request? Check assumptions in the scale-out and local journal code
+     * bases for this.
      */
-    synchronized public CounterSet getCounters() {
+	@Override
+    synchronized 
+    public CounterSet getCounters() {
         
         if (countersRoot == null) {
 
@@ -319,6 +327,7 @@ abstract public class AbstractStatisticsCollector implements IStatisticsCollecto
 
             serviceRoot.addCounter(IProcessCounters.Memory_runtimeFreeMemory,
                     new Instrument<Long>() {
+                        @Override
                         public void sample() {
                             setValue(Runtime.getRuntime().freeMemory());
                         }
@@ -326,6 +335,7 @@ abstract public class AbstractStatisticsCollector implements IStatisticsCollecto
 
             serviceRoot.addCounter(IProcessCounters.Memory_runtimeTotalMemory,
                     new Instrument<Long>() {
+                        @Override
                         public void sample() {
                             setValue(Runtime.getRuntime().totalMemory());
                         }
@@ -599,6 +609,7 @@ abstract public class AbstractStatisticsCollector implements IStatisticsCollecto
      * Start collecting host performance data -- must be extended by the
      * concrete subclass.
      */
+    @Override
     public void start() {
 
         if (log.isInfoEnabled())
@@ -612,6 +623,7 @@ abstract public class AbstractStatisticsCollector implements IStatisticsCollecto
      * Stop collecting host performance data -- must be extended by the concrete
      * subclass.
      */
+    @Override
     public void stop() {
         
         if (log.isInfoEnabled())
@@ -634,6 +646,7 @@ abstract public class AbstractStatisticsCollector implements IStatisticsCollecto
      
         final Thread t = new Thread() {
             
+            @Override
             public void run() {
                 
                 AbstractStatisticsCollector.this.stop();

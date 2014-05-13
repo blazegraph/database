@@ -1019,6 +1019,8 @@ public class BigdataRDFContext extends BigdataBaseContext {
          *            The connection.
          * 
          * @return The query.
+         * 
+         * @see http://trac.bigdata.com/ticket/914 (Set timeout on remote query)
          */
         private AbstractQuery newQuery(final BigdataSailRepositoryConnection cxn) {
 

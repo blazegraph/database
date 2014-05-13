@@ -1,5 +1,6 @@
 /**
-Copyright (C) SYSTAP, LLC 2006-2014.  All rights reserved.
+
+Copyright (C) SYSTAP, LLC 2006-2010.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
@@ -20,22 +21,34 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
-package com.bigdata.rdf.sail.webapp.lbs.policy.ganglia;
+package com.bigdata.journal.jini.ha;
 
-import com.bigdata.ganglia.IHostReport;
+import com.bigdata.rdf.sail.webapp.lbs.IHALoadBalancerPolicy;
+import com.bigdata.rdf.sail.webapp.lbs.policy.counters.CountersLBSPolicy;
 
 /**
- * Returns ONE for each host (all hosts appear to have an equal workload).
+ * Test suite for the HA load balancer. 
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * 
+ * @see <a href="http://trac.bigdata.com/ticket/624"> HA Load Balancer </a>
  */
-public class NOPHostScoringRule implements IHostScoringRule {
+public class TestHA3LoadBalancer_CountersLBS extends AbstractHA3LoadBalancerTestCase {
 
-    @Override
-    public double getScore(final IHostReport hostReport) {
-
-        return 1d;
-
+    public TestHA3LoadBalancer_CountersLBS() {
     }
 
+    public TestHA3LoadBalancer_CountersLBS(final String name) {
+
+        super(name);
+        
+    }
+
+    @Override
+    protected IHALoadBalancerPolicy newTestPolicy() {
+
+        return new CountersLBSPolicy();
+        
+    }
+    
 }

@@ -116,7 +116,7 @@
    Requests directed to /bigdata/LBS/read are load balanced over the
    services joined with the met quourm.  This URL may only be used
    with idempotent requests (reads).
-      
+   
    For non-HA deployments, requests are simply forwarded to the local
    service after stripping off the /LBS/leader or /LBS/read prefix.
    Thus, it is always safe to use the LBS request URLs.
@@ -159,11 +159,20 @@
       
          Round robin for read requests.
       
+      com.bigdata.rdf.sail.webapp.lbs.policy.counters.CountersLBSPolicy:
+      
+         Load based proxying for read requests using the build in http
+         service for reporting performance counters.  This policy requires
+         the PlatformStatsPlugIn and may also require platform specific
+         metrics collection dependencies, e.g., sysstat.
+
       com.bigdata.rdf.sail.webapp.lbs.policy.ganglia.GangliaLBSPolicy:
       
-         Load based proxying for read requests using ganglia. Either gmond
-         must be installed on each node or the embedded GangliaService must
-         be enabled such that performance metrics are collected and reported.
+         Load based proxying for read requests using ganglia. This policy
+         requires the requires the PlatformStatsPlugIn.  In addition, either
+         gmond must be installed on each node or the embedded GangliaService
+         must be enabled such that performance metrics are collected and
+         reported.
       
       Some of these policies can be further configured using additional
       init-param elements that they understand. See the javadoc for the

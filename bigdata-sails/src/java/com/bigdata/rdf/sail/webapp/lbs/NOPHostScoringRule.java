@@ -1,5 +1,5 @@
 /**
-Copyright (C) SYSTAP, LLC 2013.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2014.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
@@ -20,23 +20,27 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
-package com.bigdata.rdf.sail.webapp;
-
-import junit.framework.Test;
-import junit.framework.TestCase;
-import junit.framework.TestSuite;
+package com.bigdata.rdf.sail.webapp.lbs;
 
 /**
- * A collection of proxied tests for the SPARQL 1.1 protocol.
+ * Returns ONE for each host (all hosts appear to have an equal workload).
+ * 
+ * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
-public class TestProtocolAll  extends TestCase  {
-    public static Test suite() {
-        final TestSuite suite = ProxySuiteHelper.suiteWithOptionalProxy("SPARQL 1.1 Protocol",TestMode.quads,TestMode.triples, TestMode.sids);
-        suite.addTestSuite(ExampleProtocolTest.class);
-        suite.addTestSuite(TestRelease123Protocol.class);
-        suite.addTestSuite(TestPostNotURLEncoded.class);
-        suite.addTestSuite(TestAskJsonTrac704.class);
-        return suite;
+public class NOPHostScoringRule implements IHostScoringRule {
+
+    @Override
+    public String[] getMetricNames() {
+     
+        return new String[]{};
+        
+    }
+    
+    @Override
+    public double getScore(final IHostMetrics metrics) {
+
+        return 1d;
+
     }
 
 }

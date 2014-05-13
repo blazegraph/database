@@ -2288,7 +2288,7 @@ public abstract class AbstractHA3JournalServerTestCase extends
                 cmds.add("-D" + TEST_JETTY_PORT + "=" + jettyPort);
 
                 // Override the location of the webapp as deployed.
-                cmds.add("-D" + JETTY_RESOURCE_BASE + "=\".\"");
+                cmds.add("-D" + JETTY_RESOURCE_BASE + "=.");
 
                 // Override the jetty.dump.start.
                 cmds.add("-D" + TEST_JETTY_DUMP_START + "=" + jettyDumpStart);

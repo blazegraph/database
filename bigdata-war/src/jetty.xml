@@ -122,62 +122,41 @@
     <!-- =========================================================== -->
     <!-- Set handler Collection Structure                            --> 
     <!-- =========================================================== -->
-    <!-- Recommended approach: does not work for HA CI test suite.
     <Set name="handler">
       <New id="Handlers" class="org.eclipse.jetty.server.handler.HandlerCollection">
         <Set name="handlers">
          <Array type="org.eclipse.jetty.server.Handler">
            <Item>
-            <New id="WebAppContext" class="org.eclipse.jetty.webapp.WebAppContext">
-				<Set name="war">
-					<SystemProperty name="jetty.resourceBase" default="bigdata-war/src" />
-				</Set>
-            <Set name="contextPath">/bigdata</Set>
-            <Set name="descriptor">WEB-INF/web.xml</Set>
-            <Set name="parentLoaderPriority">true</Set>
-            <Set name="extractWAR">false</Set>
-            </New>
+             <New id="Contexts" class="org.eclipse.jetty.server.handler.ContextHandlerCollection">
+                   <Call name="addHandler">
+                      <Arg>
+                        <!-- This is the redirect from root to /bigdata -->
+                        <New id="moved" class="org.eclipse.jetty.server.handler.MovedContextHandler">
+              <Set name="contextPath">/</Set>
+              <Set name="newContextURL">/bigdata</Set>
+              <Set name="permanent">true</Set>
+              <Set name="discardPathInfo">false</Set>
+              <Set name="discardQuery">false</Set>
+                        </New>
+                    </Arg>
+                  </Call>
+                  <Call name="addHandler">
+                    <Arg>
+                        <!-- This is the bigdata web application. -->
+                        <New id="WebAppContext" class="org.eclipse.jetty.webapp.WebAppContext">
+                            <Set name="war">
+                               <!-- The location of the top-level of the bigdata webapp. -->
+                              <SystemProperty name="jetty.resourceBase" default="bigdata-war/src" />
+                           </Set>
+                          <Set name="contextPath">/bigdata</Set>
+                         <Set name="descriptor">WEB-INF/web.xml</Set>
+                         <Set name="parentLoaderPriority">true</Set>
+                         <Set name="extractWAR">false</Set>
+                        </New>
+                    </Arg>
+                  </Call>
+             </New>
            </Item>
-         </Array>
-        </Set>
-      </New>
-    </Set> -->
-    <Set name="handler">
-      <New id="Handlers" class="org.eclipse.jetty.server.handler.HandlerCollection">
-        <Set name="handlers">
-         <Array type="org.eclipse.jetty.server.Handler">
-           <Item>
-            <!-- This is the bigdata web application. -->
-            <New id="WebAppContext" class="org.eclipse.jetty.webapp.WebAppContext">
-            <Set name="resourceBase">
-               <!-- The location of the top-level of the bigdata webapp. -->
-               <SystemProperty name="jetty.resourceBase" default="bigdata-war/src" />
-            </Set>
-            <Set name="contextPath">/bigdata</Set>
-            <Set name="descriptor">WEB-INF/web.xml</Set>
-            <Set name="parentLoaderPriority">true</Set>
-            <Set name="extractWAR">false</Set>
-            </New>
-           </Item>
-           <Item>
-            <!-- This appears to be necessary in addition to the above.   -->
-            <!-- Without this, it will not resolve http://localhost:8080/ --> 
-            <!-- and can fail to deliver some of the static content.      -->
-            <New id="ResourceHandler" class="org.eclipse.jetty.server.handler.ResourceHandler">
-            <Set name="resourceBase">
-               <!-- The location of the top-level of the bigdata webapp. -->
-               <SystemProperty name="jetty.resourceBase" default="bigdata-war/src" />
-            </Set>
-            <Set name="welcomeFiles">
-             <Array type="java.lang.String">
-              <Item>html/index.html</Item>
-             </Array>
-            </Set>
-            </New>
-           </Item>
-           <!-- <Item>
-            <New id="DefaultHandler" class="org.eclipse.jetty.server.handler.DefaultHandler"></New>
-           </Item> -->
          </Array>
         </Set>
       </New>

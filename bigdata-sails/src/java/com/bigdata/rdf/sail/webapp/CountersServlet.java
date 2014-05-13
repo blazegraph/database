@@ -33,8 +33,11 @@ import java.io.OutputStreamWriter;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import org.apache.log4j.Logger;
+
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.ICounterSetAccess;
+import com.bigdata.counters.format.CounterSetFormat;
 import com.bigdata.counters.query.CounterSetSelector;
 import com.bigdata.counters.query.URLQueryModel;
 import com.bigdata.counters.render.IRenderer;
@@ -48,7 +51,6 @@ import com.bigdata.service.IService;
  * Servlet for exposing performance counters.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  * 
  *          TODO The SPARQL layer needs to be separated from the core bigdata
  *          layer, with the BigdataContext moving into a servlet package in the
@@ -67,7 +69,7 @@ public class CountersServlet extends BigdataServlet {
      */
     private static final long serialVersionUID = 1L;
     
-//    static private final transient Logger log = Logger.getLogger(CountersServlet.class); 
+    static private final transient Logger log = Logger.getLogger(CountersServlet.class); 
 
     /**
      * 
@@ -160,12 +162,12 @@ public class CountersServlet extends BigdataServlet {
         
         final IIndexManager indexManager = getIndexManager();
 
-        if(indexManager instanceof IBigdataFederation) {
-        	
-        	((IBigdataFederation<?>)indexManager).reattachDynamicCounters();
-        	
+        if (indexManager instanceof IBigdataFederation) {
+
+            ((IBigdataFederation<?>) indexManager).reattachDynamicCounters();
+
         }
-        
+
         final CounterSet counterSet = ((ICounterSetAccess) indexManager)
                 .getCounters();
 
@@ -175,15 +177,27 @@ public class CountersServlet extends BigdataServlet {
         /*
          * Obtain a renderer.
          * 
-         * @todo This really should pass in the Accept header and our own list
-         * of preferences and do CONNEG for (X)HMTL vs XML vs text/plain.
-         * 
          * @todo if controller state error then send HTTP_BAD_REQUEST
          * 
          * @todo Write XSL and stylesheet for interactive browsing of the
          * CounterSet XML?
          */
-        final String mimeType = MIME_TEXT_HTML;
+
+        // Do conneg.
+        final String acceptStr = req.getHeader("Accept");
+
+        final ConnegUtil util = new ConnegUtil(acceptStr);
+
+        final CounterSetFormat format = util
+                .getCounterSetFormat(CounterSetFormat.HTML/* fallback */);
+
+//         final String mimeType = MIME_TEXT_HTML;
+        final String mimeType = format.getDefaultMIMEType();
+
+        if (log.isDebugEnabled())
+            log.debug("\nAccept=" + acceptStr + ",\nformat=" + format
+                    + ", mimeType=" + mimeType);
+
         final IRenderer renderer;
         {
 
@@ -191,8 +205,14 @@ public class CountersServlet extends BigdataServlet {
             final URLQueryModel model = URLQueryModel.getInstance(service,
                     req, resp);
 
+            if (log.isDebugEnabled())
+                log.debug("\nmodel=" + model);
+
             renderer = RendererFactory.get(model, counterSelector, mimeType);
-            
+
+            if (log.isDebugEnabled())
+                log.debug("\nrenderer=" + renderer);
+
         }
 
         resp.setStatus(HTTP_OK);
@@ -224,11 +244,10 @@ public class CountersServlet extends BigdataServlet {
 
             w.flush();
 
-//            is = new ByteArrayInputStream(baos.toByteArray());
-            
         }
-        
-//        copyStream(is, resp.getOutputStream());
+
+        if (log.isTraceEnabled())
+            log.trace("done");
 
     }
     

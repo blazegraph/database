@@ -59,7 +59,7 @@ public class RoundRobinLBSPolicy extends AbstractLBSPolicy {
      * the request can be proxied to that service.
      */
     @Override
-    public String getReaderURL(final HttpServletRequest request) {
+    public String getReaderURI(final HttpServletRequest request) {
 
         final ServiceScore[] serviceScores = this.serviceTableRef.get();
 

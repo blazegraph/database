@@ -87,7 +87,7 @@ import cutthecrap.utils.striterators.Striterator;
  */
 public class CounterSet extends AbstractCounterSet implements ICounterSet {
 
-    static protected final Logger log = Logger.getLogger(CounterSet.class);
+    static private final Logger log = Logger.getLogger(CounterSet.class);
 
 //    private String pathx;
     private final Map<String,ICounterNode> children = new ConcurrentHashMap<String,ICounterNode>();
@@ -107,7 +107,7 @@ public class CounterSet extends AbstractCounterSet implements ICounterSet {
      * @param name
      *            The name of the child.
      */
-    private CounterSet(String name,CounterSet parent) {
+    private CounterSet(final String name, final CounterSet parent) {
 
         super(name,parent);
         
@@ -159,6 +159,9 @@ public class CounterSet extends AbstractCounterSet implements ICounterSet {
 //
 //    }
     
+    /**
+     * Return <code>true</code> iff there are no children.
+     */
     public boolean isLeaf() {
         
         return children.isEmpty();
@@ -216,7 +219,6 @@ public class CounterSet extends AbstractCounterSet implements ICounterSet {
         
     }
 
-    @SuppressWarnings("unchecked")
     private void attach2(final ICounterNode src, final boolean replace) {
 
         if (src == null)
@@ -286,7 +288,7 @@ public class CounterSet extends AbstractCounterSet implements ICounterSet {
                 
             } else {
                 
-                ((Counter)src).parent = this;
+                ((Counter<?>)src).parent = this;
                 
             }
             
@@ -311,7 +313,8 @@ public class CounterSet extends AbstractCounterSet implements ICounterSet {
      * @return The node -or- <code>null</code> if there is no node with that
      *         path.
      */
-    synchronized public ICounterNode detach(String path) {
+    @SuppressWarnings({ "rawtypes", "unchecked" })
+    synchronized public ICounterNode detach(final String path) {
         
         final ICounterNode node = getPath(path);
         
@@ -347,7 +350,7 @@ public class CounterSet extends AbstractCounterSet implements ICounterSet {
      * @todo optimize for patterns that are anchored by filtering the child
      *       {@link ICounterSet}.
      */
-    @SuppressWarnings("unchecked")
+    @SuppressWarnings({ "unchecked", "rawtypes" })
     public Iterator<ICounter> counterIterator(final Pattern filter) {
         
         final IStriterator src = new Striterator(directChildIterator(
@@ -391,7 +394,7 @@ public class CounterSet extends AbstractCounterSet implements ICounterSet {
      * 
      * @return
      */
-    @SuppressWarnings("unchecked")
+    @SuppressWarnings({ "unchecked", "rawtypes" })
     public Iterator<ICounterNode> getNodes(final Pattern filter) {
      
         IStriterator src = ((IStriterator) postOrderIterator())
@@ -414,7 +417,8 @@ public class CounterSet extends AbstractCounterSet implements ICounterSet {
         
     }
     
-    @SuppressWarnings("unchecked")
+    @Override
+    @SuppressWarnings({ "unchecked", "rawtypes" })
     public Iterator<ICounter> getCounters(final Pattern filter) {
      
         IStriterator src = ((IStriterator) postOrderIterator())
@@ -450,8 +454,9 @@ public class CounterSet extends AbstractCounterSet implements ICounterSet {
      *            When <code>null</code> all directly attached children
      *            (counters and counter sets) are visited.
      */
-    public Iterator directChildIterator(boolean sorted,
-            Class<? extends ICounterNode> type) {
+    @SuppressWarnings("rawtypes")
+    public Iterator directChildIterator(final boolean sorted,
+            final Class<? extends ICounterNode> type) {
         
         /*
          * Note: In order to avoid concurrent modification problems under
@@ -514,7 +519,7 @@ public class CounterSet extends AbstractCounterSet implements ICounterSet {
      * child with a post-order traversal of its children and finally visits this
      * node itself.
      */
-    @SuppressWarnings("unchecked")
+    @SuppressWarnings({ "rawtypes", "unchecked" })
     public Iterator postOrderIterator() {
 
         /*
@@ -531,6 +536,7 @@ public class CounterSet extends AbstractCounterSet implements ICounterSet {
      * child with a pre-order traversal of its children and finally visits this
      * node itself.
      */
+    @SuppressWarnings({ "rawtypes", "unchecked" })
     public Iterator preOrderIterator() {
         
         /*
@@ -562,7 +568,9 @@ public class CounterSet extends AbstractCounterSet implements ICounterSet {
             /*
              * Expand each child in turn.
              */
-            protected Iterator expand(Object childObj) {
+            @Override
+            @SuppressWarnings("rawtypes")
+            protected Iterator expand(final Object childObj) {
 
                 /*
                  * A child of this node.
@@ -603,7 +611,9 @@ public class CounterSet extends AbstractCounterSet implements ICounterSet {
             /*
              * Expand each child in turn.
              */
-            protected Iterator expand(Object childObj) {
+            @Override
+            @SuppressWarnings("rawtypes")
+            protected Iterator expand(final Object childObj) {
 
                 /*
                  * A child of this node.
@@ -624,7 +634,8 @@ public class CounterSet extends AbstractCounterSet implements ICounterSet {
 
     }
     
-    public ICounterNode getChild(String name) {
+    @Override
+    public ICounterNode getChild(final String name) {
 
         if (name == null)
             throw new IllegalArgumentException();
@@ -642,6 +653,7 @@ public class CounterSet extends AbstractCounterSet implements ICounterSet {
      * 
      * @return The {@link CounterSet} described by the path.
      */
+    @Override
     synchronized public CounterSet makePath(String path) {
         
         if (path == null) {
@@ -740,6 +752,7 @@ public class CounterSet extends AbstractCounterSet implements ICounterSet {
      *            The object that is used to take the measurements from which
      *            the counter's value will be determined.
      */
+    @SuppressWarnings("rawtypes")
     synchronized public ICounter addCounter(final String path,
             final IInstrument instrument) {
 
@@ -767,7 +780,7 @@ public class CounterSet extends AbstractCounterSet implements ICounterSet {
 
     }
 
-    @SuppressWarnings("unchecked")
+    @SuppressWarnings({ "unchecked", "rawtypes" })
     private ICounter addCounter2(final String name, final IInstrument instrument) {
 
         if (name == null)
@@ -831,12 +844,14 @@ public class CounterSet extends AbstractCounterSet implements ICounterSet {
      * 
      * @throws IOException
      */
+    @Override
     public void asXML(Writer w, Pattern filter) throws IOException {
 
         XMLUtility.INSTANCE.writeXML(this, w, filter);
 
     }
 
+    @Override
     public void readXML(final InputStream is,
             final IInstrumentFactory instrumentFactory, final Pattern filter)
             throws IOException, ParserConfigurationException, SAXException {

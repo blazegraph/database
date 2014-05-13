@@ -239,6 +239,9 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
 					throw new UnsupportedOperationException();
 				}
 	
+                /**
+                 * @see http://trac.bigdata.com/ticket/914 (Set timeout on remote query)
+                 */
 				@Override
 				public void setMaxQueryTime(int arg0) {
 					throw new UnsupportedOperationException();
@@ -340,6 +343,9 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
 					throw new UnsupportedOperationException();
 				}
 	
+                /**
+                 * @see http://trac.bigdata.com/ticket/914 (Set timeout on remote query)
+                 */
 				@Override
 				public void setMaxQueryTime(int arg0) {
 					throw new UnsupportedOperationException();
@@ -465,7 +471,10 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
 				public int getMaxQueryTime() {
 					throw new UnsupportedOperationException();
 				}
-	
+
+			    /**
+			     * @see http://trac.bigdata.com/ticket/914 (Set timeout on remote query)
+			     */
 				@Override
 				public void setMaxQueryTime(int arg0) {
 					throw new UnsupportedOperationException();
@@ -571,7 +580,7 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
 	public void add(Statement stmt, Resource... c)
 			throws RepositoryException {
 
-//		log.warn("single statement updates not recommended");
+		log.warn("single statement updates not recommended");
 		
 		final Graph g = new GraphImpl();
 		g.add(stmt);

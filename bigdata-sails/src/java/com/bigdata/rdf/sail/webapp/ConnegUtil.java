@@ -27,7 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sail.webapp;
 
-
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.Arrays;
@@ -43,19 +42,17 @@ import org.openrdf.query.resultio.BooleanQueryResultWriterRegistry;
 import org.openrdf.query.resultio.TupleQueryResultFormat;
 import org.openrdf.rio.RDFFormat;
 
+import com.bigdata.counters.format.CounterSetFormat;
 import com.bigdata.rdf.properties.PropertiesFormat;
 import com.bigdata.rdf.sail.webapp.client.MiniMime;
-
 
 /**
  * Helper class for content negotiation.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class ConnegUtil {
 	
-
     private static Logger log = Logger.getLogger(ConnegUtil.class);
 
     private static final Pattern pattern;
@@ -104,10 +101,16 @@ public class ConnegUtil {
      * @param acceptStr
      *            The <code>Accept</code> header.
      */
-    public ConnegUtil(final String acceptStr) {
+    public ConnegUtil(String acceptStr) {
 
-        if (acceptStr == null)
-            throw new IllegalArgumentException();
+        if (acceptStr == null) {
+            /*
+             * If no Accept header is present, then the client has no
+             * preferences.
+             */
+//            throw new IllegalArgumentException();
+            acceptStr = "";
+        }
 
         final String[] a = pattern.split(acceptStr);
 
@@ -171,6 +174,21 @@ public class ConnegUtil {
                     if (format != null) {
 
                         scores.add(new ConnegScore<PropertiesFormat>(t.q,
+                                format));
+
+                    }
+
+                }
+                
+                // CounterSetFormat
+                {
+
+                    final CounterSetFormat format = CounterSetFormat
+                            .forMIMEType(t.getMimeType());
+
+                    if (format != null) {
+
+                        scores.add(new ConnegScore<CounterSetFormat>(t.q,
                                 format));
 
                     }
@@ -355,6 +373,47 @@ public class ConnegUtil {
     }
 
     /**
+     * Return the best {@link CounterSetFormat} from the <code>Accept</code>
+     * header, where "best" is measured by the <code>q</code> parameter.
+     * 
+     * @return The best {@link CounterSetFormat} -or- <code>null</code> if no
+     *         {@link CounterSetFormat} was requested.
+     */
+    public CounterSetFormat getCounterSetFormat() {
+
+        return getCounterSetFormat(null/* fallback */);
+
+    }
+
+    /**
+     * Return the best {@link RDCountersFormatFFormat} from the
+     * <code>Accept</code> header, where "best" is measured by the
+     * <code>q</code> parameter.
+     * 
+     * @param fallback
+     *            The caller's default, which is returned if no match was
+     *            specified.
+     * 
+     * @return The best {@link CounterSetFormat} -or- <i>fallback</i> if no
+     *         {@link CounterSetFormat} was requested.
+     */
+    public CounterSetFormat getCounterSetFormat(final CounterSetFormat fallback) {
+
+        for (ConnegScore<?> s : scores) {
+
+            if (s.format instanceof CounterSetFormat) {
+
+                return (CounterSetFormat) s.format;
+
+            }
+
+        }
+
+        return fallback;
+
+    }
+    
+    /**
      * Return an ordered list of the {@link ConnegScore}s for MIME Types which
      * are consistent with the desired format type.
      * 
@@ -385,6 +444,7 @@ public class ConnegUtil {
 
     }
 
+    @Override
     public String toString() {
 
         return getClass().getSimpleName() + "{" + Arrays.toString(scores) + "}";
