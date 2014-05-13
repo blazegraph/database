@@ -20,8 +20,9 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
-package com.bigdata.rdf.sail.webapp.lbs.policy.ganglia;
+package com.bigdata.rdf.sail.webapp.lbs.policy.counters;
 
+import com.bigdata.counters.IHostCounters;
 import com.bigdata.rdf.sail.webapp.lbs.IHostMetrics;
 import com.bigdata.rdf.sail.webapp.lbs.IHostScoringRule;
 
@@ -48,20 +49,21 @@ import com.bigdata.rdf.sail.webapp.lbs.IHostScoringRule;
  */
 public class DefaultHostScoringRule implements IHostScoringRule {
 
-    private static final String CPU_IDLE = "cpu_idle";
-    private static final String CPU_WIO = "cpu_wio";
-    
+    private static final String CPU_NOT_IDLE = IHostCounters.CPU_PercentProcessorTime;
+
+    private static final String CPU_WIO = IHostCounters.CPU_PercentIOWait;
+
     @Override
     public String[] getMetricNames() {
-     
-        return new String[]{CPU_IDLE, CPU_WIO};
-        
+
+        return new String[] { CPU_NOT_IDLE, CPU_WIO };
+
     }
-    
+
     @Override
     public double getScore(final IHostMetrics metrics) {
 
-        final double cpu_idle = metrics.getNumeric(CPU_IDLE, .5d);
+        final double cpu_idle = 1d - metrics.getNumeric(CPU_NOT_IDLE, .5d);
 
         final double cpu_wio = metrics.getNumeric(CPU_WIO, .05d);
 

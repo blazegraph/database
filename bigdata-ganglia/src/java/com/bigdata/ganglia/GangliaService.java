@@ -204,7 +204,8 @@ public class GangliaService implements Runnable, IGangliaMetricsReporter {
 	 * The period after which a host which has not been updated will have its
 	 * metrics deleted from the {@link GangliaState}.
 	 */
-	private final int globalDMax;
+	@SuppressWarnings("unused")
+    private final int globalDMax;
 	
 	/**
 	 * Object which knows how to generate {@link IGangliaMetricMessage}s which
@@ -1387,7 +1388,8 @@ public class GangliaService implements Runnable, IGangliaMetricsReporter {
      *            reflect the metrics in the order in which they are requested
      *            here.
      * @param comparator
-     *            The comparator used to order the {@link IHostReport}s.
+     *            The comparator used to order the {@link IHostReport}s
+     *            (optional).
      * 
      * @return The {@link IHostReport}s for each specified host ordered by the
      *         given {@link Comparator}.
@@ -1398,8 +1400,8 @@ public class GangliaService implements Runnable, IGangliaMetricsReporter {
 		if (reportOn == null || reportOn.length == 0)
 			throw new IllegalArgumentException();
 
-		if (comparator == null)
-			throw new IllegalArgumentException();
+//		if (comparator == null)
+//			throw new IllegalArgumentException();
 		
 		final IHostReport[] a = new IHostReport[hosts.length];
 
@@ -1446,7 +1448,11 @@ public class GangliaService implements Runnable, IGangliaMetricsReporter {
 		}
 
 		// Sort
-		Arrays.sort(a, comparator);
+        if (comparator != null) {
+         
+            Arrays.sort(a, comparator);
+            
+        }
 
 		return a;
 

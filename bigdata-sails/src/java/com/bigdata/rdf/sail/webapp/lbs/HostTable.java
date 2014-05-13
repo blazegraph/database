@@ -20,11 +20,10 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
-package com.bigdata.rdf.sail.webapp.lbs.policy.ganglia;
+package com.bigdata.rdf.sail.webapp.lbs;
 
 import java.util.Arrays;
 
-import com.bigdata.rdf.sail.webapp.lbs.HostScore;
 
 /**
  * Class bundles together the set of {@link HostScore}s for services that are

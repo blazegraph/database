@@ -20,9 +20,7 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
-package com.bigdata.rdf.sail.webapp.lbs.policy.ganglia;
-
-import com.bigdata.ganglia.IHostReport;
+package com.bigdata.rdf.sail.webapp.lbs;
 
 /**
  * Returns ONE for each host (all hosts appear to have an equal workload).
@@ -32,7 +30,14 @@ import com.bigdata.ganglia.IHostReport;
 public class NOPHostScoringRule implements IHostScoringRule {
 
     @Override
-    public double getScore(final IHostReport hostReport) {
+    public String[] getMetricNames() {
+     
+        return new String[]{};
+        
+    }
+    
+    @Override
+    public double getScore(final IHostMetrics metrics) {
 
         return 1d;
 

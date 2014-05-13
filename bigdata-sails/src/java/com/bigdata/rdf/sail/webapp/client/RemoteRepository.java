@@ -1880,10 +1880,10 @@ public class RemoteRepository {
      * @throws Exception
      *             If anything goes wrong.
      */
-    public GraphQueryResult graphResults(final ConnectOptions opts, final UUID queryId) 
-    		throws Exception {
+    public GraphQueryResult graphResults(final ConnectOptions opts,
+            final UUID queryId) throws Exception {
 
-    	HttpResponse response = null;
+        HttpResponse response = null;
         HttpEntity entity = null;
         BackgroundGraphResult result = null;
         try {
@@ -1929,8 +1929,16 @@ public class RemoteRepository {
             parser.setStopAtFirstError(true);
 
             parser.setDatatypeHandling(RDFParser.DatatypeHandling.IGNORE);
-
-            Charset charset = Charset.forName(UTF8);
+            /**
+             * Note: The default charset depends on the MIME Type. The [charset]
+             * MUST be [null] if the MIME Type is binary since this effects
+             * whether a Reader or InputStream will be used to construct and
+             * apply the RDF parser.
+             * 
+             * @see <a href="http://trac.bigdata.com/ticket/920" > Content
+             *      negotiation orders accept header scores in reverse </a>
+             */
+            Charset charset = format.getCharset();//Charset.forName(UTF8);
             try {
                 final Header encoding = entity.getContentEncoding();
                 if (encoding != null)

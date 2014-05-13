@@ -76,6 +76,11 @@ public class TestAll extends TestCase {
         suite.addTestSuite(TestConneg.class);
         
         /*
+         * Basic LBS unit tests (ranking and scoring hosts).
+         */
+        suite.addTest(com.bigdata.rdf.sail.webapp.lbs.TestAll.suite());
+
+        /*
          * Core test suite for REST API behavior. This test suite is run for
          * each mode of the database (triples, sids, quads).
          * 
@@ -88,7 +93,7 @@ public class TestAll extends TestCase {
         suite.addTest(TestNanoSparqlServerWithProxyIndexManager.suite(TestMode.sids));
         
         suite.addTest(TestNanoSparqlServerWithProxyIndexManager.suite(TestMode.quads));
-        
+
         return suite;
 
     }

@@ -38,9 +38,8 @@ import org.apache.log4j.Logger;
 import org.eclipse.jetty.proxy.ProxyServlet;
 
 import com.bigdata.BigdataStatics;
-import com.bigdata.journal.GangliaPlugIn;
+import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.IIndexManager;
-import com.bigdata.journal.PlatformStatsPlugIn;
 import com.bigdata.journal.jini.ha.HAJournal;
 import com.bigdata.rdf.sail.webapp.lbs.DefaultHARequestURIRewriter;
 import com.bigdata.rdf.sail.webapp.lbs.IHALoadBalancerPolicy;
@@ -72,26 +71,6 @@ import com.bigdata.util.StackInfoReport;
  * requests to the quorum leader. Read requests will be directed to one of the
  * services that is joined with the met quorum.
  * <p>
- * 
- * <h3>Default Load Balancer Policy Configuration</h3>
- * <p>
- * The default policy will load balance read requests over the leader and
- * followers in a manner that reflects the CPU, IO Wait, and GC Time associated
- * with each service.
- * <p>
- * The {@link PlatformStatsPlugIn} and {@link GangliaPlugIn} MUST be enabled
- * for the default load balancer policy to operate. It depends on those plugins
- * to maintain a model of the load on the HA replication cluster. The
- * GangliaPlugIn should be run only as a listener if you are are running the
- * real gmond process on the host. If you are not running gmond, then the
- * {@link GangliaPlugIn} should be configured as both a listener and a sender.
- * <p>
- * <ul>
- * <li>The {@link PlatformStatsPlugIn} must be enabled.</li>.
- * <li>The {@link GangliaPlugIn} must be enabled. The service does not need to
- * be enabled for {@link GangliaPlugIn.Options#GANGLIA_REPORT}, but it must be
- * enabled for {@link GangliaPlugIn.Options#GANGLIA_LISTEN}.
- * </ul>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * 
@@ -372,9 +351,17 @@ public class HALoadBalancerServlet extends ProxyServlet {
         final IIndexManager indexManager = BigdataServlet
                 .getIndexManager(servletContext);
 
-        if (!(indexManager instanceof HAJournal)) {
+        if (!(indexManager instanceof HAJournal)){
             // This is not an error, but the LBS is only for HA.
-            log.warn("Not HA");
+            log.info("LBS Disabled - not HA");
+            return;
+        }
+        if (indexManager instanceof AbstractJournal
+                && ((AbstractJournal) indexManager).getQuorum() != null
+                && ((AbstractJournal) indexManager).getQuorum()
+                        .replicationFactor() == 1) {
+            // This is not an error, but the LBS is only for HA.
+            log.info("LBS Disabled - not HA");
             return;
         }
 
@@ -861,7 +848,8 @@ public class HALoadBalancerServlet extends ProxyServlet {
      * 
      * @return The full prefix.
      * 
-     *         TODO This may need to configurable. It is currently static since
+     *         TODO This may need to be configurable. It is currently static
+     *         since
      *         {@link #forwardToThisService(boolean, HttpServletRequest, HttpServletResponse)}
      *         is static.
      */
@@ -906,12 +894,15 @@ public class HALoadBalancerServlet extends ProxyServlet {
         
         if(isLeaderRequest) {
             // Proxy to leader.
-            proxyToRequestURI = policy.getLeaderURL(request);
+            proxyToRequestURI = policy.getLeaderURI(request);
         } else {
             // Proxy to any joined service.
-            proxyToRequestURI = policy.getReaderURL(request);
+            proxyToRequestURI = policy.getReaderURI(request);
         }
         
+        if (log.isDebugEnabled())
+            log.debug("proxyToRequestURI=" + proxyToRequestURI);
+
         if (proxyToRequestURI == null) {
             // Could not rewrite.
             return null;
@@ -925,7 +916,7 @@ public class HALoadBalancerServlet extends ProxyServlet {
 
         if (rewriter == null) {
             // Could not rewrite.
-            log.warn("No rewriter: requestURI="+originalRequestURI);
+            log.warn("No rewriter: requestURI=" + originalRequestURI);
             return null;
         }
         
@@ -965,12 +956,12 @@ public class HALoadBalancerServlet extends ProxyServlet {
             log.info("Could not rewrite: request=" + request,
                     new StackInfoReport());
         
-        // Figure out if request is to leader or readers.
+        // Figure out if request is to leader or reader.
         final Boolean isLeaderRequest = isLeaderRequest(request);
         
         if (isLeaderRequest == null) {
          
-            // Could not identify request based on known prefixes.
+            // Could not identify request based on known prefixes (leader|read).
             response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
                     "Unknown prefix: requestURL=" + request.getRequestURL());
             return;

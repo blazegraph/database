@@ -43,10 +43,10 @@ import org.openrdf.query.resultio.BooleanQueryResultFormat;
 import org.openrdf.query.resultio.TupleQueryResultFormat;
 import org.openrdf.rio.RDFFormat;
 
-//import com.bigdata.rdf.ServiceProviderHook;
-
 /**
  * Options for the HTTP connection.
+ * 
+ * TODO This should be refactored for better encapsulation.
  */
 public class ConnectOptions {
 
@@ -64,11 +64,6 @@ public class ConnectOptions {
      * is ignored for non-HA requests.
      */
     public boolean update;
-    
-//    /**
-//     * The accept header (NO DEFAULT).
-//     */
-//    public String acceptHeader = null;
     
     /**
      * Used for {@link RDFFormat} responses.
@@ -136,45 +131,33 @@ public class ConnectOptions {
 
     /**
      * Request parameters to be formatted as URL query parameters.
-     * 
-     * TODO Should be private or package private
      */
     public Map<String, String[]> requestParams;
 
     /**
      * Optional request headers.
-     * 
-     * TODO Should be private or package private
      */
     public Map<String, String> requestHeaders;
 
     /** Request entity.
-     * 
-     * TODO Should be private or package private.
      */
     public HttpEntity entity = null;
 
-//    /**
-//     * The connection timeout (ms) -or- ZERO (0) for an infinite timeout
-//     * 
-//     * FIXME How is this communicated using http components? (I do not believe
-//     * that it is, in which case how is this settable; if people can do it
-//     * themselves then drop it otherwise hook it into http components.)
-//     * 
-//     * It looks like the answer setting an appropriate parameter on the
-//     * {@link DefaultHttpClient}
-//     * 
-//     * <pre>
-//     * {@link org.apache.http.params.CoreConnectionPNames#TCP_NODELAY}
-//     * </pre>
-//     * 
-//     * If so, then this can not be overridden here. It needs to be done for the
-//     * {@link HttpClient} as a whole. That would suggest an SPI mechanism for
-//     * configuring that client (or maybe doing it via the
-//     * {@link RemoteServiceOptions}).
-//     */
-//    public int timeout = 0;
+    @Override
+    public String toString() {
 
+        return getClass().getName()//
+                + "{method=" + method//
+                + ",serviceURL=" + serviceURL//
+                + ",update=" + update//
+                + ",requestParams=" + requestParams//
+                + ",requestHeaders=" + requestHeaders//
+                + ",entity=" + entity//
+                + ",requestHeaders=" + requestHeaders//
+                + "}";//
+
+    }
+    
     public ConnectOptions(final String serviceURL) {
 
         this.serviceURL = serviceURL;

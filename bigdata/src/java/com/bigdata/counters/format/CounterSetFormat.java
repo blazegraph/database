@@ -55,7 +55,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /*
  * Created on Jul 25, 2012
  */
-package com.bigdata.rdf.properties;
+package com.bigdata.counters.format;
 
 import info.aduna.lang.FileFormat;
 
@@ -65,24 +65,26 @@ import java.util.Collection;
 import java.util.Iterator;
 import java.util.concurrent.CopyOnWriteArraySet;
 
+import com.bigdata.counters.ICounterSet;
+
 /**
- * Formats for a properties file.
+ * Formats for {@link ICounterSet}s.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
-public class PropertiesFormat extends FileFormat implements Iterable<PropertiesFormat> {
+public class CounterSetFormat extends FileFormat implements Iterable<CounterSetFormat> {
 
     /**
      * All known/registered formats for this class.
      */
-    private static final CopyOnWriteArraySet<PropertiesFormat> formats = new CopyOnWriteArraySet<PropertiesFormat>();
+    private static final CopyOnWriteArraySet<CounterSetFormat> formats = new CopyOnWriteArraySet<CounterSetFormat>();
 
     /**
      * A thread-safe iterator that will visit all known formats (declared by
      * {@link Iterable}).
      */
     @Override
-    public Iterator<PropertiesFormat> iterator() {
+    public Iterator<CounterSetFormat> iterator() {
         
         return formats.iterator();
         
@@ -91,7 +93,7 @@ public class PropertiesFormat extends FileFormat implements Iterable<PropertiesF
     /**
      * Alternative static method signature.
      */
-    static public Iterator<PropertiesFormat> getFormats() {
+    static public Iterator<CounterSetFormat> getFormats() {
         
         return formats.iterator();
         
@@ -101,18 +103,18 @@ public class PropertiesFormat extends FileFormat implements Iterable<PropertiesF
      * Text properties file using <code>text/plain</code> and
      * <code>UTF-8</code>.
      */
-    public static final PropertiesFormat TEXT = new PropertiesFormat(//
+    public static final CounterSetFormat TEXT = new CounterSetFormat(//
             "text/plain",//
             Arrays.asList("text/plain"),//
             Charset.forName("UTF-8"), //
-            Arrays.asList("properties")//
+            Arrays.asList("counterSet")//
             );
 
     /**
      * XML properties file using <code>application/xml</code> and
      * <code>UTF-8</code>.
      */
-    public static final PropertiesFormat XML = new PropertiesFormat(//
+    public static final CounterSetFormat XML = new CounterSetFormat(//
             "application/xml",//
             Arrays.asList("application/xml"),//
             Charset.forName("UTF-8"),// charset
@@ -120,9 +122,19 @@ public class PropertiesFormat extends FileFormat implements Iterable<PropertiesF
     );
 
     /**
+     * XML properties file using <code>text/html</code> and <code>UTF-8</code>.
+     */
+   public static final CounterSetFormat HTML = new CounterSetFormat(//
+           "text/html",//
+           Arrays.asList("text/html"),//
+           Charset.forName("UTF-8"),// charset
+           Arrays.asList("html")// known-file-extensions
+   );
+
+    /**
      * Registers the specified format.
      */
-    public static void register(final PropertiesFormat format) {
+    public static void register(final CounterSetFormat format) {
     
         formats.add(format);
         
@@ -130,21 +142,12 @@ public class PropertiesFormat extends FileFormat implements Iterable<PropertiesF
 
     static {
         
+        register(HTML);
         register(TEXT);
         register(XML);
         
     }
     
-//    /**
-//     * Binary properties file using <code>application/octet-stream</code>
-//     */
-//    public static final PropertiesFormat BINARY = new PropertiesFormat(//
-//            "application/octet-stream",//
-//            Arrays.asList("application/octet-stream"),//
-//            null,// charset
-//            (List) Collections.emptyList()// known-file-extensions
-//    );
-
     /**
      * Creates a new RDFFormat object.
      * 
@@ -163,7 +166,7 @@ public class PropertiesFormat extends FileFormat implements Iterable<PropertiesF
      *            RDF/XML files. The first item in the list is interpreted
      *            as the default file extension for the format.
      */
-    public PropertiesFormat(final String name,
+    public CounterSetFormat(final String name,
             final Collection<String> mimeTypes, final Charset charset,
             final Collection<String> fileExtensions) {
 
@@ -172,36 +175,36 @@ public class PropertiesFormat extends FileFormat implements Iterable<PropertiesF
     }
 
     /**
-     * Tries to determine the appropriate file format based on the a MIME
-     * type that describes the content type.
+     * Tries to determine the appropriate file format based on the a MIME type
+     * that describes the content type.
      * 
      * @param mimeType
-     *        A MIME type, e.g. "text/html".
-     * @return An {@link PropertiesFormat} object if the MIME type was recognized, or
-     *         <tt>null</tt> otherwise.
+     *            A MIME type, e.g. "text/html".
+     * @return An {@link CounterSetFormat} object if the MIME type was
+     *         recognized, or <tt>null</tt> otherwise.
      * @see #forMIMEType(String,PropertiesFormat)
      * @see #getMIMETypes()
      */
-    public static PropertiesFormat forMIMEType(final String mimeType) {
+    public static CounterSetFormat forMIMEType(final String mimeType) {
 
         return forMIMEType(mimeType, null);
-        
+
     }
 
     /**
-     * Tries to determine the appropriate file format based on the a MIME
-     * type that describes the content type. The supplied fallback format will be
+     * Tries to determine the appropriate file format based on the a MIME type
+     * that describes the content type. The supplied fallback format will be
      * returned when the MIME type was not recognized.
      * 
      * @param mimeType
-     *        A file name.
-     * @return An {@link PropertiesFormat} that matches the MIME type, or the fallback format if
-     *         the extension was not recognized.
+     *            A file name.
+     * @return An {@link CounterSetFormat} that matches the MIME type, or the
+     *         fallback format if the extension was not recognized.
      * @see #forMIMEType(String)
      * @see #getMIMETypes()
      */
-    public static PropertiesFormat forMIMEType(String mimeType,
-            PropertiesFormat fallback) {
+    public static CounterSetFormat forMIMEType(String mimeType,
+            CounterSetFormat fallback) {
 
         return matchMIMEType(mimeType, formats/* Iterable<FileFormat> */,
                 fallback);

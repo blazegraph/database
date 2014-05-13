@@ -39,6 +39,7 @@ import net.jini.core.lookup.ServiceID;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.concurrent.FutureTaskMon;
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.QuorumService;
 import com.bigdata.jini.util.JiniUtil;
@@ -295,7 +296,7 @@ abstract public class AbstractLBSPolicy implements IHALoadBalancerPolicy,
      * proxied to the quorum leader.
      */
     @Override
-    final public String getLeaderURL(final HttpServletRequest request) {
+    final public String getLeaderURI(final HttpServletRequest request) {
 
         final ServletContext servletContext = request.getServletContext();
 
@@ -383,7 +384,7 @@ abstract public class AbstractLBSPolicy implements IHALoadBalancerPolicy,
      * 
      * @return The first service for that host.
      */
-    protected ServiceScore getServiceScore(final String hostname) {
+    protected ServiceScore getServiceScoreForHostname(final String hostname) {
 
         if (hostname == null)
             throw new IllegalArgumentException();
@@ -444,10 +445,20 @@ abstract public class AbstractLBSPolicy implements IHALoadBalancerPolicy,
         switch (e.getEventType()) {
         case SERVICE_JOIN:
         case SERVICE_LEAVE:
-            updateServiceTable();
+            /*
+             * Note: We do not want to run any blocking code in the ZK event
+             * thread!
+             */
+            getJournal().getExecutorService().execute(
+                    new FutureTaskMon<Void>(new Runnable() {
+                        @Override
+                        public void run() {
+                            updateServiceTable();
+                        }
+                    }, (Void) null/* result */));
             break;
         }
-    }
+   }
 
     /**
      * Conditionally update the {@link #serviceTableRef} iff it does not exist or
@@ -542,17 +553,13 @@ abstract public class AbstractLBSPolicy implements IHALoadBalancerPolicy,
             try {
 
                 // Do RMI to create declaration for this service.
-                serviceScores[i] = new ServiceScore(journal, contextPath.get(),
-                        serviceId);
+                serviceScores[i] = ServiceScore.newInstance(journal,
+                        contextPath.get(), serviceId);
 
-            } catch (RuntimeException ex) {
+            } catch (Exception ex) {
 
-                /*
-                 * Ignore. Might not be an HAGlue instance.
-                 */
-
-                if (log.isInfoEnabled())
-                    log.info(ex, ex);
+                // Service is not usable.
+                log.warn(ex, ex);
 
                 continue;
 

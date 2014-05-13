@@ -30,6 +30,7 @@ package com.bigdata.counters.query;
 
 import java.util.regex.Pattern;
 
+import com.bigdata.counters.HistoryInstrument;
 import com.bigdata.counters.ICounter;
 import com.bigdata.counters.PeriodEnum;
 
@@ -37,7 +38,6 @@ import com.bigdata.counters.PeriodEnum;
  * Interface for selecting counters.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public interface ICounterSelector {
 
@@ -57,10 +57,16 @@ public interface ICounterSelector {
      *            counter timestamps which will be selected.
      * @param period
      *            The unit of aggregation for the selected performance counters.
-     * 
+     * @param historyRequired
+     *            When <code>true</code> the {@link ICounter} will be ignored
+     *            unless it is associated with a {@link HistoryInstrument}.
+     *            (This used to be the default behavior, but there are use cases
+     *            where we do not need to have history.)
+     *            
      * @return The selected performance counters.
      */
+    @SuppressWarnings("rawtypes")
     ICounter[] selectCounters(int depth, Pattern pattern, long fromTime,
-            long toTime, PeriodEnum period);
+            long toTime, PeriodEnum period, boolean historyRequired);
 
 }

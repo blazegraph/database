@@ -24,48 +24,38 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Nov 7, 2007
  */
 
-package com.bigdata.rdf.sail.webapp;
+package com.bigdata.rdf.sail.webapp.lbs;
 
 import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
 
 /**
- * A version of the test suite that is intended for local debugging and is NOT
- * run in CI. This is intended just to make it easier to run specific proxied
- * test suites.
- * <p>
- * TO USE: Comment in/out those tests suites that you want to run in
- * {@link #suite()} and also in
- * {@link TestNanoSparqlServerWithProxyIndexManager2}.
+ * Test suite.
  * 
- * @see TestAll
+ * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
-public class TestAll2 extends TestCase {
+public class TestAll extends TestCase {
 
     /**
      * 
      */
-    public TestAll2() {
+    public TestAll() {
         super();
     }
 
     /**
      * @param arg0
      */
-    public TestAll2(String arg0) {
+    public TestAll(String arg0) {
         super(arg0);
     }
 
     public static Test suite() {
 
-        final TestSuite suite = new TestSuite("WebApp (local debugging)");
+        final TestSuite suite = new TestSuite("LBS");
 
-        suite.addTest(TestNanoSparqlServerWithProxyIndexManager2.suite(TestMode.triples));
-        
-        suite.addTest(TestNanoSparqlServerWithProxyIndexManager2.suite(TestMode.sids));
-        
-        suite.addTest(TestNanoSparqlServerWithProxyIndexManager2.suite(TestMode.quads));
+        suite.addTestSuite(TestAbstractHostLBSPolicy.class);
         
         return suite;
 

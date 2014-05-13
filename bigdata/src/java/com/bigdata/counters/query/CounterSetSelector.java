@@ -43,11 +43,10 @@ import com.bigdata.counters.PeriodEnum;
  * Reads counters from a {@link CounterSet}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class CounterSetSelector implements ICounterSelector {
 
-    protected static final Logger log = Logger.getLogger(CounterSetSelector.class);
+    private static final Logger log = Logger.getLogger(CounterSetSelector.class);
 
     private final CounterSet counterSet;
     
@@ -70,10 +69,13 @@ public class CounterSetSelector implements ICounterSelector {
      * Note: logic was modified to no longer consider the relative depth, only
      * the absolute depth.
      * 
-     * FIXME does not use [fromTime, toTime, or period].
+     * FIXME does not use [fromTime, toTime, or period] (or model.path)
      */
+    @Override
+    @SuppressWarnings("rawtypes")
     public ICounter[] selectCounters(final int depth, final Pattern pattern,
-            final long fromTime, final long toTime, final PeriodEnum period) {
+            final long fromTime, final long toTime, final PeriodEnum period,
+            final boolean historyRequired) {
 
 //        // depth of the hierarchy at the point where we are starting.
 //        final int ourDepth = counterSet.getDepth();
@@ -94,20 +96,21 @@ public class CounterSetSelector implements ICounterSelector {
 
             nscanned++;
             
-            if(!(c.getInstrument() instanceof HistoryInstrument)) {
+            if (log.isDebugEnabled())
+                log.debug("considering: " + c.getPath());
+            
+            if (historyRequired
+                    && !(c.getInstrument() instanceof HistoryInstrument)) {
 
                 // prune non-history counters.
                 if (log.isDebugEnabled())
-                    log.debug("skipping: " + c.getPath());
+                    log.debug("skipping (history): " + c.getPath());
 
                 nskipped++;
                 
                 continue;
                 
             }
-            
-            if (log.isDebugEnabled())
-                log.debug("considering: " + c.getPath());
             
             if (depth != 0) {
 
@@ -117,7 +120,7 @@ public class CounterSetSelector implements ICounterSelector {
 
                     // prune by depth
                     if (log.isDebugEnabled())
-                        log.debug("skipping: " + c.getPath());
+                        log.debug("skipping (depth): " + c.getPath());
 
                     nskipped++;
 

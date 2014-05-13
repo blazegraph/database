@@ -62,27 +62,27 @@ public interface IHALoadBalancerPolicy extends IHAPolicyLifeCycle {
             throws ServletException, IOException;
 
     /**
-     * Return the URL to which a non-idempotent request will be proxied.
+     * Return the Request-URI to which a non-idempotent request will be proxied.
      * 
      * @param req
      *            The request.
      * 
-     * @return The proxyTo URL -or- <code>null</code> if we could not find a
-     *         service to which we could proxy this request.
+     * @return The proxyTo Request-URI -or- <code>null</code> if we could not
+     *         find a service to which we could proxy this request.
      */
-    String getLeaderURL(HttpServletRequest req);
+    String getLeaderURI(HttpServletRequest req);
 
     /**
-     * Return the URL to which a <strong>read-only</strong> request will be
-     * proxied. The returned URL must include the protocol, hostname and port
+     * Return the Request-URL to which a <strong>read-only</strong> request will
+     * be proxied. The returned URL must include the protocol, hostname and port
      * (if a non-default port will be used) as well as the target request path.
      * 
      * @param req
      *            The request.
      * 
-     * @return The proxyTo URL -or- <code>null</code> if we could not find a
-     *         service to which we could proxy this request.
+     * @return The proxyTo Request-URI -or- <code>null</code> if we could not
+     *         find a service to which we could proxy this request.
      */
-    String getReaderURL(HttpServletRequest req);
+    String getReaderURI(HttpServletRequest req);
     
 }

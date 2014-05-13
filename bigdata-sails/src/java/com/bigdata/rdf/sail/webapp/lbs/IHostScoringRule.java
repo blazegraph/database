@@ -20,9 +20,8 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
-package com.bigdata.rdf.sail.webapp.lbs.policy.ganglia;
+package com.bigdata.rdf.sail.webapp.lbs;
 
-import com.bigdata.ganglia.IHostReport;
 
 /**
  * Interface for scoring the load on a host.
@@ -32,13 +31,18 @@ import com.bigdata.ganglia.IHostReport;
 public interface IHostScoringRule {
 
     /**
-     * Return a score for the given {@link IHostReport}.
+     * Return the set of metric names that are used by this scoring rule.
+     */
+    public String[] getMetricNames();
+    
+    /**
+     * Return a score for the given {@link IHostMetrics}.
      * 
-     * @param hostReport
-     *            The {@link IHostReport}.
+     * @param metrics
+     *            The {@link IHostMetrics}.
      * 
      * @return The score.
      */
-    public double getScore(final IHostReport hostReport);
+    public double getScore(final IHostMetrics metrics);
 
 }

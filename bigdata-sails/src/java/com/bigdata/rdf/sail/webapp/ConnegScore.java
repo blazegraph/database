@@ -44,41 +44,39 @@ public class ConnegScore<E> implements Comparable<ConnegScore<E>> {
      */
     final public E format;
 
-    // /**
-    // * The as given MIME type.
-    // */
-    // final public String mimeType;
-
     public ConnegScore(final float q, final E format) {
-        // , final String mimeTypeIsIgnored) {
 
         if (format == null)
             throw new IllegalArgumentException();
-
-        // if (mimeType == null)
-        // throw new IllegalArgumentException();
 
         this.q = q;
 
         this.format = format;
 
-        // this.mimeType = mimeType;
-
     }
 
+    /**
+     * The higher the <code>q</code> score the better the match with the user
+     * agent's preference. A mime type without an explicit <code>q</code> score
+     * has an implicit score of <code>1</code>.
+     * 
+     * @see <a href="http://trac.bigdata.com/ticket/920" > Content negotiation
+     *      orders accept header scores in reverse </a>
+     */
     @Override
     public int compareTo(final ConnegScore<E> o) {
 
         if (q < o.q)
-            return -1;
+            return 1;
 
         if (q > o.q)
-            return 1;
+            return -1;
 
         return 0;
 
     }
 
+    @Override
     public String toString() {
 
         return getClass().getSimpleName() + "{q=" + q + ", format=" + format
@@ -86,6 +84,7 @@ public class ConnegScore<E> implements Comparable<ConnegScore<E>> {
 
     }
 
+    @Override
     public boolean equals(final Object o) {
 
         if (this == o)

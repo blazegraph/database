@@ -33,36 +33,121 @@ import com.bigdata.counters.AbstractStatisticsCollector;
 public class HostScore implements Comparable<HostScore> {
 
     /** The hostname. */
-    final public String hostname;
+    private final String hostname;
 
     /**
      * <code>true</code> iff the host is this host.
      */
-    final public boolean thisHost;
+    private final boolean thisHost;
 
-    /** The raw (write) score computed for that index partition. */
+    /**
+     * The raw score for some host. This is a measure of the load on a host. The
+     * measure is computed based on {@link #metrics} using the
+     * {@link #scoringRule}.
+     */
     private final double rawScore;
 
-    /** The normalized score computed for that index partition. */
-    final public double score;
+    /**
+     * The normalized score computed for that host.
+     * <p>
+     * Note: The {@link #rawScore} is a measure of the <em>load</em> on a host.
+     * The normalized {@link #score} is based on
+     * <code>1-{@link #rawScore}</code> and is a measure of the normalized
+     * amount of capacity to do more work on a host. Load balancing decision are
+     * based on this normalized {@link #score}.
+     */
+    private final double score;
 
-    /** The rank in [0:#scored]. This is an index into the Scores[]. */
-    public int rank = -1;
+    /**
+     * The {@link IHostScoringRule} used to convert the {@link #metrics} into
+     * the {@link #rawScore}.
+     */
+    private final IHostScoringRule scoringRule;
+    
+    /**
+     * The {@link IHostMetrics} associated with this host (this is
+     * informational. The {@link #metrics} provide the detailed per-host
+     * performance metrics that were intepreted by the {@link #scoringRule} .
+     */
+    final private IHostMetrics metrics;
 
-    /** The normalized double precision rank in [0.0:1.0]. */
-    public double drank = -1d;
+//    /** The rank in [0:#scored]. This is an index into the Scores[]. */
+//    public int rank = -1;
+//
+//    /** The normalized double precision rank in [0.0:1.0]. */
+//    public double drank = -1d;
+
+    /**
+     * Return the raw score for a host, which is a measure of the load on that
+     * host. The measure is computed based on {@link IHostMetrics} using some
+     * {@link IHostScoringRule}.
+     */
+    public double getRawScore() {
+        return rawScore;
+    }
+
+    /**
+     * Return the measure of free capacity to do work on the host.
+     * <p>
+     * Note: The {@link #getRawScore() rawScore} is a measure of the
+     * <em>load</em> on a host. The normalized {@link #getScore() score} is
+     * based on <code>1-{@link #getRawScore() rawScore}</code> and is a measure
+     * of the normalized amount of capacity to do more work on a host. Load
+     * balancing decision are based on this normalized {@link #getScore() score}
+     * .
+     */
+    public double getScore() {
+        return score;
+    }
+
+    /** Return the hostname. */
+    public String getHostname() {
+        return hostname;
+    }
+
+    /**
+     * The {@link IHostMetrics} associated with this host (this is
+     * informational. The {@link #getMetrics()} provide the detailed per-host
+     * performance metrics that were intepreted by the {@link #getScoringRule()}
+     * .
+     */
+    public IHostMetrics getMetrics() {
+        return metrics;
+    }
+    
+    /**
+     * The {@link IHostScoringRule} used to convert the {@link #getMetrics()}
+     * into the {@link #getRawScore()}.
+     */
+    public IHostScoringRule getScoringRule() {
+        return scoringRule;
+    }
+
+    /**
+     * Return <code>true</code> iff the host is this host.
+     */
+    public boolean isThisHost() {
+        return thisHost;
+    }
 
     @Override
     public String toString() {
 
-        return "HostScore{hostname=" + hostname + ", thisHost=" + thisHost
-                + ", rawScore=" + rawScore + ", score=" + score + ", rank="
-                + rank + ", drank=" + drank + "}";
+        return "HostScore"//
+                + "{hostname=" + hostname //
+                + ", thisHost=" + thisHost//
+                + ", rawScore=" + rawScore //
+                + ", score=" + score //
+//                + ", rank=" + rank //
+//                + ", drank=" + drank //
+                + ", metrics=" + metrics //
+                + "}";
 
     }
 
     public HostScore(final String hostname, final double rawScore,
-            final double totalRawScore) {
+            final double totalRawScore, final IHostScoringRule scoringRule,
+            final IHostMetrics metrics) {
 
         if (hostname == null)
             throw new IllegalArgumentException();
@@ -77,13 +162,17 @@ public class HostScore implements Comparable<HostScore> {
         this.thisHost = AbstractStatisticsCollector.fullyQualifiedHostName
                 .equals(hostname);
 
+        this.scoringRule = scoringRule;
+        
+        this.metrics = metrics;
+        
         score = normalize(rawScore, totalRawScore);
 
     }
 
     /**
-     * Normalizes a raw score in the context of totals for some data
-     * service.
+     * Computes the normalized {@link #score} from the {@link #rawScore} in the
+     * context of total over the {@link #rawScore}s for some set of hosts.
      * 
      * @param rawScore
      *            The raw score.
@@ -101,22 +190,23 @@ public class HostScore implements Comparable<HostScore> {
 
         }
 
-        return rawScore / totalRawScore;
+        return (1d - rawScore) / totalRawScore;
 
     }
 
     /**
-     * Places elements into order by ascending {@link #rawScore}. The
-     * {@link #hostname} is used to break any ties.
+     * Places elements into order by increasing normalized {@link #getScore()}.
+     * The {@link #getHostname()} is used to break any ties (but this does not
+     * help when all services are on the same host).
      */
     @Override
     public int compareTo(final HostScore arg0) {
 
-        if (rawScore < arg0.rawScore) {
+        if (score < arg0.score) {
 
             return -1;
 
-        } else if (rawScore > arg0.rawScore) {
+        } else if (score > arg0.score) {
 
             return 1;
 
