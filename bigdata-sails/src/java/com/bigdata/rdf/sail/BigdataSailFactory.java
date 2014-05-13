@@ -28,12 +28,11 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Properties;
 
-import org.openrdf.repository.Repository;
-
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.Journal;
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.axioms.OwlAxioms;
+import com.bigdata.rdf.sail.remote.BigdataSailRemoteRepository;
 import com.bigdata.rdf.vocab.RDFSVocabulary;
 
 /**
@@ -86,6 +85,34 @@ public class BigdataSailFactory {
         
     }
     
+    /**
+     * Connect to a remote bigdata instance.
+     */
+    public static BigdataSailRemoteRepository connect(final String host, final int port) {
+        
+        return connect("http://"+host+":"+port);
+        
+    }
+    
+    /**
+     * Connect to a remote bigdata instance.
+     */
+    public static BigdataSailRemoteRepository connect(final String serviceEndpoint) {
+        
+        if (serviceEndpoint.endsWith("/bigdata/sparql")) {
+            return new BigdataSailRemoteRepository(serviceEndpoint);
+        } else if (serviceEndpoint.endsWith("/bigdata/")) {
+            return new BigdataSailRemoteRepository(serviceEndpoint + "sparql");
+        } else if (serviceEndpoint.endsWith("/bigdata")) {
+            return new BigdataSailRemoteRepository(serviceEndpoint + "/sparql");
+        } else if (serviceEndpoint.endsWith("/")) {
+            return new BigdataSailRemoteRepository(serviceEndpoint + "bigdata/sparql");
+        } else {
+            return new BigdataSailRemoteRepository(serviceEndpoint + "/bigdata/sparql");
+        }
+        
+    }
+
     /**
      * Open an existing persistent bigdata instance.
      */

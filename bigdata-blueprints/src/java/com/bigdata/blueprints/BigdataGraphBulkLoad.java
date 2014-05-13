@@ -35,6 +35,7 @@ import com.bigdata.rdf.changesets.IChangeLog;
 import com.bigdata.rdf.changesets.IChangeRecord;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
 import com.tinkerpop.blueprints.Edge;
+import com.tinkerpop.blueprints.Features;
 import com.tinkerpop.blueprints.GraphQuery;
 import com.tinkerpop.blueprints.TransactionalGraph;
 import com.tinkerpop.blueprints.Vertex;
@@ -106,36 +107,8 @@ public class BigdataGraphBulkLoad extends BigdataGraph
 	
     static {
 
-//        FEATURES.supportsSerializableObjectProperty = false;
-//        FEATURES.supportsBooleanProperty = true;
-//        FEATURES.supportsDoubleProperty = true;
-//        FEATURES.supportsFloatProperty = true;
-//        FEATURES.supportsIntegerProperty = true;
-//        FEATURES.supportsPrimitiveArrayProperty = false;
-//        FEATURES.supportsUniformListProperty = false;
-//        FEATURES.supportsMixedListProperty = false;
-//        FEATURES.supportsLongProperty = true;
-//        FEATURES.supportsMapProperty = false;
-//        FEATURES.supportsStringProperty = true;
-//
-//        FEATURES.supportsDuplicateEdges = true;
-//        FEATURES.supportsSelfLoops = true;
-//        FEATURES.isPersistent = true;
-//        FEATURES.isWrapper = false;
-//        FEATURES.supportsVertexIteration = true;
-//        FEATURES.supportsEdgeIteration = true;
-//        FEATURES.supportsVertexIndex = false;
-//        FEATURES.supportsEdgeIndex = false;
-//        FEATURES.ignoresSuppliedIds = true;
-        BigdataGraph.FEATURES.supportsTransactions = true;
-//        FEATURES.supportsIndices = true;
-//        FEATURES.supportsKeyIndices = true;
-//        FEATURES.supportsVertexKeyIndex = true;
-//        FEATURES.supportsEdgeKeyIndex = true;
-//        FEATURES.supportsEdgeRetrieval = true;
-//        FEATURES.supportsVertexProperties = true;
-//        FEATURES.supportsEdgeProperties = true;
-//        FEATURES.supportsThreadedTransactions = false;
+        FEATURES.supportsTransactions = true;
+        
     }
 
 

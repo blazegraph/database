@@ -56,17 +56,23 @@ public class BigdataEdge extends BigdataElement implements Edge {
 	
 	@Override
 	public Object getId() {
+	    
 		return graph.factory.fromEdgeURI(uri);
+		
 	}
 
 	@Override
 	public void remove() {
+	    
 		graph.removeEdge(this);
+		
 	}
 
 	@Override
 	public String getLabel() {
+	    
 		return (String) graph.getProperty(uri, RDFS.LABEL);
+		
 	}
 
 	@Override
@@ -86,22 +92,24 @@ public class BigdataEdge extends BigdataElement implements Edge {
 	}
 	
 	@Override
-	public void setProperty(final String property, final Object val) {
+	public void setProperty(final String prop, final Object val) {
 
-		if (property == null || blacklist.contains(property)) {
+		if (prop == null || blacklist.contains(prop)) {
 			throw new IllegalArgumentException();
 		}
 
-		super.setProperty(property, val);
+		super.setProperty(prop, val);
 
 	}
 
     @Override
     public String toString() {
+        
         final URI s = (URI) stmt.getSubject();
         final URI p = (URI) stmt.getPredicate();
         final URI o = (URI) stmt.getObject();
         return "e["+p.getLocalName()+"]["+s.getLocalName()+"->"+o.getLocalName()+"]";
+        
     }
     
 }

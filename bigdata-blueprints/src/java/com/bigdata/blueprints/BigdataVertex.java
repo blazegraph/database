@@ -45,57 +45,90 @@ public class BigdataVertex extends BigdataElement implements Vertex {
 	
 	@Override
 	public Object getId() {
+	    
 		return graph.factory.fromVertexURI(uri);
+		
 	}
 	
 	@Override
 	public void remove() {
+	    
 		graph.removeVertex(this);
+		
 	}
 
 	@Override
 	public Edge addEdge(final String label, final Vertex to) {
+	    
 		return graph.addEdge(null, this, to, label);
+		
 	}
 
 	@Override
 	@SuppressWarnings("unchecked")
 	public Iterable<Edge> getEdges(final Direction dir, final String... labels) {
+	    
 		final URI wild = null;
+		
 		if (dir == Direction.OUT) {
+		    
 			return graph.getEdges(uri, wild, labels);
+			
 		} else if (dir == Direction.IN) {
+		    
 			return graph.getEdges(wild, uri, labels);
+			
 		} else {
+		    
 			return graph.fuse(
 					graph.getEdges(uri, wild, labels),
 					graph.getEdges(wild, uri, labels));
+			
 		}
+		
 	}
 
 	@Override
 	@SuppressWarnings("unchecked")
 	public Iterable<Vertex> getVertices(final Direction dir, final String... labels) {
+	    
 		final URI wild = null;
+		
 		if (dir == Direction.OUT) {
+		    
 			return graph.getVertices(uri, wild, labels);
+			
 		} else if (dir == Direction.IN) {
+		    
 			return graph.getVertices(wild, uri, labels);
+			
 		} else {
+		    
 			return graph.fuse(
 					graph.getVertices(uri, wild, labels),
 					graph.getVertices(wild, uri, labels));
+			
 		}
+		
 	}
 
+	/**
+	 * Not bothering to provide a SPARQL translation for vertex queries at
+	 * this time.  I suspect that scan and filter works fine when starting from
+	 * an individual vertex.
+	 */
 	@Override
 	public VertexQuery query() {
+	    
 		return new DefaultVertexQuery(this);
+		
 	}
 
 	@Override
 	public String toString() {
+	    
 	    return "v["+uri.getLocalName()+"]";
+	    
 	}
 	
 }

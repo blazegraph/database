@@ -24,31 +24,31 @@ package com.bigdata.blueprints;
 
 import java.io.File;
 import java.lang.reflect.Method;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
-import java.util.Properties;
+import java.util.concurrent.CountDownLatch;
 
-import com.bigdata.rdf.axioms.NoAxioms;
+import org.apache.log4j.Logger;
+
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSailRepository;
-import com.bigdata.rdf.sail.ProxyBigdataSailTestCase;
-import com.bigdata.rdf.vocab.NoVocabulary;
 import com.tinkerpop.blueprints.Edge;
-import com.tinkerpop.blueprints.EdgeTestSuite;
 import com.tinkerpop.blueprints.Graph;
-import com.tinkerpop.blueprints.GraphQueryTestSuite;
-import com.tinkerpop.blueprints.GraphTestSuite;
 import com.tinkerpop.blueprints.TestSuite;
+import com.tinkerpop.blueprints.TransactionalGraph;
+import com.tinkerpop.blueprints.TransactionalGraphTestSuite;
 import com.tinkerpop.blueprints.Vertex;
-import com.tinkerpop.blueprints.VertexQueryTestSuite;
-import com.tinkerpop.blueprints.VertexTestSuite;
 import com.tinkerpop.blueprints.impls.GraphTest;
 import com.tinkerpop.blueprints.util.io.graphml.GraphMLReader;
 
 /**
  */
-public class TestBigdataGraphEmbedded extends ProxyBigdataSailTestCase {
+public class TestBigdataGraphEmbedded extends AbstractTestBigdataGraph {
 
+    protected static final transient Logger log = Logger.getLogger(TestBigdataGraphEmbedded.class);
+    
     /**
      * 
      */
@@ -62,149 +62,189 @@ public class TestBigdataGraphEmbedded extends ProxyBigdataSailTestCase {
         super(name);
     }
 
-    public void testVertexTestSuite() throws Exception {
-    	final GraphTest test = new BigdataGraphTest();
-    	test.stopWatch();
-        test.doTestSuite(new VertexTestSuite(test));
-        GraphTest.printTestPerformance("VertexTestSuite", test.stopWatch());
-    }
+    public void testTransactionalGraphTestSuite() throws Exception {
+        final GraphTest test = newBigdataGraphTest();
+        test.stopWatch();
+        test.doTestSuite(new TransactionalGraphTestSuite(test));
+        GraphTest.printTestPerformance("TransactionalGraphTestSuite",
+                test.stopWatch());
+    }    
+//  public void testGraphSuite() throws Exception {
+//  final GraphTest test = newBigdataGraphTest();
+//  test.stopWatch();
+//    test.doTestSuite(new GraphTestSuite(test));
+//    GraphTest.printTestPerformance("GraphTestSuite", test.stopWatch());
+//}
 
-    public void testEdgeSuite() throws Exception {
-    	final GraphTest test = new BigdataGraphTest();
-    	test.stopWatch();
-        test.doTestSuite(new EdgeTestSuite(test));
-        GraphTest.printTestPerformance("EdgeTestSuite", test.stopWatch());
-    }
 
-    public void testGraphSuite() throws Exception {
-    	final GraphTest test = new BigdataGraphTest();
-    	test.stopWatch();
-        test.doTestSuite(new GraphTestSuite(test));
-        GraphTest.printTestPerformance("GraphTestSuite", test.stopWatch());
-    }
-
-    public void testVertexQueryTestSuite() throws Exception {
-    	final GraphTest test = new BigdataGraphTest();
-    	test.stopWatch();
-        test.doTestSuite(new VertexQueryTestSuite(test));
-        GraphTest.printTestPerformance("VertexQueryTestSuite", test.stopWatch());
-    }
-
-    public void testGraphQueryTestSuite() throws Exception {
-    	final GraphTest test = new BigdataGraphTest();
-    	test.stopWatch();
-        test.doTestSuite(new GraphQueryTestSuite(test));
-        GraphTest.printTestPerformance("GraphQueryTestSuite", test.stopWatch());
-    }
-//
-//    public void testTransactionalGraphTestSuite() throws Exception {
-//    	final GraphTest test = new BigdataGraphTest();
-//    	test.stopWatch();
-//        test.doTestSuite(new TransactionalGraphTestSuite(test));
-//        GraphTest.printTestPerformance("TransactionalGraphTestSuite", test.stopWatch());
-//    }
-//
-//    public void testBulkTransactionsOnEdges() throws Exception {
+//    public void testTransactionIsolationCommitCheck() throws Exception {
 //        final BigdataGraphTest test = new BigdataGraphTest();
 //        test.stopWatch();
 //        final BigdataTestSuite testSuite = new BigdataTestSuite(test);
 //        try {
-//            testSuite.testBulkTransactionsOnEdges();
+//            testSuite.testTransactionIsolationCommitCheck();
 //        } finally {
 //            test.shutdown();
 //        }
 //        
 //    }
-//    
-//    private static class BigdataTestSuite extends TestSuite {
-//        
-//        public BigdataTestSuite(final BigdataGraphTest graphTest) {
-//            super(graphTest);
-//        }
-//        
-//        public void testBulkTransactionsOnEdges() {
-//            BigdataGraphEmbedded graph = (BigdataGraphEmbedded) graphTest.generateGraph();
-//            for (int i = 0; i < 5; i++) {
-//                graph.addEdge(null, graph.addVertex(null), graph.addVertex(null), graphTest.convertLabel("test"));
-//            }
-//            edgeCount(graph, 5);
-//            graph.rollback();
-//            edgeCount(graph, 0);
-//
-//            for (int i = 0; i < 4; i++) {
-//                graph.addEdge(null, graph.addVertex(null), graph.addVertex(null), graphTest.convertLabel("test"));
-//            }
-//            edgeCount(graph, 4);
-//            graph.rollback();
-//            edgeCount(graph, 0);
-//
-//
-//            for (int i = 0; i < 3; i++) {
-//                graph.addEdge(null, graph.addVertex(null), graph.addVertex(null), graphTest.convertLabel("test"));
-//            }
-//            edgeCount(graph, 3);
-//            graph.commit();
-//            edgeCount(graph, 3);
-//
-//            graph.shutdown();
-//        }
-//        
-//    }
-//    
+    
+    private static class BigdataTestSuite extends TestSuite {
+        
+        public BigdataTestSuite(final BigdataGraphTest graphTest) {
+            super(graphTest);
+        }
+        
+        public void testTransactionIsolationCommitCheck() throws Exception {
+            // the purpose of this test is to simulate rexster access to a graph instance, where one thread modifies
+            // the graph and a separate thread cannot affect the transaction of the first
+            final TransactionalGraph graph = (TransactionalGraph) graphTest.generateGraph();
+
+            final CountDownLatch latchCommittedInOtherThread = new CountDownLatch(1);
+            final CountDownLatch latchCommitInOtherThread = new CountDownLatch(1);
+
+            // this thread starts a transaction then waits while the second thread tries to commit it.
+            final Thread threadTxStarter = new Thread() {
+                public void run() {
+                    System.err.println(Thread.currentThread().getId() + ": 1");
+                    final Vertex v = graph.addVertex(null);
+
+                    // System.out.println("added vertex");
+
+                    System.err.println(Thread.currentThread().getId() + ": 2");
+                    latchCommitInOtherThread.countDown();
+
+                    System.err.println(Thread.currentThread().getId() + ": 3");
+                    try {
+                        latchCommittedInOtherThread.await();
+                    } catch (InterruptedException ie) {
+                        throw new RuntimeException(ie);
+                    }
+
+                    System.err.println(Thread.currentThread().getId() + ": 4");
+                    graph.rollback();
+
+                    System.err.println(Thread.currentThread().getId() + ": 5");
+                    // there should be no vertices here
+                    // System.out.println("reading vertex before tx");
+                    assertFalse(graph.getVertices().iterator().hasNext());
+                    // System.out.println("read vertex before tx");
+                }
+            };
+
+            threadTxStarter.start();
+
+            // this thread tries to commit the transaction started in the first thread above.
+            final Thread threadTryCommitTx = new Thread() {
+                public void run() {
+                    System.err.println(Thread.currentThread().getId() + ": 6");
+                    try {
+                        latchCommitInOtherThread.await();
+                    } catch (InterruptedException ie) {
+                        throw new RuntimeException(ie);
+                    }
+
+                    System.err.println(Thread.currentThread().getId() + ": 7");
+                    // try to commit the other transaction
+                    graph.commit();
+
+                    System.err.println(Thread.currentThread().getId() + ": 8");
+                    latchCommittedInOtherThread.countDown();
+                    System.err.println(Thread.currentThread().getId() + ": 9");
+                }
+            };
+
+            threadTryCommitTx.start();
+
+            threadTxStarter.join();
+            threadTryCommitTx.join();
+            graph.shutdown();
+
+        }
+
+
+    }
+
+    
+    protected GraphTest newBigdataGraphTest() {
+        return new BigdataGraphTest();
+    }
     
     private class BigdataGraphTest extends GraphTest {
 
+        private List<String> exclude = Arrays.asList(new String[] {
+           "testTransactionIsolationCommitCheck"  
+        });
+        
 		@Override
 		public void doTestSuite(TestSuite testSuite) throws Exception {
 	        for (Method method : testSuite.getClass().getDeclaredMethods()) {
 	            if (method.getName().startsWith("test")) {
-	                System.out.println("Testing " + method.getName() + "...");
-	                try {
-		                method.invoke(testSuite);
-	                } catch (Exception ex) {
-	                	ex.getCause().printStackTrace();
-	                	throw ex;
-	                } finally {
-		                shutdown();
+	                if (exclude.contains(method.getName())) {
+	                    System.out.println("Skipping test " + method.getName() + ".");
+	                } else {
+    	                System.out.println("Testing " + method.getName() + "...");
+    	                try {
+    		                method.invoke(testSuite);
+    	                } catch (Exception ex) {
+    	                	ex.getCause().printStackTrace();
+    	                	throw ex;
+    	                } finally {
+    		                shutdown();
+    	                }
 	                }
 	            }
 	        }
 		}
 		
-		private Map<String,BigdataSail> testSails = new LinkedHashMap<String, BigdataSail>();
+		private Map<String,BigdataGraphEmbedded> testGraphs = new LinkedHashMap<String, BigdataGraphEmbedded>();
 
 		@Override
 		public Graph generateGraph(final String key) {
 			
 			try {
-	            if (testSails.containsKey(key) == false) {
+	            if (testGraphs.containsKey(key) == false) {
 	                final BigdataSail testSail = getSail();
 	                testSail.initialize();
-	                testSails.put(key, testSail);
+	                final BigdataSailRepository repo = new BigdataSailRepository(testSail);
+	                final BigdataGraphEmbedded graph = new BigdataGraphEmbedded(repo) {
+	    
+	                    /**
+	                     * Test cases have weird semantics for shutdown.
+	                     */
+	                    @Override
+	                    public void shutdown() {
+	                        try {
+//	                          if (cxn != null) {
+//	                              cxn.commit();
+//	                              cxn.close();
+//	                              cxn = null;
+//	                          }
+//	                          commit();
+//	                          super.shutdown();
+	                        } catch (Exception ex) {
+	                            throw new RuntimeException(ex);
+	                        }
+	                    }
+	                    
+	                };
+                   testGraphs.put(key, graph);
 	            }
 	            
-				final BigdataSail sail = testSails.get(key); //testSail; //getSail();
-				final BigdataSailRepository repo = new BigdataSailRepository(sail);
-				final BigdataGraph graph = new BigdataGraphEmbedded(repo) {
-	
-				    /**
-				     * Test cases have weird semantics for shutdown.
-				     */
-					@Override
-					public void shutdown() {
-					    try {
-				            if (cxn != null) {
-    					        cxn.commit();
-    					        cxn.close();
-    					        cxn = null;
-				            }
-					    } catch (Exception ex) {
-					        throw new RuntimeException(ex);
-					    }
-					}
-					
-				};
+				BigdataGraphEmbedded graph = testGraphs.get(key); //testSail; //getSail();
+				
+//				if (!graph.repo.getSail().isOpen()) {
+//				    
+//				    final BigdataSail sail = reopenSail(graph.repo.getSail());
+//				    sail.initialize();
+//                    final BigdataSailRepository repo = new BigdataSailRepository(sail);
+//                    graph = new BigdataGraphEmbedded(repo);// {
+//                    testGraphs.put(key, graph);
+//				    
+//				}
+				
 				return graph;
+				
 			} catch (Exception ex) {
 				throw new RuntimeException(ex);
 			}
@@ -218,34 +258,15 @@ public class TestBigdataGraphEmbedded extends ProxyBigdataSailTestCase {
 		}
 		
 		public void shutdown() {
-		    for (BigdataSail sail : testSails.values()) {
-		        sail.__tearDownUnitTest();
+		    for (BigdataGraphEmbedded sail : testGraphs.values()) {
+		        sail.repo.getSail().__tearDownUnitTest();
 		    }
-		    testSails.clear();
+		    testGraphs.clear();
 		}
 		
     	
     }
 
-    @Override
-    public Properties getProperties() {
-        
-        Properties props = super.getProperties();
-
-        /*
-         * For example, here is a set of five properties that turns off
-         * inference, truth maintenance, and the free text index.
-         */
-        props.setProperty(BigdataSail.Options.AXIOMS_CLASS, NoAxioms.class.getName());
-        props.setProperty(BigdataSail.Options.VOCABULARY_CLASS, NoVocabulary.class.getName());
-        props.setProperty(BigdataSail.Options.TRUTH_MAINTENANCE, "false");
-        props.setProperty(BigdataSail.Options.JUSTIFY, "false");
-        props.setProperty(BigdataSail.Options.TEXT_INDEX, "false");
-        
-        return props;
-        
-    }
-    
     public static final void main(final String[] args) throws Exception {
 
         { // create an in-memory instance
@@ -326,7 +347,6 @@ public class TestBigdataGraphEmbedded extends ProxyBigdataSailTestCase {
         jnl.delete();
         
     }
-
 
 
 }
