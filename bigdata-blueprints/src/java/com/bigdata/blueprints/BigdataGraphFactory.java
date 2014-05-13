@@ -41,6 +41,13 @@ public class BigdataGraphFactory  {
     /**
      * Connect to a remote bigdata instance.
      */
+    public static BigdataGraph connect(final String host, final int port) {
+        return connect("http://"+host+":"+port);
+    }
+    
+    /**
+     * Connect to a remote bigdata instance.
+     */
     public static BigdataGraph connect(final String serviceEndpoint) {
         if (serviceEndpoint.endsWith("/bigdata/sparql")) {
             return new BigdataGraphClient(serviceEndpoint);

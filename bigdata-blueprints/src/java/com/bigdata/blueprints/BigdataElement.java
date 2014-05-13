@@ -26,7 +26,6 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 
-import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
 
 import com.tinkerpop.blueprints.Element;
@@ -56,9 +55,7 @@ public abstract class BigdataElement implements Element {
 	@SuppressWarnings("unchecked")
 	public <T> T getProperty(final String property) {
 		
-		final URI p = graph.factory.toPropertyURI(property);
-		
-		return (T) graph.getProperty(uri, p);
+		return (T) graph.getProperty(uri, property);
 		
 	}
 
@@ -73,27 +70,47 @@ public abstract class BigdataElement implements Element {
 	@SuppressWarnings("unchecked")
 	public <T> T removeProperty(final String property) {
 
-		final URI p = graph.factory.toPropertyURI(property);
-		
-		return (T) graph.removeProperty(uri, p);
+		return (T) graph.removeProperty(uri, property);
 		
 	}
 
 	@Override
-	public void setProperty(final String property, final Object val) {
+	public void setProperty(final String prop, final Object val) {
 
-		if (property == null || blacklist.contains(property)) {
+		if (prop == null || blacklist.contains(prop)) {
 			throw new IllegalArgumentException();
 		}
 		
-		final URI p = graph.factory.toPropertyURI(property);
-		
-		final Literal o = graph.factory.toLiteral(val);
-		
-		graph.setProperty(uri, p, o);
+		graph.setProperty(uri, prop, val);
 
 	}
+	
+	/**
+	 * Simple extension for multi-valued properties.
+	 */
+	public void addProperty(final String prop, final Object val) {
+	    
+        if (prop == null || blacklist.contains(prop)) {
+            throw new IllegalArgumentException();
+        }
+        
+        graph.addProperty(uri, prop, val);
+	    
+	}
 
+	/**
+	 * Simple extension for multi-valued properties.
+	 */
+    @SuppressWarnings("unchecked")
+    public <T> List<T> getProperties(final String property) {
+        
+        return (List<T>) graph.getProperties(uri, property);
+        
+    }
+
+	/**
+	 * Generated code.
+	 */
 	@Override
 	public int hashCode() {
 		final int prime = 31;
@@ -103,6 +120,9 @@ public abstract class BigdataElement implements Element {
 		return result;
 	}
 
+    /**
+     * Generated code.
+     */
 	@Override
 	public boolean equals(Object obj) {
 		if (this == obj)

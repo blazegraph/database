@@ -46,6 +46,13 @@ public class RESTServlet extends BigdataRDFServlet {
     private static final transient Logger log = Logger
             .getLogger(RESTServlet.class);
 
+    static {
+//        // pull a Tinkerpop interface into the class loader
+//        log.info(com.tinkerpop.blueprints.Graph.class.getName());
+        
+//        log.info(org.apache.avro.Schema.class.getName());
+    }
+    
     /**
      * 
      */
@@ -59,6 +66,7 @@ public class RESTServlet extends BigdataRDFServlet {
     private DeleteServlet m_deleteServlet;
     private UpdateServlet m_updateServlet;
     private WorkbenchServlet m_workbenchServlet;
+    private BlueprintsServlet m_blueprintsServlet;
     
     /**
      * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/584">
@@ -84,6 +92,7 @@ public class RESTServlet extends BigdataRDFServlet {
         m_deleteServlet = new DeleteServlet();
         m_describeServlet = new DescribeCacheServlet();
         m_workbenchServlet = new WorkbenchServlet();
+        m_blueprintsServlet = new BlueprintsServlet();
 
         m_queryServlet.init(getServletConfig());
         m_insertServlet.init(getServletConfig());
@@ -91,6 +100,7 @@ public class RESTServlet extends BigdataRDFServlet {
         m_deleteServlet.init(getServletConfig());
         m_describeServlet.init(getServletConfig());
         m_workbenchServlet.init(getServletConfig());
+        m_blueprintsServlet.init(getServletConfig());
         
     }
     
@@ -128,6 +138,11 @@ public class RESTServlet extends BigdataRDFServlet {
         if (m_workbenchServlet != null) {
             m_workbenchServlet.destroy();
             m_workbenchServlet = null;
+        }
+
+        if (m_blueprintsServlet != null) {
+            m_blueprintsServlet.destroy();
+            m_blueprintsServlet = null;
         }
 
         super.destroy();
@@ -242,6 +257,10 @@ public class RESTServlet extends BigdataRDFServlet {
         	
         	m_workbenchServlet.doPost(req, resp);
         	
+        } else if (req.getParameter(BlueprintsServlet.ATTR_BLUEPRINTS) != null) {
+            
+            m_blueprintsServlet.doPost(req, resp);
+            
         } else if (req.getParameter("uri") != null) {
 
             // INSERT via w/ URIs

@@ -31,7 +31,6 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
-import org.apache.commons.io.IOUtils;
 import org.openrdf.OpenRDFException;
 import org.openrdf.model.Literal;
 import org.openrdf.model.Statement;
@@ -53,7 +52,6 @@ import com.tinkerpop.blueprints.Features;
 import com.tinkerpop.blueprints.Graph;
 import com.tinkerpop.blueprints.GraphQuery;
 import com.tinkerpop.blueprints.Vertex;
-import com.tinkerpop.blueprints.util.DefaultGraphQuery;
 import com.tinkerpop.blueprints.util.io.graphml.GraphMLReader;
 
 /**
@@ -64,97 +62,74 @@ import com.tinkerpop.blueprints.util.io.graphml.GraphMLReader;
  */
 public abstract class BigdataGraph implements Graph {
 
+    /**
+     * URI used to represent a Vertex.
+     */
 	public static final URI VERTEX = new URIImpl(BD.NAMESPACE + "Vertex");
 	
+    /**
+     * URI used to represent a Edge.
+     */
 	public static final URI EDGE = new URIImpl(BD.NAMESPACE + "Edge");
 	
-//	final BigdataSailRepository repo;
-//	
-//	transient BigdataSailRepositoryConnection cxn;
-	
+	/**
+	 * Factory for round-tripping between Blueprints data and RDF data.
+	 */
 	final BlueprintsRDFFactory factory;
 	
-//	public BigdataGraph(final BigdataSailRepository repo) {
-//		this(repo, BigdataRDFFactory.INSTANCE);
-//	}
-	
-	public BigdataGraph(//final BigdataSailRepository repo, 
-			final BlueprintsRDFFactory factory) {
-//		try {
-//		    this.repo = repo;
-//			this.cxn = repo.getUnisolatedConnection();
-//			this.cxn.setAutoCommit(false);
-			this.factory = factory;
-//		} catch (RepositoryException ex) {
-//			throw new RuntimeException(ex);
-//		}
+	public BigdataGraph(final BlueprintsRDFFactory factory) {
+
+	    this.factory = factory;
+	    
 	}
 	
+	/**
+	 * For some reason this is part of the specification (i.e. part of the
+	 * Blueprints test suite).
+	 */
 	public String toString() {
+	    
 	    return getClass().getSimpleName().toLowerCase();
+	    
 	}
 	
     /**
-     * Post a GraphML file to the remote server. (Bulk-upload operation.)
+     * Different implementations will return different types of connections
+     * depending on the mode (client/server, embedded, read-only, etc.)
      */
-    public void loadGraphML(final String file) throws Exception {
-        GraphMLReader.inputGraph(this, file);
-    }
-    
 	protected abstract RepositoryConnection cxn() throws Exception;
 	
-//	public BigdataSailRepositoryConnection getConnection() {
-//		return this.cxn;
-//	}
-//	
-//	public BlueprintsRDFFactory getFactory() {
-//		return this.factory;
-//	}
-	
-//	public Value getValue(final URI s, final URI p) {
-//		
-//		try {
-//		
-//			final RepositoryResult<Statement> result = 
-//					cxn.getStatements(s, p, null, false);
-//			
-//			if (result.hasNext()) {
-//				
-//				final Value o = result.next().getObject();
-//				
-//				if (result.hasNext()) {
-//					throw new RuntimeException(s
-//							+ ": more than one value for p: " + p
-//							+ ", did you mean to call getValues()?");
-//				}
-//				
-//				return o;
-//				
-//			}
-//			
-//			return null;
-//			
-//		} catch (Exception ex) {
-//			throw new RuntimeException(ex);
-//		}
-//		
-//	}
-	
-	public Object getProperty(final URI s, final URI p) {
+	/**
+	 * Return a single-valued property for an edge or vertex.
+     * 
+     * @see {@link BigdataElement}
+	 */
+    public Object getProperty(final URI uri, final String prop) {
+        
+        return getProperty(uri, factory.toPropertyURI(prop));
+        
+    }
+
+    /**
+     * Return a single-valued property for an edge or vertex.
+     * 
+     * @see {@link BigdataElement}
+     */
+	public Object getProperty(final URI uri, final URI prop) {
 
 		try {
 			
 			final RepositoryResult<Statement> result = 
-					cxn().getStatements(s, p, null, false);
+					cxn().getStatements(uri, prop, null, false);
 			
 			if (result.hasNext()) {
 				
 				final Value value = result.next().getObject();
 				
 				if (result.hasNext()) {
-					throw new RuntimeException(s
-							+ ": more than one value for p: " + p
-							+ ", did you mean to call getValues()?");
+					throw new RuntimeException(uri
+							+ ": more than one value for p: " + prop
+							+ ", did you mean to call getProperties()?");
 				}
 
 				if (!(value instanceof Literal)) {
@@ -175,37 +150,29 @@ public abstract class BigdataGraph implements Graph {
 		
 	}
 	
-//	public List<Value> getValues(final URI s, final URI p) {
-//		
-//		try {
-//		
-//			final RepositoryResult<Statement> result = 
-//					cxn().getStatements(s, p, null, false);
-//			
-//			final List<Value> values = new LinkedList<Value>();
-//			
-//			while (result.hasNext()) {
-//				
-//				final Value o = result.next().getObject();
-//				
-//				values.add(o);
-//				
-//			}
-//			
-//			return values;
-//			
-//		} catch (Exception ex) {
-//			throw new RuntimeException(ex);
-//		}
-//		
-//	}
-	
-	public List<Object> getProperties(final URI s, final URI p) {
+    /**
+     * Return a multi-valued property for an edge or vertex.
+     * 
+     * @see {@link BigdataElement}
+     */
+    public List<Object> getProperties(final URI uri, final String prop) {
+        
+        return getProperties(uri, factory.toPropertyURI(prop));
+        
+    }
+
+
+	/**
+     * Return a multi-valued property for an edge or vertex.
+     * 
+     * @see {@link BigdataElement}
+	 */
+	public List<Object> getProperties(final URI uri, final URI prop) {
 
 		try {
 			
 			final RepositoryResult<Statement> result = 
-					cxn().getStatements(s, p, null, false);
+					cxn().getStatements(uri, prop, null, false);
 			
 			final List<Object> props = new LinkedList<Object>();
 			
@@ -231,12 +198,17 @@ public abstract class BigdataGraph implements Graph {
 		
 	}
 	
-	public Set<String> getPropertyKeys(final URI s) {
+	/**
+	 * Return the property names for an edge or vertex.
+     * 
+     * @see {@link BigdataElement}
+	 */
+	public Set<String> getPropertyKeys(final URI uri) {
 		
 		try {
 			
 			final RepositoryResult<Statement> result = 
-					cxn().getStatements(s, null, null, false);
+					cxn().getStatements(uri, null, null, false);
 			
 			final Set<String> properties = new LinkedHashSet<String>();
 			
@@ -267,13 +239,29 @@ public abstract class BigdataGraph implements Graph {
 		
 	}
 
-	public Object removeProperty(final URI s, final URI p) {
+    /**
+     * Remove all values for a particular property on an edge or vertex.
+     * 
+     * @see {@link BigdataElement}
+     */
+    public Object removeProperty(final URI uri, final String prop) {
+        
+        return removeProperty(uri, factory.toPropertyURI(prop));
+        
+    }
+    
+	/**
+	 * Remove all values for a particular property on an edge or vertex.
+     * 
+     * @see {@link BigdataElement}
+	 */
+	public Object removeProperty(final URI uri, final URI prop) {
 
 		try {
 			
-			final Object oldVal = getProperty(s, p);
+			final Object oldVal = getProperty(uri, prop);
 			
-			cxn().remove(s, p, null);
+			cxn().remove(uri, prop, null);
 			
 			return oldVal;
 			
@@ -283,13 +271,31 @@ public abstract class BigdataGraph implements Graph {
 	
 	}
 
-	public void setProperty(final URI s, final URI p, final Literal o) {
+    /**
+     * Set a single-value property on an edge or vertex (remove the old
+     * value first).
+     * 
+     * @see {@link BigdataElement}
+     */
+    public void setProperty(final URI uri, final String prop, final Object val) {
+        
+        setProperty(uri, factory.toPropertyURI(prop), factory.toLiteral(val));
+
+    }
+    
+	/**
+	 * Set a single-value property on an edge or vertex (remove the old
+	 * value first).
+	 * 
+	 * @see {@link BigdataElement}
+	 */
+	public void setProperty(final URI uri, final URI prop, final Literal val) {
 		
 		try {
 			
-			cxn().remove(s, p, null);
+			cxn().remove(uri, prop, null);
 			
-			cxn().add(s, p, o);
+			cxn().add(uri, prop, val);
 			
 		} catch (Exception e) {
 			throw new RuntimeException(e);
@@ -297,6 +303,46 @@ public abstract class BigdataGraph implements Graph {
 		
 	}
 	
+    /**
+     * Add a property on an edge or vertex (multi-value property extension).
+     * 
+     * @see {@link BigdataElement}
+     */
+    public void addProperty(final URI uri, final String prop, final Object val) {
+        
+        setProperty(uri, factory.toPropertyURI(prop), factory.toLiteral(val));
+
+    }
+    
+    /**
+     * Add a property on an edge or vertex (multi-value property extension).
+     * 
+     * @see {@link BigdataElement}
+     */
+    public void addProperty(final URI uri, final URI prop, final Literal val) {
+        
+        try {
+            
+            cxn().add(uri, prop, val);
+            
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+        
+    }
+    
+    /**
+     * Post a GraphML file to the remote server. (Bulk-upload operation.)
+     */
+    public void loadGraphML(final String file) throws Exception {
+        
+        GraphMLReader.inputGraph(this, file);
+        
+    }
+    
+	/**
+	 * Add an edge.
+	 */
 	@Override
 	public Edge addEdge(final Object key, final Vertex from, final Vertex to, 
 			final String label) {
@@ -324,6 +370,7 @@ public abstract class BigdataGraph implements Graph {
 			
 		try {
 				
+		    // do we need to check this?
 //			if (cxn().hasStatement(edgeURI, RDF.TYPE, EDGE, false)) {
 //				throw new IllegalArgumentException("edge " + eid + " already exists");
 //			}
@@ -343,6 +390,9 @@ public abstract class BigdataGraph implements Graph {
 		
 	}
 
+	/**
+	 * Add a vertex.
+	 */
 	@Override
 	public Vertex addVertex(final Object key) {
 		
@@ -353,6 +403,7 @@ public abstract class BigdataGraph implements Graph {
 					
 			final URI uri = factory.toVertexURI(vid);
 
+            // do we need to check this?
 //			if (cxn().hasStatement(vertexURI, RDF.TYPE, VERTEX, false)) {
 //				throw new IllegalArgumentException("vertex " + vid + " already exists");
 //			}
@@ -367,6 +418,9 @@ public abstract class BigdataGraph implements Graph {
 		
 	}
 
+	/**
+	 * Lookup an edge.
+	 */
 	@Override
 	public Edge getEdge(final Object key) {
 		
@@ -401,6 +455,9 @@ public abstract class BigdataGraph implements Graph {
 		
 	}
 
+	/**
+	 * Iterate all edges.
+	 */
 	@Override
 	public Iterable<Edge> getEdges() {
 		
@@ -409,37 +466,97 @@ public abstract class BigdataGraph implements Graph {
 		
 	}
 	
-	public Iterable<Edge> getEdges(final URI s, final URI o, final String... labels) {
-		
-		try {
-			
-//			final RepositoryResult<Statement> result = 
-//					cxn().getStatements(s, p, o, false);
-//
-//			return new EdgeIterable(result);
-			
-			final StringBuilder sb = new StringBuilder();
-			sb.append("construct { ?from ?edge ?to . } where {\n");
-			sb.append("?edge rdf:type bd:Edge . ?from ?edge ?to .\n");
-			if (labels != null && labels.length > 0) {
-				if (labels.length == 1) {
-					sb.append("?edge rdfs:label \"").append(labels[0]).append("\" .\n");
-				} else {
-					sb.append("?edge rdfs:label ?label .\n");
-					sb.append("filter(?label in (");
-					for (String label : labels) {
-						sb.append("\""+label+"\", ");
-					}
-					sb.setLength(sb.length()-2);
-					sb.append(")) .\n");
-				}
-			}
-			sb.append("}");
-			
-			final String queryStr = sb.toString()
-						.replace("?from", s != null ? "<"+s+">" : "?from")
-							.replace("?to", o != null ? "<"+o+">" : "?to");
-			
+	/**
+     * Find edges based on the from and to vertices and the edge labels, all
+     * optional parameters (can be null). The edge labels can be null to include
+     * all labels.
+     * <p>
+     * 
+     * @param from
+     *            the from vertex (null for wildcard)
+     * @param to
+     *            the to vertex (null for wildcard)
+     * @param labels
+     *            the edge labels to consider (optional)
+     * @return the edges matching the supplied criteria
+     */
+	Iterable<Edge> getEdges(final URI from, final URI to, final String... labels) {
+
+	    final GraphQueryResult stmts = getElements(from, to, labels);
+	    
+        return new EdgeIterable(stmts);
+
+	}
+
+	/**
+	 * Translates the request to a high-performance SPARQL query:
+     * 
+     * construct {
+     *   ?from ?edge ?to .
+     * } where {
+     *   ?edge rdf:type <Edge> .
+     *   
+     *   ?from ?edge ?to .
+     *   
+     *   # filter by edge label
+     *   ?edge rdfs:label ?label .
+     *   filter(?label in ("label1", "label2", ...)) .
+     * }
+	 */
+	protected GraphQueryResult getElements(final URI from, final URI to, 
+	        final String... labels) {
+	    
+        final StringBuilder sb = new StringBuilder();
+        sb.append("construct { ?from ?edge ?to . } where {\n");
+        sb.append("  ?edge rdf:type bd:Edge .\n");
+        sb.append("  ?from ?edge ?to .\n");
+        if (labels != null && labels.length > 0) {
+            if (labels.length == 1) {
+                sb.append("  ?edge rdfs:label \"").append(labels[0]).append("\" .\n");
+            } else {
+                sb.append("  ?edge rdfs:label ?label .\n");
+                sb.append("  filter(?label in (");
+                for (String label : labels) {
+                    sb.append("\""+label+"\", ");
+                }
+                sb.setLength(sb.length()-2);
+                sb.append(")) .\n");
+            }
+        }
+        sb.append("}");
+
+        // bind the from and/or to
+        final String queryStr = sb.toString()
+                    .replace("?from", from != null ? "<"+from+">" : "?from")
+                        .replace("?to", to != null ? "<"+to+">" : "?to");
+     
+        try {
+            
+            final org.openrdf.query.GraphQuery query = 
+                    cxn().prepareGraphQuery(QueryLanguage.SPARQL, queryStr);
+            
+            final GraphQueryResult stmts = query.evaluate();
+
+            return stmts;
+            
+        } catch (Exception ex) {
+            throw new RuntimeException(ex);
+        }
+        
+	}
+	
+	/**
+	 * Find edges based on a SPARQL construct query.  The query MUST construct
+	 * edge statements: 
+	 * <p>
+	 * construct { ?from ?edge ?to } where { ... }
+	 * 
+	 * @see {@link BigdataGraphQuery}
+	 */
+	Iterable<Edge> getEdges(final String queryStr) { 
+	    
+	    try {
+	        
 			final org.openrdf.query.GraphQuery query = 
 					cxn().prepareGraphQuery(QueryLanguage.SPARQL, queryStr);
 			
@@ -453,52 +570,56 @@ public abstract class BigdataGraph implements Graph {
 		
 	}
 
-	public Iterable<Vertex> getVertices(final URI s, final URI o, 
+    /**
+     * Find vertices based on the supplied from and to vertices and the edge 
+     * labels.  One or the other (from and to) must be null (wildcard), but not 
+     * both. Use getEdges() for wildcards on both the from and to.  The edge 
+     * labels can be null to include all labels.
+     * 
+     * @param from
+     *             the from vertex (null for wildcard)
+     * @param to
+     *             the to vertex (null for wildcard)
+     * @param labels
+     *             the edge labels to consider (optional)
+     * @return
+     *             the vertices matching the supplied criteria
+     */
+	Iterable<Vertex> getVertices(final URI from, final URI to, 
 			final String... labels) {
 		
-		if (s != null && o != null) {
+		if (from != null && to != null) {
 			throw new IllegalArgumentException();
 		}
 		
-		if (s == null && o == null) {
+		if (from == null && to == null) {
 			throw new IllegalArgumentException();
 		}
 		
-		try {
-			
-//			final RepositoryResult<Statement> result = 
-//					cxn().getStatements(s, null, o, false);
-//			
-//			return new VertexIterable(result, s == null);
-
-			final StringBuilder sb = new StringBuilder();
-			sb.append("construct { ?from ?edge ?to . } where {\n");
-			sb.append("?edge rdf:type bd:Edge . ?from ?edge ?to .\n");
-			if (labels != null && labels.length > 0) {
-				if (labels.length == 1) {
-					sb.append("?edge rdfs:label \"").append(labels[0]).append("\" .\n");
-				} else {
-					sb.append("?edge rdfs:label ?label .\n");
-					sb.append("filter(?label in (");
-					for (String label : labels) {
-						sb.append("\""+label+"\", ");
-					}
-					sb.setLength(sb.length()-2);
-					sb.append(")) .\n");
-				}
-			}
-			sb.append("}");
-			
-			final String queryStr = sb.toString()
-						.replace("?from", s != null ? "<"+s+">" : "?from")
-							.replace("?to", o != null ? "<"+o+">" : "?to");
-			
+        final GraphQueryResult stmts = getElements(from, to, labels);
+        
+        return new VertexIterable(stmts, from == null);
+		
+	}
+	
+    /**
+     * Find vertices based on a SPARQL construct query. If the subject parameter
+     * is true, the vertices will be taken from the subject position of the
+     * constructed statements, otherwise they will be taken from the object
+     * position.
+     * 
+     * @see {@link BigdataGraphQuery}
+     */
+	Iterable<Vertex> getVertices(final String queryStr, final boolean subject) {
+	    
+	    try {
+	        
 			final org.openrdf.query.GraphQuery query = 
 					cxn().prepareGraphQuery(QueryLanguage.SPARQL, queryStr);
 			
 			final GraphQueryResult stmts = query.evaluate();
 			
-			return new VertexIterable(stmts, s == null);
+			return new VertexIterable(stmts, subject);
 			
 		} catch (Exception ex) {
 			throw new RuntimeException(ex);
@@ -506,12 +627,17 @@ public abstract class BigdataGraph implements Graph {
 		
 	}
 	
-	public final <T> Iterable<T> fuse(final Iterable<T>... args) {
-		
-		return new FusedIterable<T>(args);
-	}
-	
-
+	/**
+	 * Find edges with the supplied property value.
+	 * 
+	 * construct {
+     *   ?from ?edge ?to .
+     * }
+     * where {
+     *   ?edge <prop> <val> .
+     *   ?from ?edge ?to .
+     * }
+	 */
 	@Override
 	public Iterable<Edge> getEdges(final String prop, final Object val) {
 		
@@ -520,17 +646,15 @@ public abstract class BigdataGraph implements Graph {
 		
 		try {
 		
-			final String queryStr = IOUtils.toString(
-					getClass().getResourceAsStream("edgesByProperty.rq"))
-						.replace("?prop", "<"+p+">")
-							.replace("?val", o.toString());
-			
-			final org.openrdf.query.GraphQuery query = 
-					cxn().prepareGraphQuery(QueryLanguage.SPARQL, queryStr);
-			
-			final GraphQueryResult stmts = query.evaluate();
-			
-			return new EdgeIterable(stmts);
+	        final StringBuilder sb = new StringBuilder();
+	        sb.append("construct { ?from ?edge ?to . } where {\n");
+	        sb.append("  ?edge <"+p+"> "+o+" .\n");
+	        sb.append("  ?from ?edge ?to .\n");
+	        sb.append("}");
+
+	        final String queryStr = sb.toString();
+
+			return getEdges(queryStr);
 			
 		} catch (Exception ex) {
 			throw new RuntimeException(ex);
@@ -538,13 +662,9 @@ public abstract class BigdataGraph implements Graph {
 		
 	}
 
-	@Override
-	public Features getFeatures() {
-		
-		return FEATURES;
-		
-	}
-
+	/**
+	 * Lookup a vertex.
+	 */
 	@Override
 	public Vertex getVertex(final Object key) {
 		
@@ -552,120 +672,136 @@ public abstract class BigdataGraph implements Graph {
 			throw new IllegalArgumentException();
 		
 		final URI uri = factory.toVertexURI(key.toString());
+		
 		try {
+		    
 			if (cxn().hasStatement(uri, RDF.TYPE, VERTEX, false)) {
 				return new BigdataVertex(uri, this);
 			}
+			
 			return null;
+			
 		} catch (Exception ex) {
 			throw new RuntimeException(ex);
 		}
 		
 	}
 
+	
+    /**
+     * Iterate all vertices.
+     */
 	@Override
 	public Iterable<Vertex> getVertices() {
 		
 		try {
+		    
 			final RepositoryResult<Statement> result = 
 					cxn().getStatements(null, RDF.TYPE, VERTEX, false);
+			
 			return new VertexIterable(result, true);
+			
 		} catch (Exception ex) {
 			throw new RuntimeException(ex);
 		}
 		
 	}
 
+    /**
+     * Find vertices with the supplied property value.
+     */
 	@Override
-	public Iterable<Vertex> getVertices(String prop, Object val) {
+	public Iterable<Vertex> getVertices(final String prop, final Object val) {
 		
 		final URI p = factory.toPropertyURI(prop);
 		final Literal o = factory.toLiteral(val);
+		
 		try {
+		    
 			final RepositoryResult<Statement> result = 
 					cxn().getStatements(null, p, o, false);
+			
 			return new VertexIterable(result, true);
+			
 		} catch (Exception ex) {
 			throw new RuntimeException(ex);
 		}
 		
 	}
 
+	/**
+	 * Providing an override implementation for our GraphQuery to avoid the
+	 * low-performance scan and filter paradigm. See {@link BigdataGraphQuery}. 
+	 */
 	@Override
 	public GraphQuery query() {
-		return new DefaultGraphQuery(this);
+//		return new DefaultGraphQuery(this);
+	    return new BigdataGraphQuery(this);
 	}
 
+	/**
+	 * Remove an edge and its properties.
+	 */
 	@Override
 	public void removeEdge(final Edge edge) {
+	    
 		try {
+		    
 			final URI uri = factory.toURI(edge);
+			
             if (!cxn().hasStatement(uri, RDF.TYPE, EDGE, false)) {
                 throw new IllegalStateException();
             }
+            
             final URI wild = null;
+            
 			// remove the edge statement
 			cxn().remove(wild, uri, wild);
+			
 			// remove its properties
 			cxn().remove(uri, wild, wild);
+			
 		} catch (Exception e) {
 			throw new RuntimeException(e);
 		}
+		
 	}
 
+	/**
+	 * Remove a vertex and its edges and properties.
+	 */
 	@Override
 	public void removeVertex(final Vertex vertex) {
+	    
 		try {
+		    
 			final URI uri = factory.toURI(vertex);
+			
             if (!cxn().hasStatement(uri, RDF.TYPE, VERTEX, false)) {
                 throw new IllegalStateException();
             }
+            
             final URI wild = null;
-			// remove outgoing links and properties
+            
+			// remove outgoing edges and properties
 			cxn().remove(uri, wild, wild);
-			// remove incoming links
+			
+			// remove incoming edges
 			cxn().remove(wild, wild, uri);
+			
 		} catch (Exception e) {
 			throw new RuntimeException(e);
 		}
+		
 	}
 
-//	@Override
-//	public void commit() {
-//		try {
-//			cxn().commit();
-//		} catch (RepositoryException e) {
-//			throw new RuntimeException(e);
-//		}
-//	}
-//
-//	@Override
-//	public void rollback() {
-//		try {
-//			cxn().rollback();
-//			cxn.close();
-//            cxn = repo.getUnisolatedConnection();
-//		    cxn.setAutoCommit(false);
-//		} catch (RepositoryException e) {
-//			throw new RuntimeException(e);
-//		}
-//	}
-//
-//	@Override
-//	public void shutdown() {
-//		try {
-//			cxn.close();
-//			repo.shutDown();
-//		} catch (RepositoryException e) {
-//			throw new RuntimeException(e);
-//		}
-//	}
-//
-//	@Override
-//	@Deprecated
-//	public void stopTransaction(Conclusion arg0) {
-//	}
-	
+	/**
+	 * Translate a collection of Bigdata statements into an iteration of
+	 * Blueprints vertices.
+	 *  
+	 * @author mikepersonick
+	 *
+	 */
 	public class VertexIterable implements Iterable<Vertex>, Iterator<Vertex> {
 
 		private final CloseableIteration<Statement, ? extends OpenRDFException> stmts;
@@ -720,6 +856,13 @@ public abstract class BigdataGraph implements Graph {
 		
 	}
 
+    /**
+     * Translate a collection of Bigdata statements into an iteration of
+     * Blueprints edges.
+     *  
+     * @author mikepersonick
+     *
+     */
 	public class EdgeIterable implements Iterable<Edge>, Iterator<Edge> {
 
 		private final CloseableIteration<Statement, ? extends OpenRDFException> stmts;
@@ -768,6 +911,21 @@ public abstract class BigdataGraph implements Graph {
 		
 	}
 
+    /**
+     * Fuse two iterables together into one.  Useful for combining IN and OUT
+     * edges for a vertex.
+     */
+    public final <T> Iterable<T> fuse(final Iterable<T>... args) {
+        
+        return new FusedIterable<T>(args);
+    }
+    
+    /**
+     * Fuse two iterables together into one.  Useful for combining IN and OUT
+     * edges for a vertex.
+     *  
+     * @author mikepersonick
+     */
 	public class FusedIterable<T> implements Iterable<T>, Iterator<T> {
 		
 		private final Iterable<T>[] args;
@@ -814,8 +972,15 @@ public abstract class BigdataGraph implements Graph {
 	
     protected static final Features FEATURES = new Features();
 
-    static {
+    @Override
+    public Features getFeatures() {
 
+        return FEATURES;
+        
+    }
+    
+    static {
+        
         FEATURES.supportsSerializableObjectProperty = false;
         FEATURES.supportsBooleanProperty = true;
         FEATURES.supportsDoubleProperty = true;
@@ -846,6 +1011,7 @@ public abstract class BigdataGraph implements Graph {
         FEATURES.supportsVertexProperties = true;
         FEATURES.supportsEdgeProperties = true;
         FEATURES.supportsThreadedTransactions = false;
+        
     }
 
 }
