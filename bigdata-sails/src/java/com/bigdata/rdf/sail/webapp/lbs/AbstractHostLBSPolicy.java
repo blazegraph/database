@@ -459,8 +459,8 @@ public abstract class AbstractHostLBSPolicy extends AbstractLBSPolicy {
 
         }
 
-        if (log.isInfoEnabled())
-            log.info("hostMetricsMap=" + hostMetricsMap);
+        if (log.isTraceEnabled())
+            log.trace("hostMetricsMap=" + hostMetricsMap);
 
         final HostTable newHostTable = normalizeHostScores(scoringRule,
                 hostMetricsMap);
