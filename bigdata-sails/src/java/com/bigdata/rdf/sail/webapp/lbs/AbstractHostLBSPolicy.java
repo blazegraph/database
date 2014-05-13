@@ -494,7 +494,6 @@ public abstract class AbstractHostLBSPolicy extends AbstractLBSPolicy {
          */
 
         final int nhosts = hostMetricsMap.size();
-        // int nhostsWithServices = 0;
 
         final String[] hostnames = new String[nhosts];
 
@@ -533,7 +532,7 @@ public abstract class AbstractHostLBSPolicy extends AbstractLBSPolicy {
 
                 totalScore += hostScore;
 
-                // nhostsWithServices++;
+                i++;
 
             }
 
