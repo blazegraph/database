@@ -802,7 +802,7 @@ public abstract class AbstractHostLBSPolicy extends AbstractLBSPolicy {
                 double sum = 0d;
                 for (HostScore tmp : hostScores) {
                     hostScore = tmp;
-                    sum += (1d - hostScore.getScore());
+                    sum += hostScore.getScore();
                     if (sum >= d) {
                         // found desired host.
                         break;
