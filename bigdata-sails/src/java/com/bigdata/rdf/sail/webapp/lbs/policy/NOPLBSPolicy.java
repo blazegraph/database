@@ -49,15 +49,17 @@ public class NOPLBSPolicy extends AbstractLBSPolicy {
     private static final long serialVersionUID = 1L;
 
     @Override
-    public boolean service(final boolean isLeaderRequest,
-            final HttpServletRequest request, final HttpServletResponse response)
-            throws IOException, ServletException {
+    public boolean service(//
+            final boolean isLeaderRequest,//
+            final HALoadBalancerServlet servlet,//
+            final HttpServletRequest request, //
+            final HttpServletResponse response//
+    ) throws IOException, ServletException {
 
         if (!isLeaderRequest) {
 
             // Always handle read requests locally.
-            HALoadBalancerServlet.forwardToThisService(isLeaderRequest,
-                    request, response);
+            servlet.forwardToLocalService(isLeaderRequest, request, response);
 
             // Request was handled.
             return true;
@@ -65,7 +67,7 @@ public class NOPLBSPolicy extends AbstractLBSPolicy {
         }
 
         // Proxy update requests to the quorum leader.
-        return super.service(isLeaderRequest, request, response);
+        return super.service(isLeaderRequest, servlet, request, response);
 
     }
 

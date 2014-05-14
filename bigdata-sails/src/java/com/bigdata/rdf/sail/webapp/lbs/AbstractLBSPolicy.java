@@ -197,9 +197,12 @@ abstract public class AbstractLBSPolicy implements IHALoadBalancerPolicy,
     }
 
     @Override
-    public boolean service(final boolean isLeaderRequest,
-            final HttpServletRequest request, final HttpServletResponse response)
-            throws ServletException, IOException {
+    public boolean service(//
+            final boolean isLeaderRequest,
+            final HALoadBalancerServlet servlet,//
+            final HttpServletRequest request, //
+            final HttpServletResponse response//
+    ) throws ServletException, IOException {
 
         /*
          * Figure out whether the quorum is met and if this is the quorum
@@ -239,8 +242,7 @@ abstract public class AbstractLBSPolicy implements IHALoadBalancerPolicy,
              * 
              * @see #forwardToThisService()
              */
-            HALoadBalancerServlet.forwardToThisService(isLeaderRequest,
-                    request, response);
+            servlet.forwardToLocalService(isLeaderRequest, request, response);
 
             // request was handled.
             return true;
@@ -258,7 +260,7 @@ abstract public class AbstractLBSPolicy implements IHALoadBalancerPolicy,
              * Provide an opportunity to forward a read request to the local
              * service.
              */
-            if (conditionallyForwardReadRequest(request, response)) {
+            if (conditionallyForwardReadRequest(servlet, request, response)) {
 
                 // Handled.
                 return true;
@@ -282,8 +284,10 @@ abstract public class AbstractLBSPolicy implements IHALoadBalancerPolicy,
      * @throws IOException
      */
     protected boolean conditionallyForwardReadRequest(
-            final HttpServletRequest request, final HttpServletResponse response)
-            throws IOException {
+            final HALoadBalancerServlet servlet,
+            final HttpServletRequest request, //
+            final HttpServletResponse response//
+            ) throws IOException {
 
         return false;
 

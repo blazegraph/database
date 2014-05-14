@@ -50,6 +50,10 @@ public interface IHALoadBalancerPolicy extends IHAPolicyLifeCycle {
      *            balanced over the joined services. UPDATEs MUST be handled by
      *            the leader. Read requests can be handled by any service that
      *            is joined with the met quorum.
+     * @param servlet
+     *            The {@link HALoadBalancerServlet}. This is exposed in order to
+     *            allow the {@link IHALoadBalancerPolicy} to perform a local
+     *            forward of the request.
      * @param request
      *            The request.
      * @param response
@@ -57,9 +61,12 @@ public interface IHALoadBalancerPolicy extends IHAPolicyLifeCycle {
      * 
      * @return <code>true</code> iff the request was handled.
      */
-    boolean service(final boolean isLeaderRequest,
-            final HttpServletRequest request, final HttpServletResponse response)
-            throws ServletException, IOException;
+    boolean service(//
+            final boolean isLeaderRequest,
+            final HALoadBalancerServlet servlet,//
+            final HttpServletRequest request, //
+            final HttpServletResponse response//
+    ) throws ServletException, IOException;
 
     /**
      * Return the Request-URI to which a non-idempotent request will be proxied.

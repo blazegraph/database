@@ -30,7 +30,6 @@ import java.net.InetSocketAddress;
 import java.security.DigestException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.util.Arrays;
 import java.util.Iterator;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
@@ -65,7 +64,6 @@ import com.bigdata.quorum.Quorum;
 import com.bigdata.quorum.zk.ZKQuorumClient;
 import com.bigdata.quorum.zk.ZKQuorumImpl;
 import com.bigdata.rdf.sail.webapp.StatusServlet.DigestEnum;
-import com.bigdata.rdf.sail.webapp.lbs.IHALoadBalancerPolicy;
 import com.bigdata.zookeeper.DumpZookeeper;
 
 /**
@@ -290,15 +288,12 @@ public class HAStatusServletUtil {
                         + journal.getSnapshotManager().getRestorePolicy())
                         .node("br").close();
 
-                // LBS policy
+                // HA Load Balancer.
                 {
 
-                    final IHALoadBalancerPolicy[] a = HALoadBalancerServlet
-                            .getLBSPolicy(req.getServletContext());
-                    
                     p.text("Service: LBSPolicy="
-                            + (a == null ? "N/A" : Arrays.toString(a)))
-                            .node("br").close();
+                            + HALoadBalancerServlet.toString(req
+                                    .getServletContext())).node("br").close();
                 }
 //                if(true) {
 //                    /*
