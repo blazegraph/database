@@ -111,8 +111,8 @@ public abstract class AbstractHostLBSPolicy extends AbstractLBSPolicy {
          * 
          * TODO In fact, we could automatically compute and use a reasonable
          * value based on the quorum size as
-         * <code>ceil((1/replicationFactor)-.05)</code>. With this approach, the
-         * local forward bias is automatic and has no more than a 5% deviation
+         * <code>ceil((1/replicationFactor)-.01)</code>. With this approach, the
+         * local forward bias is automatic and has no more than a 1% deviation
          * from the optimal decision if a round-robin is NOT being applied.
          */
         String LOCAL_FORWARD_THRESHOLD = "localForwardThreshold";
@@ -670,7 +670,7 @@ public abstract class AbstractHostLBSPolicy extends AbstractLBSPolicy {
 
                 if (log.isDebugEnabled())
                     log.debug("hostname=" + hostname + ", metrics="
-                            + metrics2[i] + ", score=" + hostScore.getScore());
+                            + metrics2[i] + ", score=" + hostScore.getAvailability());
 
             }
 
@@ -836,7 +836,7 @@ public abstract class AbstractHostLBSPolicy extends AbstractLBSPolicy {
                 double sum = 0d;
                 for (HostScore tmp : hostScores) {
                     hostScore = tmp;
-                    sum += hostScore.getScore();
+                    sum += hostScore.getAvailability();
                     if (sum >= d) {
                         // found desired host.
                         break;
@@ -948,7 +948,7 @@ public abstract class AbstractHostLBSPolicy extends AbstractLBSPolicy {
                 : hostTable.thisHost;
 
         if (thisHostScore != null
-                && thisHostScore.getScore() >= localForwardThresholdRef.get()) {
+                && thisHostScore.getAvailability() >= localForwardThresholdRef.get()) {
 
             servlet.forwardToLocalService(false/* isLeaderRequest */, request,
                     response);

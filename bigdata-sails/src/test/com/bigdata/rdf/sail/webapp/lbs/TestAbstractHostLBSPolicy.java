@@ -77,7 +77,7 @@ public class TestAbstractHostLBSPolicy extends TestCase2 {
         final HostScore hostScore1 = new HostScore("H1", 1d);
 
         // should sum to 1.0
-        assertEquals(1d, hostScore1.getScore());
+        assertEquals(1d, hostScore1.getAvailability());
 
         final HostScore[] hostScores = new HostScore[] { //
         hostScore1 //
