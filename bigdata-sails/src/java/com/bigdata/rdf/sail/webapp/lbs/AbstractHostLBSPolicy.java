@@ -762,6 +762,8 @@ public abstract class AbstractHostLBSPolicy extends AbstractLBSPolicy {
      *         be proxied -or- <code>null</code> if the request should not be
      *         proxied (because we lack enough information to identify a target
      *         host).
+     * 
+     * @see bigdata/src/resources/architecture/HA_LBS.xls
      */
     static HostScore getHost(//
             final double d, //
