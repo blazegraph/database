@@ -28,11 +28,11 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.counters.linux;
 
-import java.util.HashMap;
-import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.regex.Pattern;
 
 import com.bigdata.counters.AbstractProcessCollector;
@@ -50,7 +50,6 @@ import com.bigdata.counters.ProcessReaderHelper;
  * Collects some counters using <code>vmstat</code>.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class VMStatCollector extends AbstractProcessCollector implements
         ICounterHierarchy, IRequiredHostCounters, IHostCounters{
@@ -61,7 +60,6 @@ public class VMStatCollector extends AbstractProcessCollector implements
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
      *         Thompson</a>
-     * @version $Id$
      */
     abstract class I<T> implements IInstrument<T> {
         
@@ -73,17 +71,19 @@ public class VMStatCollector extends AbstractProcessCollector implements
             
         }
         
-        public I(String path) {
+        public I(final String path) {
             
-            assert path != null;
+            if (path == null)
+                throw new IllegalArgumentException();
             
             this.path = path;
             
         }
 
+        @Override
         public long lastModified() {
 
-            return lastModified;
+            return lastModified.get();
             
         }
 
@@ -91,7 +91,8 @@ public class VMStatCollector extends AbstractProcessCollector implements
          * @throws UnsupportedOperationException
          *             always.
          */
-        public void setValue(T value, long timestamp) {
+        @Override
+        public void setValue(final T value, final long timestamp) {
            
             throw new UnsupportedOperationException();
             
@@ -108,15 +109,15 @@ public class VMStatCollector extends AbstractProcessCollector implements
 
         protected final double scale;
         
-        DI(String path, double scale) {
-            
-            super( path );
+        DI(final String path, final double scale) {
+
+            super(path);
             
             this.scale = scale;
             
         }
         
-        
+        @Override
         public Double getValue() {
          
             final Double value = (Double) vals.get(path);
@@ -138,24 +139,26 @@ public class VMStatCollector extends AbstractProcessCollector implements
      * are paths into the {@link CounterSet}. The values are the data most
      * recently read from <code>vmstat</code>.
      */
-    final private Map<String, Object> vals = new HashMap<String, Object>();
+    final private Map<String, Object> vals = new ConcurrentHashMap<String, Object>();
     
     /**
      * The timestamp associated with the most recently collected values.
      */
-    private long lastModified = System.currentTimeMillis();
+    private final AtomicLong lastModified = new AtomicLong(
+            System.currentTimeMillis());
 
     /**
      * <code>true</code> iff you want collect the user time, system time,
      * and IO WAIT time using vmstat (as opposed to sar).
      */
-    protected final boolean cpuStats;
+    private final boolean cpuStats;
 
     /**
      * The {@link Pattern} used to split apart the rows read from
      * <code>vmstat</code>.
      */
-    final protected static Pattern pattern = Pattern.compile("\\s+");
+    // Note: Exposed to the test suite.
+    final static Pattern pattern = Pattern.compile("\\s+");
 
     /**
      * 
@@ -173,6 +176,7 @@ public class VMStatCollector extends AbstractProcessCollector implements
         
     }
     
+    @Override
     public List<String> getCommand() {
 
         final List<String> command = new LinkedList<String>();
@@ -192,11 +196,11 @@ public class VMStatCollector extends AbstractProcessCollector implements
     /**
      * Declares the counters that we will collect
      */
+    @Override
 	public CounterSet getCounters() {
 
-		final CounterSet root = new CounterSet();
-
-		inst = new LinkedList<I>();
+	    @SuppressWarnings("rawtypes")
+        final List<I> inst = new LinkedList<I>();
 
 		/*
 		 * Note: Counters are all declared as Double to facilitate aggregation.
@@ -257,20 +261,19 @@ public class VMStatCollector extends AbstractProcessCollector implements
 
 		}
 
-		for (Iterator<I> itr = inst.iterator(); itr.hasNext();) {
+        final CounterSet root = new CounterSet();
 
-			final I i = itr.next();
+        for (@SuppressWarnings("rawtypes") I i : inst) {
 
-			root.addCounter(i.getPath(), i);
+            root.addCounter(i.getPath(), i);
 
-		}
+        }
 
 		return root;
 
 	}
 
-	private List<I> inst = null;
-
+    @Override
     public AbstractProcessReader getProcessReader() {
         
         return new VMStatReader();
@@ -296,6 +299,7 @@ public class VMStatCollector extends AbstractProcessCollector implements
      */
     private class VMStatReader extends ProcessReaderHelper {
         
+        @Override
         protected ActiveProcess getActiveProcess() {
             
             if (activeProcess == null)
@@ -317,7 +321,7 @@ public class VMStatCollector extends AbstractProcessCollector implements
             if(log.isInfoEnabled())
                 log.info("begin");
 
-            for(int i=0; i<10 && !getActiveProcess().isAlive(); i++) {
+            for (int i = 0; i < 10 && !getActiveProcess().isAlive(); i++) {
 
                 if(log.isInfoEnabled())
                     log.info("waiting for the readerFuture to be set.");
@@ -362,7 +366,7 @@ public class VMStatCollector extends AbstractProcessCollector implements
                 try {
 
                     // timestamp
-                    lastModified = System.currentTimeMillis();
+                    lastModified.set(System.currentTimeMillis());
 
                     final String[] fields = pattern.split(data.trim(), 0/* limit */);
 
