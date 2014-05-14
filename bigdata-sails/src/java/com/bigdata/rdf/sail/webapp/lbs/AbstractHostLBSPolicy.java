@@ -290,7 +290,9 @@ public abstract class AbstractHostLBSPolicy extends AbstractLBSPolicy {
         {
 
             final String s = HALoadBalancerServlet.getConfigParam(
-                    servletConfig, InitParams.LOCAL_FORWARD_THRESHOLD,
+                    servletConfig, //
+                    AbstractHostLBSPolicy.class,// owningClass
+                    InitParams.LOCAL_FORWARD_THRESHOLD,
                     InitParams.DEFAULT_LOCAL_FORWARD_THRESHOLD);
 
             final double d = Double.valueOf(s);
@@ -304,7 +306,9 @@ public abstract class AbstractHostLBSPolicy extends AbstractLBSPolicy {
 
         {
 
-            scoringRuleRef.set(HALoadBalancerServlet.newInstance(servletConfig,
+            scoringRuleRef.set(HALoadBalancerServlet.newInstance(//
+                    servletConfig,//
+                    AbstractHostLBSPolicy.class,// owningClass
                     IHostScoringRule.class, InitParams.HOST_SCORING_RULE,
                     getDefaultScoringRule()));
 
@@ -317,7 +321,9 @@ public abstract class AbstractHostLBSPolicy extends AbstractLBSPolicy {
         {
 
             final String s = HALoadBalancerServlet.getConfigParam(
-                    servletConfig, InitParams.HOST_DISCOVERY_INITIAL_DELAY,
+                    servletConfig, //
+                    AbstractHostLBSPolicy.class,// owningClass
+                    InitParams.HOST_DISCOVERY_INITIAL_DELAY,
                     InitParams.DEFAULT_HOST_DISCOVERY_INITIAL_DELAY);
 
             hostDiscoveryInitialDelay = Long.valueOf(s);
@@ -330,8 +336,10 @@ public abstract class AbstractHostLBSPolicy extends AbstractLBSPolicy {
 
         {
 
-            final String s = HALoadBalancerServlet.getConfigParam(
-                    servletConfig, InitParams.HOST_DISCOVERY_DELAY,
+            final String s = HALoadBalancerServlet.getConfigParam(//
+                    servletConfig, //
+                    AbstractHostLBSPolicy.class,// owningClass
+                    InitParams.HOST_DISCOVERY_DELAY,//
                     InitParams.DEFAULT_HOST_DISCOVERY_DELAY);
 
             hostDiscoveryDelay = Long.valueOf(s);
