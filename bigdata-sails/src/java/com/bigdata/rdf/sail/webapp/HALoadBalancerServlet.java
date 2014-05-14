@@ -418,8 +418,10 @@ public class HALoadBalancerServlet extends ProxyServlet {
 
         {
             // Get the as-configured policy.
-            final IHALoadBalancerPolicy policy = newInstance(servletConfig,
-                    null/* owningClass */, IHALoadBalancerPolicy.class,
+            final IHALoadBalancerPolicy policy = newInstance(//
+                    servletConfig, //
+                    HALoadBalancerServlet.class,// owningClass
+                    IHALoadBalancerPolicy.class,//
                     InitParams.POLICY, InitParams.DEFAULT_POLICY);
 
             // Set the as-configured policy.
@@ -428,8 +430,10 @@ public class HALoadBalancerServlet extends ProxyServlet {
         }
         {
 
-            final IHARequestURIRewriter rewriter = newInstance(servletConfig,
-                    null/* owningClass */, IHARequestURIRewriter.class,
+            final IHARequestURIRewriter rewriter = newInstance(//
+                    servletConfig,//
+                    HALoadBalancerServlet.class, // owningClass
+                    IHARequestURIRewriter.class,//
                     InitParams.REWRITER, InitParams.DEFAULT_REWRITER);
 
             setRewriter(rewriter);
@@ -671,9 +675,8 @@ public class HALoadBalancerServlet extends ProxyServlet {
      * @param servletConfig
      *            The {@link ServletConfig}.
      * @param owningClass
-     *            The name of the class that provides the namespace for the
-     *            <code>init-param</code> (optional - not used by the outer
-     *            servlet, just by the inner policy classes).
+     *            The class that declares the init-param. This serves as
+     *            a namespace when searching the environment variables.
      * @param name
      *            The name of the servlet <code>init-param</code>.
      * @param def
@@ -681,8 +684,7 @@ public class HALoadBalancerServlet extends ProxyServlet {
      * @return
      */
     public static String getConfigParam(final ServletConfig servletConfig,
-            final Class<? extends IHAPolicyLifeCycle> owningClass,
-            final String name, final String def) {
+            final Class<?> owningClass, final String name, final String def) {
 
         String s = null;
         
@@ -725,6 +727,9 @@ public class HALoadBalancerServlet extends ProxyServlet {
      * 
      * @param servletConfig
      *            The {@link ServletConfig}.
+     * @param owningClass
+     *            The class that declares the init-param. This serves as
+     *            a namespace when searching the environment variables.
      * @param iface
      *            The interface that the type must implement.
      * @param name
@@ -739,7 +744,7 @@ public class HALoadBalancerServlet extends ProxyServlet {
      */
     @SuppressWarnings("unchecked")
     public static <T> T newInstance(final ServletConfig servletConfig,
-            final Class<? extends IHAPolicyLifeCycle> owningClass,
+            final Class<?> owningClass,
             final Class<? extends T> iface, final String name, final String def)
             throws ServletException {
 
