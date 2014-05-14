@@ -258,7 +258,7 @@ public class ArbitraryLengthPathNode
 				zeroMatchAdjustment =  Long.MAX_VALUE / 2;
 				// The following is more accurate, but more expensive and unnecessary.
 				// db.getURICount() + db.getBNodeCount(); 
-				System.err.println("adj: "+zeroMatchAdjustment);
+//				System.err.println("adj: "+zeroMatchAdjustment);
 				break;
 			}
 		}
