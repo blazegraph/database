@@ -566,9 +566,6 @@ public abstract class AbstractHostLBSPolicy extends AbstractLBSPolicy {
 
                 final IHostMetrics metrics = e.getValue();
 
-                if (log.isDebugEnabled())
-                    log.debug("hostname=" + hostname + ", metrics=" + metrics);
-
                 // flag host if no load information is available.
                 double hostScore = metrics == null ? NO_INFO : scoringRule
                         .getScore(metrics);
@@ -647,6 +644,10 @@ public abstract class AbstractHostLBSPolicy extends AbstractLBSPolicy {
                     thisHostScore = hostScore;
 
                 }
+
+                if (log.isDebugEnabled())
+                    log.debug("hostname=" + hostname + ", metrics="
+                            + metrics2[i] + ", score=" + hostScore.getScore());
 
             }
 
