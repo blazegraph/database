@@ -686,10 +686,8 @@ public class HALoadBalancerServlet extends ProxyServlet {
     public static String getConfigParam(final ServletConfig servletConfig,
             final Class<?> owningClass, final String name, final String def) {
 
-        String s = null;
-        
         // Look at environment variables for an override.
-        System.getProperty(owningClass.getName() + "." + name);
+        String s = System.getProperty(owningClass.getName() + "." + name);
 
         if (s == null || s.trim().length() == 0) {
 
