@@ -784,9 +784,11 @@ public abstract class AbstractHostLBSPolicy extends AbstractLBSPolicy {
                 for (HostScore tmp : hostScores) {
                     hostScore = tmp;
                     sum += (1d - hostScore.getScore());
-                    if (sum >= d) // scan further.
+                    if (sum >= d) {
+                        // found desired host.
                         break;
-                    break;
+                    }
+                    // scan further.
                 }
             }
 
