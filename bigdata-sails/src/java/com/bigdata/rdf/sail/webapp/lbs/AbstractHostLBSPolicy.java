@@ -112,8 +112,11 @@ public abstract class AbstractHostLBSPolicy extends AbstractLBSPolicy {
          * TODO In fact, we could automatically compute and use a reasonable
          * value based on the quorum size as
          * <code>ceil((1/replicationFactor)-.01)</code>. With this approach, the
-         * local forward bias is automatic and has no more than a 1% deviation
-         * from the optimal decision if a round-robin is NOT being applied.
+         * local forward bias is automatic. However, we still only want to do
+         * this if there is a round-robin over the services. Otherwise we will
+         * slam this host whenever its load gets below the threshold while not
+         * assigning any work to the other hosts until the next update of the
+         * {@link HostTable}.
          */
         String LOCAL_FORWARD_THRESHOLD = "localForwardThreshold";
 
