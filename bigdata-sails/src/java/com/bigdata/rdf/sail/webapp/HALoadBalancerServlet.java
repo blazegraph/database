@@ -419,8 +419,8 @@ public class HALoadBalancerServlet extends ProxyServlet {
         {
             // Get the as-configured policy.
             final IHALoadBalancerPolicy policy = newInstance(servletConfig,
-                    IHALoadBalancerPolicy.class, InitParams.POLICY,
-                    InitParams.DEFAULT_POLICY);
+                    null/* owningClass */, IHALoadBalancerPolicy.class,
+                    InitParams.POLICY, InitParams.DEFAULT_POLICY);
 
             // Set the as-configured policy.
             setLBSPolicy(policy);
@@ -429,8 +429,8 @@ public class HALoadBalancerServlet extends ProxyServlet {
         {
 
             final IHARequestURIRewriter rewriter = newInstance(servletConfig,
-                    IHARequestURIRewriter.class, InitParams.REWRITER,
-                    InitParams.DEFAULT_REWRITER);
+                    null/* owningClass */, IHARequestURIRewriter.class,
+                    InitParams.REWRITER, InitParams.DEFAULT_REWRITER);
 
             setRewriter(rewriter);
 
@@ -661,29 +661,43 @@ public class HALoadBalancerServlet extends ProxyServlet {
     /**
      * Return the configured value of the named parameter. This method checks
      * the environment variables first for a fully qualified value for the
-     * parameter using <code>HALoadBalancerServer</code><i>name</i>. If no value
-     * is found for that variable, it checks the {@link ServletContext} for
-     * <i>name</i>. If no value is found again, it returns the default value
-     * specified by the caller. This makes it possible to configure the behavior
-     * of the {@link HALoadBalancerServlet} using environment variables.
+     * parameter using <i>owningClass</i>.<i>name</i> (or just <i>name</i> if
+     * <i>owningClass</i> is <code>null</code>). If no value is found for that
+     * variable, it checks the {@link ServletContext} for <i>name</i>. If no
+     * value is found again, it returns the default value specified by the
+     * caller. This makes it possible to configure the behavior of the
+     * {@link HALoadBalancerServlet} using environment variables.
      * 
      * @param servletConfig
      *            The {@link ServletConfig}.
-     * 
-     * @param iface
-     *            The interface that the type must implement.
+     * @param owningClass
+     *            The name of the class that provides the namespace for the
+     *            <code>init-param</code> (optional - not used by the outer
+     *            servlet, just by the inner policy classes).
      * @param name
-     *            The name of the servlet init parameter.
+     *            The name of the servlet <code>init-param</code>.
      * @param def
-     *            The default value for the servlet init parameter.
+     *            The default value for the servlet <code>init-param</code>.
      * @return
      */
     public static String getConfigParam(final ServletConfig servletConfig,
+            final Class<? extends IHAPolicyLifeCycle> owningClass,
             final String name, final String def) {
 
+        String s = null;
+        
         // Look at environment variables for an override.
-        String s = System.getProperty(HALoadBalancerServlet.class.getName()
-                + "." + name);
+        if (owningClass != null) {
+
+            // namespace is the owningClass.
+            System.getProperty(owningClass.getName() + "." + name);
+            
+        } else {
+            
+            // no namespace.
+            System.getProperty(name);
+            
+        }
 
         if (s == null || s.trim().length() == 0) {
 
@@ -725,10 +739,11 @@ public class HALoadBalancerServlet extends ProxyServlet {
      */
     @SuppressWarnings("unchecked")
     public static <T> T newInstance(final ServletConfig servletConfig,
+            final Class<? extends IHAPolicyLifeCycle> owningClass,
             final Class<? extends T> iface, final String name, final String def)
             throws ServletException {
 
-        final String s = getConfigParam(servletConfig, name, def);
+        final String s = getConfigParam(servletConfig, owningClass, name, def);
 
         final T t;
         final Class<? extends T> cls;
