@@ -108,6 +108,12 @@ public abstract class AbstractHostLBSPolicy extends AbstractLBSPolicy {
          * their normalized availability scores will be <code>.3333</code>. If
          * the score for a given host is close to this normalized availability,
          * then a local forward is a reasonable choice.
+         * 
+         * TODO In fact, we could automatically compute and use a reasonable
+         * value based on the quorum size as
+         * <code>ceil((1/replicationFactor)-.05)</code>. With this approach, the
+         * local forward bias is automatic and has no more than a 5% deviation
+         * from the optimal decision if a round-robin is NOT being applied.
          */
         String LOCAL_FORWARD_THRESHOLD = "localForwardThreshold";
 
