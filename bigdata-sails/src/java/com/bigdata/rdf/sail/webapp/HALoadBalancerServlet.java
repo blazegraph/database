@@ -675,8 +675,8 @@ public class HALoadBalancerServlet extends ProxyServlet {
      * @param servletConfig
      *            The {@link ServletConfig}.
      * @param owningClass
-     *            The class that declares the init-param. This serves as
-     *            a namespace when searching the environment variables.
+     *            The class that declares the init-param (required). This serves
+     *            as a namespace when searching the environment variables.
      * @param name
      *            The name of the servlet <code>init-param</code>.
      * @param def
@@ -689,17 +689,7 @@ public class HALoadBalancerServlet extends ProxyServlet {
         String s = null;
         
         // Look at environment variables for an override.
-        if (owningClass != null) {
-
-            // namespace is the owningClass.
-            System.getProperty(owningClass.getName() + "." + name);
-            
-        } else {
-            
-            // no namespace.
-            System.getProperty(name);
-            
-        }
+        System.getProperty(owningClass.getName() + "." + name);
 
         if (s == null || s.trim().length() == 0) {
 
