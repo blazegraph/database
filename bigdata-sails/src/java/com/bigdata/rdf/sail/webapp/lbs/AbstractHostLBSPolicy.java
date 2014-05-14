@@ -95,15 +95,19 @@ public abstract class AbstractHostLBSPolicy extends AbstractLBSPolicy {
          * when considering the normalized workload of the hosts. The value must
          * be in [0:1] and represents a normalized availability threshold for
          * the hosts having services that are joined with the met quorum. This
-         * may be set to ONT (1.0) to disable this bias. The default is
-         * {@value #DEFAULT_LOCAL_FORWARD_THRESHOLD}. A reasonable value might
-         * be on the order of <code>.7</code> or <code>.8</code>.
+         * may be set to ONE (1.0) to disable this bias. The default is
+         * {@value #DEFAULT_LOCAL_FORWARD_THRESHOLD}.
          * <p>
          * This bias is designed for use when an external round-robin policy is
          * distributing the requests evenly across the services. In this case,
          * the round-robin smooths out most of the workload and the
          * {@link IHALoadBalancerPolicy} takes over only when there is a severe
          * workload imbalance (as defined by the value of this parameter).
+         * <p>
+         * For example, if you have 3 hosts and they are equally available, then
+         * their normalized availability scores will be <code>.3333</code>. If
+         * the score for a given host is close to this normalized availability,
+         * then a local forward is a reasonable choice.
          */
         String LOCAL_FORWARD_THRESHOLD = "localForwardThreshold";
 
