@@ -23,7 +23,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sail.webapp.lbs;
 
 import java.io.IOException;
-import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -47,6 +46,7 @@ import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.PlatformStatsPlugIn;
 import com.bigdata.journal.jini.ha.HAJournal;
+import com.bigdata.quorum.Quorum;
 import com.bigdata.rdf.sail.webapp.HALoadBalancerServlet;
 import com.bigdata.util.InnerCause;
 
@@ -127,10 +127,42 @@ public abstract class AbstractHostLBSPolicy extends AbstractLBSPolicy {
 
     }
     
+    /*
+     * Static declarations of some common exceptions to reduce overhead
+     * associated with filling in the stack traces.
+     */
+
+    /**
+     * The {@link HostTable} is empty (no hosts).
+     */
+    private static final RuntimeException CAUSE_EMPTY_HOST_TABLE = new RuntimeException(
+            "Empty host table.");
+
+    /**
+     * The service table is empty (no services).
+     */
+    private static final RuntimeException CAUSE_EMPTY_SERVICE_TABLE = new RuntimeException(
+            "Empty service table.");
+
+    /**
+     * The load balancing logic failed to select a host to handle the
+     * request.
+     */
+    private static final RuntimeException CAUSE_NO_HOST_SELECTED = new RuntimeException(
+            "No host selected for request.");
+
+    /**
+     * The load balancing logic failed to select a service to handle the
+     * request.
+     */
+    private static final RuntimeException CAUSE_NO_SERVICE_SELECTED = new RuntimeException(
+            "No service selected for request.");
+
     /**
      * @see InitParams#LOCAL_FORWARD_THRESHOLD
      */
     private final AtomicReference<Double> localForwardThresholdRef = new AtomicReference<Double>();
+
     /**
      * The rule used to score the {@link IHostMetrics}.
      * 
@@ -465,6 +497,9 @@ public abstract class AbstractHostLBSPolicy extends AbstractLBSPolicy {
         final HostTable newHostTable = normalizeHostScores(scoringRule,
                 hostMetricsMap);
 
+        if (log.isTraceEnabled())
+            log.trace("newHostTable=" + newHostTable);
+
         // Set the host table.
         hostTableRef.set(newHostTable);
 
@@ -472,13 +507,18 @@ public abstract class AbstractHostLBSPolicy extends AbstractLBSPolicy {
 
     /**
      * Compute and return the normalized load across the known hosts.
+     * <p>
+     * Note: This needs to be done only for those hosts that are associated with
+     * the {@link Quorum} members. If we do it for the other hosts then the
+     * normalization is not meaningful since we will only load balance across
+     * the services that are joined with a met {@link Quorum}. 
      * 
      * @param scoringRule
      *            The {@link IHostScoringRule} used to integrate the per-host
      *            performance metrics.
      * @param hostMetricsMap
      *            The per-host performance metrics for the known hosts.
-     *            
+     * 
      * @return The normalized host workload.
      */
     private static HostTable normalizeHostScores(
@@ -505,24 +545,39 @@ public abstract class AbstractHostLBSPolicy extends AbstractLBSPolicy {
 
         {
 
+            /*
+             * TODO Since the scoring rule does not produce normalized host
+             * scores, we do not know how the NO_INFO will be ordered with
+             * respect to those hosts for which the scoring rule was
+             * successfully applied. This could be made to work either by
+             * flagging hosts without metrics or by pushing down the handling of
+             * a [null] metrics reference into the scoring rule, which would
+             * know how to return a "median" value.
+             */
+            final double NO_INFO = .5d;
+
             int i = 0;
 
             for (Map.Entry<String, IHostMetrics> e : hostMetricsMap.entrySet()) {
 
                 final String hostname = e.getKey();
 
+                assert hostname != null; // Note: map keys are never null.
+
                 final IHostMetrics metrics = e.getValue();
 
                 if (log.isDebugEnabled())
                     log.debug("hostname=" + hostname + ", metrics=" + metrics);
 
-                double hostScore = scoringRule.getScore(metrics);
+                // flag host if no load information is available.
+                double hostScore = metrics == null ? NO_INFO : scoringRule
+                        .getScore(metrics);
 
                 if (hostScore < 0) {
 
                     log.error("Negative score: " + hostname);
 
-                    hostScore = 0d;
+                    hostScore = NO_INFO;
 
                 }
 
@@ -530,21 +585,29 @@ public abstract class AbstractHostLBSPolicy extends AbstractLBSPolicy {
 
                 hostScores[i] = hostScore;
 
+                metrics2[i] = metrics;
+                
                 totalScore += hostScore;
 
                 i++;
 
             }
 
+            if (totalScore == 0) {
+
+                /*
+                 * If totalScore is zero, then weight all hosts equally as
+                 * (1/nhosts).
+                 */
+
+                totalScore = nhosts;
+
+            }                
+            
         }
 
         /*
          * Normalize the per-hosts scores.
-         * 
-         * Note: This needs to be done only for those hosts that are associated
-         * with the quorum members. If we do it for the other hosts then the
-         * normalization is not meaningful. That is why we first filter for only
-         * those hosts that are running services associated with this quorum.
          */
 
         HostScore thisHostScore = null;
@@ -555,28 +618,13 @@ public abstract class AbstractHostLBSPolicy extends AbstractLBSPolicy {
 
                 final String hostname = hostnames[i];
 
-                final HostScore hostScore;
-                if (totalScore == 0d) {
+                // Normalize host scores.
+                final HostScore hostScore = scores[i] = new HostScore(hostname,
+                        hostScores[i], totalScore, metrics2[i], scoringRule);
 
-                    /*
-                     * If totalScore is zero, then weight all hosts equally as
-                     * (1/nhosts).
-                     */
-                    hostScore = new HostScore(hostname, 1d, nhosts,
-                            scoringRule, metrics2[i]);
+                if (thisHostScore != null && hostScore.isThisHost()) {
 
-                } else {
-
-                    // Normalize host scores.
-                    hostScore = new HostScore(hostname, hostScores[i], 
-                            totalScore, scoringRule, metrics2[i]);
-
-                }
-
-                scores[i] = hostScore;
-
-                if (hostScore.isThisHost()) {
-
+                    // The first score discovered for this host.
                     thisHostScore = hostScore;
 
                 }
@@ -584,9 +632,6 @@ public abstract class AbstractHostLBSPolicy extends AbstractLBSPolicy {
             }
 
         }
-
-        // sort into ascending order (increasing activity).
-        Arrays.sort(scores);
 
 //        for (int i = 0; i < scores.length; i++) {
 //
@@ -596,20 +641,23 @@ public abstract class AbstractHostLBSPolicy extends AbstractLBSPolicy {
 //
 //        }
 
-        if (scores.length > 0) {
+//      // Sort into order by decreasing load.
+//      Arrays.sort(scores);
 
-            if (log.isDebugEnabled()) {
-
-                log.debug("The most active index was: "
-                        + scores[scores.length - 1]);
-
-                log.debug("The least active index was: " + scores[0]);
-
-                log.debug("This host: " + thisHostScore);
-
-            }
-
-        }
+//        if (scores.length > 0) {
+//
+//            if (log.isDebugEnabled()) {
+//
+//                log.debug("The most active index was: "
+//                        + scores[scores.length - 1]);
+//
+//                log.debug("The least active index was: " + scores[0]);
+//
+//                log.debug("This host: " + thisHostScore);
+//
+//            }
+//
+//        }
 
         return new HostTable(thisHostScore, scores);
         
@@ -626,32 +674,41 @@ public abstract class AbstractHostLBSPolicy extends AbstractLBSPolicy {
         final ServiceScore[] serviceScores = serviceTableRef.get();
 
         if (hostScores == null || hostScores.length == 0) {
-
             // Can't do anything.
-            log.warn("Empty host table.");
-            return null;
-
+            throw CAUSE_EMPTY_HOST_TABLE;
         }
 
         if (serviceScores == null) {
-
-            // No services. Can't proxy.
-            log.warn("No service scores.");
-            return null;
-
+            // No services.
+            throw CAUSE_EMPTY_SERVICE_TABLE;
         }
 
         final HostScore hostScore = getHost(rand.nextDouble(), hostScores);
 
+        if (hostScore == null) {
+            // None found.
+            throw CAUSE_NO_HOST_SELECTED;
+        }
+
         final ServiceScore serviceScore = getService(rand, hostScore,
                 serviceScores);
 
-        if(serviceScore == null) {
+        if (serviceScore == null) {
             // None found.
-            return null;
+            throw CAUSE_NO_SERVICE_SELECTED;
         }
-        
-        if(serviceScore.getServiceUUID().equals(serviceIDRef.get())) {
+
+        /*
+         * Track #of requests to each service.
+         * 
+         * Note: ServiceScore.nrequests is incremented before we make the
+         * decision to do a local forward when the target is *this* host. This
+         * means that the /status page will still show the effect of the load
+         * balancer for local forwards. This is a deliberate decision.
+         */
+        serviceScore.nrequests.increment();
+
+        if (serviceScore.getServiceUUID().equals(serviceIDRef.get())) {
             /*
              * The target is *this* service. As an optimization, we return
              * [null] so that the caller will perform a local forward (as part
@@ -720,17 +777,15 @@ public abstract class AbstractHostLBSPolicy extends AbstractLBSPolicy {
                 /*
                  * Multiple hosts.
                  * 
-                 * Note: Choice is inversely proportional to normalized
-                 * workload.
+                 * Note: Choice is inversely proportional to normalized workload
+                 * (1 - load).
                  */
                 double sum = 0d;
-                for (int i = 0; i < hostScores.length; i++) {
-                    hostScore = hostScores[i];
-                    sum += hostScore.getScore(); // score:=freeCapacity
-                    if (hostScore.getHostname() == null) // can't use w/o hostname.
-                        continue;
-                    if (d >= sum) // scan further.
-                        continue;
+                for (HostScore tmp : hostScores) {
+                    hostScore = tmp;
+                    sum += (1d - hostScore.getScore());
+                    if (sum >= d) // scan further.
+                        break;
                     break;
                 }
             }
@@ -812,16 +867,6 @@ public abstract class AbstractHostLBSPolicy extends AbstractLBSPolicy {
 
         final ServiceScore serviceScore = foundServices.get(n);
 
-        /*
-         * Track #of requests to each service.
-         * 
-         * Note: ServiceScore.nrequests is incremented before we make the
-         * decision to do a local forward when the target is *this* host. This
-         * means that the /status page will still show the effect of the load
-         * balancer for local forwards. This is a deliberate decision.
-         */
-        serviceScore.nrequests.increment();
-
         return serviceScore;
 
     }
@@ -835,8 +880,10 @@ public abstract class AbstractHostLBSPolicy extends AbstractLBSPolicy {
      */
     @Override
     protected boolean conditionallyForwardReadRequest(
-            final HttpServletRequest request, final HttpServletResponse response)
-            throws IOException {
+            final HALoadBalancerServlet servlet,//
+            final HttpServletRequest request, //
+            final HttpServletResponse response//
+    ) throws IOException {
 
         final HostTable hostTable = hostTableRef.get();
 
@@ -846,8 +893,8 @@ public abstract class AbstractHostLBSPolicy extends AbstractLBSPolicy {
         if (thisHostScore != null
                 && thisHostScore.getScore() <= localForwardThresholdRef.get()) {
 
-            HALoadBalancerServlet.forwardToThisService(
-                    false/* isLeaderRequest */, request, response);
+            servlet.forwardToLocalService(false/* isLeaderRequest */, request,
+                    response);
 
             // request was handled.
             return true;

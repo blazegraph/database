@@ -24,7 +24,6 @@ package com.bigdata.rdf.sail.webapp.lbs;
 
 import java.util.Arrays;
 
-
 /**
  * Class bundles together the set of {@link HostScore}s for services that are
  * joined with the met quorum and the {@link HostScore} for this service (iff it

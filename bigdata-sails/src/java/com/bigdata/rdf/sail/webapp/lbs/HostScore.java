@@ -25,8 +25,9 @@ package com.bigdata.rdf.sail.webapp.lbs;
 import com.bigdata.counters.AbstractStatisticsCollector;
 
 /**
- * Helper class assigns a raw and a normalized score to each host based on its
- * per-host.
+ * Helper class assigns a raw score (load) and a normalized score (normalized
+ * load) to each host based on its per-host metrics and a rule for computing the
+ * load of a host from those metrics.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
@@ -48,13 +49,13 @@ public class HostScore implements Comparable<HostScore> {
     private final double rawScore;
 
     /**
-     * The normalized score computed for that host.
+     * The normalized score for that host.
      * <p>
      * Note: The {@link #rawScore} is a measure of the <em>load</em> on a host.
-     * The normalized {@link #score} is based on
-     * <code>1-{@link #rawScore}</code> and is a measure of the normalized
-     * amount of capacity to do more work on a host. Load balancing decision are
-     * based on this normalized {@link #score}.
+     * The normalized {@link #score} is a measure of the normalized
+     * <em>load</em> on a host. Load balancing decision are based on this
+     * normalized {@link #score} (work is assigned to a host in inverse
+     * proportion to its normalized {@link #score}).
      */
     private final double score;
 
@@ -78,23 +79,22 @@ public class HostScore implements Comparable<HostScore> {
 //    public double drank = -1d;
 
     /**
-     * Return the raw score for a host, which is a measure of the load on that
-     * host. The measure is computed based on {@link IHostMetrics} using some
-     * {@link IHostScoringRule}.
+     * Return the raw score (aka load) for a host. This raw score is an
+     * unnormalized measure of the load on that host. The measure is computed
+     * based on {@link IHostMetrics} using some {@link IHostScoringRule}.
      */
     public double getRawScore() {
         return rawScore;
     }
 
     /**
-     * Return the measure of free capacity to do work on the host.
+     * Return the normalized load for the host.
      * <p>
      * Note: The {@link #getRawScore() rawScore} is a measure of the
-     * <em>load</em> on a host. The normalized {@link #getScore() score} is
-     * based on <code>1-{@link #getRawScore() rawScore}</code> and is a measure
-     * of the normalized amount of capacity to do more work on a host. Load
-     * balancing decision are based on this normalized {@link #getScore() score}
-     * .
+     * <em>load</em> on a host. The normalized {@link #getScore() score} is the
+     * normalized load for a host. Load balancing decision are based on this
+     * normalized {@link #getScore() score} (work is assigned to hosts in
+     * inverse proportion to the normalized load of the host).
      */
     public double getScore() {
         return score;
@@ -106,10 +106,9 @@ public class HostScore implements Comparable<HostScore> {
     }
 
     /**
-     * The {@link IHostMetrics} associated with this host (this is
-     * informational. The {@link #getMetrics()} provide the detailed per-host
-     * performance metrics that were intepreted by the {@link #getScoringRule()}
-     * .
+     * The {@link IHostMetrics} associated with this host (optional). The
+     * {@link #getMetrics()} provide the detailed per-host performance metrics
+     * that were intepreted by the {@link #getScoringRule()} .
      */
     public IHostMetrics getMetrics() {
         return metrics;
@@ -117,7 +116,7 @@ public class HostScore implements Comparable<HostScore> {
     
     /**
      * The {@link IHostScoringRule} used to convert the {@link #getMetrics()}
-     * into the {@link #getRawScore()}.
+     * into the {@link #getRawScore()} (optional).
      */
     public IHostScoringRule getScoringRule() {
         return scoringRule;
@@ -141,13 +140,32 @@ public class HostScore implements Comparable<HostScore> {
 //                + ", rank=" + rank //
 //                + ", drank=" + drank //
                 + ", metrics=" + metrics //
+                + ", scoringRule=" + scoringRule //
                 + "}";
 
     }
 
-    public HostScore(final String hostname, final double rawScore,
-            final double totalRawScore, final IHostScoringRule scoringRule,
-            final IHostMetrics metrics) {
+    /**
+     * 
+     * @param hostname
+     *            The hostname (required, must be non-empty).
+     * @param rawScore
+     *            The unnormalized load for that host.
+     * @param totalRawScore
+     *            The total unnormalized load across all hosts.
+     * @param metrics
+     *            The performance metrics used to compute the unnormalized load
+     *            for each host (optional).
+     * @param scoringRule
+     *            The rule used to score those metrics (optional).
+     */
+    public HostScore(//
+            final String hostname,//
+            final double rawScore,//
+            final double totalRawScore, //
+            final IHostMetrics metrics,//
+            final IHostScoringRule scoringRule//
+    ) {
 
         if (hostname == null)
             throw new IllegalArgumentException();
@@ -190,25 +208,38 @@ public class HostScore implements Comparable<HostScore> {
 
         }
 
-        return (1d - rawScore) / totalRawScore;
+        final double score = rawScore / totalRawScore;
 
+        if (score < 0 || score > 1) {
+
+            throw new RuntimeException("score(" + score + ") := rawScore("
+                    + rawScore + ") / totalRawScore(" + totalRawScore + ")");
+
+        }
+
+        return score;
+        
     }
 
     /**
-     * Places elements into order by increasing normalized {@link #getScore()}.
-     * The {@link #getHostname()} is used to break any ties (but this does not
-     * help when all services are on the same host).
+     * Places elements into order by decreasing {@link #getScore() normalized
+     * load}. The {@link #getHostname()} is used to break any ties (but this
+     * does not help when all services are on the same host).
+     * <p>
+     * Note: The ordering is not really material to anything. Stochastic load
+     * balancing decisions can be made without regard to this ordering using the
+     * {@link #getScore() normalized load}.
      */
     @Override
     public int compareTo(final HostScore arg0) {
 
         if (score < arg0.score) {
 
-            return -1;
+            return 1;
 
         } else if (score > arg0.score) {
 
-            return 1;
+            return -1;
 
         }
 

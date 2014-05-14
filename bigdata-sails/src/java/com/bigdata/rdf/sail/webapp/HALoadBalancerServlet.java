@@ -38,6 +38,7 @@ import org.apache.log4j.Logger;
 import org.eclipse.jetty.proxy.ProxyServlet;
 
 import com.bigdata.BigdataStatics;
+import com.bigdata.counters.CAT;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.jini.ha.HAJournal;
@@ -133,6 +134,38 @@ public class HALoadBalancerServlet extends ProxyServlet {
 
     }
     
+    /*
+     * Static declarations of some common exceptions to reduce overhead
+     * associated with filling in the stack traces.
+     */
+
+    /**
+     * There is no {@link IHALoadBalancerPolicy} currently declared.
+     */
+    private static final RuntimeException CAUSE_NO_LBS_POLICY = new RuntimeException(
+            "No LBS policy");
+
+    /**
+     * The <code>Request-URI</code> does not map to either {@link #PATH_LEADER}
+     * or {@link #PATH_READ}.
+     */
+    private static final RuntimeException CAUSE_BAD_REQUEST_URI = new RuntimeException(
+            "Bad Request-URI");
+
+    /**
+     * There is no {@link IHARequestURIRewriter} currently declared.
+     */
+    private static final RuntimeException CAUSE_NO_REWRITER_POLICY = new RuntimeException(
+            "No rewriter policy");
+
+    /**
+     * The destination could not be validated.
+     * 
+     * @see #validateDestination(String, int)
+     */
+    private static final RuntimeException CAUSE_DESTINATION_NOT_VALID = new RuntimeException(
+            "Could not validate destination");
+
     public HALoadBalancerServlet() {
 
         super();
@@ -191,6 +224,24 @@ public class HALoadBalancerServlet extends ProxyServlet {
      */
     private final AtomicReference<IHARequestURIRewriter> rewriterRef = new AtomicReference<IHARequestURIRewriter>();
     
+    /**
+     * The number of requests that were forwarded to the local service.
+     */
+    private final CAT nforward = new CAT();
+    
+    /**
+     * The number of requests that were proxied some service.
+     */
+    private final CAT nproxy = new CAT();
+    
+    /**
+     * The number of requests for which {@link #rewriteURI(HttpServletRequest)}
+     * trapped an error.
+     * <p>
+     * Note: Such requests wind up being forwarded to the local service.
+     */
+    private final CAT nerror = new CAT();
+
     /**
      * Change the {@link IHALoadBalancerPolicy} associated with this instance of
      * this servlet. The new policy will be installed iff it can be initialized
@@ -524,30 +575,44 @@ public class HALoadBalancerServlet extends ProxyServlet {
      * @return The {@link IHALoadBalancerPolicy}[] -or- <code>null</code> if
      *         there are no {@link HALoadBalancerServlet}s.
      */
-    public static IHALoadBalancerPolicy[] getLBSPolicy(
-            final ServletContext servletContext) {
+    public static String toString(final ServletContext servletContext) {
 
         final HALoadBalancerServlet[] servlets = getServlets(servletContext);
 
         if (servlets == null || servlets.length == 0) {
          
             // None running.
-            return null;
+            return "Not running";
 
         }
 
-        final IHALoadBalancerPolicy[] a = new IHALoadBalancerPolicy[servlets.length];
-
+        final StringBuilder sb = new StringBuilder();
+        
         for (int i = 0; i < servlets.length; i++) {
 
-            a[i] = servlets[i].getLBSPolicy();
+            sb.append(servlets[i].toString());
 
         }
-
-        return a;
+        
+        return sb.toString();
         
     }
-    
+
+    @Override
+    public String toString() {
+        
+        return super.toString()//
+                + "{prefix=" + prefix//
+                + ",policy=" + policyRef.get()//
+                + ",rewriter=" + rewriterRef.get()//
+                + ",nforward=" + nforward.estimate_get()//
+                + ",nproxy=" + nproxy.estimate_get()//
+                + ",nerror=" + nerror.estimate_get()//
+                + "}"//
+        ;
+
+    }
+
     /**
      * {@inheritDoc}
      * <p>
@@ -714,7 +779,7 @@ public class HALoadBalancerServlet extends ProxyServlet {
              * LBS is disabled. Strip LBS prefix from the requestURI and forward
              * the request to servlet on this host (NOP LBS).
              */
-            forwardToThisService(isLeaderRequest,request, response);
+            forwardToLocalService(isLeaderRequest,request, response);
             return;
         }
 
@@ -730,7 +795,7 @@ public class HALoadBalancerServlet extends ProxyServlet {
          * this service is not the leader. Look at it again under a debugger
          * and optimize the code paths.
          */
-        if (policy.service(isLeaderRequest, request, response)) {
+        if (policy.service(isLeaderRequest, this, request, response)) {
 
             // Return immediately if the response was committed.
             return;
@@ -760,7 +825,7 @@ public class HALoadBalancerServlet extends ProxyServlet {
      * @throws IOException
      * @throws ServletException
      */
-    static public void forwardToThisService(//
+    public void forwardToLocalService(//
             final boolean isLeaderRequest,//
             final HttpServletRequest request, //
             final HttpServletResponse response//
@@ -817,15 +882,17 @@ public class HALoadBalancerServlet extends ProxyServlet {
          * stripped off the prefix for the LBS.
          */
 
-        if (log.isInfoEnabled())
-            log.info("forward: " + path + " => " + newPath);
-
         // Get dispatched for the new requestURL path.
         final RequestDispatcher requestDispatcher = request
                 .getRequestDispatcher(newPath);
 
         try {
+
+            nforward.increment();
             
+            if (log.isInfoEnabled())
+                log.info("forward: " + path + " => " + newPath);
+
             // forward to a local servlet.
             requestDispatcher.forward(request, response);
             
@@ -848,76 +915,152 @@ public class HALoadBalancerServlet extends ProxyServlet {
      * 
      * @return The full prefix.
      * 
-     *         TODO This may need to be configurable. It is currently static
-     *         since
-     *         {@link #forwardToThisService(boolean, HttpServletRequest, HttpServletResponse)}
-     *         is static.
+     *         TODO This may need to be configurable.
      */
-    private static String getFullPrefix(final boolean isLeaderRequest,
+    private String getFullPrefix(final boolean isLeaderRequest,
             final String prefix) {
 
-        final String full_prefix = isLeaderRequest ? prefix + "/leader"
-                : prefix + "/read";
+        final String full_prefix = isLeaderRequest ? prefix + PATH_LEADER
+                : prefix + PATH_READ;
 
         return full_prefix;
 
     }
 
     /**
+     * Wrapper invokes {@link #doRewriteURI(HttpServletRequest)} and handles
+     * any thrown exceptions.
+     * 
+     * @see #doRewriteURI(HttpServletRequest)
+     */
+    @Override
+    final protected URI rewriteURI(final HttpServletRequest request) {
+
+        try {
+
+            final URI rewritten = doRewriteURI(request);
+
+            if (rewritten != null) {
+
+                // Track #of requests that are proxied.
+                nproxy.increment();
+                
+            }
+            
+            return rewritten;
+            
+        } catch (Throwable t) {
+
+            /*
+             * Could not rewrite.
+             */
+
+            if (InnerCause.isInnerCause(t, InterruptedException.class)) {
+
+                throw new RuntimeException(t);
+                
+            }
+
+            nerror.increment();
+            
+            if (log.isDebugEnabled()) {
+                // full stack trace.
+                log.warn(t, t);
+            } else {
+                // just the message.
+                log.warn(t);
+            }
+
+            /*
+             * Could not rewrite.
+             * 
+             * Return [null]. This will cause the onRewriteFailed() to be
+             * invoked. That will do a local forward. If the request can not be
+             * handled locally, then the local service will generate an error
+             * message.
+             * 
+             * Note: This pattern means that we do not throw errors arising from
+             * the decision to rewrite the request. They are logger (above) and
+             * then the local forwarding logic is applied. This can mask some
+             * errors since they will only appear in the log. However, this does
+             * make the rewrite logic more robust.
+             */
+  
+            return null;
+
+        }
+
+    }
+    
+    /**
+     * Hook allows the servlet to rewrite the request.
+     * 
      * For update requests, rewrite the requestURL to the service that is the
      * quorum leader. For read requests, rewrite the requestURL to the service
      * having the least load.
+     * 
+     * @param request
+     *            The request.
+     *            
+     * @return Return the {@link URI} if the request should be proxied to
+     *         another service -or- <code>null</code> if the request should be
+     *         locally forwarded.
      */
-    @Override
-    protected URI rewriteURI(final HttpServletRequest request) {
-
+    protected URI doRewriteURI(final HttpServletRequest request) {
+        
         final IHALoadBalancerPolicy policy = policyRef.get();
 
         if (policy == null) {
-            // Could not rewrite.
-            return null;
+            // No policy. Can not rewrite.
+            throw CAUSE_NO_LBS_POLICY;
         }
         
         final String originalRequestURI = request.getRequestURI();
         
-        if (!originalRequestURI.startsWith(prefix))
-            return null;
+        if (!originalRequestURI.startsWith(prefix)) {
+            // Request is not for this servlet.
+            throw CAUSE_BAD_REQUEST_URI;
+        }
 
         final Boolean isLeaderRequest = isLeaderRequest(request);
         
         if (isLeaderRequest == null) {
             // Neither /LBS/leader -nor- /LBS/read.
-            return null;
+            throw CAUSE_BAD_REQUEST_URI;
         }
 
         final String proxyToRequestURI;
-        
-        if(isLeaderRequest) {
-            // Proxy to leader.
-            proxyToRequestURI = policy.getLeaderURI(request);
-        } else {
-            // Proxy to any joined service.
-            proxyToRequestURI = policy.getReaderURI(request);
-        }
-        
-        if (log.isDebugEnabled())
-            log.debug("proxyToRequestURI=" + proxyToRequestURI);
+        {
 
-        if (proxyToRequestURI == null) {
-            // Could not rewrite.
-            return null;
+            if (isLeaderRequest) {
+                // Proxy to leader.
+                proxyToRequestURI = policy.getLeaderURI(request);
+            } else {
+                // Proxy to any joined service.
+                proxyToRequestURI = policy.getReaderURI(request);
+            }
+
+            if (log.isDebugEnabled())
+                log.debug("proxyToRequestURI=" + proxyToRequestURI);
+
+            if (proxyToRequestURI == null) {
+                /*
+                 * The LBS policy made a choice not to rewrite this request (not
+                 * an error, but a deliberate choice).
+                 */
+                return null;
+            }
+
         }
 
-        // the full LBS prefix (includes /leader or /read).
+        // The full LBS prefix (includes /leader or /read).
         final String full_prefix = getFullPrefix(isLeaderRequest, prefix);
 
         // The configured Request-URL rewriter.
         final IHARequestURIRewriter rewriter = rewriterRef.get();
 
         if (rewriter == null) {
-            // Could not rewrite.
-            log.warn("No rewriter: requestURI=" + originalRequestURI);
-            return null;
+            throw CAUSE_NO_REWRITER_POLICY;
         }
         
         // Re-write requestURL.  
@@ -932,13 +1075,15 @@ public class HALoadBalancerServlet extends ProxyServlet {
         // Normalize the request.
         final URI rewrittenURI = URI.create(uri.toString()).normalize();
 
-        if (!validateDestination(rewrittenURI.getHost(), rewrittenURI.getPort()))
-            return null;
+        if (!validateDestination(rewrittenURI.getHost(), rewrittenURI.getPort())) {
+            throw CAUSE_DESTINATION_NOT_VALID;
+        }
         
         if (log.isInfoEnabled())
             log.info("rewrote: " + originalRequestURI + " => " + rewrittenURI);
         
         return rewrittenURI;
+        
     }
 
     /**
@@ -969,7 +1114,7 @@ public class HALoadBalancerServlet extends ProxyServlet {
         }
         
         // Forward to this service (let it generate an error message).
-        forwardToThisService(isLeaderRequest, request, response);
+        forwardToLocalService(isLeaderRequest, request, response);
         
 //        response.sendError(HttpServletResponse.SC_FORBIDDEN);
         

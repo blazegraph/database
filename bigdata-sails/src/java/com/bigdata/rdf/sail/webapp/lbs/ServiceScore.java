@@ -34,12 +34,6 @@ import com.bigdata.quorum.Quorum;
 
 /**
  * Helper class caches metadata about an {@link HAGlue} service.
- * <p>
- * Note: This class is written fairly defensively. The fields can wind up being
- * left at their default values (typically <code>null</code>) if we are not able
- * to find the necessary information for the {@link HAGlue} service. Users of
- * this class must test for <code>null</code> values and skip over those
- * services since they have not been pre-resolved to a host and requestURL.
  */
 public class ServiceScore {
 
@@ -131,6 +125,18 @@ public class ServiceScore {
 
     }
 
+    /**
+     * 
+     * @param serviceUUID
+     *            The {@link UUID} for the service.
+     * @param hostname
+     *            The hostname of the host on which the service is running.
+     * @param requestURI
+     *            The Request-URI for the service.
+     *            
+     * @throws IllegalArgumentException
+     *             if any argument is <code>null</code>.
+     */
     ServiceScore(final UUID serviceUUID, final String hostname,
             final String requestURI) {
 
@@ -151,9 +157,37 @@ public class ServiceScore {
         
     }
     
+    /**
+     * Factory for {@link ServiceScore} instances.
+     * 
+     * @param indexManager
+     *            The index manager (required).
+     * @param contextPath
+     *            The Context-Path of the web application (/bigdata).
+     * @param serviceUUID
+     *            The {@link UUID} of the service.
+     * 
+     * @return The {@link ServiceScore}.
+     * 
+     * @throws IllegalArgumentException
+     *             if any argument is <code>null</code>.
+     * @throws ClassCastException
+     *             if the {@link IIndexManager} is not an {@link HAJournal}.
+     * @throws IOException
+     *             If an RMI to the {@link HAGlue} proxy fails.
+     * @throws RuntimeException
+     *             if anything else goes wrong.
+     */
     static public ServiceScore newInstance(final IIndexManager indexManager,
             final String contextPath, final UUID serviceUUID)
-            throws IOException, RuntimeException {
+            throws IllegalArgumentException, ClassCastException, IOException,
+            RuntimeException {
+
+        if (indexManager == null)
+            throw new IllegalArgumentException();
+
+        if (contextPath == null)
+            throw new IllegalArgumentException();
 
         if (serviceUUID == null)
             throw new IllegalArgumentException();
