@@ -23,6 +23,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sail.webapp.lbs;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -113,7 +114,7 @@ public abstract class AbstractHostLBSPolicy extends AbstractLBSPolicy {
         String HOST_DISCOVERY_INITIAL_DELAY = AbstractHostLBSPolicy.class.getName()
                 + ".hostDiscoveryInitialDelay";
 
-        String DEFAULT_HOST_DISCOVERY_INITIAL_DELAY = "60000"; // ms.
+        String DEFAULT_HOST_DISCOVERY_INITIAL_DELAY = "10000"; // ms.
 
         /**
          * The delay in milliseconds between scheduled tasks that update the
@@ -123,7 +124,7 @@ public abstract class AbstractHostLBSPolicy extends AbstractLBSPolicy {
         String HOST_DISCOVERY_DELAY = AbstractHostLBSPolicy.class.getName()
                 + ".hostDiscoveryDelay";
 
-        String DEFAULT_HOST_DISCOVERY_DELAY = "5000"; // ms.
+        String DEFAULT_HOST_DISCOVERY_DELAY = "10000"; // ms.
 
     }
     
@@ -678,6 +679,14 @@ public abstract class AbstractHostLBSPolicy extends AbstractLBSPolicy {
 //            }
 //
 //        }
+
+        /*
+         * Sort into order by hostname (useful for /bigdata/status view).
+         * 
+         * Note: The ordering is not really material to anything. Stochastic
+         * load balancing decisions are made without regard to this ordering.
+         */
+        Arrays.sort(scores, HostScore.COMPARE_BY_HOSTNAME);
 
         return new HostTable(thisHostScore, scores);
         

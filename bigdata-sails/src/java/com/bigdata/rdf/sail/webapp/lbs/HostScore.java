@@ -22,6 +22,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.rdf.sail.webapp.lbs;
 
+import java.util.Comparator;
+
 import com.bigdata.counters.AbstractStatisticsCollector;
 
 /**
@@ -31,7 +33,7 @@ import com.bigdata.counters.AbstractStatisticsCollector;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
-public class HostScore implements Comparable<HostScore> {
+public class HostScore {
 
     /** The hostname. */
     private final String hostname;
@@ -196,63 +198,44 @@ public class HostScore implements Comparable<HostScore> {
         
     }
 
-//    /**
-//     * Computes the normalized {@link #score} from the {@link #rawScore} in the
-//     * context of total over the {@link #rawScore}s for some set of hosts.
-//     * 
-//     * @param rawScore
-//     *            The raw score.
-//     * @param totalRawScore
-//     *            The raw score computed from the totals.
-//     * 
-//     * @return The normalized score.
-//     */
-//    static private double normalize(final double rawScore,
-//            final double totalRawScore) {
-//
-//        if (totalRawScore == 0d) {
-//
-//            return 0d;
-//
-//        }
-//
-//        final double score = rawScore / totalRawScore;
-//
-//        if (score < 0 || score > 1) {
-//
-//            throw new RuntimeException("score(" + score + ") := rawScore("
-//                    + rawScore + ") / totalRawScore(" + totalRawScore + ")");
-//
-//        }
-//
-//        return score;
-//        
-//    }
-
     /**
      * Places elements into order by decreasing {@link #getScore() normalized
-     * load}. The {@link #getHostname()} is used to break any ties (but this
-     * does not help when all services are on the same host).
-     * <p>
-     * Note: The ordering is not really material to anything. Stochastic load
-     * balancing decisions can be made without regard to this ordering using the
-     * {@link #getScore() normalized load}.
+     * load}. The {@link #getHostname()} is used to break any ties.
      */
-    @Override
-    public int compareTo(final HostScore arg0) {
+    public final static Comparator<HostScore> COMPARE_BY_HOSTNAME = new Comparator<HostScore>() {
 
-        if (score < arg0.score) {
+        @Override
+        public int compare(final HostScore t1, final HostScore t2) {
 
-            return 1;
+            if (t1.score < t2.score) {
 
-        } else if (score > arg0.score) {
+                return 1;
 
-            return -1;
+            } else if (t1.score > t2.score) {
+
+                return -1;
+
+            }
+
+            return t1.hostname.compareTo(t2.hostname);
 
         }
 
-        return hostname.compareTo(arg0.hostname);
+    };
 
-    }
+    /**
+     * Orders by hostname. This provides a stable way of viewing the data in
+     * <code>/bigdata/status</code>.
+     */
+    public final Comparator<HostScore> COMPARE_BY_SCORE = new Comparator<HostScore>() {
+
+        @Override
+        public int compare(final HostScore t1, final HostScore t2) {
+
+            return t1.hostname.compareTo(t2.hostname);
+
+        }
+        
+    };
 
 }
