@@ -48,6 +48,7 @@ import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.fed.QueryEngineFactory;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.DefaultInstrumentFactory;
+import com.bigdata.counters.ICounterNode;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.PlatformStatsPlugIn;
@@ -102,7 +103,13 @@ public class CountersLBSPolicy extends AbstractHostLBSPolicy {
      * 
      * TODO Does not track per-service metrics unless we change to the service
      * {@link UUID} as the key. This means that we can not monitor the GC load
-     * associated with a specific JVM instance.
+     * associated with a specific JVM instance. [Another problem is that the
+     * metrics that we are collecting have the hostname as a prefix. The service
+     * metrics do not. This will cause problems in the path prefix in the
+     * {@link CounterSet} when we try to resolve the performance counter name.
+     * We could work around that by using a regex pattern to match the counters
+     * of interest, ignoring where they appear in the {@link CounterSet}
+     * hierarchy.]
      */
     private final ConcurrentHashMap<String/* hostname */, IHostMetrics> hostMetricsMap = new ConcurrentHashMap<String, IHostMetrics>();
 
@@ -179,10 +186,25 @@ public class CountersLBSPolicy extends AbstractHostLBSPolicy {
                 log.warn("No data: hostname=" + hostname);
                 continue;
             }
-            
-            // Add to the map.
+
+            // Look for the child named by the hostname.
+            final ICounterNode childNode = counterSet.getPath(hostname);
+            if (childNode == null) {
+                log.warn("No data: hostname=" + hostname);
+                continue;
+            }
+
+            /*
+             * Add to the map.
+             * 
+             * Note: We are adding the childNode. This is the CounterSet for the
+             * specific host. This means that the IHostScoringRules do not need
+             * to be aware of the hostname on which they are running. (The other
+             * approach would be to pass in the hostname as a prefix to the
+             * wrapper class that we are placing into the hostMetricsMap.)
+             */
             hostMetricsMap.put(hostname, new CounterSetHostMetricsWrapper(
-                    counterSet));
+                    (CounterSet) childNode));
 
         }
 
