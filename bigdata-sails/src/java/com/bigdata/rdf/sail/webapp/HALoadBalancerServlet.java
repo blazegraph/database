@@ -667,16 +667,21 @@ public class HALoadBalancerServlet extends ProxyServlet {
      * the environment variables first for a fully qualified value for the
      * parameter using <i>owningClass</i>.<i>name</i> (or just <i>name</i> if
      * <i>owningClass</i> is <code>null</code>). If no value is found for that
-     * variable, it checks the {@link ServletContext} for <i>name</i>. If no
-     * value is found again, it returns the default value specified by the
-     * caller. This makes it possible to configure the behavior of the
-     * {@link HALoadBalancerServlet} using environment variables.
+     * variable, it checks the {@link ServletContext} for <i>name</i> (if the
+     * owningClass:=HALoadBalancerServlet) and otherwise for
+     * <i>owningClass.name</i>. If no value is found again, it returns the
+     * default value specified by the caller. This makes it possible to
+     * configure the behavior of the {@link HALoadBalancerServlet} using
+     * environment variables.
      * 
      * @param servletConfig
      *            The {@link ServletConfig}.
      * @param owningClass
      *            The class that declares the init-param (required). This serves
-     *            as a namespace when searching the environment variables.
+     *            as a namespace when searching the environment variables. This
+     *            is also used to impose a namespace when searching
+     *            <code>web.xml</code> when
+     *            <code>owningClass!=HALoadBalancerServlet</code>.
      * @param name
      *            The name of the servlet <code>init-param</code>.
      * @param def
@@ -692,7 +697,25 @@ public class HALoadBalancerServlet extends ProxyServlet {
         if (s == null || s.trim().length() == 0) {
 
             // Look at ServletConfig for the configured value.
-            s = servletConfig.getInitParameter(name);
+            if (owningClass == HALoadBalancerServlet.class) {
+
+                /*
+                 * The HALoadBalancerServlet does not use a namespace prefix for
+                 * its web.xml declarations.
+                 */
+                s = servletConfig.getInitParameter(name);
+                
+            } else {
+                
+                /*
+                 * The other policy objects DO use their owningClass as a
+                 * namespace prefix. This is done to avoid collisions among the
+                 * different policy classes.
+                 */
+                s = servletConfig.getInitParameter(owningClass.getName() + "."
+                        + name);
+
+            }
 
         }
 
