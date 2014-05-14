@@ -609,7 +609,7 @@ public abstract class AbstractHostLBSPolicy extends AbstractLBSPolicy {
         {
             for (int i = 0; i < nhosts; i++) {
 
-                final double avail = totalLoad - load[i];
+                final double avail = availability[i] = totalLoad - load[i];
                 
                 totalAvailability += avail;
                 
