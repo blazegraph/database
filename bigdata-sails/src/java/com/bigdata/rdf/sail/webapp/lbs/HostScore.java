@@ -202,7 +202,7 @@ public class HostScore {
      * Places elements into order by decreasing {@link #getScore() normalized
      * load}. The {@link #getHostname()} is used to break any ties.
      */
-    public final static Comparator<HostScore> COMPARE_BY_HOSTNAME = new Comparator<HostScore>() {
+    public final static Comparator<HostScore> COMPARE_BY_SCORE = new Comparator<HostScore>() {
 
         @Override
         public int compare(final HostScore t1, final HostScore t2) {
@@ -227,7 +227,7 @@ public class HostScore {
      * Orders by hostname. This provides a stable way of viewing the data in
      * <code>/bigdata/status</code>.
      */
-    public final Comparator<HostScore> COMPARE_BY_SCORE = new Comparator<HostScore>() {
+    public final static Comparator<HostScore> COMPARE_BY_HOSTNAME = new Comparator<HostScore>() {
 
         @Override
         public int compare(final HostScore t1, final HostScore t2) {
@@ -235,7 +235,7 @@ public class HostScore {
             return t1.hostname.compareTo(t2.hostname);
 
         }
-        
+
     };
 
 }
