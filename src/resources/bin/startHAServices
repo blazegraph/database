@@ -21,17 +21,6 @@ mkdir -p $lockDir
 pidFile=$lockDir/pid
 
 ##
-# ServiceStarter JVM options.
-#
-# The ServiceStarter is launched as a JVM with the following JVM options.
-# The other services (including the HAJournalServer) will run inside of 
-# this JVM. This is where you specify the size of the Java heap and the
-# size of the direct memory heap (used for the write cache buffers and
-# some related things).
-##
-export JVM_OPTS="-server -Xmx4G -XX:MaxDirectMemorySize=3000m"
-
-##
 # HAJournalServer configuration parameter overrides (see HAJournal.config).
 #
 # The bigdata HAJournal.config file may be heavily parameterized through 
