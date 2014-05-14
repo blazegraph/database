@@ -44,6 +44,8 @@ import javax.xml.parsers.ParserConfigurationException;
 import org.apache.log4j.Logger;
 import org.xml.sax.SAXException;
 
+import com.bigdata.util.StackInfoReport;
+
 import cutthecrap.utils.striterators.Expander;
 import cutthecrap.utils.striterators.Filter;
 import cutthecrap.utils.striterators.IStriterator;
@@ -798,7 +800,7 @@ public class CounterSet extends AbstractCounterSet implements ICounterSet {
                 if(counter instanceof ICounter ) {
                 
                     // counter exists for that path.
-                    log.error("Exists: path=" + getPath() + ", name=" + name);
+                    log.error(new StackInfoReport("Exists: path=" + getPath() + ", name=" + name));
                 
                     // return existing counter for path @todo vs replace.
                     return (ICounter)counter;
