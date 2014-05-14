@@ -992,7 +992,6 @@ public abstract class BigdataGraph implements Graph {
         FEATURES.supportsLongProperty = true;
         FEATURES.supportsMapProperty = false;
         FEATURES.supportsStringProperty = true;
-
         FEATURES.supportsDuplicateEdges = true;
         FEATURES.supportsSelfLoops = true;
         FEATURES.isPersistent = true;
