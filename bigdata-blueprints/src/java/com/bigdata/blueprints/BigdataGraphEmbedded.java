@@ -22,22 +22,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.blueprints;
 
-import java.util.List;
-import java.util.Set;
-
-import org.openrdf.model.Literal;
-import org.openrdf.model.URI;
-import org.openrdf.query.GraphQueryResult;
 import org.openrdf.repository.RepositoryConnection;
 
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSailRepository;
-import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
-import com.tinkerpop.blueprints.Edge;
 import com.tinkerpop.blueprints.Features;
-import com.tinkerpop.blueprints.GraphQuery;
 import com.tinkerpop.blueprints.TransactionalGraph;
-import com.tinkerpop.blueprints.Vertex;
 
 /**
  * This is the most basic possible implementation of the Blueprints Graph API.
@@ -159,9 +149,49 @@ public class BigdataGraphEmbedded extends BigdataGraph implements TransactionalG
 	}
 	
 	
-    static {
+    protected static final Features FEATURES = new Features();
 
-        FEATURES.supportsTransactions = true;
+    @Override
+    public Features getFeatures() {
+
+        return FEATURES;
+        
+    }
+    
+    static {
+        
+        FEATURES.supportsSerializableObjectProperty = BigdataGraph.FEATURES.supportsSerializableObjectProperty;
+        FEATURES.supportsBooleanProperty = BigdataGraph.FEATURES.supportsBooleanProperty;
+        FEATURES.supportsDoubleProperty = BigdataGraph.FEATURES.supportsDoubleProperty;
+        FEATURES.supportsFloatProperty = BigdataGraph.FEATURES.supportsFloatProperty;
+        FEATURES.supportsIntegerProperty = BigdataGraph.FEATURES.supportsIntegerProperty;
+        FEATURES.supportsPrimitiveArrayProperty = BigdataGraph.FEATURES.supportsPrimitiveArrayProperty;
+        FEATURES.supportsUniformListProperty = BigdataGraph.FEATURES.supportsUniformListProperty;
+        FEATURES.supportsMixedListProperty = BigdataGraph.FEATURES.supportsMixedListProperty;
+        FEATURES.supportsLongProperty = BigdataGraph.FEATURES.supportsLongProperty;
+        FEATURES.supportsMapProperty = BigdataGraph.FEATURES.supportsMapProperty;
+        FEATURES.supportsStringProperty = BigdataGraph.FEATURES.supportsStringProperty;
+        FEATURES.supportsDuplicateEdges = BigdataGraph.FEATURES.supportsDuplicateEdges;
+        FEATURES.supportsSelfLoops = BigdataGraph.FEATURES.supportsSelfLoops;
+        FEATURES.isPersistent = BigdataGraph.FEATURES.isPersistent;
+        FEATURES.isWrapper = BigdataGraph.FEATURES.isWrapper;
+        FEATURES.supportsVertexIteration = BigdataGraph.FEATURES.supportsVertexIteration;
+        FEATURES.supportsEdgeIteration = BigdataGraph.FEATURES.supportsEdgeIteration;
+        FEATURES.supportsVertexIndex = BigdataGraph.FEATURES.supportsVertexIndex;
+        FEATURES.supportsEdgeIndex = BigdataGraph.FEATURES.supportsEdgeIndex;
+        FEATURES.ignoresSuppliedIds = BigdataGraph.FEATURES.ignoresSuppliedIds;
+//        FEATURES.supportsTransactions = BigdataGraph.FEATURES.supportsTransactions;
+        FEATURES.supportsIndices = BigdataGraph.FEATURES.supportsIndices;
+        FEATURES.supportsKeyIndices = BigdataGraph.FEATURES.supportsKeyIndices;
+        FEATURES.supportsVertexKeyIndex = BigdataGraph.FEATURES.supportsVertexKeyIndex;
+        FEATURES.supportsEdgeKeyIndex = BigdataGraph.FEATURES.supportsEdgeKeyIndex;
+        FEATURES.supportsEdgeRetrieval = BigdataGraph.FEATURES.supportsEdgeRetrieval;
+        FEATURES.supportsVertexProperties = BigdataGraph.FEATURES.supportsVertexProperties;
+        FEATURES.supportsEdgeProperties = BigdataGraph.FEATURES.supportsEdgeProperties;
+        FEATURES.supportsThreadedTransactions = BigdataGraph.FEATURES.supportsThreadedTransactions;
+        
+        // override
+        FEATURES.supportsTransactions = true; //BigdataGraph.FEATURES.supportsTransactions;
         
     }
 
