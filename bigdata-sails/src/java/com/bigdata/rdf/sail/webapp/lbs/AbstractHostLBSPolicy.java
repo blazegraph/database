@@ -65,6 +65,12 @@ public abstract class AbstractHostLBSPolicy extends AbstractLBSPolicy {
      */
     private static final long serialVersionUID = 1L;
     
+    /**
+     * 
+     * @see HALoadBalancerServlet#getConfigParam(ServletConfig, Class, String,
+     *      String) for how these <code>init-param</code> values can be set in
+     *      <code>web.xml</code> and via environment variables.
+     */
     public interface InitParams extends AbstractLBSPolicy.InitParams {
         
         /**
@@ -81,8 +87,7 @@ public abstract class AbstractHostLBSPolicy extends AbstractLBSPolicy {
          * Note: The default policy is specific to the concrete instance of the
          * outer class.
          */
-        String HOST_SCORING_RULE = AbstractHostLBSPolicy.class.getName()
-                + ".hostScoringRule";
+        String HOST_SCORING_RULE = "hostScoringRule";
 
         /**
          * Read requests are forwarded to the local service if the availability
@@ -100,8 +105,7 @@ public abstract class AbstractHostLBSPolicy extends AbstractLBSPolicy {
          * {@link IHALoadBalancerPolicy} takes over only when there is a severe
          * workload imbalance (as defined by the value of this parameter).
          */
-        String LOCAL_FORWARD_THRESHOLD = AbstractHostLBSPolicy.class.getName()
-                + ".localForwardThreshold";
+        String LOCAL_FORWARD_THRESHOLD = "localForwardThreshold";
 
         String DEFAULT_LOCAL_FORWARD_THRESHOLD = "1.0";
 
@@ -111,8 +115,7 @@ public abstract class AbstractHostLBSPolicy extends AbstractLBSPolicy {
          * the joined services (default
          * {@value #DEFAULT_HOST_DISCOVERY_INITIAL_DELAY}).
          */
-        String HOST_DISCOVERY_INITIAL_DELAY = AbstractHostLBSPolicy.class.getName()
-                + ".hostDiscoveryInitialDelay";
+        String HOST_DISCOVERY_INITIAL_DELAY = "hostDiscoveryInitialDelay";
 
         String DEFAULT_HOST_DISCOVERY_INITIAL_DELAY = "10000"; // ms.
 
@@ -121,8 +124,7 @@ public abstract class AbstractHostLBSPolicy extends AbstractLBSPolicy {
          * in-memory snapshots of the performance metrics for the joined
          * services (default {@value #DEFAULT_HOST_DISCOVERY_DELAY}).
          */
-        String HOST_DISCOVERY_DELAY = AbstractHostLBSPolicy.class.getName()
-                + ".hostDiscoveryDelay";
+        String HOST_DISCOVERY_DELAY = "hostDiscoveryDelay";
 
         String DEFAULT_HOST_DISCOVERY_DELAY = "10000"; // ms.
 
@@ -235,6 +237,8 @@ public abstract class AbstractHostLBSPolicy extends AbstractLBSPolicy {
         super.toString(sb);
 
         sb.append(",localForwardThreshold=" + localForwardThresholdRef.get());
+
+        sb.append(",hostDiscoveryInitialDelay=" + hostDiscoveryInitialDelay);
 
         sb.append(",hostDiscoveryDelay=" + hostDiscoveryDelay);
 
