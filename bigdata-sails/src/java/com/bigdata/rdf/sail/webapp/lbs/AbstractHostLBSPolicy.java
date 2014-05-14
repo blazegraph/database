@@ -85,25 +85,25 @@ public abstract class AbstractHostLBSPolicy extends AbstractLBSPolicy {
                 + ".hostScoringRule";
 
         /**
-         * Read requests are forwarded to the local service if the load on that
-         * service is less than the configured threshold when considering the
-         * normalized workload of the hosts. The value must be in (0:1) and
-         * represents a normalized workload threshold for the hosts having
-         * services that are joined with the met quorum. This may be set to ZERO
-         * (0) to disable this bias. The default is
-         * {@value #DEFAULT_LOCAL_FORWARD_THRESHOLD}.
+         * Read requests are forwarded to the local service if the availability
+         * on that service is greater than or equal to the configured threshold
+         * when considering the normalized workload of the hosts. The value must
+         * be in [0:1] and represents a normalized availability threshold for
+         * the hosts having services that are joined with the met quorum. This
+         * may be set to ONT (1.0) to disable this bias. The default is
+         * {@value #DEFAULT_LOCAL_FORWARD_THRESHOLD}. A reasonable value might
+         * be on the order of <code>.7</code> or <code>.8</code>.
          * <p>
          * This bias is designed for use when an external round-robin policy is
          * distributing the requests evenly across the services. In this case,
-         * the round-robin smooths out most of the load and the
-         * {@link HALoadBalancerServlet} {@link #POLICY} takes over only when
-         * there is a severe load imbalance (as defined by the value of this
-         * parameter).
+         * the round-robin smooths out most of the workload and the
+         * {@link IHALoadBalancerPolicy} takes over only when there is a severe
+         * workload imbalance (as defined by the value of this parameter).
          */
         String LOCAL_FORWARD_THRESHOLD = AbstractHostLBSPolicy.class.getName()
                 + ".localForwardThreshold";
 
-        String DEFAULT_LOCAL_FORWARD_THRESHOLD = "0";
+        String DEFAULT_LOCAL_FORWARD_THRESHOLD = "1.0";
 
         /**
          * The initial delay in milliseconds before the first scheduled task
@@ -907,9 +907,11 @@ public abstract class AbstractHostLBSPolicy extends AbstractLBSPolicy {
     /**
      * {@inheritDoc}
      * <p>
-     * If the normalized workload for this host is under a configured threshold,
-     * then we forward the request to this service. This help to reduce the
-     * latency of the request since it is not being proxied.
+     * If the normalized availability for this host is over a configured
+     * threshold, then we forward the request to the local service. This help to
+     * reduce the latency of the request since it is not being proxied.
+     * 
+     * @see InitParams#LOCAL_FORWARD_THRESHOLD
      */
     @Override
     protected boolean conditionallyForwardReadRequest(
@@ -924,7 +926,7 @@ public abstract class AbstractHostLBSPolicy extends AbstractLBSPolicy {
                 : hostTable.thisHost;
 
         if (thisHostScore != null
-                && thisHostScore.getScore() <= localForwardThresholdRef.get()) {
+                && thisHostScore.getScore() >= localForwardThresholdRef.get()) {
 
             servlet.forwardToLocalService(false/* isLeaderRequest */, request,
                     response);
