@@ -28,12 +28,11 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.counters.linux;
 
-import java.io.File;
-import java.util.HashMap;
-import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 
 import com.bigdata.counters.AbstractProcessCollector;
 import com.bigdata.counters.AbstractProcessReader;
@@ -51,23 +50,9 @@ import com.bigdata.counters.ProcessReaderHelper;
  * <code>sar -u</code>.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class SarCpuUtilizationCollector extends AbstractProcessCollector
         implements ICounterHierarchy, IRequiredHostCounters, IHostCounters {
-
-//    static protected final Logger log = Logger
-//            .getLogger(SarCpuUtilizationCollector.class);
-//
-//    /**
-//     * True iff the {@link #log} level is DEBUG or less.
-//     */
-//    final protected static boolean DEBUG = log.isDebugEnabled();
-//
-//    /**
-//     * True iff the {@link #log} level is log.isInfoEnabled() or less.
-//     */
-//    final protected static boolean log.isInfoEnabled() = log.isInfoEnabled();
 
     /**
      * Inner class integrating the current values with the {@link ICounterSet}
@@ -75,7 +60,6 @@ public class SarCpuUtilizationCollector extends AbstractProcessCollector
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
      *         Thompson</a>
-     * @version $Id$
      */
     abstract class I<T> implements IInstrument<T> {
         
@@ -87,17 +71,19 @@ public class SarCpuUtilizationCollector extends AbstractProcessCollector
             
         }
         
-        public I(String path) {
+        public I(final String path) {
             
-            assert path != null;
+            if (path == null)
+                throw new IllegalArgumentException();
             
             this.path = path;
             
         }
 
+        @Override
         public long lastModified() {
 
-            return lastModified;
+            return lastModified.get();
             
         }
 
@@ -105,7 +91,8 @@ public class SarCpuUtilizationCollector extends AbstractProcessCollector
          * @throws UnsupportedOperationException
          *             always.
          */
-        public void setValue(T value, long timestamp) {
+        @Override
+        public void setValue(final T value, final long timestamp) {
            
             throw new UnsupportedOperationException();
             
@@ -117,13 +104,12 @@ public class SarCpuUtilizationCollector extends AbstractProcessCollector
      * Double precision counter with scaling factor.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     class DI extends I<Double> {
 
         protected final double scale;
         
-        DI(String path, double scale) {
+        DI(final String path, final double scale) {
             
             super( path );
             
@@ -131,7 +117,7 @@ public class SarCpuUtilizationCollector extends AbstractProcessCollector
             
         }
         
-        
+        @Override
         public Double getValue() {
          
             final Double value = (Double) vals.get(path);
@@ -153,12 +139,12 @@ public class SarCpuUtilizationCollector extends AbstractProcessCollector
      * keys are paths into the {@link CounterSet}. The values are the data
      * most recently read from <code>sar</code>.
      */
-    private Map<String,Object> vals = new HashMap<String, Object>();
+    private final Map<String,Object> vals = new ConcurrentHashMap<String, Object>();
     
     /**
      * The timestamp associated with the most recently collected values.
      */
-    private long lastModified = System.currentTimeMillis();
+    private final AtomicLong lastModified = new AtomicLong(System.currentTimeMillis());
 
     /**
      * 
@@ -173,6 +159,7 @@ public class SarCpuUtilizationCollector extends AbstractProcessCollector
 
     }
     
+    @Override
     public List<String> getCommand() {
 
         final List<String> command = new LinkedList<String>();
@@ -192,53 +179,44 @@ public class SarCpuUtilizationCollector extends AbstractProcessCollector
         
     }
 
-    /**
-     * Declares the counters that we will collect using <code>sar</code>.
-     */
-    /*synchronized*/ public CounterSet getCounters() {
+    @Override
+    public CounterSet getCounters() {
         
-//        if(root == null) {
-        
-            final CounterSet root = new CounterSet();
-            
-            inst = new LinkedList<I>();
-            
-            /*
-             * Note: Counters are all declared as Double to facilitate
-             * aggregation.
-             * 
-             * Note: sar reports percentages in [0:100] so we convert them to
-             * [0:1] using a scaling factor.
-             */
+        final CounterSet root = new CounterSet();
 
-            inst.add(new DI(IRequiredHostCounters.CPU_PercentProcessorTime,.01d));
-            
-            inst.add(new DI(IHostCounters.CPU_PercentUserTime,.01d));
-            inst.add(new DI(IHostCounters.CPU_PercentSystemTime,.01d));
-            inst.add(new DI(IHostCounters.CPU_PercentIOWait,.01d));
-            
-            for(Iterator<I> itr = inst.iterator(); itr.hasNext(); ) {
-                
-                final I i = itr.next();
-                
-                root.addCounter(i.getPath(), i);
-                
-            }
-            
-//        }
+        @SuppressWarnings("rawtypes")
+        final List<I> inst = new LinkedList<I>();
+
+        /*
+         * Note: Counters are all declared as Double to facilitate aggregation.
+         * 
+         * Note: sar reports percentages in [0:100] so we convert them to [0:1]
+         * using a scaling factor.
+         */
+
+        inst.add(new DI(IRequiredHostCounters.CPU_PercentProcessorTime, .01d));
+
+        inst.add(new DI(IHostCounters.CPU_PercentUserTime, .01d));
+        inst.add(new DI(IHostCounters.CPU_PercentSystemTime, .01d));
+        inst.add(new DI(IHostCounters.CPU_PercentIOWait, .01d));
+
+        for (@SuppressWarnings("rawtypes") I i : inst) {
+
+            root.addCounter(i.getPath(), i);
+
+        }
         
         return root;
         
     }
-    private List<I> inst = null;
-//    private CounterSet root = null;
    
     /**
      * Extended to force <code>sar</code> to use a consistent timestamp
      * format regardless of locale by setting
      * <code>S_TIME_FORMAT="ISO"</code> in the environment.
      */
-    protected void setEnvironment(Map<String, String> env) {
+    @Override
+    protected void setEnvironment(final Map<String, String> env) {
 
         super.setEnvironment(env);
         
@@ -246,6 +224,7 @@ public class SarCpuUtilizationCollector extends AbstractProcessCollector
         
     }
 
+    @Override
     public AbstractProcessReader getProcessReader() {
         
         return new SarReader();
@@ -269,10 +248,10 @@ public class SarCpuUtilizationCollector extends AbstractProcessCollector
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
      *         Thompson</a>
-     * @version $Id$
      */
     private class SarReader extends ProcessReaderHelper {
         
+        @Override
         protected ActiveProcess getActiveProcess() {
             
             if (activeProcess == null)
@@ -376,7 +355,7 @@ public class SarCpuUtilizationCollector extends AbstractProcessCollector
                  * adjusting for the UTC time of the start of the current day,
                  * which is what we would have to do.
                  */
-                  lastModified = System.currentTimeMillis();
+                  lastModified.set(System.currentTimeMillis());
 
 //                final String user = data.substring(20-1, 30-1);
 ////              final String nice = data.substring(30-1, 40-1);

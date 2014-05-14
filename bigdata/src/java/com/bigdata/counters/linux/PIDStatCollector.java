@@ -28,13 +28,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.counters.linux;
 
-import java.io.File;
 import java.io.IOException;
-import java.util.HashMap;
-import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 
 import com.bigdata.counters.AbstractProcessCollector;
 import com.bigdata.counters.AbstractProcessReader;
@@ -61,7 +60,6 @@ import com.bigdata.rawstore.Bytes;
  * repeat forever if interval was specified.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class PIDStatCollector extends AbstractProcessCollector implements
         ICounterHierarchy, IProcessCounters {
@@ -92,7 +90,6 @@ public class PIDStatCollector extends AbstractProcessCollector implements
      * hierarchy.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     abstract class AbstractInst<T> implements IInstrument<T> {
         
@@ -104,17 +101,19 @@ public class PIDStatCollector extends AbstractProcessCollector implements
             
         }
         
-        protected AbstractInst(String path) {
-            
-            assert path != null;
+        protected AbstractInst(final String path) {
+
+            if (path == null)
+                throw new IllegalArgumentException();
             
             this.path = path;
             
         }
         
+        @Override
         final public long lastModified() {
 
-            return lastModified;
+            return lastModified.get();
             
         }
 
@@ -122,7 +121,8 @@ public class PIDStatCollector extends AbstractProcessCollector implements
          * @throws UnsupportedOperationException
          *             always.
          */
-        final public void setValue(T value, long timestamp) {
+        @Override
+        final public void setValue(final T value, final long timestamp) {
            
             throw new UnsupportedOperationException();
             
@@ -135,13 +135,12 @@ public class PIDStatCollector extends AbstractProcessCollector implements
      * hierarchy.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     class IL extends AbstractInst<Long> {
         
         protected final long scale;
         
-        public IL(String path, long scale) {
+        public IL(final String path, final long scale) {
             
             super( path );
             
@@ -149,6 +148,7 @@ public class PIDStatCollector extends AbstractProcessCollector implements
             
         }
         
+        @Override
         public Long getValue() {
          
             final Long value = (Long) vals.get(path);
@@ -170,13 +170,12 @@ public class PIDStatCollector extends AbstractProcessCollector implements
      * hierarchy.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     class ID extends AbstractInst<Double> {
         
         protected final double scale;
         
-        public ID(String path, double scale) {
+        public ID(final String path, final double scale) {
 
             super(path);
             
@@ -184,6 +183,7 @@ public class PIDStatCollector extends AbstractProcessCollector implements
             
         }
         
+        @Override
         public Double getValue() {
          
             final Double value = (Double) vals.get(path);
@@ -205,7 +205,7 @@ public class PIDStatCollector extends AbstractProcessCollector implements
      * as the last modified time for counters based on that process and
      * defaulted to the time that we begin to collect performance data.
      */
-    private long lastModified = System.currentTimeMillis();
+    private final AtomicLong lastModified = new AtomicLong(System.currentTimeMillis());
     
     /**
      * Map containing the current values for the configured counters. The keys
@@ -217,7 +217,7 @@ public class PIDStatCollector extends AbstractProcessCollector implements
      * declared within {@link #getCounters()} and not whatever path the counters
      * are eventually placed under within a larger hierarchy.
      */
-    private Map<String,Object> vals = new HashMap<String, Object>();
+    private final Map<String,Object> vals = new ConcurrentHashMap<String, Object>();
 
     /**
      * @param pid
@@ -229,7 +229,8 @@ public class PIDStatCollector extends AbstractProcessCollector implements
      * 
      * @todo kernelVersion could be static.
      */
-    public PIDStatCollector(int pid, int interval, KernelVersion kernelVersion) {
+    public PIDStatCollector(final int pid, final int interval,
+            final KernelVersion kernelVersion) {
 
         super(interval);
         
@@ -269,79 +270,69 @@ public class PIDStatCollector extends AbstractProcessCollector implements
         command.add("-r"); // memory report
         
 //          command.add("-w"); // context switching report (not implemented in our code).
-        
-        command.add(""+getInterval());
-        
+
+        command.add("" + getInterval());
+
         return command;
         
     }
     
-    /**
-     * Declare the counters that we will collect using <code>pidstat</code>.
-     * These counters are NOT placed within the counter hierarchy but are
-     * declared using the bare path for the counter. E.g., as
-     * {@link IProcessCounters#Memory_virtualSize}.
-     */
-    /*synchronized*/ public CounterSet getCounters() {
+    @Override
+    public CounterSet getCounters() {
         
-//        if(root == null) {
-        
+        final List<AbstractInst<?>> inst = new LinkedList<AbstractInst<?>>();
+
+        /*
+         * Note: Counters are all declared as Double to facilitate aggregation
+         * and scaling.
+         * 
+         * Note: pidstat reports percentages as [0:100] so we normalize them to
+         * [0:1] using a scaling factor.
+         */
+
+        inst.add(new ID(IProcessCounters.CPU_PercentUserTime, .01d));
+        inst.add(new ID(IProcessCounters.CPU_PercentSystemTime, .01d));
+        inst.add(new ID(IProcessCounters.CPU_PercentProcessorTime, .01d));
+
+        inst.add(new ID(IProcessCounters.Memory_minorFaultsPerSec, 1d));
+        inst.add(new ID(IProcessCounters.Memory_majorFaultsPerSec, 1d));
+        inst.add(new IL(IProcessCounters.Memory_virtualSize, Bytes.kilobyte));
+        inst.add(new IL(IProcessCounters.Memory_residentSetSize, Bytes.kilobyte));
+        inst.add(new ID(IProcessCounters.Memory_percentMemorySize, .01d));
+
+        /*
+         * Note: pidstat reports in kb/sec so we normalize to bytes/second using
+         * a scaling factor.
+         */
+        inst.add(new ID(IProcessCounters.PhysicalDisk_BytesReadPerSec,
+                Bytes.kilobyte32));
+        inst.add(new ID(IProcessCounters.PhysicalDisk_BytesWrittenPerSec,
+                Bytes.kilobyte32));
+
         final CounterSet root = new CounterSet();
-            
-            inst = new LinkedList<AbstractInst<?>>();
-            
-            /*
-             * Note: Counters are all declared as Double to facilitate
-             * aggregation and scaling.
-             * 
-             * Note: pidstat reports percentages as [0:100] so we normalize them
-             * to [0:1] using a scaling factor.
-             */
-
-            inst.add(new ID(IProcessCounters.CPU_PercentUserTime,.01d));
-            inst.add(new ID(IProcessCounters.CPU_PercentSystemTime,.01d));
-            inst.add(new ID(IProcessCounters.CPU_PercentProcessorTime,.01d));
-            
-            inst.add(new ID(IProcessCounters.Memory_minorFaultsPerSec,1d));
-            inst.add(new ID(IProcessCounters.Memory_majorFaultsPerSec,1d));
-            inst.add(new IL(IProcessCounters.Memory_virtualSize,Bytes.kilobyte));
-            inst.add(new IL(IProcessCounters.Memory_residentSetSize,Bytes.kilobyte));
-            inst.add(new ID(IProcessCounters.Memory_percentMemorySize,.01d));
-
-            /*
-             * Note: pidstat reports in kb/sec so we normalize to bytes/second
-             * using a scaling factor.
-             */
-            inst.add(new ID(IProcessCounters.PhysicalDisk_BytesReadPerSec, Bytes.kilobyte32));
-            inst.add(new ID(IProcessCounters.PhysicalDisk_BytesWrittenPerSec, Bytes.kilobyte32));
-
-//        }
         
-        for(Iterator<AbstractInst<?>> itr = inst.iterator(); itr.hasNext(); ) {
-            
-            final AbstractInst<?> i = itr.next();
-            
+        for (AbstractInst<?> i : inst) {
+
             root.addCounter(i.getPath(), i);
-            
+
         }
-        
+
         return root;
-        
+
     }
-    private List<AbstractInst<?>> inst = null;
-//    private CounterSet root = null;
-    
+
     /**
-     * Extended to force <code>pidstat</code> to use a consistent
-     * timestamp format regardless of locale by setting
-     * <code>S_TIME_FORMAT="ISO"</code> in the environment.
+     * Extended to force <code>pidstat</code> to use a consistent timestamp
+     * format regardless of locale by setting <code>S_TIME_FORMAT="ISO"</code>
+     * in the environment.
      */
-    protected void setEnvironment(Map<String, String> env) {
+    @Override
+    protected void setEnvironment(final Map<String, String> env) {
 
         super.setEnvironment(env);
-        
+
         env.put("S_TIME_FORMAT", "ISO");
-        
+
     }
 
     @Override
@@ -374,10 +365,10 @@ public class PIDStatCollector extends AbstractProcessCollector implements
      * </pre>
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     protected class PIDStatReader extends ProcessReaderHelper {
 
+        @Override
         protected ActiveProcess getActiveProcess() {
             
             if (activeProcess == null)
@@ -410,6 +401,7 @@ public class PIDStatCollector extends AbstractProcessCollector implements
          *       is possible that this will not work when the host is
          *       using an English locale.
          */
+        @Override
         protected void readProcess() throws IOException, InterruptedException {
 
             if(log.isInfoEnabled())
@@ -478,7 +470,7 @@ public class PIDStatCollector extends AbstractProcessCollector implements
              * time of the start of the current day, which is what we would have
              * to do.
              */
-            lastModified = System.currentTimeMillis();
+            lastModified.set(System.currentTimeMillis());
                             
             if(header.contains("%CPU")) {
                 
