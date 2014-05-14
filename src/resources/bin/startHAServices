@@ -81,6 +81,12 @@ export HA_OPTS="\
  -DGANGLIA_LISTEN=${GANGLIA_LISTEN}\
  -DSYSSTAT_DIR=${SYSSTAT_DIR}\
  -Dcom.bigdata.counters.linux.sysstat.path=${SYSSTAT_DIR}\
+ -Dcom.bigdata.rdf.sail.webapp.HALoadBalancerServlet.policy=${LBS_POLICY}\
+ -Dcom.bigdata.rdf.sail.webapp.HALoadBalancerServlet.rewriter=${LBS_REWRITER}\
+ -Dcom.bigdata.rdf.sail.webapp.lbs.AbstractHostLBSPolicy.hostScoringRule=${LBS_HOST_SCORING_RULE}\
+ -Dcom.bigdata.rdf.sail.webapp.lbs.AbstractHostLBSPolicy.localForwardThreshold=${LBS_LOCAL_FORWARD_THRESHOLD}\
+ -Dcom.bigdata.rdf.sail.webapp.lbs.AbstractHostLBSPolicy.hostDiscoveryInitialDelay=${LBS_HOST_DISCOVERY_INITIAL_DELAY}\
+ -Dcom.bigdata.rdf.sail.webapp.lbs.AbstractHostLBSPolicy.hostDiscoveryDelay=${LBS_HOST_DISCOVERY_DELAY}\
 "
 
 ##
