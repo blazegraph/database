@@ -539,9 +539,9 @@ public abstract class AbstractHostLBSPolicy extends AbstractLBSPolicy {
 
         final IHostMetrics[] metrics2 = new IHostMetrics[nhosts];
 
-        final double[] hostScores = new double[nhosts];
+        final double[] load = new double[nhosts];
 
-        double totalScore = 0d;
+        double totalLoad = 0d;
 
         {
 
@@ -583,29 +583,39 @@ public abstract class AbstractHostLBSPolicy extends AbstractLBSPolicy {
 
                 hostnames[i] = hostname;
 
-                hostScores[i] = hostScore;
+                load[i] = hostScore;
 
                 metrics2[i] = metrics;
                 
-                totalScore += hostScore;
+                totalLoad += hostScore;
 
                 i++;
 
             }
-
-            if (totalScore == 0) {
-
-                /*
-                 * If totalScore is zero, then weight all hosts equally as
-                 * (1/nhosts).
-                 */
-
-                totalScore = nhosts;
-
-            }                
             
         }
 
+        /*
+         * Convert from LOAD to AVAILABILITY.
+         * 
+         * AVAILABILITY := TOTAL - LOAD[i]
+         * 
+         * Note: The per-host metrics and scoring rule give us LOAD. However, we
+         * want to distribute the requests based on the inverse of the load,
+         * which is the AVAILABILITY to do more work.
+         */
+        double totalAvailability = 0;
+        double availability[] = new double[nhosts];
+        {
+            for (int i = 0; i < nhosts; i++) {
+
+                final double avail = totalLoad - load[i];
+                
+                totalAvailability += avail;
+                
+            }
+        }
+        
         /*
          * Normalize the per-hosts scores.
          */
@@ -614,13 +624,22 @@ public abstract class AbstractHostLBSPolicy extends AbstractLBSPolicy {
         final HostScore[] scores = new HostScore[nhosts];
         {
 
-            for (int i = 0; i < scores.length; i++) {
+            for (int i = 0; i < nhosts; i++) {
 
                 final String hostname = hostnames[i];
 
+                final double normalizedAvailability;
+                if (totalAvailability == 0) {
+                    // divide the work evenly.
+                    normalizedAvailability = 1d / nhosts;
+                } else {
+                    normalizedAvailability = availability[i]
+                            / totalAvailability;
+                }
+
                 // Normalize host scores.
                 final HostScore hostScore = scores[i] = new HostScore(hostname,
-                        hostScores[i], totalScore, metrics2[i], scoringRule);
+                        normalizedAvailability);
 
                 if (thisHostScore != null && hostScore.isThisHost()) {
 
