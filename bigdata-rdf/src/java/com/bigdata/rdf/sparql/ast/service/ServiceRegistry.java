@@ -37,7 +37,7 @@ public class ServiceRegistry {
     /**
      * TODO Allow SPI pattern for override?
      */
-    private static ServiceRegistry DEFAULT = new ServiceRegistry();
+    private static final ServiceRegistry DEFAULT = new ServiceRegistry();
 
     static public ServiceRegistry getInstance() {
 
