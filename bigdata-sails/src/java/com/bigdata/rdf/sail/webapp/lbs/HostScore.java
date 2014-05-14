@@ -41,12 +41,12 @@ public class HostScore implements Comparable<HostScore> {
      */
     private final boolean thisHost;
 
-    /**
-     * The raw score for some host. This is a measure of the load on a host. The
-     * measure is computed based on {@link #metrics} using the
-     * {@link #scoringRule}.
-     */
-    private final double rawScore;
+//    /**
+//     * The raw score for some host. This is a measure of the load on a host. The
+//     * measure is computed based on {@link #metrics} using the
+//     * {@link #scoringRule}.
+//     */
+//    private final double rawScore;
 
     /**
      * The normalized score for that host.
@@ -59,18 +59,18 @@ public class HostScore implements Comparable<HostScore> {
      */
     private final double score;
 
-    /**
-     * The {@link IHostScoringRule} used to convert the {@link #metrics} into
-     * the {@link #rawScore}.
-     */
-    private final IHostScoringRule scoringRule;
-    
-    /**
-     * The {@link IHostMetrics} associated with this host (this is
-     * informational. The {@link #metrics} provide the detailed per-host
-     * performance metrics that were intepreted by the {@link #scoringRule} .
-     */
-    final private IHostMetrics metrics;
+//    /**
+//     * The {@link IHostScoringRule} used to convert the {@link #metrics} into
+//     * the {@link #rawScore}.
+//     */
+//    private final IHostScoringRule scoringRule;
+//    
+//    /**
+//     * The {@link IHostMetrics} associated with this host (this is
+//     * informational. The {@link #metrics} provide the detailed per-host
+//     * performance metrics that were intepreted by the {@link #scoringRule} .
+//     */
+//    final private IHostMetrics metrics;
 
 //    /** The rank in [0:#scored]. This is an index into the Scores[]. */
 //    public int rank = -1;
@@ -78,14 +78,14 @@ public class HostScore implements Comparable<HostScore> {
 //    /** The normalized double precision rank in [0.0:1.0]. */
 //    public double drank = -1d;
 
-    /**
-     * Return the raw score (aka load) for a host. This raw score is an
-     * unnormalized measure of the load on that host. The measure is computed
-     * based on {@link IHostMetrics} using some {@link IHostScoringRule}.
-     */
-    public double getRawScore() {
-        return rawScore;
-    }
+//    /**
+//     * Return the raw score (aka load) for a host. This raw score is an
+//     * unnormalized measure of the load on that host. The measure is computed
+//     * based on {@link IHostMetrics} using some {@link IHostScoringRule}.
+//     */
+//    public double getRawScore() {
+//        return rawScore;
+//    }
 
     /**
      * Return the normalized load for the host.
@@ -105,22 +105,22 @@ public class HostScore implements Comparable<HostScore> {
         return hostname;
     }
 
-    /**
-     * The {@link IHostMetrics} associated with this host (optional). The
-     * {@link #getMetrics()} provide the detailed per-host performance metrics
-     * that were intepreted by the {@link #getScoringRule()} .
-     */
-    public IHostMetrics getMetrics() {
-        return metrics;
-    }
-    
-    /**
-     * The {@link IHostScoringRule} used to convert the {@link #getMetrics()}
-     * into the {@link #getRawScore()} (optional).
-     */
-    public IHostScoringRule getScoringRule() {
-        return scoringRule;
-    }
+//    /**
+//     * The {@link IHostMetrics} associated with this host (optional). The
+//     * {@link #getMetrics()} provide the detailed per-host performance metrics
+//     * that were intepreted by the {@link #getScoringRule()} .
+//     */
+//    public IHostMetrics getMetrics() {
+//        return metrics;
+//    }
+//    
+//    /**
+//     * The {@link IHostScoringRule} used to convert the {@link #getMetrics()}
+//     * into the {@link #getRawScore()} (optional).
+//     */
+//    public IHostScoringRule getScoringRule() {
+//        return scoringRule;
+//    }
 
     /**
      * Return <code>true</code> iff the host is this host.
@@ -135,12 +135,12 @@ public class HostScore implements Comparable<HostScore> {
         return "HostScore"//
                 + "{hostname=" + hostname //
                 + ", thisHost=" + thisHost//
-                + ", rawScore=" + rawScore //
+//                + ", rawScore=" + rawScore //
                 + ", score=" + score //
 //                + ", rank=" + rank //
 //                + ", drank=" + drank //
-                + ", metrics=" + metrics //
-                + ", scoringRule=" + scoringRule //
+//                + ", metrics=" + metrics //
+//                + ", scoringRule=" + scoringRule //
                 + "}";
 
     }
@@ -149,22 +149,25 @@ public class HostScore implements Comparable<HostScore> {
      * 
      * @param hostname
      *            The hostname (required, must be non-empty).
-     * @param rawScore
-     *            The unnormalized load for that host.
-     * @param totalRawScore
-     *            The total unnormalized load across all hosts.
-     * @param metrics
-     *            The performance metrics used to compute the unnormalized load
-     *            for each host (optional).
-     * @param scoringRule
-     *            The rule used to score those metrics (optional).
+     *            @param score The normalized availability score for this
+     *            host.
+//     * @param rawScore
+//     *            The unnormalized load for that host.
+//     * @param totalRawScore
+//     *            The total unnormalized load across all hosts.
      */
+//    * @param metrics
+//    *            The performance metrics used to compute the unnormalized load
+//    *            for each host (optional).
+//    * @param scoringRule
+//    *            The rule used to score those metrics (optional).
     public HostScore(//
             final String hostname,//
-            final double rawScore,//
-            final double totalRawScore, //
-            final IHostMetrics metrics,//
-            final IHostScoringRule scoringRule//
+            final double score
+//            final double rawScore,//
+//            final double totalRawScore //
+//            final IHostMetrics metrics,//
+//            final IHostScoringRule scoringRule//
     ) {
 
         if (hostname == null)
@@ -173,53 +176,58 @@ public class HostScore implements Comparable<HostScore> {
         if (hostname.trim().length() == 0)
             throw new IllegalArgumentException();
 
+        if (score < 0d || score > 1d)
+            throw new IllegalArgumentException();
+        
         this.hostname = hostname;
 
-        this.rawScore = rawScore;
+        this.score = score;
+        
+//        this.rawScore = rawScore;
 
         this.thisHost = AbstractStatisticsCollector.fullyQualifiedHostName
                 .equals(hostname);
 
-        this.scoringRule = scoringRule;
+//        this.scoringRule = scoringRule;
+//        
+//        this.metrics = metrics;
         
-        this.metrics = metrics;
-        
-        score = normalize(rawScore, totalRawScore);
-
-    }
-
-    /**
-     * Computes the normalized {@link #score} from the {@link #rawScore} in the
-     * context of total over the {@link #rawScore}s for some set of hosts.
-     * 
-     * @param rawScore
-     *            The raw score.
-     * @param totalRawScore
-     *            The raw score computed from the totals.
-     * 
-     * @return The normalized score.
-     */
-    static private double normalize(final double rawScore,
-            final double totalRawScore) {
-
-        if (totalRawScore == 0d) {
-
-            return 0d;
-
-        }
-
-        final double score = rawScore / totalRawScore;
-
-        if (score < 0 || score > 1) {
-
-            throw new RuntimeException("score(" + score + ") := rawScore("
-                    + rawScore + ") / totalRawScore(" + totalRawScore + ")");
-
-        }
-
-        return score;
+//        score = normalize(rawScore, totalRawScore);
         
     }
+
+//    /**
+//     * Computes the normalized {@link #score} from the {@link #rawScore} in the
+//     * context of total over the {@link #rawScore}s for some set of hosts.
+//     * 
+//     * @param rawScore
+//     *            The raw score.
+//     * @param totalRawScore
+//     *            The raw score computed from the totals.
+//     * 
+//     * @return The normalized score.
+//     */
+//    static private double normalize(final double rawScore,
+//            final double totalRawScore) {
+//
+//        if (totalRawScore == 0d) {
+//
+//            return 0d;
+//
+//        }
+//
+//        final double score = rawScore / totalRawScore;
+//
+//        if (score < 0 || score > 1) {
+//
+//            throw new RuntimeException("score(" + score + ") := rawScore("
+//                    + rawScore + ") / totalRawScore(" + totalRawScore + ")");
+//
+//        }
+//
+//        return score;
+//        
+//    }
 
     /**
      * Places elements into order by decreasing {@link #getScore() normalized
