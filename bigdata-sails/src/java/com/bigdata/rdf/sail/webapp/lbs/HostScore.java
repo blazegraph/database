@@ -27,9 +27,11 @@ import java.util.Comparator;
 import com.bigdata.counters.AbstractStatisticsCollector;
 
 /**
- * Helper class assigns a raw score (load) and a normalized score (normalized
- * load) to each host based on its per-host metrics and a rule for computing the
- * load of a host from those metrics.
+ * Helper class pairs a hostname and the normalized availabilty for that host.
+ * The availability is based on (normalized) <code>1 - LOAD</code> for the host.
+ * The <code>LOAD</code> is computed using the {@link IHostMetrics} and an
+ * {@link IHostScoringRule} for computing the workload of a host from those
+ * metrics. The availability is then computed from the LOAD and normalized.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
@@ -43,86 +45,25 @@ public class HostScore {
      */
     private final boolean thisHost;
 
-//    /**
-//     * The raw score for some host. This is a measure of the load on a host. The
-//     * measure is computed based on {@link #metrics} using the
-//     * {@link #scoringRule}.
-//     */
-//    private final double rawScore;
+    /**
+     * The normalized availability for the host.
+     */
+    private final double availability;
 
     /**
-     * The normalized score for that host.
-     * <p>
-     * Note: The {@link #rawScore} is a measure of the <em>load</em> on a host.
-     * The normalized {@link #score} is a measure of the normalized
-     * <em>load</em> on a host. Load balancing decision are based on this
-     * normalized {@link #score} (work is assigned to a host in inverse
-     * proportion to its normalized {@link #score}).
+     * Return the normalized availability for the host. Load balancing decision
+     * are based on this normalized {@link #getAvailability() score} (work is
+     * assigned to hosts in inverse proportion to the normalized load of the
+     * host).
      */
-    private final double score;
-
-//    /**
-//     * The {@link IHostScoringRule} used to convert the {@link #metrics} into
-//     * the {@link #rawScore}.
-//     */
-//    private final IHostScoringRule scoringRule;
-//    
-//    /**
-//     * The {@link IHostMetrics} associated with this host (this is
-//     * informational. The {@link #metrics} provide the detailed per-host
-//     * performance metrics that were intepreted by the {@link #scoringRule} .
-//     */
-//    final private IHostMetrics metrics;
-
-//    /** The rank in [0:#scored]. This is an index into the Scores[]. */
-//    public int rank = -1;
-//
-//    /** The normalized double precision rank in [0.0:1.0]. */
-//    public double drank = -1d;
-
-//    /**
-//     * Return the raw score (aka load) for a host. This raw score is an
-//     * unnormalized measure of the load on that host. The measure is computed
-//     * based on {@link IHostMetrics} using some {@link IHostScoringRule}.
-//     */
-//    public double getRawScore() {
-//        return rawScore;
-//    }
-
-    /**
-     * Return the normalized load for the host.
-     * <p>
-     * Note: The {@link #getRawScore() rawScore} is a measure of the
-     * <em>load</em> on a host. The normalized {@link #getScore() score} is the
-     * normalized load for a host. Load balancing decision are based on this
-     * normalized {@link #getScore() score} (work is assigned to hosts in
-     * inverse proportion to the normalized load of the host).
-     */
-    public double getScore() {
-        return score;
+    public double getAvailability() {
+        return availability;
     }
 
     /** Return the hostname. */
     public String getHostname() {
         return hostname;
     }
-
-//    /**
-//     * The {@link IHostMetrics} associated with this host (optional). The
-//     * {@link #getMetrics()} provide the detailed per-host performance metrics
-//     * that were intepreted by the {@link #getScoringRule()} .
-//     */
-//    public IHostMetrics getMetrics() {
-//        return metrics;
-//    }
-//    
-//    /**
-//     * The {@link IHostScoringRule} used to convert the {@link #getMetrics()}
-//     * into the {@link #getRawScore()} (optional).
-//     */
-//    public IHostScoringRule getScoringRule() {
-//        return scoringRule;
-//    }
 
     /**
      * Return <code>true</code> iff the host is this host.
@@ -137,12 +78,7 @@ public class HostScore {
         return "HostScore"//
                 + "{hostname=" + hostname //
                 + ", thisHost=" + thisHost//
-//                + ", rawScore=" + rawScore //
-                + ", score=" + score //
-//                + ", rank=" + rank //
-//                + ", drank=" + drank //
-//                + ", metrics=" + metrics //
-//                + ", scoringRule=" + scoringRule //
+                + ", availabilty=" + availability //
                 + "}";
 
     }
@@ -151,25 +87,12 @@ public class HostScore {
      * 
      * @param hostname
      *            The hostname (required, must be non-empty).
-     *            @param score The normalized availability score for this
-     *            host.
-//     * @param rawScore
-//     *            The unnormalized load for that host.
-//     * @param totalRawScore
-//     *            The total unnormalized load across all hosts.
+     * @param availability
+     *            The normalized availability score for this host.
      */
-//    * @param metrics
-//    *            The performance metrics used to compute the unnormalized load
-//    *            for each host (optional).
-//    * @param scoringRule
-//    *            The rule used to score those metrics (optional).
     public HostScore(//
             final String hostname,//
-            final double score
-//            final double rawScore,//
-//            final double totalRawScore //
-//            final IHostMetrics metrics,//
-//            final IHostScoringRule scoringRule//
+            final double availability
     ) {
 
         if (hostname == null)
@@ -178,28 +101,20 @@ public class HostScore {
         if (hostname.trim().length() == 0)
             throw new IllegalArgumentException();
 
-        if (score < 0d || score > 1d)
+        if (availability < 0d || availability > 1d)
             throw new IllegalArgumentException();
         
         this.hostname = hostname;
 
-        this.score = score;
+        this.availability = availability;
         
-//        this.rawScore = rawScore;
-
         this.thisHost = AbstractStatisticsCollector.fullyQualifiedHostName
                 .equals(hostname);
-
-//        this.scoringRule = scoringRule;
-//        
-//        this.metrics = metrics;
-        
-//        score = normalize(rawScore, totalRawScore);
         
     }
 
     /**
-     * Places elements into order by decreasing {@link #getScore() normalized
+     * Places elements into order by decreasing {@link #getAvailability() normalized
      * load}. The {@link #getHostname()} is used to break any ties.
      */
     public final static Comparator<HostScore> COMPARE_BY_SCORE = new Comparator<HostScore>() {
@@ -207,11 +122,11 @@ public class HostScore {
         @Override
         public int compare(final HostScore t1, final HostScore t2) {
 
-            if (t1.score < t2.score) {
+            if (t1.availability < t2.availability) {
 
                 return 1;
 
-            } else if (t1.score > t2.score) {
+            } else if (t1.availability > t2.availability) {
 
                 return -1;
 
