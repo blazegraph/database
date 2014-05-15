@@ -1,5 +1,5 @@
 /**
-Copyright (C) SYSTAP, LLC 2006-2014.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-Infinity.  All rights reserved.
 
 Contact:
      SYSTAP, LLC

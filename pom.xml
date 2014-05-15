@@ -99,8 +99,9 @@ dependencies.
       <lgplutils.version>1.0.7-270114</lgplutils.version>
       <bigdata.ganglia.version>1.0.4</bigdata.ganglia.version>
       <jackson.version>2.2.3</jackson.version>
-      <blueprints.version>2.4.0</blueprints.version>
+      <blueprints.version>2.5.0</blueprints.version>
       <jettison.version>1.3.3</jettison.version>
+      <rexster.version>2.5.0</rexster.version>
     </properties>
     <!-- TODO Can we declare the versions of the dependencies here as
          properties and have them be substituted in for us? Can we pick
@@ -320,6 +321,11 @@ dependencies.
            <groupId>com.tinkerpop.blueprints</groupId>
            <artifactId>blueprints-core</artifactId>
            <version>${blueprints.version}</version>
+        </dependency>
+        <dependency>
+          <groupId>com.tinkerpop.rexster</groupId>
+          <artifactId>rexster-core</artifactId>
+          <version>${rexster.version}</version>
         </dependency>
        <!--                                                           -->
        <!-- artifacts that we publish (because they are not readily   -->
