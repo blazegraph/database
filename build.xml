@@ -2592,7 +2592,7 @@ ${postInstallMessage}</echo>
     <target name="fetch-rexster" depends="prepare,compile,jar">
         <echo>Installing Rexster...</echo>
         <get 
-            src="http://www.tinkerpop.com/downloads/gremlin/rexster-console-2.5.0.zip"
+            src="http://www.tinkerpop.com/downloads/rexster/rexster-console-2.5.0.zip"
             dest="${build.dir}/rexster-console-2.5.0.zip"/>
         <unzip src="${build.dir}/rexster-console-2.5.0.zip" dest="${build.dir}/"/>
         <delete file="${build.dir}/rexster-console-2.5.0.zip"/>
