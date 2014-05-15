@@ -217,7 +217,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
      * 
      * @see http://trac.bigdata.com/ticket/914 (Set timeout on remote query)
      */
-    static private final String HTTP_HEADER_BIGDATA_MAX_QUERY_MILLIS = "BIGDATA_MAX_QUERY_MILLIS";
+    static private final String HTTP_HEADER_BIGDATA_MAX_QUERY_MILLIS = "X-BIGDATA-MAX-QUERY-MILLIS";
 
     private final SparqlEndpointConfig m_config;
 

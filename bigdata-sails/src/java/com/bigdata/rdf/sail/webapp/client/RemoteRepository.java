@@ -192,7 +192,7 @@ public class RemoteRepository {
      * 
      * @see http://trac.bigdata.com/ticket/914 (Set timeout on remote query)
      */
-    static private final String HTTP_HEADER_BIGDATA_MAX_QUERY_MILLIS = "BIGDATA_MAX_QUERY_MILLIS";
+    static private final String HTTP_HEADER_BIGDATA_MAX_QUERY_MILLIS = "X-BIGDATA-MAX-QUERY-MILLIS";
     
     /**
      * When <code>true</code>, the REST API methods will use the load balancer
