@@ -115,6 +115,12 @@ public class NanoSparqlServer {
         String JETTY_STARTUP_TIMEOUT = "jetty.start.timeout";
 
         String DEFAULT_JETTY_STARTUP_TIMEOUT = "10";
+
+        /**
+         * When <code>true</code>, the state of jetty will be dumped onto a
+         * logger after the server start.
+         */
+        String JETTY_DUMP_START = "jetty.dump.start";
         
     }
 
@@ -338,42 +344,12 @@ public class NanoSparqlServer {
         initParams.put(ConfigParams.SERVLET_CONTEXT_LISTENER_CLASS,
                 servletContextListenerClass);
 
-        final long jettyStartTimeout = Long.parseLong(System.getProperty(
-                SystemProperties.JETTY_STARTUP_TIMEOUT,
-                SystemProperties.DEFAULT_JETTY_STARTUP_TIMEOUT));
+        // Create the service.
+        final Server server = NanoSparqlServer.newInstance(port, jettyXml,
+                null/* indexManager */, initParams);
 
-        final Server server = awaitServerStart(port, jettyXml, initParams,
-                jettyStartTimeout, TimeUnit.SECONDS);
+        awaitServerStart(server);
 
-        /*
-         * Report *an* effective URL of this service.
-         * 
-         * Note: This is an effective local URL (and only one of them, and
-         * even then only one for the first connector). It does not reflect
-         * any knowledge about the desired external deployment URL for the
-         * service end point.
-         */
-        final String serviceURL;
-        {
-
-            final int actualPort = getLocalPort(server);
-
-            String hostAddr = NicUtil.getIpAddress("default.nic", "default",
-                    true/* loopbackOk */);
-
-            if (hostAddr == null) {
-
-                hostAddr = "localhost";
-
-            }
-
-            serviceURL = new URL("http", hostAddr, actualPort, ""/* file */)
-                    .toExternalForm();
-
-            System.out.println("serviceURL: " + serviceURL);
-
-        }
-        
         // Wait for the service to terminate.
         server.join();
 
@@ -382,37 +358,25 @@ public class NanoSparqlServer {
     /**
      * Await a {@link Server} start up to a timeout.
      * 
-     * @param port
-     *            The port (maybe ZERO for a random port).
-     * @param jettyXml
-     *            The location of the <code>jetty.xml</code> file.
-     * @param initParams
-     *            The init-param overrides.
-     * @param timeout
-     *            The timeout.
-     * @param units
-     * 
-     * @return The server iff the server started before the timeout.
-     * 
+     * @parma server The {@link Server} to start.
      * @throws InterruptedException
      * @throws TimeoutException
      * @throws Exception
      */
-    private static Server awaitServerStart(final int port,
-            final String jettyXml, final Map<String, String> initParams,
-            final long timeout, final TimeUnit units)
+    public static void awaitServerStart(final Server server)
             throws InterruptedException, TimeoutException, Exception {
 
-        Server server = null;
+        final long timeout = Long.parseLong(System.getProperty(
+                SystemProperties.JETTY_STARTUP_TIMEOUT,
+                SystemProperties.DEFAULT_JETTY_STARTUP_TIMEOUT));
+
         boolean ok = false;
         final long begin = System.nanoTime();
-        final long nanos = units.toNanos(timeout);
+        final long nanos = TimeUnit.SECONDS.toNanos(timeout);
         long remaining = nanos;
         try {
-            // Create the service.
-            server = NanoSparqlServer.newInstance(port, jettyXml,
-                    null/* indexManager */, initParams);
             // Start Server.
+            log.warn("Starting NSS");
             server.start();
             // Await running.
             remaining = nanos - (System.nanoTime() - begin);
@@ -432,13 +396,59 @@ public class NanoSparqlServer {
                 System.err.println(msg);
                 log.fatal(msg);
                 if (server != null) {
+                    /*
+                     * Support the jetty dump-after-start semantics.
+                     */
+                    if (Boolean.getBoolean(SystemProperties.JETTY_DUMP_START)) {
+                        log.warn(server.dump());
+                    }
                     server.stop();
                     server.destroy();
                 }
             }
         }
-        return server;
 
+        /*
+         * Support the jetty dump-after-start semantics.
+         */
+        if (Boolean.getBoolean(SystemProperties.JETTY_DUMP_START)) {
+            log.warn(server.dump());
+        }
+
+        /*
+         * Report *an* effective URL of this service.
+         * 
+         * Note: This is an effective local URL (and only one of them, and even
+         * then only one for the first connector). It does not reflect any
+         * knowledge about the desired external deployment URL for the service
+         * end point.
+         */
+        final String serviceURL;
+        {
+
+            final int actualPort = getLocalPort(server);
+
+            String hostAddr = NicUtil.getIpAddress("default.nic", "default",
+                    true/* loopbackOk */);
+
+            if (hostAddr == null) {
+
+                hostAddr = "localhost";
+
+            }
+
+            serviceURL = new URL("http", hostAddr, actualPort, ""/* file */)
+                    .toExternalForm();
+
+            final String msg = "serviceURL: " + serviceURL;
+
+            System.out.println(msg);
+            
+            if (log.isInfoEnabled())
+                log.warn(msg);
+            
+        }
+        
     }
     
     /**
@@ -528,9 +538,7 @@ public class NanoSparqlServer {
     }
 
     /**
-     * Variant used when you already have the {@link IIndexManager} on hand and
-     * want to use <code>web.xml</code> to configure the {@link WebAppContext}
-     * and <code>jetty.xml</code> to configure the jetty {@link Server}.
+     * Variant used when you already have the {@link IIndexManager}.
      * <p>
      * When the optional {@link IIndexManager} argument is specified, it will be
      * set as an attribute on the {@link WebAppContext}. This will cause the
@@ -563,9 +571,11 @@ public class NanoSparqlServer {
      *      Allow configuration of embedded NSS jetty server using jetty-web.xml
      *      </a>
      */
-    static public Server newInstance(final String jettyXml,
-            final IIndexManager indexManager,
-            final Map<String, String> initParams) throws Exception {
+    static public Server newInstance(//
+            final String jettyXml,//
+            final IIndexManager indexManager,//
+            final Map<String, String> initParams//
+    ) throws Exception {
 
         if (jettyXml == null)
             throw new IllegalArgumentException();
@@ -676,10 +686,12 @@ public class NanoSparqlServer {
              */
             if (initParams != null) {
 
-                wac.setAttribute(BigdataRDFServletContextListener.INIT_PARAM_OVERRIDES, initParams);
+                wac.setAttribute(
+                        BigdataRDFServletContextListener.INIT_PARAM_OVERRIDES,
+                        initParams);
 
             }
-            
+
         }
 
         return server;

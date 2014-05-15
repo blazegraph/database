@@ -29,7 +29,6 @@ import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.net.InetSocketAddress;
-import java.net.URL;
 import java.nio.ByteBuffer;
 import java.nio.channels.ClosedByInterruptException;
 import java.rmi.Remote;
@@ -105,6 +104,7 @@ import com.bigdata.rdf.sail.CreateKBTask;
 import com.bigdata.rdf.sail.webapp.ConfigParams;
 import com.bigdata.rdf.sail.webapp.HALoadBalancerServlet;
 import com.bigdata.rdf.sail.webapp.NanoSparqlServer;
+import com.bigdata.rdf.sail.webapp.NanoSparqlServer.SystemProperties;
 import com.bigdata.rdf.sail.webapp.lbs.IHALoadBalancerPolicy;
 import com.bigdata.rwstore.RWStore;
 import com.bigdata.service.AbstractHATransactionService;
@@ -114,7 +114,6 @@ import com.bigdata.util.InnerCause;
 import com.bigdata.util.StackInfoReport;
 import com.bigdata.util.concurrent.LatchedExecutor;
 import com.bigdata.util.concurrent.MonitoredFutureTask;
-import com.bigdata.util.config.NicUtil;
 import com.sun.jini.start.LifeCycle;
 
 /**
@@ -4544,54 +4543,8 @@ public class HAJournalServer extends AbstractServer {
             jettyServer = NanoSparqlServer
                     .newInstance(jettyXml, journal, null/* initParams */);
 
-            log.warn("Starting NSS");
-            
-            // Start the server.
-            jettyServer.start();
-
-            if (Boolean.getBoolean("jetty.dump.start")) {
-
-                // Support the jetty dump-after-start semantics.
-                log.warn(jettyServer.dump());
-            
-            }
-            
-            /*
-             * Report *an* effective URL of this service.
-             * 
-             * Note: This is an effective local URL (and only one of them, and
-             * even then only one for the first connector). It does not reflect
-             * any knowledge about the desired external deployment URL for the
-             * service end point.
-             */
-            final String serviceURL;
-            {
-
-                final int actualPort = getNSSPort();
-//                final int actualPort = jettyServer.getConnectors()[0]
-//                        .getLocalPort();
-
-                String hostAddr = NicUtil.getIpAddress("default.nic",
-                        "default", true/* loopbackOk */);
-
-                if (hostAddr == null) {
-
-                    hostAddr = "localhost";
-
-                }
-
-                serviceURL = new URL("http", hostAddr, actualPort, ""/* file */)
-                        .toExternalForm();
-
-                final String msg = "logicalServiceZPath: "
-                        + logicalServiceZPath + "\n" + "serviceURL: "
-                        + serviceURL;
-
-                System.out.println(msg);
-                if (log.isInfoEnabled())
-                    log.warn(msg);
-
-            }
+            // Wait until the server starts (up to a timeout).
+            NanoSparqlServer.awaitServerStart(jettyServer);
 
         } catch (Exception e1) {
 
