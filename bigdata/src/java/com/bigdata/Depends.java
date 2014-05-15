@@ -277,6 +277,10 @@ public class Depends {
             "https://github.com/tinkerpop/blueprints",
             "https://github.com/tinkerpop/blueprints/blob/master/LICENSE.txt");
 
+    private final static Dep rexsterCore = new Dep("rexster-core", 
+            "https://github.com/tinkerpop/rexster",
+            "https://github.com/tinkerpop/rexster/blob/master/LICENSE.txt");
+
     static private final Dep[] depends;
     static {
         depends = new Dep[] { //
@@ -306,6 +310,7 @@ public class Depends {
             servletApi,//
             jacksonCore,//
             blueprintsCore,//
+            rexsterCore,//
             bigdataGanglia,//
             // scale-out
             jini,//

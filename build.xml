@@ -457,7 +457,7 @@ public class BuildInfo {
         <include name="**/*.jar" />
     </fileset>
     <fileset dir="${bigdata.dir}/bigdata-blueprints/lib">
-        <include name="blueprints-core-${blueprints.version}.jar" />
+        <include name="**/*.jar" />
     </fileset>
    <fileset dir="${bigdata.dir}/bigdata-gom/lib">
       <include name="**/*.jar" />
@@ -2520,7 +2520,7 @@ ${postInstallMessage}</echo>
         <java classname="com.bigdata.rdf.sail.webapp.NanoSparqlServer" failonerror="true" fork="true" logerror="true">
             <classpath refid="runtime.classpath" />
             <jvmarg value="-server"/>
-            <jvmarg value="-Xmx1G"/>
+            <jvmarg value="-Xmx4G"/>
             <jvmarg value="-Dlog4j.configuration=bigdata-war/src/WEB-INF/classes/log4j.properties"/>
             <arg value="9999"/>
             <arg value="kb"/>
@@ -2550,36 +2550,8 @@ ${postInstallMessage}</echo>
                 <include name="semargl-rdf-0.4.jar"/>
                 <include name="semargl-rdfa-0.4.jar"/>
                 <include name="semargl-sesame-0.4.jar"/>
-                <include name="sesame-http-client-2.7.10.jar"/>
-                <include name="sesame-http-protocol-2.7.10.jar"/>
-                <include name="sesame-model-2.7.10.jar"/>
-                <include name="sesame-query-2.7.10.jar"/>
-                <include name="sesame-queryalgebra-evaluation-2.7.10.jar"/>
-                <include name="sesame-queryalgebra-model-2.7.10.jar"/>
-                <include name="sesame-queryparser-api-2.7.10.jar"/>
-                <include name="sesame-queryparser-serql-2.7.10.jar"/>
-                <include name="sesame-queryparser-sparql-2.7.10.jar"/>
-                <include name="sesame-queryresultio-api-2.7.10.jar"/>
-                <include name="sesame-queryresultio-sparqlxml-2.7.10.jar"/>
-                <include name="sesame-repository-api-2.7.10.jar"/>
-                <include name="sesame-repository-sparql-2.7.10.jar"/>
-                <include name="sesame-rio-api-2.7.10.jar"/>
-                <include name="sesame-rio-binary-2.7.10.jar"/>
-                <include name="sesame-rio-datatypes-2.7.10.jar"/>
-                <include name="sesame-rio-languages-2.7.10.jar"/>
-                <include name="sesame-rio-n3-2.7.10.jar"/>
-                <include name="sesame-rio-nquads-2.7.10.jar"/>
-                <include name="sesame-rio-ntriples-2.7.10.jar"/>
-                <include name="sesame-rio-rdfjson-2.7.10.jar"/>
-                <include name="sesame-rio-rdfxml-2.7.10.jar"/>
-                <include name="sesame-rio-trig-2.7.10.jar"/>
-                <include name="sesame-rio-trix-2.7.10.jar"/>
-                <include name="sesame-rio-turtle-2.7.10.jar"/>
-                <include name="sesame-sail-api-2.7.10.jar"/>
-                <include name="sesame-sail-inferencer-2.7.10.jar"/>
-                <include name="sesame-sail-memory-2.7.10.jar"/>
-                <include name="sesame-sail-nativerdf-2.7.10.jar"/>
-                <include name="sesame-util-2.7.10.jar"/>
+                <include name="sesame-*.jar"/>
+                <include name="neo4j-*.jar"/>
                 <include name="bigdata-*.jar"/>
             </fileset>
         </delete>
@@ -2615,6 +2587,65 @@ ${postInstallMessage}</echo>
     </target>
         
     <target name="gremlin" depends="fetch-gremlin,install-gremlin">
+    </target>
+    
+    <target name="fetch-rexster" depends="prepare,compile,jar">
+        <echo>Installing Rexster...</echo>
+        <get 
+            src="http://www.tinkerpop.com/downloads/gremlin/rexster-console-2.5.0.zip"
+            dest="${build.dir}/rexster-console-2.5.0.zip"/>
+        <unzip src="${build.dir}/rexster-console-2.5.0.zip" dest="${build.dir}/"/>
+        <delete file="${build.dir}/rexster-console-2.5.0.zip"/>
+    </target>
+    
+    <target name="install-rexster" depends="prepare,compile,jar,bundle">
+        <delete>
+            <fileset dir="${build.dir}/rexster-server-2.5.0/lib">
+                <include name="blueprints-sail-graph-2.5.0.jar"/>
+                <include name="jsonld-java-0.3.jar"/>
+                <include name="jsonld-java-sesame-0.3.jar"/>
+                <include name="linked-data-sail-1.1.jar"/>
+                <include name="repository-sail-1.8.jar"/>
+                <include name="semargl-core-0.4.jar"/>
+                <include name="semargl-rdf-0.4.jar"/>
+                <include name="semargl-rdfa-0.4.jar"/>
+                <include name="semargl-sesame-0.4.jar"/>
+                <include name="sesame-*.jar"/>
+                <include name="neo4j-*.jar"/>
+                <include name="bigdata-*.jar"/>
+            </fileset>
+        </delete>
+        <copy toDir="${build.dir}/rexster-server-2.5.0/lib" flatten="true">
+            <!--
+            <fileset dir="${bigdata.dir}/bigdata-rdf/lib">
+                <include name="openrdf-sesame-${sesame.version}-onejar.jar" />
+            </fileset>
+            <fileset dir="${bigdata.dir}/bigdata-sails/lib/httpcomponents">
+                <include name="httpmime-${apache.httpmime.version}.jar" />
+            </fileset>
+            -->
+            <fileset dir="${build.dir}/lib">
+                <include name="*.jar" />
+            </fileset>
+            <fileset dir="${build.dir}">
+                <include name="${version}.jar" />
+            </fileset>
+        </copy>
+        <copy toDir="${build.dir}/rexster-server-2.5.0/config/"
+        	  file="${bigdata.dir}/bigdata-blueprints/src/resources/rexster.xml"
+        	  overwrite="true"/>
+        <chmod file="${build.dir}/rexster-server-2.5.0/bin/rexster.sh" perm="+x"/>
+        <echo>Rexster installation complete.
+0. Make sure the bigdata server is running:
+   > ant start-bigdata
+1. Start the rexster server:
+   > ./${build.dir}/rexster-server-2.5.0/bin/rexster.sh -s -c ${build.dir}/rexster-server-2.5.0/config/rexster.xml
+2. Open the DogHouse UI: http://localhost:8182/doghouse
+        </echo>
+        
+    </target>
+        
+    <target name="rexster" depends="fetch-rexster,install-rexster">
     </target>
     
 </project>
