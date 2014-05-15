@@ -188,6 +188,13 @@ public class RemoteRepository {
     static public final int DEFAULT_MAX_REQUEST_URL_LENGTH = 1000;
     
     /**
+     * HTTP header may be used to specify the timeout for a query.
+     * 
+     * @see http://trac.bigdata.com/ticket/914 (Set timeout on remote query)
+     */
+    static private final String HTTP_HEADER_BIGDATA_MAX_QUERY_MILLIS = "BIGDATA_MAX_QUERY_MILLIS";
+    
+    /**
      * When <code>true</code>, the REST API methods will use the load balancer
      * aware requestURLs. The load balancer has essentially zero cost when not
      * using HA, so it is recommended to always specify <code>true</code>. When
@@ -1145,7 +1152,37 @@ public class RemoteRepository {
             opts.setHeader(name, value);
             
         }
+        
+        @Override
+        public void setMaxQueryMillis(final long timeout) {
+            
+            opts.setHeader(HTTP_HEADER_BIGDATA_MAX_QUERY_MILLIS,
+                    Long.toString(timeout));
+            
+        }
 
+        /**
+         * {@inheritDoc}
+         * <p>
+         * Note: <code>-1L</code> is returned if the http header is not
+         * specified.
+         */
+        @Override
+        public long getMaxQueryMillis() {
+
+            final String s = opts
+                    .getHeader(HTTP_HEADER_BIGDATA_MAX_QUERY_MILLIS);
+
+            if (s == null) {
+
+                return -1L;
+
+            }
+
+            return StringUtil.toLong(s);
+            
+        }
+        
         @Override
         public String getHeader(final String name) {
             

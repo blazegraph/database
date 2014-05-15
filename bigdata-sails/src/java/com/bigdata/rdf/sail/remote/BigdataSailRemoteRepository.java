@@ -33,7 +33,6 @@ import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.http.impl.client.DefaultRedirectStrategy;
 import org.openrdf.model.ValueFactory;
 import org.openrdf.repository.Repository;
-import org.openrdf.repository.RepositoryConnection;
 import org.openrdf.repository.RepositoryException;
 
 import com.bigdata.rdf.sail.webapp.client.DefaultClientConnectionManagerFactory;
