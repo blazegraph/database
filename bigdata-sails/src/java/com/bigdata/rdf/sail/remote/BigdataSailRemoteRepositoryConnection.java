@@ -33,6 +33,7 @@ import java.io.InputStream;
 import java.io.Reader;
 import java.net.URL;
 import java.util.Iterator;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.log4j.Logger;
 import org.openrdf.model.Graph;
@@ -95,15 +96,17 @@ import com.bigdata.rdf.sail.webapp.client.RemoteRepository.RemoveOp;
  */
 public class BigdataSailRemoteRepositoryConnection implements RepositoryConnection {
 
-	private static final transient Logger log = Logger.getLogger(BigdataSailRemoteRepositoryConnection.class);
-	
-	private final BigdataSailRemoteRepository repo;
-	
-	public BigdataSailRemoteRepositoryConnection(final BigdataSailRemoteRepository repo) {
-		
-		this.repo = repo;
-		
-	}
+    private static final transient Logger log = Logger
+            .getLogger(BigdataSailRemoteRepositoryConnection.class);
+
+    private final BigdataSailRemoteRepository repo;
+
+    public BigdataSailRemoteRepositoryConnection(
+            final BigdataSailRemoteRepository repo) {
+
+        this.repo = repo;
+
+    }
 	
 	public long count(final Resource s, final URI p, final Value o, 
 			final Resource... c) 
@@ -124,9 +127,9 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
 	}
 	
 	@Override
-	public RepositoryResult<Statement> getStatements(Resource s, URI p,
-			Value o, boolean includeInferred, Resource... c)
-			throws RepositoryException {
+    public RepositoryResult<Statement> getStatements(final Resource s,
+            final URI p, final Value o, final boolean includeInferred,
+            final Resource... c) throws RepositoryException {
 		
 		try {
 			
@@ -187,8 +190,9 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
 	}
 
 	@Override
-	public boolean hasStatement(Resource s, URI p, Value o,
-			boolean includeInferred, Resource... c) throws RepositoryException {
+    public boolean hasStatement(final Resource s, final URI p, final Value o,
+            final boolean includeInferred, final Resource... c)
+            throws RepositoryException {
 
 		try {
 			
@@ -205,8 +209,9 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
 	}
 
 	@Override
-	public BooleanQuery prepareBooleanQuery(QueryLanguage ql, String query)
-			throws RepositoryException, MalformedQueryException {
+    public BooleanQuery prepareBooleanQuery(final QueryLanguage ql,
+            final String query) throws RepositoryException,
+            MalformedQueryException {
 		
 		if (ql != QueryLanguage.SPARQL) {
 			
@@ -234,17 +239,32 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
 					}
 				}
 	
-				@Override
-				public int getMaxQueryTime() {
-					throw new UnsupportedOperationException();
-				}
-	
+				/**
+                 * @see http://trac.bigdata.com/ticket/914 (Set timeout on remote query)
+				 */
+                @Override
+                public int getMaxQueryTime() {
+
+                    final long millis = q.getMaxQueryMillis();
+
+                    if (millis == -1) {
+                        // Note: -1L is returned if the http header is not specified.
+                        return -1;
+                        
+                    }
+                    
+                    return (int) TimeUnit.MILLISECONDS.toSeconds(millis);
+
+                }
+                
                 /**
                  * @see http://trac.bigdata.com/ticket/914 (Set timeout on remote query)
                  */
 				@Override
-				public void setMaxQueryTime(int arg0) {
-					throw new UnsupportedOperationException();
+				public void setMaxQueryTime(final int seconds) {
+
+				    q.setMaxQueryMillis(TimeUnit.SECONDS.toMillis(seconds));
+				    
 				}
 	
 				@Override
@@ -298,9 +318,10 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
 	}
 
 	@Override
-	public BooleanQuery prepareBooleanQuery(QueryLanguage ql, String query,
-			String baseURI) throws RepositoryException, MalformedQueryException {
-		
+    public BooleanQuery prepareBooleanQuery(final QueryLanguage ql,
+            final String query, final String baseURI)
+            throws RepositoryException, MalformedQueryException {
+
         if (baseURI != null)
             throw new UnsupportedOperationException("baseURI not supported");
 		
@@ -309,8 +330,9 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
 	}
 
 	@Override
-	public GraphQuery prepareGraphQuery(QueryLanguage ql, String query)
-			throws RepositoryException, MalformedQueryException {
+    public GraphQuery prepareGraphQuery(final QueryLanguage ql,
+            final String query) throws RepositoryException,
+            MalformedQueryException {
 
 		if (ql != QueryLanguage.SPARQL) {
 			
@@ -338,18 +360,35 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
 					}
 				}
 	
-				@Override
-				public int getMaxQueryTime() {
-					throw new UnsupportedOperationException();
-				}
-	
                 /**
-                 * @see http://trac.bigdata.com/ticket/914 (Set timeout on remote query)
+                 * @see http://trac.bigdata.com/ticket/914 (Set timeout on
+                 *      remote query)
                  */
-				@Override
-				public void setMaxQueryTime(int arg0) {
-					throw new UnsupportedOperationException();
-				}
+                @Override
+                public int getMaxQueryTime() {
+
+                    final long millis = q.getMaxQueryMillis();
+
+                    if (millis == -1) {
+                        // Note: -1L is returned if the http header is not specified.
+                        return -1;
+                        
+                    }
+
+                    return (int) TimeUnit.MILLISECONDS.toSeconds(millis);
+
+                }
+
+                /**
+                 * @see http://trac.bigdata.com/ticket/914 (Set timeout on
+                 *      remote query)
+                 */
+                @Override
+                public void setMaxQueryTime(final int seconds) {
+
+                    q.setMaxQueryMillis(TimeUnit.SECONDS.toMillis(seconds));
+
+                }
 	
 				@Override
 				public void clearBindings() {
@@ -408,8 +447,9 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
 	}
 
 	@Override
-	public GraphQuery prepareGraphQuery(QueryLanguage ql, String query,
-			String baseURI) throws RepositoryException, MalformedQueryException {
+    public GraphQuery prepareGraphQuery(final QueryLanguage ql,
+            final String query, final String baseURI)
+            throws RepositoryException, MalformedQueryException {
 
         if (baseURI != null)
             throw new UnsupportedOperationException("baseURI not supported.");
@@ -419,27 +459,29 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
 	}
 
 	@Override
-	public Query prepareQuery(QueryLanguage ql, String query)
-			throws RepositoryException, MalformedQueryException {
-		
+    public Query prepareQuery(final QueryLanguage ql, final String query)
+            throws RepositoryException, MalformedQueryException {
+
 		throw new UnsupportedOperationException("please use the specific operation for your query type: prepare[Boolean/Tuple/Graph]Query");
 		
 	}
 
 	@Override
-	public Query prepareQuery(QueryLanguage ql, String query, String baseURI)
-			throws RepositoryException, MalformedQueryException {
+    public Query prepareQuery(final QueryLanguage ql, final String query,
+            final String baseURI) throws RepositoryException,
+            MalformedQueryException {
 
         if (baseURI != null)
             throw new UnsupportedOperationException("baseURI not supported");
 
         return prepareQuery(ql, query);
 
-	}
+    }
 
-	@Override
-	public TupleQuery prepareTupleQuery(QueryLanguage ql, String query)
-			throws RepositoryException, MalformedQueryException {
+    @Override
+    public TupleQuery prepareTupleQuery(final QueryLanguage ql,
+            final String query) throws RepositoryException,
+            MalformedQueryException {
 
 		if (ql != QueryLanguage.SPARQL) {
 			
@@ -466,19 +508,36 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
 						throw new QueryEvaluationException(ex);
 					}
 				}
-	
-				@Override
+
+                /**
+                 * @see http://trac.bigdata.com/ticket/914 (Set timeout on
+                 *      remote query)
+                 */
+                @Override
 				public int getMaxQueryTime() {
-					throw new UnsupportedOperationException();
+
+                    final long millis = q.getMaxQueryMillis();
+
+                    if (millis == -1) {
+                        // Note: -1L is returned if the http header is not specified.
+                        return -1;
+                        
+                    }
+                    
+                    return (int) TimeUnit.MILLISECONDS.toSeconds(millis);
+
 				}
 
-			    /**
-			     * @see http://trac.bigdata.com/ticket/914 (Set timeout on remote query)
-			     */
-				@Override
-				public void setMaxQueryTime(int arg0) {
-					throw new UnsupportedOperationException();
-				}
+                /**
+                 * @see http://trac.bigdata.com/ticket/914 (Set timeout on
+                 *      remote query)
+                 */
+                @Override
+                public void setMaxQueryTime(final int seconds) {
+
+                    q.setMaxQueryMillis(TimeUnit.SECONDS.toMillis(seconds));
+
+                }
 	
 				@Override
 				public void clearBindings() {
@@ -537,8 +596,9 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
 	}
 
 	@Override
-	public TupleQuery prepareTupleQuery(QueryLanguage ql, String query,
-			String baseURI) throws RepositoryException, MalformedQueryException {
+    public TupleQuery prepareTupleQuery(final QueryLanguage ql,
+            final String query, final String baseURI)
+            throws RepositoryException, MalformedQueryException {
 
         if (baseURI != null)
             throw new UnsupportedOperationException("baseURI not supported.");
@@ -547,17 +607,18 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
 	}
 
 	@Override
-	public boolean hasStatement(Statement s, boolean includeInferred, Resource... c)
-			throws RepositoryException {
+    public boolean hasStatement(final Statement s,
+            final boolean includeInferred, final Resource... c)
+            throws RepositoryException {
 		
 		return hasStatement(s.getSubject(), s.getPredicate(), s.getObject(), includeInferred, c);
 		
 	}
 
 	@Override
-	public <E extends Exception> void add(
-			Iteration<? extends Statement, E> stmts, Resource... c)
-			throws RepositoryException, E {
+    public <E extends Exception> void add(
+            final Iteration<? extends Statement, E> stmts, final Resource... c)
+            throws RepositoryException, E {
 		
 		final Graph g = new GraphImpl();
 		while (stmts.hasNext()) {
@@ -569,15 +630,20 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
 	}
 
 	@Override
-	public void add(Resource s, URI p, Value o, Resource... c)
-			throws RepositoryException {
+    public void add(final Resource s, final URI p, final Value o,
+            final Resource... c) throws RepositoryException {
 		
 		add(new StatementImpl(s, p, o), c);
 		
 	}
 
+    /**
+     * <strong>single statement updates not recommended</strong>
+     * <p>
+     * {@inheritDoc}
+     */
 	@Override
-	public void add(Statement stmt, Resource... c)
+	public void add(final Statement stmt, final Resource... c)
 			throws RepositoryException {
 
 		log.warn("single statement updates not recommended");
@@ -589,9 +655,9 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
 
 	}
 
-	@Override
-	public void add(Iterable<? extends Statement> stmts, Resource... c)
-			throws RepositoryException {
+    @Override
+    public void add(final Iterable<? extends Statement> stmts,
+            final Resource... c) throws RepositoryException {
 
 		final AddOp op = new AddOp(stmts);
 		
@@ -603,8 +669,9 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
 	 * TODO support baseURI
 	 */
 	@Override
-	public void add(Reader input, String baseURI, RDFFormat format, Resource... c)
-			throws IOException, RDFParseException, RepositoryException {
+    public void add(final Reader input, final String baseURI,
+            final RDFFormat format, final Resource... c) throws IOException,
+            RDFParseException, RepositoryException {
 		
 		final AddOp op = new AddOp(input, format);
 		
@@ -616,8 +683,9 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
 	 * TODO support baseURI
 	 */
 	@Override
-	public void add(URL input, String baseURI, RDFFormat format, Resource... c)
-			throws IOException, RDFParseException, RepositoryException {
+    public void add(final URL input, final String baseURI,
+            final RDFFormat format, final Resource... c) throws IOException,
+            RDFParseException, RepositoryException {
 		
 		final AddOp op = new AddOp(input.toString());
 		
@@ -629,8 +697,9 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
 	 * TODO support baseURI
 	 */
 	@Override
-	public void add(File input, String baseURI, RDFFormat format, Resource... c)
-			throws IOException, RDFParseException, RepositoryException {
+    public void add(final File input, final String baseURI,
+            final RDFFormat format, final Resource... c) throws IOException,
+            RDFParseException, RepositoryException {
 		
 		final AddOp op = new AddOp(input, format);
 		
@@ -641,9 +710,10 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
 	/**
 	 * TODO support baseURI
 	 */
-	@Override
-	public void add(InputStream input, String baseURI, RDFFormat format, Resource... c)
-			throws IOException, RDFParseException, RepositoryException {
+    @Override
+    public void add(final InputStream input, final String baseURI,
+            final RDFFormat format, final Resource... c) throws IOException,
+            RDFParseException, RepositoryException {
 		
 		final AddOp op = new AddOp(input, format);
 		
@@ -671,9 +741,9 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
 	}
 
 	@Override
-	public <E extends Exception> void remove(
-			Iteration<? extends Statement, E> stmts, Resource... c)
-			throws RepositoryException, E {
+    public <E extends Exception> void remove(
+            final Iteration<? extends Statement, E> stmts, final Resource... c)
+            throws RepositoryException, E {
 
 		final Graph g = new GraphImpl();
 		while (stmts.hasNext())
@@ -683,8 +753,13 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
 
 	}
 
-	@Override
-	public void remove(Statement stmt, Resource... c)
+    /**
+     * <strong>single statement updates not recommended</strong>
+     * <p>
+     * {@inheritDoc}
+     */
+    @Override
+	public void remove(final Statement stmt, final Resource... c)
 			throws RepositoryException {
 		
 		log.warn("single statement updates not recommended");
@@ -697,8 +772,8 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
 	}
 
 	@Override
-	public void remove(Iterable<? extends Statement> stmts, Resource... c)
-			throws RepositoryException {
+    public void remove(final Iterable<? extends Statement> stmts,
+            final Resource... c) throws RepositoryException {
 
 		final RemoveOp op = new RemoveOp(stmts);
 		
@@ -707,8 +782,8 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
 	}
 
 	@Override
-	public void remove(Resource s, URI p, Value o, Resource... c)
-			throws RepositoryException {
+    public void remove(final Resource s, URI p, Value o, final Resource... c)
+            throws RepositoryException {
 
 		final RemoveOp op = new RemoveOp(s, p, o, c);
 		
@@ -736,11 +811,12 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
 	}
 
 	@Override
-	public void setAutoCommit(boolean autoCommit) throws RepositoryException {
+	public void setAutoCommit(final boolean autoCommit) throws RepositoryException {
 		
-		if (autoCommit == false)
-			throw new IllegalArgumentException("only auto-commit is currently supported");
-		
+        if (autoCommit == false)
+            throw new IllegalArgumentException(
+                    "only auto-commit is currently supported");
+
 	}
 
 	@Override
@@ -815,7 +891,7 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
 	}
 
 	@Override
-	public long size(Resource... c) throws RepositoryException {
+	public long size(final Resource... c) throws RepositoryException {
 		
 		try {
 			
@@ -832,14 +908,14 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
 	}
 
 	@Override
-	public void clear(Resource... c) throws RepositoryException {
+	public void clear(final Resource... c) throws RepositoryException {
 		
 		remove(null, null, null, c);
 
 	}
 
 	@Override
-	public void export(RDFHandler handler, Resource... c)
+	public void export(final RDFHandler handler, final Resource... c)
 			throws RepositoryException, RDFHandlerException {
 
 		exportStatements(null, null, null, true, handler, c);
@@ -888,8 +964,8 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
 
 	
 	@Override
-	public Update prepareUpdate(QueryLanguage ql, String query)
-			throws RepositoryException, MalformedQueryException {
+    public Update prepareUpdate(final QueryLanguage ql, final String query)
+            throws RepositoryException, MalformedQueryException {
 
 		if (ql != QueryLanguage.SPARQL) {
 			
@@ -967,9 +1043,10 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
 		
 	}
 
-	@Override
-	public Update prepareUpdate(QueryLanguage ql, String query, String baseURI)
-			throws RepositoryException, MalformedQueryException {
+    @Override
+    public Update prepareUpdate(final QueryLanguage ql, final String query,
+            final String baseURI) throws RepositoryException,
+            MalformedQueryException {
 
 	    if (baseURI != null)
             throw new UnsupportedOperationException("baseURI not supported");

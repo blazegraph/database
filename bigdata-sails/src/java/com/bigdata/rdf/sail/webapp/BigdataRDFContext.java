@@ -95,6 +95,7 @@ import com.bigdata.rdf.sail.BigdataSailUpdate;
 import com.bigdata.rdf.sail.ISPARQLUpdateListener;
 import com.bigdata.rdf.sail.SPARQLUpdateEvent;
 import com.bigdata.rdf.sail.sparql.Bigdata2ASTSPARQLParser;
+import com.bigdata.rdf.sail.webapp.client.StringUtil;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.QueryOptimizerEnum;
@@ -211,7 +212,14 @@ public class BigdataRDFContext extends BigdataBaseContext {
      */
     protected static final String NAMESPACE = "namespace";
     
-	private final SparqlEndpointConfig m_config;
+    /**
+     * HTTP header may be used to specify the timeout for a query.
+     * 
+     * @see http://trac.bigdata.com/ticket/914 (Set timeout on remote query)
+     */
+    static private final String HTTP_HEADER_BIGDATA_MAX_QUERY_MILLIS = "BIGDATA_MAX_QUERY_MILLIS";
+
+    private final SparqlEndpointConfig m_config;
 
     /**
      * A thread pool for running accepted queries against the
@@ -1024,14 +1032,36 @@ public class BigdataRDFContext extends BigdataBaseContext {
          */
         private AbstractQuery newQuery(final BigdataSailRepositoryConnection cxn) {
 
-            final long queryTimeout = getConfig().queryTimeout;
-            
-            if (queryTimeout > 0) {
+            /*
+             * Establish the query timeout. This may be set in web.xml, which
+             * overrides all queries and sets a maximum allowed time for query
+             * execution. This may also be set either via setMaxQuery() or
+             * setMaxQueryMillis() which set a HTTP header (in milliseconds).
+             */
+            long queryTimeoutMillis = getConfig().queryTimeout;
+
+            {
+                final String s = req
+                        .getHeader(HTTP_HEADER_BIGDATA_MAX_QUERY_MILLIS);
+                if (s != null) {
+                    long tmp = StringUtil.toLong(s);
+                    if (tmp != -1L && //
+                            (queryTimeoutMillis == 0/* noLimit */
+                            || //
+                            tmp < queryTimeoutMillis/* shorterLimit */)//
+                    ) {
+                        // Set based on the http header value.
+                        queryTimeoutMillis = tmp;
+                    }
+                }
+            }
+
+            if (queryTimeoutMillis > 0) {
 
                 final QueryRoot originalQuery = astContainer.getOriginalAST();
 
-                originalQuery.setTimeout(queryTimeout);
-                
+                originalQuery.setTimeout(queryTimeoutMillis);
+
             }
             
 //            final ASTContainer astContainer = ((BigdataParsedQuery) parsedQuery)
