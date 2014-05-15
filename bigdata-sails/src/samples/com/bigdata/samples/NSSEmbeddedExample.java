@@ -1,6 +1,5 @@
 package com.bigdata.samples;
 
-import java.net.URL;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -10,7 +9,6 @@ import org.eclipse.jetty.server.Server;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.webapp.NanoSparqlServer;
-import com.bigdata.util.config.NicUtil;
 
 /**
  * Class demonstrates how to start the {@link NanoSparqlServer} from within
@@ -56,23 +54,7 @@ public class NSSEmbeddedExample implements Runnable {
             server = NanoSparqlServer.newInstance(port, indexManager,
                     initParams);
 
-            server.start();
-
-            final int actualPort = NanoSparqlServer.getLocalPort(server);
-
-            String hostAddr = NicUtil.getIpAddress("default.nic",
-                    "default", true/* loopbackOk */);
-
-            if (hostAddr == null) {
-
-                hostAddr = "localhost";
-
-            }
-
-            final String serviceURL = new URL("http", hostAddr, actualPort, ""/* file */)
-                    .toExternalForm();
-            
-            System.out.println("serviceURL: " + serviceURL);
+            NanoSparqlServer.awaitServerStart(server);
 
             // Block and wait. The NSS is running.
             server.join();
