@@ -28,6 +28,8 @@ import java.io.InputStream;
 import java.net.URL;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import javax.servlet.ServletContextListener;
 
@@ -106,6 +108,14 @@ public class NanoSparqlServer {
          */
         String DEFAULT_JETTY_XML = "jetty.xml";
 
+        /**
+         * The timeout in seconds that we will await the start of the jetty
+         * {@link Server} (default {@value #DEFAULT_JETTY_START_TIMEOUT}).
+         */
+        String JETTY_STARTUP_TIMEOUT = "jetty.start.timeout";
+
+        String DEFAULT_JETTY_STARTUP_TIMEOUT = "10";
+        
     }
 
     /**
@@ -328,26 +338,12 @@ public class NanoSparqlServer {
         initParams.put(ConfigParams.SERVLET_CONTEXT_LISTENER_CLASS,
                 servletContextListenerClass);
 
-        final Server server;
+        final long jettyStartTimeout = Long.parseLong(System.getProperty(
+                SystemProperties.JETTY_STARTUP_TIMEOUT,
+                SystemProperties.DEFAULT_JETTY_STARTUP_TIMEOUT));
 
-        boolean ok = false;
-        try {
-            // Create the service.
-            server = NanoSparqlServer.newInstance(port, jettyXml,
-                    null/* indexManager */, initParams);
-            // Start Server.
-            server.start();
-            // Await running.
-            while (server.isStarting() && !server.isRunning()) {
-                Thread.sleep(100/* ms */);
-            }
-            ok = true;
-        } finally {
-            if (!ok) {
-                // Complain if Server did not start.
-                System.err.println("Server did not start.");
-            }
-        }
+        final Server server = awaitServerStart(port, jettyXml, initParams,
+                jettyStartTimeout, TimeUnit.SECONDS);
 
         /*
          * Report *an* effective URL of this service.
@@ -383,6 +379,68 @@ public class NanoSparqlServer {
 
     }
 
+    /**
+     * Await a {@link Server} start up to a timeout.
+     * 
+     * @param port
+     *            The port (maybe ZERO for a random port).
+     * @param jettyXml
+     *            The location of the <code>jetty.xml</code> file.
+     * @param initParams
+     *            The init-param overrides.
+     * @param timeout
+     *            The timeout.
+     * @param units
+     * 
+     * @return The server iff the server started before the timeout.
+     * 
+     * @throws InterruptedException
+     * @throws TimeoutException
+     * @throws Exception
+     */
+    private static Server awaitServerStart(final int port,
+            final String jettyXml, final Map<String, String> initParams,
+            final long timeout, final TimeUnit units)
+            throws InterruptedException, TimeoutException, Exception {
+
+        Server server = null;
+        boolean ok = false;
+        final long begin = System.nanoTime();
+        final long nanos = units.toNanos(timeout);
+        long remaining = nanos;
+        try {
+            // Create the service.
+            server = NanoSparqlServer.newInstance(port, jettyXml,
+                    null/* indexManager */, initParams);
+            // Start Server.
+            server.start();
+            // Await running.
+            remaining = nanos - (System.nanoTime() - begin);
+            while (server.isStarting() && !server.isRunning() && remaining > 0) {
+                Thread.sleep(100/* ms */);
+                // remaining = nanos - (now - begin) [aka elapsed]
+                remaining = nanos - (System.nanoTime() - begin);
+            }
+            if (remaining < 0) {
+                throw new TimeoutException();
+            }
+            ok = true;
+        } finally {
+            if (!ok) {
+                // Complain if Server did not start.
+                final String msg = "Server did not start.";
+                System.err.println(msg);
+                log.fatal(msg);
+                if (server != null) {
+                    server.stop();
+                    server.destroy();
+                }
+            }
+        }
+        return server;
+
+    }
+    
     /**
      * Start the embedded {@link Server}.
      * <p>
