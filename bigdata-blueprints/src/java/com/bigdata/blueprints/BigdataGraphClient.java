@@ -29,19 +29,19 @@ import com.tinkerpop.blueprints.Features;
 
 /**
  * This is a thin-client implementation of a Blueprints wrapper around the
- * client library that interacts with the NanoSparqlServer.  This is a functional
+ * client library that interacts with the NanoSparqlServer. This is a functional
  * implementation suitable for writing POCs - it is not a high performance
- * implementation by any means (currently does not support caching, batched
- * update, or Blueprints query re-writes).  Does have a single "bulk upload"
- * operation that wraps a method on RemoteRepository that will POST a graphml
- * file to the blueprints layer of the bigdata server.
+ * implementation by any means (currently does not support caching or batched
+ * update). Does have a single "bulk upload" operation that wraps a method on
+ * RemoteRepository that will POST a graphml file to the blueprints layer of the
+ * bigdata server.
  * 
  * @see {@link BigdataSailRemoteRepository}
  * @see {@link BigdataSailRemoteRepositoryConnection}
  * @see {@link RemoteRepository}
  * 
  * @author mikepersonick
- *
+ * 
  */
 public class BigdataGraphClient extends BigdataGraph {
 
