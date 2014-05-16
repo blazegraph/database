@@ -68,7 +68,8 @@ public class TestBigdataGraphEmbedded extends AbstractTestBigdataGraph {
         test.doTestSuite(new TransactionalGraphTestSuite(test));
         GraphTest.printTestPerformance("TransactionalGraphTestSuite",
                 test.stopWatch());
-    }    
+    }
+    
 //  public void testGraphSuite() throws Exception {
 //  final GraphTest test = newBigdataGraphTest();
 //  test.stopWatch();
@@ -77,12 +78,12 @@ public class TestBigdataGraphEmbedded extends AbstractTestBigdataGraph {
 //}
 
 
-//    public void testTransactionIsolationCommitCheck() throws Exception {
+//    public void testGetEdgesByLabel() throws Exception {
 //        final BigdataGraphTest test = new BigdataGraphTest();
 //        test.stopWatch();
 //        final BigdataTestSuite testSuite = new BigdataTestSuite(test);
 //        try {
-//            testSuite.testTransactionIsolationCommitCheck();
+//            testSuite.testGetEdgesByLabel();
 //        } finally {
 //            test.shutdown();
 //        }
@@ -95,71 +96,25 @@ public class TestBigdataGraphEmbedded extends AbstractTestBigdataGraph {
             super(graphTest);
         }
         
-        public void testTransactionIsolationCommitCheck() throws Exception {
-            // the purpose of this test is to simulate rexster access to a graph instance, where one thread modifies
-            // the graph and a separate thread cannot affect the transaction of the first
-            final TransactionalGraph graph = (TransactionalGraph) graphTest.generateGraph();
-
-            final CountDownLatch latchCommittedInOtherThread = new CountDownLatch(1);
-            final CountDownLatch latchCommitInOtherThread = new CountDownLatch(1);
-
-            // this thread starts a transaction then waits while the second thread tries to commit it.
-            final Thread threadTxStarter = new Thread() {
-                public void run() {
-                    System.err.println(Thread.currentThread().getId() + ": 1");
-                    final Vertex v = graph.addVertex(null);
-
-                    // System.out.println("added vertex");
-
-                    System.err.println(Thread.currentThread().getId() + ": 2");
-                    latchCommitInOtherThread.countDown();
-
-                    System.err.println(Thread.currentThread().getId() + ": 3");
-                    try {
-                        latchCommittedInOtherThread.await();
-                    } catch (InterruptedException ie) {
-                        throw new RuntimeException(ie);
-                    }
-
-                    System.err.println(Thread.currentThread().getId() + ": 4");
-                    graph.rollback();
-
-                    System.err.println(Thread.currentThread().getId() + ": 5");
-                    // there should be no vertices here
-                    // System.out.println("reading vertex before tx");
-                    assertFalse(graph.getVertices().iterator().hasNext());
-                    // System.out.println("read vertex before tx");
-                }
-            };
-
-            threadTxStarter.start();
-
-            // this thread tries to commit the transaction started in the first thread above.
-            final Thread threadTryCommitTx = new Thread() {
-                public void run() {
-                    System.err.println(Thread.currentThread().getId() + ": 6");
-                    try {
-                        latchCommitInOtherThread.await();
-                    } catch (InterruptedException ie) {
-                        throw new RuntimeException(ie);
-                    }
-
-                    System.err.println(Thread.currentThread().getId() + ": 7");
-                    // try to commit the other transaction
-                    graph.commit();
-
-                    System.err.println(Thread.currentThread().getId() + ": 8");
-                    latchCommittedInOtherThread.countDown();
-                    System.err.println(Thread.currentThread().getId() + ": 9");
-                }
-            };
-
-            threadTryCommitTx.start();
-
-            threadTxStarter.join();
-            threadTryCommitTx.join();
-            graph.shutdown();
-
+        public void testGetEdgesByLabel() {
+            Graph graph = graphTest.generateGraph();
+            if (graph.getFeatures().supportsEdgeIteration) {
+              Vertex v1 = graph.addVertex(null);
+              Vertex v2 = graph.addVertex(null);
+              Vertex v3 = graph.addVertex(null);
+      
+              Edge e1 = graph.addEdge(null, v1, v2, graphTest.convertLabel("test1"));
+              Edge e2 = graph.addEdge(null, v2, v3, graphTest.convertLabel("test2"));
+              Edge e3 = graph.addEdge(null, v3, v1, graphTest.convertLabel("test3"));
+      
+              assertEquals(e1, getOnlyElement(graph.query().has("label", graphTest.convertLabel("test1")).edges()));
+              assertEquals(e2, getOnlyElement(graph.query().has("label", graphTest.convertLabel("test2")).edges()));
+              assertEquals(e3, getOnlyElement(graph.query().has("label", graphTest.convertLabel("test3")).edges()));
+      
+              assertEquals(e1, getOnlyElement(graph.getEdges("label", graphTest.convertLabel("test1"))));
+              assertEquals(e2, getOnlyElement(graph.getEdges("label", graphTest.convertLabel("test2"))));
+              assertEquals(e3, getOnlyElement(graph.getEdges("label", graphTest.convertLabel("test3"))));
+            }
         }
 
 
@@ -173,6 +128,7 @@ public class TestBigdataGraphEmbedded extends AbstractTestBigdataGraph {
     private class BigdataGraphTest extends GraphTest {
 
         private List<String> exclude = Arrays.asList(new String[] {
+           // this one creates a deadlock, no way around it
            "testTransactionIsolationCommitCheck"  
         });
         

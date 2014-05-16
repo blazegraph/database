@@ -30,6 +30,7 @@ import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
 import org.openrdf.model.ValueFactory;
 import org.openrdf.model.impl.ValueFactoryImpl;
+import org.openrdf.model.vocabulary.RDFS;
 
 import com.bigdata.rdf.internal.XSD;
 import com.tinkerpop.blueprints.Edge;
@@ -138,7 +139,19 @@ public class BigdataRDFFactory implements BlueprintsRDFFactory {
 		
 		try {
 
-			return vf.createURI(GRAPH_NAMESPACE, URLEncoder.encode(property, "UTF-8"));
+		    if (property.equals("label")) {
+		     
+		        /*
+		         * Label is a reserved property for edge labels, we use
+		         * rdfs:label for that.
+		         */
+		        return RDFS.LABEL;
+		        
+		    } else {
+			
+		        return vf.createURI(GRAPH_NAMESPACE, URLEncoder.encode(property, "UTF-8"));
+		        
+		    }
 				
 		} catch (UnsupportedEncodingException e) {
 			

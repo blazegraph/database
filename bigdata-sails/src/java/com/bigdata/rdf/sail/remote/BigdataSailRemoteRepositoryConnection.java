@@ -646,7 +646,7 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
 	public void add(final Statement stmt, final Resource... c)
 			throws RepositoryException {
 
-		log.warn("single statement updates not recommended");
+//		log.warn("single statement updates not recommended");
 		
 		final Graph g = new GraphImpl();
 		g.add(stmt);

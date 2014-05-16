@@ -144,9 +144,11 @@ public abstract class BigdataGraph implements Graph {
 			
 			return null;
 			
-		} catch (Exception ex) {
-			throw new RuntimeException(ex);
-		}
+        } catch (RuntimeException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
 		
 	}
 	
@@ -192,9 +194,11 @@ public abstract class BigdataGraph implements Graph {
 			
 			return props;
 			
-		} catch (Exception ex) {
-			throw new RuntimeException(ex);
-		}
+        } catch (RuntimeException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
 		
 	}
 	
@@ -233,9 +237,11 @@ public abstract class BigdataGraph implements Graph {
 			
 			return properties;
 			
-		} catch (Exception ex) {
-			throw new RuntimeException(ex);
-		}
+        } catch (RuntimeException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
 		
 	}
 
@@ -297,9 +303,11 @@ public abstract class BigdataGraph implements Graph {
 			
 			cxn().add(uri, prop, val);
 			
-		} catch (Exception e) {
-			throw new RuntimeException(e);
-		}
+        } catch (RuntimeException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
 		
 	}
 	
@@ -325,6 +333,8 @@ public abstract class BigdataGraph implements Graph {
             
             cxn().add(uri, prop, val);
             
+        } catch (RuntimeException e) {
+            throw e;
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
@@ -384,9 +394,11 @@ public abstract class BigdataGraph implements Graph {
 			
 			return new BigdataEdge(new StatementImpl(fromURI, edgeURI, toURI), this);
 			
-		} catch (Exception ex) {
-			throw new RuntimeException(ex);
-		}
+        } catch (RuntimeException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
 		
 	}
 
@@ -412,9 +424,11 @@ public abstract class BigdataGraph implements Graph {
 
 			return new BigdataVertex(uri, this);
 			
-		} catch (Exception ex) {
-			throw new RuntimeException(ex);
-		}
+        } catch (RuntimeException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
 		
 	}
 
@@ -449,9 +463,11 @@ public abstract class BigdataGraph implements Graph {
 			
 			return null;
 			
-		} catch (Exception ex) {
-			throw new RuntimeException(ex);
-		}
+        } catch (RuntimeException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
 		
 	}
 
@@ -539,8 +555,10 @@ public abstract class BigdataGraph implements Graph {
 
             return stmts;
             
-        } catch (Exception ex) {
-            throw new RuntimeException(ex);
+        } catch (RuntimeException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new RuntimeException(e);
         }
         
 	}
@@ -564,9 +582,11 @@ public abstract class BigdataGraph implements Graph {
 			
 			return new EdgeIterable(stmts);
 
-		} catch (Exception ex) {
-			throw new RuntimeException(ex);
-		}
+        } catch (RuntimeException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
 		
 	}
 
@@ -621,9 +641,11 @@ public abstract class BigdataGraph implements Graph {
 			
 			return new VertexIterable(stmts, subject);
 			
-		} catch (Exception ex) {
-			throw new RuntimeException(ex);
-		}
+        } catch (RuntimeException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
 		
 	}
 	
@@ -656,9 +678,11 @@ public abstract class BigdataGraph implements Graph {
 
 			return getEdges(queryStr);
 			
-		} catch (Exception ex) {
-			throw new RuntimeException(ex);
-		}
+        } catch (RuntimeException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
 		
 	}
 
@@ -681,9 +705,11 @@ public abstract class BigdataGraph implements Graph {
 			
 			return null;
 			
-		} catch (Exception ex) {
-			throw new RuntimeException(ex);
-		}
+        } catch (RuntimeException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
 		
 	}
 
@@ -701,9 +727,11 @@ public abstract class BigdataGraph implements Graph {
 			
 			return new VertexIterable(result, true);
 			
-		} catch (Exception ex) {
-			throw new RuntimeException(ex);
-		}
+        } catch (RuntimeException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
 		
 	}
 
@@ -723,9 +751,11 @@ public abstract class BigdataGraph implements Graph {
 			
 			return new VertexIterable(result, true);
 			
-		} catch (Exception ex) {
-			throw new RuntimeException(ex);
-		}
+        } catch (RuntimeException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
 		
 	}
 
@@ -761,9 +791,11 @@ public abstract class BigdataGraph implements Graph {
 			// remove its properties
 			cxn().remove(uri, wild, wild);
 			
-		} catch (Exception e) {
-			throw new RuntimeException(e);
-		}
+        } catch (RuntimeException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
 		
 	}
 
@@ -789,7 +821,9 @@ public abstract class BigdataGraph implements Graph {
 			// remove incoming edges
 			cxn().remove(wild, wild, uri);
 			
-		} catch (Exception e) {
+		} catch (RuntimeException e) {
+            throw e;
+        } catch (Exception e) {
 			throw new RuntimeException(e);
 		}
 		
