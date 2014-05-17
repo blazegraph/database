@@ -1955,6 +1955,9 @@ ${postInstallMessage}</echo>
 
       <property name="app.home" location="${bigdata.dir}" />
 
+    	<!-- port for test NSS deployments. -->
+      <property name="test.NSS.port" value="24444" />
+
       <property name="test.codebase.port" value="23333" />
       <property name="test.codebase.dir" value="${dist.lib.dl}" />
       <property name="test.codebase" value="http://${this.hostname}:${test.codebase.port}/jsk-dl.jar" />
@@ -2225,6 +2228,9 @@ ${postInstallMessage}</echo>
         <isset property="testName" />
       </condition>
 
+      <!-- test various deployment models. -->
+      <antcall target="test-deployments" />
+
       <!-- Note: timeout is milliseconds per forked JVM if specified. -->
       <!-- We have some long running unit tests so the timeout needs  -->
       <!-- to be more than a minute if you do specify this property.  -->
@@ -2433,6 +2439,33 @@ ${postInstallMessage}</echo>
      </delete>
    </target>
     
+   <!--                                                                -->
+   <!-- FIXME Ant targets for testing a variety of deployment models.  -->
+   <!--                                                                -->
+   <target name="test-deployments" description="Validate deployment models.">
+      <!-- antcall target="test-nss-default" / -->
+   </target>
+   
+   <!-- TODO Test with -Djetty.xml override. -->
+   <!-- TODO Test with -Djetty.resourceBase override. -->
+   <!-- TODO Test with CWD == ${dist.var.jetty} so it will locate the web app in the file system. -->
+   <target name="test-nss-default">
+        <java classname="com.bigdata.rdf.sail.webapp.NanoSparqlServer"
+              failonerror="true" fork="true" logerror="true">
+            <classpath path="${run.class.path}"/>
+            <jvmarg value="-server"/>
+            <jvmarg value="-Xmx1G"/>
+            <jvmarg value="-Dlog4j.configuration=${dist.var.config.logging}log4j.properties"/>
+            <arg value="${test.NSS.port}"/>
+            <arg value="kb"/>
+            <arg value="${dist.var.jetty}/WEB-INF/RWStore.properties"/>
+        </java>
+   	     <!-- TODO Get the PID -->
+        <!-- TODO Run junit test suite for validation (and integrate into total CI junit summary).  -->
+        <!-- TODO Sure kill using the PID (or use the jetty command to stop the process). -->
+   	     <!-- TODO We also need a reliable way to handle this for a remote deploy. -->
+    </target>
+
 <!--                                                                   -->
 <!--                    SESAME SERVER TARGETS                          -->
 <!--                                                                   -->
