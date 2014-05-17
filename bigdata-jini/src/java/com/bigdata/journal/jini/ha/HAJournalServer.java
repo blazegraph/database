@@ -104,7 +104,6 @@ import com.bigdata.rdf.sail.CreateKBTask;
 import com.bigdata.rdf.sail.webapp.ConfigParams;
 import com.bigdata.rdf.sail.webapp.HALoadBalancerServlet;
 import com.bigdata.rdf.sail.webapp.NanoSparqlServer;
-import com.bigdata.rdf.sail.webapp.NanoSparqlServer.SystemProperties;
 import com.bigdata.rdf.sail.webapp.lbs.IHALoadBalancerPolicy;
 import com.bigdata.rwstore.RWStore;
 import com.bigdata.service.AbstractHATransactionService;
@@ -752,6 +751,7 @@ public class HAJournalServer extends AbstractServer {
             /*
              * Zookeeper quorum.
              */
+            @SuppressWarnings({ "unchecked", "rawtypes" })
             final Quorum<HAGlue, QuorumService<HAGlue>> quorum = (Quorum) new ZKQuorumImpl<HAGlue, HAQuorumService<HAGlue, HAJournal>>(
                     replicationFactor);
 
