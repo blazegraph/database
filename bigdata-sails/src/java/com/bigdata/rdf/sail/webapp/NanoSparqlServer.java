@@ -176,7 +176,7 @@ public class NanoSparqlServer {
          *      start from command line: bigdata-war/src not found </a>
          */
         String JETTY_RESOURCE_BASE = "jetty.resourceBase";
-        
+
     }
 
     /**
@@ -767,20 +767,74 @@ public class NanoSparqlServer {
              * jetty.resourceBase not declared in the environment.
              */
 
-            // default location: TODO To DEFAULT_JETTY_RESOURCE_BASE
-            resourceBaseStr = "./bigdata-war/src";
+            // The default location to check in the file system.
+            final File file = new File("bigdata-war/src");
 
             final URL resourceBaseURL;
-            if (new File(resourceBaseStr).exists()) {
+            if (file.exists()) {
 
                 // Check the file system.
-                resourceBaseURL = new URL("file:" + resourceBaseStr);
+                resourceBaseURL = new URL("file:" + file.getAbsolutePath());
                 isFile = true;
 
             } else {
 
-                // Check the classpath.
-                resourceBaseURL = classLoader.getResource(resourceBaseStr);
+                /*
+                 * Check the classpath.
+                 * 
+                 * Note: When checking the classpath we need to test different
+                 * resources depending on whether we are running under the
+                 * eclipse IDE or at the command line!
+                 */
+                URL tmp = null;
+                String src = null;
+                if (tmp == null) {
+                    /**
+                     * Eclipse IDE class path.
+                     * 
+                     * Note: This is what gets found when running under eclipse.
+                     * The URL will be in the configured build directory for the
+                     * eclipse project. So, something like:
+                     * 
+                     * <pre>
+                     * file:/Users/bryan/Documents/workspace/BIGDATA_RELEASE_1_3_0_NEW_SVN/bin/WEB-INF/web.xml
+                     * </pre>
+                     */
+                    tmp = classLoader.getResource(src = "/WEB-INF/web.xml");
+                }
+//                if (tmp == null)// Eclipse IDE class path (system class loader).
+//                    tmp = ClassLoader.getSystemClassLoader().getResource(
+//                            src = "WEB-INF/web.xml");
+//                if (tmp == null)
+//                    tmp = classLoader // JAR class path.
+//                            .getResource(src = "/bigdata-war/src/WEB-INF/web.xml");
+                if (tmp == null) {
+                    /**
+                     * JAR class path (system class loader).
+                     * 
+                     * Note: This is what gets located when we run from the
+                     * command line (outside of eclipse). The resulting JAR URL
+                     * will be something like:
+                     * 
+                     * <pre>
+                     * jar:file:/Users/bryan/Documents/workspace/BIGDATA_RELEASE_1_3_0_NEW_SVN/ant-build/lib/bigdata-1.3.0-20140517.jar!/bigdata-war/src/WEB-INF/web.xml
+                     * </pre>
+                     */
+                    tmp = ClassLoader.getSystemClassLoader().getResource(
+                            src = "bigdata-war/src/WEB-INF/web.xml");
+                }
+                if (tmp != null) {
+                    if (src != null) {
+                        if (log.isInfoEnabled())
+                            log.info("Found: src=" + src + ", url=" + tmp);
+                    }
+                    final String s = tmp.toExternalForm();
+                    final int endIndex = s.lastIndexOf("WEB-INF/web.xml");
+                    final String t = s.substring(0, endIndex);
+                    resourceBaseURL = new URL(t);
+                } else {
+                    resourceBaseURL = null;
+                }
                 isClassPath = resourceBaseURL != null;
 
             }
