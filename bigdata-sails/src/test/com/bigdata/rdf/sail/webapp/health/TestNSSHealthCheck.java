@@ -615,6 +615,9 @@ public class TestNSSHealthCheck extends TestCase2 {
             // Setup test suite
             final Test test = createTestSuite(null/* name */, requestURI);
 
+            System.out.println("Running health check: Request-URI="
+                    + requestURI);
+
             // Run the test suite.
             test.run(result);
 
@@ -623,7 +626,8 @@ public class TestNSSHealthCheck extends TestCase2 {
         }
 
         final String msg = "nerrors=" + result.errorCount() + ", nfailures="
-                + result.failureCount() + ", nrun=" + result.runCount();
+                + result.failureCount() + ", nrun=" + result.runCount()
+                + " : Request-URI=" + requestURI;
 
         System.out.println(msg);
 
