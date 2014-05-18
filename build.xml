@@ -393,14 +393,16 @@ public class BuildInfo {
     <!-- Note: the javadoc requires a LOT of RAM, but runs quickly on a
          server class machine. 
          
-         @todo man page for [bigdata] script to @{build.dir}/docs
+         TODO man page for [bigdata] script to @{build.dir}/docs
          
+         TODO: New overview page. Old one was very dated and has been removed.
+         
+                overview="${bigdata.dir}/overview.html"
          -->
     <target name="javadoc" depends="prepare" if="javadoc">
         <mkdir dir="${build.dir}/docs/api" />
         <javadoc destdir="${build.dir}/docs/api" defaultexcludes="yes"
                   author="true" version="true" use="true" verbose="no"
-                overview="${bigdata.dir}/overview.html"
              windowtitle="bigdata&#174; v${build.ver}"
             classpathref="build.classpath"
             encoding="utf-8"
@@ -675,8 +677,6 @@ an "NOP" bash script or edit your crontab.
     <!-- @todo cleanup LEGAL into one directory off the root in the src tree? -->
     <fileset dir="${bigdata.dir}">
         <include name="LICENSE.txt" />
-        <include name="overview.html" />
-        <include name="README-JINI" />
         <include name="bigdata/LEGAL/*" />
         <include name="bigdata-jini/LEGAL/*" />
       <include name="bigdata-rdf/LEGAL/*" />
@@ -1474,8 +1474,6 @@ ${postInstallMessage}</echo>
       <copy tofile="${build.dir}/build.properties" file="build.properties" />
       <copy tofile="${build.dir}/build.xml" file="build.xml" />
       <copy tofile="${build.dir}/LICENSE.txt" file="LICENSE.txt" />
-      <copy tofile="${build.dir}/overview.html" file="overview.html" />
-      <copy tofile="${build.dir}/README-JINI" file="README-JINI" />
       <copy toDir="${build.dir}/LEGAL" flatten="true">
         <fileset dir="${bigdata.dir}">
           <include name="**/LEGAL/*" />
@@ -1497,8 +1495,6 @@ ${postInstallMessage}</echo>
           <include name="build.xml" />
           <include name="LICENSE.txt" />
           <include name="NOTICE" />
-          <include name="overview.html" />
-          <include name="README-JINI" />
           <include name="**/LEGAL/*" />
 
           <include name="bigdata/src/**" />
@@ -1572,8 +1568,6 @@ ${postInstallMessage}</echo>
       <copy toDir="${install.doc.dir}">
         <fileset dir="${bigdata.dir}">
           <include name="LICENSE.txt" />
-          <include name="overview.html" />
-          <include name="README-JINI" />
           <include name="bigdata/LEGAL/*" />
           <include name="bigdata-jini/LEGAL/*" />
           <include name="bigdata-rdf/LEGAL/*" />
