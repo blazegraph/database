@@ -152,24 +152,38 @@ public class NanoSparqlServer {
          * environment variable will be used to locate the web application.</li>
          * <li>
          * <code>jetty.resourceBase</code> is not specified (either
-         * <code>null</code> or whitespace). An attempt is made to locate the
-         * <code>bigdata-war/src</code> resource in the file system (relative to
-         * the current working directory). If found, the
-         * <code>jetty.resourceBase</code> environment variable is set to this
-         * resource using a <code>file:</code> style URL. This will cause jetty
-         * to use the web application directory in the file system.
-         * <p>
-         * If the resource is not found in the file system, then an attempt is
-         * made to locate that resource using the classpath. If found, the the
-         * <code>jetty.resourceBase</code> is set to the URL for the located
-         * resource. This will cause jetty to use the web application resource
-         * on the classpath. If there are multiple such resources on the
-         * classpath, the first such resource will be discovered and used.</li>
+         * <code>null</code> or whitespace).
+         * <ol>
+         * <li>An attempt is made to locate the <code>bigdata-war/src</code>
+         * resource in the file system (relative to the current working
+         * directory). If found, the <code>jetty.resourceBase</code> environment
+         * variable is set to this resource using a <code>file:</code> style
+         * URL. This will cause jetty to use the web application directory in
+         * the file system.</li>
+         * <li>
+         * An attempt is made to locate the resource
+         * <code>/WEB-INF/web.xml</code> using the classpath (this handles the
+         * case when running under the eclipse IDE). If found, the the
+         * <code>jetty.resourceBase</code> is set to the URL formed by removing
+         * the trailing <code>WEB-INF/web.xml</code> for the located resource.
+         * This will cause jetty to use the web application resource on the
+         * classpath. If there are multiple such resources on the classpath, the
+         * first such resource will be discovered and used.</li>
+         * <li>An attempt is made to locate the resource
+         * <code>bigdata-war/src/WEB-INF/web.xml</code> using the classpath
+         * (this handles the case when running from the command line using a
+         * bigdata JAR). If found, the the <code>jetty.resourceBase</code> is
+         * set to the URL formed by the trailing <code>WEB-INF/web.xml</code>
+         * for the located resource. This will cause jetty to use the web
+         * application resource on the classpath. If there are multiple such
+         * resources on the classpath, the first such resource will be
+         * discovered and used.</li>
          * <li>
          * Otherwise, the <code>jetty.resourceBase</code> environment variable
          * is not modified and the default location specified in the
          * <code>jetty.xml</code> file will be used. If jetty is unable to
          * resolve that resource, then the web application will not start.</li>
+         * </ol>
          * </ol>
          * 
          * @see <a href="http://trac.bigdata.com/ticket/939" > NSS does not
@@ -825,7 +839,7 @@ public class NanoSparqlServer {
                 }
                 if (tmp != null) {
                     if (src != null) {
-                        if (log.isInfoEnabled())
+                        if(log.isInfoEnabled())
                             log.info("Found: src=" + src + ", url=" + tmp);
                     }
                     final String s = tmp.toExternalForm();
