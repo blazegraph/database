@@ -16,16 +16,17 @@ http://sourceforge.net/projects/bigdata/
 
 You can checkout this release from:
 
-https://bigdata.svn.sourceforge.net/svnroot/bigdata/tags/BIGDATA_RELEASE_1_3_1
+https://svn.code.sf.net/p/bigdata/code/branches/BIGDATA_RELEASE_1_3_1
 
 New features:
 
+- Java 7 is now required.
 - High availability [10].
-- HA Load balancer.
-- New workbench.
+- High availability load balancer.
+- New RDF/SPARQL workbench.
 - Blueprints API.
-- Reification Done Right (RDR) support [11].
 - RDF Graph Mining Service (GASService) [12].
+- Reification Done Right (RDR) support [11].
 - Property Path performance enhancements.
 - Plus numerous other bug fixes and performance enhancements. 
 
@@ -54,7 +55,81 @@ Change log:
 
 1.3.1:
 
-TBD
+- http://trac.bigdata.com/ticket/242   (Deadlines do not play well with GROUP_BY, ORDER_BY, etc.)
+- http://trac.bigdata.com/ticket/256   (Amortize RTO cost)
+- http://trac.bigdata.com/ticket/257   (Support BOP fragments in the RTO.)
+- http://trac.bigdata.com/ticket/258   (Integrate RTO into SAIL)
+- http://trac.bigdata.com/ticket/259   (Dynamically increase RTO sampling limit.)
+- http://trac.bigdata.com/ticket/526   (Reification done right)
+- http://trac.bigdata.com/ticket/580   (Problem with the bigdata RDF/XML parser with sids)
+- http://trac.bigdata.com/ticket/622   (NSS using jetty+windows can lose connections (windows only; jdk 6/7 bug))
+- http://trac.bigdata.com/ticket/624   (HA Load Balancer)
+- http://trac.bigdata.com/ticket/629   (Graph processing API)
+- http://trac.bigdata.com/ticket/721   (Support HA1 configurations)
+- http://trac.bigdata.com/ticket/730   (Allow configuration of embedded NSS jetty server using jetty-web.xml)
+- http://trac.bigdata.com/ticket/759   (multiple filters interfere)
+- http://trac.bigdata.com/ticket/763   (Stochastic results with Analytic Query Mode)
+- http://trac.bigdata.com/ticket/774   (Converge on Java 7.)
+- http://trac.bigdata.com/ticket/779   (Resynchronization of socket level write replication protocol (HA))
+- http://trac.bigdata.com/ticket/780   (Incremental or asynchronous purge of HALog files)
+- http://trac.bigdata.com/ticket/782   (Wrong serialization version)
+- http://trac.bigdata.com/ticket/784   (Describe Limit/offset don't work as expected)
+- http://trac.bigdata.com/ticket/787   (Update documentations and samples, they are OUTDATED)
+- http://trac.bigdata.com/ticket/788   (Name2Addr does not report all root causes if the commit fails.)
+- http://trac.bigdata.com/ticket/789   (ant task to build sesame fails, docs for setting up bigdata for sesame are ancient)
+- http://trac.bigdata.com/ticket/790   (should not be pruning any children)
+- http://trac.bigdata.com/ticket/791   (Clean up query hints)
+- http://trac.bigdata.com/ticket/793   (Explain reports incorrect value for opCount)
+- http://trac.bigdata.com/ticket/796   (Filter assigned to sub-query by query generator is dropped from evaluation)
+- http://trac.bigdata.com/ticket/797   (add sbt setup to getting started wiki)
+- http://trac.bigdata.com/ticket/798   (Solution order not always preserved)
+- http://trac.bigdata.com/ticket/799   (mis-optimation of quad pattern vs triple pattern)
+- http://trac.bigdata.com/ticket/802   (Optimize DatatypeFactory instantiation in DateTimeExtension)
+- http://trac.bigdata.com/ticket/803   (prefixMatch does not work in full text search)
+- http://trac.bigdata.com/ticket/804   (update bug deleting quads)
+- http://trac.bigdata.com/ticket/806   (Incorrect AST generated for OPTIONAL { SELECT })
+- http://trac.bigdata.com/ticket/808   (Wildcard search in bigdata for type suggessions)
+- http://trac.bigdata.com/ticket/810   (Expose GAS API as SPARQL SERVICE)
+- http://trac.bigdata.com/ticket/815   (RDR query does too much work)
+- http://trac.bigdata.com/ticket/816   (Wildcard projection ignores variables inside a SERVICE call.)
+- http://trac.bigdata.com/ticket/817   (Unexplained increase in journal size)
+- http://trac.bigdata.com/ticket/821   (Reject large files, rather then storing them in a hidden variable)
+- http://trac.bigdata.com/ticket/831   (UNION with filter issue)
+- http://trac.bigdata.com/ticket/841   (Using "VALUES" in a query returns lexical error)
+- http://trac.bigdata.com/ticket/848   (Fix SPARQL Results JSON writer to write the RDR syntax)
+- http://trac.bigdata.com/ticket/849   (Create writers that support the RDR syntax)
+- http://trac.bigdata.com/ticket/851   (RDR GAS interface)
+- http://trac.bigdata.com/ticket/852   (RemoteRepository.cancel() does not consume the HTTP response entity.)
+- http://trac.bigdata.com/ticket/853   (Follower does not accept POST of idempotent operations (HA))
+- http://trac.bigdata.com/ticket/854   (Allow override of maximum length before converting an HTTP GET to an HTTP POST)
+- http://trac.bigdata.com/ticket/855   (AssertionError: Child does not have persistent identity)
+- http://trac.bigdata.com/ticket/862   (Create parser for JSON SPARQL Results)
+- http://trac.bigdata.com/ticket/863   (HA1 commit failure)
+- http://trac.bigdata.com/ticket/866   (Batch remove API for the SAIL)
+- http://trac.bigdata.com/ticket/867   (NSS concurrency problem with list namespaces and create namespace)
+- http://trac.bigdata.com/ticket/869   (HA5 test suite)
+- http://trac.bigdata.com/ticket/872   (Full text index range count optimization)
+- http://trac.bigdata.com/ticket/874   (FILTER not applied when there is UNION in the same join group)
+- http://trac.bigdata.com/ticket/876   (When I upload a file I want to see the filename.)
+- http://trac.bigdata.com/ticket/877   (RDF Format selector is invisible)
+- http://trac.bigdata.com/ticket/883   (CANCEL Query fails on non-default kb namespace on HA follower.)
+- http://trac.bigdata.com/ticket/886   (Provide workaround for bad reverse DNS setups.)
+- http://trac.bigdata.com/ticket/887   (BIND is leaving a variable unbound)
+- http://trac.bigdata.com/ticket/892   (HAJournalServer does not die if zookeeper is not running)
+- http://trac.bigdata.com/ticket/893   (large sparql insert optimization slow?)
+- http://trac.bigdata.com/ticket/894   (unnecessary synchronization)
+- http://trac.bigdata.com/ticket/895   (stack overflow in populateStatsMap)
+- http://trac.bigdata.com/ticket/902   (Update Basic Bigdata Chef Cookbook)
+- http://trac.bigdata.com/ticket/904   (AssertionError:  PropertyPathNode got to ASTJoinOrderByType.optimizeJoinGroup)
+- http://trac.bigdata.com/ticket/905   (unsound combo query optimization: union + filter)
+- http://trac.bigdata.com/ticket/906   (DC Prefix Button Appends "</li>")
+- http://trac.bigdata.com/ticket/907   (Add a quick-start ant task for the BD Server "ant start")
+- http://trac.bigdata.com/ticket/912   (Provide a configurable IAnalyzerFactory)
+- http://trac.bigdata.com/ticket/913   (Blueprints API Implementation)
+- http://trac.bigdata.com/ticket/914   (Settable timeout on SPARQL Query (REST API))
+- http://trac.bigdata.com/ticket/915   (DefaultAnalyzerFactory issues)
+- http://trac.bigdata.com/ticket/920   (Content negotiation orders accept header scores in reverse)
+- http://trac.bigdata.com/ticket/939   (NSS does not start from command line: bigdata-war/src not found.)
 
 1.3.0:
 
