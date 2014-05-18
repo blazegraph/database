@@ -23,9 +23,9 @@
     <!-- =========================================================== -->
     <Arg name="threadpool"><New id="threadpool" class="org.eclipse.jetty.util.thread.QueuedThreadPool"/></Arg>
     <Get name="ThreadPool">
-      <Set name="minThreads" type="int"><SystemProperty name="jetty.threads.min" default="10"/></Set>
-      <Set name="maxThreads" type="int"><SystemProperty name="jetty.threads.max" default="64"/></Set>
-      <Set name="idleTimeout" type="int"><SystemProperty name="jetty.threads.timeout" default="60000"/></Set>
+      <Set name="minThreads" type="int"><Property name="jetty.threads.min" default="10"/></Set>
+      <Set name="maxThreads" type="int"><Property name="jetty.threads.max" default="64"/></Set>
+      <Set name="idleTimeout" type="int"><Property name="jetty.threads.timeout" default="60000"/></Set>
       <Set name="detailedDump">false</Set>
     </Get>
 
