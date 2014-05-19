@@ -39,6 +39,7 @@ import org.openrdf.query.parser.sparql.SPARQLQueryTest;
 import org.openrdf.repository.Repository;
 import org.openrdf.repository.dataset.DatasetRepository;
 
+import com.bigdata.BigdataStatics;
 import com.bigdata.btree.keys.CollatorEnum;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.btree.keys.StrengthEnum;
@@ -103,7 +104,12 @@ extends SPARQLASTQueryTest
         if(hideDatasetTests)
             suite1 = BigdataSparqlTest.filterOutTests(suite1,"dataset");
         
-        suite1 = BigdataSparqlTest.filterOutTests(suite1, "property-paths");
+        suite1 = BigdataSparqlTest.filterOutTests(suite1, BigdataSparqlTest.badTests);
+
+        if (!BigdataStatics.runKnownBadTests)
+            suite1 = BigdataSparqlTest.filterOutTests(suite1, BigdataSparqlTest.knownBadTests);
+
+        //        suite1 = BigdataSparqlTest.filterOutTests(suite1, "property-paths");
         
         /**
          * BSBM BI use case query 5

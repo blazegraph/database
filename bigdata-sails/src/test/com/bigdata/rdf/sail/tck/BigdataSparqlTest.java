@@ -107,7 +107,7 @@ extends SPARQLASTQueryTest // Bigdata native AST based evaluation
     /**
      * The tests test things that are no longer in the spec.
      */
-    static final Collection<String> badTests = Arrays.asList(new String[] {
+    static final public Collection<String> badTests = Arrays.asList(new String[] {
 		"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/syntax-sparql1/manifest#sparql11-sequence-04",
 		"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/syntax-sparql1/manifest#sparql11-sequence-05",
 		"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/syntax-sparql1/manifest#sparql11-sequence-06",
@@ -118,7 +118,7 @@ extends SPARQLASTQueryTest // Bigdata native AST based evaluation
      * {@link BigdataStatics#runKnownBadTests}. This is done as a convenience to
      * 'green' up CI.
      */
-    static final Collection<String> knownBadTests = Arrays.asList(new String[] {
+    static final public Collection<String> knownBadTests = Arrays.asList(new String[] {
             "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/expr-builtin/manifest#dawg-datatype-2",
             "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/syntax-sparql1/manifest#sparql11-wildcard-cycles-04",
             "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/syntax-sparql1/manifest#sparql11-subquery-04",
