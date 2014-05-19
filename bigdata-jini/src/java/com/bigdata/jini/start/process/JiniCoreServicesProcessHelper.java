@@ -149,8 +149,8 @@ public class JiniCoreServicesProcessHelper extends ProcessHelper {
          */
         final ServiceRegistrar[] registrars = JiniCoreServicesConfiguration
                 .getServiceRegistrars(Integer.MAX_VALUE/* maxCount */,
-                        clientConfig.groups, clientConfig.locators, 1500,
-                        TimeUnit.MILLISECONDS);
+                        clientConfig.groups, clientConfig.locators, 
+                        1500/* timeout */, TimeUnit.MILLISECONDS);
 
         if (log.isInfoEnabled())
             log.info("registrars: #found=" + registrars.length + ", #desired="
