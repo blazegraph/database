@@ -25,8 +25,10 @@ package com.bigdata.rdf.sail.webapp;
 import java.io.IOException;
 import java.net.URI;
 import java.util.concurrent.CopyOnWriteArraySet;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
 
+import javax.servlet.AsyncContext;
 import javax.servlet.RequestDispatcher;
 import javax.servlet.ServletConfig;
 import javax.servlet.ServletContext;
@@ -35,6 +37,7 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.apache.log4j.Logger;
+import org.eclipse.jetty.client.api.Response;
 import org.eclipse.jetty.proxy.ProxyServlet;
 
 import com.bigdata.BigdataStatics;
@@ -1149,6 +1152,49 @@ public class HALoadBalancerServlet extends ProxyServlet {
         
 //        response.sendError(HttpServletResponse.SC_FORBIDDEN);
         
+    }
+
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Overridden to provide more information about the error. The
+     * implementation is derived from the jetty 9.1.4 implementation of the
+     * method in the base {@link ProxyServlet} class, but logs @ ERROR so we can
+     * see more about the underlying problem.
+     * 
+     * @see <a href="http://trac.bigdata.com/ticket/941" > HA LBS Gateway errors
+     *      under heavy load </a>
+     * 
+     *      TODO jetty 9.2 provides a fully asynchronous proxy servlet. We will
+     *      wind up replacing our base class with that implementation soon,
+     *      probably for the 1.3.2 release. Until then, this will provide
+     *      additional diagnoistic information about the root causes when there
+     *      is a gateway error (proxying fails). If we can find some patterns to
+     *      these failures, then it would be useful to recharacterize more of
+     *      them to encourage the client to retry the request. Those semantics
+     *      are not really available for 502 (Bad Gateway). They are more a
+     *      appropriate for both 503 (Service Unavailable - temporary overload),
+     *      and 504 (Gateway Timeout). 503 might be the best choice if there is
+     *      not an explicit timeout and the root cause does not clearly indicate
+     *      a durable problem with the target host.
+     */
+    @Override
+    protected void onResponseFailure(//
+            final HttpServletRequest request,//
+            final HttpServletResponse response,//
+            final Response proxyResponse,//
+            final Throwable failure) {
+        
+        log.error(getRequestId(request) + " proxying failed: " + request, failure);
+        if (!response.isCommitted())
+        {
+            if (failure instanceof TimeoutException)
+                response.setStatus(HttpServletResponse.SC_GATEWAY_TIMEOUT);
+            else
+                response.setStatus(HttpServletResponse.SC_BAD_GATEWAY);
+        }
+        AsyncContext asyncContext = (AsyncContext)request.getAttribute(ASYNC_CONTEXT);
+        asyncContext.complete();
     }
 
     /**
