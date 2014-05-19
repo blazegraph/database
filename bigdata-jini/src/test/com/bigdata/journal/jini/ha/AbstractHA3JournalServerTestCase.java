@@ -95,6 +95,7 @@ import com.bigdata.quorum.QuorumClient;
 import com.bigdata.quorum.QuorumException;
 import com.bigdata.quorum.zk.ZKQuorumClient;
 import com.bigdata.quorum.zk.ZKQuorumImpl;
+import com.bigdata.rdf.sail.webapp.NanoSparqlServer;
 import com.bigdata.rdf.sail.webapp.client.HttpException;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
 import com.bigdata.service.jini.JiniClientConfig;
@@ -135,6 +136,7 @@ public abstract class AbstractHA3JournalServerTestCase extends
      */
     static class ServiceListener implements IServiceListener {
 
+        @SuppressWarnings("unused")
         private volatile HAGlue haGlue;
         private volatile ProcessHelper processHelper;
         private volatile boolean dead = false;
@@ -2226,7 +2228,7 @@ public abstract class AbstractHA3JournalServerTestCase extends
              * Used to override the port at which jetty sets up the http
              * connection.
              */
-            private final String TEST_JETTY_PORT = "jetty.port";
+            private final String TEST_JETTY_PORT = NanoSparqlServer.SystemProperties.JETTY_PORT;
 
             /**
              * The path in the local file system to the root of the web
@@ -2234,13 +2236,15 @@ public abstract class AbstractHA3JournalServerTestCase extends
              * code, but the webapp gets deployed to the serviceDir for this
              * test suite.
              */
-            private final String JETTY_RESOURCE_BASE = "jetty.resourceBase";
-            
+            private final String JETTY_RESOURCE_BASE = NanoSparqlServer.SystemProperties.JETTY_RESOURCE_BASE;
+
+            private final String JETTY_OVERRIDE_WEB_XML = NanoSparqlServer.SystemProperties.JETTY_OVERRIDE_WEB_XML;
+
             /**
              * Used to override the <code>jetty.dump.start</code> environment
              * property.
              */
-            private final String TEST_JETTY_DUMP_START = "jetty.dump.start";
+            private final String TEST_JETTY_DUMP_START = NanoSparqlServer.SystemProperties.JETTY_DUMP_START;
 
             /**
              * The absolute effective path of the service directory. This is
@@ -2289,6 +2293,9 @@ public abstract class AbstractHA3JournalServerTestCase extends
 
                 // Override the location of the webapp as deployed.
                 cmds.add("-D" + JETTY_RESOURCE_BASE + "=.");
+
+                // Override the location of the override-web.xml file as deployed.
+                cmds.add("-D" + JETTY_OVERRIDE_WEB_XML + "=./WEB-INF/override-web.xml");
 
                 // Override the jetty.dump.start.
                 cmds.add("-D" + TEST_JETTY_DUMP_START + "=" + jettyDumpStart);
