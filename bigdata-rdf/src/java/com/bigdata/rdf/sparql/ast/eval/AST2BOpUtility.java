@@ -2308,8 +2308,35 @@ public class AST2BOpUtility extends AST2BOpRTO {
         final JoinGroupNode subgroup = (JoinGroupNode) alpNode.subgroup();
     	
         // Convert the child join group.
-        final PipelineOp subquery = convertJoinGroup(null,
+        PipelineOp subquery = convertJoinGroup(null/*left*/,
                 subgroup, doneSet, ctx, false/* needsEndOp */);
+
+        if (ctx.isCluster()) {
+            
+            /**
+             * Note: This is necessary if the first operator in the query plan
+             * is a sharded join and we want it to run using a sharded index
+             * view. Without this, the operator will actually run against the
+             * global index view.
+             * <p>
+             * Note: There may be other ways to "fix" this. See the ticket for
+             * more information.
+             * 
+             * @see <a href="http://trac.bigdata.com/ticket/478" > Cluster does
+             *      not map input solution(s) across shards </a>
+             * @see <a href="http://trac.bigdata.com/ticket/942" > Property path
+             *      errors in scale-out </a>
+             */
+            
+            subquery = applyQueryHints(
+                    new StartOp(BOp.NOARGS, NV.asMap(new NV[] {//
+                                    new NV(Predicate.Annotations.BOP_ID, ctx
+                                            .nextId()),
+                                    new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
+                                            BOpEvaluationContext.CONTROLLER), })),
+                    alpNode, ctx);
+            
+        }
 
         final IVariableOrConstant<?> leftTerm = 
         		(IVariableOrConstant<?>) alpNode.left().getValueExpression();
