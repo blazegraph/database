@@ -191,6 +191,23 @@ public class NanoSparqlServer {
          */
         String JETTY_RESOURCE_BASE = "jetty.resourceBase";
 
+        /**
+         * The location of the <code>override-web.xml</code> resource. The
+         * default is given in <code>jetty.xml</code> and serves to locate the
+         * resource when deployed under an IDE. If not explicitly given, value
+         * of the environment variable is set by the same logic that sets the
+         * {@link #JETTY_RESOURCE_BASE} environment variable. This allows the
+         * <code>override-web.xml</code> resource to be found in its default
+         * location (which is the same directory / package as the
+         * <code>web.xml</code> file) while still preserving the ability to
+         * override the location of that resource explicitly by setting the
+         * environment variable before starting the server.
+         * 
+         * @see <a href="http://trac.bigdata.com/ticket/940" > ProxyServlet in
+         *      web.xml breaks tomcat WAR (HA LBS) </a>
+         */
+        String JETTY_OVERRIDE_WEB_XML = "jetty.overrideWebXml";
+
     }
 
     /**
@@ -439,10 +456,17 @@ public class NanoSparqlServer {
     public static void awaitServerStart(final Server server)
             throws InterruptedException, TimeoutException, Exception {
 
+//        Note: Does not appear to help.
+//        
+//        final WebAppContext wac = getWebApp(server);
+//
+//        if (wac == null)
+//            throw new Exception("WebApp is not available?");
+
         final long timeout = Long.parseLong(System.getProperty(
                 SystemProperties.JETTY_STARTUP_TIMEOUT,
                 SystemProperties.DEFAULT_JETTY_STARTUP_TIMEOUT));
-
+        
         boolean ok = false;
         final long begin = System.nanoTime();
         final long nanos = TimeUnit.SECONDS.toNanos(timeout);
@@ -453,7 +477,8 @@ public class NanoSparqlServer {
             server.start();
             // Await running.
             remaining = nanos - (System.nanoTime() - begin);
-            while (server.isStarting() && !server.isRunning() && remaining > 0) {
+            while (server.isStarting() && !server.isRunning()
+                   /* && !wac.isRunning() */ && remaining > 0) {
                 Thread.sleep(100/* ms */);
                 // remaining = nanos - (now - begin) [aka elapsed]
                 remaining = nanos - (System.nanoTime() - begin);
@@ -461,6 +486,8 @@ public class NanoSparqlServer {
             if (remaining < 0) {
                 throw new TimeoutException();
             }
+//            if (!wac.isRunning())
+//                throw new Exception("WebApp is not running?");
             ok = true;
         } finally {
             if (!ok) {
@@ -870,9 +897,18 @@ public class NanoSparqlServer {
                  * to jetty itself since it will interpret the jetty.xml file
                  * itself.
                  */
-                System.setProperty(SystemProperties.JETTY_RESOURCE_BASE,
-                        resourceBaseURL.toExternalForm());
+                final String tmp = resourceBaseURL.toExternalForm();
 
+                System.setProperty(SystemProperties.JETTY_RESOURCE_BASE,
+                        tmp);
+
+                final URL overrideWebXmlURL = new URL(tmp
+                        + (tmp.endsWith("/") ? "" : "/")
+                        + "WEB-INF/override-web.xml");
+
+                System.setProperty(SystemProperties.JETTY_OVERRIDE_WEB_XML,
+                        overrideWebXmlURL.toExternalForm());
+                
             }
 
         }
@@ -885,7 +921,9 @@ public class NanoSparqlServer {
                     + ", isClassPath="
                     + isClassPath
                     + ", jetty.resourceBase(effective)="
-                    + System.getProperty(SystemProperties.JETTY_RESOURCE_BASE));
+                    + System.getProperty(SystemProperties.JETTY_RESOURCE_BASE)
+                    + ", jetty.overrideWebXml(effective)="
+                    + System.getProperty(SystemProperties.JETTY_OVERRIDE_WEB_XML));
         
     }
     
