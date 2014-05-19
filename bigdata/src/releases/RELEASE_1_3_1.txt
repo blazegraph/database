@@ -130,6 +130,7 @@ Change log:
 - http://trac.bigdata.com/ticket/915   (DefaultAnalyzerFactory issues)
 - http://trac.bigdata.com/ticket/920   (Content negotiation orders accept header scores in reverse)
 - http://trac.bigdata.com/ticket/939   (NSS does not start from command line: bigdata-war/src not found.)
+- http://trac.bigdata.com/ticket/940   (ProxyServlet in web.xml breaks tomcat WAR (HA LBS)
 
 1.3.0:
 
