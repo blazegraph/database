@@ -259,4 +259,34 @@ public class TestUnions extends AbstractDataDrivenSPARQLTestCase {
         
     }    
 
+    /**
+     * This is DAWG sparql11-subquery-05. It fails in scale-out.
+     * 
+     * <pre>
+     * SELECT * 
+     * WHERE { 
+     *     {
+     *       SELECT ?s 
+     *       WHERE {?s ?p ?o}
+     *       LIMIT 1 
+     *     }
+     *     {?s ?p ?o} 
+     *     UNION 
+     *     {} 
+     * }
+     * </pre>
+     * 
+     * @throws Exception
+     */
+    public void test_union_ticket_944() throws Exception {
+        
+        new TestHelper(
+                "ticket_944", // testURI,
+                "ticket_944.rq",// queryFileURL
+                "ticket_944.trig",// dataFileURL
+                "ticket_944.srx"// resultFileURL
+                ).runTest();
+        
+    }
+    
 }

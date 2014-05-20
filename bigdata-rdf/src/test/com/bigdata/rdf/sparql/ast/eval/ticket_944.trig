@@ -1,0 +1,7 @@
+@prefix :  <http://example.org/> .
+
+<file:/tmp/sparql-1.1-evaluation5799/testcases-sparql-1.1/subquery/data-04.ttl>{
+:a1 :p2 "a1+p2" .
+:a0 :p1 "a0+p1" .
+:a0 :p0 "a0+p0" . 
+}
