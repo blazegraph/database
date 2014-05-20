@@ -464,8 +464,8 @@ public class BigdataRDFServletContextListener implements
             rdfContext = null;
             
         }
-        
-        if (txs != null && readLock != null) {
+
+        if (txs != null && readLock != null && readLock != -1L) {
 
             try {
             
