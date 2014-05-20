@@ -431,12 +431,23 @@ public class JiniCoreServicesConfiguration extends ServiceConfiguration {
 
             long remaining = nanos;
             
-            while (remaining > 0 && registrars.length < maxCount) {
+            while (registrars.length < maxCount) {
 
                 remaining = nanos - (System.nanoTime() - begin);
+
+                if (remaining <= 0) {
+
+                    // Note: Avoids negative timeout fo signal.wait().
+                    break;
+                    
+                }
                 
                 if (log.isDebugEnabled())
-                    log.debug("remaining: " + remaining);
+                    log.debug("timeout="
+                            + TimeUnit.NANOSECONDS.toMillis(timeout)
+                            + "ms, remaining: "
+                            + TimeUnit.NANOSECONDS.toMillis(remaining)
+                            + "ms, #registrars=" + registrars.length);
 
                 synchronized (signal) {
 
