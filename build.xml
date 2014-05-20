@@ -408,7 +408,7 @@ public class BuildInfo {
             encoding="utf-8"
             private="false" 
             >
-         <arg value="-J-Xmx1000m" />
+         <arg value="-J-Xmx2000m" />
          <arg value="-quiet" />
          <packageset dir="${bigdata.dir}/bigdata/src/java" />
          <packageset dir="${bigdata.dir}/bigdata/src/samples" />
@@ -917,7 +917,7 @@ ${postInstallMessage}</echo>
     <!--                                                    -->
     <target name="stage"
             description="stages resources (jar, config, policy, logging files) needed to package or execute the bigdata distribution."
-            depends="jar">
+            depends="jar, javadoc">
 
       <!-- Create staging directories -->
       <property name="dist.dir" location="${bigdata.dir}/dist/bigdata" />
@@ -933,6 +933,7 @@ ${postInstallMessage}</echo>
       <property name="dist.var.config.jini" location="${dist.var.config}/jini" />
       <property name="dist.var.jetty" location="${dist.var}/jetty" />
       <property name="dist.doc" location="${dist.dir}/doc" />
+      <property name="dist.doc.api" location="${dist.dir}/doc/api" />
       <property name="dist.doc.legal" location="${dist.dir}/doc/LEGAL" />
 
       <delete dir="${dist.dir}" quiet="true" />
@@ -947,6 +948,7 @@ ${postInstallMessage}</echo>
       <mkdir dir="${dist.var.config.logging}" />
       <mkdir dir="${dist.var.config.jini}" />
       <mkdir dir="${dist.doc}" />
+      <mkdir dir="${dist.doc.api}" />
       <mkdir dir="${dist.doc.legal}" />
       <mkdir dir="${dist.dir}/etc" />
       <mkdir dir="${dist.dir}/etc/init.d" />
@@ -1232,12 +1234,18 @@ ${postInstallMessage}</echo>
           </fileset>
         </copy>
 
-        <!-- Stage top-level license file and copyright NOTICE file. -->
+      <!-- Stage top-level license file and copyright NOTICE file. -->
       <copy toDir="${dist.doc}">
         <fileset file="${bigdata.dir}/LICENSE.txt"/>
         <fileset file="${bigdata.dir}/NOTICE"/>
       </copy>
       
+      <!-- Stage javadoc (iff generated). -->
+      <copy toDir="${dist.doc.api}" failonerror="false">
+        <fileset dir="${build.dir}/docs/api">
+        </fileset>
+      </copy>
+
       <!-- Stage license files for dependencies (LEGAL).  -->
       <copy toDir="${dist.doc.legal}" flatten="true">
         <fileset dir="${bigdata.dir}">
@@ -1245,11 +1253,11 @@ ${postInstallMessage}</echo>
         </fileset>
       </copy>
 
-        <!-- Stage README. -->
+      <!-- Stage README. -->
       <copy file="${src.resources}/HAJournal/README"
             todir="${dist.dir}/doc" />
 
-        <!-- Stage documentation from the wiki. -->
+      <!-- Stage documentation from the wiki. -->
       <get dest="${dist.doc}/HAJournalServer.html" ignoreerrors="true"
           src="http://wiki.bigdata.com/wiki/index.php/HAJournalServer?printable=yes"
          />
@@ -1299,10 +1307,11 @@ ${postInstallMessage}</echo>
     bigdata/var/jetty - the webapp.
     bigdata/var/jetty/jetty.xml - jetty server configuration.
     bigdata/var/jetty/bigdata/WEB-INF/web.xml - webapp configuration.
+    bigdata/doc - documentation
     bigdata/doc/LEGAL - license files for dependencies.
     bigdata/doc/LICENSE.txt - bigdata license file.
     bigdata/doc/NOTICE - copyright NOTICE files.
-    bigdata/doc/docs - javadoc (FIXME INSTALL JAVADOC, HA wiki page)
+    bigdata/doc/api - javadoc
     bigdata/etc/init.d/bigdataHA - HA services start/stop script.
     bigdata/etc/default/bigdataHA - HA services required config file.
     

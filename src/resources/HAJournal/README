@@ -1,5 +1,7 @@
 Bigdata Highly Available Replication Cluster
 
+*** See the HAJournalServer on the wiki for more information ***
+
 ========== INSTALL ==========
 
 0. The nodes MUST have synchronized clocks, both for logging and to
