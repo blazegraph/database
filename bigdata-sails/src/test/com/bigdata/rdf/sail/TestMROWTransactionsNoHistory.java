@@ -1,31 +1,6 @@
 package com.bigdata.rdf.sail;
 
-import java.util.Properties;
 import java.util.Random;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicReference;
-
-import org.openrdf.model.URI;
-import org.openrdf.model.impl.URIImpl;
-
-import com.bigdata.counters.CAT;
-import com.bigdata.journal.BufferMode;
-import com.bigdata.journal.ITx;
-import com.bigdata.journal.Journal;
-import com.bigdata.rdf.axioms.NoAxioms;
-import com.bigdata.rdf.sail.BigdataSail.Options;
-import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.rdf.store.BD;
-import com.bigdata.rdf.store.BigdataStatementIterator;
-import com.bigdata.rdf.vocab.NoVocabulary;
-import com.bigdata.service.AbstractTransactionService;
-import com.bigdata.util.InnerCause;
-import com.bigdata.util.PseudoRandom;
-import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
  * TestCase to test single writer/mutiple transaction committed readers with
@@ -49,10 +24,12 @@ public class TestMROWTransactionsNoHistory extends TestMROWTransactions {
 		super(arg0);
 	}
 
+	@Override
     protected void setUp() throws Exception {
         super.setUp();
     }
     
+    @Override
     protected void tearDown() throws Exception {
         super.tearDown();
     }
