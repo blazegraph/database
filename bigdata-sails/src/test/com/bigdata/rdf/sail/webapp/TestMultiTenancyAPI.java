@@ -304,7 +304,11 @@ public class TestMultiTenancyAPI<S extends IIndexManager> extends
          * The properties are mostly inherited from the default configuration,
          * but the namespace of the new data set is explicitly set for the
          * CREATE operation.
+         * 
+         * Note: The '/' character is reserved by zookeeper for a path separator.
+         * It can not appear in a bigdata namespace in scale-out.
          */
+//        final String namespace2 = "kb2-" + UUID.randomUUID() + "-&/<>-foo";
         final String namespace2 = "kb2-" + UUID.randomUUID() + "-&/<>-foo";
 
         doTestCreate(namespace2);
