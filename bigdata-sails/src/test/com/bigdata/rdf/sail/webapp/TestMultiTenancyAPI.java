@@ -309,7 +309,7 @@ public class TestMultiTenancyAPI<S extends IIndexManager> extends
          * It can not appear in a bigdata namespace in scale-out.
          */
 //        final String namespace2 = "kb2-" + UUID.randomUUID() + "-&/<>-foo";
-        final String namespace2 = "kb2-" + UUID.randomUUID() + "-&/<>-foo";
+        final String namespace2 = "kb2-" + UUID.randomUUID() + "-&<>-foo";
 
         doTestCreate(namespace2);
         
