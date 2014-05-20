@@ -70,7 +70,7 @@ public class TestNanoSparqlClient2<S extends IIndexManager> extends
     	final URI systap = new URIImpl("bd:/sytap");
     	// 
     	
-    	System.err.println(m_serviceURL);
+    	log.warn(m_serviceURL);
     	
     	final Graph ontology = new GraphImpl();
     	ontology.add(person, RDFS.SUBCLASSOF, entity);
