@@ -215,6 +215,16 @@ public final class StaticOptimizer {
 		}
 
 		/*
+		 * Always choose a ZERO cardinality tail first, regardless of ancestry.
+		 */
+		for (int i = 0; i < arity; i++) {
+		    if (cardinality(i) == 0) {
+		        preferredFirstTail = i;
+		        break;
+		    }
+		}
+		
+		/*
 		 * If there was no "run first" query hint, then go to the ancestry.
 		 */
 		if (preferredFirstTail == -1)
