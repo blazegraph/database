@@ -59,12 +59,12 @@ public class TestService794 extends AbstractProtocolTest {
 	 * @param args
 	 * @throws IOException
 	 */
-	private void abstactAskService(String ... args) throws IOException {
+	private void abstactAskService(final String ... args) throws IOException {
 
 		setMethodisPostUrlEncodedData();
 		serviceRequest("update","PREFIX eg: <http://example.com/a#> INSERT { eg:a eg:p \"rs123\" ; eg:q 123, 100 } WHERE {}");
 		
-		StringBuilder bld = new StringBuilder();
+		final StringBuilder bld = new StringBuilder();
 		// Set the base URI to be our sparql end point, for re-entrant queries,
 		// using the idiom SERVICE <>
 		bld.append("base <");
@@ -75,9 +75,9 @@ public class TestService794 extends AbstractProtocolTest {
 			bld.append(arg);
 		}
 		
-		System.err.println(bld.toString());
-		String result = serviceRequest("query",bld.toString());
-		System.err.println(result);
+		if(log.isInfoEnabled()) log.info(bld.toString());
+		final String result = serviceRequest("query",bld.toString());
+		if(log.isInfoEnabled()) log.info(result);
 		assertTrue(result.contains("true"));
 		
 	}
