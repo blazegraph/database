@@ -16,7 +16,7 @@ http://sourceforge.net/projects/bigdata/
 
 You can checkout this release from:
 
-https://svn.code.sf.net/p/bigdata/code/branches/BIGDATA_RELEASE_1_3_1
+https://svn.code.sf.net/p/bigdata/code/tags/BIGDATA_RELEASE_1_3_1
 
 New features:
 
