@@ -1,0 +1,15 @@
+clientPort=<%= node['zookeeper'][:zoocfg][:clientPort] %>
+dataDir=<%= node['zookeeper'][:zoocfg][:dataDir] %>
+dataLogDir=<%= node['zookeeper'][:zoocfg][:dataDir] %>
+# The number of milliseconds of each tick
+tickTime=2000
+# The number of ticks that the initial
+# synchronization phase can take
+initLimit=10
+# The number of ticks that can pass between
+# sending a request and getting an acknowledgement
+syncLimit=5
+# the ensemble
+server.1=<%= node['bigdata'][:zk_server1] %>:2888:3888
+server.2=<%= node['bigdata'][:zk_server2] %>:2888:3888
+server.3=<%= node['bigdata'][:zk_server3] %>:2888:3888
