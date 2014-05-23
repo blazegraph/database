@@ -1272,7 +1272,7 @@ ${postInstallMessage}</echo>
       <chmod file="${dist.bin}/bigdata" perm="755" />
       <copy file="${deploy.nss}/bin/bigdataNSS"
             todir="${dist.bin}" />
-      <chmod file="${dist.bin}/bigdata" perm="755" />
+      <chmod file="${dist.bin}/bigdataNSS" perm="755" />
       <copy file="${deploy.nss}/bin/startNSS"
             todir="${dist.bin}" />
       <chmod file="${dist.bin}/startNSS" perm="755" />
