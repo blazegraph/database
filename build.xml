@@ -935,6 +935,9 @@ ${postInstallMessage}</echo>
       <property name="dist.doc" location="${dist.dir}/doc" />
       <property name="dist.doc.api" location="${dist.dir}/doc/api" />
       <property name="dist.doc.legal" location="${dist.dir}/doc/LEGAL" />
+    	<!-- deployment directories having stuff to be staged. -->
+      <property name="deploy" location="src/resources/deployment"/>
+      <property name="deploy.nss" location="${deploy}/nss"/>
 
       <delete dir="${dist.dir}" quiet="true" />
       <mkdir dir="${dist.dir}" />
@@ -966,7 +969,7 @@ ${postInstallMessage}</echo>
       <property name="bigdata-jini.lib" location="${bigdata.dir}/bigdata-jini/lib/jini/lib" />
       <property name="bigdata-rdf.lib" location="${bigdata.dir}/bigdata-rdf/lib" />
       <property name="bigdata-sails.lib" location="${bigdata.dir}/bigdata-sails/lib" />
-        <property name="bigdata-blueprints.lib" location="${bigdata.dir}/bigdata-blueprints/lib" />
+      <property name="bigdata-blueprints.lib" location="${bigdata.dir}/bigdata-blueprints/lib" />
       <property name="bigdata-gom.lib" location="${bigdata.dir}/bigdata-gom/lib" />
       <property name="bigdata-jetty.lib" location="${bigdata.dir}/bigdata/lib/jetty" />
       <property name="bigdata-http.lib" location="${bigdata.dir}/bigdata-sails/lib/httpcomponents" />
@@ -1265,6 +1268,30 @@ ${postInstallMessage}</echo>
           src="http://wiki.bigdata.com/wiki/index.php/NanoSparqlServer?printable=yes"
          />
 
+      <!-- Stage files specific to NSS deployments provided by Brew and Chef. -->
+      <chmod file="${dist.bin}/bigdata" perm="755" />
+      <copy file="${deploy.nss}/bin/bigdataNSS"
+            todir="${dist.bin}" />
+      <chmod file="${dist.bin}/bigdata" perm="755" />
+      <copy file="${deploy.nss}/bin/startNSS"
+            todir="${dist.bin}" />
+      <chmod file="${dist.bin}/startNSS" perm="755" />
+<!-- 
+TODO These lines were removed per #951 (Deployments branch merge). They
+break the other deployment models by introducing metavariables for regex
+substitutions.
+
+ bigdata-war/src/WEB-INF/RWStore.properties (staged into bigdata/var/jetty/bigdata/WEB-INF/RWStore.properties)
+ 
+ and
+ 
+ bigdata/src/resources/log4j.properties (staged into dist/var/config/logging/log4j.properties).
+    	<copy file="${deploy.nss}/WEB-INF/RWStore.properties"
+            todir="${dist.var.jetty}/WEB-INF" overwrite="true" />
+      <copy file="${deploy.nss}/WEB-INF/classes/log4j.properties"
+            todir="${dist.var.jetty}/WEB-INF/classes" overwrite="true" />
+-->
+
     </target>
 
     <!--                                                    -->
@@ -1344,8 +1371,41 @@ ${postInstallMessage}</echo>
 
     </target>
 
+    <target name="package-nss-brew" depends="clean, stage"
+           description="Create compressed tar file for Jetty based deployment via Brew and Chef installers.">
 
-    <!-- FIXME DEBUG and add 'depends="javadoc, stage" (should stage stage javadoc?)' -->
+     <tar destfile="${bigdata.dir}/REL-NSS.${version}.tgz"
+          compression="gzip">
+
+       <tarfileset dir="${bigdata.dir}/dist">
+         <include name="bigdata/doc/**" />
+         <exclude name="bigdata/doc/api/**" />
+         <exclude name="bigdata/doc/HAJournalServer.html" />
+         <include name="bigdata/lib/**" />
+         <exclude name="bigdata/lib/bigdata-ganglia.jar" />
+         <exclude name="bigdata/lib/browser.jar" />
+         <exclude name="bigdata/lib/reggie.jar" />
+         <exclude name="bigdata/lib/zookeeper.jar" />
+         <exclude name="bigdata/lib/jsk-*.jar" />
+         <exclude name="bigdata/lib-dl" />
+         <exclude name="bigdata/lib-ext" />
+         <include name="bigdata/var/jetty/**" />
+         <include name="bigdata/var/config/logging/logging.properties" />
+         <exclude name="bigdata/var/jetty/html/new.html" />
+         <exclude name="bigdata/var/jetty/html/old.html" />
+       </tarfileset>
+
+       <!-- Add scripts separately, making them executable -->
+
+       <tarfileset dir="${bigdata.dir}/dist" filemode="755">
+         <include name="bigdata/bin/bigdataNSS" />
+         <include name="bigdata/bin/startNSS" />
+       </tarfileset>
+     </tar>
+
+   </target>
+
+	<!-- FIXME DEBUG and add 'depends="javadoc, stage" (should stage stage javadoc?)' -->
     <!-- Note: can require 'rpm' and 'rpm-build. -->
     <!-- TODO: We do not need both this and "deploy-artifact". -->
     <target name="rpm" depends="prepare" description="Build RPM installer.">

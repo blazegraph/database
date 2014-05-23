@@ -29,46 +29,46 @@
       <Set name="detailedDump">false</Set>
     </Get>
 
-	<!-- =========================================================== -->
-	<!-- Get the platform mbean server                               -->
-	<!-- =========================================================== -->
-	<Call id="MBeanServer" class="java.lang.management.ManagementFactory"
-	  name="getPlatformMBeanServer" />
-	
-	<!-- =========================================================== -->
-	<!-- Initialize the Jetty MBean container                        -->
-	<!-- =========================================================== -->
-	<!-- Note: This breaks CI if it is enabled
-	<Call name="addBean">
-	  <Arg>
-	    <New id="MBeanContainer" class="org.eclipse.jetty.jmx.MBeanContainer">
-	      <Arg>
-	        <Ref refid="MBeanServer" />
-	      </Arg>
-	    </New>
-	  </Arg>
-	</Call>-->
-	
-	<!-- Add the static log to the MBean server. 
-	<Call name="addBean">
-	  <Arg>
-	    <New class="org.eclipse.jetty.util.log.Log" />
-	  </Arg>
-	</Call>-->
+   <!-- =========================================================== -->
+   <!-- Get the platform mbean server                               -->
+   <!-- =========================================================== -->
+   <Call id="MBeanServer" class="java.lang.management.ManagementFactory"
+     name="getPlatformMBeanServer" />
+   
+   <!-- =========================================================== -->
+   <!-- Initialize the Jetty MBean container                        -->
+   <!-- =========================================================== -->
+   <!-- Note: This breaks CI if it is enabled
+   <Call name="addBean">
+     <Arg>
+       <New id="MBeanContainer" class="org.eclipse.jetty.jmx.MBeanContainer">
+         <Arg>
+           <Ref refid="MBeanServer" />
+         </Arg>
+       </New>
+     </Arg>
+   </Call>-->
+   
+   <!-- Add the static log to the MBean server. 
+   <Call name="addBean">
+     <Arg>
+       <New class="org.eclipse.jetty.util.log.Log" />
+     </Arg>
+   </Call>-->
 
-	<!-- For remote MBean access (optional)  
-	<New id="ConnectorServer" class="org.eclipse.jetty.jmx.ConnectorServer">
-	  <Arg>
-	    <New class="javax.management.remote.JMXServiceURL">
-	      <Arg type="java.lang.String">rmi</Arg>
-	      <Arg type="java.lang.String" />
-	      <Arg type="java.lang.Integer"><SystemProperty name="jetty.jmxrmiport" default="1090"/></Arg>
-	      <Arg type="java.lang.String">/jndi/rmi://<SystemProperty name="jetty.jmxrmihost" default="localhost"/>:<SystemProperty name="jetty.jmxrmiport" default="1099"/>/jmxrmi</Arg>
-	    </New>
-	  </Arg>
-	  <Arg>org.eclipse.jetty.jmx:name=rmiconnectorserver</Arg>
-	  <Call name="start" />
-	</New>-->
+   <!-- For remote MBean access (optional)  
+   <New id="ConnectorServer" class="org.eclipse.jetty.jmx.ConnectorServer">
+     <Arg>
+       <New class="javax.management.remote.JMXServiceURL">
+         <Arg type="java.lang.String">rmi</Arg>
+         <Arg type="java.lang.String" />
+         <Arg type="java.lang.Integer"><Property name="jetty.jmxrmiport" default="1090"/></Arg>
+         <Arg type="java.lang.String">/jndi/rmi://<Property name="jetty.jmxrmihost" default="localhost"/>:<Property name="jetty.jmxrmiport" default="1099"/>/jmxrmi</Arg>
+       </New>
+     </Arg>
+     <Arg>org.eclipse.jetty.jmx:name=rmiconnectorserver</Arg>
+     <Call name="start" />
+   </New>-->
  
     <!-- =========================================================== -->
     <!-- Http Configuration.                                         -->
@@ -97,25 +97,25 @@
     </New>
     
     <!-- Configure the HTTP endpoint.                                -->
- 	 <Call name="addConnector">
-	    <Arg>
-	      <New class="org.eclipse.jetty.server.ServerConnector">
-	        <Arg name="server"><Ref refid="Server" /></Arg>
-	        <Arg name="factories">
-	          <Array type="org.eclipse.jetty.server.ConnectionFactory">
-	            <Item>
-	              <New class="org.eclipse.jetty.server.HttpConnectionFactory">
-	                <Arg name="config"><Ref refid="httpConfig" /></Arg>
-	              </New>
-	            </Item>
-	          </Array>
-	        </Arg>
-	        <Set name="host"><SystemProperty name="jetty.host" /></Set>
-	        <Set name="port"><SystemProperty name="jetty.port" default="8080" /></Set>
-	        <Set name="idleTimeout"><SystemProperty name="http.timeout" default="30000"/></Set>
-	      </New>
-	    </Arg>
-	  </Call>
+    <Call name="addConnector">
+       <Arg>
+         <New class="org.eclipse.jetty.server.ServerConnector">
+           <Arg name="server"><Ref refid="Server" /></Arg>
+           <Arg name="factories">
+             <Array type="org.eclipse.jetty.server.ConnectionFactory">
+               <Item>
+                 <New class="org.eclipse.jetty.server.HttpConnectionFactory">
+                   <Arg name="config"><Ref refid="httpConfig" /></Arg>
+                 </New>
+               </Item>
+             </Array>
+           </Arg>
+           <Set name="host"><Property name="jetty.host" /></Set>
+           <Set name="port"><Property name="jetty.port" default="8080" /></Set>
+           <Set name="idleTimeout"><Property name="http.timeout" default="30000"/></Set>
+         </New>
+       </Arg>
+     </Call>
 
     <!-- =========================================================== -->
     <!-- Set handler Collection Structure                            --> 
@@ -142,12 +142,12 @@
                     <Arg>
                         <!-- This is the bigdata web application. -->
                         <New id="WebAppContext" class="org.eclipse.jetty.webapp.WebAppContext">
-                         <Set name="war"><SystemProperty name="jetty.resourceBase" default="bigdata-war/src"/></Set>
+                         <Set name="war"><Property name="jetty.resourceBase" default="bigdata-war/src"/></Set>
                          <Set name="contextPath">/bigdata</Set>
                          <Set name="descriptor">WEB-INF/web.xml</Set>
                          <Set name="parentLoaderPriority">true</Set>
                          <Set name="extractWAR">false</Set>
-                         <Set name="overrideDescriptor"><SystemProperty name="jetty.overrideWebXml" default="bigdata-war/src/WEB-INF/override-web.xml"/></Set>
+                         <Set name="overrideDescriptor"><Property name="jetty.overrideWebXml" default="bigdata-war/src/WEB-INF/override-web.xml"/></Set>
                         </New>
                     </Arg>
                   </Call>
