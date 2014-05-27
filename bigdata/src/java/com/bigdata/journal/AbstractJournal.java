@@ -1752,6 +1752,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
     }
 
+    @Override
 	final public File getFile() {
 
 		final IBufferStrategy tmp = getBufferStrategy();
@@ -1915,6 +1916,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 	 * @exception IllegalStateException
 	 *                if the journal is open.
 	 */
+	@Override
 	public void deleteResources() {
 
 		if (isOpen())
@@ -2307,12 +2309,14 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
 	}
 
+    @Override
 	final public UUID getUUID() {
 
 		return journalMetadata.get().getUUID();
 
 	}
 
+	@Override
 	final public IResourceMetadata getResourceMetadata() {
 
 		return journalMetadata.get();
