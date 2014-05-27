@@ -85,6 +85,7 @@ import com.bigdata.jini.start.config.ZookeeperClientConfig;
 import com.bigdata.jini.start.process.ProcessHelper;
 import com.bigdata.jini.util.ConfigMath;
 import com.bigdata.jini.util.JiniUtil;
+import com.bigdata.journal.CommitCounterUtility;
 import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.StoreState;
 import com.bigdata.journal.jini.ha.HAJournalTest.HAGlueTest;
@@ -1529,6 +1530,7 @@ public abstract class AbstractHA3JournalServerTestCase extends
         }
 
         // Quorum that can be used to monitor the distributed quorum state.
+        @SuppressWarnings({ "unchecked", "rawtypes" })
         final Quorum<HAGlue, QuorumClient<HAGlue>> quorum = (Quorum) new ZKQuorumImpl<HAGlue, ZKQuorumClient<HAGlue>>(
                 replicationFactor);//, zka, acl);
 
@@ -3154,6 +3156,7 @@ public abstract class AbstractHA3JournalServerTestCase extends
         awaitNSSAndHAReady(haGlue);
         // Wait until self-reports RunMet.
         assertCondition(new Runnable() {
+            @Override
             public void run() {
                 try {
                     final String extendedRunState = haGlue.getExtendedRunState();
@@ -3169,6 +3172,22 @@ public abstract class AbstractHA3JournalServerTestCase extends
     }
 
     /**
+     * Assert that a snapshot exists for the specific commit point.
+     * 
+     * @param snapshotDir
+     *            The snapshot directory for the service.
+     * @param commitCounter
+     *            The commit point.
+     */
+    protected void assertSnapshotExists(final File snapshotDir,
+            long commitCounter) {
+
+        assertTrue(CommitCounterUtility.getCommitCounterFile(snapshotDir,
+                commitCounter, SnapshotManager.SNAPSHOT_EXT).exists());
+        
+    }
+    
+    /**
      * Await the specified snapshot.
      * 
      * @param server
@@ -3183,6 +3202,7 @@ public abstract class AbstractHA3JournalServerTestCase extends
 
         // Wait until self-reports RunMet.
         assertCondition(new Runnable() {
+            @Override
             public void run() {
                 try {
 

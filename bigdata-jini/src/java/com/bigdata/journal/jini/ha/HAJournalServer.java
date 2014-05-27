@@ -383,6 +383,19 @@ public class HAJournalServer extends AbstractServer {
         String DEFAULT_SNAPSHOT_DIR = "snapshot";
 
         /**
+         * The number of threads that will be used for a parallel scan of the
+         * files in the {@link #HA_LOG_DIR} and {@link #SNAPSHOT_DIR} in order
+         * to accelerate the service start. The minimum is ONE (1). The default
+         * is {@value #DEFAULT_STARTUP_THREADS}.
+         * 
+         * @see <a href="http://trac.bigdata.com/ticket/775" > HAJournal start()
+         *      (optimization) </a>
+         */
+        String STARTUP_THREADS = "startupThreads";
+        
+        int DEFAULT_STARTUP_THREADS = 20;
+
+        /**
          * The policy that specifies when a new snapshot will be taken. The
          * decision to take a snapshot is a local decision and the snapshot is
          * assumed to be written to local disk. However, offsite replication of
@@ -871,6 +884,36 @@ public class HAJournalServer extends AbstractServer {
      * {@inheritDoc}
      * <p>
      * Note: called from {@link AbstractServer#run()}
+     * 
+     * FIXME We should be able to start the NSS while still reading the HALog
+     * files from the disk. The action to start the {@link HAQuorumService}
+     * should await a {@link Future} for the journal start. Thus, the
+     * {@link HAJournal} start needs to be turned into a {@link Callable} or
+     * {@link Runnable}.
+     * <p>
+     * In fact, the journal open is very fast. The slow part is the building an
+     * index over the HALogs and (to a lesser extent) over the snapshots. Those
+     * index builds can run in parallel, but we need to have a critical section
+     * in which we check some necessary conditions, especially whether the last
+     * HALog is valid.
+     * <p>
+     * We need to push a start() computation into both the {@link HALogNexus}
+     * and the {@link SnapshotManager}. This could be done with an interface
+     * that is also shared by the {@link HAJournal}. The interface could provide
+     * some reporting on the startup process, but most critical is that it
+     * provides a {@link Future} for evaluating that process.
+     * <p>
+     * The {@link Future} can evaluate to the outcome of that startup procedure.
+     * <p>
+     * The startup procedure should use multiple threads (or async IO) to reduce
+     * the startup latency. It could use the executor on the journal for this.
+     * <p>
+     * We could parallelize the HALog and snapshot startup then enter a critical
+     * section in which we validate the consistency of those resources with
+     * respect to the HAJournal's current root block.
+     * 
+     * @see <a href="http://trac.bigdata.com/ticket/775" > HAJournal start()
+     *      (optimization) </a>
      */
     @Override
     protected void startUpHook() { 

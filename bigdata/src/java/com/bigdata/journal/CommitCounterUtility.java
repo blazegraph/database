@@ -37,6 +37,17 @@ import com.bigdata.journal.jini.ha.SnapshotManager;
 
 /**
  * Utility class for operations on files that are named using a commit counter.
+ * <p>
+ * The commit counter based files are arranged in a heirarchial directory
+ * structure with 3 digits per directory and 7 directory levels. These levels
+ * are labeled with depths <code>[0..6]</code>. The root directory is at depth
+ * ZERO (0). Each directory contains up to <code>1000</code> children. The
+ * children in the non-leaf directories are subdirectories labeled
+ * <code>0..999</code>. The leaf directories are at depth SIX (6). Leaf
+ * directories contain files. Each file in a leaf directory is labeled with a
+ * <code>21</code> digit base name and some purpose specific file extension.
+ * Each such file has data for the specific commit point encoded by the basename
+ * of the file.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
@@ -44,6 +55,89 @@ public class CommitCounterUtility {
 
     private static final Logger log = Logger
             .getLogger(CommitCounterUtility.class);
+    
+    /**
+     * The number of base-10 digits per directory level. This allows children
+     * having labels <code>000...999</code>. Thus there are <code>1000</code>
+     * children per directory.
+     */
+    private static final int DIGITS_PER_DIR = 3;
+    
+    /**  The number of files per directory. */
+    private static final int FILES_PER_DIR = 1000;
+    
+    /** The depth of the root directory. */
+    private static final int ROOT_DIR_DEPTH = 0;
+    
+    /** The depth of a leaf directory. */
+    private static final int LEAF_DIR_DEPTH = 6;
+    
+    /**
+     * The #of digits (21) in the base file name for a commit counter as
+     * formatted by {@link #getCommitCounterStr(long)}.
+     * <p>
+     * Note: 21 := (leafDirDepth+1) * digitsPerDir
+     */
+    private static final int BASENAME_DIGITS = 21;
+
+    /**
+     * The {@link Formatter} string that is used to generate the base name of
+     * the files in the leaf directories. This string represents the commit
+     * counter value with leading zeros. The leading zeros are relied upon to
+     * impose an ordering over the base names of the files using a sort.
+     */
+    private static final String FORMAT_STR = "%0" + BASENAME_DIGITS + "d";
+    
+    /**
+     * The #of digits (21) in the base file name for a commit counter as
+     * formatted by {@link #getCommitCounterStr(long)}.
+     * <p>
+     * Note: 21 := (leafDirDepth+1) * digitsPerDir
+     */
+    public static int getBasenameDigits() {
+
+        return BASENAME_DIGITS;
+
+    }
+
+    /**
+     * The number of base-10 digits per directory level (
+     * {@value #DIGITS_PER_DIR}). This allows children having labels
+     * <code>000...999</code>. Thus there are <code>1000</code> children per
+     * directory.
+     */
+    public static int getDigitsPerDirectory() {
+
+        return DIGITS_PER_DIR;
+
+    }
+
+    /**
+     * The number of files per directory ({@value #FILES_PER_DIR}).
+     */
+    public static int getFilesPerDirectory() {
+
+        return FILES_PER_DIR;
+        
+    }
+    
+    /**
+     * The depth of the root directory ({@value #ROOT_DIR_DEPTH}).
+     */
+    public static int getRootDirectoryDepth() {
+
+        return ROOT_DIR_DEPTH;
+        
+    }
+    
+    /**
+     * The depth of a leaf directory ({@value #LEAF_DIR_DEPTH}).
+     */
+    public static int getLeafDirectoryDepth() {
+
+        return LEAF_DIR_DEPTH;
+        
+    }
     
     /**
      * Return the name of the {@link File} associated with the commitCounter.
@@ -79,15 +173,11 @@ public class CommitCounterUtility {
          * Now figure out the recursive directory name.
          */
         File t = dir;
+        
+        for (int i = 0; i < (BASENAME_DIGITS - DIGITS_PER_DIR); i += DIGITS_PER_DIR) {
 
-        if (true) {
+            t = new File(t, basename.substring(i, i + DIGITS_PER_DIR));
 
-            for (int i = 0; i < (21 - 3); i += 3) {
-
-                t = new File(t, basename.substring(i, i + 3));
-
-            }
-            
         }
 
         final File file = new File(t, basename + ext);
@@ -108,11 +198,11 @@ public class CommitCounterUtility {
      */
     public static String getCommitCounterStr(final long commitCounter) {
 
-        final StringBuilder sb = new StringBuilder(21);
+        final StringBuilder sb = new StringBuilder(BASENAME_DIGITS);
 
         final Formatter f = new Formatter(sb);
 
-        f.format("%021d", commitCounter);
+        f.format(FORMAT_STR, commitCounter);
         f.flush();
         f.close();
 

@@ -36,10 +36,13 @@ import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.security.DigestException;
 import java.security.MessageDigest;
+import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
+import java.util.concurrent.FutureTask;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.zip.GZIPInputStream;
@@ -73,17 +76,19 @@ import com.bigdata.journal.jini.ha.SnapshotIndex.SnapshotRecord;
 import com.bigdata.quorum.Quorum;
 import com.bigdata.quorum.QuorumException;
 import com.bigdata.rawstore.Bytes;
+import com.bigdata.service.IServiceInit;
 import com.bigdata.striterator.Resolver;
 import com.bigdata.striterator.Striterator;
 import com.bigdata.util.ChecksumError;
 import com.bigdata.util.ChecksumUtility;
+import com.bigdata.util.concurrent.LatchedExecutor;
 
 /**
  * Class to manage the snapshot files.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
-public class SnapshotManager {
+public class SnapshotManager implements IServiceInit<Void> {
 
     private static final Logger log = Logger.getLogger(SnapshotManager.class);
 
@@ -183,6 +188,11 @@ public class SnapshotManager {
      * @see HAJournalServer.ConfigurationOptions#RESTORE_POLICY
      */
     private final IRestorePolicy restorePolicy;
+    
+    /**
+     * @see HAJournalServer.ConfigurationOptions#STARTUP_THREADS
+     */
+    private final int startupThreads;
     
     /**
      * An in memory index over the last commit time of each snapshot. This is
@@ -299,26 +309,232 @@ public class SnapshotManager {
                 IRestorePolicy.class, //
                 HAJournalServer.ConfigurationOptions.DEFAULT_RESTORE_POLICY);
 
+        {
+
+            startupThreads = (Integer) config
+                    .getEntry(
+                            HAJournalServer.ConfigurationOptions.COMPONENT,
+                            HAJournalServer.ConfigurationOptions.STARTUP_THREADS,
+                            Integer.TYPE,
+                            HAJournalServer.ConfigurationOptions.DEFAULT_STARTUP_THREADS);
+
+            if (startupThreads <= 0) {
+                throw new ConfigurationException(
+                        HAJournalServer.ConfigurationOptions.STARTUP_THREADS
+                                + "=" + startupThreads + " : must be GT ZERO");
+            }
+
+        }
+        
         snapshotIndex = SnapshotIndex.createTransient();
 
-        /*
-         * Delete any temporary files that were left lying around in the
-         * snapshot directory.
-         */
-        CommitCounterUtility.recursiveDelete(false/* errorIfDeleteFails */,
-                getSnapshotDir(), TEMP_FILE_FILTER);
-
-        // Make sure the snapshot directory exists.
-        ensureSnapshotDirExists();
-        
-        // Populate the snapshotIndex from the snapshotDir.
-        populateIndexRecursive(getSnapshotDir(), SNAPSHOT_FILTER);
-
-        // Initialize the snapshot policy.  It can self-schedule.
-        snapshotPolicy.init(journal);
-        
     }
 
+    @Override
+    public Callable<Void> init() {
+        
+        return new InitTask();
+
+    }
+
+    /**
+     * Task that is used to initialize the {@link SnapshotManager}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     */
+    private class InitTask implements Callable<Void> {
+
+        @Override
+        public Void call() throws Exception {
+
+            lock.lock();
+            
+            try {
+            
+                doRunWithLock();
+                
+                // Done.
+                return (Void) null;
+                
+            } finally {
+                
+                lock.unlock();
+                
+            }
+            
+        }
+
+        private void doRunWithLock() throws IOException, InterruptedException,
+                ExecutionException {
+
+            if (log.isInfoEnabled())
+                log.info("Starting cleanup.");
+
+            /*
+             * Delete any temporary files that were left lying around in the
+             * snapshot directory.
+             * 
+             * TODO This may be relatively lengthy. It would be better to
+             * combine this with the scan in which we read the root blocks and
+             * index the snapshots. However, this will require another refactor
+             * of the parallel scan logic. For now, I am merely reporting out
+             * the times for these different scans so I can get a better sense
+             * of the latencies involved.
+             */
+            CommitCounterUtility.recursiveDelete(false/* errorIfDeleteFails */,
+                    getSnapshotDir(), TEMP_FILE_FILTER);
+
+            // Make sure the snapshot directory exists.
+            ensureSnapshotDirExists();
+
+            if (log.isInfoEnabled())
+                log.info("Starting scan.");
+
+            final LatchedExecutor executor = new LatchedExecutor(
+                    journal.getExecutorService(), startupThreads);
+
+            // Populate the snapshotIndex from the snapshotDir.
+            populateIndexRecursive(//
+                    executor,//
+                    getSnapshotDir(), //
+                    SNAPSHOT_FILTER, //
+                    0 // depth@root
+            );
+
+            if (log.isInfoEnabled())
+                log.info("Starting policy.");
+
+            // Initialize the snapshot policy. It can self-schedule.
+            snapshotPolicy.init(journal);
+
+            if (log.isInfoEnabled())
+                log.info("Done.");
+
+        }
+
+        /**
+         * Scans the {@link #snapshotDir} and populates the {@link #snapshotIndex}
+         * from the root blocks in snapshot files found in that directory.
+         * 
+         * @throws IOException
+         * @throws ExecutionException
+         * @throws InterruptedException
+         */
+        private void populateIndexRecursive(final LatchedExecutor executor,
+                final File f, final FileFilter fileFilter, final int depth)
+                throws IOException, InterruptedException, ExecutionException {
+
+            if (depth == CommitCounterUtility.getLeafDirectoryDepth()) {
+
+                /*
+                 * Leaf directory.
+                 */
+                
+                final File[] children = f.listFiles(fileFilter);
+
+                /*
+                 * Setup tasks for parallel threads to read the commit record from
+                 * each file.
+                 */
+                final List<FutureTask<SnapshotRecord>> futures = new ArrayList<FutureTask<SnapshotRecord>>(
+                        children.length);
+
+                for (int i = 0; i < children.length; i++) {
+
+                    final File child = children[i];
+
+                    final FutureTask<SnapshotRecord> ft = new FutureTask<SnapshotRecord>(
+
+                    new Callable<SnapshotRecord>() {
+
+                        @Override
+                        public SnapshotRecord call() throws Exception {
+
+                            return getSnapshotRecord(child);
+
+                        }
+
+                    });
+
+                    futures.add(ft);
+
+                }
+
+                try {
+
+                    /*
+                     * Schedule all futures.
+                     */
+                    for (FutureTask<SnapshotRecord> ft : futures) {
+
+                        executor.execute(ft);
+
+                    }
+                    
+                    /*
+                     * Await futures, obtaining snapshot records for the current
+                     * leaf directory.
+                     */
+                    final List<SnapshotRecord> records = new ArrayList<SnapshotRecord>(
+                            children.length);
+
+                    for (int i = 0; i < children.length; i++) {
+
+                        final Future<SnapshotRecord> ft = futures.get(i);
+
+                        final SnapshotRecord r = ft.get();
+
+                        records.add(r);
+
+                    }
+
+                    // Add all records in the caller's thread.
+                    for (SnapshotRecord r : records) {
+
+                        snapshotIndex.add(r);
+
+                    }
+
+                } finally {
+
+                    /*
+                     * Ensure tasks are terminated.
+                     */
+                    
+                    for (Future<SnapshotRecord> ft : futures) {
+
+                        ft.cancel(true/* mayInterruptIfRunning */);
+
+                    }
+                    
+                }
+                
+            } else if (f.isDirectory()) {
+
+                /*
+                 * Sequential recursion into a child directory.
+                 */
+                
+                final File[] children = f.listFiles(fileFilter);
+
+                for (int i = 0; i < children.length; i++) {
+
+                    final File child = children[i];
+
+                    populateIndexRecursive(executor, child, fileFilter, depth + 1);
+
+                }
+
+            } else {
+
+                log.warn("Ignoring file in non-leaf directory: " + f);
+
+            }
+
+        }
+
+    }
+    
     private void ensureSnapshotDirExists() throws IOException {
 
         if (!snapshotDir.exists()) {
@@ -327,33 +543,6 @@ public class SnapshotManager {
             if (!snapshotDir.mkdirs())
                 throw new IOException("Could not create directory: "
                         + snapshotDir);
-
-        }
-
-    }
-    
-    /**
-     * Scans the {@link #snapshotDir} and populates the {@link #snapshotIndex}
-     * from the root blocks in snapshot files found in that directory.
-     * 
-     * @throws IOException 
-     */
-    private void populateIndexRecursive(final File f,
-            final FileFilter fileFilter) throws IOException {
-
-        if (f.isDirectory()) {
-
-            final File[] children = f.listFiles(fileFilter);
-
-            for (int i = 0; i < children.length; i++) {
-
-                populateIndexRecursive(children[i], fileFilter);
-
-            }
-
-        } else {
-
-            addSnapshot(f);
 
         }
 
@@ -434,6 +623,25 @@ public class SnapshotManager {
      *             if the file can not be read.
      * @throws ChecksumError
      *             if there is a checksum problem with the root blocks.
+     */
+    private void addSnapshot(final File file) throws IOException {
+
+        snapshotIndex.add(getSnapshotRecord(file));
+
+    }
+
+    /**
+     * Create a {@link SnapshotRecord} from a file.
+     * 
+     * @param file
+     *            The snapshot file.
+     * 
+     * @throws IllegalArgumentException
+     *             if argument is <code>null</code>.
+     * @throws IOException
+     *             if the file can not be read.
+     * @throws ChecksumError
+     *             if there is a checksum problem with the root blocks.
      * 
      *             TODO If the root blocks are bad, then this will throw an
      *             IOException and that will prevent the startup of the
@@ -449,8 +657,8 @@ public class SnapshotManager {
      *             with that HALog file unless it also happens to correspond to
      *             a snapshot.
      */
-    private void addSnapshot(final File file) throws IOException {
-
+    private SnapshotRecord getSnapshotRecord(final File file) throws IOException {
+        
         if (file == null)
             throw new IllegalArgumentException();
         
@@ -459,10 +667,10 @@ public class SnapshotManager {
 
         final long sizeOnDisk = file.length();
 
-        snapshotIndex.add(new SnapshotRecord(currentRootBlock, sizeOnDisk));
-
+        return new SnapshotRecord(currentRootBlock, sizeOnDisk);
+        
     }
-
+    
     /**
      * Remove an snapshot from the file system and the {@link #snapshotIndex}.
      * 
@@ -1164,6 +1372,7 @@ public class SnapshotManager {
 
         }
 
+        @Override
 		public IHASnapshotResponse call() throws Exception {
 
 			// The quorum token (must remain valid through this operation).
