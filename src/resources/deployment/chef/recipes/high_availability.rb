@@ -167,7 +167,7 @@ if node['bigdata'][:install_flavor] == "ha"
 	#
 	execute "set absolute path to RWStore.properties" do
 		cwd	"#{node['bigdata'][:jetty_dir]}/WEB-INF"
-		command	"sed -i 's|<param-value>WEB-INF/RWStore.properties|<param-value>#{node['bigdata'][:jetty_dir]}/WEB-INF/RWStore.properties|' web.xml"
+		command	"sed -i 's|<param-value>WEB-INF/RWStore.properties|<param-value>#{node['bigdata'][:properties]}|' web.xml"
 	end
 
 	#
