@@ -2,8 +2,6 @@ require "formula"
 
 class Bigdata < Formula
   homepage "http://bigdata.com/"
-# url "http://bigdata.com/deploy/bigdata-1.3.0.tgz"
-# sha1 "c22fa05df965019b3132161507ce0e77a4a1f6e2"
   url "http://bigdata.com/deploy/bigdata-1.3.1.tgz"
   sha1 "bcfacd08b1e1c7429d3ca31b8632a20cdff1fb79"
 

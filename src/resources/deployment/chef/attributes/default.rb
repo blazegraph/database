@@ -15,6 +15,8 @@ default['bigdata'][:base_version] = "1.3.1"
 #
 default['bigdata'][:source_dir] = "/home/ubuntu/bigdata-code"
 
+# Where the RWStore.properties file can be found:
+default['bigdata'][:properties] = node['bigdata'][:home] + "/RWStore.properties"
 
 case node['bigdata'][:install_flavor]
 when "nss"
@@ -45,7 +47,7 @@ when "tomcat"
 	default['bigdata'][:url]  = "http://hivelocity.dl.sourceforge.net/project/bigdata/bigdata/#{node['bigdata'][:base_version]}/bigdata.war"
 
 	# Where the bigdata contents reside under Tomcat:
-	default['bigdata'][:web_home] = default['tomcat'][:webapp_dir] + "/bigdata"
+	default['bigdata'][:web_home] = node['tomcat'][:webapp_dir] + "/bigdata"
 
 	# Where the log4j.properites file can be found:
 	default['bigdata'][:log4j_properties] = default['bigdata'][:web_home] + "/WEB-INF/classes/log4j.properties"
@@ -79,6 +81,9 @@ when "ha"
 	# Where the jetty resourceBase is defined:
 	default['bigdata'][:jetty_dir] = node['bigdata'][:home] + "/var/jetty"
 
+	# Where the RWStore.properties file can be found:
+	default['bigdata'][:properties] = node['bigdata'][:jetty_dir] + "/WEB-INF/RWStore.properties"
+
 	# Name of the federation of services (controls the Apache River GROUPS).
 	default['bigdata'][:fedname] = 'my-cluster-1'
 
@@ -102,9 +107,6 @@ end
 #  Set the RWStore.properties attributes that apply for all installation scenarios.
 #
 ###################################################################################
-
-# Where the RWStore.properties file can be found:
-default['bigdata'][:properties] = default['bigdata'][:home] + "/RWStore.properties"
 
 
 default['bigdata']['journal.AbstractJournal.bufferMode'] = "DiskRW"
