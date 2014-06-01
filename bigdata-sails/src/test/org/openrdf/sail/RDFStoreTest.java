@@ -730,7 +730,7 @@ public abstract class RDFStoreTest extends TestCase {
 	}
 
 	@Test
-	public void testMultiThreadedAccess() {
+	private void testMultiThreadedAccess() {
 
 		Runnable runnable = new Runnable() {
 
