@@ -6,7 +6,6 @@ import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFParserRegistry;
 
 import com.bigdata.rdf.axioms.NoAxioms;
-import com.bigdata.rdf.rio.nquads.NQuadsParser;
 import com.bigdata.rdf.rio.turtle.BigdataTurtleParser;
 import com.bigdata.rdf.store.AbstractTripleStore;
 
@@ -32,7 +31,7 @@ public class TestNumericBNodes extends RemoteGOMTestCase {
 	 * Mike,
 	 * 
 	 * If you load the attached file into the NSS and then execute
-	 * bigdata-gom/samples/É/Example1 (or Example2) it will throw an exception
+	 * bigdata-gom/samples//Example1 (or Example2) it will throw an exception
 	 * having to do with bnode Ids. This is the issue that David Booth posted
 	 * here [1].
 	 * 

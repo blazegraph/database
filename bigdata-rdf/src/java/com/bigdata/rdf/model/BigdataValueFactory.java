@@ -27,6 +27,8 @@
 
 package com.bigdata.rdf.model;
 
+import java.util.Date;
+
 import javax.xml.datatype.XMLGregorianCalendar;
 
 import org.openrdf.model.BNode;
@@ -113,6 +115,8 @@ public interface BigdataValueFactory extends ValueFactory {
     BigdataLiteral createLiteral(double arg0);
 
     BigdataLiteral createLiteral(XMLGregorianCalendar arg0);
+
+    BigdataLiteral createLiteral(Date arg0);
 
     BigdataLiteral createLiteral(String label, String language);
 

@@ -63,6 +63,7 @@ import org.openrdf.repository.Repository;
 import org.openrdf.repository.RepositoryConnection;
 import org.openrdf.repository.RepositoryException;
 import org.openrdf.repository.RepositoryResult;
+import org.openrdf.repository.UnknownTransactionStateException;
 import org.openrdf.rio.ParserConfig;
 import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFHandler;
@@ -1096,5 +1097,16 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
 	public ValueFactory getValueFactory() {
 		throw new UnsupportedOperationException();
 	}
+
+    @Override
+    public void begin() throws RepositoryException {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public boolean isActive() 
+            throws UnknownTransactionStateException, RepositoryException {
+        throw new UnsupportedOperationException();
+    }
 
 }

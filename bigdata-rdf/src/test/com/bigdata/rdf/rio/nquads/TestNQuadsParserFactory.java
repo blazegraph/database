@@ -33,9 +33,8 @@ import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFParser;
 import org.openrdf.rio.RDFParserFactory;
 import org.openrdf.rio.RDFParserRegistry;
-
-import com.bigdata.rdf.rio.nquads.NQuadsParser;
-import com.bigdata.rdf.rio.nquads.NQuadsParserFactory;
+import org.openrdf.rio.nquads.NQuadsParser;
+import org.openrdf.rio.nquads.NQuadsParserFactory;
 
 /**
  * Test suite for the {@link NQuadsParserFactory}.

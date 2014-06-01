@@ -16,6 +16,7 @@ import org.apache.http.HttpEntity;
 import org.apache.http.util.EntityUtils;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.QueryEvaluationException;
+import org.openrdf.query.QueryResultHandlerException;
 import org.openrdf.query.TupleQueryResult;
 import org.openrdf.query.TupleQueryResultHandler;
 import org.openrdf.query.TupleQueryResultHandlerException;
@@ -70,7 +71,7 @@ public class BackgroundTupleResult extends TupleQueryResultImpl implements
 	}
 
     @Override
-	public void close() throws QueryEvaluationException {
+	public void handleClose() throws QueryEvaluationException {
 		synchronized (closeLock) {
 			if (!closed) {
 				closed = true;
@@ -163,5 +164,18 @@ public class BackgroundTupleResult extends TupleQueryResultImpl implements
 	public void endQueryResult() throws TupleQueryResultHandlerException {
 		// no-op
 	}
+
+    @Override
+    public void handleBoolean(boolean arg0) throws QueryResultHandlerException {
+
+        throw new UnsupportedOperationException("Cannot handle boolean results");
+        
+    }
+
+    @Override
+    public void handleLinks(List<String> arg0)
+            throws QueryResultHandlerException {
+        // no-op
+    }
 
 }

@@ -61,38 +61,38 @@ public class ConnegUtil {
     }
 
 
-	static {
-	// Work-around for sesame not handling ask and json (see trac 704 and 714)
-		
-		if (BooleanQueryResultFormat.forMIMEType(BigdataRDFServlet.MIME_SPARQL_RESULTS_JSON)!=null) {
-			// This should fire once trac 714 is fixed, and we have upgraded, at this point the whole static block should be deleted.
-			log.warn("Workaround for sesame 2.6 BooleanQueryResultFormat defect no longer needed", new RuntimeException("location of issue"));
-		} else {
-			final BooleanQueryResultFormat askJsonFormat = BooleanQueryResultFormat.register("SPARQL/JSON",BigdataRDFServlet.MIME_SPARQL_RESULTS_JSON,"srj");
-			BooleanQueryResultWriterRegistry.getInstance().add(new BooleanQueryResultWriterFactory(){
-
-				@Override
-				public BooleanQueryResultFormat getBooleanQueryResultFormat() {
-					return askJsonFormat;
-				}
-
-				@Override
-				public BooleanQueryResultWriter getWriter(final OutputStream out) {
-					return new BooleanQueryResultWriter(){
-
-						@Override
-						public BooleanQueryResultFormat getBooleanQueryResultFormat() {
-							return askJsonFormat;
-						}
-
-						@Override
-						public void write(boolean arg0) throws IOException {
-							final String answer = "{ \"head\":{ } , \"boolean\": " +  Boolean.toString(arg0) + " }";
-							out.write(answer.getBytes("utf-8"));
-						}};
-				}});
-		}
-	}
+//	static {
+//	// Work-around for sesame not handling ask and json (see trac 704 and 714)
+//		
+//		if (BooleanQueryResultFormat.forMIMEType(BigdataRDFServlet.MIME_SPARQL_RESULTS_JSON)!=null) {
+//			// This should fire once trac 714 is fixed, and we have upgraded, at this point the whole static block should be deleted.
+//			log.warn("Workaround for sesame 2.6 BooleanQueryResultFormat defect no longer needed", new RuntimeException("location of issue"));
+//		} else {
+//			final BooleanQueryResultFormat askJsonFormat = BooleanQueryResultFormat.register("SPARQL/JSON",BigdataRDFServlet.MIME_SPARQL_RESULTS_JSON,"srj");
+//			BooleanQueryResultWriterRegistry.getInstance().add(new BooleanQueryResultWriterFactory(){
+//
+//				@Override
+//				public BooleanQueryResultFormat getBooleanQueryResultFormat() {
+//					return askJsonFormat;
+//				}
+//
+//				@Override
+//				public BooleanQueryResultWriter getWriter(final OutputStream out) {
+//					return new BooleanQueryResultWriter(){
+//
+//						@Override
+//						public BooleanQueryResultFormat getBooleanQueryResultFormat() {
+//							return askJsonFormat;
+//						}
+//
+//						@Override
+//						public void write(boolean arg0) throws IOException {
+//							final String answer = "{ \"head\":{ } , \"boolean\": " +  Boolean.toString(arg0) + " }";
+//							out.write(answer.getBytes("utf-8"));
+//						}};
+//				}});
+//		}
+//	}
 	
     private final ConnegScore<?>[] scores;
 

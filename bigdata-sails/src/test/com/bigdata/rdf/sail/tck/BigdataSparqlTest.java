@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sail.tck;
 
 import info.aduna.io.IOUtil;
+import info.aduna.iteration.Iterations;
 
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -36,19 +37,29 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Enumeration;
 import java.util.Properties;
+import java.util.Set;
 
 import junit.framework.Test;
 import junit.framework.TestSuite;
 
+import org.openrdf.model.Statement;
+import org.openrdf.query.BooleanQuery;
 import org.openrdf.query.Dataset;
-import org.openrdf.query.parser.sparql.ManifestTest;
-import org.openrdf.query.parser.sparql.SPARQL11ManifestTest;
-import org.openrdf.query.parser.sparql.SPARQLASTQueryTest;
-import org.openrdf.query.parser.sparql.SPARQLQueryTest;
+import org.openrdf.query.GraphQuery;
+import org.openrdf.query.GraphQueryResult;
+import org.openrdf.query.Query;
+import org.openrdf.query.QueryLanguage;
+import org.openrdf.query.TupleQuery;
+import org.openrdf.query.TupleQueryResult;
+import org.openrdf.query.parser.sparql.manifest.ManifestTest;
+import org.openrdf.query.parser.sparql.manifest.SPARQL11ManifestTest;
+import org.openrdf.query.parser.sparql.manifest.SPARQLQueryTest;
 import org.openrdf.repository.Repository;
+import org.openrdf.repository.RepositoryConnection;
 import org.openrdf.repository.RepositoryException;
 import org.openrdf.repository.dataset.DatasetRepository;
 import org.openrdf.repository.sail.SailRepository;
+import org.openrdf.rio.helpers.BasicParserSettings;
 import org.openrdf.sail.memory.MemoryStore;
 
 import com.bigdata.BigdataStatics;
@@ -70,8 +81,8 @@ import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
  * @version $Id$
  */
 public class BigdataSparqlTest 
-//extends SPARQLQueryTest // Sesame TupleExpr based evaluation 
-extends SPARQLASTQueryTest // Bigdata native AST based evaluation
+extends SPARQLQueryTest // Sesame TupleExpr based evaluation 
+//extends SPARQLASTQueryTest // Bigdata native AST based evaluation
 {
 
 //    static private final Logger log = Logger.getLogger(BigdataSparqlTest.class);
@@ -254,9 +265,9 @@ extends SPARQLASTQueryTest // Bigdata native AST based evaluation
             if (aTest instanceof TestSuite) {
             	final TestSuite aTestSuite = (TestSuite) aTest;
                 suite2.addTest(filterOutTests(aTestSuite, testURIs));
-            } else if (aTest instanceof SPARQLQueryTest) {
-                final SPARQLQueryTest test = (SPARQLQueryTest) aTest;
-                if (!testURIs.contains(test.getTestURI())) {
+            } else if (aTest instanceof BigdataSparqlTest) {
+                final BigdataSparqlTest test = (BigdataSparqlTest) aTest;
+                if (!testURIs.contains(test.testURI)) {
                     suite2.addTest(test);
                 }
             }
@@ -521,9 +532,9 @@ extends SPARQLASTQueryTest // Bigdata native AST based evaluation
                 if (test != null)
                     return test;
             }
-            if (aTest instanceof SPARQLQueryTest) {
-                final SPARQLQueryTest test = (SPARQLQueryTest) aTest;
-                if (testURI.equals(test.getTestURI())) {
+            if (aTest instanceof BigdataSparqlTest) {
+                final BigdataSparqlTest test = (BigdataSparqlTest) aTest;
+                if (testURI.equals(test.testURI)) {
                     return test;
                 }
             }
@@ -536,7 +547,7 @@ extends SPARQLASTQueryTest // Bigdata native AST based evaluation
      */
     public static TestSuite suiteLTSWithPipelineJoins() throws Exception {
 
-        final Factory factory = new Factory() {
+        final SPARQLQueryTest.Factory factory = new SPARQLQueryTest.Factory() {
 
             public SPARQLQueryTest createSPARQLQueryTest(String testURI,
                     String name, String queryFileURL, String resultFileURL,
@@ -578,7 +589,7 @@ extends SPARQLASTQueryTest // Bigdata native AST based evaluation
         suite.addTest(ManifestTest.suite(factory));
 
         // SPARQL 1.1
-        suite.addTest(SPARQL11ManifestTest.suite(factory));
+        suite.addTest(SPARQL11ManifestTest.suite(factory, true, true, true));
         
         return suite;
 
@@ -757,74 +768,4 @@ extends SPARQLASTQueryTest // Bigdata native AST based evaluation
         return queryString;
     }
     
-/*
- * Note: This override is being done in the base class now.
- */
-    
-//    @Override
-//    protected void runTest()
-//        throws Exception
-//    {
-//    	if(true) {
-//			/*
-//			 * Dump out some interesting things about the query, the parse tree,
-//			 * and the state of the database *before* we run the unit test. This
-//			 * uses the same logic that is used when the test is run by the base
-//			 * class.
-//			 */
-//        BigdataSailRepositoryConnection con = getQueryConnection(dataRep);
-//        try {
-//
-////            log.info("database dump:");
-////            RepositoryResult<Statement> stmts = con.getStatements(null, null, null, false);
-////            while (stmts.hasNext()) {
-////                log.info(stmts.next());
-////            }
-//            log.info("dataset:\n" + dataset);
-//
-//            String queryString = readQueryString();
-//            log.info("query:\n" + getQueryString());
-//            
-//            Query query = con.prepareQuery(QueryLanguage.SPARQL, queryString, queryFileURL);
-//            if (dataset != null) {
-//                query.setDataset(dataset);
-//            }
-//
-//            if (query instanceof TupleQuery) {
-//                TupleQueryResult queryResult = ((TupleQuery)query).evaluate();
-//                while (queryResult.hasNext()) {
-//                    log.info("query result:\n" + queryResult.next());
-//                }
-//            }
-//
-//        }
-//        finally {
-//            con.close();
-//        }
-//    	}
-//        
-//        super.runTest();
-//    }
-
-	/**
-	 * Overridden to use {@link BigdataSail#getReadOnlyConnection()} as a
-	 * workaround to the test harness which invokes
-	 * {@link BigdataSail#getConnection()} multiple times from within the same
-	 * thread. When full transactions are not enabled, that will delegate to
-	 * {@link BigdataSail#getUnisolatedConnection()}. Only one unisolated
-	 * connection is permitted at a time. While different threads will block to
-	 * await the unisolated connection, that method will throw an exception if
-	 * there is an attempt by a single thread to obtain more than one instance
-	 * of the unisolated connection (since that operation would otherwise
-	 * deadlock).
-	 */
-	@Override
-    protected BigdataSailRepositoryConnection getQueryConnection(
-            Repository dataRep) throws Exception {
-
-        return ((BigdataSailRepository) ((DatasetRepository) dataRep)
-                .getDelegate()).getReadOnlyConnection();
-
-    }
-
 }

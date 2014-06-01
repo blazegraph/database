@@ -34,8 +34,9 @@ import java.util.Properties;
 import junit.framework.Test;
 
 import org.openrdf.model.URI;
-import org.openrdf.query.parser.sparql.SPARQL11ManifestTest;
-import org.openrdf.query.parser.sparql.SPARQLUpdateConformanceTest;
+import org.openrdf.query.parser.sparql.manifest.SPARQL11ManifestTest;
+import org.openrdf.query.parser.sparql.manifest.SPARQLSyntaxTest.Factory;
+import org.openrdf.query.parser.sparql.manifest.SPARQLUpdateConformanceTest;
 import org.openrdf.repository.RepositoryException;
 import org.openrdf.repository.contextaware.ContextAwareRepository;
 import org.openrdf.repository.sail.SailRepository;
@@ -78,7 +79,7 @@ public class BigdataSPARQLUpdateConformanceTest extends
                         resultDefaultGraphURI, resultNamedGraphs);
             }
 
-        });
+        }, true, true, false);
         
         return suite;
     }

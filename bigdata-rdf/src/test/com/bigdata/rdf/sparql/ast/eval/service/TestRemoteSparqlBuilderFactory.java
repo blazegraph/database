@@ -38,9 +38,9 @@ import org.openrdf.model.BNode;
 import org.openrdf.model.Value;
 import org.openrdf.model.impl.BNodeImpl;
 import org.openrdf.model.impl.LiteralImpl;
+import org.openrdf.model.vocabulary.DC;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.impl.MapBindingSet;
-import org.openrdf.query.parser.sparql.DC;
 
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.Var;

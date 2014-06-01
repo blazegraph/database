@@ -5,8 +5,8 @@ import java.net.URISyntaxException;
 import junit.framework.TestCase;
 
 import org.openrdf.model.Resource;
+import org.openrdf.model.vocabulary.FOAF;
 import org.openrdf.model.vocabulary.RDF;
-import org.openrdf.query.parser.sparql.FOAF;
 import org.openrdf.repository.RepositoryConnection;
 import org.openrdf.repository.RepositoryException;
 

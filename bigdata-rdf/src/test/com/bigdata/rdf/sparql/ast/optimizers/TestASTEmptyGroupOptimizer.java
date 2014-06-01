@@ -29,10 +29,10 @@ package com.bigdata.rdf.sparql.ast.optimizers;
 
 import org.openrdf.model.impl.LiteralImpl;
 import org.openrdf.model.impl.URIImpl;
+import org.openrdf.model.vocabulary.DC;
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
 import org.openrdf.query.algebra.StatementPattern.Scope;
-import org.openrdf.query.parser.sparql.DC;
 
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.rdf.internal.IV;

@@ -44,6 +44,7 @@ import org.openrdf.rio.RDFParseException;
 import org.openrdf.rio.RDFParser;
 import org.openrdf.rio.RDFParserRegistry;
 import org.openrdf.rio.helpers.RDFHandlerBase;
+import org.openrdf.rio.nquads.NQuadsParser;
 
 /**
  * Test suite for the {@link NQuadsParser}.
