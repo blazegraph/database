@@ -26,7 +26,6 @@ import org.openrdf.repository.RepositoryResult;
 import org.openrdf.rio.RDFFormat;
 
 import com.bigdata.journal.IIndexManager;
-import com.bigdata.rdf.rio.nquads.NQuadsParser;
 import com.bigdata.rdf.sail.remote.BigdataSailRemoteRepository;
 
 /**

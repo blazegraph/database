@@ -33,13 +33,13 @@ import junit.framework.Test;
 import junit.framework.TestSuite;
 
 import org.openrdf.query.MalformedQueryException;
-import org.openrdf.query.parser.sparql.SPARQLSyntaxTest;
+import org.openrdf.query.parser.sparql.manifest.SPARQLSyntaxTest;
+import org.openrdf.query.parser.sparql.manifest.SPARQLSyntaxTest.Factory;
 
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.rdf.axioms.NoAxioms;
-import com.bigdata.rdf.sail.sparql.Bigdata2ASTSPARQLParser;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.LocalTripleStore;
 

@@ -33,10 +33,10 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 
+import org.openrdf.model.vocabulary.DC;
 import org.openrdf.query.MalformedQueryException;
 import org.openrdf.query.algebra.StatementPattern.Scope;
 import org.openrdf.query.impl.DatasetImpl;
-import org.openrdf.query.parser.sparql.DC;
 
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataStatement;

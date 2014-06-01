@@ -34,15 +34,15 @@ import junit.framework.TestSuite;
 
 import org.openrdf.query.MalformedQueryException;
 import org.openrdf.query.QueryLanguage;
+import org.openrdf.query.parser.ParsedOperation;
 import org.openrdf.query.parser.QueryParserUtil;
-import org.openrdf.query.parser.sparql.SPARQL11SyntaxTest;
-import org.openrdf.query.parser.sparql.SPARQLSyntaxTest;
+import org.openrdf.query.parser.sparql.manifest.SPARQL11SyntaxTest;
+import org.openrdf.query.parser.sparql.manifest.SPARQLSyntaxTest;
 
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.rdf.axioms.NoAxioms;
-import com.bigdata.rdf.sail.sparql.Bigdata2ASTSPARQLParser;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.LocalTripleStore;
 
@@ -144,20 +144,22 @@ public class Bigdata2ASTSPARQL11SyntaxTest extends SPARQL11SyntaxTest {
      * {@inheritDoc}
      * 
      * This uses the {@link Bigdata2ASTSPARQLParser}. 
+     * @return 
      */
     @Override
-    protected void parseOperation(final String query, final String queryFileURL)
+    protected ParsedOperation parseOperation(final String query, final String queryFileURL)
             throws MalformedQueryException {
 
         try {
 
             if (useBigdataParser) {
                 // bigdata parser.
-                new Bigdata2ASTSPARQLParser(tripleStore).parseOperation(query,
+                return new Bigdata2ASTSPARQLParser(tripleStore).parseOperation(query,
                         queryFileURL);
+                
             } else {
                 // openrdf parser.
-                QueryParserUtil
+                return QueryParserUtil
                         .parseOperation(QueryLanguage.SPARQL, query, queryFileURL);
             }
             
@@ -172,7 +174,7 @@ public class Bigdata2ASTSPARQL11SyntaxTest extends SPARQL11SyntaxTest {
 
     public static Test suite() throws Exception {
 
-        final Factory factory = new Factory() {
+        final SPARQL11SyntaxTest.Factory factory = new SPARQL11SyntaxTest.Factory() {
 
             @Override
             public SPARQL11SyntaxTest createSPARQLSyntaxTest(String testURI,
@@ -187,7 +189,7 @@ public class Bigdata2ASTSPARQL11SyntaxTest extends SPARQL11SyntaxTest {
         
         final TestSuite suite = new TestSuite();
 
-        suite.addTest(SPARQL11SyntaxTest.suite(factory));
+        suite.addTest(SPARQL11SyntaxTest.suite(factory, false));
 
         return suite;
 

@@ -1804,16 +1804,16 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
             System.err.println("]");
             throw ex;
         }
-        catch( AssertionFailedError ex ) {
-            System.err.println("m="+m);
-            System.err.print("keys=[");
-            for(int i=0; i<keys.length; i++ ) {
-                if( i>0 ) System.err.print(", ");
-                System.err.print(keys[order[i]]);
-            }
-            System.err.println("]");
-            throw ex;
-        }
+//        catch( AssertionFailedError ex ) {
+//            System.err.println("m="+m);
+//            System.err.print("keys=[");
+//            for(int i=0; i<keys.length; i++ ) {
+//                if( i>0 ) System.err.print(", ");
+//                System.err.print(keys[order[i]]);
+//            }
+//            System.err.println("]");
+//            throw ex;
+//        }
 
         if(log.isInfoEnabled())
             log.info(btree.getBtreeCounters().toString());

@@ -16,17 +16,19 @@
  */
 package com.bigdata.rdf.rio.json;
 
+import java.io.OutputStream;
+
 import org.openrdf.query.resultio.TupleQueryResultFormat;
-import org.openrdf.query.resultio.TupleQueryResultParser;
-import org.openrdf.query.resultio.TupleQueryResultParserFactory;
+import org.openrdf.query.resultio.TupleQueryResultWriter;
+import org.openrdf.query.resultio.TupleQueryResultWriterFactory;
 
 /**
- * A {@link TupleQueryResultParserFactory} for parsers of SPARQL-1.1 JSON Tuple
- * Query Results.
+ * A {@link TupleQueryResultWriterFactory} for writers of SPARQL/JSON query
+ * results.
  * 
- * @author Peter Ansell
+ * @author Arjohn Kampman
  */
-public class BigdataSPARQLResultsJSONParserFactory implements TupleQueryResultParserFactory {
+public class BigdataSPARQLResultsJSONWriterFactory implements TupleQueryResultWriterFactory {
 
 	/**
 	 * Returns {@link TupleQueryResultFormat#JSON}.
@@ -36,9 +38,9 @@ public class BigdataSPARQLResultsJSONParserFactory implements TupleQueryResultPa
 	}
 
 	/**
-	 * Returns a new instance of {@link SPARQLResultsJSONParser}.
+	 * Returns a new instance of SPARQLResultsJSONWriter.
 	 */
-	public TupleQueryResultParser getParser() {
-		return new BigdataSPARQLResultsJSONParser();
+	public TupleQueryResultWriter getWriter(OutputStream out) {
+		return new BigdataSPARQLResultsJSONWriter(out);
 	}
 }

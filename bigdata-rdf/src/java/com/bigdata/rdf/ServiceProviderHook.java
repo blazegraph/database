@@ -32,6 +32,7 @@ import info.aduna.lang.service.ServiceRegistry;
 import java.util.ServiceLoader;
 
 import org.openrdf.query.QueryLanguage;
+import org.openrdf.query.resultio.TupleQueryResultParserRegistry;
 import org.openrdf.query.resultio.TupleQueryResultWriterRegistry;
 import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFParserRegistry;
@@ -39,10 +40,8 @@ import org.openrdf.rio.RDFWriterRegistry;
 
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.rio.json.BigdataSPARQLResultsJSONParserFactory;
-import com.bigdata.rdf.rio.json.BigdataSPARQLResultsJSONWriterFactoryForConstruct;
-import com.bigdata.rdf.rio.json.BigdataSPARQLResultsJSONWriterFactoryForSelect;
+import com.bigdata.rdf.rio.json.BigdataSPARQLResultsJSONWriterFactory;
 import com.bigdata.rdf.rio.ntriples.BigdataNTriplesParserFactory;
-import com.bigdata.rdf.rio.rdfxml.BigdataRDFXMLWriterFactory;
 import com.bigdata.rdf.rio.turtle.BigdataTurtleParserFactory;
 import com.bigdata.rdf.rio.turtle.BigdataTurtleWriterFactory;
 
@@ -126,7 +125,7 @@ public class ServiceProviderHook {
              * Allows parsing of JSON SPARQL Results with an {s,p,o,[c]} header.
              * RDR-enabled.
              */
-            r.add(new BigdataSPARQLResultsJSONParserFactory());
+//            r.add(new BigdataSPARQLResultsJSONParserFactory());
             
         }
         
@@ -134,11 +133,19 @@ public class ServiceProviderHook {
         	
         	final TupleQueryResultWriterRegistry r = TupleQueryResultWriterRegistry.getInstance();
 
-        	// add our custom RDR-enabled JSON writer (RDR-enabled)
-        	r.add(new BigdataSPARQLResultsJSONWriterFactoryForSelect());
+        	// add our custom RDR-enabled JSON writer
+        	r.add(new BigdataSPARQLResultsJSONWriterFactory());
         	
         }
 
+        {
+            
+            final TupleQueryResultParserRegistry r = TupleQueryResultParserRegistry.getInstance();
+
+            // add our custom RDR-enabled JSON parser
+            r.add(new BigdataSPARQLResultsJSONParserFactory());
+            
+        }
 
         // Ditto, but for the writer.
         {
@@ -150,7 +157,7 @@ public class ServiceProviderHook {
             r.add(new BigdataTurtleWriterFactory());
 
             // RDR-enabled
-            r.add(new BigdataSPARQLResultsJSONWriterFactoryForConstruct());
+//            r.add(new BigdataSPARQLResultsJSONWriterFactory());
             
         }
 

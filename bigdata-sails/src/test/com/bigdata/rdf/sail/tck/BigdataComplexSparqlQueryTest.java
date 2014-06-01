@@ -33,6 +33,7 @@ import java.io.InputStreamReader;
 import java.util.Properties;
 
 import org.apache.log4j.Logger;
+import org.openrdf.model.Resource;
 import org.openrdf.query.parser.sparql.ComplexSPARQLQueryTest;
 import org.openrdf.repository.Repository;
 import org.openrdf.repository.RepositoryException;
@@ -189,22 +190,20 @@ public class BigdataComplexSparqlQueryTest extends ComplexSPARQLQueryTest {
      * loaded.
      */
     @Override
-    protected void loadTestData(final String dataFile)
+    protected void loadTestData(String dataFile, Resource... contexts)
             throws RDFParseException, RepositoryException, IOException
-        {
-            logger.debug("loading dataset...");
-            final InputStream dataset = ComplexSPARQLQueryTest.class.getResourceAsStream
-                    (   dataFile // "/testdata-query/dataset-query.trig"
-                            );
-            try {
-                conn.setAutoCommit(false);
-                conn.add(dataset, "", RDFFormat.forFileName(dataFile));
-                conn.commit();
-            }
-            finally {
-                dataset.close();
-            }
-            logger.debug("dataset loaded.");
+    {
+        logger.debug("loading dataset " + dataFile);
+        InputStream dataset = ComplexSPARQLQueryTest.class.getResourceAsStream(dataFile);
+        try {
+            conn.setAutoCommit(false);
+            conn.add(dataset, "", RDFFormat.forFileName(dataFile), contexts);
+            conn.commit();
         }
+        finally {
+            dataset.close();
+        }
+        logger.debug("dataset loaded.");
+    }
     
 }
