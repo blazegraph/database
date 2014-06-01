@@ -36,13 +36,16 @@ import java.net.URL;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Enumeration;
+import java.util.HashSet;
 import java.util.Properties;
 import java.util.Set;
 
 import junit.framework.Test;
 import junit.framework.TestSuite;
 
+import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
+import org.openrdf.model.URI;
 import org.openrdf.query.BooleanQuery;
 import org.openrdf.query.Dataset;
 import org.openrdf.query.GraphQuery;
@@ -768,4 +771,99 @@ extends SPARQLQueryTest // Sesame TupleExpr based evaluation
         return queryString;
     }
     
+    @Override
+    protected void runTest()
+        throws Exception
+    {
+        RepositoryConnection con = getQueryConnection(dataRep);
+        // Some SPARQL Tests have non-XSD datatypes that must pass for the test
+        // suite to complete successfully
+        con.getParserConfig().set(BasicParserSettings.VERIFY_DATATYPE_VALUES, Boolean.FALSE);
+        con.getParserConfig().set(BasicParserSettings.FAIL_ON_UNKNOWN_DATATYPES, Boolean.FALSE);
+        try {
+            String queryString = readQueryString();
+            Query query = con.prepareQuery(QueryLanguage.SPARQL, queryString, queryFileURL);
+            if (dataset != null) {
+                query.setDataset(dataset);
+            }
+
+            String name = this.getName();
+
+            if (name.contains("pp34")) {
+                System.out.println(name);
+            }
+
+            if (query instanceof TupleQuery) {
+                TupleQueryResult queryResult = ((TupleQuery)query).evaluate();
+
+                TupleQueryResult expectedResult = readExpectedTupleQueryResult();
+
+                compareTupleQueryResults(queryResult, expectedResult);
+
+                // Graph queryGraph = RepositoryUtil.asGraph(queryResult);
+                // Graph expectedGraph = readExpectedTupleQueryResult();
+                // compareGraphs(queryGraph, expectedGraph);
+            }
+            else if (query instanceof GraphQuery) {
+                GraphQueryResult gqr = ((GraphQuery)query).evaluate();
+                Set<Statement> queryResult = Iterations.asSet(gqr);
+
+                Set<Statement> expectedResult = readExpectedGraphQueryResult();
+
+                compareGraphs(queryResult, expectedResult);
+            }
+            else if (query instanceof BooleanQuery) {
+                boolean queryResult = ((BooleanQuery)query).evaluate();
+                boolean expectedResult = readExpectedBooleanQueryResult();
+                assertEquals(expectedResult, queryResult);
+            }
+            else {
+                throw new RuntimeException("Unexpected query type: " + query.getClass());
+            }
+        }
+        finally {
+            con.close();
+        }
+    }
+
+    /**
+     * Overridden to use {@link BigdataSail#getReadOnlyConnection()} as a
+     * workaround to the test harness which invokes
+     * {@link BigdataSail#getConnection()} multiple times from within the same
+     * thread. When full transactions are not enabled, that will delegate to
+     * {@link BigdataSail#getUnisolatedConnection()}. Only one unisolated
+     * connection is permitted at a time. While different threads will block to
+     * await the unisolated connection, that method will throw an exception if
+     * there is an attempt by a single thread to obtain more than one instance
+     * of the unisolated connection (since that operation would otherwise
+     * deadlock).
+     */
+    protected BigdataSailRepositoryConnection getQueryConnection(
+            Repository dataRep) throws Exception {
+
+        return ((BigdataSailRepository) ((DatasetRepository) dataRep)
+                .getDelegate()).getReadOnlyConnection();
+
+    }
+
+    protected void uploadDataset(Dataset dataset)
+        throws Exception
+    {
+//        RepositoryConnection con = dataRep.getConnection();
+//        try {
+            // Merge default and named graphs to filter duplicates
+            Set<URI> graphURIs = new HashSet<URI>();
+            graphURIs.addAll(dataset.getDefaultGraphs());
+            graphURIs.addAll(dataset.getNamedGraphs());
+
+            for (Resource graphURI : graphURIs) {
+                upload(((URI)graphURI), graphURI);
+            }
+//        }
+//        finally {
+//            con.close();
+//        }
+    }
+
+
 }

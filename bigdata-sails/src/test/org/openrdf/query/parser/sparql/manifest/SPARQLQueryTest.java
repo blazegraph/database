@@ -458,7 +458,10 @@ public abstract class SPARQLQueryTest extends TestCase {
 		}
 	}
 
-	protected final void uploadDataset(Dataset dataset)
+	/*
+	 * MRP: Made !final.
+	 */
+	protected void uploadDataset(Dataset dataset)
 		throws Exception
 	{
 		RepositoryConnection con = dataRep.getConnection();
@@ -477,7 +480,10 @@ public abstract class SPARQLQueryTest extends TestCase {
 		}
 	}
 
-	private void upload(URI graphURI, Resource context)
+    /*
+     * MRP: Made protected.
+     */
+	protected void upload(URI graphURI, Resource context)
 		throws Exception
 	{
 		RepositoryConnection con = dataRep.getConnection();
