@@ -90,6 +90,9 @@ when "ha"
 	# Name of the replication cluster to which this HAJournalServer will belong.
 	default['bigdata'][:logical_service_id] = 'HA-Replication-Cluster-1'
 
+	# Set the REPLICATION_FACTOR.  1 = HA1, 3 = HA3, etc
+	default['bigdata'][:replication_factor] = 3
+
 	# Where to find the Apache River service registrars (can also use multicast).
 	default['bigdata'][:river_locator1] = '33.33.33.10'
 	default['bigdata'][:river_locator2] = '33.33.33.11'
