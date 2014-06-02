@@ -106,7 +106,7 @@ if node['bigdata'][:install_flavor] == "ha"
 				user	'root'
 				group	'root'
 				cwd	"#{node['bigdata'][:home]}/etc/init.d" 
-				command	"sed -i 's|startHAServices\"|startHAServices > /dev/null 2>\&1 \&\"|' bigdataHA"
+				command	"sed -i 's|startHAServices\"|startHAServices > /dev/null 2>\\&1\"|' bigdataHA"
 			end
 
 			execute "Change SystemProperty to Property in the 'host' attribute of jetty.xml" do
@@ -184,7 +184,7 @@ if node['bigdata'][:install_flavor] == "ha"
 	# Copy the /etc/default/bigdataHA template:
 	#
 	template "/etc/default/bigdataHA" do
-		source	"default/bigdataHA.erb"
+		source	"etc/default/bigdataHA.erb"
  		user	'root'
  		group	'root'
 		mode	00644

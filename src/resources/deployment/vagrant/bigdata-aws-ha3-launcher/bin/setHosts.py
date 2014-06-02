@@ -37,10 +37,13 @@ def createZookeeperSubstitution( index, host, ipAddress ):
 
 def createJiniLocatorsSubstitution():
 	locators = ""
+	vbHostAddresses = [ "33.33.33.10", "33.33.33.11", "33.33.33.12" ]
+	index = 0
 	for host in hostMap:
-		locators = locators + "jini://" + hostMap[host] + "/,"
+		locators = locators + "sudo sed -i 's|" + vbHostAddresses[index] + "|" + hostMap[host] + "|' /etc/default/bigdataHA ;"
+		index = index + 1
 	locators = locators[:-1]
-	return "sudo sed -i 's|%JINI_LOCATORS%|" + locators + "|' /etc/default/bigdataHA"
+	return locators
 
 if __name__ == '__main__':
 
@@ -60,7 +63,7 @@ if __name__ == '__main__':
 	group = ec2conn.get_all_security_groups( private_security_group_name )[0]
 
 	jini_locators = createJiniLocatorsSubstitution()
-	# print "JINI_LOCATORS = " + jini_locators
+	print "JINI_LOCATORS = " + jini_locators
 
 	i = 1
 	for host in bigdataHosts:
@@ -87,9 +90,9 @@ if __name__ == '__main__':
 		# startHAServices does not exit as expected, so remote restart commands will hang.
 		# As a work around, we restart the host:
 		#
-		print "Running: sudo /etc/init.d/zookeeper-server restart on host ", host
+		# print "Running: sudo /etc/init.d/zookeeper-server restart on host ", host
 		status, stdin, stderr = ssh_client.run( "sudo /etc/init.d/zookeeper-server restart" )
-		print "Running: sudo /etc/init.d/bigdata restart on host ", host
+		# print "Running: sudo /etc/init.d/bigdata restart on host ", host
 		status, stdin, stderr = ssh_client.run( "sudo /etc/init.d/bigdataHA restart" )
 		# status, stdin, stderr = ssh_client.run( "sudo service bigdataHA restart" )
 		# host.reboot()
