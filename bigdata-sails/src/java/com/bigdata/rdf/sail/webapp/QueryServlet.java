@@ -133,6 +133,14 @@ public class QueryServlet extends BigdataRDFServlet {
      */
     static final transient String ATTR_UUID = "uuid";
 
+    /**
+     * The name of the URL query parameter which indicates the timestamp against
+     * which an operation will be carried out.
+     * 
+     * @see BigdataRDFServlet#getTimestamp(HttpServletRequest)
+     */
+    static final transient String ATTR_TIMESTAMP = "timestamp";
+    
 //    /**
 //     * The name of the request attribute for the {@link AbstractQueryTask}.
 //     */
@@ -244,44 +252,56 @@ public class QueryServlet extends BigdataRDFServlet {
      */
     private void doServiceDescription(final HttpServletRequest req,
             final HttpServletResponse resp) throws IOException {
-        
-        final String namespace = getNamespace(req);
 
-        final long timestamp = getTimestamp(req);
-
-        final AbstractTripleStore tripleStore = getBigdataRDFContext()
-                .getTripleStore(namespace, timestamp);
-        
-        if (tripleStore == null) {
-            /*
-             * There is no such triple/quad store instance.
-             */
-            buildResponse(resp, HTTP_NOTFOUND, MIME_TEXT_PLAIN);
-            return;
-        }
-
-        // The serviceURIs for this graph.
-        final String[] serviceURI = BigdataServlet.getServiceURIs(
-                getServletContext(), req);
-
-        /*
-         * TODO Resolve the SD class name and ctor via a configuration property
-         * for extensible descriptions.
+        /**
+         * Protect the entire operation with a transaction.
+         * 
+         * @see <a href="http://trac.bigdata.com/ticket/867"> NSS concurrency
+         *      problem with list namespaces and create namespace </a>
          */
-        final Graph g = new GraphImpl();
-        {
+        final long tx = getBigdataRDFContext().newTx(getTimestamp(req));
+        
+        try {
+            
+            final AbstractTripleStore tripleStore = getBigdataRDFContext()
+                    .getTripleStore(getNamespace(req), tx);
 
-            final SD sd = new SD(g, tripleStore, serviceURI);
+            if (tripleStore == null) {
+                /*
+                 * There is no such triple/quad store instance.
+                 */
+                buildResponse(resp, HTTP_NOTFOUND, MIME_TEXT_PLAIN);
+                return;
+            }
 
-            final SparqlEndpointConfig config = getBigdataRDFContext()
-                    .getConfig();
+            // The serviceURIs for this graph.
+            final String[] serviceURI = BigdataServlet.getServiceURIs(
+                    getServletContext(), req);
 
-            sd.describeService(true/* describeStatistics */,
-                    config.describeEachNamedGraph);
+            /*
+             * TODO Resolve the SD class name and ctor via a configuration
+             * property for extensible descriptions.
+             */
+            final Graph g = new GraphImpl();
+            {
+
+                final SD sd = new SD(g, tripleStore, serviceURI);
+
+                final SparqlEndpointConfig config = getBigdataRDFContext()
+                        .getConfig();
+
+                sd.describeService(true/* describeStatistics */,
+                        config.describeEachNamedGraph);
+
+            }
+
+            sendGraph(req, resp, g);
+
+        } finally {
+
+            getBigdataRDFContext().abortTx(tx);
 
         }
-
-        sendGraph(req, resp, g);
 
     }
 
@@ -386,11 +406,11 @@ public class QueryServlet extends BigdataRDFServlet {
             ft.get();
 
         } catch (Throwable e) {
-            try {
+//            try {
                 throw BigdataRDFServlet.launderThrowable(e, resp, updateStr);
-            } catch (Exception e1) {
-                throw new RuntimeException(e);
-            }
+//            } catch (Exception e1) {
+//                throw new RuntimeException(e);
+//            }
         }
         
     }
@@ -627,11 +647,11 @@ public class QueryServlet extends BigdataRDFServlet {
             }
 
 		} catch (Throwable e) {
-			try {
+//			try {
 				throw BigdataRDFServlet.launderThrowable(e, resp, queryStr);
-			} catch (Exception e1) {
-				throw new RuntimeException(e);
-			}
+//			} catch (Exception e1) {
+//				throw new RuntimeException(e);
+//			}
 		}
 	
 	}

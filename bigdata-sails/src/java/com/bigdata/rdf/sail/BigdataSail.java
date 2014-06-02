@@ -698,22 +698,15 @@ public class BigdataSail extends SailBase implements Sail {
          * during the middle of a BigdataSailConnection level operation (or visa
          * versa).
          */
+        boolean acquiredConnection = false;
         try {
-            // acquire the unisolated connection permit.
-            journal.acquireUnisolatedConnection();
-        } catch (InterruptedException e) {
-            throw new RuntimeException(e);
-        }
-        try {
-            
-//            final boolean create;
-//            final long tx0 = txService.newTx(ITx.READ_COMMITTED);
-//            try {
-//                // verify kb does not exist (can not be located).
-//                create = journal.getResourceLocator().locate(namespace, tx0) == null;
-//            } finally {
-//                txService.abort(tx0);
-//            }
+            try {
+                // acquire the unisolated connection permit.
+                journal.acquireUnisolatedConnection();
+                acquiredConnection = true;
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
             
             // Check for pre-existing instance.
             {
@@ -730,28 +723,49 @@ public class BigdataSail extends SailBase implements Sail {
             }
             
             // Create a new instance.
-//            if (create) 
             {
             
-                final LocalTripleStore lts = new LocalTripleStore(
-                        journal, namespace, ITx.UNISOLATED, properties);
-                
                 if (Boolean.parseBoolean(properties.getProperty(
                         BigdataSail.Options.ISOLATABLE_INDICES,
                         BigdataSail.Options.DEFAULT_ISOLATABLE_INDICES))) {
                 
+                    /*
+                     * Isolatable indices: requires the use of a tx to create
+                     * the KB instance.
+                     */
+
                     final long txCreate = txService.newTx(ITx.UNISOLATED);
-        
-                    final AbstractTripleStore txCreateView = new LocalTripleStore(
-                            journal, namespace, Long.valueOf(txCreate), properties);
-        
-                    // create the kb instance within the tx.
-                    txCreateView.create();
-        
-                    // commit the tx.
-                    txService.commit(txCreate);
+
+                    boolean ok = false;
+                    try {
+                        
+                        final AbstractTripleStore txCreateView = new LocalTripleStore(
+                                journal, namespace, Long.valueOf(txCreate),
+                                properties);
+
+                        // create the kb instance within the tx.
+                        txCreateView.create();
+
+                        // commit the tx.
+                        txService.commit(txCreate);
+                        
+                        ok = true;
+
+                    } finally {
+                        
+                        if (!ok)
+                            txService.abort(txCreate);
+                        
+                    }
                     
                 } else {
+                    
+                    /*
+                     * Create KB without isolatable indices.
+                     */
+
+                    final LocalTripleStore lts = new LocalTripleStore(
+                            journal, namespace, ITx.UNISOLATED, properties);
                     
                     lts.create();
                     
@@ -790,7 +804,8 @@ public class BigdataSail extends SailBase implements Sail {
             
         } finally {
 
-            journal.releaseUnisolatedConnection();
+            if (acquiredConnection)
+                journal.releaseUnisolatedConnection();
 
         }
         
@@ -1314,21 +1329,39 @@ public class BigdataSail extends SailBase implements Sail {
                     "UNISOLATED connection is not reentrant.");
         }
 
-        if (getDatabase().getIndexManager() instanceof Journal) {
-            // acquire permit from Journal.
-            ((Journal) getDatabase().getIndexManager())
-                    .acquireUnisolatedConnection();
+        boolean acquiredConnection = false;
+        Lock writeLock = null;
+        BigdataSailConnection conn = null;
+        try {
+            if (getDatabase().getIndexManager() instanceof Journal) {
+                // acquire permit from Journal.
+                ((Journal) getDatabase().getIndexManager())
+                        .acquireUnisolatedConnection();
+                acquiredConnection = true;
+            }
+
+            // acquire the write lock.
+            writeLock = lock.writeLock();
+            writeLock.lock();
+
+            // new writable connection.
+            conn = new BigdataSailConnection(database, writeLock, true/* unisolated */)
+                    .startConn();
+        } finally {
+            if (conn == null) {
+                // Did not obtain connection.
+                if (writeLock != null) {
+                    // release write lock.
+                    writeLock.unlock();
+                }
+                if (acquiredConnection) {
+                    // release permit.
+                    ((Journal) getDatabase().getIndexManager())
+                            .releaseUnisolatedConnection();
+                }
+            }
         }
-
-		// acquire the write lock.
-		final Lock writeLock = lock.writeLock();
-		writeLock.lock();
-
-		// new writable connection.
-		final BigdataSailConnection conn = new BigdataSailConnection(database,
-				writeLock, true/* unisolated */).startConn();
-
-		return conn;
+        return conn;
 
     }
     

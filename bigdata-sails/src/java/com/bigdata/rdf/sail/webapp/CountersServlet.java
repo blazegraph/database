@@ -77,35 +77,6 @@ public class CountersServlet extends BigdataServlet {
     public CountersServlet() {
     }
 
-//    /**
-//     * Access to the {@link CounterSet} exposed by this service.
-//     */
-//    private final ICounterSetAccess accessor;
-//    
-//    /**
-//     * The service reference iff one one specified to the ctor (may be null).
-//     */
-//    private final IService service;
-//
-//    /**
-//     * The minimum time before a client can force the re-materialization of the
-//     * {@link CounterSet}. This is designed to limit the impact of the client on
-//     * the service.
-//     * 
-//     * TODO Configuration parameter for {@link #minUpdateLatency}
-//     */
-//    private final long minUpdateLatency = 5000;
-//    
-//    /**
-//     * The last materialized {@link CounterSet}.
-//     */
-//    private volatile CounterSet counterSet = null;
-//
-//    /**
-//     * The timestamp of the last materialized {@link CounterSet}.
-//     */
-//    private volatile long lastTimestamp = 0L;
-
     /**
      * Performance counters
      * <pre>
@@ -115,48 +86,9 @@ public class CountersServlet extends BigdataServlet {
     @Override
     protected void doGet(final HttpServletRequest req,
             final HttpServletResponse resp) throws IOException {
+
+        try {
         
-//        final ByteArrayOutputStream baos = new ByteArrayOutputStream(
-//                2 * Bytes.kilobyte32);
-//
-//        final InputStream is;
-
-//        /*
-//         * If the request uri is one of the pre-declared resources then we send
-//         * that resource.
-//         */
-//        final DeclaredResource decl = allowedClassPathResources.get(req.uri);
-//
-//        if (decl != null) {
-//
-//            // send that resource.
-//            return sendClasspathResource(decl);
-//
-//        }
-
-        /*
-         * Materialization the CounterSet iff necessary or stale.
-         * 
-         * Note: This bit needs to be single threaded to avoid concurrent
-         * requests causing concurrent materialization of the counter set.
-         */
-//        final ICounterSelector counterSelector;
-//        synchronized(this) {
-//            
-//            final long now = System.currentTimeMillis();
-//
-//            final long elapsed = now - lastTimestamp;
-//
-//            if (counterSet == null || elapsed > minUpdateLatency/* ms */) {
-//
-//                counterSet = accessor.getCounters();
-//                
-//            }
-//
-//            counterSelector = new CounterSetSelector(counterSet);
-//
-//        }
-
         // TODO Hook this how? (NSS does not define an IService right now)
         final IService service = null;
         
@@ -255,6 +187,12 @@ public class CountersServlet extends BigdataServlet {
 
         if (log.isTraceEnabled())
             log.trace("done");
+        
+        } catch (Throwable t) {
+            
+            throw BigdataRDFServlet.launderThrowable(t, resp, "");
+            
+        }
 
     }
     

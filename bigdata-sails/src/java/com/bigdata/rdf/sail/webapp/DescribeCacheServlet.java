@@ -369,14 +369,14 @@ public class DescribeCacheServlet extends BigdataRDFServlet {
                 os.flush();
 
             } catch (Throwable e) {
-                try {
+//                try {
                     throw BigdataRDFServlet.launderThrowable(e, resp,
                             "DESCRIBE"
                     // queryStr // TODO Report as "DESCRIBE uri(s)".
                             );
-                } catch (Exception e1) {
-                    throw new RuntimeException(e);
-                }
+//                } catch (Exception e1) {
+//                    throw new RuntimeException(e);
+//                }
             }
 
         }

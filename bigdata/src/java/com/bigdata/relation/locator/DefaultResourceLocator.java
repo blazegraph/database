@@ -482,7 +482,7 @@ public class DefaultResourceLocator<T extends ILocatableResource> //
     protected Properties locateResource(final String namespace,
             final long timestamp, final AtomicReference<IIndexManager> foundOn) {
 
-        synchronized (seeAlso) {
+        synchronized (seeAlso) { // FIXME Probably a read/write lock since [seeAlso] normally empty.
 
             for (IIndexManager indexManager : seeAlso.keySet()) {
 
@@ -1126,7 +1126,7 @@ public class DefaultResourceLocator<T extends ILocatableResource> //
      * 
      * @see #locateResource(String)
      */
-    public void add(IIndexManager indexManager) {
+    public void add(final IIndexManager indexManager) {
 
         if (indexManager == null)
             throw new IllegalArgumentException();

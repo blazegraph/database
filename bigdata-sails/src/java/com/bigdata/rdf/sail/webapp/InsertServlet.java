@@ -140,7 +140,11 @@ public class InsertServlet extends BigdataRDFServlet {
         final String namespace = getNamespace(req);
 
         final String contentType = req.getContentType();
-        if(contentType==null) buildResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN, "Content-Type not specified.");
+
+        if (contentType == null)
+            buildResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN,
+                    "Content-Type not specified.");
+        
         if (log.isInfoEnabled())
             log.info("Request body: " + contentType);
 
@@ -220,6 +224,7 @@ public class InsertServlet extends BigdataRDFServlet {
             final AtomicLong nmodified = new AtomicLong(0L);
 
             BigdataSailRepositoryConnection conn = null;
+            boolean success = false;
             try {
 
                 conn = getBigdataRDFContext()
@@ -256,26 +261,26 @@ public class InsertServlet extends BigdataRDFServlet {
                 
                 reportModifiedCount(resp, nmodified.get(), elapsed);
                 
+                success = true;
+                
                 return;
-
-            } catch(Throwable t) {
-                
-                if(conn != null)
-                    conn.rollback();
-                
-                throw new RuntimeException(t);
 
             } finally {
 
-                if (conn != null)
+                if (conn != null) {
+
+                    if (!success)
+                        conn.rollback();
+                    
                     conn.close();
+
+                }
                 
             }
 
-        } catch (Exception ex) {
+        } catch (Throwable t) {
 
-            // Will be rendered as an INTERNAL_ERROR.
-            throw new RuntimeException(ex);
+            throw BigdataRDFServlet.launderThrowable(t, resp, "");
             
         }
 
