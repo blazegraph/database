@@ -45,7 +45,7 @@ Vagrant.configure("2") do |config|
     config.vm.provision :shell, inline: "sudo apt-get update ; sudo curl -L https://www.opscode.com/chef/install.sh | sudo bash"
 
     chef.run_list = [
-        "recipe[bigdata::tomcat]"
+        "recipe[bigdata::nss]"
     ]
 
   end
