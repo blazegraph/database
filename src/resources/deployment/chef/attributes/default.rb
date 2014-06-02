@@ -91,14 +91,18 @@ when "ha"
 	default['bigdata'][:logical_service_id] = 'HA-Replication-Cluster-1'
 
 	# Where to find the Apache River service registrars (can also use multicast).
-	default['bigdata'][:river_locator1] = 'bigdataA'
-	default['bigdata'][:river_locator2] = 'bigdataB'
-	default['bigdata'][:river_locator3] = 'bigdataC'
+	default['bigdata'][:river_locator1] = '33.33.33.10'
+	default['bigdata'][:river_locator2] = '33.33.33.11'
+	default['bigdata'][:river_locator3] = '33.33.33.12'
 
 	# Where to find the Apache Zookeeper ensemble.
 	default['bigdata'][:zk_server1] = 'bigdataA'
 	default['bigdata'][:zk_server2] = 'bigdataB'
 	default['bigdata'][:zk_server3] = 'bigdataC'
+
+	# set the JVM_OPTS as used by startHAService
+	default['bigdata'][:java_options] = "-server -Xmx4G -XX:MaxDirectMemorySize=3000m"
+	# default['bigdata'][:java_options] = "-server -Xmx4G -XX:MaxDirectMemorySize=3000m -Xdebug -Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=1046"
 end
 
 
