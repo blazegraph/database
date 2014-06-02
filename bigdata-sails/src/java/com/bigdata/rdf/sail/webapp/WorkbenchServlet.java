@@ -91,7 +91,7 @@ public class WorkbenchServlet extends BigdataRDFServlet {
     	
         final String namespace = getNamespace(req);
 
-        final long timestamp = getTimestamp(req);
+        final long timestamp = getTimestamp(req); // FIXME Use newTx().  Why does this even look for a KB instance?
 
         final AbstractTripleStore tripleStore = getBigdataRDFContext()
                 .getTripleStore(namespace, timestamp);

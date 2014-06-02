@@ -131,7 +131,6 @@ public class DeleteServlet extends BigdataRDFServlet {
              */
             final PipedOutputStream os = new PipedOutputStream();
             final InputStream is = newPipedInputStream(os);
-            try {
 
                 // Use this format for the query results.
                 final RDFFormat format = RDFFormat.NTRIPLES;
@@ -215,16 +214,9 @@ public class DeleteServlet extends BigdataRDFServlet {
 
                 }
 
-            } catch (Throwable t) {
+        } catch (Throwable t) {
 
-                throw BigdataRDFServlet.launderThrowable(t, resp, queryStr);
-
-            }
-
-        } catch (Exception ex) {
-
-            // Will be rendered as an INTERNAL_ERROR.
-            throw new RuntimeException(ex);
+            throw BigdataRDFServlet.launderThrowable(t, resp, queryStr);
 
         }
 
@@ -382,10 +374,9 @@ public class DeleteServlet extends BigdataRDFServlet {
 
             }
 
-        } catch (Exception ex) {
+        } catch (Throwable t) {
 
-            // Will be rendered as an INTERNAL_ERROR.
-            throw new RuntimeException(ex);
+            throw BigdataRDFServlet.launderThrowable(t, resp, "");
             
         }
 
@@ -480,8 +471,6 @@ public class DeleteServlet extends BigdataRDFServlet {
 
         try {
 
-            try {
-
                 BigdataSailRepositoryConnection conn = null;
                 try {
 
@@ -528,18 +517,19 @@ public class DeleteServlet extends BigdataRDFServlet {
 
                 }
 
-            } catch (Throwable t) {
+        } catch (Throwable t) {
 
-                throw BigdataRDFServlet.launderThrowable(t, resp, "");
-
-            }
-
-        } catch (Exception ex) {
-
-            // Will be rendered as an INTERNAL_ERROR.
-            throw new RuntimeException(ex);
+            throw BigdataRDFServlet.launderThrowable(t, resp, "s=" + s + ",p="
+                    + p + ",o=" + o + ",c=" + c);
 
         }
+
+//        } catch (Exception ex) {
+//
+//            // Will be rendered as an INTERNAL_ERROR.
+//            throw new RuntimeException(ex);
+//
+//        }
 
     }
 

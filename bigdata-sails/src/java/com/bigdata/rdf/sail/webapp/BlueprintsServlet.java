@@ -138,10 +138,9 @@ public class BlueprintsServlet extends BigdataRDFServlet {
                 
             }
 
-        } catch (Exception ex) {
+        } catch (Throwable t) {
 
-            // Will be rendered as an INTERNAL_ERROR.
-            throw new RuntimeException(ex);
+            throw BigdataRDFServlet.launderThrowable(t, resp, "");
             
         }
         

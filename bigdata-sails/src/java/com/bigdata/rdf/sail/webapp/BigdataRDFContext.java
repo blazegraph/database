@@ -2167,7 +2167,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
      * @param namespace
      *            The namespace.
      * @param timestamp
-     *            The timestamp.
+     *            A timestamp -or- a tx identifier.
      * 
      * @return The {@link AbstractTripleStore} -or- <code>null</code> if none is
      *         found for that namespace and timestamp.
@@ -2205,7 +2205,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
      * 
      * @throws RepositoryException
      */
-    public BigdataSailRepositoryConnection getUnisolatedConnection(
+    public BigdataSailRepositoryConnection getUnisolatedConnection( // FIXME REVIEW CALLERS
             final String namespace) throws SailException, RepositoryException {
 
         // resolve the default namespace.
@@ -2247,7 +2247,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
         
 		try {
 			
-		    return getNamespaces(timestamp, tx);
+		    return getNamespacesTx(tx);
 			
 		} finally {
 			
@@ -2257,25 +2257,25 @@ public class BigdataRDFContext extends BigdataBaseContext {
 
     }
 
-	private List<String> getNamespaces(long timestamp, final long tx) {
+	/*package*/ List<String> getNamespacesTx(final long tx) {
 
-        if (timestamp == ITx.READ_COMMITTED) {
-
-            // Use the last commit point.
-            timestamp = getIndexManager().getLastCommitTime();
-
-        }
+//        if (timestamp == ITx.READ_COMMITTED) {
+//
+//            // Use the last commit point.
+//            timestamp = getIndexManager().getLastCommitTime();
+//
+//        }
 
         // the triple store namespaces.
 		final List<String> namespaces = new LinkedList<String>();
 
 		final SparseRowStore grs = getIndexManager().getGlobalRowStore(
-				timestamp);
+				tx);
 
 		if (grs == null) {
 
-			log.warn("No GRS @ timestamp="
-					+ TimestampUtility.toString(timestamp));
+			log.warn("No GRS @ tx="
+					+ TimestampUtility.toString(tx));
 
 			// Empty.
 			return namespaces;
@@ -2346,6 +2346,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
         long tx = timestamp; // use dirty reads unless Journal.
 
         if (getIndexManager() instanceof Journal) {
+            
             final ITransactionService txs = ((Journal) getIndexManager())
                     .getLocalTransactionManager().getTransactionService();
 
@@ -2368,11 +2369,8 @@ public class BigdataRDFContext extends BigdataBaseContext {
 	 *            The transaction identifier.
 	 */
 	public void abortTx(final long tx) {
-		if (getIndexManager() instanceof Journal) {
-//			if (!TimestampUtility.isReadWriteTx(tx)) {
-//				// Not a transaction.
-//				throw new IllegalStateException();
-//			}
+
+	    if (getIndexManager() instanceof Journal) {
 
 			final ITransactionService txs = ((Journal) getIndexManager())
 					.getLocalTransactionManager().getTransactionService();
@@ -2387,5 +2385,23 @@ public class BigdataRDFContext extends BigdataBaseContext {
 		}
 
 	}
+	
+//	public void commitTx(final long tx) {
+//
+//	    if (getIndexManager() instanceof Journal) {
+//
+//            final ITransactionService txs = ((Journal) getIndexManager())
+//                    .getLocalTransactionManager().getTransactionService();
+//
+//            try {
+//                txs.commit(tx);
+//            } catch (IOException e) {
+//                // Note: Local operation. Will not throw IOException.
+//                throw new RuntimeException(e);
+//            }
+//
+//        }
+//
+//    }
 	
 }
