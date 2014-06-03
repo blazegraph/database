@@ -328,6 +328,8 @@ public class SnapshotManager implements IServiceInit<Void> {
         
         snapshotIndex = SnapshotIndex.createTransient();
 
+        // Note: Caller MUST invoke init() Callable.
+
     }
 
     @Override
@@ -340,7 +342,11 @@ public class SnapshotManager implements IServiceInit<Void> {
     /**
      * Task that is used to initialize the {@link SnapshotManager}.
      * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+     *         Thompson</a>
+     * 
+     * @see <a href="http://trac.bigdata.com/ticket/775" > HAJournal start()
+     *      (optimization) </a>
      */
     private class InitTask implements Callable<Void> {
 
@@ -367,9 +373,6 @@ public class SnapshotManager implements IServiceInit<Void> {
         private void doRunWithLock() throws IOException, InterruptedException,
                 ExecutionException {
 
-            if (log.isInfoEnabled())
-                log.info("Starting cleanup.");
-
             /*
              * Delete any temporary files that were left lying around in the
              * snapshot directory.
@@ -381,6 +384,9 @@ public class SnapshotManager implements IServiceInit<Void> {
              * the times for these different scans so I can get a better sense
              * of the latencies involved.
              */
+            if (log.isInfoEnabled())
+                log.info("Starting cleanup.");
+
             CommitCounterUtility.recursiveDelete(false/* errorIfDeleteFails */,
                     getSnapshotDir(), TEMP_FILE_FILTER);
 
@@ -413,12 +419,29 @@ public class SnapshotManager implements IServiceInit<Void> {
         }
 
         /**
-         * Scans the {@link #snapshotDir} and populates the {@link #snapshotIndex}
-         * from the root blocks in snapshot files found in that directory.
+         * Scans the {@link SnapshotManager#getSnapshotDir()} and populates the
+         * {@link SnapshotIndex} from the root blocks in snapshot files found in
+         * that directory.
          * 
          * @throws IOException
          * @throws ExecutionException
          * @throws InterruptedException
+         * 
+         *             TODO Follow the code pattern for the HALogNexus and
+         *             provide robust error handling for snapshot files. Note
+         *             that snapshots are taken locally based on various
+         *             criteria (including the size of the delta, the #of
+         *             HALogs, etc.). As long as we have all HALogs the services
+         *             should be able to make a purely local decisions about
+         *             what to do if we have a bad snapshot file. One option is
+         *             to force a snapshot when the service starts. That option
+         *             is only available of course if the service can join with
+         *             the quorum.
+         *             <p>
+         *             Note: If the service CAN NOT do a point in time recovery
+         *             because it lacks a combination of valid HALog files and
+         *             snapshots, then a failover to that service will degrade
+         *             the availability of the cluster.
          */
         private void populateIndexRecursive(final LatchedExecutor executor,
                 final File f, final FileFilter fileFilter, final int depth)
@@ -474,6 +497,20 @@ public class SnapshotManager implements IServiceInit<Void> {
                     /*
                      * Await futures, obtaining snapshot records for the current
                      * leaf directory.
+                     * 
+                     * TODO If the root blocks are bad, then this will throw an
+                     * IOException and that will prevent the startup of the
+                     * HAJournalServer. However, if we start up the server with
+                     * a known bad snapshot *and* the snapshot is the earliest
+                     * snapshot, then we can not restore commit points which
+                     * depend on that earliest snapshot (we can still restore
+                     * commit points that are GTE the first useable snapshot).
+                     * 
+                     * TODO A similar problem exists if any of the HALog files
+                     * GTE the earliest snapshot are missing, have bad root
+                     * blocks, etc. We will not be able to restore the commit
+                     * point associated with that HALog file unless it also
+                     * happens to correspond to a snapshot.
                      */
                     final List<SnapshotRecord> records = new ArrayList<SnapshotRecord>(
                             children.length);
@@ -492,6 +529,22 @@ public class SnapshotManager implements IServiceInit<Void> {
                     for (SnapshotRecord r : records) {
 
                         snapshotIndex.add(r);
+
+                        final long nentries = snapshotIndex.getEntryCount();
+
+                        if (nentries % 1000 == 0) {
+
+                            /*
+                             * Provide an indication that the server is doing
+                             * work during startup (it would be unusual to have
+                             * a lot of snapshot files, but this provides
+                             * symmetry with the HALog startup procedure).
+                             */
+
+                            haLog.warn("Indexed " + nentries
+                                    + " snapshot files");
+
+                        }
 
                     }
 
@@ -533,7 +586,7 @@ public class SnapshotManager implements IServiceInit<Void> {
 
         }
 
-    }
+    } // class InitTask
     
     private void ensureSnapshotDirExists() throws IOException {
 
@@ -642,20 +695,6 @@ public class SnapshotManager implements IServiceInit<Void> {
      *             if the file can not be read.
      * @throws ChecksumError
      *             if there is a checksum problem with the root blocks.
-     * 
-     *             TODO If the root blocks are bad, then this will throw an
-     *             IOException and that will prevent the startup of the
-     *             HAJournalServer. However, if we start up the server with a
-     *             known bad snapshot *and* the snapshot is the earliest
-     *             snapshot, then we can not restore commit points which depend
-     *             on that earliest snapshot (we can still restore commit points
-     *             that are GTE the first useable snapshot).
-     * 
-     *             TODO A similar problem exists if any of the HALog files GTE
-     *             the earliest snapshot are missing, have bad root blocks, etc.
-     *             We will not be able to restore the commit point associated
-     *             with that HALog file unless it also happens to correspond to
-     *             a snapshot.
      */
     private SnapshotRecord getSnapshotRecord(final File file) throws IOException {
         
