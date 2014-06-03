@@ -2628,7 +2628,7 @@ ${postInstallMessage}</echo>
 </java>
 </target>
 
-    <target name="start-bigdata" depends="compile" description="Start the Bigdata Server.">
+    <target name="start-bigdata" depends="compile" description="Start the Bigdata Server (triples mode).">
         <java classname="com.bigdata.rdf.sail.webapp.NanoSparqlServer" failonerror="true" fork="true" logerror="true">
             <classpath refid="runtime.classpath" />
             <jvmarg value="-server"/>
