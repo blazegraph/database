@@ -40,7 +40,9 @@ import org.openrdf.rio.RDFWriterRegistry;
 
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.rio.json.BigdataSPARQLResultsJSONParserFactory;
+import com.bigdata.rdf.rio.json.BigdataSPARQLResultsJSONParserForConstructFactory;
 import com.bigdata.rdf.rio.json.BigdataSPARQLResultsJSONWriterFactory;
+import com.bigdata.rdf.rio.json.BigdataSPARQLResultsJSONWriterForConstructFactory;
 import com.bigdata.rdf.rio.ntriples.BigdataNTriplesParserFactory;
 import com.bigdata.rdf.rio.turtle.BigdataTurtleParserFactory;
 import com.bigdata.rdf.rio.turtle.BigdataTurtleWriterFactory;
@@ -125,7 +127,7 @@ public class ServiceProviderHook {
              * Allows parsing of JSON SPARQL Results with an {s,p,o,[c]} header.
              * RDR-enabled.
              */
-//            r.add(new BigdataSPARQLResultsJSONParserFactory());
+            r.add(new BigdataSPARQLResultsJSONParserForConstructFactory());
             
         }
         
@@ -157,7 +159,7 @@ public class ServiceProviderHook {
             r.add(new BigdataTurtleWriterFactory());
 
             // RDR-enabled
-//            r.add(new BigdataSPARQLResultsJSONWriterFactory());
+            r.add(new BigdataSPARQLResultsJSONWriterForConstructFactory());
             
         }
 

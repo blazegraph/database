@@ -48,7 +48,7 @@ import com.fasterxml.jackson.core.JsonToken;
  */
 public class BigdataSPARQLResultsJSONParser extends SPARQLJSONParserBase implements TupleQueryResultParser {
 
-    public static final String STATEMENT = "statement";
+    public static final String SID = "sid";
 
     public static final String SUBJECT = "subject";
 
@@ -156,7 +156,7 @@ public class BigdataSPARQLResultsJSONParser extends SPARQLJSONParserBase impleme
         }
         
         // added for Sids support
-        if (type.equals(STATEMENT)) {
+        if (type.equals(SID)) {
             
             final Resource s = (Resource) sid.get(SUBJECT);
             final URI p = (URI) sid.get(PREDICATE);
