@@ -19,15 +19,13 @@ package com.bigdata.rdf.rio.json;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
+import java.io.Writer;
 import java.nio.charset.Charset;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
-
-import com.fasterxml.jackson.core.JsonFactory;
-import com.fasterxml.jackson.core.JsonGenerator;
 
 import org.openrdf.model.BNode;
 import org.openrdf.model.Literal;
@@ -42,6 +40,9 @@ import org.openrdf.query.resultio.QueryResultWriter;
 import org.openrdf.query.resultio.QueryResultWriterBase;
 import org.openrdf.rio.RioSetting;
 import org.openrdf.rio.helpers.BasicWriterSettings;
+
+import com.fasterxml.jackson.core.JsonFactory;
+import com.fasterxml.jackson.core.JsonGenerator;
 
 /**
  * An abstract class to implement the base functionality for both
@@ -85,6 +86,15 @@ abstract class SPARQLJSONWriterBase extends QueryResultWriterBase implements Que
 	protected boolean linksFound = false;
 
 	protected final JsonGenerator jg;
+
+    public SPARQLJSONWriterBase(Writer writer) {
+        try {
+            jg = JSON_FACTORY.createJsonGenerator(writer);
+        }
+        catch (IOException e) {
+            throw new IllegalArgumentException(e);
+        }
+    }
 
 	public SPARQLJSONWriterBase(OutputStream out) {
 		try {
@@ -413,7 +423,7 @@ abstract class SPARQLJSONWriterBase extends QueryResultWriterBase implements Que
 		// Ignored by SPARQLJSONWriterBase
 	}
 
-	protected void endDocument()
+	public void endDocument()
 		throws IOException
 	{
 		jg.writeEndObject();

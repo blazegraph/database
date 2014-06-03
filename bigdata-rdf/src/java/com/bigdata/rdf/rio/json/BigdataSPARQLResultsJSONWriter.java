@@ -18,13 +18,10 @@ package com.bigdata.rdf.rio.json;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.io.Writer;
 
-import org.openrdf.model.BNode;
-import org.openrdf.model.Literal;
-import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.query.QueryResultHandlerException;
-import org.openrdf.query.TupleQueryResultHandlerException;
 import org.openrdf.query.resultio.TupleQueryResultFormat;
 import org.openrdf.query.resultio.TupleQueryResultWriter;
 
@@ -41,6 +38,10 @@ public class BigdataSPARQLResultsJSONWriter extends SPARQLJSONWriterBase impleme
 	/*--------------*
 	 * Constructors *
 	 *--------------*/
+
+    public BigdataSPARQLResultsJSONWriter(Writer writer) {
+        super(writer);
+    }
 
 	public BigdataSPARQLResultsJSONWriter(OutputStream out) {
 		super(out);
@@ -82,21 +83,21 @@ public class BigdataSPARQLResultsJSONWriter extends SPARQLJSONWriterBase impleme
         
         jg.writeStartObject();
 
-        jg.writeStringField("type", "statement");
+        jg.writeStringField("type", BigdataSPARQLResultsJSONParser.SID);
         
         final BigdataStatement stmt = sid.getStatement();
         
-        jg.writeFieldName("subject");
+        jg.writeFieldName(BigdataSPARQLResultsJSONParser.SUBJECT);
         writeValue(stmt.getSubject());
         
-        jg.writeFieldName("predicate");
-        writeValue(stmt.getSubject());
+        jg.writeFieldName(BigdataSPARQLResultsJSONParser.PREDICATE);
+        writeValue(stmt.getPredicate());
         
-        jg.writeFieldName("object");
-        writeValue(stmt.getSubject());
+        jg.writeFieldName(BigdataSPARQLResultsJSONParser.OBJECT);
+        writeValue(stmt.getObject());
 
         if (stmt.getContext() != null) {
-            jg.writeFieldName("context");
+            jg.writeFieldName(BigdataSPARQLResultsJSONParser.CONTEXT);
             writeValue(stmt.getContext());
         }
         
