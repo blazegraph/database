@@ -355,9 +355,12 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
 
             if (tripleStore != null) {
                 /*
-                 * Already exists.
+                 * The namespace already exists.
+                 * 
+                 * Note: The response code is defined as 409 (Conflict) since
+                 * 1.3.2.
                  */
-                buildResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN,
+                buildResponse(resp, HttpServletResponse.SC_CONFLICT, MIME_TEXT_PLAIN,
                         "EXISTS: " + namespace);
                 return;
             }
@@ -395,12 +398,15 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
 
             }
 
-            buildResponse(resp, HTTP_OK, MIME_TEXT_PLAIN, "CREATED: "
-                    + namespace);
+            /*
+             * Note: The response code is defined as 201 (Created) since 1.3.2.
+             */
+            buildResponse(resp, HttpServletResponse.SC_CREATED,
+                    MIME_TEXT_PLAIN, "CREATED: " + namespace);
 
         } catch (Throwable e) {
 
-            throw launderThrowable(e, resp, "");
+            throw launderThrowable(e, resp, "namespace=" + namespace);
 
         }
         
