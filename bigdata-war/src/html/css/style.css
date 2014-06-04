@@ -188,29 +188,13 @@ h2 {
    overflow: hidden;
 }
 
+#query-form, #update-box-container {
+   clear: both;
+}
+
 .namespace-shortcuts {
    float: right;
    margin-bottom: 20px;
-}
-
-.namespace-shortcuts li {
-   display: inline-block;
-   border: 1px solid #e4e4e4;
-   padding: 5px;
-   margin-left: 5px;
-   cursor: pointer;
-   width: 40px;
-   text-align: center;
-}
-
-.namespace-shortcuts li:hover {
-   border-color: #b7b7b7;
-   background-color: #b7b7b7;
-   color: #ededed;
-}
-
-#query-form, #update-box-container {
-   clear: both;
 }
 
 #large-file-message {
@@ -228,7 +212,6 @@ textarea {
 .CodeMirror {
    margin: 5px 0;
    border: 1px solid #e1e1e1;
-   font-size: 125%;
 }
 
 .CodeMirror-placeholder {
@@ -279,6 +262,19 @@ th {
 
 pre {
    font-family: monospace;
+}
+
+/* make cursor visible in error highlighting */
+div.CodeMirror-cursors {
+   z-index: 3;
+}
+
+.error-line {
+   background: red;
+}
+
+.error-character {
+   background: green;
 }
 
 #page-selector {
