@@ -1,9 +1,28 @@
 $(function() {
 
 // global variables
-var DEFAULT_NAMESPACE, NAMESPACE, NAMESPACE_URL, NAMESPACES_READY, NAMESPACE_SHORTCUTS, FILE_CONTENTS, QUERY_RESULTS;
-var QUERY_EDITOR, UPDATE_EDITOR;
+var DEFAULT_NAMESPACE, NAMESPACE, NAMESPACES_READY, NAMESPACE_SHORTCUTS, FILE_CONTENTS, QUERY_RESULTS;
+// LBS URLs do not currently work with non-HA and HA1 setups. Set this to true to use LBS URLs
+if(false) {
+   var RW_URL_PREFIX = '/bigdata/LBS/leader/', RO_URL_PREFIX = '/bigdata/LBS/read/';
+} else {
+   var RW_URL_PREFIX = '/bigdata/', RO_URL_PREFIX = '/bigdata/';
+}
+var CODEMIRROR_DEFAULTS, EDITORS = {}, ERROR_LINE_MARKERS = {}, ERROR_CHARACTER_MARKERS = {};
 var PAGE_SIZE = 50, TOTAL_PAGES, CURRENT_PAGE;
+var NAMESPACE_PARAMS = {
+   'name': 'com.bigdata.rdf.sail.namespace',
+   'index': 'com.bigdata.search.FullTextIndex.fieldsEnabled',
+   'truthMaintenance': 'com.bigdata.rdf.sail.truthMaintenance',
+   'quads': 'com.bigdata.rdf.store.AbstractTripleStore.quads'
+};
+
+
+CODEMIRROR_DEFAULTS = {
+   lineNumbers: true,
+   mode: 'sparql',
+   extraKeys: {'Ctrl-,': moveTabLeft, 'Ctrl-.': moveTabRight}
+};
 
 // debug to access closure variables
 $('html, textarea, select').bind('keydown', 'ctrl+d', function() { debugger; });
@@ -29,7 +48,7 @@ $('#search-form').submit(function(e) {
       return;
    }
    var query = 'select ?s ?p ?o { ?o bds:search "' + term + '" . ?s ?p ?o . }'
-   $('#query-box').val(query);
+   EDITORS.query.setValue(query);
    $('#query-errors').hide();
    $('#query-form').submit();
    showTab('query');
@@ -49,10 +68,8 @@ function showTab(tab, nohash) {
    if(!nohash && window.location.hash.substring(1).indexOf(tab) != 0) {
       window.location.hash = tab;
    }
-   if(tab == 'query') {
-      QUERY_EDITOR.refresh();
-   } else if(tab == 'update') {
-      UPDATE_EDITOR.refresh();
+   if(EDITORS[tab]) {
+      EDITORS[tab].refresh();
    }
 }
 
@@ -89,7 +106,7 @@ $('html, textarea, select').bind('keydown', 'ctrl+¾', moveTabRight);
 /* Namespaces */
 
 function getNamespaces() {
-   $.get('/bigdata/namespace?describe-each-named-graph=false', function(data) {
+   $.get(RO_URL_PREFIX + 'namespace?describe-each-named-graph=false', function(data) {
       $('#namespaces-list').empty();
       var rdf = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#';
       var namespaces = namespaces = data.getElementsByTagNameNS(rdf, 'Description')
@@ -103,11 +120,11 @@ function getNamespaces() {
          } else {
             use = '<a href="#" class="use-namespace">Use</a>';
          }
-         $('#namespaces-list').append('<li data-name="' + title + '" data-url="' + url + '">' + titleText + ' - ' + use + ' - <a href="#" class="delete-namespace">Delete</a> - <a href="#" class="namespace-properties">Properties</a> - <a href="/bigdata/namespace/' + title + '/sparql" class="namespace-service-description">Service Description</a></li>');
+         $('#namespaces-list').append('<li data-name="' + title + '">' + titleText + ' - ' + use + ' - <a href="#" class="delete-namespace">Delete</a> - <a href="#" class="namespace-properties">Properties</a> - <a href="' + RO_URL_PREFIX + 'namespace/' + title + '/sparql" class="namespace-service-description">Service Description</a></li>');
       }
       $('.use-namespace').click(function(e) {
          e.preventDefault();
-         useNamespace($(this).parent().data('name'), $(this).parent().data('url'));
+         useNamespace($(this).parent().data('name'));
       });
       $('.delete-namespace').click(function(e) {
          e.preventDefault();
@@ -116,6 +133,14 @@ function getNamespaces() {
       $('.namespace-properties').click(function(e) {
          e.preventDefault();
          getNamespaceProperties($(this).parent().data('name'));
+      });
+      $('.namespace-properties-java').click(function(e) {
+         e.preventDefault();
+         getNamespaceProperties($(this).parent().data('name'), 'java');
+      });
+      $('.clone-namespace').click(function(e) {
+         e.preventDefault();
+         cloneNamespace($(this).parent().data('name'));
       });
       $('.namespace-service-description').click(function(e) {
          return confirm('This can be an expensive operation. Proceed anyway?');
@@ -133,10 +158,9 @@ function selectNamespace(name) {
    }
 }
 
-function useNamespace(name, url) {
+function useNamespace(name) {
    $('#current-namespace').html(name);
    NAMESPACE = name;
-   NAMESPACE_URL = url;
    getNamespaces();
 }
 
@@ -151,7 +175,7 @@ function deleteNamespace(namespace) {
       if(namespace == NAMESPACE) {
          // FIXME: what is the desired behaviour when deleting the current namespace?
       }
-      var url = '/bigdata/namespace/' + namespace;
+      var url = RW_URL_PREFIX + 'namespace/' + namespace;
       var settings = {
          type: 'DELETE',
          success: getNamespaces,
@@ -161,46 +185,84 @@ function deleteNamespace(namespace) {
    }
 }
 
-function getNamespaceProperties(namespace) {
-   $('#namespace-properties h1').html(namespace);
-   $('#namespace-properties table').empty();
-   $('#namespace-properties').show();
-   var url = '/bigdata/namespace/' + namespace + '/properties';
+function getNamespaceProperties(namespace, download) {
+   var url = RO_URL_PREFIX + 'namespace/' + namespace + '/properties';
+      if(!download) {
+         $('#namespace-properties h1').html(namespace);
+         $('#namespace-properties table').empty();
+         $('#namespace-properties').show();
+      }
    $.get(url, function(data) {
+      var java = '';
       $.each(data.getElementsByTagName('entry'), function(i, entry) {
-         $('#namespace-properties table').append('<tr><td>' + entry.getAttribute('key') + '</td><td>' + entry.textContent + '</td></tr>');
+         if(download) {
+            java += entry.getAttribute('key') + '=' + entry.textContent + '\n';
+         } else {
+            $('#namespace-properties table').append('<tr><td>' + entry.getAttribute('key') + '</td><td>' + entry.textContent + '</td></tr>');
+         }
       });
+      if(download) {
+         downloadFile(java, 'text/x-java-properties', this.url.split('/')[3] + '.properties');
+      }
+   });
+}
+
+function cloneNamespace(namespace) {
+   var url = RO_URL_PREFIX + 'namespace/' + namespace + '/properties';
+   $.get(url, function(data) {
+      var reversed_params = {};
+      for(var key in NAMESPACE_PARAMS) {
+         reversed_params[NAMESPACE_PARAMS[key]] = key;
+      }
+      $.each(data.getElementsByTagName('entry'), function(i, entry) {
+         var key = entry.getAttribute('key');
+         if(reversed_params[key] == 'name') {
+            return;
+         }
+         if(key in reversed_params) {
+            $('#new-namespace-' + reversed_params[key]).prop('checked', entry.textContent.trim() == 'true');
+         }
+      });
+      $('#new-namespace-name').focus();
    });
 }
 
 function createNamespace(e) {
    e.preventDefault();
-   var input = $(this).find('input[type=text]');
-   var namespace = input.val();
-   if(!namespace) {
+   // get new namespace name and config options
+   var params = {};
+   params.name = $('#new-namespace-name').val().trim();
+   if(!params.name) {
       return;
    }
+   params.index = $('#new-namespace-index').is(':checked');
+   params.truthMaintenance = $('#new-namespace-truth-maintenance').is(':checked');
+   params.quads = $('#new-namespace-quads').is(':checked');
    // TODO: validate namespace
    // TODO: allow for other options to be specified
-   var data = '<?xml version="1.0" encoding="UTF-8" standalone="no"?>\n<!DOCTYPE properties SYSTEM "http://java.sun.com/dtd/properties.dtd">\n<properties>\n<entry key="com.bigdata.rdf.sail.namespace">' + namespace + '</entry>\n</properties>';
+   var data = '<?xml version="1.0" encoding="UTF-8" standalone="no"?>\n<!DOCTYPE properties SYSTEM "http://java.sun.com/dtd/properties.dtd">\n<properties>\n';
+   for(key in NAMESPACE_PARAMS) {
+      data += '<entry key="' + NAMESPACE_PARAMS[key] + '">' + params[key] + '</entry>\n';
+   }
+   data += '</properties>';
    var settings = {
       type: 'POST',
       data: data,
       contentType: 'application/xml',
-      success: function() { input.val(''); getNamespaces(); },
-      error: function(jqXHR, textStatus, errorThrown) { alert(jqXHR.statusText); }
+      success: function() { $('#new-namespace-name').val(''); getNamespaces(); },
+      error: function(jqXHR, textStatus, errorThrown) { debugger;alert(jqXHR.responseText); }
    };
-   $.ajax('/bigdata/namespace', settings);
+   $.ajax(RW_URL_PREFIX + 'namespace', settings);
 }
 $('#namespace-create').submit(createNamespace);
 
 function getDefaultNamespace() {
-   $.get('/bigdata/namespace?describe-each-named-graph=false&describe-default-namespace=true', function(data) {
+   $.get(RO_URL_PREFIX + 'namespace?describe-each-named-graph=false&describe-default-namespace=true', function(data) {
       // Chrome does not work with rdf\:Description, so look for Description too
       var defaultDataset = $(data).find('rdf\\:Description, Description');
       DEFAULT_NAMESPACE = defaultDataset.find('title')[0].textContent;
       var url = defaultDataset.find('sparqlEndpoint')[0].attributes['rdf:resource'].textContent;
-      useNamespace(DEFAULT_NAMESPACE, url);
+      useNamespace(DEFAULT_NAMESPACE);
    });
 }
 
@@ -210,34 +272,51 @@ getDefaultNamespace();
 /* Namespace shortcuts */
 
 NAMESPACE_SHORTCUTS = {
-   'rdf': 'http://www.w3.org/1999/02/22-rdf-syntax-ns#',
-   'rdfs': 'http://www.w3.org/2000/01/rdf-schema#',
-   'owl': 'http://www.w3.org/2002/07/owl#',
-   'bd': 'http://www.bigdata.com/rdf#',
-   'bds': 'http://www.bigdata.com/rdf/search#',
-   'gas': 'http://www.bigdata.com/rdf/gas#',
-   'foaf': 'http://xmlns.com/foaf/0.1/',
-   'hint': 'http://www.bigdata.com/queryHints#',
-   'dc': 'http://purl.org/dc/elements/1.1/',
-   'xsd': 'http://www.w3.org/2001/XMLSchema#'
+   'Bigdata': {
+      'bd': 'http://www.bigdata.com/rdf#',
+      'bds': 'http://www.bigdata.com/rdf/search#',
+      'gas': 'http://www.bigdata.com/rdf/gas#',
+      'hint': 'http://www.bigdata.com/queryHints#'
+   },
+   'W3C': {
+      'rdf': 'http://www.w3.org/1999/02/22-rdf-syntax-ns#',
+      'rdfs': 'http://www.w3.org/2000/01/rdf-schema#',
+      'owl': 'http://www.w3.org/2002/07/owl#',
+      'skos': 'http://www.w3.org/2004/02/skos/core#',
+      'xsd': 'http://www.w3.org/2001/XMLSchema#'
+   },
+   'Dublic Core': {
+      'dc': 'http://purl.org/dc/elements/1.1/',
+      'dcterm': 'http://purl.org/dc/terms/',
+      'void': 'http://rdfs.org/ns/void#'
+   },
+   'Social/Other': {
+      'foaf': 'http://xmlns.com/foaf/0.1/',
+      'schema': 'http://schema.org/',
+      'sioc': 'http://rdfs.org/sioc/ns#'
+   }
 };
 
-$('.namespace-shortcuts').html('<ul>');
-for(var ns in NAMESPACE_SHORTCUTS) {
-   // cannot use data-ns attribute on li, as jQuery mangles namespaces that don't end with #, adding </li> to them
-   var li = $('<li>' + ns.toUpperCase() + '</li>');
-   li.data('ns', 'prefix ' + ns + ': <' + NAMESPACE_SHORTCUTS[ns] + '>');
-   li.appendTo('.namespace-shortcuts ul');
+$('.namespace-shortcuts').html('');
+for(var category in NAMESPACE_SHORTCUTS) {
+   var select = $('<select><option>' + category + '</option></select>').appendTo($('.namespace-shortcuts'));
+   for(var ns in NAMESPACE_SHORTCUTS[category]) {
+      select.append('<option value="' + NAMESPACE_SHORTCUTS[category][ns] + '">' + ns + '</option>');
+   }
 }
 
-$('.namespace-shortcuts li').click(function() {
-   var textarea = $(this).parents('.tab').find('textarea');
-   var current = textarea.val();
-   var ns = $(this).data('ns');
+$('.namespace-shortcuts select').change(function() {
+   var uri = this.value;
+   var tab = $(this).parents('.tab').attr('id').split('-')[0];
+   var current = EDITORS[tab].getValue();
 
-   if(current.indexOf(ns) == -1) {
-      textarea.val(ns + '\n' + current);
+   if(current.indexOf(uri) == -1) {
+      var ns = $(this).find(':selected').text();
+      EDITORS[tab].setValue('prefix ' + ns + ': <' + uri + '>\n' + current);
    }
+
+   // reselect group label
+   this.selectedIndex = 0;
 });
 
 
@@ -379,7 +458,7 @@ function setUpdateMode(type) {
          mode = rdf_modes[type];
       }
    }
-   UPDATE_EDITOR.setOption('mode', mode);
+   EDITORS.update.setOption('mode', mode);
 }
 
 // .xml is used for both RDF and TriX, assume it's RDF
@@ -420,9 +499,14 @@ $('#clear-file').click(clearFile);
 
 $('#update-update').click(submitUpdate);
 
-UPDATE_EDITOR = CodeMirror.fromTextArea($('#update-box')[0], {lineNumbers: true, mode: 'sparql',
-   extraKeys: {'Ctrl-Enter': submitUpdate, 'Ctrl-,': moveTabLeft, 'Ctrl-.': moveTabRight}
+EDITORS.update = CodeMirror.fromTextArea($('#update-box')[0], CODEMIRROR_DEFAULTS);
+EDITORS.update.on('change', function() { 
+   if(ERROR_LINE_MARKERS.update) {
+      ERROR_LINE_MARKERS.update.clear();
+      ERROR_CHARACTER_MARKERS.update.clear();
+   }
 });
+EDITORS.update.addKeyMap({'Ctrl-Enter': submitUpdate});
 
 function submitUpdate(e) {
    // Updates are submitted as a regular form for SPARQL updates in monitor mode, and via AJAX for non-monitor SPARQL, RDF & file path updates.
@@ -435,9 +519,10 @@ function submitUpdate(e) {
 
    $('#update-response').show();
 
+   var url = RW_URL_PREFIX + 'namespace/' + NAMESPACE + '/sparql';
    var settings = {
       type: 'POST',
-      data: FILE_CONTENTS == null ? UPDATE_EDITOR.getValue() : FILE_CONTENTS,
+      data: FILE_CONTENTS == null ? EDITORS.update.getValue() : FILE_CONTENTS,
       success: updateResponseXML,
       error: updateResponseError
    }
@@ -449,7 +534,7 @@ function submitUpdate(e) {
          if($('#update-monitor').is(':checked')) {
             // create form and submit it, sending output to the iframe
             var form = $('<form method="POST" target="update-response-container">')
-               .attr('action', NAMESPACE_URL)
+               .attr('action', url)
                .append($('<input name="update">').val(settings.data))
                .append('<input name="monitor" value="true">');
             if($('#update-analytic').is(':checked')) {
@@ -485,7 +570,7 @@ function submitUpdate(e) {
 
    $('#update-response pre').show().html('Data loading...');   
 
-   $.ajax(NAMESPACE_URL, settings);
+   $.ajax(url, settings);
 }
 
 $('#update-clear').click(function() {
@@ -538,9 +623,14 @@ $('#query-details').change(function() {
    }
 });
 
-QUERY_EDITOR = CodeMirror.fromTextArea($('#query-box')[0], {lineNumbers: true, mode: 'sparql',
-   extraKeys: {'Ctrl-Enter': submitQuery, 'Ctrl-,': moveTabLeft, 'Ctrl-.': moveTabRight}
+EDITORS.query = CodeMirror.fromTextArea($('#query-box')[0], CODEMIRROR_DEFAULTS);
+EDITORS.query.on('change', function() { 
+   if(ERROR_LINE_MARKERS.query) {
+      ERROR_LINE_MARKERS.query.clear();
+      ERROR_CHARACTER_MARKERS.query.clear();
+   }
 });
+EDITORS.query.addKeyMap({'Ctrl-Enter': submitQuery});
 
 function submitQuery(e) {
    try {
@@ -548,8 +638,14 @@ function submitQuery(e) {
    } catch(e) {}
 
    // transfer CodeMirror content to textarea
-   QUERY_EDITOR.save();
+   EDITORS.query.save();
 
+   // do nothing if query is empty
+   if($('#query-box').val().trim() == '') {
+      return;
+   }
+
+   var url = RO_URL_PREFIX + 'namespace/' + NAMESPACE + '/sparql';
    var settings = {
       type: 'POST',
       data: $('#query-form').serialize(),
@@ -561,7 +657,7 @@ function submitQuery(e) {
    $('#query-response').show().html('Query running...');
    $('#query-pagination').hide();
 
-   $.ajax(NAMESPACE_URL, settings);
+   $.ajax(url, settings);
 
    $('#query-explanation').empty();
    if($('#query-explain').is(':checked')) {
@@ -572,7 +668,7 @@ function submitQuery(e) {
          success: showQueryExplanation,
          error: queryResultsError
       };
-      $.ajax(NAMESPACE_URL, settings);
+      $.ajax(url, settings);
    } else {
       $('#query-explanation').hide();
    }
@@ -630,7 +726,7 @@ $('#query-download').click(function() {
          success: function() { downloadFile(data, dataType, filename); },
          error: downloadRDFError
       };
-      $.ajax('/bigdata/sparql?workbench&convert', settings);
+      $.ajax(RO_URL_PREFIX + 'sparql?workbench&convert', settings);
    } else {
       // not RDF
       export_extensions[dataType][3](filename);
@@ -811,21 +907,9 @@ function highlightError(description, pane) {
    if(match) {
       // highlight character at error position
       var line = match[1] - 1;
-      var column = match[2] - 1;
-      var input = $('#' + pane + '-box').val();
-      var lines = input.split('\n');
-      var container = '#' + pane + '-errors';
-      $(container).html('');
-      for(var i=0; i<line; i++) {
-         var p = $('<p>').text(lines[i]);
-         $(container).append(p);
-      }
-      $(container).append('<p class="error-line">');
-      $(container + ' .error-line').append(document.createTextNode(lines[line].substr(0, column)));
-      $(container + ' .error-line').append($('<span class="error-character">').text(lines[line].charAt(column) || ' '));
-      $(container + ' .error-line').append(document.createTextNode(lines[line].substr(column + 1)));
-      $(container).show();
-      $('#' + pane + '-box').scrollTop(0);
+      var character = match[2] - 1;
+      ERROR_LINE_MARKERS[pane] = EDITORS.query.doc.markText({line: line, ch: 0}, {line: line}, {className: 'error-line'});
+      ERROR_CHARACTER_MARKERS[pane] = EDITORS.query.doc.markText({line: line, ch: character}, {line: line, ch: character + 1}, {className: 'error-character'});
    }
 }
 
@@ -925,8 +1009,16 @@ function showPage(n) {
 
 $('#explore-form').submit(function(e) {
    e.preventDefault();
-   var uri = $(this).find('input').val();
+   var uri = $(this).find('input[type="text"]').val().trim();
    if(uri) {
+      // add < > if they're not present and this is not a namespaced URI
+      if(uri[0] != '<' && uri.match(/^\w+:\//)) {
+         uri = '<' + uri;
+         if(uri.slice(-1) != '>') {
+            uri += '>';
+         }
+         $(this).find('input[type="text"]').val(uri);
+      }
       loadURI(uri);
 
       // if this is a SID, make the components clickable
@@ -1015,7 +1107,7 @@ group by ?col1 ?col2 ?incoming';
       success: updateExploreStart,
       error: updateExploreError
    };
-   $.ajax(NAMESPACE_URL, settings); 
+   $.ajax(RO_URL_PREFIX + 'namespace/' + NAMESPACE + '/sparql', settings); 
 }
 
 function updateExploreStart(data) {
@@ -1142,7 +1234,7 @@ function getStatus(e) {
    if(e) {
       e.preventDefault();
    }
-   $.get('/bigdata/status', function(data) {
+   $.get(RO_URL_PREFIX + 'status', function(data) {
       // get data inside a jQuery object
       data = $('<div>').append(data);
       getStatusNumbers(data);
@@ -1151,8 +1243,8 @@ function getStatus(e) {
 
 function getStatusNumbers(data) {
    $('#status-text').html(data);
-   $('#status-text a[href*="status"]').eq(0).click(function(e) { e.preventDefault(); showQueries(false); return false; });
-   $('#status-text a[href*="status"]').eq(1).click(function(e) { e.preventDefault(); showQueries(true); return false; });
+   $('#status-text a').eq(1).click(function(e) { e.preventDefault(); showQueries(false); return false; });
+   $('#status-text a').eq(2).click(function(e) { e.preventDefault(); showQueries(true); return false; });
 }
 
 $('#show-queries').click(function(e) {
@@ -1166,7 +1258,7 @@ $('#show-query-details').click(function(e) {
 });
 
 function showQueries(details) {
-   var url = '/bigdata/status?showQueries';
+   var url = RO_URL_PREFIX + 'status?showQueries';
    if(details) {
       url += '=details';
    }
@@ -1218,7 +1310,7 @@ function cancelQuery(e) {
    e.preventDefault();
    if(confirm('Cancel query?')) {
       var id = $(this).data('queryId');
-      $.post('/bigdata/status?cancelQuery&queryId=' + id, function() { getStatus(); });
+      $.post(RW_URL_PREFIX + 'status?cancelQuery&queryId=' + id, function() { getStatus(); });
       $(this).parents('li').remove();
    }
 }
@@ -1226,7 +1318,7 @@ function cancelQuery(e) {
 function getQueryDetails(e) {
    e.preventDefault();
    var id = $(this).data('queryId');
-   $.ajax({url: '/bigdata/status?showQueries=details&queryId=' + id,
+   $.ajax({url: RO_URL_PREFIX + 'status?showQueries=details&queryId=' + id,
       success: function(data) {
          // get data inside a jQuery object
          data = $('<div>').append(data);
@@ -1247,7 +1339,7 @@ function getQueryDetails(e) {
 /* Performance */
 
 $('#tab-selector a[data-target=performance]').click(function(e) {
-   $.get('/bigdata/counters', function(data) {
+   $.get(RO_URL_PREFIX + 'counters', function(data) {
       $('#performance-tab .box').html(data);
    });
 });
