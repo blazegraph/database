@@ -1269,10 +1269,35 @@ public class BigdataSail extends SailBase implements Sail {
      * returns the unisolated view of the database. Note that truth maintenance
      * requires only one connection at a time and is therefore not compatible
      * with full read/write transactions.
+     * <p>
+     * The correct pattern for obtaining an updatable connection, doing work
+     * with that connection, and committing or rolling back that update is as
+     * follows.
+     * 
+     * <pre>
+     * 
+     * BigdataSailConnection conn = null;
+     * boolean ok = false;
+     * try {
+     *     conn = sail.getConnection();
+     *     doWork(conn);
+     *     conn.commit();
+     *     ok = true;
+     * } finally {
+     *     if (conn != null) {
+     *         if (!ok) {
+     *             conn.rollback();
+     *         }
+     *         conn.close();
+     *     }
+     * }
+     * </pre>
+     * 
+     * This pattern can also be used with {@link #getUnisolatedConnection()}.
      */
     @Override
     public BigdataSailConnection getConnection() throws SailException {
-        
+      
         return (BigdataSailConnection) super.getConnection();
         
     }
@@ -1297,25 +1322,49 @@ public class BigdataSail extends SailBase implements Sail {
      */
     final private ReentrantReadWriteLock lock = new ReentrantReadWriteLock(false/*fair*/);
 
-	/**
-	 * Return an unisolated connection to the database. The unisolated
-	 * connection supports fast, scalable updates against the database. The
-	 * unisolated connection is ACID when used with a local {@link Journal} and
-	 * shard-wise ACID when used with an {@link IBigdataFederation}.
-	 * <p>
-	 * In order to guarantee that operations against the unisolated connection
-	 * are ACID, only one of unisolated connection is permitted at a time for a
-	 * {@link Journal} and this method will block until the connection is
-	 * available. If there is an open unisolated connection against a local
-	 * {@link Journal}, then the open connection must be closed before a new
-	 * connection can be returned by this method.
-	 * <p>
-	 * This constraint that there can be only one unisolated connection is not
-	 * enforced in scale-out since unisolated operations in scale-out are only
-	 * shard-wise ACID.
-	 * 
-	 * @return The unisolated connection to the database
-	 */
+	    /**
+     * Return an unisolated connection to the database. The unisolated
+     * connection supports fast, scalable updates against the database. The
+     * unisolated connection is ACID when used with a local {@link Journal} and
+     * shard-wise ACID when used with an {@link IBigdataFederation}.
+     * <p>
+     * In order to guarantee that operations against the unisolated connection
+     * are ACID, only one of unisolated connection is permitted at a time for a
+     * {@link Journal} and this method will block until the connection is
+     * available. If there is an open unisolated connection against a local
+     * {@link Journal}, then the open connection must be closed before a new
+     * connection can be returned by this method.
+     * <p>
+     * This constraint that there can be only one unisolated connection is not
+     * enforced in scale-out since unisolated operations in scale-out are only
+     * shard-wise ACID.
+     * <p>
+     * The correct pattern for obtaining an updatable connection, doing work
+     * with that connection, and committing or rolling back that update is as
+     * follows.
+     * 
+     * <pre>
+     * BigdataSailConnection conn = null;
+     * boolean ok = false;
+     * try {
+     *     conn = sail.getUnisolatedConnection();
+     *     doWork(conn);
+     *     conn.commit();
+     *     ok = true;
+     * } finally {
+     *     if (conn != null) {
+     *         if (!ok) {
+     *             conn.rollback();
+     *         }
+     *         conn.close();
+     *     }
+     * }
+     * </pre>
+     * 
+     * @return The unisolated connection to the database
+     * 
+     * @see #getConnection()
+     */
     public BigdataSailConnection getUnisolatedConnection()
             throws InterruptedException {
 
