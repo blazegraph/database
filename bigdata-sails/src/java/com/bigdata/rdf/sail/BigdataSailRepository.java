@@ -33,6 +33,35 @@ public class BigdataSailRepository extends SailRepository {
 //        
 //    }
 
+    /**
+     * {@inheritDoc}
+     * <p>
+     * The correct pattern for obtaining an updatable connection, doing work
+     * with that connection, and committing or rolling back that update is as
+     * follows.
+     * 
+     * <pre>
+     * 
+     * BigdataSailConnection conn = null;
+     * boolean ok = false;
+     * try {
+     *     conn = repo.getConnection();
+     *     doWork(conn);
+     *     conn.commit();
+     *     ok = true;
+     * } finally {
+     *     if (conn != null) {
+     *         if (!ok) {
+     *             conn.rollback();
+     *         }
+     *         conn.close();
+     *     }
+     * }
+     * </pre>
+     * 
+     * @see BigdataSail#getConnection()
+     * @see #getUnisolatedConnection()
+     */
     @Override
     public BigdataSailRepositoryConnection getConnection() 
             throws RepositoryException {
@@ -105,12 +134,36 @@ public class BigdataSailRepository extends SailRepository {
     }
     
     /**
-     * Return an unisolated connection to the database.  Only one of these
+     * Return an unisolated connection to the database. Only one of these
      * allowed at a time.
+     * <p>
+     * The correct pattern for obtaining an updatable connection, doing work
+     * with that connection, and committing or rolling back that update is as
+     * follows.
+     * 
+     * <pre>
+     * 
+     * BigdataSailConnection conn = null;
+     * boolean ok = false;
+     * try {
+     *     conn = repo.getConnection();
+     *     doWork(conn);
+     *     conn.commit();
+     *     ok = true;
+     * } finally {
+     *     if (conn != null) {
+     *         if (!ok) {
+     *             conn.rollback();
+     *         }
+     *         conn.close();
+     *     }
+     * }
+     * </pre>
      * 
      * @return unisolated connection to the database
      * 
      * @see BigdataSail#getUnisolatedConnection()
+     * @see #getConnection()
      */
     public BigdataSailRepositoryConnection getUnisolatedConnection() 
         throws RepositoryException {
