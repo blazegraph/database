@@ -1547,16 +1547,19 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
         
     }
 
-	/**
-	 * When {@link #getRawRecords()} returns <code>true</code>, this method
-	 * returns the maximum byte length of a <code>byte[]</code> value which may
-	 * be stored in a B+Tree leaf (default {@link Options#MAX_REC_LEN}. Values
-	 * larger than this will be automatically converted into raw record
-	 * references.
-	 * 
-	 * @see Options#MAX_REC_LEN
-	 * @see Options#DEFAULT_MAX_REC_LEN
-	 */
+    /**
+     * When {@link #getRawRecords()} returns <code>true</code>, this method
+     * returns the maximum byte length of a <code>byte[]</code> value will be be
+     * stored in a B+Tree leaf (default {@link Options#MAX_REC_LEN}) while
+     * values larger than this will be automatically converted into raw record
+     * references. Note that this method returns the configured value regardless
+     * of the value of {@link #getRawRecords()} - the caller must check
+     * {@link #getRawRecords()} in order to correctly interpret the value
+     * returned by this method.
+     * 
+     * @see Options#MAX_REC_LEN
+     * @see Options#DEFAULT_MAX_REC_LEN
+     */
 	public final int getMaxRecLen() {return maxRecLen;}
 
 	/**
