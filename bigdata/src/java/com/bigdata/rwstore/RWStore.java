@@ -306,6 +306,11 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
          * should be tuned to target perhaps 80% of an 8k page in order to have
          * only a small number of pages that spill over into blobs.
          * 
+         * TODO: We should consider a more adaptable BLOB approach where we
+         * specify the maximum "slop" in an allocation as the means to determine
+         * a blob boundary.  So, for example, a 5.5K allocation, with maximum slop of
+         * 1K, would be allocated as a blob of 4K + 2K and not an 8K slot.
+         * 
          * @see #ALLOCATION_SIZES
          */
         String DEFAULT_ALLOCATION_SIZES = "1, 2, 3, 5, 8, 12, 16, 32, 48, 64, 128";
@@ -321,10 +326,23 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
          * <p>
          * Note: A value of <code>9</code> may be used to stress the logic which
          * is responsible for the growth in the meta bits region.
+         * <p>
+         * This has now been deprecated since it adds complexity with no significant benefit
          */
-        String META_BITS_SIZE = RWStore.class.getName() + ".metaBitsSize";
+        @Deprecated String META_BITS_SIZE = RWStore.class.getName() + ".metaBitsSize";
 
-        String DEFAULT_META_BITS_SIZE = "9";
+        @Deprecated String DEFAULT_META_BITS_SIZE = "9";
+
+        /**
+         * Defines whether the metabits should be allocated an explicit demispace (default)
+         * or if not, then to use a standard Allocation (which limits the metabits size to
+         * the maximum FixedAllocator slot size).
+         * <p>
+         * The value should be either "true" or "false"
+         */
+        String META_BITS_DEMI_SPACE = RWStore.class.getName() + ".metabitsDemispace";
+
+        String DEFAULT_META_BITS_DEMI_SPACE = "true";
 
         /**
          * Defines the number of bits that must be free in a FixedAllocator for
@@ -398,7 +416,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
     static final int OFFSET_BITS = 13;
     static final int OFFSET_BITS_MASK = 0x1FFF; // was 0xFFFF
     
-    static final int ALLOCATION_SCALEUP = 16; // multiplier to convert allocations based on minimum allocation of 32k
+    static final int ALLOCATION_SCALEUP = 16; // multiplier to convert allocations based on minimum allocation of 64k
     static private final int META_ALLOCATION = 8; // 8 * 32K is size of meta Allocation
 
     // If required, then allocate 1M direct buffers
@@ -771,16 +789,29 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
             log.info(AbstractTransactionService.Options.MIN_RELEASE_AGE + "="
                     + m_minReleaseAge);
 
-        cDefaultMetaBitsSize = Integer.valueOf(fileMetadata.getProperty(
-                Options.META_BITS_SIZE,
-                Options.DEFAULT_META_BITS_SIZE));
+        // Remove parameterisation, we want to use fixed Allocator block sizing
+        //	there is no significant advantage to parameterize this since file cache
+        //	locality is handled by size of the allocation - 256K is a reasonable
+        //	number as 32 * 8 * 1K size.
+        //
+        // Equally there is no benefit to increasing the size of the Allocators beyond
+        //	1K.
+//        cDefaultMetaBitsSize = Integer.valueOf(fileMetadata.getProperty(
+//                Options.META_BITS_SIZE,
+//                Options.DEFAULT_META_BITS_SIZE));
+        
+//        cDefaultMetaBitsSize = 9;
 
-        if (cDefaultMetaBitsSize < 9)
-            throw new IllegalArgumentException(Options.META_BITS_SIZE
-                    + " : Must be GTE 9");
+//        if (cDefaultMetaBitsSize < 9)
+//            throw new IllegalArgumentException(Options.META_BITS_SIZE
+//                    + " : Must be GTE 9");
                 
         m_metaBitsSize = cDefaultMetaBitsSize;
 
+        m_useMetabitsDemispace = Boolean.valueOf(fileMetadata.getProperty(
+                Options.META_BITS_DEMI_SPACE,
+                Options.DEFAULT_META_BITS_DEMI_SPACE));
+        
         cDefaultFreeBitsThreshold = Integer.valueOf(fileMetadata.getProperty(
                 Options.FREE_BITS_THRESHOLD,
                 Options.DEFAULT_FREE_BITS_THRESHOLD));
@@ -1419,6 +1450,14 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
              * allocators. So, 16-bits gives us up 64k * 32 = 2M allocators.
              * Except, that the total #of allocators is reduced by the presence
              * of a startAddr every N positions in the metaBits[].
+             * 
+             * The theoretical maximum number is also reduced since the number
+             * of "committed" bits could be half the total number of bits.
+             * 
+             * The theoretical restriction is also limited by the maximum indexable
+             * allocator, since only 19 bits is available to the index, which, once
+             * the sign is removed reduces the maximum number of addressable
+             * allocators to 256K.
              */
             final int metaBitsStore = (int) (rawmbaddr & 0xFFFF);
             
@@ -1445,7 +1484,9 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
                                     + storeVersion + ", cVersion=" + cVersion);
                 }
                 m_lastDeferredReleaseTime = strBuf.readLong();
-                cDefaultMetaBitsSize = strBuf.readInt();
+                if (strBuf.readInt() != cDefaultMetaBitsSize) {
+                	throw new IllegalStateException("Store opened with unsupported metabits size");
+                }
                 
                 final int allocBlocks = strBuf.readInt();
                 m_storageStatsAddr = strBuf.readLong();
@@ -1483,12 +1524,6 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
         
                 readAllocationBlocks();
                 
-                // clearOutstandingDeferrels(deferredFreeListAddr, deferredFreeListEntries);
-    
-                if (physicalAddress(m_metaBitsAddr) == 0) {
-                    throw new IllegalStateException("Free/Invalid metaBitsAddr on load");
-                }
-    
             }
             
             if (log.isInfoEnabled())
@@ -2963,6 +2998,25 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
      * last one being the allocation for the metabits themselves (allowing for
      * an extension!).
      * 
+     * Ticket #936: The meta-bits allocation is currently made from the FixedAllocator
+     * region. This works well providing the required allocation bits is less than
+     * the maximum FixedAllocator slot size.  While this is neat, there are problems at scale
+     * for maximum slot sizes less than 64K.
+     * 
+     * To address the 8K bits in a 1K alloctor, 13 bits are required, this leaves 19 bits
+     * to index an Allocator, or 18 bits without the sign => 256K maximum index.
+     * 
+     * To be able to commit changes to all 256K allocators requires 512K metabits => 64K bytes.
+     * We would like to associate the 64K allocations with the root block, so a single 128K
+     * allocation would be split into 64K demi-spaces, one for each root block.
+     * 
+     * While a negative address indicates a standard RW allocation a ositive address can be used
+     * to indicate an explicitly allocated region. The trick is to ensure that the region is
+     * allocated on a 128K boundary, then the lower bits can indicate which demi-space is used with
+     * a simple XOR.
+     * 
+     * Note that we must ensure that any previous demi-space write is removed from the WCS.
+     * 
      * @throws IOException
      */
     private void writeMetaBits() throws IOException {
@@ -3013,7 +3067,8 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
          * Note: this address is set by commit() prior to calling
          * writeMetaBits().
          */
-        final long addr = physicalAddress(m_metaBitsAddr);
+        //final long addr = physicalAddress(m_metaBitsAddr);
+        final long addr = ((long) m_metaBitsAddr) << ALLOCATION_SCALEUP;
         if (addr == 0) {
             throw new IllegalStateException("Invalid metabits address: " + m_metaBitsAddr);
         }
@@ -3024,7 +3079,9 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
         	if (log.isDebugEnabled())
         		log.debug("writing metabits at: " + addr);
         	
-            m_writeCacheService.write(addr, ByteBuffer.wrap(buf), 0/*chk*/, false/*useChecksum*/, m_metaBitsAddr/*latchedAddr*/);
+        	// Similar to writeMetaBits, we are no longer writing to a FixedAllocator managed region,
+        	//	so no latched address is provided
+            m_writeCacheService.write(addr, ByteBuffer.wrap(buf), 0/*chk*/, false/*useChecksum*/, 0 /*latchedAddr*/);
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
@@ -3077,19 +3134,41 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
              * that we do not need to reallocate the metabits region when we are
              * writing out the updated versions of the FixedAllocators).
              */
-            final long oldMetaBits = m_metaBitsAddr;
-            final int oldMetaBitsSize = (m_metaBits.length + m_allocSizes.length + 1) * 4;
-            m_metaBitsAddr = alloc(getRequiredMetaBitsStorage(), null);
+//            final long oldMetaBits = m_metaBitsAddr;
+//            final int oldMetaBitsSize = (m_metaBits.length + m_allocSizes.length + 1) * 4;
+//            m_metaBitsAddr = alloc(getRequiredMetaBitsStorage(), null);
 
-            // DEBUG SANITY CHECK!
+            /*
+             * If m_metaBitsAddr < 0 then was allocated from FixedAllocators (for existing-store compatibility)
+             */
+            if (m_metaBitsAddr < 0) {
             if (physicalAddress(m_metaBitsAddr) == 0) {
                 throw new IllegalStateException("Returned MetaBits Address not valid!");
             }
             
+	            final int oldMetaBitsSize = (m_metaBits.length + m_allocSizes.length + 1) * 4;
             // Call immediateFree - no need to defer freeof metaBits, this
             //  has to stop somewhere!
             // No more allocations must be made
-            immediateFree((int) oldMetaBits, oldMetaBitsSize);
+	            immediateFree((int) m_metaBitsAddr, oldMetaBitsSize);
+	            
+	            m_metaBitsAddr = 0;
+            }
+            
+            if (m_metaBitsAddr == 0) {
+            	// Allocate special region to be able to store maximum metabits (128k of 2 64K demi-space
+            	// Must be aligned on 128K boundary and allocations are made in units of 64K.
+            	while (m_nextAllocation % 2 != 0) {
+            		m_nextAllocation--;
+            	}
+            	m_metaBitsAddr = -m_nextAllocation; // must be positive to differentiate from FixedAllocator address
+            	m_nextAllocation -= 2; // allocate 2 * 64K
+            } else { // remove previous write from WCS
+            	m_writeCacheService.removeWriteToAddr(convertAddr(-m_metaBitsAddr), 0);
+            }
+            
+            // Now "toggle" m_metaBitsAddr - 64K boundary
+            m_metaBitsAddr ^= 0x01; // toggle zero or 64K offset
 
             // There must be no buffered deferred frees
             // assert m_deferredFreeOut.getBytesWritten() == 0;
@@ -3397,11 +3476,13 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
     /**
      * @see Options#META_BITS_SIZE
      */
-    private int cDefaultMetaBitsSize;
+    final private int cDefaultMetaBitsSize = 9;
     /**
      * @see Options#META_BITS_SIZE
      */
     volatile private int m_metaBitsSize;
+    
+    volatile private boolean m_useMetabitsDemispace = true;
     /**
      * Package private since is uded by FixedAllocators
      * 
@@ -4146,11 +4227,17 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
     }
 
     /**
-     * The 
+     * Since we need to store the absolute address and the size can be
+     * a maximum of 64K, the absolute address is limited to 48 bits, setting
+     * the maximum address as 140T, which is sufficient.
+     *  
      * @return long representation of metaBitsAddr PLUS the size
      */
     public long getMetaBitsAddr() {
-        long ret = physicalAddress((int) m_metaBitsAddr);
+    	assert m_metaBitsAddr > 0;
+    	
+        // long ret = physicalAddress((int) m_metaBitsAddr);
+        long ret = convertAddr(-m_metaBitsAddr); // maximum 48 bit address range
         ret <<= 16;
         
         // include space for version, allocSizes and deferred free info AND cDefaultMetaBitsSize
@@ -4163,6 +4250,14 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
                     + metaBitsSize);
 
         return ret;
+    }
+
+    /**
+     * 
+     * @return the address of the metaBits demi-space
+     */
+    public long getMetaBitsDemiSpace() {
+        return convertAddr(-m_metaBitsAddr);
     }
 
     /**
@@ -4180,6 +4275,10 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
      */
     public long getNextOffset() {
         long ret = -m_nextAllocation;
+        if (m_metaBitsAddr > 0) {
+        	// FIX for sign use in m_metaBitsAddr when packing into long
+        	ret++;
+        }
         ret <<= 32;
         ret += -m_metaBitsAddr;
 
