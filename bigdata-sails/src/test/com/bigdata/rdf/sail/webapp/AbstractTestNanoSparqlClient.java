@@ -233,7 +233,14 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
 			if (log.isInfoEnabled())
 				log.info("Destroying: " + namespace);
 
-			tripleStore.destroy();
+            if (!BigdataStatics.NSS_GROUP_COMMIT) {
+                /*
+                 * FIXME GROUP COMMIT: We need to submit a task that does this
+                 * in order to stay inside of the same concurrency control
+                 * mechanism as the database.
+                 */
+                tripleStore.destroy();
+            }
 			
 		}
 

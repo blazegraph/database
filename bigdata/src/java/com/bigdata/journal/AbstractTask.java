@@ -1249,7 +1249,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
      * Flag is cleared if the task is aborted.  This is used to refuse
      * access to resources for tasks that ignore interrupts.
      */
-    boolean aborted = false;
+    volatile boolean aborted = false;
     
     /**
      * The {@link AbstractTask} increments various counters of interest to the
@@ -1557,7 +1557,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
     /**
      * Return <code>true</code> iff the task declared this as a resource.
      * 
-     * @param name
+     * @param theRequestedResource
      *            The name of a resource.
      * 
      * @return <code>true</code> iff <i>name</i> is a declared resource.
@@ -1565,17 +1565,58 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
      * @throws IllegalArgumentException
      *             if <i>name</i> is <code>null</code>.
      */
-    public boolean isResource(String name) {
-        
-        if (name == null)
+    public boolean isResource(final String theRequestedResource) {
+
+        if (theRequestedResource == null)
             throw new IllegalArgumentException();
-        
-        for(String s : resource) {
-            
-            if(s.equals(name)) return true;
-            
+
+        for (String theDeclaredResource : resource) {
+
+            if (theDeclaredResource.equals(theRequestedResource)) {
+                /*
+                 * Exact match. This resource was declared.
+                 */
+                return true;
+            }
+
+            /**
+             * FIXME GROUP_COMMIT: Supporting this requires us to support
+             * efficient scans of the indices in Name2Addr having the prefix
+             * values declared by [resources] since getIndex(name) will fail if
+             * the Name2Addr entry has not been buffered within the [n2a] cache.
+             * 
+             * @see <a
+             *      href="http://sourceforge.net/apps/trac/bigdata/ticket/753" >
+             *      HA doLocalAbort() should interrupt NSS requests and
+             *      AbstractTasks </a>
+             * @see <a
+             *      href="- http://sourceforge.net/apps/trac/bigdata/ticket/566"
+             *      > Concurrent unisolated operations against multiple KBs </a>
+             */
+//            if (theRequestedResource.startsWith(theDeclaredResource)) {
+//                
+//                // Possible prefix match.
+//                
+//                if (theRequestedResource.charAt(theDeclaredResource.length()) == '.') {
+//
+//                    /*
+//                     * Prefix match.
+//                     * 
+//                     * E.g., name:="kb.spo.osp" and the task declared the
+//                     * resource "kb". In this case, "kb" is a PREFIX of the
+//                     * declared resource and the next character is the separator
+//                     * character for the resource names (this last point is
+//                     * important to avoid unintended contention between
+//                     * namespaces such as "kb" and "kb1").
+//                     */
+//                    return true;
+//
+//                }
+//
+//            }
+
         }
-        
+
         return false;
         
     }
@@ -2085,46 +2126,53 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
             
         }
 
+        @Override
         public IResourceManager getResourceManager() {
 
             return delegate.getResourceManager();
         
         }
 
+        @Override
         public IJournal getJournal() {
 
             return delegate.getJournal();
             
         }
 
+        @Override
         public String[] getResource() {
 
             return delegate.getResource();
             
         }
 
+        @Override
         public String getOnlyResource() {
 
             return delegate.getOnlyResource();
             
         }
 
+        @Override
         public IIndex getIndex(String name) {
 
             return delegate.getIndex(name);
             
         }
                 
+        @Override
         public TaskCounters getTaskCounters() {
             
             return delegate.getTaskCounters();
             
         }
         
+        @Override
         public String toString() {
             
-            return getClass().getName()+"("+delegate.toString()+")";
-            
+            return getClass().getName() + "(" + delegate.toString() + ")";
+           
         }
         
     }
@@ -2577,7 +2625,12 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
             }
             
             // read committed view IFF it exists otherwise [null]
-            return new GlobalRowStoreHelper(this).get(ITx.READ_COMMITTED);
+            // TODO Review. Make sure we have tx protection to avoid recycling of the view.
+            final long lastCommitTime = getLastCommitTime();
+            
+            return new GlobalRowStoreHelper(this).get(lastCommitTime);
+
+            //return new GlobalRowStoreHelper(this).get(ITx.READ_COMMITTED);
             
         }
 
@@ -2696,9 +2749,29 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
          * Disallowed methods (commit protocol and shutdown protocol).
          */
         
+        /**
+         * {@inheritDoc}
+         * <p>
+         * Marks the task as aborted. The task will not commit. However, the
+         * task will continue to execute until control returns from its
+         * {@link AbstractTask#doTask()} method.
+         */
         @Override
         public void abort() {
-            throw new UnsupportedOperationException();
+            aborted = true;
+        }
+
+        /**
+         * {@inheritDoc}
+         * <p>
+         * Overridden as NOP. Tasks do not directly invoke commit() on the
+         * Journal.
+         */
+        @Override
+        public long commit() {
+            if (aborted)
+                throw new IllegalStateException("aborted");
+            return 0;
         }
 
         @Override
@@ -2713,11 +2786,6 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
 
         @Override
         public void deleteResources() {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public long commit() {
             throw new UnsupportedOperationException();
         }
 

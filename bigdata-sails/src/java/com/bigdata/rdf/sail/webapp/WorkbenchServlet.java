@@ -30,6 +30,7 @@ import javax.servlet.http.HttpServletResponse;
 import org.apache.log4j.Logger;
 import org.openrdf.model.Graph;
 import org.openrdf.model.impl.GraphImpl;
+import org.openrdf.model.impl.ValueFactoryImpl;
 import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFParser;
 import org.openrdf.rio.RDFParserFactory;
@@ -37,7 +38,6 @@ import org.openrdf.rio.RDFParserRegistry;
 import org.openrdf.rio.helpers.StatementCollector;
 
 import com.bigdata.rdf.sail.webapp.client.MiniMime;
-import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
  * Helper servlet for workbench requests.
@@ -87,23 +87,8 @@ public class WorkbenchServlet extends BigdataRDFServlet {
     private void doConvert(final HttpServletRequest req,
             final HttpServletResponse resp) throws IOException {
         
-    	final String baseURI = req.getRequestURL().toString();
+    	    final String baseURI = req.getRequestURL().toString();
     	
-        final String namespace = getNamespace(req);
-
-        final long timestamp = getTimestamp(req); // FIXME Use newTx().  Why does this even look for a KB instance?
-
-        final AbstractTripleStore tripleStore = getBigdataRDFContext()
-                .getTripleStore(namespace, timestamp);
-        
-        if (tripleStore == null) {
-            /*
-             * There is no such triple/quad store instance.
-             */
-            buildResponse(resp, HTTP_NOTFOUND, MIME_TEXT_PLAIN);
-            return;
-        }
-        
         final String contentType = req.getContentType();
 
         if (log.isInfoEnabled())
@@ -153,7 +138,7 @@ public class WorkbenchServlet extends BigdataRDFServlet {
 	        final RDFParser rdfParser = rdfParserFactory
 	                .getParser();
 	
-	        rdfParser.setValueFactory(tripleStore.getValueFactory());
+	        rdfParser.setValueFactory(new ValueFactoryImpl());
 	
 	        rdfParser.setVerifyData(true);
 	

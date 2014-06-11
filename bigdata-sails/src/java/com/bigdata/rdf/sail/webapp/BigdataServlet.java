@@ -29,8 +29,11 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.Writer;
+import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Set;
+import java.util.concurrent.Future;
 
 import javax.servlet.ServletContext;
 import javax.servlet.http.HttpServlet;
@@ -39,12 +42,18 @@ import javax.servlet.http.HttpServletResponse;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.BigdataStatics;
 import com.bigdata.ha.HAStatusEnum;
 import com.bigdata.journal.AbstractJournal;
+import com.bigdata.journal.IConcurrencyManager;
 import com.bigdata.journal.IIndexManager;
+import com.bigdata.journal.Journal;
+import com.bigdata.journal.TimestampUtility;
 import com.bigdata.quorum.AbstractQuorum;
 import com.bigdata.rdf.sail.webapp.client.IMimeTypes;
 import com.bigdata.rdf.sail.webapp.lbs.IHALoadBalancerPolicy;
+import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.service.IBigdataFederation;
 
 /**
  * Useful glue for implementing service actions, but does not directly implement
@@ -190,6 +199,149 @@ abstract public class BigdataServlet extends HttpServlet implements IMimeTypes {
 
     }
 
+    /**
+     * Submit a task and return a {@link Future} for that task. The task will be
+     * run on the appropriate executor service depending on the nature of the
+     * backing database and the view required by the task.
+     * 
+     * @param task
+     *            The task.
+     * 
+     * @return The {@link Future} for that task.
+     * 
+     * @throws DatasetNotFoundException
+     * 
+     * @see <a href="http://sourceforge.net/apps/trac/bigdata/ticket/753" > HA
+     *      doLocalAbort() should interrupt NSS requests and AbstractTasks </a>
+     * @see <a href="- http://sourceforge.net/apps/trac/bigdata/ticket/566" >
+     *      Concurrent unisolated operations against multiple KBs </a>
+     */
+    @SuppressWarnings({ "unchecked", "rawtypes" })
+    protected <T> Future<T> submitApiTask(final RestApiTask<T> task)
+            throws DatasetNotFoundException {
+
+        final String namespace = task.getNamespace();
+        
+        final long timestamp = task.getTimestamp();
+        
+        final IIndexManager indexManager = getIndexManager();
+
+        if (!BigdataStatics.NSS_GROUP_COMMIT || indexManager instanceof IBigdataFederation
+                || TimestampUtility.isReadOnly(timestamp)
+                ) {
+
+            /*
+             * Run on a normal executor service.
+             * 
+             * Note: For scale-out, the operation will be applied using
+             * client-side global views of the indices.
+             * 
+             * Note: This can be used for operations on read-only views (even on
+             * a Journal). This is helpful since we can avoid some overhead
+             * associated the AbstractTask lock declarations.
+             */
+
+            return indexManager.getExecutorService().submit(
+                    new RestApiTaskForIndexManager(indexManager, task));
+
+        } else {
+
+            /**
+             * Run on the ConcurrencyManager of the Journal.
+             * 
+             * Mutation operations will be scheduled based on the pre-declared
+             * locks and will have exclusive access to the resources guarded by
+             * those locks when they run.
+             * 
+             * FIXME GROUP COMMIT: The {@link AbstractTask} was written to
+             * require the exact set of resource lock declarations. However, for
+             * the REST API, we want to operate on all indices associated with a
+             * KB instance. This requires either:
+             * <p>
+             * (a) pre-resolving the names of those indices and passing them all
+             * into the AbstractTask; or
+             * <P>
+             * (b) allowing the caller to only declare the namespace and then to
+             * be granted access to all indices whose names are in that
+             * namespace.
+             * 
+             * (b) is now possible with the fix to the Name2Addr prefix scan.
+             */
+
+            // Obtain the necessary locks for R/w access to KB indices.
+            final String[] locks = getLocksForKB((Journal) indexManager,
+                    namespace);
+
+            final IConcurrencyManager cc = ((Journal) indexManager)
+                    .getConcurrencyManager();
+            
+            // Submit task to ConcurrencyManager. Will acquire locks and run.
+            return cc.submit(new RestApiTaskForJournal(cc, task.getTimestamp(),
+                    locks, task));
+
+        }
+
+    }
+
+    /**
+     * Acquire the locks for the named indices associated with the specified KB.
+     * 
+     * @param indexManager
+     *            The {@link Journal}.
+     * @param namespace
+     *            The namespace of the KB instance.
+     * 
+     * @return The locks for the named indices associated with that KB instance.
+     * 
+     * @throws DatasetNotFoundException
+     * 
+     *             FIXME GROUP COMMIT : [This should be replaced by the use of
+     *             the namespace and hierarchical locking support in
+     *             AbstractTask.] This could fail to discover a recently create
+     *             KB between the time when the KB is created and when the group
+     *             commit for that create becomes visible. This data race exists
+     *             because we are using [lastCommitTime] rather than the
+     *             UNISOLATED view of the GRS.
+     *             <p>
+     *             Note: This data race MIGHT be closed by the default locator
+     *             cache. If it records the new KB properties when they are
+     *             created, then they should be visible. If they are not
+     *             visible, then we have a data race. (But if it records them
+     *             before the group commit for the KB create, then the actual KB
+     *             indices will not be durable until the that group commit...).
+     *             <p>
+     *             Note: The problem can obviously be resolved by using the
+     *             UNISOLATED index to obtain the KB properties, but that would
+     *             serialize ALL updates. What we need is a suitable caching
+     *             mechanism that (a) ensures that newly create KB instances are
+     *             visible; and (b) has high concurrency for read-only requests
+     *             for the properties for those KB instances.
+     */
+    private static String[] getLocksForKB(final Journal indexManager,
+            final String namespace) throws DatasetNotFoundException {
+
+        final long timestamp = indexManager.getLastCommitTime();
+
+        final AbstractTripleStore tripleStore = (AbstractTripleStore) indexManager
+                .getResourceLocator().locate(namespace, timestamp);
+
+        if (tripleStore == null)
+            throw new DatasetNotFoundException("Not found: namespace="
+                    + namespace + ", timestamp="
+                    + TimestampUtility.toString(timestamp));
+
+        final Set<String> lockSet = new HashSet<String>();
+
+        lockSet.addAll(tripleStore.getSPORelation().getIndexNames());
+
+        lockSet.addAll(tripleStore.getLexiconRelation().getIndexNames());
+
+        final String[] locks = lockSet.toArray(new String[lockSet.size()]);
+
+        return locks;
+
+    }
+    
 //    /**
 //     * Return the {@link Quorum} -or- <code>null</code> if the
 //     * {@link IIndexManager} is not participating in an HA {@link Quorum}.

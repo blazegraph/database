@@ -48,6 +48,7 @@ import com.bigdata.journal.ITx;
 import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
 import com.bigdata.rdf.sail.webapp.BigdataRDFContext.AbstractQueryTask;
+import com.bigdata.rdf.sail.webapp.RestApiTask.RestApiMutationTask;
 import com.bigdata.rdf.sail.webapp.client.EncodeDecodeValue;
 import com.bigdata.rdf.sail.webapp.client.MiniMime;
 
@@ -105,6 +106,14 @@ public class DeleteServlet extends BigdataRDFServlet {
      * process deleting the statements. This is done while it is holding the
      * unisolated connection which prevents concurrent modifications. Therefore
      * the entire SELECT + DELETE operation is ACID.
+     * 
+     * FIXME GROUP COMMIT : Again, a pattern where a query is run to produce
+     * solutions that are then deleted from the database. Can we rewrite this to
+     * be a SPARQL UPDATE? (DELETE WHERE). Note that the ACID semantics of this
+     * operation would be broken by group commit since other tasks could have
+     * updated the KB since the lastCommitTime and been checkpointed and hence
+     * be visible to an unisolated operation without there being an intervening
+     * commit point.
      */
     private void doDeleteWithQuery(final HttpServletRequest req,
             final HttpServletResponse resp) throws IOException {
@@ -158,6 +167,7 @@ public class DeleteServlet extends BigdataRDFServlet {
                 final AtomicLong nmodified = new AtomicLong(0L);
 
                 BigdataSailRepositoryConnection conn = null;
+                boolean success = false;
                 try {
 
                     conn = getBigdataRDFContext().getUnisolatedConnection(
@@ -196,21 +206,22 @@ public class DeleteServlet extends BigdataRDFServlet {
                     // Commit the mutation.
                     conn.commit();
 
+                    success = true;
+                    
                     final long elapsed = System.currentTimeMillis() - begin;
                     
                     reportModifiedCount(resp, nmodified.get(), elapsed);
 
-                } catch(Throwable t) {
-                    
-                    if(conn != null)
-                        conn.rollback();
-                    
-                    throw new RuntimeException(t);
-                    
                 } finally {
 
-                    if (conn != null)
+                    if (conn != null) {
+
+                        if (!success)
+                            conn.rollback();
+
                         conn.close();
+
+                    }
 
                 }
 
@@ -257,8 +268,6 @@ public class DeleteServlet extends BigdataRDFServlet {
      */
     private void doDeleteWithBody(final HttpServletRequest req,
             final HttpServletResponse resp) throws IOException {
-
-        final long begin = System.currentTimeMillis();
 
         final String baseURI = req.getRequestURL().toString();
         
@@ -325,15 +334,66 @@ public class DeleteServlet extends BigdataRDFServlet {
                 }
             }
             
-            final RDFParser rdfParser = rdfParserFactory.getParser();
+            submitApiTask(
+                    new DeleteWithBodyTask(req, resp, namespace,
+                            ITx.UNISOLATED, baseURI, defaultContext,
+                            rdfParserFactory)).get();
+                    
+        } catch (Throwable t) {
 
-            final AtomicLong nmodified = new AtomicLong(0L);
+            throw BigdataRDFServlet.launderThrowable(t, resp, "");
+            
+        }
 
+    }
+    
+    private static class DeleteWithBodyTask extends RestApiMutationTask<Void> {
+
+        private final String baseURI;
+        private final Resource[] defaultContext;
+        private final RDFParserFactory rdfParserFactory;
+
+        /**
+         * 
+         * @param namespace
+         *            The namespace of the target KB instance.
+         * @param timestamp
+         *            The timestamp used to obtain a mutable connection.
+         * @param baseURI
+         *            The base URI for the operation.
+         * @param defaultContext
+         *            The context(s) for triples without an explicit named graph
+         *            when the KB instance is operating in a quads mode.
+         * @param rdfParserFactory
+         *            The factory for the {@link RDFParser}. This should have
+         *            been chosen based on the caller's knowledge of the
+         *            appropriate content type.
+         */
+        public DeleteWithBodyTask(final HttpServletRequest req,
+                final HttpServletResponse resp,
+                final String namespace, final long timestamp,
+                final String baseURI, final Resource[] defaultContext,
+                final RDFParserFactory rdfParserFactory) {
+            super(req, resp, namespace, timestamp);
+            this.baseURI = baseURI;
+            this.defaultContext = defaultContext;
+            this.rdfParserFactory = rdfParserFactory;
+        }
+
+        @Override
+        public Void call() throws Exception {
+
+            final long begin = System.currentTimeMillis();
+            
             BigdataSailRepositoryConnection conn = null;
+            boolean success = false;
             try {
 
-                conn = getBigdataRDFContext()
-                        .getUnisolatedConnection(namespace);
+                conn = getUnisolatedConnection();
+
+                final RDFParser rdfParser = rdfParserFactory.getParser();
+
+                final AtomicLong nmodified = new AtomicLong(0L);
 
                 rdfParser.setValueFactory(conn.getTripleStore()
                         .getValueFactory());
@@ -356,32 +416,31 @@ public class DeleteServlet extends BigdataRDFServlet {
                 // Commit the mutation.
                 conn.commit();
 
+                success = true;
+                
                 final long elapsed = System.currentTimeMillis() - begin;
 
-                reportModifiedCount(resp, nmodified.get(), elapsed);
+                reportModifiedCount(nmodified.get(), elapsed);
 
-            } catch(Throwable t) {
-                
-                if (conn != null)
-                    conn.rollback();
-
-                throw new RuntimeException(t);
+                return null;
                 
             } finally {
 
-                if (conn != null)
+                if (conn != null) {
+
+                    if (!success)
+                        conn.rollback();
+
                     conn.close();
 
+                }
+                
             }
 
-        } catch (Throwable t) {
-
-            throw BigdataRDFServlet.launderThrowable(t, resp, "");
-            
         }
-
+        
     }
-    
+
     /**
      * Helper class removes statements from the sail as they are visited by a parser.
      */
@@ -429,10 +488,10 @@ public class DeleteServlet extends BigdataRDFServlet {
             }
 
             if (c.length >= 2) {
-            	// removed from more than one context
-            	nmodified.addAndGet(c.length);
+                // removed from more than one context
+                nmodified.addAndGet(c.length);
             } else {
-            	nmodified.incrementAndGet();
+                nmodified.incrementAndGet();
             }
 
         }
@@ -445,8 +504,6 @@ public class DeleteServlet extends BigdataRDFServlet {
     private void doDeleteWithAccessPath(final HttpServletRequest req,
             final HttpServletResponse resp) throws IOException {
 
-        final long begin = System.currentTimeMillis();
-        
         final String namespace = getNamespace(req);
 
         final Resource s;
@@ -471,51 +528,9 @@ public class DeleteServlet extends BigdataRDFServlet {
 
         try {
 
-                BigdataSailRepositoryConnection conn = null;
-                try {
-
-                    conn = getBigdataRDFContext().getUnisolatedConnection(
-                            namespace);
-
-                    // Remove all statements matching that access path.
-//                    final long nmodified = conn.getSailConnection()
-//                            .getBigdataSail().getDatabase()
-//                            .removeStatements(s, p, o, c);
-                    
-                    // Remove all statements matching that access path.
-                    long nmodified = 0;
-                    if (c != null && c.length > 0) {
-	                    for (Resource r : c) {
-	                    	nmodified += conn.getSailConnection()
-	                              .getBigdataSail().getDatabase()
-	                              .removeStatements(s, p, o, r);
-	                    }
-                    } else {
-                    	nmodified += conn.getSailConnection()
-                              .getBigdataSail().getDatabase()
-                              .removeStatements(s, p, o, null);
-                    }
-                    
-                    // Commit the mutation.
-                    conn.commit();
-
-                    final long elapsed = System.currentTimeMillis() - begin;
-                    
-                    reportModifiedCount(resp, nmodified, elapsed);
-
-                } catch(Throwable t) {
-                    
-                    if(conn != null)
-                        conn.rollback();
-                    
-                    throw new RuntimeException(t);
-                    
-                } finally {
-
-                    if (conn != null)
-                        conn.close();
-
-                }
+            submitApiTask(
+                    new DeleteWithAccessPathTask(req, resp, namespace,
+                            ITx.UNISOLATED, s, p, o, c)).get();
 
         } catch (Throwable t) {
 
@@ -524,15 +539,98 @@ public class DeleteServlet extends BigdataRDFServlet {
 
         }
 
-//        } catch (Exception ex) {
-//
-//            // Will be rendered as an INTERNAL_ERROR.
-//            throw new RuntimeException(ex);
-//
-//        }
-
     }
 
 //    static private transient final Resource[] nullArray = new Resource[]{};
     
+    private static class DeleteWithAccessPathTask extends RestApiMutationTask<Void> {
+
+        private Resource s;
+        private URI p;
+        private final Value o;
+        private final Resource[] c;
+
+        /**
+         * 
+         * @param namespace
+         *            The namespace of the target KB instance.
+         * @param timestamp
+         *            The timestamp used to obtain a mutable connection.
+         * @param baseURI
+         *            The base URI for the operation.
+         * @param defaultContext
+         *            The context(s) for triples without an explicit named graph
+         *            when the KB instance is operating in a quads mode.
+         * @param rdfParserFactory
+         *            The factory for the {@link RDFParser}. This should have
+         *            been chosen based on the caller's knowledge of the
+         *            appropriate content type.
+         */
+        public DeleteWithAccessPathTask(final HttpServletRequest req,
+                final HttpServletResponse resp, //
+                final String namespace, final long timestamp,//
+                final Resource s, final URI p, final Value o, final Resource[] c) {
+            super(req, resp, namespace, timestamp);
+            this.s = s;
+            this.p = p;
+            this.o = o;
+            this.c = c;
+        }
+
+        @Override
+        public Void call() throws Exception {
+
+            final long begin = System.currentTimeMillis();
+
+            BigdataSailRepositoryConnection conn = null;
+            boolean success = false;
+            try {
+
+                conn = getUnisolatedConnection();
+
+                // Remove all statements matching that access path.
+                // final long nmodified = conn.getSailConnection()
+                // .getBigdataSail().getDatabase()
+                // .removeStatements(s, p, o, c);
+
+                // Remove all statements matching that access path.
+                long nmodified = 0;
+                if (c != null && c.length > 0) {
+                    for (Resource r : c) {
+                        nmodified += conn.getSailConnection().getBigdataSail()
+                                .getDatabase().removeStatements(s, p, o, r);
+                    }
+                } else {
+                    nmodified += conn.getSailConnection().getBigdataSail()
+                            .getDatabase().removeStatements(s, p, o, null);
+                }
+
+                // Commit the mutation.
+                conn.commit();
+
+                success = true;
+
+                final long elapsed = System.currentTimeMillis() - begin;
+
+                reportModifiedCount(nmodified, elapsed);
+
+                return null;
+
+            } finally {
+
+                if (conn != null) {
+
+                    if (!success)
+                        conn.rollback();
+
+                    conn.close();
+
+                }
+
+            }
+
+        }
+        
+    }
+
 }

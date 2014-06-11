@@ -27,12 +27,14 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata;
 
+import com.bigdata.journal.IIndexManager;
+import com.bigdata.relation.AbstractRelation;
+
 /**
  * A class for those few statics that it makes sense to reference from other
  * places.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class BigdataStatics {
 
@@ -109,4 +111,21 @@ public class BigdataStatics {
         
     }
     
+    /**
+     * FIXME GROUP COMMIT : Disable/Enable group commit on the Journal from the
+     * NSS API. Some global flag should control this and also disable the
+     * journal's semaphore and should disable the wrapping of BTree as an
+     * UnisolatedReadWriteIndex (
+     * {@link AbstractRelation#getIndex(IIndexManager, String, long)}, and
+     * should disable the calls to commit() or abort() from the LocalTripleStore
+     * to the Journal.
+     * 
+     * @see <a href="http://sourceforge.net/apps/trac/bigdata/ticket/753" > HA
+     *      doLocalAbort() should interrupt NSS requests and AbstractTasks </a>
+     * @see <a href="- http://sourceforge.net/apps/trac/bigdata/ticket/566" >
+     *      Concurrent unisolated operations against multiple KBs </a>
+     */
+    public static final boolean NSS_GROUP_COMMIT = Boolean
+            .getBoolean("com.bigdata.nssGroupCommit");
+
 }

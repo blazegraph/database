@@ -233,6 +233,8 @@ public class StatusServlet extends BigdataRDFServlet {
      * @param indexManager
      * 
      * @throws IOException
+     * 
+     * FIXME GROUP COMMIT: Review cancellation and leader fail scenarios.
      */
     static void doCancelQuery(final HttpServletRequest req,
             final HttpServletResponse resp, final IIndexManager indexManager,

@@ -343,7 +343,7 @@ public class QueryServlet extends BigdataRDFServlet {
         }
 
         /*
-         * Setup task to execute the query. The task is executed on a thread
+         * Setup task to execute the request. The task is executed on a thread
          * pool. This bounds the possible concurrency of query execution (as
          * opposed to queries accepted for eventual execution).
          * 
@@ -353,12 +353,7 @@ public class QueryServlet extends BigdataRDFServlet {
          */
         try {
 
-            final OutputStream os = resp.getOutputStream();
-
             final BigdataRDFContext context = getBigdataRDFContext();
-
-            // final boolean explain =
-            // req.getParameter(BigdataRDFContext.EXPLAIN) != null;
 
             final UpdateTask updateTask;
             try {
@@ -370,7 +365,7 @@ public class QueryServlet extends BigdataRDFServlet {
                 
                 updateTask = (UpdateTask) context.getQueryTask(namespace,
                         timestamp, updateStr, null/* acceptOverride */, req,
-                        resp, os, true/* update */);
+                        resp, resp.getOutputStream(), true/* update */);
                 
                 if (updateTask == null) {
                     // KB not found. Response already committed.
@@ -406,15 +401,47 @@ public class QueryServlet extends BigdataRDFServlet {
             ft.get();
 
         } catch (Throwable e) {
-//            try {
-                throw BigdataRDFServlet.launderThrowable(e, resp, updateStr);
-//            } catch (Exception e1) {
-//                throw new RuntimeException(e);
-//            }
+
+            throw BigdataRDFServlet.launderThrowable(e, resp, updateStr);
+
         }
         
     }
 
+    /**
+     * FIXME GROUP COMMIT: We need to refactor the code that manages the
+     * running queries in BigdataRDFServlet so we can separate out the
+     * concurrency control of the views from the control over the #of 
+     * running queries and/or update requests and the metadata that we
+     * manage to track and report on those requests. 
+     */
+//    private static class SparqlUpdateTask extends RestApiMutationTask<Void> {
+//
+//        /**
+//         * 
+//         * @param namespace
+//         *            The namespace of the target KB instance.
+//         * @param timestamp
+//         *            The timestamp used to obtain a mutable connection.
+//         * @param baseURI
+//         *            The base URI for the operation.
+//         */
+//        public SparqlUpdateTask(final HttpServletRequest req,
+//                final HttpServletResponse resp,
+//                final String namespace, final long timestamp
+//                ) {
+//            super(req, resp, namespace, timestamp);
+//        }
+//        
+//        @Override
+//        public Void call() throws Exception {
+//
+//            
+//
+//        }
+//        
+//    }
+    
     /**
      * Run a SPARQL query.
      */
@@ -647,11 +674,9 @@ public class QueryServlet extends BigdataRDFServlet {
             }
 
 		} catch (Throwable e) {
-//			try {
-				throw BigdataRDFServlet.launderThrowable(e, resp, queryStr);
-//			} catch (Exception e1) {
-//				throw new RuntimeException(e);
-//			}
+
+		    throw BigdataRDFServlet.launderThrowable(e, resp, queryStr);
+		    
 		}
 	
 	}
