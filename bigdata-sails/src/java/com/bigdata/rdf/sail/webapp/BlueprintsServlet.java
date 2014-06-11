@@ -105,6 +105,7 @@ public class BlueprintsServlet extends BigdataRDFServlet {
         try {
             
             BigdataSailRepositoryConnection conn = null;
+            boolean success = false;
             try {
 
                 conn = getBigdataRDFContext()
@@ -116,6 +117,8 @@ public class BlueprintsServlet extends BigdataRDFServlet {
                 
                 graph.commit();
                 
+                success = true;
+                
                 final long nmodified = graph.getMutationCountLastCommit();
 
                 final long elapsed = System.currentTimeMillis() - begin;
@@ -124,17 +127,16 @@ public class BlueprintsServlet extends BigdataRDFServlet {
                 
                 return;
 
-            } catch(Throwable t) {
-                
-                if(conn != null)
-                    conn.rollback();
-                
-                throw new RuntimeException(t);
-
             } finally {
 
-                if (conn != null)
+                if (conn != null) {
+
+                    if (!success)
+                        conn.rollback();
+
                     conn.close();
+
+                }
                 
             }
 
