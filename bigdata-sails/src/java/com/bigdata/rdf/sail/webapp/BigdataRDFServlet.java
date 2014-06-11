@@ -359,7 +359,7 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
      * 
      * @throws IOException
      */
-    protected void reportModifiedCount(final HttpServletResponse resp,
+    static protected void reportModifiedCount(final HttpServletResponse resp,
             final long nmodified, final long elapsed) throws IOException {
 
         final StringWriter w = new StringWriter();
@@ -385,7 +385,7 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
      * 
      * @throws IOException
      */
-    protected void reportRangeCount(final HttpServletResponse resp,
+    static protected void reportRangeCount(final HttpServletResponse resp,
             final long rangeCount, final long elapsed) throws IOException {
 
         final StringWriter w = new StringWriter();
@@ -411,20 +411,22 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
      * 
      * @throws IOException
      */
-    protected void reportContexts(final HttpServletResponse resp,
-            final RepositoryResult<Resource> contexts, final long elapsed) 
-            		throws IOException, RepositoryException {
+    static protected void reportContexts(final HttpServletResponse resp,
+            final RepositoryResult<Resource> contexts, final long elapsed)
+            throws IOException, RepositoryException {
 
         final StringWriter w = new StringWriter();
         
         final XMLBuilder t = new XMLBuilder(w);
 
         final Node root = t.root("contexts");
+
         while (contexts.hasNext()) {
-        	root.node("context")
-        		.attr("uri", contexts.next())
-        		.close();
+
+            root.node("context").attr("uri", contexts.next()).close();
+
         }
+
         root.close();
 
         buildResponse(resp, HTTP_OK, MIME_APPLICATION_XML, w.toString());
