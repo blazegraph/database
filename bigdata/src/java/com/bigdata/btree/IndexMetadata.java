@@ -2910,9 +2910,17 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
      * specified for <i>this</i> index.
      * </p>
      */
+    @Override
     public IKeyBuilder getKeyBuilder() {
 
         return getTupleSerializer().getKeyBuilder();
+        
+    }
+
+    @Override
+    public IKeyBuilder getPrimaryKeyBuilder() {
+
+        return getTupleSerializer().getPrimaryKeyBuilder();
         
     }
     

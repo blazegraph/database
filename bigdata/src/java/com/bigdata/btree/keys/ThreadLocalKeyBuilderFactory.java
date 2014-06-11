@@ -31,8 +31,9 @@ package com.bigdata.btree.keys;
 import com.bigdata.btree.IIndex;
 
 /**
+ * A thread-local implementation.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class ThreadLocalKeyBuilderFactory implements IKeyBuilderFactory {
 
@@ -58,6 +59,7 @@ public class ThreadLocalKeyBuilderFactory implements IKeyBuilderFactory {
      */
     private ThreadLocal<IKeyBuilder> threadLocalKeyBuilder = new ThreadLocal<IKeyBuilder>() {
 
+        @Override
         protected synchronized IKeyBuilder initialValue() {
 
             return delegate.getKeyBuilder();
@@ -67,12 +69,40 @@ public class ThreadLocalKeyBuilderFactory implements IKeyBuilderFactory {
     };
 
     /**
+     * {@inheritDoc}
+     * <p>
      * Return a {@link ThreadLocal} {@link IKeyBuilder} instance configured
      * using the {@link IKeyBuilderFactory} specified to the ctor.
      */
+    @Override
     public IKeyBuilder getKeyBuilder() {
         
         return threadLocalKeyBuilder.get();
+        
+    }
+
+    private ThreadLocal<IKeyBuilder> threadLocalPrimaryKeyBuilder = new ThreadLocal<IKeyBuilder>() {
+
+        @Override
+        protected synchronized IKeyBuilder initialValue() {
+
+            return delegate.getPrimaryKeyBuilder();
+
+        }
+
+    };
+        
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Return a {@link ThreadLocal} {@link IKeyBuilder} instance configured
+     * using the {@link IKeyBuilderFactory} specified to the ctor but with the
+     * {@link StrengthEnum} overriden as {@link StrengthEnum#Primary}.
+     */
+    @Override
+    public IKeyBuilder getPrimaryKeyBuilder() {
+
+        return threadLocalPrimaryKeyBuilder.get();
         
     }
 
