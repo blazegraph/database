@@ -3049,6 +3049,7 @@ public class BigdataSail extends SailBase implements Sail {
 //            
 //        }
 
+        @Override
         public synchronized CloseableIteration<? extends Resource, SailException> getContextIDs()
                 throws SailException {
             
@@ -3083,6 +3084,7 @@ public class BigdataSail extends SailBase implements Sail {
                 private Resource next = null;
                 private boolean open = true;
 
+                @Override
                 public void close() throws SailException {
                     if (open) {
                         open = false;
@@ -3091,6 +3093,7 @@ public class BigdataSail extends SailBase implements Sail {
                     }
                 }
 
+                @Override
                 public boolean hasNext() throws SailException {
                     if(open && _hasNext())
                         return true;
@@ -3112,6 +3115,7 @@ public class BigdataSail extends SailBase implements Sail {
                     return false;
                 }
 
+                @Override
                 public Resource next() throws SailException {
                     if (next == null)
                         throw new SailException();
@@ -3120,6 +3124,7 @@ public class BigdataSail extends SailBase implements Sail {
                     return tmp;
                 }
 
+                @Override
                 public void remove() throws SailException {
                     /*
                      * Note: remove is not supported. The semantics would
@@ -3143,6 +3148,7 @@ public class BigdataSail extends SailBase implements Sail {
          * Note: The semantics depend on the {@link Options#STORE_CLASS}. See
          * {@link ITripleStore#abort()}.
          */
+        @Override
         public synchronized void rollback() throws SailException {
 
             assertWritableConn();
@@ -3234,12 +3240,14 @@ public class BigdataSail extends SailBase implements Sail {
          * Note: The semantics depend on the {@link Options#STORE_CLASS}.  See
          * {@link AbstractTripleStore#commit()}.
          */
+        @Override
         final public synchronized void commit() throws SailException {
             
             commit2();
             
         }
 
+        @Override
         final public boolean isOpen() throws SailException {
 
             return openConn;
@@ -3269,6 +3277,7 @@ public class BigdataSail extends SailBase implements Sail {
          * artifact arises because the {@link SailConnection} is using
          * unisolated writes on the database).
          */
+        @Override
         public synchronized void close() throws SailException {
 
 //            assertOpen();
@@ -3351,6 +3360,7 @@ public class BigdataSail extends SailBase implements Sail {
         /**
          * Invoke close, which will be harmless if we are already closed. 
          */
+        @Override
         protected void finalize() throws Throwable {
             
         	/*
@@ -3488,6 +3498,7 @@ public class BigdataSail extends SailBase implements Sail {
          * from each context in a quad store, including anything in the
          * {@link BigdataSail#NULL_GRAPH}.
          */
+        @Override
         @SuppressWarnings("unchecked")
         public CloseableIteration<? extends Statement, SailException> getStatements(
                 final Resource s, final URI p, final Value o,
