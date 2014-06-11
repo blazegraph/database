@@ -82,7 +82,6 @@ import com.bigdata.util.InnerCause;
  * Test suite for {@link BufferMode#DiskRW} journals.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class TestRWJournal extends AbstractJournalTestCase {
 

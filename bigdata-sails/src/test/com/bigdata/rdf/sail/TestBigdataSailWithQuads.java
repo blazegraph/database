@@ -46,7 +46,6 @@ import com.bigdata.rdf.sail.tck.BigdataStoreTest;
  * the pipeline join algorithm.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class TestBigdataSailWithQuads extends AbstractBigdataSailTestCase {
 

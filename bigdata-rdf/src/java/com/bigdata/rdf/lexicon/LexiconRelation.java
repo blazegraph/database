@@ -71,11 +71,8 @@ import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexTypeEnum;
 import com.bigdata.btree.filter.PrefixFilter;
 import com.bigdata.btree.filter.TupleFilter;
-import com.bigdata.btree.keys.DefaultKeyBuilderFactory;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KVO;
-import com.bigdata.btree.keys.KeyBuilder;
-import com.bigdata.btree.keys.StrengthEnum;
 import com.bigdata.cache.ConcurrentWeakValueCacheWithBatchedUpdates;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.IResourceLock;
@@ -105,7 +102,6 @@ import com.bigdata.rdf.model.BigdataValueFactoryImpl;
 import com.bigdata.rdf.model.BigdataValueSerializer;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.spo.ISPO;
-import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.vocab.NoVocabulary;
 import com.bigdata.rdf.vocab.Vocabulary;
@@ -1421,26 +1417,31 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
 
         }
 
-        /*
+        /**
          * The KeyBuilder used to form the prefix keys.
          * 
-         * Note: The prefix keys are formed with IDENTICAL strength. This is
+         * Note: The prefix keys are formed with PRIMARY strength. This is
          * necessary in order to match all keys in the index since it causes the
          * secondary characteristics to NOT be included in the prefix key even
          * if they are present in the keys in the index.
+         * 
+         * @see <a href="http://trac.bigdata.com/ticket/974" >
+         *      Name2Addr.indexNameScan(prefix) uses scan + filter </a>
          */
-        final LexiconKeyBuilder keyBuilder;
-        {
-
-            final Properties properties = new Properties();
-
-            properties.setProperty(KeyBuilder.Options.STRENGTH,
-                    StrengthEnum.Primary.toString());
-
-            keyBuilder = new Term2IdTupleSerializer(
-                    new DefaultKeyBuilderFactory(properties)).getLexiconKeyBuilder();
-
-        }
+        final LexiconKeyBuilder keyBuilder = ((Term2IdTupleSerializer) getTerm2IdIndex()
+                .getIndexMetadata().getTupleSerializer())
+                .getLexiconPrimaryKeyBuilder();
+//        {
+//
+//            final Properties properties = new Properties();
+//
+//            properties.setProperty(KeyBuilder.Options.STRENGTH,
+//                    StrengthEnum.Primary.toString());
+//
+//            keyBuilder = new Term2IdTupleSerializer(
+//                    new DefaultKeyBuilderFactory(properties)).getLexiconKeyBuilder();
+//
+//        }
 
         /*
          * Formulate the keys[].

@@ -26,7 +26,7 @@ import cutthecrap.utils.striterators.FilterBase;
  * </p>
  * <h4>WARNING</h4>
  * <p>
- * <strong>The prefix keys MUST be formed with {@link StrengthEnum#Identical}.
+ * <strong>The prefix keys MUST be formed with {@link StrengthEnum#Primary}.
  * This is necessary in order to match all keys in the index since it causes the
  * secondary characteristics to NOT be included in the prefix key even if they
  * are present in the keys in the index.</strong> Using other
@@ -55,20 +55,21 @@ import cutthecrap.utils.striterators.FilterBase;
  * <p>
  * at IDENTICAL strength. The additional bytes for the IDENTICAL strength
  * reflect the Locale specific Unicode sort key encoding of secondary
- * characteristics such as case. The successor of the PRIMARY strength byte[] is
- * </p>
- * 
- * <pre>
- * [43, 75, 89, 41, 68]
- * </pre>
- * 
- * <p>
- * (one was added to the last byte) which spans all keys of interest. However
- * the successor of the IDENTICAL strength byte[] would
+ * characteristics such as case. The successor of the IDENTICAL strength byte[]
+ * is
  * </p>
  * 
  * <pre>
  * [43, 75, 89, 41, 67, 1, 9, 1, 143, 9]
+ * </pre>
+ * 
+ * <p>
+ * (one was added to the last byte) which spans all keys of interest. However
+ * the successor of the PRIMARY strength byte[] would
+ * </p>
+ * 
+ * <pre>
+ * [43, 75, 89, 41, 68]
  * </pre>
  * 
  * <p>
@@ -81,8 +82,8 @@ import cutthecrap.utils.striterators.FilterBase;
  * <pre>
  * Properties properties = new Properties();
  * 
- * properties.setProperty(KeyBuilder.Options.STRENGTH, StrengthEnum.Primary
- *         .toString());
+ * properties.setProperty(KeyBuilder.Options.STRENGTH,
+ *         StrengthEnum.Primary.toString());
  * 
  * prefixKeyBuilder = KeyBuilder.newUnicodeInstance(properties);
  * </pre>
@@ -104,7 +105,9 @@ import cutthecrap.utils.striterators.FilterBase;
  *       partition....
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
+ * 
+ * @see <a href="http://trac.bigdata.com/ticket/974" >
+ *      Name2Addr.indexNameScan(prefix) uses scan + filter </a>
  */
 public class PrefixFilter<E> extends FilterBase implements ITupleFilter<E> {
     
