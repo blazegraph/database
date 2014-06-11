@@ -234,6 +234,16 @@ public class RemoteRepository {
     private volatile String queryMethod;
 
     /**
+     * The name of the property whose value is the namespace of the KB to be
+     * created.
+     * <p>
+     * Note: This string is identicial to one defined by the BigdataSail
+     * options, but the client API must not include a dependency on the Sail so
+     * it is given by value again here in a package local scope.
+     */
+    static final String OPTION_CREATE_KB_NAMESPACE = "com.bigdata.rdf.sail.namespace";
+
+    /**
      * Return the maximum requestURL length before the request is converted into
      * a POST using a <code>application/x-www-form-urlencoded</code> request
      * entity.
