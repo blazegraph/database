@@ -223,7 +223,10 @@ public class BigdataRDFContext extends BigdataBaseContext {
 
     /**
      * A thread pool for running accepted queries against the
-     * {@link QueryEngine}.
+     * {@link QueryEngine}. The number of queries that will be processed
+     * concurrently is determined by this thread pool.
+     * 
+     * @see SparqlEndpointConfig#queryThreadPoolSize
      */
     /*package*/final ExecutorService queryService;
 	
