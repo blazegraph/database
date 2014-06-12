@@ -42,6 +42,7 @@ import java.util.TreeMap;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
@@ -2971,11 +2972,15 @@ public class TestRWJournal extends AbstractJournalTestCase {
 			super(name);
 		}
 
-		protected IRawStore getStore() {
+		protected IRawStore getStore(String storeFile) {
 
 			final Properties properties = getProperties();
 
-			properties.setProperty(Options.CREATE_TEMP_FILE, "true");
+			if (storeFile == null) {	
+				properties.setProperty(Options.CREATE_TEMP_FILE, "true");
+			} else {
+				properties.setProperty(Options.FILE, storeFile);
+			}
 
 			properties.setProperty(Options.DELETE_ON_EXIT, "true");
 
@@ -2984,6 +2989,86 @@ public class TestRWJournal extends AbstractJournalTestCase {
 			properties.setProperty(Options.WRITE_CACHE_ENABLED, "" + writeCacheEnabled);
 
 			return new Journal(properties);//.getBufferStrategy();
+
+		}
+
+		protected IRawStore getStore() {
+
+			return getStore(null); // no file provided by default
+
+		}
+
+		static long getLongArg(final String[] args, final String arg, final long def) {
+			final String sv = getArg(args, arg, null);
+			
+			return sv == null ? def : Long.parseLong(sv);
+		}
+		
+		static String getArg(final String[] args, final String arg, final String def) {
+			for (int p = 0; p < args.length; p+=2) {
+				if (arg.equals(args[p]))
+					return args[p+1];
+			}
+			
+			return def;
+		}
+		
+		/**
+		 * Stress variant to support multiple parameterised runs
+		 * 
+		 * Arguments
+		 * 
+		 * -file - optional explicit file path
+		 * -clients - reader threads
+		 * -nwrites - number of records written
+		 * -reclen - size of record written
+		 * -ntrials - number of readers
+		 * -nreads - number of reads made by each reader
+		 * -nruns - number of times to repeat process with reopen each time
+		 */
+	    public static void main(final String[] args) throws Exception {
+	    	final TestMROW test = new TestMROW("main");
+	    	
+            final String storeFile = getArg(args, "-file", null);
+
+	        Journal store = (Journal) test.getStore(storeFile);
+	        try {
+
+	            final long timeout = 20;
+
+	            final int nclients = (int) getLongArg(args, "-clients", 20); // 20
+			
+	            final long nwrites = getLongArg(args, "-nwrites", 100000); //1000000;
+		
+	            final int writeDelayMillis = 1;
+			
+	            final long ntrials = getLongArg(args, "-ntrials", 100000); // 100000;
+
+	            final int reclen =  (int) getLongArg(args, "-reclen", 128); // 128;
+	
+	            final long nreads = getLongArg(args, "-nreads", 1000); // 1000;
+
+	            final long nruns = getLongArg(args, "-nruns", 1); // 1000;
+
+	            final AtomicInteger nerr = new AtomicInteger();
+
+	            for (int i = 0; i < nruns; i++) {
+		            doMROWTest(store, nwrites, writeDelayMillis, timeout, nclients,
+		                    ntrials, reclen, nreads, nerr, true /*readAll*/);
+
+		            store.commit();
+
+		            store = (new TestRWJournal()).reopenStore(store);
+
+		            System.out.println("Completed run: " + i);
+	            }
+
+	        } finally {
+
+	        	if (storeFile == null)
+	        		store.destroy();
+
+	        }
 
 		}
 
