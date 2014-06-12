@@ -39,7 +39,6 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.apache.system.SystemUtil;
 
 import com.bigdata.rdf.spo.ISPO;
-import com.bigdata.rdf.spo.SPOAccessPath;
 import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.striterator.AbstractChunkedResolverator;
@@ -274,7 +273,7 @@ public class BigdataTriplePatternMaterializer
 //                                throw new AssertionError(Arrays.toString(a));
 //                        }
 //                    }
-                    out.add(a);
+                    out.put(a);
                     n += a.length;
                 }
                 return n;
