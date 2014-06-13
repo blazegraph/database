@@ -125,10 +125,11 @@ abstract public class AbstractBigdataSailTestCase extends TestCase2 {
      * returned by this method and the appropriate properties must be provided
      * either through the command line or in a properties file.
      * </p>
+     * @param storeFile 
      * 
      * @return A new properties object.
      */
-    public Properties getProperties() {
+    public Properties getProperties(final String storeFile) {
         
         if( m_properties == null ) {
             
@@ -149,12 +150,16 @@ abstract public class AbstractBigdataSailTestCase extends TestCase2 {
             // transient means that there is nothing to delete after the test.
 //            m_properties.setProperty(Options.BUFFER_MODE,BufferMode.Transient.toString());
             m_properties.setProperty(Options.BUFFER_MODE,BufferMode.Disk.toString());
+            
+            if (storeFile != null) { // overrides if one set by super class
+                m_properties.setProperty(Options.FILE,storeFile);
+            }
 
             /*
              * If an explicit filename is not specified...
              */
             if(m_properties.get(Options.FILE)==null) {
-
+            	
                 /*
                  * Use a temporary file for the test. Such files are always deleted when
                  * the journal is closed or the VM exits.
@@ -172,6 +177,10 @@ abstract public class AbstractBigdataSailTestCase extends TestCase2 {
         
     }
 
+    public Properties getProperties() {
+    	return getProperties(null);
+    }
+    
     /**
      * This method is invoked from methods that MUST be proxied to this class.
      * {@link GenericProxyTestCase} extends this class, as do the concrete
