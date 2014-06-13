@@ -204,13 +204,15 @@ abstract public class TestMROWTransactions extends ProxyBigdataSailTestCase {
                 }
 
                 for (int rdrs = 0; rdrs < nreaders; rdrs++) {
+                	
+                	final int nreads = rdrs == 0 ? Integer.MAX_VALUE : 60; // reasonably long running hopefully
 
                     lastReaderFuture = readers.submit(new Reader(r,
-                            60/* nread */, nwriters, sail, failex,
+                            nreads, nwriters, sail, failex,
                             commits, nreadersDone, subs));
 
                 }
-
+                
                 // let the writers run riot for a time, checking for failure
                 while (true) {
 //                    final boolean bothDone = lastWriterFuture.isDone()
@@ -728,7 +730,7 @@ abstract public class TestMROWTransactions extends ProxyBigdataSailTestCase {
 		
 		props.load(new FileInputStream(propertyFile));
 		
-		BigdataSail sail = new BigdataSail(props);
+		final AtomicReference<BigdataSail> sail = new AtomicReference<BigdataSail>(new BigdataSail(props));
 
 		final int nreaderThreads = (int) getLongArg(args, "-nreaderthreads", 20); // 20
 
@@ -737,20 +739,46 @@ abstract public class TestMROWTransactions extends ProxyBigdataSailTestCase {
 		final long nreaders = getLongArg(args, "-nreaders", 400); // 100000;
 
 		final long nruns = getLongArg(args, "-nruns", 1); // 1000;
+		
+		final Thread sailShutdown = new Thread() {
+			public void run() {
+				final Random r = new Random();
+				while(true) {
+					try {
+						Thread.sleep(r.nextInt(50000));
+						if (sail.get().isOpen()) {
+							log.warn("SHUTDOWN NOW");
+							sail.get().shutDown();
+						}
+					} catch (InterruptedException e) {
+						break;
+					} catch (SailException e) {
+						log.warn(e);
+					}
+				}
+			}
+		};
+		
+		sailShutdown.start();
 
 		for (int i = 0; i < nruns; i++) {
-			domultiple_csem_transaction2(sail, (int) nreaderThreads,
-					(int) nwriters, (int) nreaders, false /*no tear down*/);
-
-			// reopen for second run - should be open if !teardown
-			if (sail.isOpen())
-				sail.shutDown();
+			try {
+				domultiple_csem_transaction2(sail.get(), (int) nreaderThreads,
+						(int) nwriters, (int) nreaders, false /*no tear down*/);
+				
+				// reopen for second run - should be open if !teardown
+				if (sail.get().isOpen())
+					sail.get().shutDown();
+			} catch (Throwable e) {
+				log.warn("OOPS", e); // There will be a number of expected causes, eg IllegalStateException - service not available
+			}
 			
-			sail = new BigdataSail(props);
+			sail.set(new BigdataSail(props));
 
 			System.out.println("Completed run: " + i);
 		}
-
+		
+		sailShutdown.interrupt();
 	}
 
 }
