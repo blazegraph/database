@@ -28,6 +28,7 @@ package com.bigdata.rdf.sail;
 
 import info.aduna.iteration.CloseableIteration;
 
+import java.io.FileInputStream;
 import java.util.Properties;
 import java.util.Random;
 import java.util.concurrent.Callable;
@@ -113,7 +114,6 @@ abstract public class TestMROWTransactions extends ProxyBigdataSailTestCase {
     void domultiple_csem_transaction2(final int retentionMillis,
             final int nreaderThreads, final int nwriters, final int nreaders,
             final boolean isolatableIndices) throws Exception {
-
         if (log.isInfoEnabled()) {
             log.info("=================================================================================");
             log.info("retentionMillis=" + retentionMillis + ", nreaderThreads="
@@ -121,6 +121,15 @@ abstract public class TestMROWTransactions extends ProxyBigdataSailTestCase {
                     + nreaders + ", isolatableIndices=" + isolatableIndices);
             log.info("=================================================================================");
         }
+
+        final BigdataSail sail = getSail(getProperties(retentionMillis,
+                isolatableIndices));
+        
+        domultiple_csem_transaction2(sail, nreaderThreads, nwriters, nreaders, true);
+    }
+    
+    static void domultiple_csem_transaction2( final BigdataSail sail,
+            final int nreaderThreads, final int nwriters, final int nreaders, final boolean teardown) throws Exception {   
 
         /**
          * The most likely problem is related to the session protection in the
@@ -151,8 +160,6 @@ abstract public class TestMROWTransactions extends ProxyBigdataSailTestCase {
         final AtomicReference<Throwable> failex = new AtomicReference<Throwable>(null);
         // Set [true] iff there are no failures by the time we cancel the running tasks.
         final AtomicBoolean success = new AtomicBoolean(false);
-        final BigdataSail sail = getSail(getProperties(retentionMillis,
-                isolatableIndices));
         // log.warn("Journal: "+sail.getDatabase().getIndexManager()+", file="+((Journal)sail.getDatabase().getIndexManager()).getFile());
         try {
 
@@ -235,7 +242,6 @@ abstract public class TestMROWTransactions extends ProxyBigdataSailTestCase {
                     final Throwable ex = failex.get();
                     if (ex != null) {
                         fail("Test failed: firstCause=" + ex
-                                + ", retentionMillis=" + retentionMillis
                                 + ", nreaderThreads=" + nreaderThreads
                                 + ", nwriters=" + nwriters + ", nreaders="
                                 + nreaders + ", indexManager="
@@ -253,17 +259,19 @@ abstract public class TestMROWTransactions extends ProxyBigdataSailTestCase {
                     readers.shutdownNow();
             }
         } finally {
-            try {
-                sail.__tearDownUnitTest();
-            } catch (Throwable t) {
-                /*
-                 * FIXME The test helper tear down should not throw anything,
-                 * but it can do so if a tx has been asynchronously closed. This
-                 * has to do with the logic that openrdf uses to close open
-                 * transactions when the sail is shutdown by the caller.
-                 */
-                log.error("Problem with test shutdown: " + t, t);
-            }
+        	if (teardown) {
+	            try {
+	                sail.__tearDownUnitTest();
+	            } catch (Throwable t) {
+	                /*
+	                 * FIXME The test helper tear down should not throw anything,
+	                 * but it can do so if a tx has been asynchronously closed. This
+	                 * has to do with the logic that openrdf uses to close open
+	                 * transactions when the sail is shutdown by the caller.
+	                 */
+	                log.error("Problem with test shutdown: " + t, t);
+	            }
+        	}
 
         }
 
@@ -326,13 +334,13 @@ abstract public class TestMROWTransactions extends ProxyBigdataSailTestCase {
                     log.info("Commit #" + commits);
 
             } catch (Throwable ise) {
-                log.warn(ise, ise);
                 if (InnerCause.isInnerCause(ise, InterruptedException.class)) {
                     // ignore
                 } else if (InnerCause.isInnerCause(ise, MyBTreeException.class)
                         && aborts.get() < maxAborts) {
                     // ignore
                 } else {
+                    log.warn(ise, ise);
                     // Set the first cause (but not for the forced abort).
                     if (failex
                             .compareAndSet(null/* expected */, ise/* newValue */)) {
@@ -532,7 +540,7 @@ abstract public class TestMROWTransactions extends ProxyBigdataSailTestCase {
 //
 //    }
 
-    protected URI uri(String s) {
+    protected static URI uri(String s) {
         return new URIImpl(BD.NAMESPACE + s);
     }
 
@@ -568,7 +576,33 @@ abstract public class TestMROWTransactions extends ProxyBigdataSailTestCase {
             final boolean isolatableIndices) {
 
         final Properties props = getProperties();
+        
+        props.setProperty(BigdataSail.Options.TRUTH_MAINTENANCE, "false");
+        props.setProperty(BigdataSail.Options.AXIOMS_CLASS, NoAxioms.class.getName());
+        props.setProperty(BigdataSail.Options.VOCABULARY_CLASS, NoVocabulary.class.getName());
+        props.setProperty(BigdataSail.Options.JUSTIFY, "false");
+        props.setProperty(BigdataSail.Options.TEXT_INDEX, "false");
+        // props.setProperty(Options.WRITE_CACHE_BUFFER_COUNT, "3");
 
+        // ensure using RWStore
+        props.setProperty(Options.BUFFER_MODE, BufferMode.DiskRW.toString());
+        // props.setProperty(RWStore.Options.MAINTAIN_BLACKLIST, "false");
+        // props.setProperty(RWStore.Options.OVERWRITE_DELETE, "true");
+        // props.setProperty(Options.CREATE_TEMP_FILE, "false");
+        // props.setProperty(Options.FILE, "/Volumes/SSDData/csem.jnl");
+
+        // props.setProperty(IndexMetadata.Options.WRITE_RETENTION_QUEUE_CAPACITY, "20");
+        // props.setProperty(IndexMetadata.Options.WRITE_RETENTION_QUEUE_SCAN, "0");
+        props.setProperty(IndexMetadata.Options.WRITE_RETENTION_QUEUE_CAPACITY, "500");
+        props.setProperty(IndexMetadata.Options.WRITE_RETENTION_QUEUE_SCAN, "10");
+
+        setProperties(props, retention, isolatableIndices);
+        
+        return props;
+    }
+
+   static void setProperties(final Properties props, final int retention,
+           final boolean isolatableIndices) {
         props.setProperty(BigdataSail.Options.ISOLATABLE_INDICES,
                 Boolean.toString(isolatableIndices));
 
@@ -599,8 +633,9 @@ abstract public class TestMROWTransactions extends ProxyBigdataSailTestCase {
                     + ".com.bigdata.btree.BTree.className",
                     MyBTree.class.getName());
         }
-        return props;
     }
+    
+    
 
     /**
      * Helper class for force abort of a B+Tree write.
@@ -648,5 +683,74 @@ abstract public class TestMROWTransactions extends ProxyBigdataSailTestCase {
         private static final long serialVersionUID = 1L;
         
     }
+
+    /** utilities for main subclass support **/
+	static long getLongArg(final String[] args, final String arg, final long def) {
+		final String sv = getArg(args, arg, null);
+		
+		return sv == null ? def : Long.parseLong(sv);
+	}
+	
+	static String getArg(final String[] args, final String arg, final String def) {
+		for (int p = 0; p < args.length; p+=2) {
+			if (arg.equals(args[p]))
+				return args[p+1];
+		}
+		
+		return def;
+	}
+    
+	/**
+	 * Command line variant to allow stress testing without JUnit support
+	 * 
+	 * Invokes the same domultiple_csem_transaction2 method.
+	 * 
+	 * A property file is required.  Note that if a file is specified then
+	 * it will be re-opened and not removed for each run as specified by
+	 * nruns.
+	 * 
+	 * Optional arguments
+	 * -nruns - number of runs through the test
+	 * -nreaderthreads - reader threads
+	 * -nwriters - writer tasks
+	 * -nreaders - reader tasks
+	 */
+	public static void main(String[] args) throws Exception {
+
+		final String propertyFile = getArg(args, "-propertyfile", null);
+		if (propertyFile == null) {
+			System.out.println("-propertyfile <properties> must be specified");
+			return;
+		}
+			
+		
+		final Properties props = new Properties();
+		
+		props.load(new FileInputStream(propertyFile));
+		
+		BigdataSail sail = new BigdataSail(props);
+
+		final int nreaderThreads = (int) getLongArg(args, "-nreaderthreads", 20); // 20
+
+		final long nwriters = getLongArg(args, "-nwriters", 100); // 1000000;
+
+		final long nreaders = getLongArg(args, "-nreaders", 400); // 100000;
+
+		final long nruns = getLongArg(args, "-nruns", 1); // 1000;
+
+		for (int i = 0; i < nruns; i++) {
+			domultiple_csem_transaction2(sail, (int) nreaderThreads,
+					(int) nwriters, (int) nreaders, false /*no tear down*/);
+
+			// reopen for second run - should be open if !teardown
+			if (sail.isOpen())
+				sail.shutDown();
+			
+			sail = new BigdataSail(props);
+
+			System.out.println("Completed run: " + i);
+		}
+
+	}
 
 }
