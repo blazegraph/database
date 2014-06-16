@@ -96,6 +96,7 @@ abstract public class AbstractRelation<E> extends AbstractResource<IRelation<E>>
      * 
      * @return The index name.
      */
+    @Override
     public String getFQN(final IKeyOrder<? extends E> keyOrder) {
         
         return getFQN(this, keyOrder);
@@ -161,6 +162,7 @@ abstract public class AbstractRelation<E> extends AbstractResource<IRelation<E>>
      *       construct to return the correct hard reference. This behavior
      *       should be encapsulated.
      */
+    @Override
     public IIndex getIndex(final IKeyOrder<? extends E> keyOrder) {
 
         return getIndex(getFQN(keyOrder));
@@ -302,12 +304,14 @@ abstract public class AbstractRelation<E> extends AbstractResource<IRelation<E>>
 
     }
     
+    @Override
     final public IAccessPath<E> getAccessPath(final IPredicate<E> predicate) {
     
         return getAccessPath(getKeyOrder(predicate), predicate);
         
     }
     
+    @Override
     final public IAccessPath<E> getAccessPath(final IKeyOrder<E> keyOrder,
             final IPredicate<E> predicate) {
 
@@ -315,6 +319,7 @@ abstract public class AbstractRelation<E> extends AbstractResource<IRelation<E>>
 
     }
 
+    @Override
     @SuppressWarnings("unchecked")
     final public IAccessPath<E> getAccessPath(
             final IIndexManager localIndexManager, //
