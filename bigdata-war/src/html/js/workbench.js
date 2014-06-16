@@ -568,7 +568,7 @@ function submitUpdate(e) {
          break;
    }
 
-   $('#update-response pre').show().html('Data loading...');   
+   $('#update-response pre').show().html('Running update...');   
 
    $.ajax(url, settings);
 }
