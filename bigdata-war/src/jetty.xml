@@ -148,6 +148,7 @@
                          <Set name="parentLoaderPriority">true</Set>
                          <Set name="extractWAR">false</Set>
                          <Set name="overrideDescriptor"><SystemProperty name="jetty.overrideWebXml" default="bigdata-war/src/WEB-INF/override-web.xml"/></Set>
+                         <Set name="maxFormContentSize">105000000</Set>
                         </New>
                     </Arg>
                   </Call>
