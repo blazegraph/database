@@ -533,14 +533,16 @@ function submitUpdate(e) {
          // see if monitor mode is on
          if($('#update-monitor').is(':checked')) {
             // create form and submit it, sending output to the iframe
-            var form = $('<form method="POST" target="update-response-container">')
+            var form = $('<form id="update-monitor-form" method="POST" target="update-response-container">')
                .attr('action', url)
                .append($('<input name="update">').val(settings.data))
                .append('<input name="monitor" value="true">');
             if($('#update-analytic').is(':checked')) {
                form.append('<input name="analytic" value="true">')
             }
+            form.appendTo($('body'));
             form.submit();
+            $('#update-monitor-form').remove();
             $('#update-response iframe, #update-clear-container').show();
             $('#update-response pre').hide();
             return;
