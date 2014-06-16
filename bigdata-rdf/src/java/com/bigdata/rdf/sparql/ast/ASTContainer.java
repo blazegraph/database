@@ -122,7 +122,7 @@ public class ASTContainer extends ASTBase {
     }
     
     /**
-     * Return the original SPARQL QUERY -or- UPATE from which this AST model was
+     * Return the original SPARQL QUERY -or- UPDATE from which this AST model was
      * generated.
      * 
      * @return The original Query or Update -or- <code>null</code> if the AST
