@@ -2807,6 +2807,25 @@ public abstract class AbstractHA3JournalServerTestCase extends
     }
 
     /**
+     * Commits update transaction with LBS after awaiting quorum.
+     */
+    protected void simpleTransactionLBS() throws IOException, Exception {
+
+        // Await quorum meet.
+        final long token = quorum.awaitQuorum(awaitQuorumTimeout,
+                TimeUnit.MILLISECONDS);
+
+        // Figure out which service is the leader.
+        final HAGlue leader = quorum.getClient().getLeader(token);
+
+        // Wait until that service is ready to act as the leader.
+        assertEquals(HAStatusEnum.Leader, awaitNSSAndHAReady(leader));
+
+        simpleTransaction_noQuorumCheckLBS(leader);
+        
+    }
+
+    /**
      * Immediately issues a simple transaction against the service.
      * 
      * @param leader
@@ -2819,6 +2838,22 @@ public abstract class AbstractHA3JournalServerTestCase extends
             throws IOException, Exception {
 
         simpleTransaction_noQuorumCheck(leader, false/* useLoadBalancer */);
+
+    }
+
+    /**
+     * Immediately issues a simple transaction against the service with LBS.
+     * 
+     * @param leader
+     *            The service (must be the leader to succeed).
+     *            
+     * @throws IOException
+     * @throws Exception
+     */
+    protected void simpleTransaction_noQuorumCheckLBS(final HAGlue leader)
+            throws IOException, Exception {
+
+        simpleTransaction_noQuorumCheck(leader, true/* useLoadBalancer */);
 
     }
 

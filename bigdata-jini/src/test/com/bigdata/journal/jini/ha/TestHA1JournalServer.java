@@ -123,6 +123,19 @@ public class TestHA1JournalServer extends AbstractHA3JournalServerTestCase {
 
     }
 
+    public void testSimpleTransactionLBS() throws Exception {
+    	
+    	doStartA();
+    	
+    	serverA.awaitHAReady(2, TimeUnit.SECONDS);
+    	
+    	awaitCommitCounter(1, new HAGlue[] { serverA });
+    	
+    	simpleTransactionLBS();
+    	
+    	awaitCommitCounter(2, new HAGlue[] { serverA });
+    }
+    
     public void testMultiTransaction() throws Exception {
         doStartA();
 
