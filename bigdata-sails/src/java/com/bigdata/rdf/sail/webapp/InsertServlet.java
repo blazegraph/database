@@ -315,11 +315,11 @@ public class InsertServlet extends BigdataRDFServlet {
                 // Commit the mutation.
                 conn.commit();
 
+                success = true;
+
                 final long elapsed = System.currentTimeMillis() - begin;
 
                 reportModifiedCount(nmodified.get(), elapsed);
-
-                success = true;
 
                 return (Void) null;
 
