@@ -83,6 +83,9 @@ import com.bigdata.sparse.SparseRowStore;
 import com.bigdata.util.InnerCause;
 import com.bigdata.util.concurrent.TaskCounters;
 
+import cutthecrap.utils.striterators.Resolver;
+import cutthecrap.utils.striterators.Striterator;
+
 /**
  * Abstract base class for tasks that may be submitted to the
  * {@link ConcurrencyManager}. Tasks may be isolated (by a transaction),
@@ -292,7 +295,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
          * @param checkpointAddr
          * @param commitTime
          */
-        Entry(String name, long checkpointAddr, long commitTime) {
+        Entry(final String name, final long checkpointAddr, final long commitTime) {
             
             super(name, checkpointAddr, commitTime);
             
@@ -3007,9 +3010,26 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
             return delegate.getHttpdPort();
         }
 
+        /**
+         * {@inheritDoc}
+         * <p>
+         * Overridden to visit the name of all indices that were isolated and to
+         * ignore the timestamp.
+         */
         @Override
-        public Iterator<String> indexNameScan(String prefix, long timestamp) {
-            throw new UnsupportedOperationException();
+        public Iterator<String> indexNameScan(final String prefix,
+                final long timestampIsIgnored) {
+
+            return new Striterator(n2a.values().iterator())
+                    .addFilter(new Resolver() {
+                        private static final long serialVersionUID = 1L;
+
+                        @Override
+                        protected Object resolve(final Object obj) {
+                            return ((Entry)obj).name;
+                        }
+                    });
+
         }
 
         @Override
