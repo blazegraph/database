@@ -67,7 +67,6 @@ import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
  * a {@link Journal} without full read/write transaction support.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class BigdataSparqlTest 
 //extends SPARQLQueryTest // Sesame TupleExpr based evaluation 
