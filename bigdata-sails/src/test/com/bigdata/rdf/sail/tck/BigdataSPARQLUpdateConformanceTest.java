@@ -65,14 +65,16 @@ public class BigdataSPARQLUpdateConformanceTest extends
     }
 
     public static Test suite() throws Exception {
+
         final Test suite = SPARQL11ManifestTest.suite(new Factory() {
 
+            @Override
             public BigdataSPARQLUpdateConformanceTest createSPARQLUpdateConformanceTest(
                     String testURI, String name, String requestFile,
                     URI defaultGraphURI, Map<String, URI> inputNamedGraphs,
                     URI resultDefaultGraphURI,
                     Map<String, URI> resultNamedGraphs) {
-                System.err.println(">>>>> "+testURI);// FIXME REMOVE.
+
                 return new BigdataSPARQLUpdateConformanceTest(testURI, name,
                         requestFile, defaultGraphURI, inputNamedGraphs,
                         resultDefaultGraphURI, resultNamedGraphs);
