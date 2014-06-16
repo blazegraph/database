@@ -777,13 +777,14 @@ public class ArbitraryLengthPathOp extends PipelineOp {
 			                	 */
 			            		if (parentSolutionIn.isBound(gearing.outVar)) {
 			            			
-			            			// do this later now
-			            			
-			            			if (!bs.get(gearing.tVarOut).equals(parentSolutionIn.get(gearing.outVar))) {
-			            				
-			    	                	if (log.isDebugEnabled()) {
-			    	                		log.debug("transitive output does not match incoming binding for output var, dropping");
-			    	                	}
+			            			// do this now: note already known to be bound per test above.
+			            			final IConstant<?> poutVar = parentSolutionIn.get(gearing.outVar);
+
+			            			if (!poutVar.equals(bs.get(gearing.tVarOut))) {
+    			            				
+        			    	                	if (log.isDebugEnabled()) {
+        			    	                		log.debug("transitive output does not match incoming binding for output var, dropping");
+        			    	                	}
 			    	                	
 			            				continue;
 			            				

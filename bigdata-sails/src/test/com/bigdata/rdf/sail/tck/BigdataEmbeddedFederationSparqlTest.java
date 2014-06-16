@@ -65,7 +65,6 @@ import com.bigdata.service.IBigdataFederation;
  * {@link EmbeddedFederation}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class BigdataEmbeddedFederationSparqlTest extends BigdataSparqlTest {
 
@@ -110,7 +109,7 @@ public class BigdataEmbeddedFederationSparqlTest extends BigdataSparqlTest {
         if(hideDatasetTests)
             suite1 = filterOutTests(suite1,"dataset");
 
-        suite1 = filterOutTests(suite1, "property-paths");
+//        suite1 = filterOutTests(suite1, "property-paths");
         
         /**
          * BSBM BI use case query 5
@@ -157,6 +156,7 @@ public class BigdataEmbeddedFederationSparqlTest extends BigdataSparqlTest {
        
         final Factory factory = new Factory() {
 
+            @Override
             public SPARQLQueryTest createSPARQLQueryTest(String testURI,
                     String name, String queryFileURL, String resultFileURL,
                     Dataset dataSet, boolean laxCardinality) {
@@ -166,6 +166,7 @@ public class BigdataEmbeddedFederationSparqlTest extends BigdataSparqlTest {
                 
             }
 
+            @Override
             public SPARQLQueryTest createSPARQLQueryTest(String testURI,
                     String name, String queryFileURL, String resultFileURL,
                     Dataset dataSet, boolean laxCardinality, boolean checkOrder) {
@@ -173,6 +174,7 @@ public class BigdataEmbeddedFederationSparqlTest extends BigdataSparqlTest {
                 return new BigdataEmbeddedFederationSparqlTest(testURI, name, queryFileURL,
                         resultFileURL, dataSet, laxCardinality, checkOrder) {
 
+                    @Override
                     protected Properties getProperties() {
 
                         final Properties p = new Properties(super
@@ -295,7 +297,8 @@ public class BigdataEmbeddedFederationSparqlTest extends BigdataSparqlTest {
 
     }
 
-    protected void tearDownBackend(IIndexManager backend) {
+    @Override
+    protected void tearDownBackend(final IIndexManager backend) {
         
         backend.destroy();
         
