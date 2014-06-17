@@ -1,13 +1,7 @@
 $(function() {
 
 // global variables
-var DEFAULT_NAMESPACE, NAMESPACE, NAMESPACES_READY, NAMESPACE_SHORTCUTS, FILE_CONTENTS, QUERY_RESULTS;
-// LBS URLs do not currently work with non-HA and HA1 setups. Set this to true to use LBS URLs
-if(false) {
-   var RW_URL_PREFIX = '/bigdata/LBS/leader/', RO_URL_PREFIX = '/bigdata/LBS/read/';
-} else {
-   var RW_URL_PREFIX = '/bigdata/', RO_URL_PREFIX = '/bigdata/';
-}
+var RW_URL_PREFIX, RO_URL_PREFIX, DEFAULT_NAMESPACE, NAMESPACE, NAMESPACES_READY, NAMESPACE_SHORTCUTS, FILE_CONTENTS, QUERY_RESULTS;
 var CODEMIRROR_DEFAULTS, EDITORS = {}, ERROR_LINE_MARKERS = {}, ERROR_CHARACTER_MARKERS = {};
 var PAGE_SIZE = 50, TOTAL_PAGES, CURRENT_PAGE;
 var NAMESPACE_PARAMS = {
@@ -26,6 +20,19 @@ CODEMIRROR_DEFAULTS = {
 
 // debug to access closure variables
 $('html, textarea, select').bind('keydown', 'ctrl+d', function() { debugger; });
+
+function useLBS() {
+   if(this.checked) {
+      RW_URL_PREFIX = '/bigdata/LBS/leader/';
+      RO_URL_PREFIX = '/bigdata/LBS/read/';
+   } else {
+      RW_URL_PREFIX = '/bigdata/';
+      RO_URL_PREFIX = '/bigdata/';
+   }
+   $('.use-lbs').prop('checked', this.checked);
+}
+useLBS(true);
+$('.use-lbs').change(useLBS);
 
 /* Modal functions */
 
