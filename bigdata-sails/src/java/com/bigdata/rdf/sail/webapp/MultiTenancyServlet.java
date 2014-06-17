@@ -63,6 +63,10 @@ import com.bigdata.util.PropertyUtil;
  *      NanoSparqlServer Admin API for Multi-tenant deployments</a>
  * 
  * @author thompsonbry
+ * 
+ *         FIXME GROUP COMMIT: The CREATE and DESTROY operations require special
+ *         attention. The other operations in this class also should use the new
+ *         REST API pattern, but are not intrinsically sensitive.
  */
 public class MultiTenancyServlet extends BigdataRDFServlet {
 
@@ -540,13 +544,6 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
 
 		final long timestamp = getTimestamp(req);
 
-//		if (timestamp == ITx.READ_COMMITTED) {
-//
-//			// Use the last commit point.
-//			timestamp = getIndexManager().getLastCommitTime();
-//
-//		}
-
 		final long tx = getBigdataRDFContext().newTx(timestamp);
 		
 		try {
@@ -582,13 +579,6 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
             final HttpServletResponse resp) throws IOException {
 
         final long timestamp = getTimestamp(req);
-
-//        if (timestamp == ITx.READ_COMMITTED) {
-//        
-//            // Use the last commit point.
-//            timestamp = getIndexManager().getLastCommitTime();
-//            
-//        }
         
         final boolean describeEachNamedGraph;
         {
@@ -683,9 +673,7 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
 
         final VoID v = new VoID(g, tripleStore, serviceURI, aDataSet);
 
-        v.describeDataSet(false/* describeStatistics */,
-//                getBigdataRDFContext().getConfig().describeEachNamedGraph);
-                describeEachNamedGraph);
+        v.describeDataSet(false/* describeStatistics */, describeEachNamedGraph);
         
     }
 

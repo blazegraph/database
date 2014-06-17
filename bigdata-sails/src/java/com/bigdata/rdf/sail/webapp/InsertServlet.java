@@ -138,8 +138,6 @@ public class InsertServlet extends BigdataRDFServlet {
 	    
         final String baseURI = req.getRequestURL().toString();
         
-        final String namespace = getNamespace(req);
-
         final String contentType = req.getContentType();
 
         if (contentType == null)
@@ -175,32 +173,13 @@ public class InsertServlet extends BigdataRDFServlet {
         if (rdfParserFactory == null) {
 
             buildResponse(resp, HTTP_INTERNALERROR, MIME_TEXT_PLAIN,
-                    "Parser factory not found: Content-Type="
-                            + contentType + ", format=" + format);
-        	
-        	return;
+                    "Parser factory not found: Content-Type=" + contentType
+                            + ", format=" + format);
+
+            return;
 
         }
 
-//        /*
-//         * Allow the caller to specify the default context.
-//         */
-//        final Resource defaultContext;
-//        {
-//            final String s = req.getParameter("context-uri");
-//            if (s != null) {
-//                try {
-//                    defaultContext = new URIImpl(s);
-//                } catch (IllegalArgumentException ex) {
-//                    buildResponse(resp, HTTP_INTERNALERROR, MIME_TEXT_PLAIN,
-//                            ex.getLocalizedMessage());
-//                    return;
-//                }
-//            } else {
-//                defaultContext = null;
-//            }
-//        }
-        
         /*
          * Allow the caller to specify the default contexts.
          */
@@ -223,13 +202,16 @@ public class InsertServlet extends BigdataRDFServlet {
         try {
             
             submitApiTask(
-                    new InsertWithBodyTask(req, resp, namespace, ITx.UNISOLATED,
-                            baseURI, defaultContext, rdfParserFactory)).get();
+                    new InsertWithBodyTask(req, resp, getNamespace(req),
+                            ITx.UNISOLATED, baseURI, defaultContext,
+                            rdfParserFactory)).get();
             
         } catch (Throwable t) {
 
-            throw BigdataRDFServlet.launderThrowable(t, resp, "");
-            
+            throw BigdataRDFServlet.launderThrowable(t, resp,
+                    "INSERT-WITH-BODY: baseURI=" + baseURI + ", context-uri="
+                            + Arrays.toString(defaultContext));
+
         }
 
     }
@@ -385,25 +367,6 @@ public class InsertServlet extends BigdataRDFServlet {
             
         }
 
-//        /*
-//         * Allow the caller to specify the default context.
-//         */
-//        final Resource defaultContext;
-//        {
-//            final String s = req.getParameter("context-uri");
-//            if (s != null) {
-//                try {
-//                    defaultContext = new URIImpl(s);
-//                } catch (IllegalArgumentException ex) {
-//                    buildResponse(resp, HTTP_INTERNALERROR, MIME_TEXT_PLAIN,
-//                            ex.getLocalizedMessage());
-//                    return;
-//                }
-//            } else {
-//                defaultContext = null;
-//            }
-//        }
-
         /*
          * Allow the caller to specify the default contexts.
          */
@@ -431,8 +394,9 @@ public class InsertServlet extends BigdataRDFServlet {
 
         } catch (Throwable t) {
 
-            throw launderThrowable(t, resp, "urls=" + urls);
-            
+            throw launderThrowable(t, resp, "uri=" + urls + ", context-uri="
+                    + Arrays.toString(defaultContext));
+
         }
 
     }
@@ -688,10 +652,10 @@ public class InsertServlet extends BigdataRDFServlet {
             }
 
             if (c.length >= 2) {
-            	// added to more than one context
-            	nmodified.addAndGet(c.length);
+                // added to more than one context
+                nmodified.addAndGet(c.length);
             } else {
-            	nmodified.incrementAndGet();
+                nmodified.incrementAndGet();
             }
 
         }

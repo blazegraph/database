@@ -25,6 +25,7 @@ package com.bigdata.rdf.sail.webapp;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.PipedOutputStream;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.atomic.AtomicLong;
@@ -85,20 +86,20 @@ public class UpdateServlet extends BigdataRDFServlet {
 
         final String contentType = req.getContentType();
 
-        if(contentType == null) {
-            
+        if (contentType == null) {
+
             resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-        
-        }   
-        
-        if(queryStr == null) {
-            
+
+        }
+
+        if (queryStr == null) {
+
             resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-        
-        }   
-        
+
+        }
+
         doUpdateWithQuery(req, resp);
-        
+
     }
 
     /**
@@ -461,7 +462,23 @@ public class UpdateServlet extends BigdataRDFServlet {
 
         } catch (Throwable t) {
 
-            launderThrowable(t, resp, "");
+            launderThrowable(
+                    t,
+                    resp,
+                    "UPDATE-WITH-BODY: baseURI="
+                            + baseURI
+                            + (add == null ? null
+                                    : ", add="
+                                            + add
+                                            + (defaultContextInsert == null ? ""
+                                                    : ",context-uri-insert="
+                                                            + Arrays.toString(defaultContextInsert)))
+                            + (remove == null ? null
+                                    : ", remove="
+                                            + remove
+                                            + (defaultContextDelete == null ? ""
+                                                    : ",context-uri-delete="
+                                                            + Arrays.toString(defaultContextDelete))));
 
         }
         

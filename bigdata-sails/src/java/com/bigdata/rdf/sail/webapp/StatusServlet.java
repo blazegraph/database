@@ -75,11 +75,6 @@ import com.bigdata.util.InnerCause;
 /**
  * A status page for the service.
  * 
- * TODO A remote client can not act to cancel a request that is in the queue
- * until it begins to execute. This is because the UUID is not assigned until
- * the request begins to execute. This is true for both SPARQL QUERY and SPARQL
- * UPDATE requests.
- * 
  * TODO The KB addressed by the request should also be displayed as metadata
  * associated with the request. We should make this a restriction that can be
  * placed onto the status page and make it easy to see the status for different
@@ -221,7 +216,7 @@ public class StatusServlet extends BigdataRDFServlet {
      * Cancel a running query.
      * 
      * <pre>
-     * queryId=<UUID>
+     * queryId=&lt;UUID&gt;
      * </pre>
      * 
      * Note: This DOES NOT build a response unless there is an error. The caller
@@ -234,7 +229,17 @@ public class StatusServlet extends BigdataRDFServlet {
      * 
      * @throws IOException
      * 
-     * FIXME GROUP COMMIT: Review cancellation and leader fail scenarios.
+     *             FIXME GROUP COMMIT: Review cancellation and leader fail
+     *             scenarios.
+     * 
+     *             FIXME CANCEL: A remote client can not act to cancel a request
+     *             that is in the queue until it begins to execute. This is
+     *             because the UUID is not assigned until the request begins to
+     *             execute. This is true for both SPARQL QUERY and SPARQL UPDATE
+     *             requests. We need to track the CANCEL requests on a LRU and
+     *             apply them if we observe the query / update arriving after
+     *             the CANCEL. See <a href="http://trac.bigdata.com/ticket/988"
+     *             > REST API cancellation of queries</a>
      */
     static void doCancelQuery(final HttpServletRequest req,
             final HttpServletResponse resp, final IIndexManager indexManager,
