@@ -54,10 +54,14 @@ if [ -z "${GROUPS}" ]; then
     export GROUPS="$FEDNAME"
 fi
 if [ -z "${LOCATORS}" ]; then
-    export LOCATORS="jini://bigdata15/,jini://bigdata16/,jini://bigdata17/"
+#  export LOCATORS="jini://bigdata15/,jini://bigdata16/,jini://bigdata17/"
+   echo "Must specify: LOCATORS"
+   exit 1
 fi
 if [ -z "${ZK_SERVERS}" ]; then
-    export ZK_SERVERS="bigdata15:2081,bigdata16:2081,bigdata17:2081";
+#   export ZK_SERVERS="bigdata15:2081,bigdata16:2081,bigdata17:2081"
+   echo "Must specify: ZK_SERVERS"
+   exit 1
 fi
 
 export HA_OPTS="\
@@ -71,6 +75,7 @@ export HA_OPTS="\
  -DZK_SERVERS=${ZK_SERVERS}\
  -DRMI_PORT=${RMI_PORT}\
  -DHA_PORT=${HA_PORT}\
+ -DWRITE_CACHE_BUFFER_COUNT=${WRITE_CACHE_BUFFER_COUNT}\
  "-Dcom.bigdata.hostname=${BIGDATA_HOSTNAME}"\
  "-Djetty.port=${JETTY_PORT}"\
  "-Djetty.threads.min=${JETTY_THREADS_MIN}"\
