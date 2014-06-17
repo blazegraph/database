@@ -386,8 +386,15 @@ public class HALoadBalancerServlet extends ProxyServlet {
      * {@inheritDoc}
      * <p>
      * Extended to setup the as-configured {@link IHALoadBalancerPolicy}.
+     * <p>
+     * Note: If the deployment is does not support HA replication (e.g., either
+     * not HA or HA with replicationFactor:=1), then we still want to be able to
+     * forward to the local service.
      * 
      * @throws ServletException
+     * 
+     * @see <a href="http://trac.bigdata.com/ticket/965" > Cannot run queries in
+     *      LBS mode with HA1 setup </a>
      */
     @Override
     public void init() throws ServletException {
@@ -405,41 +412,34 @@ public class HALoadBalancerServlet extends ProxyServlet {
         final IIndexManager indexManager = BigdataServlet
                 .getIndexManager(servletContext);
 
-        if (!(indexManager instanceof HAJournal)){
-            // This is not an error, but the LBS is only for HA.
-            log.info("LBS Disabled - not HA");
-            return;
-        }
-        if (indexManager instanceof AbstractJournal
+        if (indexManager instanceof HAJournal
                 && ((AbstractJournal) indexManager).getQuorum() != null
                 && ((AbstractJournal) indexManager).getQuorum()
-                        .replicationFactor() == 1) {
-            // This is not an error, but the LBS is only for HA.
-            log.info("LBS Disabled - not HA");
-            return;
-        }
+                        .replicationFactor() > 1) {
 
-        {
-            // Get the as-configured policy.
-            final IHALoadBalancerPolicy policy = newInstance(//
-                    servletConfig, //
-                    HALoadBalancerServlet.class,// owningClass
-                    IHALoadBalancerPolicy.class,//
-                    InitParams.POLICY, InitParams.DEFAULT_POLICY);
+            {
+                // Get the as-configured policy.
+                final IHALoadBalancerPolicy policy = newInstance(//
+                        servletConfig, //
+                        HALoadBalancerServlet.class,// owningClass
+                        IHALoadBalancerPolicy.class,//
+                        InitParams.POLICY, InitParams.DEFAULT_POLICY);
 
-            // Set the as-configured policy.
-            setLBSPolicy(policy);
+                // Set the as-configured policy.
+                setLBSPolicy(policy);
 
-        }
-        {
+            }
+            {
 
-            final IHARequestURIRewriter rewriter = newInstance(//
-                    servletConfig,//
-                    HALoadBalancerServlet.class, // owningClass
-                    IHARequestURIRewriter.class,//
-                    InitParams.REWRITER, InitParams.DEFAULT_REWRITER);
+                final IHARequestURIRewriter rewriter = newInstance(//
+                        servletConfig,//
+                        HALoadBalancerServlet.class, // owningClass
+                        IHARequestURIRewriter.class,//
+                        InitParams.REWRITER, InitParams.DEFAULT_REWRITER);
 
-            setRewriter(rewriter);
+                setRewriter(rewriter);
+
+            }
 
         }
 
@@ -850,6 +850,10 @@ public class HALoadBalancerServlet extends ProxyServlet {
      * the request to the servlet at the resulting requestURI. This forwarding
      * effectively disables the LBS but still allows requests which target the
      * LBS to succeed against the webapp on the same host.
+     * <p>
+     * Note: If the deployment is does not support HA replication (e.g., either
+     * not HA or HA with replicationFactor:=1), then we still want to be able to
+     * forward to the local service.
      * 
      * @param request
      *            The request.
@@ -858,6 +862,9 @@ public class HALoadBalancerServlet extends ProxyServlet {
      * 
      * @throws IOException
      * @throws ServletException
+     * 
+     * @see <a href="http://trac.bigdata.com/ticket/965" > Cannot run queries in
+     *      LBS mode with HA1 setup </a>
      */
     public void forwardToLocalService(//
             final boolean isLeaderRequest,//

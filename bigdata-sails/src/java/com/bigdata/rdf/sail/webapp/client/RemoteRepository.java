@@ -307,6 +307,20 @@ public class RemoteRepository {
 
     }
     
+    /**
+     * 
+     * @param sparqlEndpointURL
+     * @param httpClient
+     * @param executor
+     * 
+     * @deprecated This version does not force the caller to decide whether or
+     *             not the LBS pattern will be used. In general, it should be
+     *             used if the end point is bigdata. This class is generally,
+     *             but not always, used with a bigdata end point. The main
+     *             exception is SPARQL Basic Federated Query. For that use case
+     *             we can not assume that the end point is bigdata and thus we
+     *             can not use the LBS prefix.
+     */
     public RemoteRepository(final String sparqlEndpointURL,
             final HttpClient httpClient, final Executor executor) {
 
@@ -865,7 +879,7 @@ public class RemoteRepository {
         }
             
         if (add.uri != null) {
-            // set the resource to load.
+            // set the resource to load : FIXME REST API allows multiple URIs, but RemoteRepository does not.
             opts.addRequestParam("uri", add.uri);
         }
         

@@ -1,5 +1,3 @@
-package com.bigdata.rdf.sail.remote;
-
 /**
 
 Copyright (C) SYSTAP, LLC 2006-2012.  All rights reserved.
@@ -23,6 +21,8 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
+
+package com.bigdata.rdf.sail.remote;
 
 import java.io.File;
 import java.util.concurrent.ExecutorService;
@@ -66,9 +66,30 @@ public class BigdataSailRemoteRepository implements Repository {
     /**
      * Ctor that simply specifies an endpoint and lets this class manage the
      * ClientConnectionManager for the HTTP client and the manage the
-     * ExecutorService. More convenient.
+     * ExecutorService. More convenient, but does not account for whether or not
+     * to use the LBS.
+     * 
+     * @param sparqlEndpointURL
+     *            The SPARQL end point URL
      */
-	public BigdataSailRemoteRepository(final String sparqlEndpointURL) {
+    public BigdataSailRemoteRepository(final String sparqlEndpointURL) {
+
+        this(sparqlEndpointURL, true/* useLBS */);
+
+	}
+
+    /**
+     * Ctor that simply specifies an endpoint and lets this class manage the
+     * ClientConnectionManager for the HTTP client and the manage the
+     * ExecutorService.
+     * 
+     * @param sparqlEndpointURL
+     *            The SPARQL end point URL
+     * @param useLBS
+     *            <code>true</code> iff the LBS pattern should be used.
+     */
+    public BigdataSailRemoteRepository(final String sparqlEndpointURL,
+            final boolean useLBS) {
 		
         this.executor = Executors.newCachedThreadPool();
 
@@ -84,9 +105,9 @@ public class BigdataSailRemoteRepository implements Repository {
          */
         httpClient.setRedirectStrategy(new DefaultRedirectStrategy());
 
-        this.nss = new RemoteRepository(
-                sparqlEndpointURL, httpClient, executor);
-		
+        this.nss = new RemoteRepository(sparqlEndpointURL, useLBS, httpClient,
+                executor);
+
 	}
 
 	/**

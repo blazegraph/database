@@ -375,9 +375,9 @@ public class TestNSSHealthCheck extends TestCase2 {
      * 
      * @return The connection.
      * 
-     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/619">
-     *      RemoteRepository class should use application/x-www-form-urlencoded
-     *      for large POST requests </a>
+     * @see <a href="http://trac.bigdata.com/ticket/619"> RemoteRepository class
+     *      should use application/x-www-form-urlencoded for large POST requests
+     *      </a>
      */
     private HttpResponse doConnect(final ConnectOptions opts) throws Exception {
 
@@ -452,57 +452,17 @@ public class TestNSSHealthCheck extends TestCase2 {
 
             }
             
-//            // conn = doConnect(urlString.toString(), opts.method);
-//            final URL url = new URL(urlString.toString());
-//            conn = (HttpURLConnection) url.openConnection();
-//            conn.setRequestMethod(opts.method);
-//            conn.setDoOutput(true);
-//            conn.setDoInput(true);
-//            conn.setUseCaches(false);
-//            conn.setReadTimeout(opts.timeout);
-//            conn.setRequestProperty("Accept", opts.acceptHeader);
-//            if (log.isDebugEnabled())
-//                log.debug("Accept: " + opts.acceptHeader);
-            
             if (opts.entity != null) {
 
-//                if (opts.data == null)
-//                    throw new AssertionError();
-
-//                final String contentLength = Integer.toString(opts.data.length);
-
-//                conn.setRequestProperty("Content-Type", opts.contentType);
-//                conn.setRequestProperty("Content-Length", contentLength);
-
-//                if (log.isDebugEnabled()) {
-//                    log.debug("Content-Type: " + opts.contentType);
-//                    log.debug("Content-Length: " + contentLength);
-//                }
-
-//                final ByteArrayEntity entity = new ByteArrayEntity(opts.data);
-//                entity.setContentType(opts.contentType);
-
-                ((HttpEntityEnclosingRequestBase) request).setEntity(opts.entity);
+                ((HttpEntityEnclosingRequestBase) request)
+                        .setEntity(opts.entity);
                 
-//                final OutputStream os = conn.getOutputStream();
-//                try {
-//                    os.write(opts.data);
-//                    os.flush();
-//                } finally {
-//                    os.close();
-//                }
-
             }
 
             final HttpResponse response = m_httpClient.execute(request);
             
             return response;
             
-//            // connect.
-//            conn.connect();
-//
-//            return conn;
-
         } catch (Throwable t) {
             /*
              * If something goes wrong, then close the http connection.
@@ -512,10 +472,6 @@ public class TestNSSHealthCheck extends TestCase2 {
                 
                 if (request != null)
                     request.abort();
-                
-//                // clean up the connection resources
-//                if (conn != null)
-//                    conn.disconnect();
                 
             } catch (Throwable t2) {
                 // ignored.
