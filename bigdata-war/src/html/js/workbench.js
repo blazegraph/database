@@ -285,7 +285,7 @@ NAMESPACE_SHORTCUTS = {
       'skos': 'http://www.w3.org/2004/02/skos/core#',
       'xsd': 'http://www.w3.org/2001/XMLSchema#'
    },
-   'Dublic Core': {
+   'Dublin Core': {
       'dc': 'http://purl.org/dc/elements/1.1/',
       'dcterm': 'http://purl.org/dc/terms/',
       'void': 'http://rdfs.org/ns/void#'
