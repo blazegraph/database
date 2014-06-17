@@ -22,8 +22,13 @@
 # size of the direct memory heap (used for the write cache buffers and
 # some related things).
 ##
-export JVM_OPTS="-server -Xmx4G -XX:MaxDirectMemorySize=3000m"
-#export JVM_OPTS="-server -Xmx4G -XX:MaxDirectMemorySize=3000m -Xdebug -Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=1046"
+if [ -z "$JVM_OPTS" ]; then
+   export JVM_OPTS="-server -Xmx4G -XX:MaxDirectMemorySize=3000m"
+#  export JVM_OPTS="-server -Xmx4G -XX:MaxDirectMemorySize=3000m -Xdebug -Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=1046"
+   echo "Set JVM_OPTS=${JVM_OPTS}"
+else
+   echo "Using JVM_OPTS=${JVM_OPTS}"
+fi
 
 ##
 # The following variables configure the startHAServices script, which 
