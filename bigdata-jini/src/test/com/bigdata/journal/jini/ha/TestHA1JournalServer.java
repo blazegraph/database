@@ -123,17 +123,24 @@ public class TestHA1JournalServer extends AbstractHA3JournalServerTestCase {
 
     }
 
+    /**
+     * A simple transaction test against an HA1 mode server using the LBS.
+     * 
+     * @see <a href="http://trac.bigdata.com/ticket/965" > Cannot run queries in
+     *      LBS mode with HA1 setup </a>
+     */
     public void testSimpleTransactionLBS() throws Exception {
-    	
-    	doStartA();
-    	
-    	serverA.awaitHAReady(2, TimeUnit.SECONDS);
-    	
-    	awaitCommitCounter(1, new HAGlue[] { serverA });
-    	
-    	simpleTransactionLBS();
-    	
-    	awaitCommitCounter(2, new HAGlue[] { serverA });
+
+        doStartA();
+
+        serverA.awaitHAReady(2, TimeUnit.SECONDS);
+
+        awaitCommitCounter(1, new HAGlue[] { serverA });
+
+        simpleTransactionLBS();
+
+        awaitCommitCounter(2, new HAGlue[] { serverA });
+        
     }
     
     public void testMultiTransaction() throws Exception {

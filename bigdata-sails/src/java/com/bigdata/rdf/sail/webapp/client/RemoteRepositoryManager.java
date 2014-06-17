@@ -89,7 +89,7 @@ public class RemoteRepositoryManager extends RemoteRepository {
     public RemoteRepositoryManager(final String serviceURL,
             final HttpClient httpClient, final Executor executor) {
 
-        this(serviceURL, false/* useLBS */, httpClient, executor);
+        this(serviceURL, true/* useLBS */, httpClient, executor);
 
     }
     

@@ -96,6 +96,10 @@ public class BigdataSailFactory {
     
     /**
      * Connect to a remote bigdata instance.
+     * 
+     * FIXME This does not support the HA load balancer pattern and does not
+     * parameterize the value of the ContextPath. Also, should this class be
+     * part of the "client" package?
      */
     public static BigdataSailRemoteRepository connect(final String serviceEndpoint) {
         

@@ -29,7 +29,6 @@ package com.bigdata.rdf.sparql.ast.service;
 
 import java.util.UUID;
 
-import org.apache.http.HttpResponse;
 import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.http.impl.client.DefaultRedirectStrategy;
 import org.openrdf.query.BindingSet;
@@ -49,8 +48,6 @@ import cutthecrap.utils.striterators.ICloseableIterator;
  * adjusting the {@link RemoteServiceOptions} for the service URI.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id: RemoteServiceCallImpl.java 6060 2012-03-02 16:07:38Z
- *          thompsonbry $
  */
 public class RemoteServiceCallImpl implements RemoteServiceCall {
 
@@ -149,7 +146,9 @@ public class RemoteServiceCallImpl implements RemoteServiceCall {
         // Setup a standard strategy for following redirects.
         httpClient.setRedirectStrategy(new DefaultRedirectStrategy());
         
-        final RemoteRepository repo = new RemoteRepository(uriStr,//
+        final RemoteRepository repo = new RemoteRepository(//
+                uriStr,//
+                params.getServiceOptions().isBigdataLBS(),// useLBS
                 httpClient,//
                 params.getTripleStore().getExecutorService()
                 );
