@@ -21,15 +21,19 @@ CODEMIRROR_DEFAULTS = {
 // debug to access closure variables
 $('html, textarea, select').bind('keydown', 'ctrl+d', function() { debugger; });
 
-function useLBS() {
-   if(this.checked) {
+function useLBS(state) {
+   // allows passing in of boolean, or firing on event
+   if(typeof(state) != 'boolean') {
+      state = this.checked;
+   }
+   if(state) {
       RW_URL_PREFIX = '/bigdata/LBS/leader/';
       RO_URL_PREFIX = '/bigdata/LBS/read/';
    } else {
       RW_URL_PREFIX = '/bigdata/';
       RO_URL_PREFIX = '/bigdata/';
    }
-   $('.use-lbs').prop('checked', this.checked);
+   $('.use-lbs').prop('checked', state);
 }
 useLBS(true);
 $('.use-lbs').change(useLBS);
