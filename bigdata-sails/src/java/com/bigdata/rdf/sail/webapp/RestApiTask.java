@@ -182,15 +182,12 @@ abstract class RestApiTask<T> implements Callable<T> {
     }
 
     /**
-     * Return a connection transaction. When the timestamp is associated with a
-     * historical commit point, this will be a read-only connection. When it is
-     * associated with the {@link ITx#UNISOLATED} view or a read-write
-     * transaction, this will be a mutable connection.
-     * 
-     * @param namespace
-     *            The namespace.
-     * @param timestamp
-     *            The timestamp.
+     * Return a connection transaction, which may be either read-only or support
+     * mutation depending on the timestamp associated with the task's view. When
+     * the timestamp is associated with a historical commit point, this will be
+     * a read-only connection. When it is associated with the
+     * {@link ITx#UNISOLATED} view or a read-write transaction, this will be a
+     * mutable connection.
      * 
      * @throws RepositoryException
      */

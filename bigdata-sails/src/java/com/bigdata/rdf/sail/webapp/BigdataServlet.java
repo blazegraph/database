@@ -34,6 +34,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.Future;
+import java.util.concurrent.FutureTask;
 
 import javax.servlet.ServletContext;
 import javax.servlet.http.HttpServlet;
@@ -53,6 +54,7 @@ import com.bigdata.quorum.AbstractQuorum;
 import com.bigdata.rdf.sail.webapp.client.IMimeTypes;
 import com.bigdata.rdf.sail.webapp.lbs.IHALoadBalancerPolicy;
 import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.resources.IndexManager;
 import com.bigdata.service.IBigdataFederation;
 
 /**
@@ -216,22 +218,49 @@ abstract public class BigdataServlet extends HttpServlet implements IMimeTypes {
      * @see <a href="- http://sourceforge.net/apps/trac/bigdata/ticket/566" >
      *      Concurrent unisolated operations against multiple KBs </a>
      */
-    @SuppressWarnings({ "unchecked", "rawtypes" })
     protected <T> Future<T> submitApiTask(final RestApiTask<T> task)
+            throws DatasetNotFoundException {
+
+        final IIndexManager indexManager = getIndexManager();
+
+        return submitApiTask(indexManager, task);
+        
+    }
+    
+    /**
+     * Submit a task and return a {@link Future} for that task. The task will be
+     * run on the appropriate executor service depending on the nature of the
+     * backing database and the view required by the task.
+     * 
+     * @param indexManager
+     *            The {@link IndexManager}.
+     * @param task
+     *            The task.
+     * 
+     * @return The {@link Future} for that task.
+     * 
+     * @throws DatasetNotFoundException
+     * 
+     * @see <a href="http://sourceforge.net/apps/trac/bigdata/ticket/753" > HA
+     *      doLocalAbort() should interrupt NSS requests and AbstractTasks </a>
+     * @see <a href="- http://sourceforge.net/apps/trac/bigdata/ticket/566" >
+     *      Concurrent unisolated operations against multiple KBs </a>
+     */
+    @SuppressWarnings({ "unchecked", "rawtypes" })
+    static protected <T> Future<T> submitApiTask(
+            final IIndexManager indexManager, final RestApiTask<T> task)
             throws DatasetNotFoundException {
 
         final String namespace = task.getNamespace();
         
         final long timestamp = task.getTimestamp();
         
-        final IIndexManager indexManager = getIndexManager();
-
         if (!BigdataStatics.NSS_GROUP_COMMIT || indexManager instanceof IBigdataFederation
                 || TimestampUtility.isReadOnly(timestamp)
                 ) {
 
             /*
-             * Run on a normal executor service.
+             * Execute the REST API task.
              * 
              * Note: For scale-out, the operation will be applied using
              * client-side global views of the indices.
@@ -240,9 +269,30 @@ abstract public class BigdataServlet extends HttpServlet implements IMimeTypes {
              * a Journal). This is helpful since we can avoid some overhead
              * associated the AbstractTask lock declarations.
              */
-
-            return indexManager.getExecutorService().submit(
+            // Wrap Callable.
+            final FutureTask<T> ft = new FutureTask<T>(
                     new RestApiTaskForIndexManager(indexManager, task));
+
+            if (true) {
+
+                /*
+                 * Caller runs (synchronous execution)
+                 * 
+                 * Note: By having the caller run the task here we avoid
+                 * consuming another thread.
+                 */
+                ft.run();
+                
+            } else {
+                
+                /*
+                 * Run on a normal executor service.
+                 */
+                indexManager.getExecutorService().submit(ft);
+                
+            }
+
+            return ft;
 
         } else {
 
@@ -282,7 +332,7 @@ abstract public class BigdataServlet extends HttpServlet implements IMimeTypes {
         }
 
     }
-
+    
     /**
      * Acquire the locks for the named indices associated with the specified KB.
      * 

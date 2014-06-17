@@ -95,6 +95,7 @@ import com.bigdata.rdf.sail.BigdataSailUpdate;
 import com.bigdata.rdf.sail.ISPARQLUpdateListener;
 import com.bigdata.rdf.sail.SPARQLUpdateEvent;
 import com.bigdata.rdf.sail.sparql.Bigdata2ASTSPARQLParser;
+import com.bigdata.rdf.sail.webapp.RestApiTask.RestApiMutationTask;
 import com.bigdata.rdf.sail.webapp.client.StringUtil;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.QueryHints;
@@ -365,13 +366,10 @@ public class BigdataRDFContext extends BigdataBaseContext {
     /**
      * Immediate shutdown interrupts any running queries.
      * 
-     * FIXME Must abort any open transactions. This does not matter for the
-     * standalone database, but it will make a difference in scale-out. The
-     * transaction identifiers could be obtained from the {@link #queries} map.
-     * 
-     * FIXME This must also abort any running updates. Those are currently
-     * running in thread handling the {@link HttpServletRequest}, however it
-     * probably makes sense to execute them on a bounded thread pool as well.
+     * FIXME GROUP COMMIT: Shutdown should abort open transactions (including
+     * queries and updates). This hould be addressed when we handle group commit
+     * since that provides us with a means to recognize and interrupt each
+     * running {@link RestApiTask}.
      */
     void shutdownNow() {
 
@@ -1135,83 +1133,125 @@ public class BigdataRDFContext extends BigdataBaseContext {
         abstract protected void doQuery(BigdataSailRepositoryConnection cxn,
                 OutputStream os) throws Exception;
 
-        @Override
-        final public Void call() throws Exception {
-			BigdataSailRepositoryConnection cxn = null;
-			boolean success = false;
-            try {
-                // Note: Will be UPDATE connection if UPDATE request!!!
-                cxn = getQueryConnection(namespace, timestamp);
-                if(log.isTraceEnabled())
-                    log.trace("Query running...");
-                beginNanos = System.nanoTime();
-                if (explain && !update) {
-                    /*
-                     * The data goes to a bit bucket and we send an
-                     * "explanation" of the query evaluation back to the caller.
-                     * 
-                     * Note: The trick is how to get hold of the IRunningQuery
-                     * object. It is created deep within the Sail when we
-                     * finally submit a query plan to the query engine. We have
-                     * the queryId (on queryId2), so we can look up the
-                     * IRunningQuery in [m_queries] while it is running, but
-                     * once it is terminated the IRunningQuery will have been
-                     * cleared from the internal map maintained by the
-                     * QueryEngine, at which point we can not longer find it.
-                     * 
-                     * Note: We can't do this for UPDATE since it would have a
-                     * side-effect anyway. The way to "EXPLAIN" an UPDATE is to
-                     * break it down into the component QUERY bits and execute
-                     * those.
-                     */
-                    doQuery(cxn, new NullOutputStream());
-                    success = true;
-                } else {
-                    doQuery(cxn, os);
-                    success = true;
-                    os.flush();
-                    os.close();
-                }
-                if (log.isTraceEnabled())
-                    log.trace("Query done.");
-                return null;
-            } finally {
-                endNanos = System.nanoTime();
-                m_queries.remove(queryId);
-                if (queryId2 != null) m_queries2.remove(queryId2);
-//                if (os != null) {
-//                    try {
-//                        os.close();
-//                    } catch (Throwable t) {
-//                        log.error(t, t);
-//                    }
-//                }
-                if (cxn != null) {
-                    if (!success && !cxn.isReadOnly()) {
+        /**
+         * Task for executing a SPARQL QUERY or SPARQL UPDATE.
+         * <p>
+         * See {@link AbstractQueryTask#update} to decide whether this task is a
+         * QUERY or an UPDATE.
+         * 
+         * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+         *         Thompson</a>
+         */
+        private class SparqlRestApiTask extends RestApiTask<Void> {
+
+            public SparqlRestApiTask(final HttpServletRequest req,
+                    final HttpServletResponse resp, final String namespace,
+                    final long timestamp) {
+
+                super(req, resp, namespace, timestamp);
+                
+            }
+
+            @Override
+            public Void call() throws Exception {
+                BigdataSailRepositoryConnection cxn = null;
+                boolean success = false;
+                try {
+                    // Note: Will be UPDATE connection if UPDATE request!!!
+                    cxn = getQueryConnection();//namespace, timestamp);
+                    if(log.isTraceEnabled())
+                        log.trace("Query running...");
+                    beginNanos = System.nanoTime();
+                    if (explain && !update) {
                         /*
-                         * Force rollback of the connection.
+                         * The data goes to a bit bucket and we send an
+                         * "explanation" of the query evaluation back to the caller.
                          * 
-                         * Note: It is possible that the commit has already been
-                         * processed, in which case this rollback() will be a
-                         * NOP. This can happen when there is an IO error when
-                         * communicating with the client, but the database has
-                         * already gone through a commit.
+                         * Note: The trick is how to get hold of the IRunningQuery
+                         * object. It is created deep within the Sail when we
+                         * finally submit a query plan to the query engine. We have
+                         * the queryId (on queryId2), so we can look up the
+                         * IRunningQuery in [m_queries] while it is running, but
+                         * once it is terminated the IRunningQuery will have been
+                         * cleared from the internal map maintained by the
+                         * QueryEngine, at which point we can not longer find it.
+                         * 
+                         * Note: We can't do this for UPDATE since it would have a
+                         * side-effect anyway. The way to "EXPLAIN" an UPDATE is to
+                         * break it down into the component QUERY bits and execute
+                         * those.
                          */
+                        doQuery(cxn, new NullOutputStream());
+                        success = true;
+                    } else {
+                        doQuery(cxn, os);
+                        success = true;
+                        os.flush();
+                        os.close();
+                    }
+                    if (log.isTraceEnabled())
+                        log.trace("Query done.");
+                    return null;
+                } finally {
+                    endNanos = System.nanoTime();
+                    m_queries.remove(queryId);
+                    if (queryId2 != null) m_queries2.remove(queryId2);
+//                    if (os != null) {
+//                        try {
+//                            os.close();
+//                        } catch (Throwable t) {
+//                            log.error(t, t);
+//                        }
+//                    }
+                    if (cxn != null) {
+                        if (!success && !cxn.isReadOnly()) {
+                            /*
+                             * Force rollback of the connection.
+                             * 
+                             * Note: It is possible that the commit has already been
+                             * processed, in which case this rollback() will be a
+                             * NOP. This can happen when there is an IO error when
+                             * communicating with the client, but the database has
+                             * already gone through a commit.
+                             */
+                            try {
+                                // Force rollback of the connection.
+                                cxn.rollback();
+                            } catch (Throwable t) {
+                                log.error(t, t);
+                            }
+                        }
                         try {
-                            // Force rollback of the connection.
-                            cxn.rollback();
+                            // Force close of the connection.
+                            cxn.close();
                         } catch (Throwable t) {
                             log.error(t, t);
                         }
                     }
-                    try {
-                        // Force close of the connection.
-                        cxn.close();
-                    } catch (Throwable t) {
-                        log.error(t, t);
-                    }
                 }
             }
+            
+        }
+        
+        @Override
+        final public Void call() throws Exception {
+            
+            final String queryOrUpdateStr = astContainer.getQueryString();
+            
+            try {
+                
+                return BigdataServlet.submitApiTask(getIndexManager(),
+                        new SparqlRestApiTask(req, resp, namespace, timestamp))
+                        .get();
+
+            } catch (Throwable t) {
+
+                // FIXME GROUP_COMMIT: check calling stack for existing launderThrowable.
+                throw BigdataRDFServlet.launderThrowable(t, resp,
+                        queryOrUpdateStr);
+
+            }
+
         } // call()
 
     } // class AbstractQueryTask
@@ -1234,6 +1274,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
 
         }
 
+        @Override
         protected void doQuery(final BigdataSailRepositoryConnection cxn,
                 final OutputStream os) throws Exception {
 
@@ -2111,63 +2152,63 @@ public class BigdataRDFContext extends BigdataBaseContext {
 
 	}
 
-    /**
-     * Return a connection transaction, which may be read-only or support
-     * update. When the timestamp is associated with a historical commit point,
-     * this will be a read-only connection. When it is associated with the
-     * {@link ITx#UNISOLATED} view or a read-write transaction, this will be a
-     * mutable connection.
-     * 
-     * @param namespace
-     *            The namespace.
-     * @param timestamp
-     *            The timestamp.
-     * 
-     * @throws RepositoryException
-     */
-    public BigdataSailRepositoryConnection getQueryConnection(
-            final String namespace, final long timestamp)
-            throws RepositoryException {
-
-        /*
-         * Note: [timestamp] will be a read-only tx view of the triple store if
-         * a READ_LOCK was specified when the NanoSparqlServer was started
-         * (unless the query explicitly overrides the timestamp of the view on
-         * which it will operate).
-         */
-        final AbstractTripleStore tripleStore = getTripleStore(namespace,
-                timestamp);
-        
-        if (tripleStore == null) {
-
-            throw new DatasetNotFoundException("Not found: namespace="
-                    + namespace + ", timestamp="
-                    + TimestampUtility.toString(timestamp));
-
-        }
-        
-        // Wrap with SAIL.
-        final BigdataSail sail = new BigdataSail(tripleStore);
-
-        final BigdataSailRepository repo = new BigdataSailRepository(sail);
-
-        repo.initialize();
-
-        if (TimestampUtility.isReadOnly(timestamp)) {
-
-            return (BigdataSailRepositoryConnection) repo
-                    .getReadOnlyConnection(timestamp);
-
-        }
-        
-        // Read-write connection.
-        final BigdataSailRepositoryConnection conn = repo.getConnection();
-        
-        conn.setAutoCommit(false);
-        
-        return conn;
-
-    }
+//    /**
+//     * Return a connection transaction, which may be read-only or support
+//     * update. When the timestamp is associated with a historical commit point,
+//     * this will be a read-only connection. When it is associated with the
+//     * {@link ITx#UNISOLATED} view or a read-write transaction, this will be a
+//     * mutable connection.
+//     * 
+//     * @param namespace
+//     *            The namespace.
+//     * @param timestamp
+//     *            The timestamp.
+//     * 
+//     * @throws RepositoryException
+//     */
+//    public BigdataSailRepositoryConnection getQueryConnection(
+//            final String namespace, final long timestamp)
+//            throws RepositoryException {
+//
+//        /*
+//         * Note: [timestamp] will be a read-only tx view of the triple store if
+//         * a READ_LOCK was specified when the NanoSparqlServer was started
+//         * (unless the query explicitly overrides the timestamp of the view on
+//         * which it will operate).
+//         */
+//        final AbstractTripleStore tripleStore = getTripleStore(namespace,
+//                timestamp);
+//        
+//        if (tripleStore == null) {
+//
+//            throw new DatasetNotFoundException("Not found: namespace="
+//                    + namespace + ", timestamp="
+//                    + TimestampUtility.toString(timestamp));
+//
+//        }
+//        
+//        // Wrap with SAIL.
+//        final BigdataSail sail = new BigdataSail(tripleStore);
+//
+//        final BigdataSailRepository repo = new BigdataSailRepository(sail);
+//
+//        repo.initialize();
+//
+//        if (TimestampUtility.isReadOnly(timestamp)) {
+//
+//            return (BigdataSailRepositoryConnection) repo
+//                    .getReadOnlyConnection(timestamp);
+//
+//        }
+//        
+//        // Read-write connection.
+//        final BigdataSailRepositoryConnection conn = repo.getConnection();
+//        
+//        conn.setAutoCommit(false);
+//        
+//        return conn;
+//
+//    }
 
     /**
      * Return a read-only view of the {@link AbstractTripleStore} for the given
@@ -2182,12 +2223,17 @@ public class BigdataRDFContext extends BigdataBaseContext {
      * @return The {@link AbstractTripleStore} -or- <code>null</code> if none is
      *         found for that namespace and timestamp.
      * 
-     * @todo enforce historical query by making sure timestamps conform (we do
-     *       not want to allow read/write tx queries unless update semantics are
-     *       introduced ala SPARQL 1.1).
-     * 
-     * @todo Use a distributed read-only tx for queries (it would be nice if a
-     *       tx used 2PL to specify which namespaces it could touch).
+     *         FIXME GROUP_COMMIT: Review all callers. They are suspect. The
+     *         code will sometimes resolve the KB as of the timestamp, but,
+     *         given that the default is to read against the lastCommitTime,
+     *         that does NOT prevent a concurrent destroy or create of a KB that
+     *         invalidates such a pre-condition test. The main reason for such
+     *         pre-condition tests is to provide nice HTTP status code responses
+     *         when an identified namespace does (or does not) exist. The better
+     *         way to handle this is by pushing the pre-condition test down into
+     *         the {@link RestApiTask} and then throwning out an appropriate
+     *         marked exception that gets correctly converted into an HTTP
+     *         BAD_REQUEST message rather than sending back a stack trace.
      */
     public AbstractTripleStore getTripleStore(final String namespace,
             final long timestamp) {
@@ -2214,8 +2260,12 @@ public class BigdataRDFContext extends BigdataBaseContext {
      * @throws SailException
      * 
      * @throws RepositoryException
+     * 
+     *             FIXME GROUP COMMIT: This is deprecated by the support for
+     *             {@link RestApiMutationTask}s
      */
-    public BigdataSailRepositoryConnection getUnisolatedConnection( // FIXME REVIEW CALLERS
+    @Deprecated // deprecated by the 
+    BigdataSailRepositoryConnection getUnisolatedConnection(
             final String namespace) throws SailException, RepositoryException {
 
         // resolve the default namespace.

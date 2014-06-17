@@ -129,6 +129,10 @@ public class DescribeCacheServlet extends BigdataRDFServlet {
     
     /**
      * GET returns the DESCRIBE of the resource.
+     * 
+     * FIXME DESCRIBE: TX ISOLATION for request but ensure that cache is not
+     * negatively effected by that isolation (i.e., how does the cache index
+     * based on time tx view).
      */
     @Override
     protected void doGet(final HttpServletRequest req,
@@ -369,14 +373,10 @@ public class DescribeCacheServlet extends BigdataRDFServlet {
                 os.flush();
 
             } catch (Throwable e) {
-//                try {
-                    throw BigdataRDFServlet.launderThrowable(e, resp,
-                            "DESCRIBE"
-                    // queryStr // TODO Report as "DESCRIBE uri(s)".
-                            );
-//                } catch (Exception e1) {
-//                    throw new RuntimeException(e);
-//                }
+
+                throw BigdataRDFServlet.launderThrowable(e, resp,
+                        "DESCRIBE: uris=" + internalURIs);
+                
             }
 
         }

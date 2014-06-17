@@ -196,7 +196,7 @@ public class RESTServlet extends BigdataRDFServlet {
                     "DESCRIBE <" + uri.stringValue() + ">");
             
             // Handle the linked data GET as a DESCRIBE query.
-            m_queryServlet.doQuery(req, resp);
+            m_queryServlet.doSparqlQuery(req, resp);
             
             return;
 

@@ -25,6 +25,7 @@ package com.bigdata.rdf.sail.webapp;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.PipedOutputStream;
+import java.util.Arrays;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -270,8 +271,6 @@ public class DeleteServlet extends BigdataRDFServlet {
             final HttpServletResponse resp) throws IOException {
 
         final String baseURI = req.getRequestURL().toString();
-        
-        final String namespace = getNamespace(req);
 
         final String contentType = req.getContentType();
 
@@ -281,68 +280,70 @@ public class DeleteServlet extends BigdataRDFServlet {
         if (log.isInfoEnabled())
             log.info("Request body: " + contentType);
 
+        /**
+         * There is a request body, so let's try and parse it.
+         * 
+         * <a href="https://sourceforge.net/apps/trac/bigdata/ticket/620">
+         * UpdateServlet fails to parse MIMEType when doing conneg. </a>
+         */
+
+        final RDFFormat format = RDFFormat.forMIMEType(new MiniMime(
+                contentType).getMimeType());
+
+        if (format == null) {
+
+            buildResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN,
+                    "Content-Type not recognized as RDF: " + contentType);
+
+            return;
+
+        }
+
+        final RDFParserFactory rdfParserFactory = RDFParserRegistry
+                .getInstance().get(format);
+
+        if (rdfParserFactory == null) {
+
+            buildResponse(resp, HTTP_INTERNALERROR, MIME_TEXT_PLAIN,
+                    "Parser factory not found: Content-Type=" + contentType
+                            + ", format=" + format);
+
+            return;
+
+        }
+
+        /*
+         * Allow the caller to specify the default contexts.
+         */
+        final Resource[] defaultContext;
+        {
+            final String[] s = req.getParameterValues("context-uri");
+            if (s != null && s.length > 0) {
+                try {
+                    defaultContext = toURIs(s);
+                } catch (IllegalArgumentException ex) {
+                    buildResponse(resp, HTTP_INTERNALERROR, MIME_TEXT_PLAIN,
+                            ex.getLocalizedMessage());
+                    return;
+                }
+            } else {
+                defaultContext = new Resource[0];
+            }
+        }
+
         try {
 
-            /**
-             * There is a request body, so let's try and parse it.
-             * 
-             * <a href="https://sourceforge.net/apps/trac/bigdata/ticket/620">
-             * UpdateServlet fails to parse MIMEType when doing conneg. </a>
-             */
-
-            final RDFFormat format = RDFFormat.forMIMEType(new MiniMime(
-                    contentType).getMimeType());
-
-            if (format == null) {
-
-                buildResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN,
-                        "Content-Type not recognized as RDF: " + contentType);
-
-                return;
-
-            }
-
-            final RDFParserFactory rdfParserFactory = RDFParserRegistry
-                    .getInstance().get(format);
-
-            if (rdfParserFactory == null) {
-
-                buildResponse(resp, HTTP_INTERNALERROR, MIME_TEXT_PLAIN,
-                        "Parser factory not found: Content-Type=" + contentType
-                                + ", format=" + format);
-
-                return;
-
-            }
-
-            /*
-             * Allow the caller to specify the default contexts.
-             */
-            final Resource[] defaultContext;
-            {
-                final String[] s = req.getParameterValues("context-uri");
-                if (s != null && s.length > 0) {
-                    try {
-                    	defaultContext = toURIs(s);
-                    } catch (IllegalArgumentException ex) {
-                        buildResponse(resp, HTTP_INTERNALERROR, MIME_TEXT_PLAIN,
-                                ex.getLocalizedMessage());
-                        return;
-                    }
-                } else {
-                    defaultContext = new Resource[0];
-                }
-            }
-            
             submitApiTask(
-                    new DeleteWithBodyTask(req, resp, namespace,
+                    new DeleteWithBodyTask(req, resp, getNamespace(req),
                             ITx.UNISOLATED, baseURI, defaultContext,
                             rdfParserFactory)).get();
-                    
+
         } catch (Throwable t) {
 
-            throw BigdataRDFServlet.launderThrowable(t, resp, "");
-            
+            throw BigdataRDFServlet.launderThrowable(t, resp,
+                    "DELETE-WITH-BODY: baseURI=" + baseURI + ", context-uri="
+                            + Arrays.toString(defaultContext));
+
         }
 
     }
@@ -523,7 +524,7 @@ public class DeleteServlet extends BigdataRDFServlet {
         }
         
         if (log.isInfoEnabled())
-            log.info("delete with access path: (s=" + s + ", p=" + p + ", o="
+            log.info("DELETE-WITH-ACCESS-PATH: (s=" + s + ", p=" + p + ", o="
                     + o + ", c=" + c + ")");
 
         try {
@@ -534,8 +535,9 @@ public class DeleteServlet extends BigdataRDFServlet {
 
         } catch (Throwable t) {
 
-            throw BigdataRDFServlet.launderThrowable(t, resp, "s=" + s + ",p="
-                    + p + ",o=" + o + ",c=" + c);
+            throw BigdataRDFServlet.launderThrowable(t, resp,
+                    "DELETE-WITH-ACCESS-PATH: (s=" + s + ",p=" + p + ",o=" + o
+                            + ",c=" + c + ")");
 
         }
 

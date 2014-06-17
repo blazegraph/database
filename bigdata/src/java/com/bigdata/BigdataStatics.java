@@ -125,7 +125,6 @@ public class BigdataStatics {
      * @see <a href="- http://sourceforge.net/apps/trac/bigdata/ticket/566" >
      *      Concurrent unisolated operations against multiple KBs </a>
      */
-    public static final boolean NSS_GROUP_COMMIT = Boolean
-            .getBoolean("com.bigdata.nssGroupCommit");
+    public static final boolean NSS_GROUP_COMMIT = Boolean.getBoolean("com.bigdata.nssGroupCommit");
 
 }
