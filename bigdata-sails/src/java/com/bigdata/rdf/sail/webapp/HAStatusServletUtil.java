@@ -25,11 +25,13 @@ package com.bigdata.rdf.sail.webapp;
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.math.BigInteger;
 import java.net.InetSocketAddress;
 import java.security.DigestException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.Date;
 import java.util.Iterator;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
@@ -65,6 +67,8 @@ import com.bigdata.quorum.zk.ZKQuorumClient;
 import com.bigdata.quorum.zk.ZKQuorumImpl;
 import com.bigdata.rdf.sail.webapp.StatusServlet.DigestEnum;
 import com.bigdata.zookeeper.DumpZookeeper;
+import com.fasterxml.jackson.core.JsonFactory;
+import com.fasterxml.jackson.core.JsonGenerator;
 
 /**
  * Class supports the {@link StatusServlet} and isolates code that has a
@@ -885,6 +889,68 @@ public class HAStatusServletUtil {
 
     }
 
+    /**
+     * Basic server health info
+     * 
+     * @param req
+     * @param resp
+     * @throws TimeoutException
+     * @throws InterruptedException
+     * @throws AsynchronousQuorumCloseException
+     * @throws IOException
+     */
+    public void doHealthStatus(final HttpServletRequest req,
+            final HttpServletResponse resp) throws IOException {
+
+        if (!(indexManager instanceof HAJournal))
+            return;
+
+        final HAJournal journal = (HAJournal) indexManager;
+
+        final Quorum<HAGlue, QuorumService<HAGlue>> quorum = journal
+                .getQuorum();
+        
+        StringWriter writer = new StringWriter();
+        JsonFactory factory = new JsonFactory();
+        JsonGenerator json = factory.createGenerator(writer);
+        
+        json.writeStartObject();
+        
+    	json.writeFieldName("version");
+    	json.writeString("1.0"); // FIXME
+    	json.writeFieldName("timestamp");
+    	json.writeNumber(new Date().getTime()); // FIXME
+    	if(quorum.isQuorumFullyMet(quorum.token())) {
+    		json.writeFieldName("status");
+    		json.writeString("Good");
+    		json.writeFieldName("details");
+    		json.writeString("All servers joined");
+    	} else {
+    		// at least one server is not available, so status is either Warning or Bad
+			json.writeFieldName("status");
+    		if(quorum.isQuorumMet()) {
+    			json.writeString("Warning");
+    		} else {
+    			json.writeString("Bad");
+    		}
+    		json.writeFieldName("details");
+    		json.writeString("Only " + quorum.getJoined().length + " of target " + 
+    				quorum.replicationFactor() + " servers joined");
+    	}
+
+    	json.writeEndObject();
+    	json.close();
+    	
+        // TODO Alternatively "max-age=1" for max-age in seconds.
+        resp.addHeader("Cache-Control", "no-cache");
+
+        BigdataRDFServlet.buildResponse(resp, BigdataRDFServlet.HTTP_OK,
+                BigdataRDFServlet.MIME_APPLICATION_JSON, writer.toString());
+
+        return;
+        
+    }
+    
 //    /**
 //     * Impose a lexical ordering on the file names. This is used for the HALog
 //     * and snapshot file names. The main component of those file names is the

@@ -187,6 +187,11 @@ public class StatusServlet extends BigdataRDFServlet {
     static final String HA = "HA";
 
     /**
+     * Request basic server health information.
+     */
+    static final String HEALTH = "health";
+    
+    /**
      * Handles CANCEL requests (terminate a running query).
      */
     @Override
@@ -394,6 +399,14 @@ public class StatusServlet extends BigdataRDFServlet {
             new HAStatusServletUtil(getIndexManager()).doHAStatus(req, resp);
 
             return;
+        }
+
+        if (req.getParameter(HEALTH) != null
+                && getIndexManager() instanceof AbstractJournal
+        		&& ((AbstractJournal) getIndexManager()).getQuorum() != null) { // for HA1
+        	new HAStatusServletUtil(getIndexManager()).doHealthStatus(req, resp);
+        	
+        	return;
         }
 
         // IRunningQuery objects currently running on the query controller.
