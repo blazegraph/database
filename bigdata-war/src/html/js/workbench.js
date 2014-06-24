@@ -1348,6 +1348,22 @@ function getQueryDetails(e) {
    });
 }
 
+/* Health */
+
+$('#tab-selector a[data-target=health], #health-refresh').click(getHealth);
+
+function getHealth(e) {
+   e.preventDefault();
+   $.get('/status?health', function(data) {
+      for(var key in data) {
+         if(key == 'timestamp') {
+            var date = new Date(data[key]);
+            data[key] = date.toString();
+         }
+         $('#health-' + key + ' span').html(data[key]);
+      }
+   })
+}
 
 /* Performance */
 

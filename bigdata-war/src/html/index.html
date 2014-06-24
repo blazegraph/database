@@ -25,6 +25,7 @@
         <a data-target="update">Update</a>
         <a data-target="explore">Explore</a>
         <a data-target="status">Status</a>
+        <a data-target="health">Health</a>
         <a data-target="performance">Performance</a>
         <a data-target="namespaces">Namespaces</a>
         <p>Current namespace: <span id="current-namespace"></span></p>
@@ -181,6 +182,18 @@
         <div class="box">
           <div id="status-text"></div>
           <ul id="running-queries"></ul>
+        </div>
+
+      </div>
+
+      <div class="tab" id="health-tab">
+
+        <div class="box">
+          <p id="health-status">Status: <span></span></p>
+          <p id="health-details">Details: <span></span></p>
+          <p id="health-version">Version: <span></span></p>
+          <p id="health-timestamp">Timestamp: <span></span></p>
+          <p><a href="#" id="health-refresh">Refresh</a></p>
         </div>
 
       </div>
