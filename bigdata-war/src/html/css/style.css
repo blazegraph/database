@@ -340,3 +340,15 @@ iframe {
    border: 1px solid #e1e1e1;
    box-sizing: border-box;
 }
+
+.health-good {
+   background-color: lightgreen;
+}
+
+.health-warning {
+   background-color: orange;
+}
+
+.health-bad {
+   background-color: red;
+}
