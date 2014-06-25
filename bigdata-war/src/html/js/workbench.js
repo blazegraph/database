@@ -1360,6 +1360,9 @@ function getHealth(e) {
             var date = new Date(data[key]);
             data[key] = date.toString();
          }
+         if(key == 'status') {
+            $('#health-overview').removeClass('health-good health-warning health-bad').addClass('health-' + data[key].toLowerCase());
+         }
          $('#health-' + key + ' span').html(data[key]);
       }
    })
