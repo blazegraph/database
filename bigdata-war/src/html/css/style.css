@@ -158,7 +158,6 @@ h2 {
 
 .modal {
    display: none;
-   z-index: 1;
    position: fixed;
    top: 0;
    left: 0;
@@ -167,6 +166,7 @@ h2 {
    margin-left: 25%;
    background-color: white;
    padding: 20px;
+   z-index: 4;
 }
 
 #overlay {
@@ -178,6 +178,7 @@ h2 {
    height: 100%;
    background-color: grey;
    opacity: 0.5;
+   z-index: 3;
 }
 
 .modal-open #overlay {
@@ -248,7 +249,7 @@ hr {
    border: none;
 }
 
-.advanced-features, #query-response, #query-pagination, #query-explanation, #query-export-container, #update-response, #update-clear-container, #explore-results, #namespace-properties {
+.advanced-features, #query-response, #query-pagination, #query-explanation, #query-history, #query-export-container, #update-response, #update-clear-container, #explore-results, #namespace-properties {
    display: none;
 }
 
@@ -352,4 +353,9 @@ iframe {
 
 .health-bad {
    background-color: red;
+}
+
+#links {
+   text-align: center;
+   margin-top: 20px;
 }
