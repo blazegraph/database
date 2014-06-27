@@ -261,7 +261,7 @@ function createNamespace(e) {
       data: data,
       contentType: 'application/xml',
       success: function() { $('#new-namespace-name').val(''); getNamespaces(); },
-      error: function(jqXHR, textStatus, errorThrown) { debugger;alert(jqXHR.responseText); }
+      error: function(jqXHR, textStatus, errorThrown) { alert(jqXHR.responseText); }
    };
    $.ajax(RW_URL_PREFIX + 'namespace', settings);
 }
@@ -333,22 +333,28 @@ $('.namespace-shortcuts select').change(function() {
 
 /* Update */
 
-function handleDragOver(e) {
+function handleDragOver(cm, e) {
    e.stopPropagation();
    e.preventDefault();
-   e.originalEvent.dataTransfer.dropEffect = 'copy';
+   e.dataTransfer.dropEffect = 'copy';
 }
 
-function handleFile(e) {
+function handleDrop(cm, e) {
    e.stopPropagation();
    e.preventDefault();
+   var files = e.dataTransfer.files;
+   handleFile(files);
+}
 
-   if(e.type == 'drop') {
-      var files = e.originalEvent.dataTransfer.files;
-   } else {
-      var files = e.originalEvent.target.files;
-   }
-   
+function handleFileInput(e) {
+   e.stopPropagation();
+   e.preventDefault();
+   var files = e.originalEvent.target.files;
+   handleFile(files);
+   $('#update-file').val('');
+}
+
+function handleFile(files) {
    // only one file supported
    if(files.length > 1) {
       alert('Ignoring all but first file');
@@ -359,31 +365,29 @@ function handleFile(e) {
    // if file is too large, tell user to supply local path
    if(f.size > 1048576 * 100) {
       alert('File too large, enter local path to file');
-      $('#update-box').val('/path/to/' + f.name);
+      EDITORS.update.setValue('/path/to/' + f.name);
       setType('path');
-      $('#update-box').prop('disabled', false)
+      EDITORS.update.setOption('readOnly', false)
       $('#large-file-message, #clear-file').hide();
    } else {
       var fr = new FileReader();
-      fr.onload = function(e2) {
+      fr.onload = function(e) {
          if(f.size > 10240) {
             // do not use textarea
-            $('#update-box').prop('disabled', true)
+            EDITORS.update.setOption('readOnly', true)
             $('#filename').html(f.name);
             $('#large-file-message, #clear-file').show()
-            $('#update-box').val('');
-            FILE_CONTENTS = e2.target.result;
+            EDITORS.update.setValue('');
+            FILE_CONTENTS = e.target.result;
          } else {
             // display file contents in the textarea
             clearFile();
-            $('#update-box').val(e2.target.result);
+            EDITORS.update.setValue(e.target.result);
          }
-         guessType(f.name.split('.').pop().toLowerCase(), e2.target.result);
+         guessType(f.name.split('.').pop().toLowerCase(), e.target.result);
       };
       fr.readAsText(f);
    }
-
-   $('#update-file').val('');
 }
 
 function clearFile(e) {
@@ -501,11 +505,11 @@ var rdf_modes = {'n-triples': 'ntriples', 'rdf/xml': 'xml', 'json': 'json', 'tur
 
 var sparql_update_commands = ['INSERT', 'DELETE', 'LOAD', 'CLEAR'];
 
-$('#update-file').change(handleFile);
-$('#update-box').on('dragover', handleDragOver)
-   .on('drop', handleFile)
-   .on('paste', handlePaste)
-   .on('input propertychange', function() { $('#update-errors').hide(); });
+$('#update-file').change(handleFileInput);
+// $('#update-box').on('dragover', handleDragOver)
+//    .on('drop', handleFile)
+//    .on('paste', handlePaste)
+//    .on('input propertychange', function() { $('#update-errors').hide(); });
 $('#clear-file').click(clearFile);
 
 $('#update-update').click(submitUpdate);
@@ -517,6 +521,9 @@ EDITORS.update.on('change', function() {
       ERROR_CHARACTER_MARKERS.update.clear();
    }
 });
+EDITORS.update.on('dragover', handleDragOver);
+EDITORS.update.on('drop', handleDrop);
+EDITORS.update.on('paste', handlePaste);
 EDITORS.update.addKeyMap({'Ctrl-Enter': submitUpdate});
 
 function submitUpdate(e) {
@@ -645,6 +652,14 @@ EDITORS.query.on('change', function() {
 });
 EDITORS.query.addKeyMap({'Ctrl-Enter': submitQuery});
 
+$('#query-history').on('click', '.query', loadHistory);
+
+function loadHistory() {
+   EDITORS.query.setValue(this.innerText);
+   useNamespace($(this).prev('.query-namespace').text());
+   EDITORS.query.focus();
+}
+
 function submitQuery(e) {
    try {
       e.preventDefault();
@@ -654,9 +669,38 @@ function submitQuery(e) {
    EDITORS.query.save();
 
    // do nothing if query is empty
-   if($('#query-box').val().trim() == '') {
+   var query = $('#query-box').val().trim();
+   if(query == '') {
       return;
    }
+
+   var queryExists = false;
+
+   // see if this query is already in the history
+   $('#query-history tbody tr').each(function(i, row) {
+      if($(row).find('.query')[0].innerText == query && $(row).find('.query-namespace').text() == NAMESPACE) {
+         // clear the old results and set the time to now
+         $(row).find('.query-time').text(new Date().toISOString());
+         $(row).find('.query-results').text('...');
+         // move it to the top
+         $(row).prependTo('#query-history tbody');
+         queryExists = true;
+         return false;
+      }
+   });
+
+   if(!queryExists) {
+      // add this query to the history
+      var row = $('<tr>').prependTo($('#query-history tbody'));
+      row.append('<td class="query-time">' + new Date().toISOString() + '</td>');
+      row.append('<td class="query-namespace">' + NAMESPACE + '</td>');
+      var cell = $('<td class="query">').appendTo(row);
+      cell.text(query);
+      cell.html(cell.html().replace('\n', '<br>'));
+      row.append('<td class="query-results">...</td>');
+   }
+
+   $('#query-history').show();
 
    var url = RO_URL_PREFIX + 'namespace/' + NAMESPACE + '/sparql';
    var settings = {
@@ -817,6 +861,10 @@ function downloadFile(data, type, filename) {
    $('#download-link').remove();
 }
 
+function updateResultCount(count) {
+   $('#query-history tbody tr:first td.query-results').text(count);
+}
+
 function showQueryResults(data) {
    $('#query-response').empty();
    $('#query-export-rdf').hide();
@@ -846,6 +894,7 @@ function showQueryResults(data) {
             table.append(tr);
          }
       }
+      updateResultCount(rows.length);
    } else {
       // JSON
       // save data for export and pagination
@@ -854,6 +903,7 @@ function showQueryResults(data) {
       if(typeof(data.boolean) != 'undefined') {
          // ASK query
          table.append('<tr><td>' + data.boolean + '</td></tr>').addClass('boolean');
+         updateResultCount('' + data.boolean);
          return;
       }
 
@@ -895,6 +945,7 @@ function showQueryResults(data) {
       table.append(thead);
 
       $('#total-results').html(data.results.bindings.length);
+      updateResultCount(data.results.bindings.length);
       setNumberOfPages();
       showPage(1);
 
@@ -1138,10 +1189,10 @@ function updateExploreStart(data) {
          } else {
             var uri = col.value;
             if(col.type == 'uri') {
-               uri = '<' + uri + '>';
+               uri = abbreviate(uri);
             }
          }
-         output = escapeHTML(uri).replace(/\n/g, '<br>');
+         var output = escapeHTML(uri).replace(/\n/g, '<br>');
          if(col.type == 'uri' || col.type == 'sid') {
             output = '<a href="' + buildExploreHash(uri) + '">' + output + '</a>';
          }
@@ -1383,9 +1434,11 @@ function getSID(binding) {
 }
 
 function abbreviate(uri) {
-   for(var ns in NAMESPACE_SHORTCUTS) {
-      if(uri.indexOf(NAMESPACE_SHORTCUTS[ns]) == 0) {
-         return uri.replace(NAMESPACE_SHORTCUTS[ns], ns + ':');
+   for(var nsGroup in NAMESPACE_SHORTCUTS) {
+      for(var ns in NAMESPACE_SHORTCUTS[nsGroup]) {
+         if(uri.indexOf(NAMESPACE_SHORTCUTS[nsGroup][ns]) == 0) {
+            return uri.replace(NAMESPACE_SHORTCUTS[nsGroup][ns], ns + ':');
+         }
       }
    }
    return '<' + uri + '>';
