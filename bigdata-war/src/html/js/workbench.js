@@ -1406,15 +1406,31 @@ $('#tab-selector a[data-target=health], #health-refresh').click(getHealth);
 function getHealth(e) {
    e.preventDefault();
    $.get('/status?health', function(data) {
-      for(var key in data) {
-         if(key == 'timestamp') {
-            var date = new Date(data[key]);
-            data[key] = date.toString();
+      $('#health-overview .health-status span').html(data.status);
+      $('#health-overview').removeClass('health-good health-warning health-bad').addClass('health-' + data.status.toLowerCase());
+      $('#health-overview .health-details span').html(data.details);
+      $('#health-overview .health-version span').html(data.version);
+      $('#health-overview .health-timestamp span').html(new Date(data.timestamp).toString());
+
+      $('#health-services div').remove();
+      for(var i=0; i<data.services.length; i++) {
+         var div = $('<div>');
+         div.append('<p>ID: ' + data.services[i].id + '</p>');
+         div.append('<p>Status: ' + data.services[i].status + '</p>');
+         var health;
+         switch(data.services[i].status) {
+            case 'leader':
+            case 'follower':
+               health = 'good';
+               break;
+            case 'unready':
+               health = 'warning';
+               break;
+            default:
+               health = 'bad';
          }
-         if(key == 'status') {
-            $('#health-overview').removeClass('health-good health-warning health-bad').addClass('health-' + data[key].toLowerCase());
-         }
-         $('#health-' + key + ' span').html(data[key]);
+         div.addClass('box health-' + health);
+         div.appendTo($('#health-services'));
       }
    })
 }
