@@ -350,6 +350,19 @@ public class Banner {
     }
     
     /**
+     * Attempts to return build version.
+     * 
+     * @return Build version if available
+     */
+    public final static String getVersion() {
+    	if (getBuildInfo().isEmpty()) {
+    		return "unknown";
+    	}
+    	
+    	return getBuildInfo().get("buildVersion");
+    }
+    
+    /**
      * Outputs the banner and exits.
      * 
      * @param args

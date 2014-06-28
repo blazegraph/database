@@ -43,6 +43,7 @@ import org.apache.log4j.Logger;
 import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.ZooKeeper;
 
+import com.bigdata.Banner;
 import com.bigdata.BigdataStatics;
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.HAStatusEnum;
@@ -916,28 +917,39 @@ public class HAStatusServletUtil {
         
         json.writeStartObject();
         
-    	json.writeFieldName("version");
-    	json.writeString("1.0"); // FIXME
-    	json.writeFieldName("timestamp");
-    	json.writeNumber(new Date().getTime()); // FIXME
+    	json.writeStringField("version", Banner.getVersion());
+    	json.writeNumberField("timestamp", new Date().getTime());
     	if(quorum.isQuorumFullyMet(quorum.token())) {
-    		json.writeFieldName("status");
-    		json.writeString("Good");
-    		json.writeFieldName("details");
-    		json.writeString("All servers joined");
+    		json.writeStringField("status", "Good");
+    		json.writeStringField("details", "All servers joined");
     	} else {
     		// at least one server is not available, so status is either Warning or Bad
-			json.writeFieldName("status");
     		if(quorum.isQuorumMet()) {
-    			json.writeString("Warning");
+    			json.writeStringField("status", "Warning");
     		} else {
-    			json.writeString("Bad");
+    			json.writeStringField("status", "Bad");
     		}
-    		json.writeFieldName("details");
-    		json.writeString("Only " + quorum.getJoined().length + " of target " + 
+    		json.writeStringField("details", "Only " + quorum.getJoined().length + " of target " + 
     				quorum.replicationFactor() + " servers joined");
     	}
 
+    	json.writeFieldName("services");
+    	json.writeStartArray();
+    	
+        final UUID[] joined = quorum.getJoined();
+        final UUID[] pipeline = quorum.getPipeline();
+
+        for (UUID serviceId : pipeline) {
+            final boolean isLeader = serviceId.equals(quorum.getLeaderId());
+            final boolean isFollower = indexOf(serviceId, joined) > 0;
+
+            json.writeStartObject();
+        	json.writeStringField("id", serviceId.toString());
+        	json.writeStringField("status", isLeader ? "leader" : (isFollower ? "follower" : "unready"));
+        	json.writeEndObject();
+        }
+    	
+        json.writeEndArray();
     	json.writeEndObject();
     	json.close();
     	
