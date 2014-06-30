@@ -27,10 +27,9 @@ import java.io.File;
 import java.util.Properties;
 
 import com.bigdata.journal.BufferMode;
-import com.bigdata.journal.RWStrategy;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.Journal.Options;
-import com.bigdata.rawstore.IRawStore;
+import com.bigdata.journal.RWStrategy;
 
 /**
  * A utility class to explicitly change the metabits storage to allow for
@@ -40,9 +39,16 @@ import com.bigdata.rawstore.IRawStore;
  * support stores with large numbers of allocations. If such a store needs to be
  * opened by an earlier code-base, then the store must be amended to store the
  * metabits in a standard allocation.
+ * <p>
+ * It is only possible to set the metabits demi-space mode to <code>false</code>
+ * if the size of the metabits region is less than or equal to the maximum slot
+ * size for the declared alloctors.
  * 
  * @author Martyn Cutcher
- * 
+ * @see <a href="http://trac.bigdata.com/ticket/936"> Support larger metabit
+ *      allocations</a>
+ * @see <a href="http://wiki.bigdata.com/wiki/index.php/DataMigration" > Data
+ *      migration </a>
  */
 public class MetabitsUtil {
 
@@ -55,7 +61,7 @@ public class MetabitsUtil {
 		return def;
 	}
 
-	static Journal getStore(String storeFile) {
+	static Journal getStore(final String storeFile) {
 
 		final Properties properties = new Properties();
 
@@ -68,12 +74,14 @@ public class MetabitsUtil {
 
 	}
 
-	/**
-	 * Example usage:
-	 * <p>
-	 * MatabitsUtil -store "/path/store.jnl" -usedemispace true
-	 */
-	static public void main(final String[] args) {
+    /**
+     * Example usage:
+     * 
+     * <pre>
+     * MatabitsUtil -store "/path/store.jnl" -usedemispace true
+     * </pre>
+     */
+    static public void main(final String[] args) {
 		final String store = getArg(args, "-store", null);
 		if (store == null) {
 			System.err.println("file must be specificed with -store");
