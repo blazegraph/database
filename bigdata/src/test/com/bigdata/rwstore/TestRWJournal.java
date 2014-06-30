@@ -1540,21 +1540,114 @@ public class TestRWJournal extends AbstractJournalTestCase {
 		public void test_metaAlloc() {
 
 			Journal store = (Journal) getStore();
-            try {
+			try {
 
-			final RWStrategy bs = (RWStrategy) store.getBufferStrategy();
+				final RWStrategy bs = (RWStrategy) store.getBufferStrategy();
 
-			final RWStore rw = bs.getStore();
-			long realAddr = 0;
-				for (int i = 0; i < 100000; i++) {
-					int allocAddr = rw.metaAlloc();
-
-					realAddr = rw.metaBit2Addr(allocAddr);
+				final RWStore rw = bs.getStore();
+				long realAddr = 0;
+				for (int r = 0; r < 100; r++) {
+					for (int i = 0; i < 1000; i++) {
+						int allocAddr = rw.metaAlloc();
+	
+						realAddr = rw.metaBit2Addr(allocAddr);
+					}
+					rw.commit();
 				}
-				if(log.isInfoEnabled())log.info("metaAlloc lastAddr: " + realAddr);
+
+				if (log.isInfoEnabled())
+					log.info("metaAlloc lastAddr: " + realAddr);
 			} finally {
 				store.destroy();
 			}
+		}
+		
+		/**
+		 * Tests the MetabitsUtil to switch the demispace.
+		 * 
+		 * If the address is a demispace then addr % 64K == 0.
+		 * 
+		 * If the address is NOT a demispace then it should be less than first
+		 * demispace
+		 */
+		public void test_metabitsDemispace() {
+			Journal store = (Journal) getStore();
+			try {
+
+				RWStrategy bs = (RWStrategy) store.getBufferStrategy();
+				RWStore rw = bs.getStore();				
+				final String fname = rw.getStoreFile().getAbsolutePath();
+				
+				store.commit();
+				
+				final long fa1 = rw.getMetaBitsStoreAddress();
+
+				rw.ensureMetabitsDemispace(true);				
+				store.commit();
+				
+				final long ds1 = rw.getMetaBitsStoreAddress();
+				
+				assertTrue((ds1 & 0xFFFF) == 0); // MOD 64K
+				assertTrue(ds1 > fa1);
+
+				rw.ensureMetabitsDemispace(false);				
+				store.commit();
+				
+				final long fa2 = rw.getMetaBitsStoreAddress();
+				
+				assertTrue(ds1 > fa2);
+				
+				rw.ensureMetabitsDemispace(true);			
+				store.commit();
+				
+				final long ds2 = rw.getMetaBitsStoreAddress();
+
+				assertTrue((ds2 & 0xFFFF) == 0);
+				assertTrue(ds2 > ds1);
+				
+				// Now use MetaBitsUtil
+				
+				store.close();
+				
+				MetabitsUtil.main(new String[] { "-store", fname, "-usedemispace", "false"});
+				
+				store = getExplicitStore(fname);
+				
+				bs = (RWStrategy) store.getBufferStrategy();
+				rw = bs.getStore();				
+				final long fa3 = rw.getMetaBitsStoreAddress();
+				
+				assertTrue(fa3 < ds1);
+				
+				store.close();
+
+				MetabitsUtil.main(new String[] { "-store", fname, "-usedemispace", "true"});
+				
+				store = getExplicitStore(fname);
+				
+				bs = (RWStrategy) store.getBufferStrategy();
+				rw = bs.getStore();				
+
+				final long ds3 = rw.getMetaBitsStoreAddress();
+				assertTrue((ds3 & 0xFFFF) == 0);
+				assertTrue(ds3 > ds2);
+
+			} finally {
+				store.destroy();
+			}
+		}
+
+		Journal getExplicitStore(String storeFile) {
+
+			final Properties properties = new Properties();
+
+			properties.setProperty(Options.FILE, storeFile);
+
+			properties.setProperty(Options.BUFFER_MODE,
+					BufferMode.DiskRW.toString());
+
+			return new Journal(properties);// .getBufferStrategy();
+
 		}
 
 		static class DummyAllocationContext implements IAllocationContext {

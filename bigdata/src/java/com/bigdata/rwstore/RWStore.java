@@ -342,7 +342,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
          */
         String META_BITS_DEMI_SPACE = RWStore.class.getName() + ".metabitsDemispace";
 
-        String DEFAULT_META_BITS_DEMI_SPACE = "true";
+        String DEFAULT_META_BITS_DEMI_SPACE = "false";
 
         /**
          * Defines the number of bits that must be free in a FixedAllocator for
@@ -1478,11 +1478,17 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
                 
                 // Can handle minor store version incompatibility
                 final int storeVersion = strBuf.readInt();
-                if ((storeVersion & 0xFF00) != (cVersion & 0xFF00)) {
+                
+                switch ((storeVersion & 0xFF00)) {
+            	case (cVersion & 0xFF00):
+            	case (cVersionDemispace & 0xFF00):
+                	break;
+                default:
                     throw new IllegalStateException(
                             "Incompatible RWStore header version: storeVersion="
                                     + storeVersion + ", cVersion=" + cVersion);
                 }
+ 	                
                 m_lastDeferredReleaseTime = strBuf.readLong();
                 if (strBuf.readInt() != cDefaultMetaBitsSize) {
                 	throw new IllegalStateException("Store opened with unsupported metabits size");
@@ -3031,7 +3037,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 
         final FixedOutputStream str = new FixedOutputStream(buf);
         try {
-            str.writeInt(cVersion);
+            str.writeInt(m_metaBitsAddr > 0 ? cVersionDemispace : cVersion);
             str.writeLong(m_lastDeferredReleaseTime);
             str.writeInt(cDefaultMetaBitsSize);            
             str.writeInt(m_allocSizes.length);           
@@ -3068,7 +3074,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
          * writeMetaBits().
          */
         //final long addr = physicalAddress(m_metaBitsAddr);
-        final long addr = ((long) m_metaBitsAddr) << ALLOCATION_SCALEUP;
+        final long addr = m_metaBitsAddr < 0 ? physicalAddress(m_metaBitsAddr) : ((long) m_metaBitsAddr) << ALLOCATION_SCALEUP;
         if (addr == 0) {
             throw new IllegalStateException("Invalid metabits address: " + m_metaBitsAddr);
         }
@@ -3081,7 +3087,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
         	
         	// Similar to writeMetaBits, we are no longer writing to a FixedAllocator managed region,
         	//	so no latched address is provided
-            m_writeCacheService.write(addr, ByteBuffer.wrap(buf), 0/*chk*/, false/*useChecksum*/, 0 /*latchedAddr*/);
+            m_writeCacheService.write(addr, ByteBuffer.wrap(buf), 0/*chk*/, false/*useChecksum*/, m_metaBitsAddr < 0 ? m_metaBitsAddr : 0 /*latchedAddr*/);
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
@@ -3134,42 +3140,69 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
              * that we do not need to reallocate the metabits region when we are
              * writing out the updated versions of the FixedAllocators).
              */
-//            final long oldMetaBits = m_metaBitsAddr;
-//            final int oldMetaBitsSize = (m_metaBits.length + m_allocSizes.length + 1) * 4;
-//            m_metaBitsAddr = alloc(getRequiredMetaBitsStorage(), null);
+            if (m_metaBitsAddr > 0) {
+            	// already using demi-space, remove from WCS
+            	m_writeCacheService.removeWriteToAddr(convertAddr(-m_metaBitsAddr), 0);
+            } else {
+				final int reqmbc = getRequiredMetaBitsStorage();
+				int nmbaddr = 0;
+				// if > max alloc or explicitly use the demi-space, then drop through for demi-space
+				if ((!m_useMetabitsDemispace) && reqmbc < m_maxFixedAlloc) { 
+					nmbaddr = alloc(reqmbc, null);
+				}            	
 
-            /*
-             * If m_metaBitsAddr < 0 then was allocated from FixedAllocators (for existing-store compatibility)
-             */
-            if (m_metaBitsAddr < 0) {
-            if (physicalAddress(m_metaBitsAddr) == 0) {
-                throw new IllegalStateException("Returned MetaBits Address not valid!");
-            }
-            
-	            final int oldMetaBitsSize = (m_metaBits.length + m_allocSizes.length + 1) * 4;
-            // Call immediateFree - no need to defer freeof metaBits, this
-            //  has to stop somewhere!
-            // No more allocations must be made
-	            immediateFree((int) m_metaBitsAddr, oldMetaBitsSize);
-	            
-	            m_metaBitsAddr = 0;
-            }
-            
+				// If existing allocation, then free it
+				if (m_metaBitsAddr < 0) {
+
+    				final int oldMetaBitsSize = (m_metaBits.length
+    						+ m_allocSizes.length + 1) * 4;
+    				
+    				// Call immediateFree - no need to defer freeof metaBits, this
+    				// has to stop somewhere!
+    				// No more allocations must be made
+    				immediateFree((int) m_metaBitsAddr, oldMetaBitsSize); 
+    				
+             	}
+				
+   				m_metaBitsAddr = nmbaddr;
+           }
+
             if (m_metaBitsAddr == 0) {
             	// Allocate special region to be able to store maximum metabits (128k of 2 64K demi-space
             	// Must be aligned on 128K boundary and allocations are made in units of 64K.
+            	//
+            	// May need to extend the file for teh demi-space!
             	while (m_nextAllocation % 2 != 0) {
             		m_nextAllocation--;
             	}
             	m_metaBitsAddr = -m_nextAllocation; // must be positive to differentiate from FixedAllocator address
             	m_nextAllocation -= 2; // allocate 2 * 64K
-            } else { // remove previous write from WCS
-            	m_writeCacheService.removeWriteToAddr(convertAddr(-m_metaBitsAddr), 0);
+            	
+            	// Check for file extension
+                while (m_nextAllocation <= m_fileSize) {
+                    extendFile();
+                }
+            	
+            	if (log.isInfoEnabled())
+            		log.info("Using Demi-space metabits");
             }
             
-            // Now "toggle" m_metaBitsAddr - 64K boundary
-            m_metaBitsAddr ^= 0x01; // toggle zero or 64K offset
+            if (m_metaBitsAddr > 0) { // Demi-Space
+	            // Now "toggle" m_metaBitsAddr - 64K boundary
+	            m_metaBitsAddr ^= 0x01; // toggle zero or 64K offset
+            }
 
+            if (log.isDebugEnabled()) {
+            	final long mbaddr;
+        		if (m_metaBitsAddr < 0) {
+        			mbaddr = physicalAddress((int) m_metaBitsAddr);
+        		} else {
+        			mbaddr = convertAddr(-m_metaBitsAddr); // maximum 48 bit address range
+        		}
+
+        		log.debug("Writing metabits at " + mbaddr);
+            }
+        	
             // There must be no buffered deferred frees
             // assert m_deferredFreeOut.getBytesWritten() == 0;
 
@@ -3451,8 +3484,10 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
      * Versions
      * 0x0300 - extended header to include reserved ints
      * 0x0400 - removed explicit BlobAllocators
+     * 0x0500 - using metaBits demi-space
      */
     final private int cVersion = 0x0400;
+    final private int cVersionDemispace = 0x0500;
     
     /**
      * cReservedMetaBits is the reserved space in the metaBits header
@@ -4233,31 +4268,41 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
      *  
      * @return long representation of metaBitsAddr PLUS the size
      */
-    public long getMetaBitsAddr() {
-    	assert m_metaBitsAddr > 0;
-    	
-        // long ret = physicalAddress((int) m_metaBitsAddr);
-        long ret = convertAddr(-m_metaBitsAddr); // maximum 48 bit address range
-        ret <<= 16;
-        
-        // include space for version, allocSizes and deferred free info AND cDefaultMetaBitsSize
-        final int metaBitsSize = cMetaHdrFields + m_metaBits.length + m_allocSizes.length;
-        ret += metaBitsSize;
-        
-        if (log.isTraceEnabled())
-            log.trace("Returning metabitsAddr: " + ret + ", for "
-                    + m_metaBitsAddr + " - " + m_metaBits.length + ", "
-                    + metaBitsSize);
+	public long getMetaBitsAddr() {
+		long ret = 0;
 
-        return ret;
-    }
+		if (m_metaBitsAddr < 0) {
+			ret = physicalAddress((int) m_metaBitsAddr);
+		} else {
+			// long ret = physicalAddress((int) m_metaBitsAddr);
+			ret = convertAddr(-m_metaBitsAddr); // maximum 48 bit address range
+		}
+		ret <<= 16;
+
+		// include space for version, allocSizes and deferred free info AND
+		// cDefaultMetaBitsSize
+		final int metaBitsSize = cMetaHdrFields + m_metaBits.length
+				+ m_allocSizes.length;
+		ret += metaBitsSize;
+
+		if (log.isTraceEnabled())
+			log.trace("Returning metabitsAddr: " + ret + ", for "
+					+ m_metaBitsAddr + " - " + m_metaBits.length + ", "
+					+ metaBitsSize);
+
+		return ret;
+	}
 
     /**
      * 
-     * @return the address of the metaBits demi-space
+     * @return the address of the metaBits
      */
-    public long getMetaBitsDemiSpace() {
-        return convertAddr(-m_metaBitsAddr);
+    public long getMetaBitsStoreAddress() {
+		if (m_metaBitsAddr < 0) {
+			return physicalAddress((int) m_metaBitsAddr);
+		} else {
+			return convertAddr(-m_metaBitsAddr); // maximum 48 bit address range
+		}
     }
 
     /**
@@ -7187,6 +7232,31 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 		final RWStoreState ret = new RWStoreState(this);
 		
 		return ret;
+	}
+	
+	/**
+	 * Forces a reset of the metabits allocation on the next commit.
+	 * <p>
+	 * Note that a side-effect of this is that there will be a memory leak
+	 * of either a FixedAllocation slot or an existing demi-space.
+	 * <p>
+	 * @param useDemispace
+	 * @return whether the storage has been modified.
+	 */
+	public boolean ensureMetabitsDemispace(final boolean useDemispace) {
+		final boolean isDemispace = m_metaBitsAddr > 0;
+		
+		if (isDemispace != useDemispace || m_useMetabitsDemispace != useDemispace) {
+			m_useMetabitsDemispace = useDemispace;
+	
+			m_metaBitsAddr = 0;
+			
+			m_recentAlloc = true; // force commit
+			
+			return true;
+		} else {
+			return false;
+		}
 	}
 
 //  public void prepareForRebuild(final HARebuildRequest req) {
