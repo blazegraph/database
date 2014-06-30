@@ -890,78 +890,80 @@ public class HAStatusServletUtil {
 
     }
 
-    /**
-     * Basic server health info
-     * 
-     * @param req
-     * @param resp
-     * @throws TimeoutException
-     * @throws InterruptedException
-     * @throws AsynchronousQuorumCloseException
-     * @throws IOException
-     */
-    public void doHealthStatus(final HttpServletRequest req,
-            final HttpServletResponse resp) throws IOException {
+   /**
+    * Basic server health info
+    * 
+    * @param req
+    * @param resp
+    * @throws TimeoutException
+    * @throws InterruptedException
+    * @throws AsynchronousQuorumCloseException
+    * @throws IOException
+    */
+   public void doHealthStatus(final HttpServletRequest req,
+         final HttpServletResponse resp) throws IOException {
 
-        if (!(indexManager instanceof HAJournal))
-            return;
+      if (!(indexManager instanceof HAJournal))
+         return;
 
-        final HAJournal journal = (HAJournal) indexManager;
+      final HAJournal journal = (HAJournal) indexManager;
 
-        final Quorum<HAGlue, QuorumService<HAGlue>> quorum = journal
-                .getQuorum();
-        
-        StringWriter writer = new StringWriter();
-        JsonFactory factory = new JsonFactory();
-        JsonGenerator json = factory.createGenerator(writer);
-        
-        json.writeStartObject();
-        
-    	json.writeStringField("version", Banner.getVersion());
-    	json.writeNumberField("timestamp", new Date().getTime());
-    	if(quorum.isQuorumFullyMet(quorum.token())) {
-    		json.writeStringField("status", "Good");
-    		json.writeStringField("details", "All servers joined");
-    	} else {
-    		// at least one server is not available, so status is either Warning or Bad
-    		if(quorum.isQuorumMet()) {
-    			json.writeStringField("status", "Warning");
-    		} else {
-    			json.writeStringField("status", "Bad");
-    		}
-    		json.writeStringField("details", "Only " + quorum.getJoined().length + " of target " + 
-    				quorum.replicationFactor() + " servers joined");
-    	}
+      final Quorum<HAGlue, QuorumService<HAGlue>> quorum = journal.getQuorum();
 
-    	json.writeFieldName("services");
-    	json.writeStartArray();
-    	
-        final UUID[] joined = quorum.getJoined();
-        final UUID[] pipeline = quorum.getPipeline();
+      StringWriter writer = new StringWriter();
+      JsonFactory factory = new JsonFactory();
+      JsonGenerator json = factory.createGenerator(writer);
 
-        for (UUID serviceId : pipeline) {
-            final boolean isLeader = serviceId.equals(quorum.getLeaderId());
-            final boolean isFollower = indexOf(serviceId, joined) > 0;
+      json.writeStartObject();
 
-            json.writeStartObject();
-        	json.writeStringField("id", serviceId.toString());
-        	json.writeStringField("status", isLeader ? "leader" : (isFollower ? "follower" : "unready"));
-        	json.writeEndObject();
-        }
-    	
-        json.writeEndArray();
-    	json.writeEndObject();
-    	json.close();
-    	
-        // TODO Alternatively "max-age=1" for max-age in seconds.
-        resp.addHeader("Cache-Control", "no-cache");
+      json.writeStringField("version", Banner.getVersion());
+      json.writeNumberField("timestamp", new Date().getTime());
+      if (quorum.isQuorumFullyMet(quorum.token())) {
+         json.writeStringField("status", "Good");
+         json.writeStringField("details", "All servers joined");
+      } else {
+         // at least one server is not available
+         // status is either Warning or Bad
+         if (quorum.isQuorumMet()) {
+            json.writeStringField("status", "Warning");
+         } else {
+            json.writeStringField("status", "Bad");
+         }
+         json.writeStringField("details", "Only " + quorum.getJoined().length
+               + " of target " + quorum.replicationFactor()
+               + " servers joined");
+      }
 
-        BigdataRDFServlet.buildResponse(resp, BigdataRDFServlet.HTTP_OK,
-                BigdataRDFServlet.MIME_APPLICATION_JSON, writer.toString());
+      json.writeFieldName("services");
+      json.writeStartArray();
 
-        return;
-        
-    }
+      final UUID[] pipeline = quorum.getPipeline();
+      final UUID[] joined = quorum.getJoined();
+
+      for (UUID serviceId : pipeline) {
+         final boolean isLeader = serviceId.equals(quorum.getLeaderId());
+         final boolean isFollower = indexOf(serviceId, joined) > 0;
+
+         json.writeStartObject();
+         json.writeStringField("id", serviceId.toString());
+         json.writeStringField("status", isLeader ? "leader"
+               : (isFollower ? "follower" : "unready"));
+         json.writeEndObject();
+      }
+
+      json.writeEndArray();
+      json.writeEndObject();
+      json.close();
+
+      // TODO Alternatively "max-age=1" for max-age in seconds.
+      resp.addHeader("Cache-Control", "no-cache");
+
+      BigdataRDFServlet.buildResponse(resp, BigdataRDFServlet.HTTP_OK,
+            BigdataRDFServlet.MIME_APPLICATION_JSON, writer.toString());
+
+      return;
+
+   }
     
 //    /**
 //     * Impose a lexical ordering on the file names. This is used for the HALog
