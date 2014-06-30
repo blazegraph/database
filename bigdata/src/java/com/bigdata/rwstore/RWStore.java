@@ -3487,6 +3487,15 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
      * 0x0500 - using metaBits demi-space
      */
     final private int cVersion = 0x0400;
+    /**
+     * The {@link #cVersion} value corresponding to the use of the demi-space
+     * for the metabits.
+     * 
+     * @see <a href="http://trac.bigdata.com/ticket/936"> Support larger metabit
+     *      allocations</a>
+     * @see <a href="http://wiki.bigdata.com/wiki/index.php/DataMigration" >
+     *      Data migration </a>
+     */
     final private int cVersionDemispace = 0x0500;
     
     /**
