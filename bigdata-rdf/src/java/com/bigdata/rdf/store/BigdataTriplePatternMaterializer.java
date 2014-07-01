@@ -26,9 +26,9 @@ package com.bigdata.rdf.store;
 
 import java.util.LinkedList;
 import java.util.List;
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.BlockingQueue;
+import java.util.Queue;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -118,14 +118,17 @@ public class BigdataTriplePatternMaterializer
         if (helperService == null)
             throw new IllegalStateException();
 
-        /*
+        /**
          * The output will be at most sizeof(chunk) arrays. Each array will have
          * one or more statements. Any triple patterns that have no intersection
          * in the data will be dropped and will not put anything into this
          * output queue.
+         * 
+         * @see <a href="http://trac.bigdata.com/ticket/985" > Deadlock in
+         *      BigdataTriplePatternMaterializer </a>
          */
-        final BlockingQueue<ISPO[]> out = new ArrayBlockingQueue<ISPO[]>(
-                chunk.length);
+        final Queue<ISPO[]> out = new ConcurrentLinkedQueue<ISPO[]>(
+                /*chunk.length*/);
 
         final List<FutureTask<Long>> tasks = new LinkedList<FutureTask<Long>>();
 
@@ -151,6 +154,7 @@ public class BigdataTriplePatternMaterializer
                      * Hook future to count down the latch when the task is
                      * done.
                      */
+                    @Override
                     public void run() {
                         try {
                             super.run();
@@ -223,10 +227,10 @@ public class BigdataTriplePatternMaterializer
     private class ResolveTriplePatternTask implements Callable<Long> {
 
         private final BigdataTriplePattern stmt;
-        private final BlockingQueue<ISPO[]> out;
+        private final Queue<ISPO[]> out;
 
         public ResolveTriplePatternTask(final BigdataTriplePattern stmt,
-                final BlockingQueue<ISPO[]> out) {
+                final Queue<ISPO[]> out) {
             this.stmt = stmt;
             this.out = out;
         }
@@ -273,7 +277,14 @@ public class BigdataTriplePatternMaterializer
 //                                throw new AssertionError(Arrays.toString(a));
 //                        }
 //                    }
-                    out.put(a);
+                    /**
+                     * This will never fail for a ConcurrentLinkedQueue.
+                     * 
+                     * @see <a href="http://trac.bigdata.com/ticket/985" >
+                     *      Deadlock in BigdataTriplePatternMaterializer </a>
+                     */
+                    final boolean result = out.offer(a);
+                    assert result : "insertion failed - expects an unbounded queue";
                     n += a.length;
                 }
                 return n;
