@@ -1421,7 +1421,9 @@ function getHealth(e) {
 
       $('#health-services div').remove();
       for(var i=0; i<data.services.length; i++) {
-         var div = $('<div>');
+         var container = $('<div>');
+         var div = $('<div class="box">');
+         div.appendTo(container);
          div.append('<p>ID: ' + data.services[i].id + '</p>');
          div.append('<p>Status: ' + data.services[i].status + '</p>');
          var health;
@@ -1436,8 +1438,8 @@ function getHealth(e) {
             default:
                health = 'warning';
          }
-         div.addClass('box health-' + health);
-         div.appendTo($('#health-services'));
+         container.addClass('box health-' + health);
+         container.appendTo($('#health-services'));
       }
    })
 }
