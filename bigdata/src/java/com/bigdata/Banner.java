@@ -55,7 +55,6 @@ import com.bigdata.util.config.LogUtil;
  * the copyright banner is always written out on bigdata startup.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class Banner {
 
@@ -70,7 +69,6 @@ public class Banner {
      * Environment variables understood by the {@link Banner} class.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     public interface Options {
 
@@ -384,7 +382,7 @@ public class Banner {
     * <code>build.xml</code> and is NOT available from the IDE. It is correct
     * discovered using reflection.
     * 
-    * @return Build version if available and <code>unknown</code> otherwise.
+    * @return Build version if available and <code>null</code> otherwise.
     * 
     * @see #getBuildInfo()
     */
