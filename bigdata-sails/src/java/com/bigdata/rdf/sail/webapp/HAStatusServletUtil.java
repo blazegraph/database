@@ -903,55 +903,67 @@ public class HAStatusServletUtil {
    public void doHealthStatus(final HttpServletRequest req,
          final HttpServletResponse resp) throws IOException {
 
-      if (!(indexManager instanceof HAJournal))
-         return;
-
-      final HAJournal journal = (HAJournal) indexManager;
-
-      final Quorum<HAGlue, QuorumService<HAGlue>> quorum = journal.getQuorum();
-
       StringWriter writer = new StringWriter();
       JsonFactory factory = new JsonFactory();
       JsonGenerator json = factory.createGenerator(writer);
 
       json.writeStartObject();
-
       json.writeStringField("version", Banner.getVersion());
       json.writeNumberField("timestamp", new Date().getTime());
-      if (quorum.isQuorumFullyMet(quorum.token())) {
-         json.writeStringField("status", "Good");
-         json.writeStringField("details", "All servers joined");
+
+      if (!(indexManager instanceof HAJournal)) {
+
+         // standalone
+         json.writeStringField("deployment", "standalone");
+
       } else {
-         // at least one server is not available
-         // status is either Warning or Bad
-         if (quorum.isQuorumMet()) {
-            json.writeStringField("status", "Warning");
+
+         // HA
+         json.writeStringField("deployment", "HA");
+
+         final HAJournal journal = (HAJournal) indexManager;
+
+         final Quorum<HAGlue, QuorumService<HAGlue>> quorum = journal
+               .getQuorum();
+
+         if (quorum.isQuorumFullyMet(quorum.token())) {
+            json.writeStringField("status", "Good");
+            json.writeStringField("details",
+                  "All servers (" + quorum.replicationFactor() + ") joined");
          } else {
-            json.writeStringField("status", "Bad");
+            // at least one server is not available
+            // status is either Warning or Bad
+            if (quorum.isQuorumMet()) {
+               json.writeStringField("status", "Warning");
+            } else {
+               json.writeStringField("status", "Bad");
+            }
+            json.writeStringField(
+                  "details",
+                  "Only " + quorum.getJoined().length + " of target "
+                        + quorum.replicationFactor() + " servers joined");
          }
-         json.writeStringField("details", "Only " + quorum.getJoined().length
-               + " of target " + quorum.replicationFactor()
-               + " servers joined");
+
+         json.writeFieldName("services");
+         json.writeStartArray();
+
+         final UUID[] members = quorum.getMembers();
+         final UUID[] joined = quorum.getJoined();
+
+         for (UUID serviceId : members) {
+            final boolean isLeader = serviceId.equals(quorum.getLeaderId());
+            final boolean isFollower = indexOf(serviceId, joined) > 0;
+
+            json.writeStartObject();
+            json.writeStringField("id", serviceId.toString());
+            json.writeStringField("status", isLeader ? "leader"
+                  : (isFollower ? "follower" : "unready"));
+            json.writeEndObject();
+         }
+
+         json.writeEndArray();
       }
 
-      json.writeFieldName("services");
-      json.writeStartArray();
-
-      final UUID[] pipeline = quorum.getPipeline();
-      final UUID[] joined = quorum.getJoined();
-
-      for (UUID serviceId : pipeline) {
-         final boolean isLeader = serviceId.equals(quorum.getLeaderId());
-         final boolean isFollower = indexOf(serviceId, joined) > 0;
-
-         json.writeStartObject();
-         json.writeStringField("id", serviceId.toString());
-         json.writeStringField("status", isLeader ? "leader"
-               : (isFollower ? "follower" : "unready"));
-         json.writeEndObject();
-      }
-
-      json.writeEndArray();
       json.writeEndObject();
       json.close();
 

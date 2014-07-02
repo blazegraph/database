@@ -1406,6 +1406,13 @@ $('#tab-selector a[data-target=health], #health-refresh').click(getHealth);
 function getHealth(e) {
    e.preventDefault();
    $.get('/status?health', function(data) {
+
+      if(data.deployment == 'standalone') {
+         $('#health-tab').html('<div class="box">Server operating in standalone mode.</div>');
+         $('#tab-selector a[data-target=health]').unbind('click');
+         return;
+      }
+
       $('#health-overview .health-status span').html(data.status);
       $('#health-overview').removeClass('health-good health-warning health-bad').addClass('health-' + data.status.toLowerCase());
       $('#health-overview .health-details span').html(data.details);
@@ -1424,10 +1431,10 @@ function getHealth(e) {
                health = 'good';
                break;
             case 'unready':
-               health = 'warning';
+               health = 'bad';
                break;
             default:
-               health = 'bad';
+               health = 'warning';
          }
          div.addClass('box health-' + health);
          div.appendTo($('#health-services'));
