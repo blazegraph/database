@@ -27,24 +27,16 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rwstore;
 
-import java.io.EOFException;
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Properties;
 import java.util.Random;
 import java.util.TreeMap;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.zip.GZIPInputStream;
-import java.util.zip.GZIPOutputStream;
 
 import junit.extensions.proxy.ProxyTestSuite;
 import junit.framework.Test;
@@ -577,8 +569,6 @@ public class TestRWJournal extends AbstractJournalTestCase {
 	 * 
 	 * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
 	 *         Thompson</a>
-	 * @version $Id: TestRWJournal.java 4010 2010-12-16 12:44:43Z martyncutcher
-	 *          $
 	 */
 	public static class TestRawStore extends AbstractRestartSafeTestCase {
 
@@ -1540,114 +1530,21 @@ public class TestRWJournal extends AbstractJournalTestCase {
 		public void test_metaAlloc() {
 
 			Journal store = (Journal) getStore();
-			try {
+            try {
 
-				final RWStrategy bs = (RWStrategy) store.getBufferStrategy();
+			final RWStrategy bs = (RWStrategy) store.getBufferStrategy();
 
-				final RWStore rw = bs.getStore();
-				long realAddr = 0;
-				for (int r = 0; r < 100; r++) {
-					for (int i = 0; i < 1000; i++) {
-						int allocAddr = rw.metaAlloc();
-	
-						realAddr = rw.metaBit2Addr(allocAddr);
-					}
-					rw.commit();
+			final RWStore rw = bs.getStore();
+			long realAddr = 0;
+				for (int i = 0; i < 100000; i++) {
+					int allocAddr = rw.metaAlloc();
+
+					realAddr = rw.metaBit2Addr(allocAddr);
 				}
-
-				if (log.isInfoEnabled())
-					log.info("metaAlloc lastAddr: " + realAddr);
+				if(log.isInfoEnabled())log.info("metaAlloc lastAddr: " + realAddr);
 			} finally {
 				store.destroy();
 			}
-		}
-		
-		/**
-		 * Tests the MetabitsUtil to switch the demispace.
-		 * 
-		 * If the address is a demispace then addr % 64K == 0.
-		 * 
-		 * If the address is NOT a demispace then it should be less than first
-		 * demispace
-		 */
-		public void test_metabitsDemispace() {
-			Journal store = (Journal) getStore();
-			try {
-
-				RWStrategy bs = (RWStrategy) store.getBufferStrategy();
-				RWStore rw = bs.getStore();				
-				final String fname = rw.getStoreFile().getAbsolutePath();
-				
-				store.commit();
-				
-				final long fa1 = rw.getMetaBitsStoreAddress();
-
-				rw.ensureMetabitsDemispace(true);				
-				store.commit();
-				
-				final long ds1 = rw.getMetaBitsStoreAddress();
-				
-				assertTrue((ds1 & 0xFFFF) == 0); // MOD 64K
-				assertTrue(ds1 > fa1);
-
-				rw.ensureMetabitsDemispace(false);				
-				store.commit();
-				
-				final long fa2 = rw.getMetaBitsStoreAddress();
-				
-				assertTrue(ds1 > fa2);
-				
-				rw.ensureMetabitsDemispace(true);			
-				store.commit();
-				
-				final long ds2 = rw.getMetaBitsStoreAddress();
-
-				assertTrue((ds2 & 0xFFFF) == 0);
-				assertTrue(ds2 > ds1);
-				
-				// Now use MetaBitsUtil
-				
-				store.close();
-				
-				MetabitsUtil.main(new String[] { "-store", fname, "-usedemispace", "false"});
-				
-				store = getExplicitStore(fname);
-				
-				bs = (RWStrategy) store.getBufferStrategy();
-				rw = bs.getStore();				
-				final long fa3 = rw.getMetaBitsStoreAddress();
-				
-				assertTrue(fa3 < ds1);
-				
-				store.close();
-
-				MetabitsUtil.main(new String[] { "-store", fname, "-usedemispace", "true"});
-				
-				store = getExplicitStore(fname);
-				
-				bs = (RWStrategy) store.getBufferStrategy();
-				rw = bs.getStore();				
-
-				final long ds3 = rw.getMetaBitsStoreAddress();
-				assertTrue((ds3 & 0xFFFF) == 0);
-				assertTrue(ds3 > ds2);
-
-			} finally {
-				store.destroy();
-			}
-		}
-
-		Journal getExplicitStore(String storeFile) {
-
-			final Properties properties = new Properties();
-
-			properties.setProperty(Options.FILE, storeFile);
-
-			properties.setProperty(Options.BUFFER_MODE,
-					BufferMode.DiskRW.toString());
-
-			return new Journal(properties);// .getBufferStrategy();
-
 		}
 
 		static class DummyAllocationContext implements IAllocationContext {
@@ -2100,6 +1997,135 @@ public class TestRWJournal extends AbstractJournalTestCase {
             	bs.delete(addr);
             	
             	assertTrue(bs.isCommitted(addr));
+            } finally {
+            	store.destroy();
+            }
+		}
+
+        /**
+         * Verify that we correctly restore the RWStore commit state if
+         * {@link RWStore#commit()} is followed by {@link RWStore#reset()}
+         * rather than {@link RWStore#postCommit()}.
+         * 
+         * @see <a href="http://trac.bigdata.com/ticket/973" >RWStore commit is
+         *      not robust to internal failure.</a>
+         */
+		public void test_commitState() {
+			Journal store = (Journal) getStore();
+            try {
+
+            	final RWStrategy bs = (RWStrategy) store.getBufferStrategy();
+            	
+            	final RWStore rws = bs.getStore();
+            	
+            	final long addr = bs.write(randomData(78));
+
+            	// do 1st half of the RWStore commit protocol.
+            	rws.commit();
+            	            	
+            	// then discard write set.
+            	store.abort();
+            	
+            	assertFalse(bs.isCommitted(addr)); // rolled back
+            	
+            	// now cycle standard commit to confirm correct reset
+            	for (int c = 0; c < 50; c++) {
+            		bs.write(randomData(78));
+            		store.commit();
+            	}
+           	
+            	
+            } finally {
+            	store.destroy();
+            }
+		}
+		
+        /**
+         * Test verifies that a failure to retain the commit state in
+         * {@link RWStore#commit()} will cause problems if the write set is
+         * discarded by {@link RWStore#reset()} such that subsequent write sets
+         * run into persistent addressing errors.
+         * 
+         * @see <a href="http://trac.bigdata.com/ticket/973" >RWStore commit is
+         *      not robust to internal failure.</a>
+         */
+		public void test_commitStateError() {
+			Journal store = (Journal) getStore();
+            try {
+
+            	RWStrategy bs = (RWStrategy) store.getBufferStrategy();
+            	
+            	RWStore rws = bs.getStore();
+            	
+            	final long addr = bs.write(randomData(78));
+            	
+            	// do first half of the RWStore protocol.
+            	rws.commit();
+
+            /*
+             * remove the commit state such that subsequent abort()/reset()
+             * will fail to correctly restore the pre-commit state.
+             */
+            rws.clearCommitStateRef();
+
+            // abort() succeeds because it is allowed even if commit() was
+            // not called.
+            	store.abort();
+            	
+            	assertFalse(bs.isCommitted(addr)); // rolled back
+            	
+            	try {
+	            	// now cycle standard commit to force an error from bad reset
+	            	for (int c = 0; c < 50; c++) {
+	            		bs.write(randomData(78));
+	            		store.commit();
+	            	}
+	            	fail("Expected failure");
+            	} catch (Exception e) {
+            		// expected
+            		log.info("Expected!");
+            	}
+           	
+            } finally {
+            	store.destroy();
+            }
+		}
+		
+        /**
+         * Verify that a double-commit causes an illegal state exception.
+         * Further verify that an {@link RWStore#reset()} allwos us to then
+         * apply and commit new write sets.
+         * 
+         * @see <a href="http://trac.bigdata.com/ticket/973" >RWStore commit is
+         *      not robust to internal failure.</a>
+         */
+		public void test_commitStateIllegal() {
+			final Journal store = (Journal) getStore();
+            try {
+
+            final RWStrategy bs = (RWStrategy) store.getBufferStrategy();
+            	
+            	final RWStore rws = bs.getStore();
+            	
+            	bs.write(randomData(78));
+            	
+            	rws.commit();
+            	
+            	try {
+            		store.commit();
+            		
+            		fail("Expected failure");
+            	} catch (Exception ise) {
+            		if (InnerCause.isInnerCause(ise, IllegalStateException.class)) {
+	            		store.abort();
+	            		
+	            		store.commit();
+            		} else {
+            			fail("Unexpected Exception");
+            		}
+            	}
+           	
+            	
             } finally {
             	store.destroy();
             }
@@ -3052,8 +3078,6 @@ public class TestRWJournal extends AbstractJournalTestCase {
 	 * 
 	 * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
 	 *         Thompson</a>
-	 * @version $Id: TestRWJournal.java 4010 2010-12-16 12:44:43Z martyncutcher
-	 *          $
 	 */
 	public static class TestMROW extends AbstractMROWTestCase {
 
@@ -3065,15 +3089,11 @@ public class TestRWJournal extends AbstractJournalTestCase {
 			super(name);
 		}
 
-		protected IRawStore getStore(String storeFile) {
+		protected IRawStore getStore() {
 
 			final Properties properties = getProperties();
 
-			if (storeFile == null) {	
-				properties.setProperty(Options.CREATE_TEMP_FILE, "true");
-			} else {
-				properties.setProperty(Options.FILE, storeFile);
-			}
+			properties.setProperty(Options.CREATE_TEMP_FILE, "true");
 
 			properties.setProperty(Options.DELETE_ON_EXIT, "true");
 
@@ -3085,86 +3105,6 @@ public class TestRWJournal extends AbstractJournalTestCase {
 
 		}
 
-		protected IRawStore getStore() {
-
-			return getStore(null); // no file provided by default
-
-		}
-
-		static long getLongArg(final String[] args, final String arg, final long def) {
-			final String sv = getArg(args, arg, null);
-			
-			return sv == null ? def : Long.parseLong(sv);
-		}
-		
-		static String getArg(final String[] args, final String arg, final String def) {
-			for (int p = 0; p < args.length; p+=2) {
-				if (arg.equals(args[p]))
-					return args[p+1];
-			}
-			
-			return def;
-		}
-		
-		/**
-		 * Stress variant to support multiple parameterised runs
-		 * 
-		 * Arguments
-		 * 
-		 * -file - optional explicit file path
-		 * -clients - reader threads
-		 * -nwrites - number of records written
-		 * -reclen - size of record written
-		 * -ntrials - number of readers
-		 * -nreads - number of reads made by each reader
-		 * -nruns - number of times to repeat process with reopen each time
-		 */
-	    public static void main(final String[] args) throws Exception {
-	    	final TestMROW test = new TestMROW("main");
-	    	
-            final String storeFile = getArg(args, "-file", null);
-
-	        Journal store = (Journal) test.getStore(storeFile);
-	        try {
-
-	            final long timeout = 20;
-
-	            final int nclients = (int) getLongArg(args, "-clients", 20); // 20
-			
-	            final long nwrites = getLongArg(args, "-nwrites", 100000); //1000000;
-		
-	            final int writeDelayMillis = 1;
-			
-	            final long ntrials = getLongArg(args, "-ntrials", 100000); // 100000;
-
-	            final int reclen =  (int) getLongArg(args, "-reclen", 128); // 128;
-	
-	            final long nreads = getLongArg(args, "-nreads", 1000); // 1000;
-
-	            final long nruns = getLongArg(args, "-nruns", 1); // 1000;
-
-	            final AtomicInteger nerr = new AtomicInteger();
-
-	            for (int i = 0; i < nruns; i++) {
-		            doMROWTest(store, nwrites, writeDelayMillis, timeout, nclients,
-		                    ntrials, reclen, nreads, nerr, true /*readAll*/);
-
-		            store.commit();
-
-		            store = (new TestRWJournal()).reopenStore(store);
-
-		            System.out.println("Completed run: " + i);
-	            }
-
-	        } finally {
-
-	        	if (storeFile == null)
-	        		store.destroy();
-
-	        }
-
-		}
-
 	}
 
 	/**
@@ -3172,8 +3112,6 @@ public class TestRWJournal extends AbstractJournalTestCase {
 	 * 
 	 * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
 	 *         Thompson</a>
-	 * @version $Id: TestRWJournal.java 4010 2010-12-16 12:44:43Z martyncutcher
-	 *          $
 	 */
 	public static class TestMRMW extends AbstractMRMWTestCase {
 
@@ -3208,8 +3146,6 @@ public class TestRWJournal extends AbstractJournalTestCase {
 	 * 
 	 * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
 	 *         Thompson</a>
-	 * @version $Id: TestRWJournal.java 4010 2010-12-16 12:44:43Z martyncutcher
-	 *          $
 	 */
 	public static class TestInterrupts extends AbstractInterruptsTestCase {
 	
