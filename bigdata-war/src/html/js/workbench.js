@@ -652,12 +652,21 @@ EDITORS.query.on('change', function() {
 });
 EDITORS.query.addKeyMap({'Ctrl-Enter': submitQuery});
 
-$('#query-history').on('click', '.query', loadHistory);
+$('#query-history').on('click', '.query a', loadHistory);
+$('#query-history').on('click', '.query-delete a', deleteHistoryRow)
 
-function loadHistory() {
+function loadHistory(e) {
+   e.preventDefault();
    EDITORS.query.setValue(this.innerText);
-   useNamespace($(this).prev('.query-namespace').text());
    EDITORS.query.focus();
+}
+
+function deleteHistoryRow(e) {
+   e.preventDefault();
+   $(this).parents('tr').remove();
+   if($('#query-history tbody tr').length == 0) {
+      $('#query-history').hide();
+   }
 }
 
 function submitQuery(e) {
@@ -669,8 +678,8 @@ function submitQuery(e) {
    EDITORS.query.save();
 
    // do nothing if query is empty
-   var query = $('#query-box').val().trim();
-   if(query == '') {
+   var query = $('#query-box').val();
+   if(query.trim() == '') {
       return;
    }
 
@@ -693,11 +702,12 @@ function submitQuery(e) {
       // add this query to the history
       var row = $('<tr>').prependTo($('#query-history tbody'));
       row.append('<td class="query-time">' + new Date().toISOString() + '</td>');
-      row.append('<td class="query-namespace">' + NAMESPACE + '</td>');
       var cell = $('<td class="query">').appendTo(row);
-      cell.text(query);
-      cell.html(cell.html().replace('\n', '<br>'));
+      var a = $('<a href="#">').appendTo(cell);
+      a.text(query);
+      a.html(a.html().replace(/\n/g, '<br>'));
       row.append('<td class="query-results">...</td>');
+      row.append('<td class="query-delete"><a href="#">X</a></td>')
    }
 
    $('#query-history').show();
