@@ -343,7 +343,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
         String META_BITS_DEMI_SPACE = RWStore.class.getName() + ".metabitsDemispace";
 
         String DEFAULT_META_BITS_DEMI_SPACE = "false";
-
+        
         /**
          * Defines the number of bits that must be free in a FixedAllocator for
          * it to be added to the free list.  This is used to ensure a level
@@ -824,8 +824,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
         m_metaBits = new int[m_metaBitsSize];
         
         m_metaTransientBits = new int[m_metaBitsSize];
-        
-        
+                
         m_quorum = quorum;
         
         m_fd = fileMetadata.file;
@@ -1488,7 +1487,6 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
                             "Incompatible RWStore header version: storeVersion="
                                     + storeVersion + ", cVersion=" + cVersion);
                 }
- 	                
                 m_lastDeferredReleaseTime = strBuf.readLong();
                 if (strBuf.readInt() != cDefaultMetaBitsSize) {
                 	throw new IllegalStateException("Store opened with unsupported metabits size");
@@ -2880,15 +2878,19 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 //  }
 
     /**
-     * The semantics of reset are to revert unisolated writes to committed state.
-     * 
+     * The semantics of reset are to revert unisolated writes to committed
+     * state.
+     * <p>
      * Unisolated writes must also be removed from the write cache.
-     * 
+     * <p>
      * The AllocBlocks of the FixedAllocators maintain the state to determine
      * the correct reset behavior.
-     * 
+     * <p>
      * If the store is using DirectFixedAllocators then an IllegalStateException
-     * is thrown
+     * is thrown.
+     * <p>
+     * If there is an active {@link #m_commitStateRef}, then this indicates a
+     * failure after the {@link RWStore#commit()} had "succeeded".
      */
     public void reset() {
 
@@ -2899,6 +2901,15 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
         try {
             assertOpen();
 //          assertNoRebuild();
+
+            final CommitState commitState = m_commitStateRef
+                    .getAndSet(null/* newValue */);
+
+            if (commitState != null) {
+            
+                commitState.reset(); // restore state values on RWStore.
+                
+            }
             
             boolean isolatedWrites = false;
             /**
@@ -3101,23 +3112,89 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
         return requiresCommit();
     }
     
-//  static final float s_version = 3.0f;
-//
-//  public String getVersionString() {
-//      return "RWStore " + s_version;
-//  }
+    /**
+     * Object recording the undo state for the {@link RWStore#commit()} ...
+     * {@link RWStore#postCommit()} sequence. The {@link CommitState} must
+     * either {@link CommitState#commit()} or {@link CommitState#reset()}. Those
+     * {@link CommitState} methods are invoked out of the corresponding
+     * {@link RWStore} methods.
+     * 
+     * @see <a href="http://trac.bigdata.com/ticket/973" >RWStore commit is not
+     *      robust to internal failure.</a>
+     */
+    private class CommitState {
+        /*
+         * Critical pre-commit state that must be restored if a commit is
+         * discarded.
+         */
+        private final int m_lastCommittedNextAllocation;
+        private final long m_storageStatsAddr;
+        private final int m_metaBitsAddr;
 
+        CommitState() {
+            // retain copy of critical pre-commit state
+            if (!m_allocationWriteLock.isHeldByCurrentThread())
+                throw new IllegalMonitorStateException();
+            m_lastCommittedNextAllocation = RWStore.this.m_committedNextAllocation;
+            m_storageStatsAddr = RWStore.this.m_storageStatsAddr;
+            m_metaBitsAddr = RWStore.this.m_metaBitsAddr;
+        }
+
+        void postCommit() {
+
+            // NOP
+            
+        }
+
+        /** Reset pre-commit state to support reset/abort/rollback. */
+        void reset() {
+            if (!m_allocationWriteLock.isHeldByCurrentThread())
+                throw new IllegalMonitorStateException();
+            RWStore.this.m_storageStatsAddr = m_storageStatsAddr;
+            RWStore.this.m_committedNextAllocation = m_lastCommittedNextAllocation;
+            RWStore.this.m_metaBitsAddr = m_metaBitsAddr;
+        }
+
+    }
+
+    /**
+     * @see <a href="http://trac.bigdata.com/ticket/973" >RWStore commit is not
+     *      robust to internal failure.</a>
+     */
+    private final AtomicReference<CommitState> m_commitStateRef = new AtomicReference<CommitState>();
+
+    /**
+     * Package private method used by the test suite.
+     */
+    void clearCommitStateRef() {
+
+        m_commitStateRef.set(null/* newValue */);
+
+    }
+    
+    @Override
     public void commit() {
         assertOpen();
 //        assertNoRebuild();
 
         checkCoreAllocations();
 
-        // take allocation lock to prevent other threads allocating during commit
+    	// take allocation lock to prevent other threads allocating during commit
         m_allocationWriteLock.lock();
         
         try {
         
+            /*
+             * Create a transient object to retain values of previous
+             * commitState to support abort/reset/rollback if requested after
+             * this commit() is requested.
+             */
+            if (!m_commitStateRef.compareAndSet(null/* expect */,
+                    new CommitState())) {
+                throw new IllegalStateException(
+                        "RWStore commitState found, incomplete previous commit must be rolled back/aborted");
+            }
+
 //          final int totalFreed = checkDeferredFrees(true, journal); // free now if possible
 //          
 //          if (totalFreed > 0 && log.isInfoEnabled()) {
@@ -3150,20 +3227,20 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 				if ((!m_useMetabitsDemispace) && reqmbc < m_maxFixedAlloc) { 
 					nmbaddr = alloc(reqmbc, null);
 				}            	
-
+            
 				// If existing allocation, then free it
-				if (m_metaBitsAddr < 0) {
-
+            if (m_metaBitsAddr < 0) {
+	            
     				final int oldMetaBitsSize = (m_metaBits.length
     						+ m_allocSizes.length + 1) * 4;
     				
-    				// Call immediateFree - no need to defer freeof metaBits, this
-    				// has to stop somewhere!
-    				// No more allocations must be made
-    				immediateFree((int) m_metaBitsAddr, oldMetaBitsSize); 
-    				
-             	}
-				
+	            // Call immediateFree - no need to defer freeof metaBits, this
+	            //  has to stop somewhere!
+	            // No more allocations must be made
+	            immediateFree((int) m_metaBitsAddr, oldMetaBitsSize);
+	            
+            }
+            
    				m_metaBitsAddr = nmbaddr;
            }
 
@@ -3188,8 +3265,8 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
             }
             
             if (m_metaBitsAddr > 0) { // Demi-Space
-	            // Now "toggle" m_metaBitsAddr - 64K boundary
-	            m_metaBitsAddr ^= 0x01; // toggle zero or 64K offset
+            // Now "toggle" m_metaBitsAddr - 64K boundary
+            m_metaBitsAddr ^= 0x01; // toggle zero or 64K offset
             }
 
             if (log.isDebugEnabled()) {
@@ -3199,7 +3276,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
         		} else {
         			mbaddr = convertAddr(-m_metaBitsAddr); // maximum 48 bit address range
         		}
-
+            
         		log.debug("Writing metabits at " + mbaddr);
             }
         	
@@ -3254,9 +3331,6 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
                 throw new RuntimeException(e);
             }
             
-            // Now remember the committed next allocation that will be checked in reset()
-            m_committedNextAllocation = m_nextAllocation;
-
             // Should not write rootBlock, this is responsibility of client
             // to provide control
             // writeFileSpec();
@@ -3291,12 +3365,13 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
             log.debug(showAllocatorList());
 
         }
-
+        
     }
     
     /**
      * {@inheritDoc}
      */
+    @Override
     public Lock getCommitLock() {
 
         return m_allocationWriteLock;
@@ -3308,11 +3383,25 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
      * <p>
      * Commits the FixedAllocator bits
      */
+    @Override
     public void postCommit() {
        
         if (!m_allocationWriteLock.isHeldByCurrentThread())
             throw new IllegalMonitorStateException();
 
+        final CommitState commitState = m_commitStateRef.getAndSet(null/* newValue */);
+        
+        if (commitState == null) {
+
+            throw new IllegalStateException(
+                    "No current CommitState found on postCommit");
+            
+        } else {
+            
+            commitState.postCommit();
+            
+        }
+        
         for (FixedAllocator fa : m_commitList) {
 
             fa.postCommit();
@@ -3323,6 +3412,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 
     }
 
+    @Override
     public int checkDeferredFrees(final AbstractJournal journal) {
         
         if (journal == null)
@@ -4150,7 +4240,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
         try {
 
             if (addr >= 0) {
-
+        		
                 return addr & 0xFFFFFFE0;
 
             } else {
@@ -4277,30 +4367,30 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
      *  
      * @return long representation of metaBitsAddr PLUS the size
      */
-	public long getMetaBitsAddr() {
+    public long getMetaBitsAddr() {
 		long ret = 0;
-
+    	
 		if (m_metaBitsAddr < 0) {
 			ret = physicalAddress((int) m_metaBitsAddr);
 		} else {
-			// long ret = physicalAddress((int) m_metaBitsAddr);
+        // long ret = physicalAddress((int) m_metaBitsAddr);
 			ret = convertAddr(-m_metaBitsAddr); // maximum 48 bit address range
 		}
-		ret <<= 16;
-
+        ret <<= 16;
+        
 		// include space for version, allocSizes and deferred free info AND
 		// cDefaultMetaBitsSize
 		final int metaBitsSize = cMetaHdrFields + m_metaBits.length
 				+ m_allocSizes.length;
-		ret += metaBitsSize;
+        ret += metaBitsSize;
+        
+        if (log.isTraceEnabled())
+            log.trace("Returning metabitsAddr: " + ret + ", for "
+                    + m_metaBitsAddr + " - " + m_metaBits.length + ", "
+                    + metaBitsSize);
 
-		if (log.isTraceEnabled())
-			log.trace("Returning metabitsAddr: " + ret + ", for "
-					+ m_metaBitsAddr + " - " + m_metaBits.length + ", "
-					+ metaBitsSize);
-
-		return ret;
-	}
+        return ret;
+    }
 
     /**
      * 
@@ -5178,7 +5268,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
         checkRootBlock(rootBlock);
         
         assertOpen();
-
+        
         if (log.isTraceEnabled()) {
             log.trace("Writing new rootblock with commitCounter: "
                     + rootBlock.getCommitCounter() + ", commitRecordAddr: "
@@ -7242,7 +7332,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 		
 		return ret;
 	}
-	
+
 	/**
 	 * Forces a reset of the metabits allocation on the next commit.
 	 * <p>
