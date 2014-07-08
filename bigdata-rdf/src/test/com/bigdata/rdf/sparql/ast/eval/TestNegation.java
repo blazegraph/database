@@ -32,8 +32,6 @@ import java.util.Map;
 
 import org.openrdf.model.vocabulary.RDF;
 
-import com.bigdata.bop.IVariable;
-import com.bigdata.bop.Var;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
@@ -59,7 +57,6 @@ import com.bigdata.rdf.spo.SPOKeyOrder;
  * Test suite for SPARQL negation (EXISTS and MINUS).
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class TestNegation extends AbstractDataDrivenSPARQLTestCase {
 
@@ -798,4 +795,70 @@ public class TestNegation extends AbstractDataDrivenSPARQLTestCase {
         
     }
 
+    /**
+     * Performance related test for EXISTS. This is NOT an EXISTS query.
+     * However, EXISTS is translated into an ASK sub-query. This runs the
+     * equivalent ASK query.
+     * 
+     * <pre>
+     * prefix eg: <eg:>
+     * ASK
+     * FROM eg:g
+     * { BIND (1 as ?t)
+     *   ?a eg:p/eg:p/eg:p/eg:p/eg:p/eg:p/eg:p/eg:p ?b
+     * }
+     * 
+     * <pre>
+     * 
+     * @throws Exception 
+     * 
+     * @see <a href="http://trac.bigdata.com/ticket/988"> bad
+     * performance for FILTER EXISTS </a>
+     */
+    public void test_exists_988a() throws Exception {
+        
+        new TestHelper(
+                "exists-988a", // testURI,
+                "exists-988a.rq",// queryFileURL
+                "exists-988.trig",// dataFileURL
+                "exists-988a.srx" // resultFileURL,
+//                false, // laxCardinality
+//                true // checkOrder
+                ).runTest();
+
+    }
+    
+    /**
+     * Performance related test for EXISTS.
+     * 
+     * <pre>
+     * prefix eg: <eg:>
+     * SELET *
+     * FROM eg:g
+     * { BIND (1 as ?t)
+     *   FILTER EXISTS {
+     *     ?a eg:p/eg:p/eg:p/eg:p/eg:p/eg:p/eg:p/eg:p ?b
+     *  }
+     * }
+     * 
+     * <pre>
+     * 
+     * @throws Exception 
+     * 
+     * @see <a href="http://trac.bigdata.com/ticket/988"> bad
+     * performance for FILTER EXISTS </a>
+     */
+    public void test_exists_988b() throws Exception {
+        
+        new TestHelper(
+                "exists-988b", // testURI,
+                "exists-988b.rq",// queryFileURL
+                "exists-988.trig",// dataFileURL
+                "exists-988b.srx" // resultFileURL,
+//                false, // laxCardinality
+//                true // checkOrder
+                ).runTest();
+
+    }
+    
 }

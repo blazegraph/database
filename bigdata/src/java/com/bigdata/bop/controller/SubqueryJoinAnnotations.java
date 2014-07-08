@@ -33,11 +33,6 @@ import com.bigdata.bop.join.JoinAnnotations;
  * Annotations for joins against a subquery.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id: SubqueryJoinAnnotations.java 5491 2011-11-02 20:11:07Z
- *          thompsonbry $
- * 
- * @deprecated With {@link SubqueryOp}, which is the sole class which extends
- *             this interface.
  */
 public interface SubqueryJoinAnnotations extends JoinAnnotations,
         SubqueryAnnotations {
