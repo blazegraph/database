@@ -47,6 +47,7 @@ import com.bigdata.bop.controller.JVMNamedSubqueryOp;
 import com.bigdata.bop.controller.NamedSetAnnotations;
 import com.bigdata.bop.controller.ServiceCallJoin;
 import com.bigdata.bop.controller.Steps;
+import com.bigdata.bop.controller.SubqueryOp;
 import com.bigdata.bop.controller.Union;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.join.HTreeHashIndexOp;
@@ -159,7 +160,6 @@ import cutthecrap.utils.striterators.NOPFilter;
  * {@link PipelineOp}s.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  * 
  * @see <a href=
  *      "https://sourceforge.net/apps/mediawiki/bigdata/index.php?title=QueryEvaluation"
@@ -1831,23 +1831,36 @@ public class AST2BOpUtility extends AST2BOpRTO {
      * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/515">
      *      Query with two "FILTER NOT EXISTS" expressions returns no
      *      results</a>
+     * @see <a href="http://trac.bigdata.com/ticket/988"> bad performance for
+     *      FILTER EXISTS </a>
      * @see http://www.w3.org/2009/sparql/wiki/Design:Negation
      */
     private static PipelineOp addExistsSubquery(PipelineOp left,
             final SubqueryRoot subqueryRoot, final Set<IVariable<?>> doneSet,
             final AST2BOpContext ctx) {
 
-//        if (true) {
-//            return addExistsSubqueryFast(left, subqueryRoot, doneSet, ctx);
-//        } else {
-//            return addExistsSubquerySubquery(left, subqueryRoot, doneSet, ctx);
-//        }
-//        
-//    }
-//
-//    private static PipelineOp addExistsSubqueryFast(PipelineOp left,
-//            final SubqueryRoot subqueryRoot, final Set<IVariable<?>> doneSet,
-//            final AST2BOpContext ctx) {
+        if (true) { // TODO Add query hint to allow choice of strategy.
+            // Vectored sub-plan evaluation.
+            return addExistsSubqueryFast(left, subqueryRoot, doneSet, ctx);
+        } else {
+            // Non-vectored sub-query evaluation.
+            return addExistsSubquerySubquery(left, subqueryRoot, doneSet, ctx);
+        }
+        
+    }
+
+    /**
+     * (NOT) EXISTS code path using a vectored sub-plan.
+     * 
+     * @param left
+     * @param subqueryRoot
+     * @param doneSet
+     * @param ctx
+     * @return
+     */
+    private static PipelineOp addExistsSubqueryFast(PipelineOp left,
+            final SubqueryRoot subqueryRoot, final Set<IVariable<?>> doneSet,
+            final AST2BOpContext ctx) {
 
         // Only Sub-Select is supported by this code path.
         switch (subqueryRoot.getQueryType()) {
@@ -1973,6 +1986,12 @@ public class AST2BOpUtility extends AST2BOpRTO {
 //                new NV(ProjectionOp.Annotations.SELECT, projectedVars)//
 //        );
         
+        /*
+         * FIXME EXISTS: Try DISTINCT in the sub-plan and compare to correctness
+         * without for (NOT) EXISTS and to performance of the non-vectored code
+         * path for EXISTS>
+         */
+
         // Append the subquery plan.
 //        left = convertQueryBase(left, subqueryRoot, doneSet, ctx);
         left = convertJoinGroupOrUnion(left, subqueryRoot.getWhereClause(),
@@ -2027,65 +2046,79 @@ public class AST2BOpUtility extends AST2BOpRTO {
 
     }
     
-//    /**
-//     * A slow implementation using one {@link SubqueryOp} per source solution.
-//     * 
-//     * @deprecated by
-//     *             {@link #addExistsSubqueryFast(PipelineOp, SubqueryRoot, Set, AST2BOpContext)}
-//     */
-//    private static PipelineOp addExistsSubquerySubquery(PipelineOp left,
-//            final SubqueryRoot subqueryRoot, final Set<IVariable<?>> doneSet,
-//            final AST2BOpContext ctx) {
-//
-//        // Only "ASK" subqueries are allowed.
-//        switch (subqueryRoot.getQueryType()) {
-//        case ASK:
-//            break;
-//        default:
-//            throw new UnsupportedOperationException();
-//        }
-//
-//        @SuppressWarnings("rawtypes")
-//        final Map<IConstraint, Set<IVariable<IV>>> needsMaterialization = new LinkedHashMap<IConstraint, Set<IVariable<IV>>>();
-//
-//        final IConstraint[] joinConstraints = getJoinConstraints(
-//                getJoinConstraints(subqueryRoot), needsMaterialization);
-//
-//        final boolean aggregate = StaticAnalysis.isAggregate(subqueryRoot);
-//        
-//        /*
-//         * The anonymous variable which gets bound based on the (NOT) EXISTS
-//         * graph pattern.
-//         */
-//        final IVariable<?> askVar = subqueryRoot.getAskVar();
-//
-//        if (askVar == null)
-//            throw new UnsupportedOperationException();
-//
-//        final PipelineOp subqueryPlan = convertQueryBase(null/* left */,
-//                subqueryRoot, doneSet, ctx);
-//
-//        left = new SubqueryOp(leftOrEmpty(left),// SUBQUERY
-//                new NV(Predicate.Annotations.BOP_ID, ctx.nextId()),//
-//                new NV(SubqueryOp.Annotations.SUBQUERY, subqueryPlan),//
-//                new NV(SubqueryOp.Annotations.JOIN_TYPE, JoinTypeEnum.Normal),//
-//                new NV(SubqueryOp.Annotations.ASK_VAR, askVar),//
-//                new NV(SubqueryOp.Annotations.SELECT, subqueryRoot.getProjection().getProjectionVars()),//
-//                new NV(SubqueryOp.Annotations.CONSTRAINTS, joinConstraints),//
-//                new NV(SubqueryOp.Annotations.IS_AGGREGATE, aggregate)//
-//        );
-//
-//        /*
-//         * For each filter which requires materialization steps, add the
-//         * materializations steps to the pipeline and then add the filter to the
-//         * pipeline.
-//         */
-//        left = addMaterializationSteps(ctx, left, doneSet,
-//                needsMaterialization, subqueryRoot.getQueryHints());
-//
-//        return left;
-//
-//    }
+    /**
+     * A non-vectored implementation for (NOT) EXISTS using one
+     * {@link SubqueryOp} per source solution.
+     */
+    private static PipelineOp addExistsSubquerySubquery(PipelineOp left,
+            final SubqueryRoot subqueryRoot, final Set<IVariable<?>> doneSet,
+            final AST2BOpContext ctx) {
+
+        // Only "ASK" subqueries are allowed.
+        switch (subqueryRoot.getQueryType()) {
+        case ASK:
+            break;
+        default:
+            throw new UnsupportedOperationException();
+        }
+
+        @SuppressWarnings("rawtypes")
+        final Map<IConstraint, Set<IVariable<IV>>> needsMaterialization = new LinkedHashMap<IConstraint, Set<IVariable<IV>>>();
+
+        final IConstraint[] joinConstraints = getJoinConstraints(
+                getJoinConstraints(subqueryRoot), needsMaterialization);
+
+        final boolean aggregate = StaticAnalysis.isAggregate(subqueryRoot);
+        
+        /*
+         * The anonymous variable which gets bound based on the (NOT) EXISTS
+         * graph pattern.
+         */
+        final IVariable<?> askVar = subqueryRoot.getAskVar();
+
+        if (askVar == null)
+            throw new UnsupportedOperationException();
+
+        /*
+         * Impose LIMIT ONE on the non-vectored sub-query.
+         * 
+         * Note: This reduces the amount of work for the sub-query.
+         * 
+         * For EXISTS, this means that we stop if we find at least one solution.
+         * The askVar becomes bound to true. The IConstraint associated with the
+         * EXISTS FILTER will therefore evaluate to true.
+         * 
+         * For NOT EXISTS, this means that we stop if we find at least one
+         * solution. The askVar becomes bound to true (this is the same as for
+         * EXISTS). The IConstraint associated with the NOT EXISTS FILTER will
+         * therefore evaluate to false since it tests !askVar.
+         */
+        subqueryRoot.setSlice(new SliceNode(0L/* offset */, 1L/* limit */));
+        
+        final PipelineOp subqueryPlan = convertQueryBase(null/* left */,
+                subqueryRoot, doneSet, ctx);
+
+        left = new SubqueryOp(leftOrEmpty(left),// SUBQUERY
+                new NV(Predicate.Annotations.BOP_ID, ctx.nextId()),//
+                new NV(SubqueryOp.Annotations.SUBQUERY, subqueryPlan),//
+                new NV(SubqueryOp.Annotations.JOIN_TYPE, JoinTypeEnum.Normal),//
+                new NV(SubqueryOp.Annotations.ASK_VAR, askVar),//
+                new NV(SubqueryOp.Annotations.SELECT, subqueryRoot.getProjection().getProjectionVars()),//
+                new NV(SubqueryOp.Annotations.CONSTRAINTS, joinConstraints),//
+                new NV(SubqueryOp.Annotations.IS_AGGREGATE, aggregate)//
+        );
+
+        /*
+         * For each filter which requires materialization steps, add the
+         * materializations steps to the pipeline and then add the filter to the
+         * pipeline.
+         */
+        left = addMaterializationSteps3(left, doneSet, needsMaterialization,
+                subqueryRoot.getQueryHints(), ctx);
+
+        return left;
+
+    }
 
     /**
      * Generate the query plan for a join group or union. This is invoked for

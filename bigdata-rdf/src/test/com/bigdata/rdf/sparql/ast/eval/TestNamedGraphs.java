@@ -35,7 +35,6 @@ import com.bigdata.rdf.internal.IV;
  * Test suite for named and default graph stuff.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class TestNamedGraphs extends AbstractDataDrivenSPARQLTestCase {
 
