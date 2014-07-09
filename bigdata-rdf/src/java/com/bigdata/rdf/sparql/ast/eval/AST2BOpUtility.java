@@ -103,6 +103,7 @@ import com.bigdata.rdf.sparql.ast.AssignmentNode;
 import com.bigdata.rdf.sparql.ast.ComputedMaterializationRequirement;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
 import com.bigdata.rdf.sparql.ast.DatasetNode;
+import com.bigdata.rdf.sparql.ast.FilterExistsModeEnum;
 import com.bigdata.rdf.sparql.ast.FilterNode;
 import com.bigdata.rdf.sparql.ast.FunctionNode;
 import com.bigdata.rdf.sparql.ast.FunctionRegistry;
@@ -1839,12 +1840,19 @@ public class AST2BOpUtility extends AST2BOpRTO {
             final SubqueryRoot subqueryRoot, final Set<IVariable<?>> doneSet,
             final AST2BOpContext ctx) {
 
-        if (true) { // TODO Add query hint to allow choice of strategy.
+        final FilterExistsModeEnum filterExistsMode = subqueryRoot
+                .getFilterExistsMode();
+
+        switch (filterExistsMode) {
+        case VectoredSubPlan:
             // Vectored sub-plan evaluation.
             return addExistsSubqueryFast(left, subqueryRoot, doneSet, ctx);
-        } else {
+        case SubQueryLimitOne:
             // Non-vectored sub-query evaluation.
             return addExistsSubquerySubquery(left, subqueryRoot, doneSet, ctx);
+        default:
+            throw new UnsupportedOperationException(QueryHints.FILTER_EXISTS
+                    + "=" + filterExistsMode);
         }
         
     }

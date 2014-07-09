@@ -30,14 +30,11 @@ package com.bigdata.rdf.sparql.ast;
 import java.util.Map;
 
 import com.bigdata.bop.BOp;
-import com.bigdata.bop.ModifiableBOpBase;
 
 /**
  * Anything which can appear in an {@link IGroupNode}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id: GroupMemberNodeBase.java 5174 2011-09-11 20:18:18Z thompsonbry
- *          $
  */
 abstract public class GroupMemberNodeBase<E extends IGroupMemberNode> extends
         QueryNodeBase implements IGroupMemberNode {
@@ -50,12 +47,14 @@ abstract public class GroupMemberNodeBase<E extends IGroupMemberNode> extends
     
     private IGroupNode<IGroupMemberNode> parent;
 
+    @Override
     final public IGroupNode<IGroupMemberNode> getParent() {
 
         return parent;
 
     }
 
+    @Override
     final public void setParent(final IGroupNode<IGroupMemberNode> parent) {
 
         this.parent = parent;
@@ -83,6 +82,7 @@ abstract public class GroupMemberNodeBase<E extends IGroupMemberNode> extends
 
     }
 
+    @Override
     public TermNode getContext() {
     
         final IQueryNode parent = getParent();
@@ -104,6 +104,7 @@ abstract public class GroupMemberNodeBase<E extends IGroupMemberNode> extends
     
     }
 
+    @Override
     public JoinGroupNode getParentJoinGroup() {
 
         IGroupNode<?> parent = getParent();
@@ -121,6 +122,7 @@ abstract public class GroupMemberNodeBase<E extends IGroupMemberNode> extends
 
     }
 
+    @Override
     @SuppressWarnings("unchecked")
     public GraphPatternGroup<IGroupMemberNode> getParentGraphPatternGroup() {
         

@@ -29,6 +29,7 @@ package com.bigdata.rdf.sparql.ast.eval;
 
 import java.util.Collections;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 import org.openrdf.model.vocabulary.RDF;
 
@@ -43,6 +44,7 @@ import com.bigdata.rdf.sparql.ast.GlobalAnnotations;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.NotExistsNode;
 import com.bigdata.rdf.sparql.ast.ProjectionNode;
+import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryType;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
@@ -575,6 +577,7 @@ public class TestNegation extends AbstractDataDrivenSPARQLTestCase {
                 }
                 
                 notExistsSubquery2.setAskVar(askVar2.getValueExpression());
+                notExistsSubquery2.setFilterExistsMode(QueryHints.DEFAULT_FILTER_EXISTS);
 
             } // not-exists-2
 
@@ -664,6 +667,7 @@ public class TestNegation extends AbstractDataDrivenSPARQLTestCase {
                     }
                     
                     notExistsSubquery1.setAskVar(askVar1.getValueExpression());
+                    notExistsSubquery1.setFilterExistsMode(QueryHints.DEFAULT_FILTER_EXISTS);
        
                 } // not-exists-1
 
@@ -849,6 +853,8 @@ public class TestNegation extends AbstractDataDrivenSPARQLTestCase {
      * performance for FILTER EXISTS </a>
      */
     public void test_exists_988b() throws Exception {
+
+        final long beginNanos = System.nanoTime();
         
         new TestHelper(
                 "exists-988b", // testURI,
@@ -859,6 +865,16 @@ public class TestNegation extends AbstractDataDrivenSPARQLTestCase {
 //                true // checkOrder
                 ).runTest();
 
+        final long elapsedNanos = System.nanoTime() - beginNanos;
+        
+        final long timeoutNanos = TimeUnit.MILLISECONDS.toNanos(1500);
+
+        if (timeoutNanos < elapsedNanos) {
+
+            fail("Timeout exceeded: Query hint not recognized?");
+            
+        }
+        
     }
     
 }

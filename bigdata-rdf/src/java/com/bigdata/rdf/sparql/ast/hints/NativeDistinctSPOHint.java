@@ -30,6 +30,7 @@ package com.bigdata.rdf.sparql.ast.hints;
 import com.bigdata.bop.rdf.filter.NativeDistinctFilter;
 import com.bigdata.rdf.sparql.ast.ASTBase;
 import com.bigdata.rdf.sparql.ast.QueryHints;
+import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 
 /**
@@ -44,6 +45,7 @@ final class NativeDistinctSPOHint extends AbstractBooleanQueryHint {
 
     @Override
     public void handle(final AST2BOpContext context,
+            final QueryRoot queryRoot,
             final QueryHintScope scope, final ASTBase op, final Boolean value) {
 
         if (scope == QueryHintScope.Query) {

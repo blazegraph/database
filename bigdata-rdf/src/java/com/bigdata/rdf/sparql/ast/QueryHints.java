@@ -56,7 +56,6 @@ import com.bigdata.rdf.sparql.ast.optimizers.ASTStaticJoinOptimizer;
  * @see QueryHintRegistry
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  * 
  * @see <a href="http://sourceforge.net/apps/trac/bigdata/ticket/791" > Clean up
  *      query hints </a>
@@ -550,5 +549,22 @@ public interface QueryHints {
      * @see Annotations#CUTOFF_LIMIT
      */
     String CUTOFF_LIMIT = "cutoffLimit";
-        
+ 
+    /**
+     * Used to specify the query plan for FILTER (NOT) EXISTS. There are two
+     * basic plans: vectored sub-plan and subquery with LIMIT ONE. Each plan has
+     * its advantages.
+     * 
+     * @see FilterExistsModeEnum
+     * @see <a href="http://trac.bigdata.com/ticket/988"> bad performance for
+     *      FILTER EXISTS </a>
+     */
+    String FILTER_EXISTS = "filterExists";
+
+    /**
+     * Note: The historical behavior up through bigdata release 1.3.1 is
+     * {@link FilterExistsModeEnum#VectoredSubPlan}.
+     */
+    FilterExistsModeEnum DEFAULT_FILTER_EXISTS = FilterExistsModeEnum.VectoredSubPlan;
+
 }

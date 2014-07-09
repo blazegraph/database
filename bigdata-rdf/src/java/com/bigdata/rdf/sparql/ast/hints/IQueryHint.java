@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sparql.ast.hints;
 
 import com.bigdata.rdf.sparql.ast.ASTBase;
+import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 
 /**
@@ -79,13 +80,22 @@ public interface IQueryHint<T> {
      * 
      * @param ctx
      *            The query evaluation context.
+     * @param queryRoot
+     *            The root of the query. This is required to resolve the parent
+     *            of a query hint inside of a FILTER.
      * @param scope
      *            The {@link QueryHintScope} specified for the query hint.
      * @param op
      *            An AST node to which the hint should bind.
      * @param value
      *            The value specified for the query hint.
+     * 
+     * @see <a href="http://trac.bigdata.com/ticket/988"> bad performance for
+     *      FILTER EXISTS </a>
+     * @see <a href="http://trac.bigdata.com/ticket/990"> Query hint not
+     *      recognized in FILTER</a>
      */
-    void handle(AST2BOpContext ctx, QueryHintScope scope, ASTBase op, T value);
+    void handle(AST2BOpContext ctx, QueryRoot queryRoot, QueryHintScope scope,
+            ASTBase op, T value);
 
 }
