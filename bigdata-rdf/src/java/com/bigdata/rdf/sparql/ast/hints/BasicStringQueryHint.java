@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sparql.ast.hints;
 
 import com.bigdata.rdf.sparql.ast.ASTBase;
+import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 
 /**
@@ -40,7 +41,7 @@ public class BasicStringQueryHint extends AbstractStringQueryHint {
     }
 
     @Override
-    public void handle(final AST2BOpContext context,
+    public void handle(final AST2BOpContext context, final QueryRoot queryRoot,
             final QueryHintScope scope, final ASTBase op, final String value) {
 
         _setQueryHint(context, scope, op, getName(), value);

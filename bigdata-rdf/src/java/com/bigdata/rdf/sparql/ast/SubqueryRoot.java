@@ -29,6 +29,7 @@ import java.util.Map;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IVariable;
+import com.bigdata.rdf.sparql.ast.SubqueryFunctionNodeBase.Annotations;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTSparql11SubqueryOptimizer;
 
 /**
@@ -60,6 +61,24 @@ public class SubqueryRoot extends SubqueryBase implements IJoinNode {
          */
         String ASK_VAR = "askVar";
         
+        /**
+         * Used to specify the query plan for FILTER (NOT) EXISTS. There are two
+         * basic plans: vectored sub-plan and subquery with LIMIT ONE. Each plan
+         * has its advantages.
+         * <p>
+         * Note: This annotation is propagated to the {@link SubqueryRoot} when
+         * the FILTER (NOT) EXISTS for a {@link SubqueryFunctionNodeBase} is
+         * turned into an ASK subquery.
+         * 
+         * @see SubqueryFunctionNodeBase
+         * @see FilterExistsModeEnum
+         * @see <a href="http://trac.bigdata.com/ticket/988"> bad performance
+         *      for FILTER EXISTS </a>
+         */
+        String FILTER_EXISTS = QueryHints.FILTER_EXISTS;
+        
+        FilterExistsModeEnum DEFAULT_FILTER_EXISTS = QueryHints.DEFAULT_FILTER_EXISTS;
+
     }
     
     /**
@@ -133,6 +152,26 @@ public class SubqueryRoot extends SubqueryBase implements IJoinNode {
         
         return (IVariable<?>) getProperty(Annotations.ASK_VAR);
         
+    }
+
+    /**
+     * 
+     * @see Annotations#FILTER_EXISTS
+     */
+    public void setFilterExistsMode(final FilterExistsModeEnum newVal) {
+
+        setProperty(Annotations.FILTER_EXISTS, newVal);
+        
+    }
+    
+    /**
+     * @see Annotations#FILTER_EXISTS
+     */
+    public FilterExistsModeEnum getFilterExistsMode() {
+
+        return getProperty(Annotations.FILTER_EXISTS,
+                Annotations.DEFAULT_FILTER_EXISTS);
+
     }
 
     /**
