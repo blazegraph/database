@@ -912,7 +912,7 @@ public class TestNegation extends AbstractDataDrivenSPARQLTestCase {
 
         final long elapsedNanos = System.nanoTime() - beginNanos;
         
-        final long timeoutNanos = TimeUnit.MILLISECONDS.toNanos(1500);
+        final long timeoutNanos = TimeUnit.MILLISECONDS.toNanos(2500);
 
         if (timeoutNanos < elapsedNanos) {
 
