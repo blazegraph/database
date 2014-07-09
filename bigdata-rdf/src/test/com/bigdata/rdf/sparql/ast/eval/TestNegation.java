@@ -921,4 +921,50 @@ public class TestNegation extends AbstractDataDrivenSPARQLTestCase {
         }
         
     }
+    /**
+     * Performance related test for EXISTS.
+     * 
+     * <pre>
+     * prefix eg: <eg:>
+     * SELET DISTINCT ?a
+     * FROM eg:g
+     * { { BIND( eg:d as ?a ) }
+     *   UNION
+     *   { BIND ( eg:z as ?a ) }
+     *   FILTER EXISTS {
+     *     ?a eg:p/eg:p/eg:p/eg:p/eg:p/eg:p/eg:p/eg:p ?b
+     *  }
+     * }
+     * 
+     * <pre>
+     * 
+     * @throws Exception 
+     * 
+     * @see <a href="http://trac.bigdata.com/ticket/988"> bad
+     * performance for FILTER EXISTS </a>
+     */
+    public void test_exists_988d() throws Exception {
+
+        final long beginNanos = System.nanoTime();
+        
+        new TestHelper(
+                "exists-988d", // testURI,
+                "exists-988d.rq",// queryFileURL
+                "exists-988.trig",// dataFileURL
+                "exists-988d.srx" // resultFileURL,
+//                false, // laxCardinality
+//                true // checkOrder
+                ).runTest();
+
+        final long elapsedNanos = System.nanoTime() - beginNanos;
+        
+        final long timeoutNanos = TimeUnit.MILLISECONDS.toNanos(1500);
+
+        if (timeoutNanos < elapsedNanos) {
+
+            fail("Timeout exceeded: Query hint not recognized?");
+            
+        }
+        
+    }
 }
