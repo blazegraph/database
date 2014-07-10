@@ -1,0 +1,11 @@
+PREFIX bsq:  <http://www.bigdata.com/rdf/stored-query#>
+PREFIX : <http://example.org/book/>
+
+SELECT ?book ?title ?price
+{
+   SERVICE <http://www.bigdata.com/rdf/stored-query#test_stored_query_001> {
+   }
+} 
+BINDINGS ?book {
+      (:book1)
+}

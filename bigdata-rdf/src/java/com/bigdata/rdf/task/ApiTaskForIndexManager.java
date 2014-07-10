@@ -22,7 +22,7 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 */
-package com.bigdata.rdf.sail.webapp;
+package com.bigdata.rdf.task;
 
 import java.util.concurrent.Callable;
 
@@ -41,13 +41,13 @@ import com.bigdata.service.IBigdataFederation;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @param <T>
  */
-public class RestApiTaskForIndexManager<T> implements Callable<T> {
+public class ApiTaskForIndexManager<T> implements Callable<T> {
 
     private final IIndexManager indexManager;
-    private final RestApiTask<T> delegate;
+    private final AbstractApiTask<T> delegate;
 
-    public RestApiTaskForIndexManager(final IIndexManager indexManager,
-            final RestApiTask<T> delegate) {
+    public ApiTaskForIndexManager(final IIndexManager indexManager,
+            final AbstractApiTask<T> delegate) {
 
         this.indexManager = indexManager;
         this.delegate = delegate;

@@ -48,8 +48,8 @@ import org.openrdf.sail.SailException;
 import com.bigdata.journal.ITx;
 import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
+import com.bigdata.rdf.sail.webapp.AbstractRestApiTask.RestApiMutationTask;
 import com.bigdata.rdf.sail.webapp.BigdataRDFContext.AbstractQueryTask;
-import com.bigdata.rdf.sail.webapp.RestApiTask.RestApiMutationTask;
 import com.bigdata.rdf.sail.webapp.client.EncodeDecodeValue;
 import com.bigdata.rdf.sail.webapp.client.MiniMime;
 
