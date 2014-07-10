@@ -29,7 +29,6 @@ import java.util.concurrent.Future;
 import org.apache.log4j.Logger;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.QueryEvaluationException;
-import org.openrdf.query.QueryLanguage;
 import org.openrdf.query.TupleQueryResult;
 
 import com.bigdata.rdf.internal.IV;
@@ -55,7 +54,8 @@ import cutthecrap.utils.striterators.ICloseableIterator;
  * a SPARQL query or arbitrary procedural application logic, but it must
  * evaluate to a solution multi-set. The service interface is written to the
  * openrdf interfaces in order to remove the burden of dealing with bigdata
- * {@link IV}s from the application.
+ * {@link IV}s from the application. The effective value of the baseURI during
+ * query evaluation will be the SERVICE URI.
  * <p>
  * In order to use a stored query, a concrete instance of this class must be
  * registered against the {@link ServiceRegistry}:
@@ -105,8 +105,6 @@ import cutthecrap.utils.striterators.ICloseableIterator;
  * 
  *      TODO Implicit prefix declaration for bsq.
  * 
- *      TODO Reconcile with the REST API (group commit task pattern).
- * 
  *      TODO Why does this work?
  * 
  *      <pre>
@@ -129,21 +127,13 @@ import cutthecrap.utils.striterators.ICloseableIterator;
  * }
  * </pre>
  * 
- *      TODO Example
+ *      TODO We could use {@link ASTEvalHelper} to evaluate at the bigdata level
+ *      without forcing the materialization of any variable bindings from the
+ *      lexicon indices. This would be faster for some purposes, especially if
+ *      the stored procedure is only used to JOIN into an outer query as in
+ *      <code>SELECT * { SERVICE bsq:my-service {} }</code>
  * 
- *      <pre>
- * PREFIX bsq: <http://www.bigdata.com/rdf/stored-query#>
- * #...
- * SERVICE &lt;bsq#my-service&gt; {
- *    bsq:queryParam bsq:gasClass "com.bigdata.rdf.graph.analytics.BFS" .
- *    gas:program gas:in &lt;IRI&gt; . # one or more times, specifies the initial frontier.
- *    gas:program gas:out ?out . # exactly once - will be bound to the visited vertices.
- *    gas:program gas:maxIterations 4 . # optional limit on breadth first expansion.
- *    gas:program gas:maxVisited 2000 . # optional limit on the #of visited vertices.
- *    gas:program gas:nthreads 4 . # specify the #of threads to use (optional)
- * }
- * </pre>
- * 
+ *      FIXME Generalize to support groovy scripting.
  */
 abstract public class StoredQueryService implements ServiceFactory {
 
@@ -164,12 +154,6 @@ abstract public class StoredQueryService implements ServiceFactory {
     public StoredQueryService() {
 
         serviceOptions = new OpenrdfNativeServiceOptions();
-        
-//        /*
-//         * TODO This should probably be metadata set for each specific
-//         * stored query.
-//         */
-//        serviceOptions.setRunFirst(true);
         
     }
 
@@ -196,10 +180,11 @@ abstract public class StoredQueryService implements ServiceFactory {
         if (serviceNode == null)
             throw new IllegalArgumentException();
 
-        final ServiceParams serviceParams = ServiceParams.gatherServiceParams(params);
-        
+        final ServiceParams serviceParams = ServiceParams
+                .gatherServiceParams(params);
+
         return create(params, serviceParams);
-        
+
     }
 
     public ExternalServiceCall create(
@@ -214,14 +199,28 @@ abstract public class StoredQueryService implements ServiceFactory {
         return new StoredQueryServiceCall(createParams, serviceParams);
 
     }
-    
-    /**
-     * Return the SPARQL query to be evaluated.
-     */
-    abstract protected String getQuery(
-            final ServiceCallCreateParams createParams,
-            final ServiceParams serviceParams);
 
+    /**
+     * Abstract method for core application logic. The implementation may
+     * execute a SPARQL query, or a series or SPARQL or other operations under
+     * application control.
+     * 
+     * @param cxn
+     *            The connection that should be used to read on the SPARQL
+     *            database.
+     * @param createParams
+     *            The SERVICE creation parameters.
+     * @param serviceParams
+     *            The SERVICE invocation parameters.
+     * @return The solution multi-set.
+     * 
+     * @throws Exception
+     */
+    abstract protected TupleQueryResult doQuery(
+            final BigdataSailRepositoryConnection cxn,
+            final ServiceCallCreateParams createParams,
+            final ServiceParams serviceParams) throws Exception;
+    
     private class StoredQueryServiceCall implements ExternalServiceCall {
 
         private final ServiceCallCreateParams createParams;
@@ -244,27 +243,14 @@ abstract public class StoredQueryService implements ServiceFactory {
 
         @Override
         public IServiceOptions getServiceOptions() {
-            
+
             return createParams.getServiceOptions();
-            
+
         }
 
-        /**
-         * TODO We could use {@link ASTEvalHelper} to evaluate at the bigdata
-         * level without forcing the materialization of any variable bindings
-         * from the lexicon indices. This would be faster for some purposes,
-         * especially if the stored procedure is only used to JOIN into an outer
-         * query as in <code>SELECT * { SERVICE bsq:my-service {} }</code>
-         * 
-         * FIXME Generalize to allow arbitrary application logic that has easy
-         * methods permitting it to invoke multiple queries and operate on the
-         * results.
-         * 
-         * FIXME Generalize to support groovy scripting.
-         */
         @Override
-        public ICloseableIterator<BindingSet> call(final BindingSet[] bindingSets)
-                throws Exception {
+        public ICloseableIterator<BindingSet> call(
+                final BindingSet[] bindingSets) throws Exception {
 
             if (log.isInfoEnabled()) {
                 log.info(bindingSets.length);
@@ -272,122 +258,102 @@ abstract public class StoredQueryService implements ServiceFactory {
                 log.info(serviceParams);
             }
 
-            final String queryStr = getQuery(createParams, serviceParams);
-            
-            // TODO Should the baseURI be the SERVICE URI?  Decide and document.
-            final String baseURI = createParams.getServiceURI().stringValue();
-            
-            final AbstractTripleStore tripleStore = createParams.getTripleStore();
-            
+            final AbstractTripleStore tripleStore = createParams
+                    .getTripleStore();
+
             final Future<TupleQueryResult> ft = AbstractApiTask.submitApiTask(
                     tripleStore.getIndexManager(),
-                    new SparqlApiTask(tripleStore.getNamespace(), tripleStore
-                            .getTimestamp(), queryStr, baseURI, bindingSets));
+                    new StoredQueryTask(tripleStore.getNamespace(), tripleStore
+                            .getTimestamp(), bindingSets));
 
             try {
 
                 final TupleQueryResult tupleQueryResult = ft.get();
-                
+
                 return new Sesame2BigdataIterator<BindingSet, QueryEvaluationException>(
                         tupleQueryResult);
-                
+
             } finally {
-            
+
                 ft.cancel(true/* mayInterruptIfRunning */);
-                
+
             }
 
         }
 
-    } // StoredQueryServiceCall
-
-    /**
-     * Task to execute a SPARQL query.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
-     *         Thompson</a>
-     */
-    private static class SparqlApiTask extends
-            AbstractApiTask<TupleQueryResult> {
-
-        private final String queryStr;
-        private final String baseURI;
-
         /**
+         * Task to execute the stored query.
          * 
-         * FIXME This is ignoring the exogenous bindings. This is more or less
-         * equivalent to bottom-up evaluation. It would be more efficient if we
-         * could flow in the exogenous bindings but this is not supported before
-         * openrdf 2.7 (we hack this in {@link BigdataSailTupleQuery}).
+         * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+         *         Thompson</a>
          */
-        private final BindingSet[] bindingSets;
+        private class StoredQueryTask extends AbstractApiTask<TupleQueryResult> {
 
-        public SparqlApiTask(final String namespace, final long timestamp,
-                final String queryStr, final String baseURI,
-                final BindingSet[] bindingSets) {
+            /**
+             * 
+             * FIXME This is ignoring the exogenous bindings. This is more or
+             * less equivalent to bottom-up evaluation. It would be more
+             * efficient if we could flow in the exogenous bindings but this is
+             * not supported before openrdf 2.7 (we hack this in
+             * {@link BigdataSailTupleQuery}).
+             */
+            private final BindingSet[] bindingSets;
 
-            super(namespace, timestamp);
+            public StoredQueryTask(final String namespace,
+                    final long timestamp, final BindingSet[] bindingSets) {
 
-            this.queryStr = queryStr;
-            this.baseURI = baseURI;
-            this.bindingSets = bindingSets;
+                super(namespace, timestamp);
 
-        }
+                this.bindingSets = bindingSets;
 
-        @Override
-        public TupleQueryResult call() throws Exception {
-            BigdataSailRepositoryConnection cxn = null;
-            boolean success = false;
-            try {
-                // Note: Will be UPDATE connection if UPDATE request!!!
-                cxn = getQueryConnection();
-                if (log.isTraceEnabled())
-                    log.trace("Query running...");
-                final TupleQueryResult ret = doQuery(cxn);
-                success = true;
-                if (log.isTraceEnabled())
-                    log.trace("Query done.");
-                return ret;
-            } finally {
-                if (cxn != null) {
-                    if (!success && !cxn.isReadOnly()) {
-                        /*
-                         * Force rollback of the connection.
-                         * 
-                         * Note: It is possible that the commit has already
-                         * been processed, in which case this rollback()
-                         * will be a NOP. This can happen when there is an
-                         * IO error when communicating with the client, but
-                         * the database has already gone through a commit.
-                         */
+            }
+
+            @Override
+            public TupleQueryResult call() throws Exception {
+                BigdataSailRepositoryConnection cxn = null;
+                boolean success = false;
+                try {
+                    // Note: Will be UPDATE connection if UPDATE request!!!
+                    cxn = getQueryConnection();
+                    if (log.isTraceEnabled())
+                        log.trace("Query running...");
+                    final TupleQueryResult ret = doQuery(cxn, createParams,
+                            serviceParams);
+                    success = true;
+                    if (log.isTraceEnabled())
+                        log.trace("Query done.");
+                    return ret;
+                } finally {
+                    if (cxn != null) {
+                        if (!success && !cxn.isReadOnly()) {
+                            /*
+                             * Force rollback of the connection.
+                             * 
+                             * Note: It is possible that the commit has already
+                             * been processed, in which case this rollback()
+                             * will be a NOP. This can happen when there is an
+                             * IO error when communicating with the client, but
+                             * the database has already gone through a commit.
+                             */
+                            try {
+                                // Force rollback of the connection.
+                                cxn.rollback();
+                            } catch (Throwable t) {
+                                log.error(t, t);
+                            }
+                        }
                         try {
-                            // Force rollback of the connection.
-                            cxn.rollback();
+                            // Force close of the connection.
+                            cxn.close();
                         } catch (Throwable t) {
                             log.error(t, t);
                         }
                     }
-                    try {
-                        // Force close of the connection.
-                        cxn.close();
-                    } catch (Throwable t) {
-                        log.error(t, t);
-                    }
                 }
             }
-        }
 
-        protected TupleQueryResult doQuery(
-                final BigdataSailRepositoryConnection cxn) throws Exception {
+        } // StoredQueryApiTask
 
-            final BigdataSailTupleQuery query = (BigdataSailTupleQuery) cxn
-                    .prepareTupleQuery(QueryLanguage.SPARQL, queryStr,
-                            baseURI);
+    } // StoredQueryServiceCall
 
-            return query.evaluate();
-
-        }
-
-    } // SparqlApiTask
-
-}
+} // StoredQueryService
