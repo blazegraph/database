@@ -35,7 +35,7 @@ import org.openrdf.model.impl.URIImpl;
 import org.openrdf.model.vocabulary.SESAME;
 
 import com.bigdata.rdf.sparql.ast.cache.DescribeServiceFactory;
-import com.bigdata.rdf.sparql.ast.eval.AbstractServiceFactory;
+import com.bigdata.rdf.sparql.ast.eval.ServiceParams;
 
 
 /**
@@ -177,10 +177,21 @@ public interface BD {
 //    URI ATOMIC_UPDATE_SEPARATOR_KEY = new URIImpl(NAMESPACE + "atomicUpdateSeparatorKey");
     
     /**
-     * URI that can be used as the subject of any magic triple patterns for 
-     * bigdata services.
+     * URI that can be used as the Subject of magic triple patterns for bigdata
+     * SERVICEs. There may be zero or more such triple patterns. The Predicate
+     * (key) and Object (val) positions for those triple patterns are extracted
+     * into a {@link ServiceParams} object. For each key, there may be one or
+     * more values.
      * 
-     * @see {@link AbstractServiceFactory}.
+     * <pre>
+     * SERVICE <uri> {
+     *   bd:serviceParam :key1 :val1 .
+     *   bd:serviceParam :key1 :val2 .
+     *   bd:serviceParam :key2 :val3 .
+     * }
+     * </pre>
+     * 
+     * @see ServiceParams.
      */
     URI SERVICE_PARAM = new URIImpl(NAMESPACE + "serviceParam");
     

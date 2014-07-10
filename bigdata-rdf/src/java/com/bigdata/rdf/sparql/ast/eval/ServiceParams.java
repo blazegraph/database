@@ -47,8 +47,20 @@ import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BD;
 
 /**
- * The service parameters.  Can be multi-valued.  Map from predicate to
- * one or more {@link TermNode} values.
+ * Helper class for parsing an extracting SERVICE parameters. The SERVICE group
+ * graph pattern should consist of zero or triples whose Subject is
+ * {@link BD#SERVICE_PARAM}. There may be zero or more such triple patterns. The
+ * Predicate (key) and Object (val) positions for those triple patterns are
+ * extracted into a {@link ServiceParams} object. For each key, there may be one
+ * or more values.
+ * 
+ * <pre>
+ * SERVICE <uri> {
+ *   bd:serviceParam :key1 :val1 .
+ *   bd:serviceParam :key1 :val2 .
+ *   bd:serviceParam :key2 :val3 .
+ * }
+ * </pre>
  */
 public class ServiceParams {
 
