@@ -42,7 +42,6 @@ import com.bigdata.rdf.sparql.ast.eval.ServiceParams;
  * A vocabulary for bigdata specific extensions.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public interface BD {
 

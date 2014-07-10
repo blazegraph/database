@@ -60,6 +60,8 @@ public class TestStoredQueryService extends AbstractDataDrivenSPARQLTestCase {
         super(name);
     }
 
+    static private final String NAMESPACE = "http://www.bigdata.com/rdf/stored-query#";
+
     /**
      * Simple stored query test. Note that this test also verifies that the
      * BINDINGS flow into the stored query.
@@ -100,7 +102,7 @@ public class TestStoredQueryService extends AbstractDataDrivenSPARQLTestCase {
             
         }
         
-        final URI serviceURI = new URIImpl(StoredQueryService.Options.NAMESPACE + getName());
+        final URI serviceURI = new URIImpl( NAMESPACE + getName());
         try {
 
             // register the service.
@@ -167,7 +169,7 @@ public class TestStoredQueryService extends AbstractDataDrivenSPARQLTestCase {
             
         }
         
-        final URI serviceURI = new URIImpl(StoredQueryService.Options.NAMESPACE + getName());
+        final URI serviceURI = new URIImpl(NAMESPACE+ getName());
         try {
 
             // register the service.
@@ -244,7 +246,7 @@ public class TestStoredQueryService extends AbstractDataDrivenSPARQLTestCase {
             
         }
         
-        final URI serviceURI = new URIImpl(StoredQueryService.Options.NAMESPACE + getName());
+        final URI serviceURI = new URIImpl(NAMESPACE+ getName());
         try {
 
             // register the service.
