@@ -81,8 +81,7 @@ import cutthecrap.utils.striterators.ICloseableIterator;
  *   ...
  * }
  */
-public class ValuesServiceFactory extends AbstractServiceFactory 
-		implements ServiceFactory {
+public class ValuesServiceFactory extends AbstractServiceFactory {
 
     private static final Logger log = Logger
             .getLogger(ValuesServiceFactory.class);

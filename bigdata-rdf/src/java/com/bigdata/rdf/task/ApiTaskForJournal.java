@@ -22,7 +22,7 @@
  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
  */
-package com.bigdata.rdf.sail.webapp;
+package com.bigdata.rdf.task;
 
 import com.bigdata.journal.AbstractTask;
 import com.bigdata.journal.IConcurrencyManager;
@@ -39,13 +39,13 @@ import com.bigdata.journal.Journal;
  * @see <a href="- http://sourceforge.net/apps/trac/bigdata/ticket/566" >
  *      Concurrent unisolated operations against multiple KBs </a>
  */
-public class RestApiTaskForJournal<T> extends AbstractTask<T> {
+public class ApiTaskForJournal<T> extends AbstractTask<T> {
 
-    private final RestApiTask<T> delegate;
+    private final AbstractApiTask<T> delegate;
 
-    public RestApiTaskForJournal(final IConcurrencyManager concurrencyManager,
+    public ApiTaskForJournal(final IConcurrencyManager concurrencyManager,
             final long timestamp, final String[] resource,
-            final RestApiTask<T> delegate) {
+            final AbstractApiTask<T> delegate) {
 
         super(concurrencyManager, timestamp, resource);
 

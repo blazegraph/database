@@ -95,7 +95,7 @@ import com.bigdata.rdf.sail.BigdataSailUpdate;
 import com.bigdata.rdf.sail.ISPARQLUpdateListener;
 import com.bigdata.rdf.sail.SPARQLUpdateEvent;
 import com.bigdata.rdf.sail.sparql.Bigdata2ASTSPARQLParser;
-import com.bigdata.rdf.sail.webapp.RestApiTask.RestApiMutationTask;
+import com.bigdata.rdf.sail.webapp.AbstractRestApiTask.RestApiMutationTask;
 import com.bigdata.rdf.sail.webapp.client.StringUtil;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.QueryHints;
@@ -104,6 +104,7 @@ import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryType;
 import com.bigdata.rdf.sparql.ast.Update;
 import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.rdf.task.AbstractApiTask;
 import com.bigdata.relation.RelationSchema;
 import com.bigdata.sparse.ITPS;
 import com.bigdata.sparse.SparseRowStore;
@@ -369,7 +370,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
      * FIXME GROUP COMMIT: Shutdown should abort open transactions (including
      * queries and updates). This hould be addressed when we handle group commit
      * since that provides us with a means to recognize and interrupt each
-     * running {@link RestApiTask}.
+     * running {@link AbstractRestApiTask}.
      */
     void shutdownNow() {
 
@@ -1142,7 +1143,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
          * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
          *         Thompson</a>
          */
-        private class SparqlRestApiTask extends RestApiTask<Void> {
+        private class SparqlRestApiTask extends AbstractRestApiTask<Void> {
 
             public SparqlRestApiTask(final HttpServletRequest req,
                     final HttpServletResponse resp, final String namespace,
@@ -1240,7 +1241,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
             
             try {
                 
-                return BigdataServlet.submitApiTask(getIndexManager(),
+                return AbstractApiTask.submitApiTask(getIndexManager(),
                         new SparqlRestApiTask(req, resp, namespace, timestamp))
                         .get();
 
@@ -2231,7 +2232,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
      *         pre-condition tests is to provide nice HTTP status code responses
      *         when an identified namespace does (or does not) exist. The better
      *         way to handle this is by pushing the pre-condition test down into
-     *         the {@link RestApiTask} and then throwning out an appropriate
+     *         the {@link AbstractRestApiTask} and then throwning out an appropriate
      *         marked exception that gets correctly converted into an HTTP
      *         BAD_REQUEST message rather than sending back a stack trace.
      */

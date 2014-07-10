@@ -33,7 +33,7 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.blueprints.BigdataGraphBulkLoad;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
-import com.bigdata.rdf.sail.webapp.RestApiTask.RestApiMutationTask;
+import com.bigdata.rdf.sail.webapp.AbstractRestApiTask.RestApiMutationTask;
 import com.bigdata.rdf.sail.webapp.client.MiniMime;
 import com.tinkerpop.blueprints.util.io.graphml.GraphMLReader;
 

@@ -47,10 +47,10 @@ import org.openrdf.rio.RDFParserRegistry;
 
 import com.bigdata.journal.ITx;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
+import com.bigdata.rdf.sail.webapp.AbstractRestApiTask.RestApiMutationTask;
 import com.bigdata.rdf.sail.webapp.BigdataRDFContext.AbstractQueryTask;
 import com.bigdata.rdf.sail.webapp.DeleteServlet.RemoveStatementHandler;
 import com.bigdata.rdf.sail.webapp.InsertServlet.AddStatementHandler;
-import com.bigdata.rdf.sail.webapp.RestApiTask.RestApiMutationTask;
 import com.bigdata.rdf.sail.webapp.client.MiniMime;
 
 /**
