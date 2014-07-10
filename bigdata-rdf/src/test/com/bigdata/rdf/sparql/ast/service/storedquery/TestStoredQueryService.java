@@ -28,7 +28,11 @@ package com.bigdata.rdf.sparql.ast.service.storedquery;
 
 import org.openrdf.model.URI;
 import org.openrdf.model.impl.URIImpl;
+import org.openrdf.query.QueryLanguage;
+import org.openrdf.query.TupleQueryResult;
 
+import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
+import com.bigdata.rdf.sail.BigdataSailTupleQuery;
 import com.bigdata.rdf.sparql.ast.eval.AbstractDataDrivenSPARQLTestCase;
 import com.bigdata.rdf.sparql.ast.eval.ServiceParams;
 import com.bigdata.rdf.sparql.ast.service.ServiceCallCreateParams;
@@ -78,7 +82,7 @@ public class TestStoredQueryService extends AbstractDataDrivenSPARQLTestCase {
      */
     public void test_stored_query_001() throws Exception {
         
-        class MyStoredQueryService extends StoredQueryService {
+        class MyStoredQueryService extends SimpleStoredQueryService {
 
             @Override
             public String getQuery(final ServiceCallCreateParams createParams,
@@ -140,7 +144,7 @@ public class TestStoredQueryService extends AbstractDataDrivenSPARQLTestCase {
      */
     public void test_stored_query_002() throws Exception {
         
-        class MyStoredQueryService extends StoredQueryService {
+        class MyStoredQueryService extends SimpleStoredQueryService {
 
             @Override
             public String getQuery(final ServiceCallCreateParams createParams,
@@ -172,6 +176,83 @@ public class TestStoredQueryService extends AbstractDataDrivenSPARQLTestCase {
 
             final TestHelper h = new TestHelper("stored-query-002", // testURI,
                     "stored-query-002.rq",// queryFileURL
+                    "stored-query-001.ttl",// dataFileURL
+                    "stored-query-001.srx" // resultFileURL,
+                    // false, // laxCardinality
+                    // true // checkOrder
+            );
+
+            h.runTest();
+
+        } finally {
+            // unregister the service.
+            ServiceRegistry.getInstance().remove(serviceURI);
+        }
+
+    }
+
+    /**
+     * Complex stored query test like the above, but does not extend
+     * {@link SimpleStoredQueryService}.
+     * 
+     * <pre>
+     * PREFIX bsq:  <http://www.bigdata.com/rdf/stored-query#>
+     * PREFIX : <http://example.org/book/>
+     * 
+     * SELECT ?book ?title ?price
+     * {
+     *    SERVICE <http://www.bigdata.com/rdf/stored-query#test_stored_query_003> {
+     *        bd:serviceParam :book :book1
+     *    }
+     * }
+     * </pre>
+     * 
+     * @throws Exception
+     */
+    public void test_stored_query_003() throws Exception {
+        
+        class MyStoredQueryService extends StoredQueryService {
+
+            @Override
+            protected TupleQueryResult doQuery(
+                    BigdataSailRepositoryConnection cxn,
+                    ServiceCallCreateParams createParams,
+                    ServiceParams serviceParams) throws Exception {
+
+                final URI val = serviceParams.getAsURI(new URIImpl(
+                        "http://example.org/book/book"));
+
+                final StringBuilder sb = new StringBuilder();
+                sb.append("PREFIX dc:   <http://purl.org/dc/elements/1.1/> \n");
+                sb.append("PREFIX :     <http://example.org/book/> \n");
+                sb.append("PREFIX ns:   <http://example.org/ns#> \n");
+                sb.append("SELECT ?book ?title ?price { \n");
+                sb.append("  BIND( <"+val.stringValue()+"> as ?book ) . \n");
+                sb.append("  ?book dc:title ?title ; \n");
+                sb.append("  ns:price ?price . \n");
+                sb.append("} \n");
+
+                final String queryStr = sb.toString();
+
+                final String baseURI = createParams.getServiceURI().stringValue();
+
+                final BigdataSailTupleQuery query = (BigdataSailTupleQuery) cxn
+                        .prepareTupleQuery(QueryLanguage.SPARQL, queryStr, baseURI);
+
+                return query.evaluate();
+            }
+            
+        }
+        
+        final URI serviceURI = new URIImpl(StoredQueryService.Options.NAMESPACE + getName());
+        try {
+
+            // register the service.
+            ServiceRegistry.getInstance().add(serviceURI,
+                    new MyStoredQueryService());
+
+            final TestHelper h = new TestHelper("stored-query-003", // testURI,
+                    "stored-query-003.rq",// queryFileURL
                     "stored-query-001.ttl",// dataFileURL
                     "stored-query-001.srx" // resultFileURL,
                     // false, // laxCardinality
