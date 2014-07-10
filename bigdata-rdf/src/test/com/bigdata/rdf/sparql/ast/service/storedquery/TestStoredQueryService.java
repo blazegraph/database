@@ -30,6 +30,8 @@ import org.openrdf.model.URI;
 import org.openrdf.model.impl.URIImpl;
 
 import com.bigdata.rdf.sparql.ast.eval.AbstractDataDrivenSPARQLTestCase;
+import com.bigdata.rdf.sparql.ast.eval.ServiceParams;
+import com.bigdata.rdf.sparql.ast.service.ServiceCallCreateParams;
 import com.bigdata.rdf.sparql.ast.service.ServiceRegistry;
 
 /**
@@ -76,6 +78,24 @@ public class TestStoredQueryService extends AbstractDataDrivenSPARQLTestCase {
      */
     public void test_stored_query_001() throws Exception {
         
+        class MyStoredQueryService extends StoredQueryService {
+
+            @Override
+            public String getQuery(final ServiceCallCreateParams createParams,
+                    final ServiceParams serviceParams) {
+                final StringBuilder sb = new StringBuilder();
+                sb.append("PREFIX dc:   <http://purl.org/dc/elements/1.1/> \n");
+                sb.append("PREFIX :     <http://example.org/book/> \n");
+                sb.append("PREFIX ns:   <http://example.org/ns#> \n");
+                sb.append("SELECT ?book ?title ?price { \n");
+                sb.append("  ?book dc:title ?title ; \n");
+                sb.append("  ns:price ?price . \n");
+                sb.append("} \n");
+                return sb.toString();
+            }
+            
+        }
+        
         final URI serviceURI = new URIImpl(StoredQueryService.Options.NAMESPACE + getName());
         try {
 
@@ -100,21 +120,71 @@ public class TestStoredQueryService extends AbstractDataDrivenSPARQLTestCase {
 
     }
 
-    private static class MyStoredQueryService extends StoredQueryService {
+    /**
+     * Simple stored query test verifies that the stored query has access to the
+     * {@link ServiceParams}.
+     * 
+     * <pre>
+     * PREFIX bsq:  <http://www.bigdata.com/rdf/stored-query#>
+     * PREFIX : <http://example.org/book/>
+     * 
+     * SELECT ?book ?title ?price
+     * {
+     *    SERVICE <http://www.bigdata.com/rdf/stored-query#test_stored_query_002> {
+     *        bd:serviceParam :book :book1
+     *    }
+     * } 
+     * </pre>
+     * 
+     * @throws Exception
+     */
+    public void test_stored_query_002() throws Exception {
+        
+        class MyStoredQueryService extends StoredQueryService {
 
-        @Override
-        public String getQuery() {
-            final StringBuilder sb = new StringBuilder();
-            sb.append("PREFIX dc:   <http://purl.org/dc/elements/1.1/> \n");
-            sb.append("PREFIX :     <http://example.org/book/> \n");
-            sb.append("PREFIX ns:   <http://example.org/ns#> \n");
-            sb.append("SELECT ?book ?title ?price { \n");
-            sb.append("  ?book dc:title ?title ; \n");
-            sb.append("  ns:price ?price . \n");
-            sb.append("} \n");
-            return sb.toString();
+            @Override
+            public String getQuery(final ServiceCallCreateParams createParams,
+                    final ServiceParams serviceParams) {
+                
+                final URI val = serviceParams.getAsURI(new URIImpl(
+                        "http://example.org/book/book"));
+
+                final StringBuilder sb = new StringBuilder();
+                sb.append("PREFIX dc:   <http://purl.org/dc/elements/1.1/> \n");
+                sb.append("PREFIX :     <http://example.org/book/> \n");
+                sb.append("PREFIX ns:   <http://example.org/ns#> \n");
+                sb.append("SELECT ?book ?title ?price { \n");
+                sb.append("  BIND( <"+val.stringValue()+"> as ?book ) . \n");
+                sb.append("  ?book dc:title ?title ; \n");
+                sb.append("  ns:price ?price . \n");
+                sb.append("} \n");
+                return sb.toString();
+            }
+            
         }
         
+        final URI serviceURI = new URIImpl(StoredQueryService.Options.NAMESPACE + getName());
+        try {
+
+            // register the service.
+            ServiceRegistry.getInstance().add(serviceURI,
+                    new MyStoredQueryService());
+
+            final TestHelper h = new TestHelper("stored-query-002", // testURI,
+                    "stored-query-002.rq",// queryFileURL
+                    "stored-query-001.ttl",// dataFileURL
+                    "stored-query-001.srx" // resultFileURL,
+                    // false, // laxCardinality
+                    // true // checkOrder
+            );
+
+            h.runTest();
+
+        } finally {
+            // unregister the service.
+            ServiceRegistry.getInstance().remove(serviceURI);
+        }
+
     }
-    
+
 }

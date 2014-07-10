@@ -32,24 +32,70 @@ import org.openrdf.query.QueryEvaluationException;
 import org.openrdf.query.QueryLanguage;
 import org.openrdf.query.TupleQueryResult;
 
+import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
 import com.bigdata.rdf.sail.BigdataSailTupleQuery;
 import com.bigdata.rdf.sail.Sesame2BigdataIterator;
 import com.bigdata.rdf.sparql.ast.eval.ASTEvalHelper;
 import com.bigdata.rdf.sparql.ast.eval.ServiceParams;
-import com.bigdata.rdf.sparql.ast.service.BigdataNativeServiceOptions;
 import com.bigdata.rdf.sparql.ast.service.ExternalServiceCall;
 import com.bigdata.rdf.sparql.ast.service.IServiceOptions;
+import com.bigdata.rdf.sparql.ast.service.OpenrdfNativeServiceOptions;
 import com.bigdata.rdf.sparql.ast.service.ServiceCallCreateParams;
 import com.bigdata.rdf.sparql.ast.service.ServiceFactory;
 import com.bigdata.rdf.sparql.ast.service.ServiceNode;
+import com.bigdata.rdf.sparql.ast.service.ServiceRegistry;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.task.AbstractApiTask;
 
 import cutthecrap.utils.striterators.ICloseableIterator;
 
 /**
- * A SERVICE that exposes a stored query for execution.
+ * A SERVICE that exposes a stored query for execution. The stored query may be
+ * a SPARQL query or arbitrary procedural application logic, but it must
+ * evaluate to a solution multi-set. The service interface is written to the
+ * openrdf interfaces in order to remove the burden of dealing with bigdata
+ * {@link IV}s from the application.
+ * <p>
+ * In order to use a stored query, a concrete instance of this class must be
+ * registered against the {@link ServiceRegistry}:
+ * 
+ * <pre>
+ * final URI serviceURI = new URIImpl(StoredQueryService.Options.NAMESPACE
+ *         + &quot;my-service&quot;);
+ * 
+ * ServiceRegistry.getInstance().add(serviceURI, new MyStoredQueryService());
+ * </pre>
+ * 
+ * Thereafter, the stored query may be referenced from SPARQL using its assigned
+ * service URI:
+ * 
+ * <pre>
+ * SELECT * {
+ *    SERVICE <http://www.bigdata.com/rdf/stored-query#my-service> { }
+ * }
+ * </pre>
+ * 
+ * The SERVICE invocation may include a group graph pattern that will be parsed
+ * and made accessible to the stored query service as a {@link ServiceParams}
+ * object. For example:
+ * 
+ * <pre>
+ * SELECT * {
+ *    SERVICE <http://www.bigdata.com/rdf/stored-query#my-service> {
+ *       bd:serviceParam :color :"blue" .
+ *       bd:serviceParam :color :"green" .
+ *       bd:serviceParam :size  :"large" .
+ *    }
+ * }
+ * </pre>
+ * 
+ * will provide the stored query with two bindings for the
+ * <code>:color = {"blue", "green"}</code> and one binding for
+ * <code>:size = {"large"}</code>. The value key names, the allowed value types
+ * for each key name, and the interpretation of those values are all specific to
+ * a given stored query service implementation class. They will be provided to
+ * that class as a {@link ServiceParams} object.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * 
@@ -59,7 +105,7 @@ import cutthecrap.utils.striterators.ICloseableIterator;
  * 
  *      TODO Implicit prefix declaration for bsq.
  * 
- * TODO Reconcile with the REST API (group commit task pattern). 
+ *      TODO Reconcile with the REST API (group commit task pattern).
  * 
  *      TODO Why does this work?
  * 
@@ -113,11 +159,11 @@ abstract public class StoredQueryService implements ServiceFactory {
     static private transient final Logger log = Logger
             .getLogger(StoredQueryService.class);
 
-    private final BigdataNativeServiceOptions serviceOptions;
+    private final OpenrdfNativeServiceOptions serviceOptions;
 
     public StoredQueryService() {
 
-        serviceOptions = new BigdataNativeServiceOptions();
+        serviceOptions = new OpenrdfNativeServiceOptions();
         
 //        /*
 //         * TODO This should probably be metadata set for each specific
@@ -172,8 +218,10 @@ abstract public class StoredQueryService implements ServiceFactory {
     /**
      * Return the SPARQL query to be evaluated.
      */
-    abstract protected String getQuery();
-    
+    abstract protected String getQuery(
+            final ServiceCallCreateParams createParams,
+            final ServiceParams serviceParams);
+
     private class StoredQueryServiceCall implements ExternalServiceCall {
 
         private final ServiceCallCreateParams createParams;
@@ -224,17 +272,12 @@ abstract public class StoredQueryService implements ServiceFactory {
                 log.info(serviceParams);
             }
 
-            final AbstractTripleStore tripleStore = createParams.getTripleStore();
-            
-            final String queryStr = getQuery();
-            
-            /*
-             * FIXME What about incoming bindings? They need to flow into the
-             * SERVICE.
-             */
+            final String queryStr = getQuery(createParams, serviceParams);
             
             // TODO Should the baseURI be the SERVICE URI?  Decide and document.
             final String baseURI = createParams.getServiceURI().stringValue();
+            
+            final AbstractTripleStore tripleStore = createParams.getTripleStore();
             
             final Future<TupleQueryResult> ft = AbstractApiTask.submitApiTask(
                     tripleStore.getIndexManager(),
