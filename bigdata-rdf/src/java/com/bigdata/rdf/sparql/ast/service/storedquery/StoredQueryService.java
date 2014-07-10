@@ -54,15 +54,16 @@ import cutthecrap.utils.striterators.ICloseableIterator;
  * a SPARQL query or arbitrary procedural application logic, but it must
  * evaluate to a solution multi-set. The service interface is written to the
  * openrdf interfaces in order to remove the burden of dealing with bigdata
- * {@link IV}s from the application. The effective value of the baseURI during
- * query evaluation will be the SERVICE URI.
+ * {@link IV}s from the application.
  * <p>
  * In order to use a stored query, a concrete instance of this class must be
- * registered against the {@link ServiceRegistry}:
+ * registered against the {@link ServiceRegistry}. The choice of the SERVICE URI
+ * is up to the application. The effective value of the baseURI during query
+ * evaluation will be the SERVICE URI.
  * 
  * <pre>
- * final URI serviceURI = new URIImpl(StoredQueryService.Options.NAMESPACE
- *         + &quot;my-service&quot;);
+ * final URI serviceURI = new URIImpl(
+ *         &quot;http://www.bigdata.com/rdf/stored-query#my-stored-query&quot;);
  * 
  * ServiceRegistry.getInstance().add(serviceURI, new MyStoredQueryService());
  * </pre>
@@ -72,7 +73,7 @@ import cutthecrap.utils.striterators.ICloseableIterator;
  * 
  * <pre>
  * SELECT * {
- *    SERVICE <http://www.bigdata.com/rdf/stored-query#my-service> { }
+ *    SERVICE <http://www.bigdata.com/rdf/stored-query#my-stored-query> { }
  * }
  * </pre>
  * 
@@ -82,7 +83,7 @@ import cutthecrap.utils.striterators.ICloseableIterator;
  * 
  * <pre>
  * SELECT * {
- *    SERVICE <http://www.bigdata.com/rdf/stored-query#my-service> {
+ *    SERVICE <http://www.bigdata.com/rdf/stored-query#my-stored-query> {
  *       bd:serviceParam :color :"blue" .
  *       bd:serviceParam :color :"green" .
  *       bd:serviceParam :size  :"large" .
@@ -101,48 +102,24 @@ import cutthecrap.utils.striterators.ICloseableIterator;
  * 
  * @see <a href="http://trac.bigdata.com/ticket/989">Stored Query Service</a>
  * 
- *      TODO Wiki page.
+ *      FIXME Wiki page.
  * 
- *      TODO Implicit prefix declaration for bsq.
- * 
- *      TODO Why does this work?
- * 
- *      <pre>
- * SELECT ?book ?title ?price
- * {
- *    SERVICE <http://www.bigdata.com/rdf/stored-query#test_stored_query_001> {
- *    }
- * }
- * </pre>
- * 
- *      while this does not work
- * 
- *      <pre>
- * PREFIX bsq:  <http://www.bigdata.com/rdf/stored-query#>
- * 
- * SELECT ?book ?title ?price
- * {
- *    SERVICE <bsq#test_stored_query_001> {
- *    }
- * }
- * </pre>
+ *      FIXME Generalize to support groovy scripting.
  * 
  *      TODO We could use {@link ASTEvalHelper} to evaluate at the bigdata level
  *      without forcing the materialization of any variable bindings from the
  *      lexicon indices. This would be faster for some purposes, especially if
  *      the stored procedure is only used to JOIN into an outer query as in
  *      <code>SELECT * { SERVICE bsq:my-service {} }</code>
- * 
- *      FIXME Generalize to support groovy scripting.
  */
 abstract public class StoredQueryService implements ServiceFactory {
 
     public interface Options {
         
-        /**
-         * The namespace used for stored query service.
-         */
-        String NAMESPACE = "http://www.bigdata.com/rdf/stored-query#";
+//        /**
+//         * The namespace used for stored query service.
+//         */
+//        String NAMESPACE = "http://www.bigdata.com/rdf/stored-query#";
 
     }
 
@@ -207,7 +184,7 @@ abstract public class StoredQueryService implements ServiceFactory {
      * 
      * @param cxn
      *            The connection that should be used to read on the SPARQL
-     *            database.
+     *            database. The connection will be closed by the caller.
      * @param createParams
      *            The SERVICE creation parameters.
      * @param serviceParams

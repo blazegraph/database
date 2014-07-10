@@ -1,4 +1,3 @@
-PREFIX bsq:  <http://www.bigdata.com/rdf/stored-query#>
 PREFIX : <http://example.org/book/>
 
 SELECT ?book ?title ?price
