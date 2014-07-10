@@ -28,6 +28,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sparql.ast.optimizers;
 
 import com.bigdata.rdf.sparql.ast.ArbitraryLengthPathNode;
+import com.bigdata.rdf.sparql.ast.QueryHints;
+import com.bigdata.rdf.sparql.ast.SubqueryRoot;
 
 /**
  * Test suite for {@link ASTUnionFiltersOptimizer}.
@@ -64,9 +66,10 @@ public class TestASTExistsAndJoinOrderByTypeOptimizers extends AbstractOptimizer
 							    )
 							) ) );
 			
+			final SubqueryRoot askQuery;
 			expected = select( varNode(w), 
 					where (joinGroupNode(
-								ask(varNode(y),
+								askQuery=ask(varNode(y),
 										joinGroupNode(
 											statementPatternNode(constantNode(a),constantNode(b),varNode(w))
 											 ) ),
@@ -74,7 +77,7 @@ public class TestASTExistsAndJoinOrderByTypeOptimizers extends AbstractOptimizer
 						    			statementPatternNode(constantNode(a),constantNode(b),varNode(w))))
 						    ) )
 							) );
-			
+			askQuery.setFilterExistsMode(QueryHints.DEFAULT_FILTER_EXISTS);
 		}}.test();
 		
 	}
@@ -91,13 +94,14 @@ public class TestASTExistsAndJoinOrderByTypeOptimizers extends AbstractOptimizer
 							    )
 							) ) );
 			
+			final SubqueryRoot askQuery1, askQuery2;
 			expected = select( varNode(w), 
 					where (joinGroupNode(
-								ask(varNode(y),
+								askQuery1=ask(varNode(y),
 										joinGroupNode(
 											statementPatternNode(constantNode(a),constantNode(b),varNode(w))
 											 ) ),
-								ask(varNode(z),
+								askQuery2=ask(varNode(z),
 										joinGroupNode(
 											statementPatternNode(constantNode(a),constantNode(c),varNode(w))
 											) ),
@@ -110,7 +114,8 @@ public class TestASTExistsAndJoinOrderByTypeOptimizers extends AbstractOptimizer
 								    )
 						    ) )
 							);
-			
+            askQuery1.setFilterExistsMode(QueryHints.DEFAULT_FILTER_EXISTS);
+            askQuery2.setFilterExistsMode(QueryHints.DEFAULT_FILTER_EXISTS);
 		}}.test();
 		
 	}
@@ -136,13 +141,14 @@ public class TestASTExistsAndJoinOrderByTypeOptimizers extends AbstractOptimizer
     		varCount = 0;
 			final ArbitraryLengthPathNode alpp2 = arbitartyLengthPropertyPath(varNode(w), constantNode(b), HelperFlag.ONE_OR_MORE,
 					joinGroupNode( statementPatternNode(leftVar(), constantNode(b),  rightVar()) ) );
+            final SubqueryRoot askQuery1, askQuery2;
 			expected = select( varNode(w), 
 					where (joinGroupNode(
-								ask(varNode(y),
+					            askQuery1=ask(varNode(y),
 										joinGroupNode(
 							    			alpp1
 											 ) ),
-								ask(varNode(z),
+								askQuery2=ask(varNode(z),
 										joinGroupNode(
 											statementPatternNode(constantNode(a),constantNode(c),varNode(w))
 											) ),
@@ -157,7 +163,9 @@ public class TestASTExistsAndJoinOrderByTypeOptimizers extends AbstractOptimizer
 								    )
 						    ) )
 							);
-			
+            askQuery1.setFilterExistsMode(QueryHints.DEFAULT_FILTER_EXISTS);
+            askQuery2.setFilterExistsMode(QueryHints.DEFAULT_FILTER_EXISTS);
+
 		}}.test();
 	}
 
