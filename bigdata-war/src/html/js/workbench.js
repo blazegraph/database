@@ -779,7 +779,7 @@ $('#query-export').click(function() { updateExportFileExtension(); showModal('qu
 
 var export_extensions = {
    "application/rdf+xml": ['RDF/XML', 'rdf', true],
-   "application/x-turtle": ['N-Triples', 'nt', true],
+   "application/n-triples": ['N-Triples', 'nt', true],
    "application/x-turtle": ['Turtle', 'ttl', true],
    "text/rdf+n3": ['N3', 'n3', true],
    "application/trix": ['TriX', 'trix', true],
