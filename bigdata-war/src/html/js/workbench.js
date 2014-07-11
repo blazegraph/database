@@ -6,11 +6,11 @@ var CODEMIRROR_DEFAULTS, EDITORS = {}, ERROR_LINE_MARKERS = {}, ERROR_CHARACTER_
 var PAGE_SIZE = 50, TOTAL_PAGES, CURRENT_PAGE;
 var NAMESPACE_PARAMS = {
    'name': 'com.bigdata.rdf.sail.namespace',
-   'index': 'com.bigdata.search.FullTextIndex.fieldsEnabled',
+   'index': 'com.bigdata.rdf.store.AbstractTripleStore.textIndex',
    'truthMaintenance': 'com.bigdata.rdf.sail.truthMaintenance',
-   'quads': 'com.bigdata.rdf.store.AbstractTripleStore.quads'
+   'quads': 'com.bigdata.rdf.store.AbstractTripleStore.quads',
+   'rdr': 'com.bigdata.rdf.store.AbstractTripleStore.statementIdentifiers'
 };
-
 
 CODEMIRROR_DEFAULTS = {
    lineNumbers: true,
@@ -131,7 +131,7 @@ function getNamespaces() {
          } else {
             use = '<a href="#" class="use-namespace">Use</a>';
          }
-         $('#namespaces-list').append('<li data-name="' + title + '">' + titleText + ' - ' + use + ' - <a href="#" class="delete-namespace">Delete</a> - <a href="#" class="namespace-properties">Properties</a> - <a href="' + RO_URL_PREFIX + 'namespace/' + title + '/sparql" class="namespace-service-description">Service Description</a></li>');
+         $('#namespaces-list').append('<li data-name="' + title + '">' + titleText + ' - ' + use + ' - <a href="#" class="delete-namespace">Delete</a> - <a href="#" class="namespace-properties">Properties</a> - <a href="#" class="clone-namespace">Clone</a> - <a href="' + RO_URL_PREFIX + 'namespace/' + title + '/sparql" class="namespace-service-description">Service Description</a></li>');
       }
       $('.use-namespace').click(function(e) {
          e.preventDefault();
@@ -152,6 +152,7 @@ function getNamespaces() {
       $('.clone-namespace').click(function(e) {
          e.preventDefault();
          cloneNamespace($(this).parent().data('name'));
+         $('#namespace-create-errors').html('');
       });
       $('.namespace-service-description').click(function(e) {
          return confirm('This can be an expensive operation. Proceed anyway?');
@@ -238,17 +239,45 @@ function cloneNamespace(namespace) {
    });
 }
 
+function validateNamespaceOptions() {
+   var errors = [];
+   if(!$('#new-namespace-name').val().trim()) {
+      errors.push('Enter a name');
+   }
+   if($('#new-namespace-truth-maintenance').is(':checked') && $('#new-namespace-quads').is(':checked')) {
+      errors.push('You may not select both truth maintenance and quads');
+   }
+   if($('#new-namespace-rdr').is(':checked') && $('#new-namespace-quads').is(':checked')) {
+      errors.push('You may not select both RDR and quads');
+   }
+   $('#namespace-create-errors').html('');
+   for(var i=0; i<errors.length; i++) {
+      $('#namespace-create-errors').append('<li>' + errors[i] + '</li>');
+   }
+   var valid = errors.length == 0;
+   if(valid) {
+      $('#namespace-create input[type=submit]').removeAttr('disabled');      
+   } else {
+      $('#namespace-create input[type=submit]').attr('disabled', 'disabled');      
+   }
+   return errors.length == 0;
+}
+
+$('#namespace-create input').change(validateNamespaceOptions);
+$('#namespace-create input').keyup(validateNamespaceOptions);
+
 function createNamespace(e) {
    e.preventDefault();
+   if(!validateNamespaceOptions()) {
+      return;
+   }
    // get new namespace name and config options
    var params = {};
    params.name = $('#new-namespace-name').val().trim();
-   if(!params.name) {
-      return;
-   }
    params.index = $('#new-namespace-index').is(':checked');
    params.truthMaintenance = $('#new-namespace-truth-maintenance').is(':checked');
    params.quads = $('#new-namespace-quads').is(':checked');
+   params.rdr = $('#new-namespace-rdr').is(':checked');
    // TODO: validate namespace
    // TODO: allow for other options to be specified
    var data = '<?xml version="1.0" encoding="UTF-8" standalone="no"?>\n<!DOCTYPE properties SYSTEM "http://java.sun.com/dtd/properties.dtd">\n<properties>\n';
