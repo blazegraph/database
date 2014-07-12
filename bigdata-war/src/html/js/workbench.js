@@ -1485,11 +1485,20 @@ function getHealth(e) {
 
 /* Performance */
 
-$('#tab-selector a[data-target=performance]').click(function(e) {
-   $.get(RO_URL_PREFIX + 'counters', function(data) {
+$('#tab-selector a[data-target=performance]').click(loadPerformance);
+
+function loadPerformance(path) {
+   if(typeof(path) == 'undefined') {
+      path = '';
+   }
+   $.get(RO_URL_PREFIX + 'counters?' + path, function(data) {
       $('#performance-tab .box').html(data);
+      $('#performance-tab .box a').click(function(e) {
+         e.preventDefault();
+         loadPerformance(this.href.split('?')[1]);
+      });
    });
-});
+}
 
 /* Utility functions */
 
