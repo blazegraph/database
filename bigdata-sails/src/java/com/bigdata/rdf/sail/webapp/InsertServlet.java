@@ -270,8 +270,14 @@ public class InsertServlet extends BigdataRDFServlet {
 
                 conn = getUnisolatedConnection();
 
-                /*
+                /**
                  * There is a request body, so let's try and parse it.
+                 * 
+                 * FIXME This does not handle .gz or .zip files. We handle this
+                 * in the
+                 * 
+                 * @see <a href="http://trac.bigdata.com/ticket/991" >REST API:
+                 *      INSERT does not handle .gz</a>
                  */
 
                 final RDFParser rdfParser = rdfParserFactory.getParser();
@@ -466,10 +472,16 @@ public class InsertServlet extends BigdataRDFServlet {
                         /**
                          * There is a request body, so let's try and parse it.
                          * 
-                         * <a href=
-                         * "https://sourceforge.net/apps/trac/bigdata/ticket/620"
-                         * > UpdateServlet fails to parse MIMEType when doing
-                         * conneg. </a>
+                         * @see <a href=
+                         *      "https://sourceforge.net/apps/trac/bigdata/ticket/620"
+                         *      > UpdateServlet fails to parse MIMEType when
+                         *      doing conneg. </a>
+                         * 
+                         *      FIXME This does not handle .gz or .zip files. We
+                         *      handle this in the
+                         * 
+                         * @see <a href="http://trac.bigdata.com/ticket/991"
+                         *      >REST API: INSERT does not handle .gz</a>
                          */
 
                         final String contentType = hconn.getContentType();
