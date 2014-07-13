@@ -52,6 +52,7 @@ import com.bigdata.bop.bindingSet.EmptyBindingSet;
 import com.bigdata.bop.engine.AbstractRunningQuery;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
+import com.bigdata.bop.join.JVMDistinctFilter;
 
 import cutthecrap.utils.striterators.ICloseableIterator;
 
@@ -83,6 +84,10 @@ import cutthecrap.utils.striterators.ICloseableIterator;
  * solutions from the subquery with those in the parent context.
  * 
  * @author <a href="mailto:mpersonick@users.sourceforge.net">Mike Personick</a>
+ * 
+ *         TODO There should be two version of this operator. One for the JVM
+ *         heap and another for the native heap. This will help when large
+ *         amounts of data are materialized by the internal collections.
  */
 public class ArbitraryLengthPathOp extends PipelineOp {
 
@@ -187,6 +192,7 @@ public class ArbitraryLengthPathOp extends PipelineOp {
         
     }
 
+    @Override
     public FutureTask<Void> eval(final BOpContext<IBindingSet> context) {
 
         return new FutureTask<Void>(new ArbitraryLengthPathTask(this, context));
@@ -251,6 +257,7 @@ public class ArbitraryLengthPathOp extends PipelineOp {
             
         }
 
+        @Override
         public Void call() throws Exception {
             
             try {
@@ -346,10 +353,21 @@ public class ArbitraryLengthPathOp extends PipelineOp {
             }
             
             if (!noInput) {
-
-            	for (IBindingSet parentSolutionIn : chunkIn) {
+                
+                long chunksIn = 0L;
+            	    
+                for (IBindingSet parentSolutionIn : chunkIn) {
 		            	
-	            	final IConstant<?> key = joinVar != null ? parentSolutionIn.get(joinVar) : null;
+                    /**
+                     * @see <a href="http://trac.bigdata.com/ticket/865"
+                     *      >OutOfMemoryError instead of Timeout for SPARQL
+                     *      Property Paths </a>
+                     */
+                    if (chunksIn++ % 10 == 0 && Thread.interrupted()) {
+                        throw new InterruptedException();
+                    }
+
+                    final IConstant<?> key = joinVar != null ? parentSolutionIn.get(joinVar) : null;
 	            	
 	                if (log.isDebugEnabled()) {
 	                	log.debug("adding parent solution for joining: " + parentSolutionIn);
@@ -451,13 +469,16 @@ public class ArbitraryLengthPathOp extends PipelineOp {
 
                 try {
             	
-                	/*
-                	 * TODO replace with code that does the PipelineJoins manually
-                	 */
+                	    /*
+                     * TODO Replace with code that does the PipelineJoins
+                     * manually. Unrolling these iterations can be a major
+                     * performance benefit. Another possibility is to use
+                     * the GASEngine to expand the paths.
+                     */
                     runningSubquery = queryEngine.eval(subquery,
                             nextRoundInput.toArray(new IBindingSet[nextRoundInput.size()]));
 
-					long count = 0L;
+					long subqueryChunksOut = 0L; // #of chunks read from subquery
 					try {
 
                         // Declare the child query to the parent.
@@ -476,7 +497,14 @@ public class ArbitraryLengthPathOp extends PipelineOp {
 
 			            	for (IBindingSet bs : chunk) {
 				            	
-			            		count++;
+		                    /**
+		                     * @see <a href="http://trac.bigdata.com/ticket/865"
+		                     *      >OutOfMemoryError instead of Timeout for SPARQL
+		                     *      Property Paths </a>
+		                     */
+                            if (subqueryChunksOut++ % 10 == 0 && Thread.interrupted()) {
+			            		    throw new InterruptedException();
+			            		}
 			            		
 			            		if (log.isDebugEnabled()) {
 			            			log.debug("round " + i + " solution: " + bs);
@@ -532,7 +560,7 @@ public class ArbitraryLengthPathOp extends PipelineOp {
 						
 				        if (log.isDebugEnabled()) {
 				        	log.debug("done with round " + i + 
-				        			", count=" + count + 
+				        			", count=" + subqueryChunksOut + 
 				        			", totalBefore=" + sizeBefore + 
 				        			", totalAfter=" + solutionsOut.size() +
 				        			", totalNew=" + (solutionsOut.size() - sizeBefore));
@@ -1116,6 +1144,7 @@ public class ArbitraryLengthPathOp extends PipelineOp {
             	
             }
             
+            @Override
             public String toString() {
             	
             	final StringBuilder sb = new StringBuilder();
@@ -1144,7 +1173,11 @@ public class ArbitraryLengthPathOp extends PipelineOp {
         }
         
         /**
-         * Lifted directly from the JVMDistinctBindingSetsOp.
+         * Lifted directly from the {@link JVMDistinctFilter}.
+         * 
+         * TODO Refactor to use {@link JVMDistinctFilter} directly iff possible
+         * (e.g., a chain of the AALP operator followed by the DISTINCT
+         * solutions operator)
          */
         private final static class SolutionKey {
 
@@ -1157,10 +1190,12 @@ public class ArbitraryLengthPathOp extends PipelineOp {
                 this.hash = java.util.Arrays.hashCode(vals);
             }
 
+            @Override
             public int hashCode() {
                 return hash;
             }
 
+            @Override
             public boolean equals(final Object o) {
                 if (this == o)
                     return true;
