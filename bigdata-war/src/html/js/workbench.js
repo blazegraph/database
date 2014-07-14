@@ -1367,8 +1367,8 @@ function getStatus(e) {
 
 function getStatusNumbers(data) {
    $('#status-text').html(data);
-   $('#status-text a').eq(-2).click(function(e) { e.preventDefault(); showQueries(false); return false; });
-   $('#status-text a').eq(-1).click(function(e) { e.preventDefault(); showQueries(true); return false; });
+   $('p:contains(Show queries, query details)').find('a').eq(0).click(function(e) { e.preventDefault(); showQueries(false); });
+   $('p:contains(Show queries, query details)').find('a').eq(1).click(function(e) { e.preventDefault(); showQueries(true); });
 }
 
 $('#show-queries').click(function(e) {
