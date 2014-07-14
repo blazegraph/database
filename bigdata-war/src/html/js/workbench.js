@@ -720,6 +720,7 @@ function submitQuery(e) {
          // clear the old results and set the time to now
          $(row).find('.query-time').text(new Date().toISOString());
          $(row).find('.query-results').text('...');
+         $(row).find('.query-execution-time').text('...');
          // move it to the top
          $(row).prependTo('#query-history tbody');
          queryExists = true;
@@ -736,6 +737,7 @@ function submitQuery(e) {
       a.text(query);
       a.html(a.html().replace(/\n/g, '<br>'));
       row.append('<td class="query-results">...</td>');
+      row.append('<td class="query-execution-time">...</td>');
       row.append('<td class="query-delete"><a href="#">X</a></td>')
    }
 
@@ -900,8 +902,27 @@ function downloadFile(data, type, filename) {
    $('#download-link').remove();
 }
 
-function updateResultCount(count) {
+function updateresultCountAndExecutionTime(count) {
    $('#query-history tbody tr:first td.query-results').text(count);
+
+   var ms = Date.now() - Date.parse($('#query-history tbody tr:first td.query-time').html());
+   var sec = Math.floor(ms / 1000);
+   ms = ms % 1000;
+   var min = Math.floor(sec / 60);
+   min = min % 60;
+   var hr = Math.floor(min / 60);
+   var executionTime = '';
+   if(hr > 0) {
+      executionTime += hr + 'hr, ';
+   }
+   if(min > 0) {
+      executionTime += min + 'min, ';
+   }
+   if(sec > 0) {
+      executionTime += sec + 'sec, ';
+   }
+   executionTime += ms + 'ms';
+   $('#query-history tbody tr:first td.query-execution-time').html(executionTime);
 }
 
 function showQueryResults(data) {
@@ -933,7 +954,7 @@ function showQueryResults(data) {
             table.append(tr);
          }
       }
-      updateResultCount(rows.length);
+      updateresultCountAndExecutionTime(rows.length);
    } else {
       // JSON
       // save data for export and pagination
@@ -942,7 +963,7 @@ function showQueryResults(data) {
       if(typeof(data.boolean) != 'undefined') {
          // ASK query
          table.append('<tr><td>' + data.boolean + '</td></tr>').addClass('boolean');
-         updateResultCount('' + data.boolean);
+         updateresultCountAndExecutionTime('' + data.boolean);
          return;
       }
 
@@ -984,7 +1005,7 @@ function showQueryResults(data) {
       table.append(thead);
 
       $('#total-results').html(data.results.bindings.length);
-      updateResultCount(data.results.bindings.length);
+      updateresultCountAndExecutionTime(data.results.bindings.length);
       setNumberOfPages();
       showPage(1);
 
