@@ -99,7 +99,6 @@ import cutthecrap.utils.striterators.ICloseableIterator;
  * first result when compared with pipelined evaluation.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 abstract public class AbstractRunningQuery implements IRunningQuery {
 

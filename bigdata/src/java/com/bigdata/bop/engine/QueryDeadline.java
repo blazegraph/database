@@ -19,9 +19,9 @@ import java.lang.ref.WeakReference;
 class QueryDeadline implements Comparable<QueryDeadline> {
 
     /**
-     * The deadline for this query.
+     * The deadline for this query (in nanoseconds).
      */
-    final long deadline;
+    final long deadlineNanos;
 
     /**
      * A reference to the query.
@@ -33,14 +33,14 @@ class QueryDeadline implements Comparable<QueryDeadline> {
 
     /**
      * 
-     * @param deadline
-     *            The deadline.
+     * @param deadlineNanos
+     *            The deadline for this query (in nanoseconds).
      * @param query
      *            The query.
      */
-    public QueryDeadline(final long deadline, final AbstractRunningQuery query) {
+    public QueryDeadline(final long deadlineNanos, final AbstractRunningQuery query) {
 
-        this.deadline = deadline;
+        this.deadlineNanos = deadlineNanos;
 
         this.queryRef = new WeakReference<AbstractRunningQuery>(query);
 
@@ -61,8 +61,8 @@ class QueryDeadline implements Comparable<QueryDeadline> {
      */
     @Override
     public int compareTo(final QueryDeadline o) {
-        final long d0 = this.deadline;
-        final long d1 = o.deadline;
+        final long d0 = this.deadlineNanos;
+        final long d1 = o.deadlineNanos;
         if (d0 < d1)
             return -1;
         if (d0 > d1)
@@ -74,13 +74,13 @@ class QueryDeadline implements Comparable<QueryDeadline> {
      * Check the deadline on the query. If the query is not terminated and the
      * deadline has expired, then the query is terminated as a side-effect.
      * 
-     * @param now
+     * @param nowNanosIsIgnored
      *            A current timestamp.
      * 
      * @return <code>null</code> if the query is terminated and
      *         <code>this</code> if the query is not terminated.
      */
-    QueryDeadline checkDeadline(final long now) {
+    QueryDeadline checkDeadline(final long nowNanosIsIgnored) {
 
         final AbstractRunningQuery q = queryRef.get();
 

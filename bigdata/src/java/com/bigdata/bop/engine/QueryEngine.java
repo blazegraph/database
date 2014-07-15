@@ -195,7 +195,6 @@ import com.bigdata.util.concurrent.IHaltable;
  * query manager task for the terminated join.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  * 
  * @todo Expander patterns will continue to exist until we handle the standalone
  *       backchainers in a different manner for scale-out so add support for
@@ -669,7 +668,9 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
             throw new IllegalArgumentException();
         }
 
-        deadlineQueue.add(new QueryDeadline(deadline, query));
+        final long deadlineNanos = TimeUnit.MILLISECONDS.toNanos(deadline);
+
+        deadlineQueue.add(new QueryDeadline(deadlineNanos, query));
 
     }
 
@@ -677,7 +678,7 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
      * Scan the priority queue of queries with a specified deadline, halting any
      * queries whose deadline has expired.
      */
-    static private void checkDeadlines(final long now,
+    static private void checkDeadlines(final long nowNanos,
             final PriorityBlockingQueue<QueryDeadline> deadlineQueue) {
         
         /*
@@ -690,7 +691,7 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
              * Check the head of the deadline queue for any queries whose
              * deadline has expired.
              */
-            checkHeadOfDeadlineQueue(now, deadlineQueue);
+            checkHeadOfDeadlineQueue(nowNanos, deadlineQueue);
 
             if (deadlineQueue.size() > DEADLINE_QUEUE_SCAN_SIZE) {
 
@@ -698,7 +699,7 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
                  * Scan the deadline queue, removing entries for expired
                  * queries.
                  */
-                scanDeadlineQueue(now, deadlineQueue);
+                scanDeadlineQueue(nowNanos, deadlineQueue);
 
             }
 
@@ -710,7 +711,7 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
      * Check the head of the deadline queue for any queries whose deadline has
      * expired.
      */
-    static private void checkHeadOfDeadlineQueue(final long now,
+    static private void checkHeadOfDeadlineQueue(final long nowNanos,
             final PriorityBlockingQueue<QueryDeadline> deadlineQueue) {
         
         QueryDeadline x;
@@ -719,7 +720,7 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
         while ((x = deadlineQueue.poll()) != null) {
 
             // test for query done or deadline expired.
-            if (x.checkDeadline(now) == null) {
+            if (x.checkDeadline(nowNanos) == null) {
 
                 /*
                  * This query is known to be done. It was removed from the
@@ -731,7 +732,7 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
 
             }
 
-            if (x.deadline > now) {
+            if (x.deadlineNanos > nowNanos) {
 
                 /*
                  * This query has not yet reached its deadline. That means that
@@ -757,7 +758,7 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
      * has not be reached. Therefore, periodically, we need to scan the queue
      * and clear out entries for terminated queries.
      */
-    static private void scanDeadlineQueue(final long now,
+    static private void scanDeadlineQueue(final long nowNanos,
             final PriorityBlockingQueue<QueryDeadline> deadlineQueue) {
 
         final List<QueryDeadline> c = new ArrayList<QueryDeadline>(
@@ -770,7 +771,7 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
         
         for (QueryDeadline x : c) {
 
-            if (x.checkDeadline(now) != null) {
+            if (x.checkDeadline(nowNanos) != null) {
 
                 // return this query to the deadline queue.
                 deadlineQueue.add(x);
@@ -939,27 +940,31 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
             if(log.isInfoEnabled())
                 log.info("Running: " + this);
             try {
-                long mark = System.currentTimeMillis();
-                long remaining = DEADLINE_CHECK_MILLIS;
+                final long deadline = TimeUnit.MILLISECONDS
+                        .toNanos(DEADLINE_CHECK_MILLIS);
+                long mark = System.nanoTime();
+                long remaining = deadline;
                 while (true) {
                     try {
+                        //log.warn("Polling deadline queue: remaining="+remaining+", deadlinkCheckMillis="+DEADLINE_CHECK_MILLIS);
                         final AbstractRunningQuery q = priorityQueue.poll(
-                                remaining, TimeUnit.MILLISECONDS);
-                        final long now = System.currentTimeMillis();
-                        if ((remaining = now - mark) < 0) {
+                                remaining, TimeUnit.NANOSECONDS);
+                        final long now = System.nanoTime();
+                        if ((remaining = deadline - (now - mark)) < 0) {
+                            //log.error("Checking deadline queue");
                             /*
                              * Check for queries whose deadline is expired.
-                             * 
+                             *
                              * Note: We only do this every DEADLINE_CHECK_MILLIS
                              * and then reset [mark] and [remaining].
-                             * 
+                             *
                              * Note: In queue.pool(), we only wait only up to
                              * the [remaining] time before the next check in
                              * queue.poll().
                              */
                             checkDeadlines(now, deadlineQueue);
                             mark = now;
-                            remaining = DEADLINE_CHECK_MILLIS;
+                            remaining = deadline;
                         }
                         // Consume chunk already on queue for this query.
                         if (q != null && !q.isDone())
