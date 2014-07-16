@@ -635,6 +635,7 @@ abstract public class AbstractTransactionService extends AbstractService
 
     }
 
+    @Override
     public long nextTimestamp() {
 
 //        setupLoggingContext();
@@ -698,6 +699,7 @@ abstract public class AbstractTransactionService extends AbstractService
      *             transactions which must contend for start times which will
      *             read from the appropriate historical commit point).
      */
+    @Override
     public long newTx(final long timestamp) {
 
         setupLoggingContext();
@@ -883,6 +885,7 @@ abstract public class AbstractTransactionService extends AbstractService
      * 
      * @see Options#MIN_RELEASE_AGE
      */
+    @Override
     public long getReleaseTime() {
 
         if (log.isTraceEnabled())
@@ -1527,6 +1530,7 @@ abstract public class AbstractTransactionService extends AbstractService
      * is invoked for all commits on all data services and will otherwise be a
      * global hotspot.
      */
+    @Override
     public void notifyCommit(final long commitTime) {
 
         lock.lock();
@@ -1930,6 +1934,7 @@ abstract public class AbstractTransactionService extends AbstractService
     /**
      * Note: Declared abstract so that we can hide the {@link IOException}.
      */
+    @Override
     abstract public long getLastCommitTime();
 
     /**
@@ -2008,6 +2013,7 @@ abstract public class AbstractTransactionService extends AbstractService
     /**
      * Abort the transaction (asynchronous).
      */
+    @Override
     public void abort(final long tx) {
 
         setupLoggingContext();
@@ -2097,6 +2103,7 @@ abstract public class AbstractTransactionService extends AbstractService
 
     }
 
+    @Override
     public long commit(final long tx) throws ValidationError {
 
         setupLoggingContext();
@@ -2475,6 +2482,7 @@ abstract public class AbstractTransactionService extends AbstractService
         /**
          * The hash code is based on the {@link #getStartTimestamp()}.
          */
+        @Override
         final public int hashCode() {
             
             return hashCode;
@@ -2489,6 +2497,7 @@ abstract public class AbstractTransactionService extends AbstractService
          * @param o
          *            Another transaction object.
          */
+        @Override
         final public boolean equals(final Object o) {
 
             if (this == o)
@@ -2607,6 +2616,7 @@ abstract public class AbstractTransactionService extends AbstractService
         /**
          * Returns a string representation of the transaction state.
          */
+        @Override
         final public String toString() {
 
             /*
@@ -2691,6 +2701,7 @@ abstract public class AbstractTransactionService extends AbstractService
      * {@link #getLastCommitTime()} and then changes the {@link TxServiceRunState}
      * to {@link TxServiceRunState#Running}.
      */
+    @Override
     public AbstractTransactionService start() {
 
         if(log.isInfoEnabled()) 
@@ -2741,6 +2752,7 @@ abstract public class AbstractTransactionService extends AbstractService
         
     }
 
+    @Override
     @SuppressWarnings("rawtypes")
     public Class getServiceIface() {
 
@@ -2758,60 +2770,70 @@ abstract public class AbstractTransactionService extends AbstractService
         final CounterSet countersRoot = new CounterSet();
 
         countersRoot.addCounter("runState", new Instrument<String>() {
+            @Override
             protected void sample() {
                 setValue(runState.toString());
             }
         });
 
         countersRoot.addCounter("#active", new Instrument<Integer>() {
+            @Override
             protected void sample() {
                 setValue(getActiveCount());
             }
         });
 
         countersRoot.addCounter("lastCommitTime", new Instrument<Long>() {
+            @Override
             protected void sample() {
                 setValue(getLastCommitTime());
             }
         });
 
         countersRoot.addCounter("minReleaseAge", new Instrument<Long>() {
+            @Override
             protected void sample() {
                 setValue(getMinReleaseAge());
             }
         });
 
         countersRoot.addCounter("releaseTime", new Instrument<Long>() {
+            @Override
             protected void sample() {
                 setValue(getReleaseTime());
             }
         });
 
         countersRoot.addCounter("startCount", new Instrument<Long>() {
+            @Override
             protected void sample() {
                 setValue(getStartCount());
             }
         });
 
         countersRoot.addCounter("abortCount", new Instrument<Long>() {
+            @Override
             protected void sample() {
                 setValue(getAbortCount());
             }
         });
 
         countersRoot.addCounter("commitCount", new Instrument<Long>() {
+            @Override
             protected void sample() {
                 setValue(getCommitCount());
             }
         });
 
         countersRoot.addCounter("readOnlyActiveCount", new Instrument<Long>() {
+            @Override
             protected void sample() {
                 setValue(getReadOnlyActiveCount());
             }
         });
 
         countersRoot.addCounter("readWriteActiveCount", new Instrument<Long>() {
+            @Override
             protected void sample() {
                 setValue(getReadWriteActiveCount());
             }
@@ -2826,6 +2848,7 @@ abstract public class AbstractTransactionService extends AbstractService
          */
         countersRoot.addCounter("earliestReadsOnCommitTime",
                 new Instrument<Long>() {
+                    @Override
                     protected void sample() {
                         final TxState tmp = earliestOpenTx;
                         if (tmp != null)

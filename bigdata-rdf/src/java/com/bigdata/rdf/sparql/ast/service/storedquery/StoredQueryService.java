@@ -286,6 +286,13 @@ abstract public class StoredQueryService implements ServiceFactory {
             }
 
             @Override
+            public boolean isReadOnly() {
+
+                return true;
+                
+            }
+            
+            @Override
             public TupleQueryResult call() throws Exception {
                 BigdataSailRepositoryConnection cxn = null;
                 boolean success = false;

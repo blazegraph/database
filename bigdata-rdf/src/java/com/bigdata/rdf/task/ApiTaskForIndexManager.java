@@ -37,6 +37,9 @@ import com.bigdata.service.IBigdataFederation;
  * view of a scale-out index. It can also be used for a {@link Journal} if are
  * not relying on the {@link IConcurrencyManager} to guard the resources
  * declared by the task.
+ * <p>
+ * Note: Global locks are NOT used in scale-out and operations will be only
+ * shard-wise ACID.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @param <T>

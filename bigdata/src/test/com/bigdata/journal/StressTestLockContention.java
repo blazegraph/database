@@ -48,9 +48,8 @@ import java.util.concurrent.TimeUnit;
  * should still block many serialized writer tasks together for good throughput.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
-public class StressTestLockContention extends ProxyTestCase {
+public class StressTestLockContention extends ProxyTestCase<Journal> {
 
     /**
      * 
@@ -62,7 +61,7 @@ public class StressTestLockContention extends ProxyTestCase {
     /**
      * @param name
      */
-    public StressTestLockContention(String name) {
+    public StressTestLockContention(final String name) {
         super(name);
     }
 
@@ -88,7 +87,7 @@ public class StressTestLockContention extends ProxyTestCase {
 
         final int ntasks = 500;
 
-        final List<Future> futures;
+        final List<Future<Object>> futures;
      
         {
             
@@ -100,13 +99,14 @@ public class StressTestLockContention extends ProxyTestCase {
 
             final String[] resource = new String[] { "foo", "bar", "baz" };
 
-            final Collection<AbstractTask> tasks = new HashSet<AbstractTask>(
+            final Collection<AbstractTask<Object>> tasks = new HashSet<AbstractTask<Object>>(
                     ntasks);
 
             for (int i = 0; i < ntasks; i++) {
 
-                tasks.add(new AbstractTask(journal, ITx.UNISOLATED, resource) {
+                tasks.add(new AbstractTask<Object>(journal, ITx.UNISOLATED, resource) {
 
+                    @Override
                     protected Object doTask() throws Exception {
 
                         return null;
@@ -124,7 +124,7 @@ public class StressTestLockContention extends ProxyTestCase {
              * returns.
              */
 
-            futures = journal.invokeAll(tasks, 20, TimeUnit.SECONDS);
+            futures = (List)journal.invokeAll(tasks, 20, TimeUnit.SECONDS);
 
         } finally {
 
@@ -153,7 +153,7 @@ public class StressTestLockContention extends ProxyTestCase {
 
         }
 
-        final Iterator<Future> itr = futures.iterator();
+        final Iterator<Future<Object>> itr = futures.iterator();
 
         int ncancelled = 0;
         int ncomplete = 0;

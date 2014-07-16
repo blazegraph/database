@@ -66,7 +66,6 @@ import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.rdf.sail.BigdataSailQuery;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
 import com.bigdata.rdf.sail.sparql.ast.SimpleNode;
-import com.bigdata.rdf.sail.webapp.AbstractRestApiTask.RestApiQueryTask;
 import com.bigdata.rdf.sail.webapp.BigdataRDFContext.AbstractQueryTask;
 import com.bigdata.rdf.sail.webapp.BigdataRDFContext.RunningQuery;
 import com.bigdata.rdf.sail.webapp.BigdataRDFContext.UpdateTask;
@@ -1073,7 +1072,7 @@ public class QueryServlet extends BigdataRDFServlet {
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      */
-    private static class EstCardTask extends RestApiQueryTask<Void> {
+    private static class EstCardTask extends AbstractRestApiTask<Void> {
 
         private final Resource s;
         private final URI p;
@@ -1092,6 +1091,11 @@ public class QueryServlet extends BigdataRDFServlet {
             this.o = o;
             this.c = c;
             
+        }
+        
+        @Override
+        public boolean isReadOnly() {
+            return true;
         }
 
         @Override
@@ -1169,7 +1173,7 @@ public class QueryServlet extends BigdataRDFServlet {
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      */
-    private static class GetContextsTask extends RestApiQueryTask<Void> {
+    private static class GetContextsTask extends AbstractRestApiTask<Void> {
 
         public GetContextsTask(final HttpServletRequest req,
                 final HttpServletResponse resp, final String namespace,
@@ -1177,6 +1181,11 @@ public class QueryServlet extends BigdataRDFServlet {
  
             super(req, resp, namespace, timestamp);
             
+        }
+
+        @Override
+        public boolean isReadOnly() {
+            return true;
         }
 
         @Override
@@ -1290,7 +1299,7 @@ public class QueryServlet extends BigdataRDFServlet {
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      */
-    private static class ShardsTask extends RestApiQueryTask<Void> {
+    private static class ShardsTask extends AbstractRestApiTask<Void> {
 
         private final Resource s;
         private final URI p;
@@ -1311,6 +1320,11 @@ public class QueryServlet extends BigdataRDFServlet {
             this.c = c;
             this.doRangeCount = doRangeCount;
             
+        }
+
+        @Override
+        public boolean isReadOnly() {
+            return true;
         }
 
         @Override

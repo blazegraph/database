@@ -75,6 +75,7 @@ public class StressTestConcurrentUnisolatedIndices extends
 
     private Journal journal;
 
+    @Override
     public void setUpComparisonTest(final Properties properties)
             throws Exception {
 
@@ -82,6 +83,7 @@ public class StressTestConcurrentUnisolatedIndices extends
 
     }
 
+    @Override
     public void tearDownComparisonTest() throws Exception {
 
         if (journal != null) {
@@ -425,6 +427,7 @@ public class StressTestConcurrentUnisolatedIndices extends
             
         }
 
+        @Override
         protected String getTaskName() {
             
             return super.getTaskName()+"#"+trial;
@@ -436,6 +439,7 @@ public class StressTestConcurrentUnisolatedIndices extends
          * 
          * @return null
          */
+        @Override
         public Object doTask() throws Exception {
 
             // the index names on which the writer holds a lock.
@@ -698,6 +702,7 @@ public class StressTestConcurrentUnisolatedIndices extends
      *            There are no "optional" properties - you must make sure that
      *            each property has a defined value.
      */
+    @Override
     public Result doComparisonTest(Properties properties) throws Exception {
 
         final long timeout = Long.parseLong(properties.getProperty(TestOptions.TIMEOUT));

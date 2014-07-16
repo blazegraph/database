@@ -49,7 +49,6 @@ import com.bigdata.journal.ITx;
 import com.bigdata.rdf.rio.IRDFParserOptions;
 import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
-import com.bigdata.rdf.sail.webapp.AbstractRestApiTask.RestApiMutationTask;
 import com.bigdata.rdf.sail.webapp.client.MiniMime;
 
 /**
@@ -224,7 +223,7 @@ public class InsertServlet extends BigdataRDFServlet {
      *         TODO The {@link IRDFParserOptions} defaults should be coming from
      *         the KB instance, right? What does the REST API say about this?
      */
-    private static class InsertWithBodyTask extends RestApiMutationTask<Void> {
+    private static class InsertWithBodyTask extends AbstractRestApiTask<Void> {
 
         private final String baseURI;
         private final Resource[] defaultContext;
@@ -257,6 +256,11 @@ public class InsertServlet extends BigdataRDFServlet {
             this.rdfParserFactory = rdfParserFactory;
         }
         
+        @Override
+        public boolean isReadOnly() {
+            return false;
+        }
+
         @Override
         public Void call() throws Exception {
 
@@ -407,7 +411,7 @@ public class InsertServlet extends BigdataRDFServlet {
 
     }
 	
-    private static class InsertWithURLsTask extends RestApiMutationTask<Void> {
+    private static class InsertWithURLsTask extends AbstractRestApiTask<Void> {
 
         private final Vector<URL> urls;
         private final Resource[] defaultContext;
@@ -436,6 +440,11 @@ public class InsertServlet extends BigdataRDFServlet {
             this.defaultContext = defaultContext;
         }
         
+        @Override
+        public boolean isReadOnly() {
+            return false;
+        }
+
         @Override
         public Void call() throws Exception {
 
