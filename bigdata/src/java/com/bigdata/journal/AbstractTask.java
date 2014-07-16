@@ -62,8 +62,6 @@ import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ILocalBTreeView;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.view.FusedView;
-import com.bigdata.concurrent.LockManager;
-import com.bigdata.concurrent.LockManagerTask;
 import com.bigdata.concurrent.NonBlockingLockManager;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.mdi.IResourceMetadata;
@@ -116,7 +114,6 @@ import cutthecrap.utils.striterators.Striterator;
  * {@link ConcurrencyManager#submit(AbstractTask)} it.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  * 
  * @todo declare generic type for the return as <? extends Object> to be compatible
  * with {@link ConcurrencyManager#submit(AbstractTask)}
@@ -166,12 +163,14 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
      * The object used to manage access to the resources from which views of the
      * indices are created.
      */
+    @Override
     public final IResourceManager getResourceManager() {
         
         return resourceManager;
         
     }
     
+    @Override
     synchronized public final IJournal getJournal() {
 
         if (journal == null) {
@@ -282,7 +281,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
         boolean registeredIndex = false;
         boolean droppedIndex = false;
         
-        Entry(Name2Addr.Entry entry) {
+        Entry(final Name2Addr.Entry entry) {
             
             super(entry.name, entry.checkpointAddr, entry.commitTime);
             
@@ -425,6 +424,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
         final String name;
         final ICheckpointProtocol btree;
         
+        @Override
         public String toString() {
             
             return "DirtyListener{name="+name+"}";
@@ -448,8 +448,9 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
          * Add <i>this</i> to the {@link AbstractTask#commitList}.
          * 
          * @param btree
-         *            The {@link BTree} reporting that it is dirty.
+         *            The index reporting that it is dirty.
          */
+        @Override
         public void dirtyEvent(final ICheckpointProtocol btree) {
 
             assert btree == this.btree;
@@ -966,7 +967,8 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
             this.l = l;
             
         }
-        
+
+        @Override
         public Void call() throws Exception {
 
             if(log.isInfoEnabled())
@@ -1240,8 +1242,10 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
      * fails. The boolean argument indicates whether or not the group commit
      * succeeded. Throws exceptions are trapped and logged.
      */
-    void afterTaskHook(boolean abort) {
+    void afterTaskHook(final boolean abort) {
+        
         ((IsolatedActionJournal) getJournal()).completeTask();
+        
     }
     
     /*
@@ -1260,6 +1264,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
      */
     protected TaskCounters taskCounters;
     
+    @Override
     public TaskCounters getTaskCounters() {
         
         return taskCounters;
@@ -1752,8 +1757,8 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
      * <dt>timestamp</dt>
      * <dd>The {@link #timestamp} specified to the ctor.</dd>
      * <dt>resources</dt>
-     * <dd>The named resource(s) specified to the ctor IFF {@link #INFO} is
-     * <code>true</code></dd>
+     * <dd>The named resource(s) specified to the ctor IFF logging @ INFO or
+     * above.</dd>
      * </dl>
      */
     protected void setupLoggingContext() {
@@ -1927,7 +1932,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
                  * Delegate handles handshaking for writable transactions.
                  */
 
-                final Callable<T> delegate = new InnerReadWriteTxServiceCallable(
+                final Callable<T> delegate = new InnerReadWriteTxServiceCallable<T>(
                         this, tx);
                 
                 return delegate.call();
@@ -1979,8 +1984,6 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
      * Call {@link #doTask()} for an unisolated write task.
      * 
      * @throws Exception
-     * 
-     * @todo update javadoc to reflect the change in how the locks are acquired.
      */
     private T doUnisolatedReadWriteTask() throws Exception {
         
@@ -2074,7 +2077,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
              * access to the same resources since the locks were released above.
              */ 
 
-            writeService.afterTask(this, null);
+            writeService.afterTask(this/* task */, null/* cause */);
 
             return ret;
 
@@ -2087,7 +2090,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
                 if (log.isInfoEnabled())
                     log.info("Task failed: class=" + this + " : " + t2);
                 
-                writeService.afterTask(this, t2);
+                writeService.afterTask(this/* task */, t2/* cause */);
 
             }
 
@@ -2184,11 +2187,11 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
      * Inner class used to wrap up the call to {@link AbstractTask#doTask()} for
      * read-write transactions.
      */
-    static protected class InnerReadWriteTxServiceCallable extends DelegateTask {
+    static protected class InnerReadWriteTxServiceCallable<T> extends DelegateTask<T> {
 
-        final Tx tx;
+        private final Tx tx;
         
-        InnerReadWriteTxServiceCallable(AbstractTask delegate, Tx tx) {
+        InnerReadWriteTxServiceCallable(final AbstractTask<T> delegate, final Tx tx) {
             
             super( delegate );
             
@@ -2202,7 +2205,8 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
         /**
          * Wraps up the execution of {@link AbstractTask#doTask()}.
          */
-        public Object call() throws Exception {
+        @Override
+        public T call() throws Exception {
 
             // invoke on the outer class.
 
@@ -2234,9 +2238,8 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
     }
     
     /**
-     * An instance of this class is used as the delegate for a
-     * {@link LockManagerTask} in order to coordinate the acquisition of locks
-     * with the {@link LockManager} before the task can execute and to release
+     * An instance of this class is used as the delegate to coordinate the acquisition of locks
+     * with the {@link NonBlockingLockManager} before the task can execute and to release
      * locks after the task has completed (whether it succeeds or fails).
      * <p>
      * Note: This inner class delegates the execution of the task to
@@ -2248,8 +2251,6 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
      * on a given named index are single-threaded and that deadlocks do not
      * prevent tasks from progressing. If there is strong lock contention then
      * writers will be more or less serialized.
-     * 
-     * @todo javadoc update to reflect the {@link NonBlockingLockManager}
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      */
@@ -2264,6 +2265,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
         /**
          * Note: Locks on the named indices are ONLY held during this call.
          */
+        @Override
         public T call() throws Exception {
 
             // The write service on which this task is running.
@@ -2356,7 +2358,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
             super();
         }
         
-        public ResubmitException(String msg) {
+        public ResubmitException(final String msg) {
             
             super(msg);
             
@@ -2389,6 +2391,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
         @SuppressWarnings("rawtypes")
         private final IResourceLocator resourceLocator;
         
+        @Override
         public String toString() {
 
             return getClass().getName() + "{task=" + AbstractTask.this + "}";
@@ -3016,6 +3019,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
          * Overridden to visit the name of all indices that were isolated and to
          * ignore the timestamp.
          */
+        @SuppressWarnings("unchecked")
         @Override
         public Iterator<String> indexNameScan(final String prefix,
                 final long timestampIsIgnored) {
@@ -3054,7 +3058,8 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
         
         @SuppressWarnings("rawtypes")
         private final DefaultResourceLocator resourceLocator;
-        
+
+        @Override
         public String toString() {
 
             return getClass().getName() + "{task=" + AbstractTask.this + "}";
@@ -3313,7 +3318,8 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
 
             final IIndexManager tmp = new DelegateIndexManager(this) {
 
-                public IIndex getIndex(String name, long timestampIsIgnored) {
+                @Override
+                public IIndex getIndex(final String name, final long timestampIsIgnored) {
 
                     // last commit time.
                     final long commitTime = delegate.getRootBlockView()
@@ -3610,7 +3616,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
      */
     private static class DelegateIndexManager implements IIndexManager {
      
-        private IIndexManager delegate;
+        private final IIndexManager delegate;
         
         public DelegateIndexManager(final IIndexManager delegate) {
             this.delegate = delegate;

@@ -33,7 +33,6 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.blueprints.BigdataGraphBulkLoad;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
-import com.bigdata.rdf.sail.webapp.AbstractRestApiTask.RestApiMutationTask;
 import com.bigdata.rdf.sail.webapp.client.MiniMime;
 import com.tinkerpop.blueprints.util.io.graphml.GraphMLReader;
 
@@ -108,13 +107,18 @@ public class BlueprintsServlet extends BigdataRDFServlet {
         
     }
 
-    private static class BlueprintsPostTask extends RestApiMutationTask<Void> {
+    private static class BlueprintsPostTask extends AbstractRestApiTask<Void> {
 
         public BlueprintsPostTask(HttpServletRequest req,
                 HttpServletResponse resp, String namespace, long timestamp) {
 
             super(req, resp, namespace, timestamp);
 
+        }
+
+        @Override
+        public boolean isReadOnly() {
+            return false;
         }
 
         @Override

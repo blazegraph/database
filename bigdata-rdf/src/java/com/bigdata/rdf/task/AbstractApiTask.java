@@ -36,6 +36,7 @@ import org.openrdf.sail.SailException;
 import com.bigdata.BigdataStatics;
 import com.bigdata.journal.IConcurrencyManager;
 import com.bigdata.journal.IIndexManager;
+import com.bigdata.journal.IReadOnly;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.TimestampUtility;
@@ -57,7 +58,7 @@ import com.bigdata.service.IBigdataFederation;
  * @see <a href="- http://sourceforge.net/apps/trac/bigdata/ticket/566" >
  *      Concurrent unisolated operations against multiple KBs </a>
  */
-abstract public class AbstractApiTask<T> implements IApiTask<T> {
+abstract public class AbstractApiTask<T> implements IApiTask<T>, IReadOnly {
 
     /** The reference to the {@link IIndexManager} is set before the task is executed. */
     private final AtomicReference<IIndexManager> indexManagerRef = new AtomicReference<IIndexManager>();
@@ -68,6 +69,9 @@ abstract public class AbstractApiTask<T> implements IApiTask<T> {
     /** The timestamp of the view of that KB instance. */
     protected final long timestamp;
 
+    @Override
+    abstract public boolean isReadOnly();
+    
     @Override
     public String getNamespace() {
         return namespace;
@@ -119,27 +123,20 @@ abstract public class AbstractApiTask<T> implements IApiTask<T> {
     }
 
     /**
-     * Return a read-only view of the {@link AbstractTripleStore} for the given
-     * namespace will read from the commit point associated with the given
-     * timestamp.
+     * Return a view of the {@link AbstractTripleStore} for the given namespace
+     * that will read on the commit point associated with the given timestamp.
      * 
      * @param namespace
      *            The namespace.
      * @param timestamp
-     *            The timestamp.
+     *            The timestamp or {@link ITx#UNISOLATED} to obtain a read/write
+     *            view of the index.
      * 
      * @return The {@link AbstractTripleStore} -or- <code>null</code> if none is
      *         found for that namespace and timestamp.
-     * 
-     *         TODO Enforce historical query by making sure timestamps conform
-     *         (we do not want to allow read/write tx queries unless update
-     *         semantics are introduced ala SPARQL 1.1).
      */
     protected AbstractTripleStore getTripleStore(final String namespace,
             final long timestamp) {
-
-        // if (timestamp == ITx.UNISOLATED)
-        // throw new IllegalArgumentException("UNISOLATED reads disallowed.");
 
         // resolve the default namespace.
         final AbstractTripleStore tripleStore = (AbstractTripleStore) getIndexManager()
@@ -275,7 +272,9 @@ abstract public class AbstractApiTask<T> implements IApiTask<T> {
              * Execute the REST API task.
              * 
              * Note: For scale-out, the operation will be applied using
-             * client-side global views of the indices.
+             * client-side global views of the indices. This means that
+             * there will not be any globally consistent views of the
+             * indices and that updates will be shard-wise local.
              * 
              * Note: This can be used for operations on read-only views (even on
              * a Journal). This is helpful since we can avoid some overhead
@@ -328,6 +327,11 @@ abstract public class AbstractApiTask<T> implements IApiTask<T> {
              * namespace.
              * 
              * (b) is now possible with the fix to the Name2Addr prefix scan.
+             * 
+             * Note: We also need to isolate any named solution sets in the
+             * namespace of the KB. Those will be discovered along with the
+             * indices, but they may require changes to {@link AbstractTask}
+             * for GIST support.
              */
 
             // Obtain the necessary locks for R/w access to KB indices.

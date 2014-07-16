@@ -47,7 +47,6 @@ import org.openrdf.rio.RDFParserRegistry;
 
 import com.bigdata.journal.ITx;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
-import com.bigdata.rdf.sail.webapp.AbstractRestApiTask.RestApiMutationTask;
 import com.bigdata.rdf.sail.webapp.BigdataRDFContext.AbstractQueryTask;
 import com.bigdata.rdf.sail.webapp.DeleteServlet.RemoveStatementHandler;
 import com.bigdata.rdf.sail.webapp.InsertServlet.AddStatementHandler;
@@ -110,10 +109,10 @@ public class UpdateServlet extends BigdataRDFServlet {
      * the last commit time and uses a pipe to connect the query directly to the
      * process deleting the statements. This is done while it is holding the
      * unisolated connection which prevents concurrent modifications. Therefore
-     * the entire SELECT + DELETE operation is ACID.
+     * the entire <code>SELECT + DELETE</code> operation is ACID.
      * 
      * FIXME GROUP COMMIT: update with query has a different pattern and runs a
-     * query that gets drained to discovery what to delete. Can this be turned
+     * query that gets drained to discover what to delete. Can this be turned
      * directly into a SPARQL UPDATE request? (DELETE WHERE; INSERT DATA).
      */
     private void doUpdateWithQuery(final HttpServletRequest req,
@@ -484,7 +483,7 @@ public class UpdateServlet extends BigdataRDFServlet {
         
     }
 
-    private static class UpdateWithBodyTask extends RestApiMutationTask<Void> {
+    private static class UpdateWithBodyTask extends AbstractRestApiTask<Void> {
 
         private final String baseURI;
         private final FileItem remove;
@@ -526,6 +525,11 @@ public class UpdateServlet extends BigdataRDFServlet {
             this.defaultContextInsert = defaultContextInsert;
         }
         
+        @Override
+        public boolean isReadOnly() {
+            return false;
+        }
+
         @Override
         public Void call() throws Exception {
 

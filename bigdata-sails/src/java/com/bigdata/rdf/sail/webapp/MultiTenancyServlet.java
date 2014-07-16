@@ -65,8 +65,14 @@ import com.bigdata.util.PropertyUtil;
  * @author thompsonbry
  * 
  *         FIXME GROUP COMMIT: The CREATE and DESTROY operations require special
- *         attention. The other operations in this class also should use the new
- *         REST API pattern, but are not intrinsically sensitive.
+ *         attention. Define DropKBTask and CreateKBTask for use by the
+ *         multi-tenancy API and fix up the callers of CreateKBTask and
+ *         tripleStore.destroy() to use these tasks. This means that the base
+ *         implementations of those tasks must not require the servlet
+ *         parameters.
+ * 
+ *         FIXME GROUP COMMIT: The other operations in this class also should
+ *         use the new REST API pattern, but are not intrinsically sensitive.
  */
 public class MultiTenancyServlet extends BigdataRDFServlet {
 

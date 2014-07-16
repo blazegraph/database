@@ -95,7 +95,6 @@ import com.bigdata.rdf.sail.BigdataSailUpdate;
 import com.bigdata.rdf.sail.ISPARQLUpdateListener;
 import com.bigdata.rdf.sail.SPARQLUpdateEvent;
 import com.bigdata.rdf.sail.sparql.Bigdata2ASTSPARQLParser;
-import com.bigdata.rdf.sail.webapp.AbstractRestApiTask.RestApiMutationTask;
 import com.bigdata.rdf.sail.webapp.client.StringUtil;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.QueryHints;
@@ -1150,6 +1149,14 @@ public class BigdataRDFContext extends BigdataBaseContext {
                     final long timestamp) {
 
                 super(req, resp, namespace, timestamp);
+                
+            }
+
+            @Override
+            public boolean isReadOnly() {
+             
+                // Read-only unless SPARQL UPDATE.
+                return !AbstractQueryTask.this.update;
                 
             }
 

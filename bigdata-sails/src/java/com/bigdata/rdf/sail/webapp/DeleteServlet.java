@@ -48,7 +48,6 @@ import org.openrdf.sail.SailException;
 import com.bigdata.journal.ITx;
 import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
-import com.bigdata.rdf.sail.webapp.AbstractRestApiTask.RestApiMutationTask;
 import com.bigdata.rdf.sail.webapp.BigdataRDFContext.AbstractQueryTask;
 import com.bigdata.rdf.sail.webapp.client.EncodeDecodeValue;
 import com.bigdata.rdf.sail.webapp.client.MiniMime;
@@ -348,7 +347,7 @@ public class DeleteServlet extends BigdataRDFServlet {
 
     }
     
-    private static class DeleteWithBodyTask extends RestApiMutationTask<Void> {
+    private static class DeleteWithBodyTask extends AbstractRestApiTask<Void> {
 
         private final String baseURI;
         private final Resource[] defaultContext;
@@ -379,6 +378,11 @@ public class DeleteServlet extends BigdataRDFServlet {
             this.baseURI = baseURI;
             this.defaultContext = defaultContext;
             this.rdfParserFactory = rdfParserFactory;
+        }
+
+        @Override
+        public boolean isReadOnly() {
+            return false;
         }
 
         @Override
@@ -545,7 +549,7 @@ public class DeleteServlet extends BigdataRDFServlet {
 
 //    static private transient final Resource[] nullArray = new Resource[]{};
     
-    private static class DeleteWithAccessPathTask extends RestApiMutationTask<Void> {
+    private static class DeleteWithAccessPathTask extends AbstractRestApiTask<Void> {
 
         private Resource s;
         private URI p;
@@ -577,6 +581,11 @@ public class DeleteServlet extends BigdataRDFServlet {
             this.p = p;
             this.o = o;
             this.c = c;
+        }
+
+        @Override
+        public boolean isReadOnly() {
+            return true;
         }
 
         @Override

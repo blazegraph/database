@@ -56,7 +56,6 @@ import com.bigdata.test.ExperimentDriver.Result;
  * {@link UnisolatedReadWriteIndex} rather than the {@link ConcurrencyManager}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  * @see UnisolatedReadWriteIndex
  */
 public class StressTestUnisolatedReadWriteIndex extends ProxyTestCase<Journal> {
@@ -435,6 +434,7 @@ public class StressTestUnisolatedReadWriteIndex extends ProxyTestCase<Journal> {
             
         }
 
+        @Override
         public String toString() {
 
             return getClass().getName() + "#" + trial;
@@ -446,6 +446,7 @@ public class StressTestUnisolatedReadWriteIndex extends ProxyTestCase<Journal> {
          * 
          * @return null
          */
+        @Override
         public Void call() throws Exception {
 
             final IIndex[] indices = new IIndex[resource.length];
