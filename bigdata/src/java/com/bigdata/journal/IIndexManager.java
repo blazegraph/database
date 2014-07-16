@@ -34,7 +34,6 @@ import com.bigdata.counters.ICounterSetAccess;
  * Interface for managing named indices.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public interface IIndexManager extends IIndexStore, ICounterSetAccess {
 
