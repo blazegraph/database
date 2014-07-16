@@ -387,10 +387,12 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
             for(String s : resource) {
                 
                 final Name2Addr.Entry tmp = name2Addr.getEntry(s);
-                
-                if(tmp != null) {
+
+                if (tmp != null) {
                 
                     /*
+                     * Exact match on a named index.
+                     * 
                      * Add a read-only copy of the entry with additional state
                      * for tracking registration and dropping of named indices.
                      * 
@@ -399,6 +401,37 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
                      */
                     
                     n2a.put(s, new Entry(tmp));
+                    
+                } else {
+                    
+                    /**
+                     * Add a read-only copy of the Name2Addr entry for all
+                     * entries spanned by that namespace. This provides the
+                     * additional state for tracking registration and dropping
+                     * of named indices and also supports hierarchical locking
+                     * pattersn.
+                     * 
+                     * Note: We do NOT fetch the indices here, just copy their
+                     * last checkpoint metadata from Name2Addr.
+                     * 
+                     * @see <a
+                     *      href="http://trac.bigdata.com/ticket/566"
+                     *      > Concurrent unisolated operations against multiple
+                     *      KBs </a>
+                     */
+                    
+                    final Iterator<String> itr = Name2Addr.indexNameScan(s,
+                            name2Addr);
+
+                    while (itr.hasNext()) {
+
+                        final String t = itr.next();
+
+                        final Name2Addr.Entry tmp2 = name2Addr.getEntry(t);
+
+                        n2a.put(t, new Entry(tmp2));
+
+                    }
                     
                 }
                 
@@ -517,7 +550,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
      * delegated to this method. First, the task can use this method directly.
      * Second, the task can use {@link #getJournal()} and then use
      * {@link IJournal#getIndex(String)} on that journal, which is simply
-     * delegated to this method.  See {@link IsolatedActionJournal}.
+     * delegated to this method. See {@link IsolatedActionJournal}.
      * 
      * @param name
      *            The name of the index.
@@ -534,8 +567,12 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
      * 
      * @return The index.
      * 
-     * @todo modify to return <code>null</code> if the index is not
-     *       registered?
+     * @todo modify to return <code>null</code> if the index is not registered?
+     * 
+     *       FIXME GIST. This will throw a ClassCastException if the returned
+     *       index is an ILocalBTreeView.
+     * 
+     * @see http://trac.bigdata.com/ticket/585 (GIST)
      */
     @Override
     synchronized final public ILocalBTreeView getIndex(final String name) {
@@ -955,7 +992,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
      *         Thompson</a>
      *         
-     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/675" >
+     * @see <a href="http://trac.bigdata.com/ticket/675" >
      *      Flush indices in parallel during checkpoint to reduce IO latency</a>
      */
     private class CheckpointIndexTask implements Callable<Void> {
@@ -1003,7 +1040,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
      * 
      * @return The elapsed time in nanoseconds for this operation.
      * 
-     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/675"
+     * @see <a href="http://trac.bigdata.com/ticket/675"
      *      >Flush indices in parallel during checkpoint to reduce IO
      *      latency</a>
      */
@@ -1315,13 +1352,18 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
      *            The transaction identifier -or- {@link ITx#UNISOLATED} IFF the
      *            operation is NOT isolated by a transaction -or-
      *            <code> - timestamp </code> to read from the most recent commit
-     *            point not later than the absolute value of <i>timestamp</i>
-     *            (a historical read).
+     *            point not later than the absolute value of <i>timestamp</i> (a
+     *            historical read).
      * @param resource
      *            The resource on which the task will operate. E.g., the names
      *            of the index. When the task is an unisolated write task an
      *            exclusive lock will be requested on the named resource and the
      *            task will NOT run until it has obtained that lock.
+     *            <p>
+     *            The name may identify either a namespace or a concrete index
+     *            object. If a concrete index object is discovered, only that
+     *            index is isolated. Otherwise all indices having the same
+     *            prefix as the namespace are isolated.
      */
     protected AbstractTask(final IConcurrencyManager concurrencyManager,
             final long timestamp, final String resource) {
@@ -1346,6 +1388,11 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
      *            task an exclusive lock will be requested on each named
      *            resource and the task will NOT run until it has obtained those
      *            lock(s).
+     *            <p>
+     *            The name may identify either a namespace or a concrete index
+     *            object. If a concrete index object is discovered, only that
+     *            index is isolated. Otherwise all indices having the same
+     *            prefix as the namespace are isolated.
      */
     protected AbstractTask(final IConcurrencyManager concurrencyManager,
             final long timestamp, final String[] resource) {
@@ -1453,7 +1500,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
 
                 if (transactionManager.getTx(timestamp) == null) {
 
-                    /*
+                    /**
                      * Start tx on this data service.
                      * 
                      * FIXME This should be passing the [readsOnCommitTime] into
@@ -1464,11 +1511,11 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
                      * submitted primarily for the clustered database
                      * deployment.
                      * 
-                     * @see https://sourceforge.net/apps/trac/bigdata/ticket/266
+                     * @see http://trac.bigdata.com/ticket/266
                      * (refactor native long tx id to thin object)
                      * 
                      * @see <a
-                     * href="http://sourceforge.net/apps/trac/bigdata/ticket/546"
+                     * href="http://trac.bigdata.com/ticket/546"
                      * > Add cache for access to historical index views on the
                      * Journal by name and commitTime. </a>
                      */
@@ -1588,40 +1635,39 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
             }
 
             /**
-             * FIXME GROUP_COMMIT: Supporting this requires us to support
-             * efficient scans of the indices in Name2Addr having the prefix
-             * values declared by [resources] since getIndex(name) will fail if
-             * the Name2Addr entry has not been buffered within the [n2a] cache.
+             * Look for a prefix that spans one or more resources.
              * 
-             * @see <a
-             *      href="http://sourceforge.net/apps/trac/bigdata/ticket/753" >
-             *      HA doLocalAbort() should interrupt NSS requests and
+             * Note: Supporting this requires us to support efficient scans of
+             * the indices in Name2Addr since getIndex(name) will fail if the
+             * Name2Addr entry has not been buffered within the [n2a] cache.
+             * 
+             * @see <a href="http://trac.bigdata.com/ticket/753" > HA
+             *      doLocalAbort() should interrupt NSS requests and
              *      AbstractTasks </a>
-             * @see <a
-             *      href="- http://sourceforge.net/apps/trac/bigdata/ticket/566"
-             *      > Concurrent unisolated operations against multiple KBs </a>
+             * @see <a href="http://trac.bigdata.com/ticket/566" > Concurrent
+             *      unisolated operations against multiple KBs </a>
              */
-//            if (theRequestedResource.startsWith(theDeclaredResource)) {
-//                
-//                // Possible prefix match.
-//                
-//                if (theRequestedResource.charAt(theDeclaredResource.length()) == '.') {
-//
-//                    /*
-//                     * Prefix match.
-//                     * 
-//                     * E.g., name:="kb.spo.osp" and the task declared the
-//                     * resource "kb". In this case, "kb" is a PREFIX of the
-//                     * declared resource and the next character is the separator
-//                     * character for the resource names (this last point is
-//                     * important to avoid unintended contention between
-//                     * namespaces such as "kb" and "kb1").
-//                     */
-//                    return true;
-//
-//                }
-//
-//            }
+            if (theRequestedResource.startsWith(theDeclaredResource)) {
+                
+                // Possible prefix match.
+                
+                if (theRequestedResource.charAt(theDeclaredResource.length()) == '.') {
+
+                    /*
+                     * Prefix match.
+                     * 
+                     * E.g., name:="kb.spo.osp" and the task declared the
+                     * resource "kb". In this case, "kb" is a PREFIX of the
+                     * declared resource and the next character is the separator
+                     * character for the resource names (this last point is
+                     * important to avoid unintended contention between
+                     * namespaces such as "kb" and "kb1").
+                     */
+                    return true;
+
+                }
+
+            }
 
         }
 
@@ -2488,7 +2534,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
              * FIXME GIST : Support registration of index types other than BTree
              * (HTree, Stream, etc).
              * 
-             * @see https://sourceforge.net/apps/trac/bigdata/ticket/585 (GIST)
+             * @see http://trac.bigdata.com/ticket/585 (GIST)
              */
 
             throw new UnsupportedOperationException();
@@ -2522,14 +2568,14 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
          * Note: access to an unisolated index is governed by the AbstractTask.
          */
         @Override
-        public ICheckpointProtocol getUnisolatedIndex(String name) {
+        public ICheckpointProtocol getUnisolatedIndex(final String name) {
             try {
 
                 /*
                  * FIXME GIST. This will throw a ClassCastException if the
                  * returned index is an ILocalBTreeView.
                  * 
-                 * @see https://sourceforge.net/apps/trac/bigdata/ticket/585 (GIST)
+                 * @see http://trac.bigdata.com/ticket/585 (GIST)
                  */
 
                 return (ICheckpointProtocol) AbstractTask.this.getIndex(name);
@@ -2599,7 +2645,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
              * in a ClassCastException.
              * 
              * @see <a
-             *      href="https://sourceforge.net/apps/trac/bigdata/ticket/585"
+             *      href="http://trac.bigdata.com/ticket/585"
              *      > GIST </a>
              */
             return (ICheckpointProtocol) resourceManager.getIndex(name, commitTime);
