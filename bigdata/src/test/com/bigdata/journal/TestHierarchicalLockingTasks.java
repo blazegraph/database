@@ -29,7 +29,6 @@ package com.bigdata.journal;
 
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Future;
 
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ILocalBTreeView;
@@ -130,9 +129,9 @@ public class TestHierarchicalLockingTasks extends ProxyTestCase<Journal> {
              * those that are not spanned by the namespace.
              */
 
-            final Future<Void> ft = journal
-                    .submit(new AbstractTask<Void>(journal
-                            .getConcurrencyManager(), ITx.UNISOLATED, namespace) {
+            journal.submit(
+                    new AbstractTask<Void>(journal.getConcurrencyManager(),
+                            ITx.UNISOLATED, namespace) {
 
                         @Override
                         protected Void doTask() throws Exception {
@@ -167,14 +166,7 @@ public class TestHierarchicalLockingTasks extends ProxyTestCase<Journal> {
                             // Done.
                             return null;
                         }
-                    });
-
-            try {
-                // Await outcome.
-                ft.get();
-            } finally {
-                ft.cancel(true/* mayInterruptIfRunning */);
-            }
+                    }).get();
 
         } finally {
 
