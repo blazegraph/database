@@ -373,7 +373,7 @@ NAMESPACE_SHORTCUTS = {
    }
 };
 
-$('.namespace-shortcuts').html('');
+$('.namespace-shortcuts').html('Namespace shortcuts: ');
 for(var category in NAMESPACE_SHORTCUTS) {
    var select = $('<select><option>' + category + '</option></select>').appendTo($('.namespace-shortcuts'));
    for(var ns in NAMESPACE_SHORTCUTS[category]) {
