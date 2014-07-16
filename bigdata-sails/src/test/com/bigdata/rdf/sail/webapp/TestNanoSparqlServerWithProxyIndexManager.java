@@ -60,23 +60,7 @@ import com.bigdata.service.jini.JiniFederation;
  * queries which exercise the context position; and the default-graph and
  * named-graph URL query parameters for quads.
  * 
- * @todo Security model?
- * 
- * @todo An NQUADS RDFWriter needs to be written. Then we can test NQUADS
- *       interchange.
- * 
- * @todo A SPARQL result sets JSON parser needs to be written (Sesame bundles a
- *       writer, but not a parser) before we can test queries which CONNEG for a
- *       JSON result set.
- * 
- * @todo Tests which verify the correct rejection of illegal or ill-formed
- *       requests.
- * 
- * @todo Test suite for reading from a historical commit point.
- * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id: TestNanoSparqlServer.java 4398 2011-04-14 13:55:29Z thompsonbry
- *          $
  */
 public class TestNanoSparqlServerWithProxyIndexManager<S extends IIndexManager>
         extends AbstractIndexManagerTestCase<S> {
