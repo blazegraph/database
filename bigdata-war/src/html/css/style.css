@@ -359,6 +359,11 @@ iframe {
    background-color: tomato;
 }
 
+#inference-quads-incompatible {
+   display: none;
+   font-style: italic;
+}
+
 #links {
    text-align: center;
    margin-top: 20px;

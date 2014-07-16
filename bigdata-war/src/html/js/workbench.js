@@ -9,7 +9,8 @@ var NAMESPACE_PARAMS = {
    'index': 'com.bigdata.rdf.store.AbstractTripleStore.textIndex',
    'truthMaintenance': 'com.bigdata.rdf.sail.truthMaintenance',
    'quads': 'com.bigdata.rdf.store.AbstractTripleStore.quads',
-   'rdr': 'com.bigdata.rdf.store.AbstractTripleStore.statementIdentifiers'
+   'rdr': 'com.bigdata.rdf.store.AbstractTripleStore.statementIdentifiers',
+   'axioms': 'com.bigdata.rdf.store.AbstractTripleStore.axiomsClass'
 };
 
 CODEMIRROR_DEFAULTS = {
@@ -222,49 +223,64 @@ function getNamespaceProperties(namespace, download) {
 function cloneNamespace(namespace) {
    var url = RO_URL_PREFIX + 'namespace/' + namespace + '/properties';
    $.get(url, function(data) {
-      var reversed_params = {};
-      for(var key in NAMESPACE_PARAMS) {
-         reversed_params[NAMESPACE_PARAMS[key]] = key;
-      }
+      // collect params from namespace to be cloned
+      var params = {};
       $.each(data.getElementsByTagName('entry'), function(i, entry) {
-         var key = entry.getAttribute('key');
-         if(reversed_params[key] == 'name') {
-            return;
-         }
-         if(key in reversed_params) {
-            $('#new-namespace-' + reversed_params[key]).prop('checked', entry.textContent.trim() == 'true');
-         }
+         params[entry.getAttribute('key')] = entry.textContent.trim();
       });
+
+      // set up new namespace form with collected params
+      var mode, quads, rdr;
+      quads = params[NAMESPACE_PARAMS.quads] == 'true';
+      rdr = params[NAMESPACE_PARAMS.rdr] == 'true';
+      if(!quads && !rdr) {
+         mode = 'triples';
+      } else if(!quads && rdr) {
+         mode = 'rdr';
+      } else if(quads && !rdr) {
+         mode = 'quads';
+      } else {
+         alert('Incompatible set of namespace parameters');
+         return;
+      }
+      $('#new-namespace-mode').val(mode);
+      $('#new-namespace-inference').prop('checked', params[NAMESPACE_PARAMS.axioms] == 'com.bigdata.rdf.axioms.OwlAxioms');
+      $('#new-namespace-index').prop('checked', params[NAMESPACE_PARAMS.index] == 'true');
+
       $('#new-namespace-name').focus();
    });
 }
 
 function validateNamespaceOptions() {
    var errors = [];
-   if(!$('#new-namespace-name').val().trim()) {
+   var name = $('#new-namespace-name').val().trim();
+   if(!name) {
       errors.push('Enter a name');
    }
-   if($('#new-namespace-truth-maintenance').is(':checked') && $('#new-namespace-quads').is(':checked')) {
-      errors.push('You may not select both truth maintenance and quads');
-   }
-   if($('#new-namespace-rdr').is(':checked') && $('#new-namespace-quads').is(':checked')) {
-      errors.push('You may not select both RDR and quads');
+   $('#namespaces-list li').each(function() {
+      if(name == $(this).data('name')) {
+         errors.push('Name already in use');
+         return false;
+      }
+   });
+   if($('#new-namespace-mode').val() == 'quads' && $('#new-namespace-inference').is(':checked')) {
+      errors.push('Inference is incompatible with quads mode');
    }
    $('#namespace-create-errors').html('');
    for(var i=0; i<errors.length; i++) {
       $('#namespace-create-errors').append('<li>' + errors[i] + '</li>');
    }
-   var valid = errors.length == 0;
-   if(valid) {
-      $('#namespace-create input[type=submit]').removeAttr('disabled');      
-   } else {
-      $('#namespace-create input[type=submit]').attr('disabled', 'disabled');      
-   }
    return errors.length == 0;
 }
 
-$('#namespace-create input').change(validateNamespaceOptions);
-$('#namespace-create input').keyup(validateNamespaceOptions);
+$('#new-namespace-mode').change(function() {
+   var quads = this.value == 'quads';
+   $('#new-namespace-inference').prop('disabled', quads);
+   $('#inference-quads-incompatible').toggle(quads);
+   if(quads) {
+      $('#new-namespace-inference').prop('checked', false);
+   }
+});
 
 function createNamespace(e) {
    e.preventDefault();
@@ -273,18 +289,38 @@ function createNamespace(e) {
    }
    // get new namespace name and config options
    var params = {};
+   
    params.name = $('#new-namespace-name').val().trim();
    params.index = $('#new-namespace-index').is(':checked');
-   params.truthMaintenance = $('#new-namespace-truth-maintenance').is(':checked');
-   params.quads = $('#new-namespace-quads').is(':checked');
-   params.rdr = $('#new-namespace-rdr').is(':checked');
-   // TODO: validate namespace
+   
+   var mode = $('#new-namespace-mode').val();
+   if(mode == 'triples') {
+      params.quads = false;
+      params.rdr = false;
+      params.truthMaintenance = true;
+   } else if(mode == 'rdr') {
+      params.quads = false;
+      params.rdr = true;
+      params.truthMaintenance = true;
+   } else { // quads
+      params.quads = true;
+      params.rdr = false;
+      params.truthMaintenance = false;
+   }
+   
+   if($('#new-namespace-inference').is(':checked')) {
+      params.axioms = 'com.bigdata.rdf.axioms.OwlAxioms';
+   } else {
+      params.axioms = 'com.bigdata.rdf.axioms.NoAxioms';
+   }
+
    // TODO: allow for other options to be specified
    var data = '<?xml version="1.0" encoding="UTF-8" standalone="no"?>\n<!DOCTYPE properties SYSTEM "http://java.sun.com/dtd/properties.dtd">\n<properties>\n';
    for(key in NAMESPACE_PARAMS) {
       data += '<entry key="' + NAMESPACE_PARAMS[key] + '">' + params[key] + '</entry>\n';
    }
    data += '</properties>';
+
    var settings = {
       type: 'POST',
       data: data,
@@ -1358,6 +1394,7 @@ function getStatus(e) {
    if(e) {
       e.preventDefault();
    }
+   showQueries(true);
    $.get(RO_URL_PREFIX + 'status', function(data) {
       // get data inside a jQuery object
       data = $('<div>').append(data);
