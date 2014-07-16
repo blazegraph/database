@@ -29,8 +29,10 @@ package com.bigdata.rdf.sparql.ast.eval;
 
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.openrdf.query.algebra.evaluation.QueryBindingSet;
 import org.openrdf.sail.SailException;
 
+import com.bigdata.bop.IBindingSet;
 import com.bigdata.journal.ITx;
 import com.bigdata.rdf.internal.IVCache;
 import com.bigdata.rdf.model.BigdataURI;
@@ -55,6 +57,10 @@ public class AST2BOpUpdateContext extends AST2BOpContext {
     public final BigdataSailRepositoryConnection conn;
 
     private boolean includeInferred;
+    
+    private QueryBindingSet qbs;
+    
+    private IBindingSet[] bindingSets;
 
     /**
      * The timestamp associated with the commit point for the update and
@@ -145,6 +151,30 @@ public class AST2BOpUpdateContext extends AST2BOpContext {
         
     }
     
+    public IBindingSet[] getBindings() {
+        
+        return bindingSets;
+        
+    }
+
+    public void setBindings(final IBindingSet[] bindingSets) {
+        
+        this.bindingSets = bindingSets;
+        
+    }
+
+    public QueryBindingSet getQueryBindingSet() {
+        
+        return qbs;
+        
+    }
+
+    public void setQueryBindingSet(final QueryBindingSet qbs) {
+        
+        this.qbs = qbs;
+        
+    }
+
     private BigdataURI nullGraph = null;
 
 }

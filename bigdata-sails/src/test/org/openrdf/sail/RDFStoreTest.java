@@ -729,8 +729,10 @@ public abstract class RDFStoreTest extends TestCase {
 		assertEquals("Wrong number of query results", 1, resultCount);
 	}
 
-	@Test
-	private void testMultiThreadedAccess() {
+	/**
+	 * Not compatible with our MVCC semantics.
+	 */
+	private void __testMultiThreadedAccess() {
 
 		Runnable runnable = new Runnable() {
 

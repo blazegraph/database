@@ -82,28 +82,28 @@ public class BigdataStoreTest extends RDFStoreTest {
 
     private static final Logger log = Logger.getLogger(BigdataStoreTest.class);
  
-    /**
-     * Return a test suite using the {@link LocalTripleStore} and pipeline
-     * joins.
-     */
-    public static class LTSWithPipelineJoins extends BigdataStoreTest {
-
-//        public LTSWithPipelineJoins(String name) {
+//    /**
+//     * Return a test suite using the {@link LocalTripleStore} and pipeline
+//     * joins.
+//     */
+//    public static class LTSWithPipelineJoins extends BigdataStoreTest {
+//
+////        public LTSWithPipelineJoins(String name) {
+////            
+////            super(name);
+////            
+////        }
+//        
+//        @Override
+//        protected Properties getProperties() {
 //            
-//            super(name);
+//            final Properties p = new Properties(super.getProperties());
+//       
+//            return p;
 //            
 //        }
-        
-        @Override
-        protected Properties getProperties() {
-            
-            final Properties p = new Properties(super.getProperties());
-       
-            return p;
-            
-        }
-
-    }
+//
+//    }
     
     static File createTempFile() {
         

@@ -74,7 +74,7 @@ public abstract class GroupMemberValueExpressionNodeBase extends
 
     }
 
-    abstract IValueExpressionNode getValueExpressionNode();
+    abstract public IValueExpressionNode getValueExpressionNode();
 
     abstract IValueExpression<? extends IV> getValueExpression();
 

@@ -122,31 +122,31 @@ public class BigdataConnectionTest extends RepositoryConnectionTest {
     private static final Logger log = Logger.getLogger(BigdataConnectionTest.class);
     
 	public BigdataConnectionTest(String name) {
-//		super(name);
+		super(name);
 	}
     
-    /**
-     * Return a test suite using the {@link LocalTripleStore} and pipeline
-     * joins.
-     */
-    public static class LTSWithPipelineJoins extends BigdataConnectionTest {
-
-        public LTSWithPipelineJoins(String name) {
-            
-            super(name);
-            
-        }
-        
-        @Override
-        protected Properties getProperties() {
-            
-            final Properties p = new Properties(super.getProperties());
-            
-            return p;
-            
-        }
-
-    }
+//    /**
+//     * Return a test suite using the {@link LocalTripleStore} and pipeline
+//     * joins.
+//     */
+//    public static class LTSWithPipelineJoins extends BigdataConnectionTest {
+//
+//        public LTSWithPipelineJoins(String name) {
+//            
+//            super(name);
+//            
+//        }
+//        
+//        @Override
+//        protected Properties getProperties() {
+//            
+//            final Properties p = new Properties(super.getProperties());
+//            
+//            return p;
+//            
+//        }
+//
+//    }
     
 	protected Properties getProperties() {
 	    

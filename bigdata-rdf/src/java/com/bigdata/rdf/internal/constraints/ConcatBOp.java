@@ -31,6 +31,7 @@ import org.openrdf.model.URI;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IValueExpression;
+import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.sparql.ast.GlobalAnnotations;
 
@@ -76,6 +77,11 @@ public class ConcatBOp extends IVValueExpression<IV> implements INeedsMaterializ
         for (int i = 0; i < arity(); i++) {
             @SuppressWarnings("rawtypes")
             final IV v = getAndCheckLiteral(i, bs);
+
+            if (v.isNumeric()) {
+                throw new SparqlTypeErrorException();
+            }
+            
             String label = null;
             if (allSame) {
                 final Literal lit = asLiteral(v);

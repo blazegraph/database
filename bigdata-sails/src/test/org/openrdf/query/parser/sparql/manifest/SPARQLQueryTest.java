@@ -22,6 +22,7 @@ package org.openrdf.query.parser.sparql.manifest;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.StringReader;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -39,6 +40,7 @@ import info.aduna.io.IOUtil;
 import info.aduna.iteration.Iterations;
 import info.aduna.text.StringUtil;
 
+import org.apache.commons.io.IOUtils;
 import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
@@ -249,7 +251,10 @@ public abstract class SPARQLQueryTest extends TestCase {
 		}
 	}
 
-	protected final void compareTupleQueryResults(TupleQueryResult queryResult, TupleQueryResult expectedResult)
+    /*
+     * MRP: Made !final.
+     */
+	protected void compareTupleQueryResults(TupleQueryResult queryResult, TupleQueryResult expectedResult)
 		throws Exception
 	{
 		// Create MutableTupleQueryResult to be able to re-iterate over the
@@ -405,7 +410,10 @@ public abstract class SPARQLQueryTest extends TestCase {
 		*/
 	}
 
-	protected final void compareGraphs(Set<Statement> queryResult, Set<Statement> expectedResult)
+    /*
+     * MRP: Made !final.
+     */
+	protected void compareGraphs(Set<Statement> queryResult, Set<Statement> expectedResult)
 		throws Exception
 	{
 		if (!ModelUtil.equals(expectedResult, queryResult)) {
@@ -479,7 +487,7 @@ public abstract class SPARQLQueryTest extends TestCase {
 			con.close();
 		}
 	}
-
+	
     /*
      * MRP: Made protected.
      */
@@ -662,7 +670,7 @@ public abstract class SPARQLQueryTest extends TestCase {
 		query.append(" WHERE NOT resultFile LIKE \"*.csv\" ");
 		// skip tests involving JSON, sesame currently does not have a SPARQL/JSON
 		// parser.
-		query.append(" AND NOT resultFile LIKE \"*.srj\" ");
+//		query.append(" AND NOT resultFile LIKE \"*.srj\" ");
 		// skip tests involving entailment regimes
 		query.append(" AND NOT BOUND(Regime) ");
 		// skip test involving basic federation, these are tested separately.
@@ -694,6 +702,10 @@ public abstract class SPARQLQueryTest extends TestCase {
 			BindingSet bindingSet = testCases.next();
 
 			URI testURI = (URI)bindingSet.getValue("testURI");
+			
+			System.err.println(testURI);
+	            
+
 			String testName = bindingSet.getValue("testName").toString();
 			String resultFile = bindingSet.getValue("resultFile").toString();
 			String queryFile = bindingSet.getValue("queryFile").toString();

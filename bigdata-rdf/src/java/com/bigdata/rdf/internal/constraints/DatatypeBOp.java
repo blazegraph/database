@@ -30,6 +30,7 @@ import org.apache.log4j.Logger;
 import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
+import org.openrdf.model.vocabulary.RDF;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
@@ -120,6 +121,11 @@ public class DatatypeBOp extends IVValueExpression<IV>
 
 				// literal with datatype
 				datatype = literal.getDatatype();
+
+            } else if (literal.getLanguage() != null) {
+
+                // language-tag literal
+                datatype = RDF.LANGSTRING;
 
 			} else if (literal.getLanguage() == null) {
 

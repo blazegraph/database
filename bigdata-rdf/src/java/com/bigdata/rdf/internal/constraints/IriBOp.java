@@ -27,10 +27,13 @@ import java.util.Map;
 
 import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
+import org.openrdf.query.algebra.evaluation.ValueExprEvaluationException;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IValueExpression;
+import com.bigdata.bop.ImmutableBOp;
+import com.bigdata.bop.NV;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.XSD;
@@ -49,9 +52,17 @@ public class IriBOp extends IVValueExpression<IV> implements INeedsMaterializati
 
     private static final long serialVersionUID = -8448763718374010166L;
 
+    
+    public interface Annotations extends ImmutableBOp.Annotations {
+
+        String BASE_URI = (IriBOp.class.getName() + ".baseURI").intern();
+
+    }
+
     public IriBOp(final IValueExpression<? extends IV> x, 
-    		final GlobalAnnotations globals) {
-        super(x, globals);
+    		final String baseURI,
+            final GlobalAnnotations globals) {
+        super(x, globals, new NV(Annotations.BASE_URI, baseURI));
     }
 
     public IriBOp(BOp[] args, Map<String, Object> anns) {
@@ -81,6 +92,8 @@ public class IriBOp extends IVValueExpression<IV> implements INeedsMaterializati
         if (!iv.isLiteral())
             throw new SparqlTypeErrorException();
 
+        final String baseURI = getProperty(Annotations.BASE_URI, "");
+        
         final Literal lit = asLiteral(iv);
 
         final URI dt = lit.getDatatype();
@@ -88,7 +101,20 @@ public class IriBOp extends IVValueExpression<IV> implements INeedsMaterializati
         if (dt != null && !dt.stringValue().equals(XSD.STRING.stringValue()))
             throw new SparqlTypeErrorException();
 
-        final BigdataURI uri = getValueFactory().createURI(lit.getLabel());
+//        final BigdataURI uri = getValueFactory().createURI(baseURI+lit.getLabel());
+
+        BigdataURI uri = null;
+        try {
+            uri = getValueFactory().createURI(lit.getLabel());
+        }
+        catch (IllegalArgumentException e) {
+            try {
+                uri = getValueFactory().createURI(baseURI, lit.getLabel());
+            }
+            catch (IllegalArgumentException e1) {
+                throw new SparqlTypeErrorException();
+            }
+        }
 
         return super.asIV(uri, bs);
 

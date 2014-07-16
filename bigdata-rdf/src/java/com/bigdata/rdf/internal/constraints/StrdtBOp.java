@@ -78,6 +78,10 @@ public class StrdtBOp extends IVValueExpression<IV> implements INeedsMaterializa
 
         final Literal lit = asLiteral(iv);
         
+        if (lit.getDatatype() != null || lit.getLanguage() != null) {
+            throw new SparqlTypeErrorException();
+        }
+        
         final String label = lit.getLabel();
         
         final BigdataLiteral str = getValueFactory().createLiteral(label, dt);

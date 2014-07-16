@@ -61,6 +61,8 @@ import org.openrdf.repository.RepositoryResult;
 import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFParseException;
 
+import com.bigdata.rdf.store.BD;
+
 /**
  * Tests for SPARQL 1.1 Update functionality.
  * 
@@ -1688,6 +1690,7 @@ public abstract class SPARQLUpdateTest extends TestCase {
 		declarations.append("PREFIX foaf: <" + FOAF.NAMESPACE + "> \n");
 		declarations.append("PREFIX ex: <" + EX_NS + "> \n");
 		declarations.append("PREFIX xsd: <" + XMLSchema.NAMESPACE + "> \n");
+        declarations.append("PREFIX bd: <" + BD.NAMESPACE + "> \n");
 		declarations.append("\n");
 
 		return declarations.toString();

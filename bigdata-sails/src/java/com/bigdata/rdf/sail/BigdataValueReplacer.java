@@ -117,11 +117,17 @@ public class BigdataValueReplacer {
 
         if (dataset != null) {
 
-            for(URI uri : dataset.getDefaultGraphs())
-                values.put(uri, valueFactory.asValue(uri));
+            for(URI uri : dataset.getDefaultGraphs()) {
+                if (uri != null) {
+                    values.put(uri, valueFactory.asValue(uri));
+                }
+            }
             
-            for(URI uri : dataset.getNamedGraphs())
-                values.put(uri, valueFactory.asValue(uri));
+            for(URI uri : dataset.getNamedGraphs()) {
+                if (uri != null) {
+                    values.put(uri, valueFactory.asValue(uri));
+                }
+            }
             
         }
 

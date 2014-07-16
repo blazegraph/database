@@ -92,6 +92,7 @@ import com.bigdata.rdf.internal.constraints.IsBoundBOp;
 import com.bigdata.rdf.internal.constraints.ProjectedConstraint;
 import com.bigdata.rdf.internal.constraints.SPARQLConstraint;
 import com.bigdata.rdf.internal.constraints.TryBeforeMaterializationConstraint;
+import com.bigdata.rdf.internal.constraints.UUIDBOp;
 import com.bigdata.rdf.internal.impl.literal.XSDBooleanIV;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataURI;
@@ -99,6 +100,7 @@ import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.ASTUtil;
 import com.bigdata.rdf.sparql.ast.ArbitraryLengthPathNode;
 import com.bigdata.rdf.sparql.ast.AssignmentNode;
+import com.bigdata.rdf.sparql.ast.BindingsClause;
 import com.bigdata.rdf.sparql.ast.ComputedMaterializationRequirement;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
 import com.bigdata.rdf.sparql.ast.DatasetNode;
@@ -2687,6 +2689,11 @@ public class AST2BOpUtility extends AST2BOpRTO {
                 left = addAssignment(left, (AssignmentNode) child, doneSet,
                         joinGroup.getQueryHints(), ctx, false/* projection */);
                 continue;
+            } else if (child instanceof BindingsClause) {
+//                // LET / BIND
+//                left = addAssignment(left, (AssignmentNode) child, doneSet,
+//                        joinGroup.getQueryHints(), ctx, false/* projection */);
+                continue;
             } else {
                 throw new UnsupportedOperationException("child: " + child);
             }
@@ -4574,6 +4581,16 @@ public class AST2BOpUtility extends AST2BOpRTO {
                 	
                 	return ve;
                 	
+                }
+                
+                if (op instanceof UUIDBOp) {
+                    
+                    /*
+                     * We cannot pre-generate these, they need to be unique
+                     * for each call.
+                     */
+                    return ve;
+                    
                 }
 
             }

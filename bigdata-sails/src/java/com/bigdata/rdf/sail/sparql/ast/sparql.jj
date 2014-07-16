@@ -27,6 +27,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  * "make javacc" to rebuild.  Be sure to first remove the sparql.jj file
  * so it will generate a new one.
+ * 
+ * Updated 6/7/14 by Mike Personick.  Updated to capture the delta between the 
+ * Sesame 2.6.10/2.7.12 sparql.jjt files.
  */
  
 /*
@@ -117,6 +120,30 @@ public class SyntaxTreeBuilder/*@bgen(jjtree)*/implements SyntaxTreeBuilderTreeC
         }
         return s;
     }
+
+	private String readToMatchingBrace() {
+	    StringBuilder sb = new StringBuilder();
+	    Token tok;
+	    int nesting = 1;
+	    boolean previousTokenDtSep = false;
+	    while (true) {
+		tok = getToken(1);
+		if (!previousTokenDtSep && ! tok.image.equals("^^")) {
+		    sb.append(" ");
+		}
+		if (tok.kind == LBRACE) nesting++;
+		if (tok.kind == RBRACE) {
+		    nesting--;
+		    if (nesting == 0) break;
+		}
+		sb.append(tok.image);
+		previousTokenDtSep = tok.image.equals("^^");
+
+		tok = getNextToken();
+
+	    }
+	    return sb.toString();
+	}
 }
 PARSER_END(SyntaxTreeBuilder)
 
@@ -221,6 +248,8 @@ TOKEN [IGNORE_CASE] :
 |   <BNODE: "bnode">
 |   <STRDT: "strdt">
 |   <STRLANG: "strlang">
+|	<UUID: "uuid">
+|	<STRUUID: "struuid">
 |   <IRI: "IRI"|"URI">
 |   <IF: "if">
 |   <IN: "in">
@@ -239,6 +268,7 @@ TOKEN [IGNORE_CASE] :
 |   <BIND: "bind">
 |   <SERVICE: "service">
 |   <BINDINGS: "bindings">
+|	<VALUES: "values">
 |   <UNDEF: "UNDEF">
 |   <STRLEN: "strlen">
 |   <SUBSTR: "substr">
@@ -326,9 +356,7 @@ TOKEN:
 
 |   <PNAME_NS: (<PN_PREFIX>)? ":">
 |   <PNAME_LN: (<PN_PREFIX>)? ":" <PN_LOCAL>> // Note: PN_LOCAL not optional, case handled by PNAME_NS
-
-|   <BLANK_NODE_LABEL: "_:" <PN_LOCAL>>
-
+|	<BLANK_NODE_LABEL: "_:" (<PN_CHARS_U> | <NUM>) ((<PN_CHARS>|".")* <PN_CHARS>)? >
 |   <VAR1: "?" <VARNAME>>
 |   <VAR2: "$" <VARNAME>>
 |   <LANGTAG: "@" (<ALPHA>)+ ("-" (<ALPHA>|<NUM>)+)*>
@@ -370,17 +398,14 @@ TOKEN:
       // | ["\u10000"-"\uefffF"] FIXME: JavaCC/Java can't handle this?
     >
 |   <#PN_CHARS_U: <PN_CHARS_BASE> | "_">
-|   <#PN_START_CHAR: <PN_CHARS_U> | <NUM> | <PLX>> 
-|   <#VAR_CHAR: <PN_START_CHAR> | "\u00b7" | ["\u0300"-"\u036f"] | ["\u203f"-"\u2040"]>
-|   <#PN_END_CHAR: <VAR_CHAR> | "-">
-|   <#PN_CHAR: <PN_END_CHAR> | ".">
-
-|   <#PN_PREFIX: <PN_CHARS_BASE> ( (<PN_CHAR>)* <PN_END_CHAR> )?>
-|   <#PN_LOCAL: <PN_START_CHAR> ( ( <PN_CHAR> | <PLX> )* (<PN_END_CHAR> | <PLX> ) )?>
+|	<#VAR_CHAR: <PN_CHARS_U> | <NUM> | "\u00b7" | ["\u0300"-"\u036f"] | ["\u203f"-"\u2040"]>
+|	<#PN_CHARS: <PN_CHARS_U> | "-" | <NUM> | "\u00b7" | ["\u0300"-"\u036f"] | ["\u203f"-"\u2040"]> 
+|	<#PN_PREFIX: <PN_CHARS_BASE> ( (<PN_CHARS> | ".")* <PN_CHARS>)?>
+|	<#PN_LOCAL: (<PN_CHARS_U> | ":" | <NUM> | <PLX> ) ( (<PN_CHARS> | "." | ":" | <PLX>)* ( <PN_CHARS> | ":" | <PLX>) )?>
 |   <#PLX: <PERCENT> | <PN_LOCAL_ESC>>
 |   <#PERCENT: "%" <HEX> <HEX>>
-|   <#PN_LOCAL_ESC: "\\" [ "_", "~", ".", "-", "!", "$", "&", "\"", "(", ")", "*", "+", ",", ";", "=", ":", "/", "?", "#", "@", "%" ]>
-|   <#VARNAME: <PN_START_CHAR> (<VAR_CHAR>)*>
+|	<#PN_LOCAL_ESC: "\\" [ "_", "~", ".", "-", "!", "$", "&", "\"", "(", ")", "*", "+", ",", ";", "=", "/", "?", "#", "@", "%" ]>
+|	<#VARNAME: (<PN_CHARS_U> | <NUM> ) (<VAR_CHAR>)*>
 }
 
 //
@@ -578,8 +603,7 @@ void PrefixDecl() :
 void Query()       :
 {}
 {
-    (SelectQuery() | ConstructQuery() | DescribeQuery() | AskQuery())
-}
+    (SelectQuery() | ConstructQuery() |	DescribeQuery() | AskQuery()) }
 
 void SelectQuery() :
 {/*@bgen(jjtree) SelectQuery */
@@ -1042,8 +1066,6 @@ void WhereClause() :
 /*@egen*/
 }
 
-// Note: Modified to group the binding variables and binding sets for more
-// efficient processing.
 void BindingsClause() :
 {/*@bgen(jjtree) BindingsClause */
   ASTBindingsClause jjtn000 = new ASTBindingsClause(JJTBINDINGSCLAUSE);
@@ -1053,8 +1075,92 @@ void BindingsClause() :
 {/*@bgen(jjtree) BindingsClause */
     try {
 /*@egen*/
-//    <BINDINGS> ( Var() )* <LBRACE> ( BindingSet())* <RBRACE>
-    <BINDINGS> BindingVars() BindingSets()/*@bgen(jjtree)*/
+    <VALUES> DataBlock()
+    // Keeping deprecated BINDINGS keyword for backward compatibility purposes
+    | <BINDINGS> (Var())* <LBRACE> (BindingSet())* <RBRACE>/*@bgen(jjtree)*/
+    } catch (Throwable jjte000) {
+      if (jjtc000) {
+        jjtree.clearNodeScope(jjtn000);
+        jjtc000 = false;
+      } else {
+        jjtree.popNode();
+      }
+      if (jjte000 instanceof RuntimeException) {
+        throw (RuntimeException)jjte000;
+      }
+      if (jjte000 instanceof ParseException) {
+        throw (ParseException)jjte000;
+      }
+      throw (Error)jjte000;
+    } finally {
+      if (jjtc000) {
+        jjtree.closeNodeScope(jjtn000, true);
+      }
+    }
+/*@egen*/
+}
+
+void InlineData():
+{/*@bgen(jjtree) InlineData */
+  ASTInlineData jjtn000 = new ASTInlineData(JJTINLINEDATA);
+  boolean jjtc000 = true;
+  jjtree.openNodeScope(jjtn000);
+/*@egen*/}
+{/*@bgen(jjtree) InlineData */
+    try {
+/*@egen*/
+    <VALUES> DataBlock()/*@bgen(jjtree)*/
+    } catch (Throwable jjte000) {
+      if (jjtc000) {
+        jjtree.clearNodeScope(jjtn000);
+        jjtc000 = false;
+      } else {
+        jjtree.popNode();
+      }
+      if (jjte000 instanceof RuntimeException) {
+        throw (RuntimeException)jjte000;
+      }
+      if (jjte000 instanceof ParseException) {
+        throw (ParseException)jjte000;
+      }
+      throw (Error)jjte000;
+    } finally {
+      if (jjtc000) {
+        jjtree.closeNodeScope(jjtn000, true);
+      }
+    }
+/*@egen*/
+}
+
+void DataBlock()       :
+{}
+{
+     InlineDataOneVar()
+   | InlineDataFull()
+}
+
+void InlineDataOneVar()       :
+{}
+{
+    Var() <LBRACE> (SimpleBindingSet())* <RBRACE>
+}
+
+void InlineDataFull()       :
+{}
+{
+    ( <NIL> | <LPAREN> (Var())* <RPAREN> ) <LBRACE> ( BindingSet())* <RBRACE>
+}
+
+void SimpleBindingSet()             :
+{/*@bgen(jjtree) BindingSet */
+  ASTBindingSet jjtn000 = new ASTBindingSet(JJTBINDINGSET);
+  boolean jjtc000 = true;
+  jjtree.openNodeScope(jjtn000);
+/*@egen*/}
+{/*@bgen(jjtree) BindingSet */
+    try {
+/*@egen*/
+    BindingValue()/*@bgen(jjtree)*/
     } catch (Throwable jjte000) {
       if (jjtc000) {
         jjtree.clearNodeScope(jjtn000);
@@ -1075,70 +1181,6 @@ void BindingsClause() :
       }
     }
 /*@egen*/ 
-}
-
-void BindingVars() :
-{/*@bgen(jjtree) BindingVars */
-  ASTBindingVars jjtn000 = new ASTBindingVars(JJTBINDINGVARS);
-  boolean jjtc000 = true;
-  jjtree.openNodeScope(jjtn000);
-/*@egen*/}
-{/*@bgen(jjtree) BindingVars */
-    try {
-/*@egen*/
-    ( Var() )*/*@bgen(jjtree)*/
-    } catch (Throwable jjte000) {
-      if (jjtc000) {
-        jjtree.clearNodeScope(jjtn000);
-        jjtc000 = false;
-      } else {
-        jjtree.popNode();
-      }
-      if (jjte000 instanceof RuntimeException) {
-        throw (RuntimeException)jjte000;
-      }
-      if (jjte000 instanceof ParseException) {
-        throw (ParseException)jjte000;
-      }
-      throw (Error)jjte000;
-    } finally {
-      if (jjtc000) {
-        jjtree.closeNodeScope(jjtn000, true);
-      }
-    }
-/*@egen*/
-}
-
-void BindingSets() :
-{/*@bgen(jjtree) BindingSets */
-  ASTBindingSets jjtn000 = new ASTBindingSets(JJTBINDINGSETS);
-  boolean jjtc000 = true;
-  jjtree.openNodeScope(jjtn000);
-/*@egen*/}
-{/*@bgen(jjtree) BindingSets */
-    try {
-/*@egen*/
-    <LBRACE> ( BindingSet() )* <RBRACE>/*@bgen(jjtree)*/
-    } catch (Throwable jjte000) {
-      if (jjtc000) {
-        jjtree.clearNodeScope(jjtn000);
-        jjtc000 = false;
-      } else {
-        jjtree.popNode();
-      }
-      if (jjte000 instanceof RuntimeException) {
-        throw (RuntimeException)jjte000;
-      }
-      if (jjte000 instanceof ParseException) {
-        throw (ParseException)jjte000;
-      }
-      throw (Error)jjte000;
-    } finally {
-      if (jjtc000) {
-        jjtree.closeNodeScope(jjtn000, true);
-      }
-    }
-/*@egen*/
 }
 
 void BindingSet() :
@@ -1596,6 +1638,7 @@ void GraphPatternNotTriples()       :
 |   GraphGraphPattern()
 |   MinusGraphPattern()
 |   ServiceGraphPattern()
+| 	InlineData()
 }
 
 void OptionalGraphPattern() :
@@ -1968,7 +2011,7 @@ void TriplesSameSubjectPath() :
 //  VarOrTerm() PropertyListPath()
     VarOrTermOrTRefP() PropertyListPath()
     |
-    TriplesNode() [PropertyListPath()]/*@bgen(jjtree)*/
+    TriplesNodePath() [PropertyListPath()]/*@bgen(jjtree)*/
     } catch (Throwable jjte000) {
       if (jjtc000) {
         jjtree.clearNodeScope(jjtn000);
@@ -2000,7 +2043,7 @@ void PropertyListPath() :
 {/*@bgen(jjtree) PropertyListPath */
     try {
 /*@egen*/
-    (VerbPath() | VerbSimple()) ObjectList() (LOOKAHEAD(2) <SEMICOLON> [PropertyListPath()] )*/*@bgen(jjtree)*/
+    (VerbPath() | VerbSimple()) ObjectListPath() [<SEMICOLON> [PropertyListPath()] ]/*@bgen(jjtree)*/
     } catch (Throwable jjte000) {
       if (jjtc000) {
         jjtree.clearNodeScope(jjtn000);
@@ -2020,6 +2063,38 @@ void PropertyListPath() :
         jjtree.closeNodeScope(jjtn000, true);
       }
     }
+/*@egen*/
+}
+
+void ObjectListPath()            :
+{/*@bgen(jjtree) ObjectList */
+  ASTObjectList jjtn000 = new ASTObjectList(JJTOBJECTLIST);
+  boolean jjtc000 = true;
+  jjtree.openNodeScope(jjtn000);
+/*@egen*/}
+{/*@bgen(jjtree) ObjectList */
+        try {
+/*@egen*/
+	ObjectPath() ( <COMMA> ObjectPath() )*/*@bgen(jjtree)*/
+        } catch (Throwable jjte000) {
+          if (jjtc000) {
+            jjtree.clearNodeScope(jjtn000);
+            jjtc000 = false;
+          } else {
+            jjtree.popNode();
+          }
+          if (jjte000 instanceof RuntimeException) {
+            throw (RuntimeException)jjte000;
+          }
+          if (jjte000 instanceof ParseException) {
+            throw (ParseException)jjte000;
+          }
+          throw (Error)jjte000;
+        } finally {
+          if (jjtc000) {
+            jjtree.closeNodeScope(jjtn000, true);
+          }
+        }
 /*@egen*/
 }
 
@@ -2279,16 +2354,7 @@ void PathMod() :
            }
 /*@egen*/ { jjtn000.setLowerBound(1);
          jjtn000.setUpperBound(Long.MAX_VALUE);
-    }
-    |
-    <LBRACE> ( min = <INTEGER> {jjtn000.setLowerBound(Long.parseLong(min.image)); } 
-        ( <COMMA> ( <RBRACE>/*@bgen(jjtree)*/
-                             {
-                               jjtree.closeNodeScope(jjtn000, true);
-                               jjtc000 = false;
-                             }
-/*@egen*/ {jjtn000.setUpperBound(Long.MAX_VALUE); } | max = <INTEGER> {jjtn000.setUpperBound(Long.parseLong(max.image)); } <RBRACE> ) | <RBRACE> ) 
-            | <COMMA> max = <INTEGER> {jjtn000.setUpperBound(Long.parseLong(max.image)); jjtn000.setLowerBound(0); } <RBRACE> )/*@bgen(jjtree)*/
+    }/*@bgen(jjtree)*/
     } finally {
       if (jjtc000) {
         jjtree.closeNodeScope(jjtn000, true);
@@ -2306,8 +2372,13 @@ void VerbSimple()       :
 void Object()       :
 {}
 {
-    GraphNode()
+	GraphNode()
 |   TRefPattern() // extension for triple reference patterns.
+}
+
+void ObjectPath()       :{}
+{
+    GraphNodePath()
 }
 
 void Verb()       :
@@ -2344,6 +2415,14 @@ void TriplesNode()       :
     BlankNodePropertyList()
 }
 
+void TriplesNodePath()       :
+{}
+{
+	CollectionPath()
+|
+	BlankNodePropertyListPath()
+}
+
 void BlankNodePropertyList() :
 {/*@bgen(jjtree) BlankNodePropertyList */
   ASTBlankNodePropertyList jjtn000 = new ASTBlankNodePropertyList(JJTBLANKNODEPROPERTYLIST);
@@ -2373,6 +2452,38 @@ void BlankNodePropertyList() :
         jjtree.closeNodeScope(jjtn000, true);
       }
     }
+/*@egen*/
+}
+
+void BlankNodePropertyListPath()                        :
+{/*@bgen(jjtree) BlankNodePropertyList */
+  ASTBlankNodePropertyList jjtn000 = new ASTBlankNodePropertyList(JJTBLANKNODEPROPERTYLIST);
+  boolean jjtc000 = true;
+  jjtree.openNodeScope(jjtn000);
+/*@egen*/}
+{/*@bgen(jjtree) BlankNodePropertyList */
+        try {
+/*@egen*/
+	<LBRACK> PropertyListPath() <RBRACK>/*@bgen(jjtree)*/
+        } catch (Throwable jjte000) {
+          if (jjtc000) {
+            jjtree.clearNodeScope(jjtn000);
+            jjtc000 = false;
+          } else {
+            jjtree.popNode();
+          }
+          if (jjte000 instanceof RuntimeException) {
+            throw (RuntimeException)jjte000;
+          }
+          if (jjte000 instanceof ParseException) {
+            throw (ParseException)jjte000;
+          }
+          throw (Error)jjte000;
+        } finally {
+          if (jjtc000) {
+            jjtree.closeNodeScope(jjtn000, true);
+          }
+        }
 /*@egen*/
 }
 
@@ -2408,12 +2519,52 @@ void Collection() :
 /*@egen*/
 }
 
+void CollectionPath()            :
+{/*@bgen(jjtree) Collection */
+  ASTCollection jjtn000 = new ASTCollection(JJTCOLLECTION);
+  boolean jjtc000 = true;
+  jjtree.openNodeScope(jjtn000);
+/*@egen*/}
+{/*@bgen(jjtree) Collection */
+        try {
+/*@egen*/
+	<LPAREN> ( GraphNodePath() )+ <RPAREN>/*@bgen(jjtree)*/
+        } catch (Throwable jjte000) {
+          if (jjtc000) {
+            jjtree.clearNodeScope(jjtn000);
+            jjtc000 = false;
+          } else {
+            jjtree.popNode();
+          }
+          if (jjte000 instanceof RuntimeException) {
+            throw (RuntimeException)jjte000;
+          }
+          if (jjte000 instanceof ParseException) {
+            throw (ParseException)jjte000;
+          }
+          throw (Error)jjte000;
+        } finally {
+          if (jjtc000) {
+            jjtree.closeNodeScope(jjtn000, true);
+          }
+        }
+/*@egen*/
+}
+
 void GraphNode()       :
 {}
 {
     VarOrTerm()
 |
     TriplesNode()
+}
+
+void GraphNodePath()       :
+{}
+{
+	VarOrTerm()
+|
+	TriplesNodePath()
 }
 
 void VarOrTerm()       :
@@ -3224,6 +3375,8 @@ void BrackettedExpression()       :
     <LPAREN> Expression() <RPAREN>
 }
 
+
+
 void BuiltInCall()       :
 {}
 {
@@ -3282,6 +3435,8 @@ void RDFTermFunction()       :
 |   Str()
 |   StrDt()
 |   StrLang()
+|	UUID()
+|	STRUUID()
 }
 
 void DateTimeFunction()       :
@@ -4882,6 +5037,42 @@ void StrLang() :
 /*@egen*/
 }
 
+void UUID() :
+{/*@bgen(jjtree) UUID */
+  ASTUUID jjtn000 = new ASTUUID(JJTUUID);
+  boolean jjtc000 = true;
+  jjtree.openNodeScope(jjtn000);
+/*@egen*/}
+{/*@bgen(jjtree) UUID */
+        try {
+/*@egen*/
+	<UUID> <NIL>/*@bgen(jjtree)*/
+        } finally {
+          if (jjtc000) {
+            jjtree.closeNodeScope(jjtn000, true);
+          }
+        }
+/*@egen*/
+}
+
+void STRUUID() :
+{/*@bgen(jjtree) STRUUID */
+  ASTSTRUUID jjtn000 = new ASTSTRUUID(JJTSTRUUID);
+  boolean jjtc000 = true;
+  jjtree.openNodeScope(jjtn000);
+/*@egen*/}
+{/*@bgen(jjtree) STRUUID */
+        try {
+/*@egen*/
+	<STRUUID> <NIL>/*@bgen(jjtree)*/
+        } finally {
+          if (jjtc000) {
+            jjtree.closeNodeScope(jjtn000, true);
+          }
+        }
+/*@egen*/
+}
+
 void Bind() :
 {/*@bgen(jjtree) Bind */
   ASTBind jjtn000 = new ASTBind(JJTBIND);
@@ -5472,6 +5663,24 @@ void SolutionsRef() :
 /*@egen*/  
 }
 
+void UnparsedQuadDataBlock() :
+{/*@bgen(jjtree) UnparsedQuadDataBlock */
+  ASTUnparsedQuadDataBlock jjtn000 = new ASTUnparsedQuadDataBlock(JJTUNPARSEDQUADDATABLOCK);
+  boolean jjtc000 = true;
+  jjtree.openNodeScope(jjtn000);
+/*@egen*/}
+{/*@bgen(jjtree) UnparsedQuadDataBlock */
+    try {
+/*@egen*/
+    <LBRACE> {jjtn000.setDataBlock(readToMatchingBrace()); } <RBRACE>/*@bgen(jjtree)*/
+    } finally {
+      if (jjtc000) {
+        jjtree.closeNodeScope(jjtn000, true);
+      }
+    }
+/*@egen*/
+}
+
 void QuadData()       :
 {}
 {
@@ -5779,7 +5988,7 @@ void InsertData() :
 {/*@bgen(jjtree) InsertData */
     try {
 /*@egen*/
-    <INSERT> <DATA> QuadData()/*@bgen(jjtree)*/
+    <INSERT> <DATA> UnparsedQuadDataBlock()/*@bgen(jjtree)*/
     } catch (Throwable jjte000) {
       if (jjtc000) {
         jjtree.clearNodeScope(jjtn000);
@@ -5811,7 +6020,7 @@ void DeleteData() :
 {/*@bgen(jjtree) DeleteData */
     try {
 /*@egen*/
-    <DELETE> <DATA> QuadData()/*@bgen(jjtree)*/
+    <DELETE> <DATA> UnparsedQuadDataBlock()/*@bgen(jjtree)*/
     } catch (Throwable jjte000) {
       if (jjtc000) {
         jjtree.clearNodeScope(jjtn000);

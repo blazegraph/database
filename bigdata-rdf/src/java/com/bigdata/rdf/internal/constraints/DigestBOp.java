@@ -146,8 +146,9 @@ public class DigestBOp extends IVValueExpression<IV> implements INeedsMaterializ
         //Recreate since they are not thread safe
         MessageDigest md = null;
         final Literal lit = asLiteral(iv);
-        if (lit.getLanguage() != null || lit.getDatatype() != null
-                && lit.getDatatype().equals(XSD.STRING)) {
+        if (lit.getLanguage() == null &&
+            (lit.getDatatype() == null || lit.getDatatype().equals(XSD.STRING))) {
+            
             try {
                 String label = lit.getLabel();
                 switch (op()) {
@@ -155,19 +156,19 @@ public class DigestBOp extends IVValueExpression<IV> implements INeedsMaterializ
                     md = MessageDigest.getInstance("MD5");
                     break;
                 case SHA1:
-                    md = MessageDigest.getInstance("SHA1");
+                    md = MessageDigest.getInstance("SHA-1");
                     break;
                 case SHA224:
-                    md = MessageDigest.getInstance("SHA224");
+                    md = MessageDigest.getInstance("SHA-224");
                     break;
                 case SHA256:
-                    md = MessageDigest.getInstance("SHA256");
+                    md = MessageDigest.getInstance("SHA-256");
                     break;
                 case SHA384:
-                    md = MessageDigest.getInstance("SHA384");
+                    md = MessageDigest.getInstance("SHA-384");
                     break;
                case SHA512:
-                    md = MessageDigest.getInstance("SHA512");
+                    md = MessageDigest.getInstance("SHA-512");
                     break;
                 default:
                     throw new UnsupportedOperationException();

@@ -40,6 +40,7 @@ import com.bigdata.bop.IValueExpression;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.sparql.ast.ArbitraryLengthPathNode;
 import com.bigdata.rdf.sparql.ast.AssignmentNode;
+import com.bigdata.rdf.sparql.ast.BindingsClause;
 import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.IJoinNode;
@@ -216,6 +217,12 @@ public class ASTJoinOrderByTypeOptimizer extends AbstractJoinGroupOptimizer
         final List<ServiceNode> serviceNodes = joinGroup.getServiceNodes();
 
         final List<SubqueryRoot> askSubqueries = new LinkedList<SubqueryRoot>();
+
+        for (BindingsClause values : joinGroup.getChildren(BindingsClause.class)) {
+
+            ordered.add(values);
+            
+        }
 
         /*
          * Assignments for a constant.
