@@ -42,7 +42,8 @@ import com.bigdata.bop.IVariable;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class BindingsClause extends ASTBase {
+public class BindingsClause extends GroupMemberNodeBase<BindingsClause> 
+        implements IBindingProducerNode {
 
     /**
      * 
@@ -178,7 +179,7 @@ public class BindingsClause extends ASTBase {
         
         sb.append(s);
         
-        sb.append("BINDINGS");
+        sb.append("BindingsClause");
 
         for(IVariable<?> var : declaredVars) {
             

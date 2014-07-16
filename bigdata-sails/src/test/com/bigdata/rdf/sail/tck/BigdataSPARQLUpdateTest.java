@@ -27,10 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sail.tck;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Properties;
@@ -60,6 +56,7 @@ import com.bigdata.rdf.internal.XSD;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSail.Options;
 import com.bigdata.rdf.sail.BigdataSailRepository;
+import com.bigdata.rdf.sail.BigdataSailUpdate;
 
 /**
  * Integration with the openrdf SPARQL 1.1 update test suite.
@@ -296,7 +293,8 @@ public class BigdataSPARQLUpdateTest extends SPARQLUpdateTest {
 //				+ "} LIMIT 10";//
 
 		// run update once.
-		con.prepareUpdate(QueryLanguage.SPARQL, s).execute();
+        final BigdataSailUpdate update = (BigdataSailUpdate) con.prepareUpdate(QueryLanguage.SPARQL, s);
+        update.execute();
 
 		// Both graphs should now have some data.
         assertTrue(con.hasStatement(null,null,null, true, (Resource)gin));
@@ -581,7 +579,9 @@ public class BigdataSPARQLUpdateTest extends SPARQLUpdateTest {
         final String updateStr = "PREFIX ns: <http://example.org/ns#>\n"
                 + "INSERT DATA { GRAPH ns:graph { ns:auml ns:label \"\u00C4\", \"\u00E4\" } }\n";
 
-        con.prepareUpdate(QueryLanguage.SPARQL, updateStr).execute();
+        final BigdataSailUpdate update = (BigdataSailUpdate)
+                con.prepareUpdate(QueryLanguage.SPARQL, updateStr);
+        update.execute();
 
         // Test query:
         final String queryStr = "PREFIX ns: <http://example.org/ns#>\n"
@@ -644,7 +644,5 @@ public class BigdataSPARQLUpdateTest extends SPARQLUpdateTest {
             result.close();
         }
     }
-
-
 
 }

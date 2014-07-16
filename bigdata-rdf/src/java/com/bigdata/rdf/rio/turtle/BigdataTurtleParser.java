@@ -15,6 +15,7 @@ import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.rio.RDFHandlerException;
 import org.openrdf.rio.RDFParseException;
+import org.openrdf.rio.helpers.BasicParserSettings;
 import org.openrdf.rio.turtle.TurtleParser;
 import org.openrdf.rio.turtle.TurtleUtil;
 
@@ -150,41 +151,6 @@ public class BigdataTurtleParser extends TurtleParser {
     }
 
     /**
-     * Parses a blank node ID, e.g. <tt>_:node1</tt>.
-     */
-    protected BNode parseNodeID()
-        throws IOException, RDFParseException
-    {
-        // Node ID should start with "_:"
-        verifyCharacterOrFail(read(), "_");
-        verifyCharacterOrFail(read(), ":");
-
-        // Read the node ID
-        int c = read();
-        if (c == -1) {
-            throwEOFException();
-        }
-//      modified to allow fully numeric bnode ids 
-//      else if (!TurtleUtil.isNameStartChar(c)) {
-//          reportError("Expected a letter, found '" + (char)c + "'");
-//      }
-
-        StringBuilder name = new StringBuilder(32);
-        name.append((char)c);
-
-        // Read all following letter and numbers, they are part of the name
-        c = read();
-        while (TurtleUtil.isNameChar(c)) {
-            name.append((char)c);
-            c = read();
-        }
-
-        unread(c);
-
-        return createBNode(name.toString());
-    }
-
-    /**
      * Consumes any white space characters (space, tab, line feed, newline) and
      * comments (#-style) from <tt>reader</tt>. After this method has been
      * called, the first character that is returned by <tt>reader</tt> is either
@@ -206,4 +172,54 @@ public class BigdataTurtleParser extends TurtleParser {
         return c;
     }
     
+    /**
+     * Parses a blank node ID, e.g. <tt>_:node1</tt>.
+     */
+    protected BNode parseNodeID()
+        throws IOException, RDFParseException
+    {
+        // Node ID should start with "_:"
+        verifyCharacterOrFail(read(), "_");
+        verifyCharacterOrFail(read(), ":");
+
+        // Read the node ID
+        int c = read();
+        if (c == -1) {
+            throwEOFException();
+        }
+//        modified to allow fully numeric bnode ids 
+//        else if (!TurtleUtil.isNameStartChar(c)) {
+//            reportError("Expected a letter, found '" + (char)c + "'", BasicParserSettings.PRESERVE_BNODE_IDS);
+//        }
+
+        StringBuilder name = new StringBuilder(32);
+        name.append((char)c);
+
+        // Read all following letter and numbers, they are part of the name
+        c = read();
+
+        // If we would never go into the loop we must unread now
+        if (!TurtleUtil.isNameChar(c)) {
+            unread(c);
+        }
+
+        while (TurtleUtil.isNameChar(c)) {
+            int previous = c;
+            c = read();
+            
+            if (previous == '.' && (c == -1 || TurtleUtil.isWhitespace(c) || c == '<' || c == '_')) {
+                unread(c);
+                unread(previous);
+                break;
+            }
+            name.append((char)previous);
+            if(!TurtleUtil.isNameChar(c))
+            {
+                unread(c);
+            }
+        }
+
+        return createBNode(name.toString());
+    }
+
 }

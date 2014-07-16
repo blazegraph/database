@@ -23,9 +23,16 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.rdf.internal.constraints;
 
+import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.util.Map;
 
 import javax.xml.datatype.XMLGregorianCalendar;
+
+import org.openrdf.model.Literal;
+import org.openrdf.query.algebra.evaluation.ValueExprEvaluationException;
+import org.openrdf.query.algebra.evaluation.function.datetime.Timezone;
+import org.openrdf.query.algebra.evaluation.function.datetime.Tz;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
@@ -36,8 +43,12 @@ import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.NotMaterializedException;
 import com.bigdata.rdf.internal.XSD;
-import com.bigdata.rdf.internal.impl.literal.XSDNumericIV;
+import com.bigdata.rdf.internal.impl.literal.XSDDecimalIV;
+import com.bigdata.rdf.internal.impl.literal.XSDIntegerIV;
 import com.bigdata.rdf.model.BigdataLiteral;
+import com.bigdata.rdf.model.BigdataValueFactory;
+import com.bigdata.rdf.sparql.ast.DummyConstantNode;
+import com.bigdata.rdf.sparql.ast.FilterNode;
 import com.bigdata.rdf.sparql.ast.GlobalAnnotations;
 
 /**
@@ -63,14 +74,14 @@ public class DateBOp extends IVValueExpression<IV> implements INeedsMaterializat
     }
 
     public enum DateOp {
-        YEAR, MONTH, DAY, HOURS, MINUTES, SECONDS, TIMEZONE;
+        YEAR, MONTH, DAY, HOURS, MINUTES, SECONDS, TZ, TIMEZONE
 
     }
 
     @Override
     protected boolean areGlobalsRequired() {
      
-        return false;
+        return true;
         
     }
     
@@ -84,9 +95,9 @@ public class DateBOp extends IVValueExpression<IV> implements INeedsMaterializat
      *            The annotation specifying the operation to be performed on those operands.
      */
     public DateBOp(final IValueExpression<? extends IV> left, 
-    		final DateOp op) {
+    		final DateOp op, final GlobalAnnotations globals) {
 
-        this(new BOp[] { left }, NV.asMap(Annotations.OP, op));
+        this(new BOp[] { left }, anns(globals, new NV(Annotations.OP, op)));
 
     }
 
@@ -140,19 +151,21 @@ public class DateBOp extends IVValueExpression<IV> implements INeedsMaterializat
                 XMLGregorianCalendar cal=bl.calendarValue();
                 switch (op()) {
                 case DAY:
-                    return new XSDNumericIV(cal.getDay());
+                    return new XSDIntegerIV(BigInteger.valueOf(cal.getDay()));
                 case MONTH:
-                    return new XSDNumericIV(cal.getMonth());
+                    return new XSDIntegerIV(BigInteger.valueOf(cal.getMonth()));
                 case YEAR:
-                    return new XSDNumericIV(cal.getYear());
+                    return new XSDIntegerIV(BigInteger.valueOf(cal.getYear()));
                 case HOURS:
-                    return new XSDNumericIV(cal.getHour());
+                    return new XSDIntegerIV(BigInteger.valueOf(cal.getHour()));
                 case SECONDS:
-                    return new XSDNumericIV(cal.getSecond());
+                    return new XSDDecimalIV(BigDecimal.valueOf(cal.getSecond()));
                 case MINUTES:
-                    return new XSDNumericIV(cal.getMinute());
+                    return new XSDIntegerIV(BigInteger.valueOf(cal.getMinute()));
+                case TZ:
+                    return tz(bl);
                 case TIMEZONE:
-                    return new XSDNumericIV(cal.getTimezone());
+                    return timezone(bl);
                 default:
                     throw new UnsupportedOperationException();
                 }
@@ -180,6 +193,46 @@ public class DateBOp extends IVValueExpression<IV> implements INeedsMaterializat
 
     public Requirement getRequirement() {
         return Requirement.SOMETIMES;
+    }
+    
+    protected IV tz(final BigdataLiteral l) {
+     
+        final Tz func = new Tz();
+        
+        final BigdataValueFactory vf = super.getValueFactory();
+        
+        try {
+            
+            final BigdataLiteral l2 = (BigdataLiteral) func.evaluate(vf, l);
+            
+            return DummyConstantNode.toDummyIV(l2);
+            
+        } catch (ValueExprEvaluationException e) {
+            
+            throw new SparqlTypeErrorException();
+            
+        }
+        
+    }
+
+    protected IV timezone(final BigdataLiteral l) {
+        
+        final Timezone func = new Timezone();
+        
+        final BigdataValueFactory vf = super.getValueFactory();
+        
+        try {
+            
+            final BigdataLiteral l2 = (BigdataLiteral) func.evaluate(vf, l);
+            
+            return DummyConstantNode.toDummyIV(l2);
+            
+        } catch (ValueExprEvaluationException e) {
+            
+            throw new SparqlTypeErrorException();
+            
+        }
+        
     }
 
 }

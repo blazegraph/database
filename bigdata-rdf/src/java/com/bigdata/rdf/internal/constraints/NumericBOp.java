@@ -27,6 +27,8 @@ import java.util.Map;
 
 import org.apache.log4j.Logger;
 import org.openrdf.model.Literal;
+import org.openrdf.model.URI;
+import org.openrdf.model.vocabulary.XMLSchema;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
@@ -34,6 +36,7 @@ import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.ImmutableBOp;
 import com.bigdata.bop.NV;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.sparql.ast.FilterNode;
 
 /**
  * A math expression involving a left and right IValueExpression operand. The 
@@ -123,6 +126,17 @@ public class NumericBOp extends IVValueExpression<IV>  {
     public IV get(final IBindingSet bs) {
         
     	final Literal lit = super.getAndCheckLiteralValue(0, bs);
+    	
+    	final URI dt = lit.getDatatype();
+    	
+    	final NumericOp op = op();
+    	
+    	if ((dt.equals(XMLSchema.INT) || dt.equals(XMLSchema.INTEGER)) &&
+    	    (op == NumericOp.CEIL || op == NumericOp.FLOOR || op == NumericOp.ROUND)) {
+    	    
+    	    return get(0).get(bs);
+    	            
+    	}
     	
     	if (log.isDebugEnabled())
     		log.debug(lit);
