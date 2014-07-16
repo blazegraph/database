@@ -55,8 +55,8 @@ import com.bigdata.service.IBigdataFederation;
  * request and response.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @see <a href="- http://sourceforge.net/apps/trac/bigdata/ticket/566" >
- *      Concurrent unisolated operations against multiple KBs </a>
+ * @see <a href="http://trac.bigdata.com/ticket/566" > Concurrent unisolated
+ *      operations against multiple KBs </a>
  */
 abstract public class AbstractApiTask<T> implements IApiTask<T>, IReadOnly {
 
@@ -250,10 +250,10 @@ abstract public class AbstractApiTask<T> implements IApiTask<T>, IReadOnly {
      * 
      * @throws DatasetNotFoundException
      * 
-     * @see <a href="http://sourceforge.net/apps/trac/bigdata/ticket/753" > HA
-     *      doLocalAbort() should interrupt NSS requests and AbstractTasks </a>
-     * @see <a href="- http://sourceforge.net/apps/trac/bigdata/ticket/566" >
-     *      Concurrent unisolated operations against multiple KBs </a>
+     * @see <a href="http://trac.bigdata.com/ticket/753" > HA doLocalAbort()
+     *      should interrupt NSS requests and AbstractTasks </a>
+     * @see <a href="http://trac.bigdata.com/ticket/566" > Concurrent unisolated
+     *      operations against multiple KBs </a>
      */
     @SuppressWarnings({ "unchecked", "rawtypes" })
     static public <T> Future<T> submitApiTask(
