@@ -1171,8 +1171,15 @@ $('#explore-form').submit(function(e) {
    e.preventDefault();
    var uri = $(this).find('input[type="text"]').val().trim();
    if(uri) {
-      // add < > if they're not present and this is not a namespaced URI
-      if(uri[0] != '<' && uri.match(/^\w+:\//)) {
+      // add < > if they're not present and this is not a URI with a recognised namespace
+      var namespaces = [];
+      for(var cat in NAMESPACE_SHORTCUTS) {
+         for(var namespace in NAMESPACE_SHORTCUTS[cat]) {
+            namespaces.push(namespace);
+         }
+      }
+      var namespaced = '^(' + namespaces.join('|') + '):';
+      if(uri[0] != '<' && !uri.match(namespaced)) {
          uri = '<' + uri;
          if(uri.slice(-1) != '>') {
             uri += '>';
