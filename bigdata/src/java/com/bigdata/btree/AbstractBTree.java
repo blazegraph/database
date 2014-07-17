@@ -3623,7 +3623,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
         assert node.dirty;
         assert !node.deleted;
         assert !node.isPersistent();
-        assert !node.isReadOnly(); // FIXME Occasional CI errors on this assert for TestMROWTransactions.  See https://sourceforge.net/apps/trac/bigdata/ticket/343
+        assert !node.isReadOnly(); // FIXME Occasional CI errors on this assert for TestMROWTransactions. Also StressTestUnisolatedReadWriteIndex.  See http://trac.bigdata.com/ticket/343
         assertNotReadOnly();
         
         /*

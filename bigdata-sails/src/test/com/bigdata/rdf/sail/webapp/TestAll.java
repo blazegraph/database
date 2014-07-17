@@ -30,12 +30,10 @@ import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
 
-
 /**
  * Test suite.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id: TestAll.java 4908 2011-07-13 19:42:43Z thompsonbry $
  */
 public class TestAll extends TestCase {
 

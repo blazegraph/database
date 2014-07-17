@@ -1,0 +1,42 @@
+#
+# Note: These options are applied when the journal and the triple store are
+# first created.
+
+##
+## Journal options.
+##
+
+# The backing file. This contains all your data.  You want to put this someplace
+# safe.  The default locator will wind up in the directory from which you start
+# your servlet container.
+com.bigdata.journal.AbstractJournal.file=<%= node['bigdata'][:data_dir] %>/bigdata.jnl
+
+# The persistence engine.  Use 'Disk' for the WORM or 'DiskRW' for the RWStore.
+com.bigdata.journal.AbstractJournal.bufferMode=<%= node['bigdata']['journal.AbstractJournal.bufferMode'] %>
+
+# Setup for the RWStore recycler rather than session protection.
+com.bigdata.service.AbstractTransactionService.minReleaseAge=<%= node['bigdata']['service.AbstractTransactionService.minReleaseAge'] %>
+
+com.bigdata.btree.writeRetentionQueue.capacity=<%= node['bigdata']['btree.writeRetentionQueue.capacity'] %>
+com.bigdata.btree.BTree.branchingFactor=<%= node['bigdata']['btree.BTree.branchingFactor'] %>
+
+# 200M initial extent.
+com.bigdata.journal.AbstractJournal.initialExtent=<%= node['bigdata']['journal.AbstractJournal.initialExtent'] %>
+com.bigdata.journal.AbstractJournal.maximumExtent=<%= node['bigdata']['journal.AbstractJournal.maximumExtent'] %>
+
+##
+## Setup for QUADS mode without the full text index.
+##
+com.bigdata.rdf.sail.truthMaintenance=<%= node['bigdata']['rdf.sail.truthMaintenance'] %>
+com.bigdata.rdf.store.AbstractTripleStore.quads=<%= node['bigdata']['rdf.store.AbstractTripleStore.quads'] %>
+com.bigdata.rdf.store.AbstractTripleStore.statementIdentifiers=<%= node['bigdata']['rdf.store.AbstractTripleStore.statementIdentifiers'] %>
+com.bigdata.rdf.store.AbstractTripleStore.textIndex=<%= node['bigdata']['rdf.store.AbstractTripleStore.textIndex'] %>
+com.bigdata.rdf.store.AbstractTripleStore.axiomsClass=<%= node['bigdata']['rdf.store.AbstractTripleStore.axiomsClass'] %>
+
+# Bump up the branching factor for the lexicon indices on the default kb.
+com.bigdata.namespace.kb.lex.com.bigdata.btree.BTree.branchingFactor=<%= node['bigdata']['namespace.kb.lex.com.bigdata.btree.BTree.branchingFactor'] %>
+
+# Bump up the branching factor for the statement indices on the default kb.
+com.bigdata.namespace.kb.spo.com.bigdata.btree.BTree.branchingFactor=<%= node['bigdata']['namespace.kb.spo.com.bigdata.btree.BTree.branchingFactor'] %>
+com.bigdata.rdf.sail.bufferCapacity=<%= node['bigdata']['rdf.sail.sailBufferCapacity'] %>
+# com.bigdata.rdf.store.AbstractTripleStore.vocabularyClass=<%= node['bigdata']['rdf.store.AbstractTripleStore.vocabularyClass'] %>

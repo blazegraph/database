@@ -69,6 +69,7 @@ import com.bigdata.rdf.sail.sparql.ast.SimpleNode;
 import com.bigdata.rdf.sail.webapp.BigdataRDFContext.AbstractQueryTask;
 import com.bigdata.rdf.sail.webapp.BigdataRDFContext.RunningQuery;
 import com.bigdata.rdf.sail.webapp.BigdataRDFContext.UpdateTask;
+import com.bigdata.rdf.sail.webapp.XMLBuilder.Node;
 import com.bigdata.rdf.sail.webapp.client.EncodeDecodeValue;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
@@ -133,6 +134,14 @@ public class QueryServlet extends BigdataRDFServlet {
      */
     static final transient String ATTR_UUID = "uuid";
 
+    /**
+     * The name of the URL query parameter which indicates the timestamp against
+     * which an operation will be carried out.
+     * 
+     * @see BigdataRDFServlet#getTimestamp(HttpServletRequest)
+     */
+    static final transient String ATTR_TIMESTAMP = "timestamp";
+    
 //    /**
 //     * The name of the request attribute for the {@link AbstractQueryTask}.
 //     */
@@ -155,11 +164,11 @@ public class QueryServlet extends BigdataRDFServlet {
         if (req.getParameter(ATTR_UPDATE) != null) {
             
             // SPARQL 1.1 UPDATE.
-            doUpdate(req, resp);
+            doSparqlUpdate(req, resp);
             
         } else if (RESTServlet.hasMimeType(req, MIME_SPARQL_UPDATE)) {
             // SPARQL 1.1 UPDATE, see trac 711 for bug report motivating this case
-            doUpdate(req, resp);
+            doSparqlUpdate(req, resp);
             
 	    } else if (req.getParameter(ATTR_UUID) != null) {
 
@@ -179,7 +188,7 @@ public class QueryServlet extends BigdataRDFServlet {
         } else {
             
             // SPARQL Query.
-            doQuery(req, resp);
+            doSparqlQuery(req, resp);
             
         }
 
@@ -194,7 +203,7 @@ public class QueryServlet extends BigdataRDFServlet {
 
         if (req.getParameter(ATTR_QUERY) != null) {
             
-            doQuery(req, resp);
+            doSparqlQuery(req, resp);
             
         } else if (req.getParameter(ATTR_UUID) != null) {
 
@@ -244,44 +253,56 @@ public class QueryServlet extends BigdataRDFServlet {
      */
     private void doServiceDescription(final HttpServletRequest req,
             final HttpServletResponse resp) throws IOException {
-        
-        final String namespace = getNamespace(req);
 
-        final long timestamp = getTimestamp(req);
-
-        final AbstractTripleStore tripleStore = getBigdataRDFContext()
-                .getTripleStore(namespace, timestamp);
-        
-        if (tripleStore == null) {
-            /*
-             * There is no such triple/quad store instance.
-             */
-            buildResponse(resp, HTTP_NOTFOUND, MIME_TEXT_PLAIN);
-            return;
-        }
-
-        // The serviceURIs for this graph.
-        final String[] serviceURI = BigdataServlet.getServiceURIs(
-                getServletContext(), req);
-
-        /*
-         * TODO Resolve the SD class name and ctor via a configuration property
-         * for extensible descriptions.
+        /**
+         * Protect the entire operation with a transaction.
+         * 
+         * @see <a href="http://trac.bigdata.com/ticket/867"> NSS concurrency
+         *      problem with list namespaces and create namespace </a>
          */
-        final Graph g = new GraphImpl();
-        {
+        final long tx = getBigdataRDFContext().newTx(getTimestamp(req));
+        
+        try {
+            
+            final AbstractTripleStore tripleStore = getBigdataRDFContext()
+                    .getTripleStore(getNamespace(req), tx);
 
-            final SD sd = new SD(g, tripleStore, serviceURI);
+            if (tripleStore == null) {
+                /*
+                 * There is no such triple/quad store instance.
+                 */
+                buildResponse(resp, HTTP_NOTFOUND, MIME_TEXT_PLAIN);
+                return;
+            }
 
-            final SparqlEndpointConfig config = getBigdataRDFContext()
-                    .getConfig();
+            // The serviceURIs for this graph.
+            final String[] serviceURI = BigdataServlet.getServiceURIs(
+                    getServletContext(), req);
 
-            sd.describeService(true/* describeStatistics */,
-                    config.describeEachNamedGraph);
+            /*
+             * TODO Resolve the SD class name and ctor via a configuration
+             * property for extensible descriptions.
+             */
+            final Graph g = new GraphImpl();
+            {
+
+                final SD sd = new SD(g, tripleStore, serviceURI);
+
+                final SparqlEndpointConfig config = getBigdataRDFContext()
+                        .getConfig();
+
+                sd.describeService(true/* describeStatistics */,
+                        config.describeEachNamedGraph);
+
+            }
+
+            sendGraph(req, resp, g);
+
+        } finally {
+
+            getBigdataRDFContext().abortTx(tx);
 
         }
-
-        sendGraph(req, resp, g);
 
     }
 
@@ -298,7 +319,7 @@ public class QueryServlet extends BigdataRDFServlet {
      * @param resp
      * @throws IOException
      */
-    private void doUpdate(final HttpServletRequest req,
+    private void doSparqlUpdate(final HttpServletRequest req,
             final HttpServletResponse resp) throws IOException {
 
         if (!isWritable(getServletContext(), req, resp)) {
@@ -323,7 +344,7 @@ public class QueryServlet extends BigdataRDFServlet {
         }
 
         /*
-         * Setup task to execute the query. The task is executed on a thread
+         * Setup task to execute the request. The task is executed on a thread
          * pool. This bounds the possible concurrency of query execution (as
          * opposed to queries accepted for eventual execution).
          * 
@@ -333,12 +354,7 @@ public class QueryServlet extends BigdataRDFServlet {
          */
         try {
 
-            final OutputStream os = resp.getOutputStream();
-
             final BigdataRDFContext context = getBigdataRDFContext();
-
-            // final boolean explain =
-            // req.getParameter(BigdataRDFContext.EXPLAIN) != null;
 
             final UpdateTask updateTask;
             try {
@@ -350,7 +366,7 @@ public class QueryServlet extends BigdataRDFServlet {
                 
                 updateTask = (UpdateTask) context.getQueryTask(namespace,
                         timestamp, updateStr, null/* acceptOverride */, req,
-                        resp, os, true/* update */);
+                        resp, resp.getOutputStream(), true/* update */);
                 
                 if (updateTask == null) {
                     // KB not found. Response already committed.
@@ -386,11 +402,9 @@ public class QueryServlet extends BigdataRDFServlet {
             ft.get();
 
         } catch (Throwable e) {
-            try {
-                throw BigdataRDFServlet.launderThrowable(e, resp, updateStr);
-            } catch (Exception e1) {
-                throw new RuntimeException(e);
-            }
+
+            throw BigdataRDFServlet.launderThrowable(e, resp, updateStr);
+
         }
         
     }
@@ -398,7 +412,7 @@ public class QueryServlet extends BigdataRDFServlet {
     /**
      * Run a SPARQL query.
      */
-    void doQuery(final HttpServletRequest req, final HttpServletResponse resp)
+    void doSparqlQuery(final HttpServletRequest req, final HttpServletResponse resp)
             throws IOException {
 
         if (!isReadable(getServletContext(), req, resp)) {
@@ -627,11 +641,9 @@ public class QueryServlet extends BigdataRDFServlet {
             }
 
 		} catch (Throwable e) {
-			try {
-				throw BigdataRDFServlet.launderThrowable(e, resp, queryStr);
-			} catch (Exception e1) {
-				throw new RuntimeException(e);
-			}
+
+		    throw BigdataRDFServlet.launderThrowable(e, resp, queryStr);
+		    
 		}
 	
 	}
@@ -1020,10 +1032,6 @@ public class QueryServlet extends BigdataRDFServlet {
             return;
         }
         
-        final long begin = System.currentTimeMillis();
-        
-        final String namespace = getNamespace(req);
-
         final Resource s;
         final URI p;
         final Value o;
@@ -1044,70 +1052,99 @@ public class QueryServlet extends BigdataRDFServlet {
                     + o + ", c=" + c + ")");
 
         try {
+            
+            submitApiTask(
+                    new EstCardTask(req, resp, getNamespace(req),
+                            getTimestamp(req), //
+                            s, p, o, c)).get();
 
+        } catch (Throwable t) {
+
+            launderThrowable(t, resp, "ESTCARD: access path: (s=" + s + ", p="
+                    + p + ", o=" + o + ", c=" + c + ")");
+
+        }
+        
+    }
+    
+    /**
+     * Helper task for the ESTCARD query.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     */
+    private static class EstCardTask extends AbstractRestApiTask<Void> {
+
+        private final Resource s;
+        private final URI p;
+        private final Value o;
+        private final Resource[] c;
+        
+        public EstCardTask(final HttpServletRequest req,
+                final HttpServletResponse resp, final String namespace,
+                final long timestamp, final Resource s, final URI p,
+                final Value o, final Resource[] c) {
+
+            super(req, resp, namespace, timestamp);
+
+            this.s = s;
+            this.p = p;
+            this.o = o;
+            this.c = c;
+            
+        }
+        
+        @Override
+        public boolean isReadOnly() {
+            return true;
+        }
+
+        @Override
+        public Void call() throws Exception {
+            
+            final long begin = System.currentTimeMillis();
+
+            BigdataSailRepositoryConnection conn = null;
             try {
 
-                BigdataSailRepositoryConnection conn = null;
-                try {
+                conn = getQueryConnection();
 
-                    final long timestamp = getTimestamp(req);
-
-                    conn = getBigdataRDFContext().getQueryConnection(
-                            namespace, timestamp);
-
-                    // Range count all statements matching that access path.
-                    long rangeCount = 0;
-                    if (c != null && c.length > 0) {
-	                    for (Resource r : c) {
-	                    	rangeCount += conn.getSailConnection()
-	                                .getBigdataSail().getDatabase()
-	                                .getAccessPath(s, p, o, r)
-	                                .rangeCount(false/* exact */);
-	                    }
-                    } else {
-                    	rangeCount += conn.getSailConnection()
-                                .getBigdataSail().getDatabase()
-                                .getAccessPath(s, p, o, (Resource) null)
+                // Range count all statements matching that access path.
+                long rangeCount = 0;
+                if (c != null && c.length > 0) {
+                    for (Resource r : c) {
+                        rangeCount += conn.getSailConnection().getBigdataSail()
+                                .getDatabase().getAccessPath(s, p, o, r)
                                 .rangeCount(false/* exact */);
                     }
-                    
-                    final long elapsed = System.currentTimeMillis() - begin;
-                    
-                    reportRangeCount(resp, rangeCount, elapsed);
+                } else {
+                    rangeCount += conn.getSailConnection().getBigdataSail()
+                            .getDatabase()
+                            .getAccessPath(s, p, o, (Resource) null)
+                            .rangeCount(false/* exact */);
+                }
 
-                } catch(Throwable t) {
-                    
-                    if(conn != null)
-                        conn.rollback();
-                    
-                    throw new RuntimeException(t);
-                    
-                } finally {
+                final long elapsed = System.currentTimeMillis() - begin;
 
-                    if (conn != null)
-                        conn.close();
+                reportRangeCount(resp, rangeCount, elapsed);
+
+                return null;
+
+            } finally {
+
+                if (conn != null) {
+
+                    conn.close();
 
                 }
 
-            } catch (Throwable t) {
-
-                throw BigdataRDFServlet.launderThrowable(t, resp, "");
-
             }
-
-        } catch (Exception ex) {
-
-            // Will be rendered as an INTERNAL_ERROR.
-            throw new RuntimeException(ex);
 
         }
 
-    }
+    } // ESTCARD task.
 
 	/**
 	 * Report on the contexts in use in the quads database.
-	 * @param req
-	 * @param resp
 	 */
     private void doContexts(final HttpServletRequest req,
             final HttpServletResponse resp) throws IOException {
@@ -1116,58 +1153,91 @@ public class QueryServlet extends BigdataRDFServlet {
             // HA Quorum in use, but quorum is not met.
             return;
         }
-        
-        final long begin = System.currentTimeMillis();
-        
-        final String namespace = getNamespace(req);
 
         try {
+            
+            submitApiTask(
+                    new GetContextsTask(req, resp, getNamespace(req),
+                            getTimestamp(req))).get();
 
-            try {
+        } catch (Throwable t) {
 
-                BigdataSailRepositoryConnection conn = null;
-                try {
-
-                    final long timestamp = getTimestamp(req);
-
-                    conn = getBigdataRDFContext().getQueryConnection(
-                            namespace, timestamp);
-
-                    final RepositoryResult<Resource> it = conn.getContextIDs();
-                    
-                    final long elapsed = System.currentTimeMillis() - begin;
-                    
-                    reportContexts(resp, it, elapsed);
-
-                } catch(Throwable t) {
-                    
-                    if(conn != null)
-                        conn.rollback();
-                    
-                    throw new RuntimeException(t);
-                    
-                } finally {
-
-                    if (conn != null)
-                        conn.close();
-
-                }
-
-            } catch (Throwable t) {
-
-                throw BigdataRDFServlet.launderThrowable(t, resp, "");
-
-            }
-
-        } catch (Exception ex) {
-
-            // Will be rendered as an INTERNAL_ERROR.
-            throw new RuntimeException(ex);
+            launderThrowable(t, resp, "GET-CONTEXTS");
 
         }
 
     }
 
+    /**
+     * Task to report the contexts used by a QUADS mode KB instance.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     */
+    private static class GetContextsTask extends AbstractRestApiTask<Void> {
+
+        public GetContextsTask(final HttpServletRequest req,
+                final HttpServletResponse resp, final String namespace,
+                final long timestamp) {
+ 
+            super(req, resp, namespace, timestamp);
+            
+        }
+
+        @Override
+        public boolean isReadOnly() {
+            return true;
+        }
+
+        @Override
+        public Void call() throws Exception {
+
+            BigdataSailRepositoryConnection conn = null;
+            try {
+
+                conn = getQueryConnection();
+
+                final StringWriter w = new StringWriter();
+
+                final RepositoryResult<Resource> it = conn.getContextIDs();
+
+                try {
+
+                    final XMLBuilder t = new XMLBuilder(w);
+
+                    final Node root = t.root("contexts");
+
+                    while (it.hasNext()) {
+
+                        root.node("context").attr("uri", it.next()).close();
+
+                    }
+
+                    root.close();
+
+                } finally {
+
+                    it.close();
+
+                }
+
+                buildResponse(resp, HTTP_OK, MIME_APPLICATION_XML, w.toString());
+                
+                return null;
+
+            } finally {
+
+                if (conn != null) {
+
+                    conn.close();
+                    
+                }
+
+            }
+
+        }
+        
+    }
+    
     /**
      * Private API reports the shards against which the access path would
      * read.
@@ -1189,10 +1259,6 @@ public class QueryServlet extends BigdataRDFServlet {
             return;
         }
         
-        final long begin = System.currentTimeMillis();
-        
-        final String namespace = getNamespace(req);
-
 		final boolean doRangeCount = true;
         final Resource s;
         final URI p;
@@ -1214,173 +1280,206 @@ public class QueryServlet extends BigdataRDFServlet {
                     + o + ", c=" + c + ")");
 
         try {
+            
+            submitApiTask(
+                    new ShardsTask(req, resp, getNamespace(req),
+                            getTimestamp(req), s, p, o, c, doRangeCount)).get();
 
-            try {
+        } catch (Throwable t) {
 
-                BigdataSailRepositoryConnection conn = null;
-                try {
-
-                    final long timestamp = getTimestamp(req);
-
-                    conn = getBigdataRDFContext().getQueryConnection(
-                            namespace, timestamp);
-
-                    final AccessPath<?> accessPath = (AccessPath<?>) conn
-                            .getSailConnection().getBigdataSail().getDatabase()
-                            .getAccessPath(s, p, o, c);
-                    
-                    final ClientIndexView ndx = (ClientIndexView) accessPath
-                            .getIndex();
-                    
-                    final String charset = "utf-8";// TODO from request.
-
-                    resp.setContentType(BigdataServlet.MIME_TEXT_HTML);
-                    resp.setCharacterEncoding(charset);
-                    final Writer w = resp.getWriter();
-                    try {
-
-                        final HTMLBuilder doc = new HTMLBuilder(charset, w);
-                        
-                        XMLBuilder.Node current = doc.root("html");
-                        {
-                            current = current.node("head");
-                            current.node("meta")
-                                    .attr("http-equiv", "Content-Type")
-                                    .attr("content",
-                                            "text/html;charset=utf-8")
-                                    .close();
-                            current.node("title")
-                                    .textNoEncode("bigdata&#174;").close();
-                            current = current.close();// close the head.
-                        }
-
-                        // open the body
-                        current = current.node("body");
-
-                        final IBigdataFederation<?> fed = (IBigdataFederation<?>) getBigdataRDFContext()
-                                .getIndexManager();
-                        
-                        final Iterator<PartitionLocator> itr = ndx.locatorScan(
-                                timestamp, accessPath.getFromKey(),
-                                accessPath.getToKey(), false/* reverseScan */);
-
-                        int nlocators = 0;
-
-                        // The distinct hosts on which the shards are located.
-                        final Map<String,AtomicInteger> hosts = new TreeMap<String,AtomicInteger>();
-                        
-                        // The host+locators in key order.
-                        final StringBuilder sb = new StringBuilder();
-                        
-                        while (itr.hasNext()) {
-
-                            final PartitionLocator loc = itr.next();
-
-                            final IDataService ds = fed.getDataService(loc
-                                    .getDataServiceUUID());
-                            
-							final String hostname = ds == null ? "N/A" : ds
-									.getHostname();
-
-							AtomicInteger nshards = hosts.get(hostname);
-
-							if (nshards == null) {
-
-								hosts.put(hostname,
-										nshards = new AtomicInteger());
-							
-							}
-							
-							nshards.incrementAndGet();
-							
-							sb.append("\nhost=" + hostname);
-							sb.append(", locator=" + loc);
-							
-							nlocators++;
-
-                        } // while(itr.hasNext())
-
-                        // elapsed locator scan time
-						final long begin2 = System.currentTimeMillis();
-						final long elapsed = begin2 - begin;
-						
-						// fast range count (requires visiting shards)
-						final long rangeCount = doRangeCount ? accessPath
-								.rangeCount(false/* exact */) : -1;
-
-						// elapsed time for the fast range count
-						final long elapsed2 = System.currentTimeMillis()
-								- begin2;
-
-						current = current.node("H2", "summary");
-						{
-							current.node("p", "index="
-									+ ndx.getIndexMetadata().getName()
-									+ ", locators=" + nlocators + ", hosts="
-									+ hosts.size() + ", elapsed=" + elapsed
-									+ "ms");
-							if (doRangeCount) {
-								current.node("p", "rangeCount=" + rangeCount
-										+ ", elapsed=" + elapsed2 + "ms");
-							}
-//							current = current.close();
-						}
-
-						// host + locators in key order.
-						current.node("H2","shards").node("pre", sb.toString());
-						
-						// hosts + #shards in host name order
-						{
-
-							sb.setLength(0); // clear buffer.
-
-							for (Map.Entry<String, AtomicInteger> e : hosts
-									.entrySet()) {
-
-								sb.append("\nhost=" + e.getKey());
-								
-								sb.append(", #shards=" + e.getValue());
-								
-							}
-
-							current.node("H2","hosts").node("pre", sb.toString());
-
-						}
-
-                        doc.closeAll(current);
-                        
-                    } finally {
-                        w.flush();
-                        w.close();
-                    }
-
-                } catch(Throwable t) {
-                    
-                    if(conn != null)
-                        conn.rollback();
-                    
-                    throw new RuntimeException(t);
-                    
-                } finally {
-
-                    if (conn != null)
-                        conn.close();
-
-                }
-
-            } catch (Throwable t) {
-
-                throw BigdataRDFServlet.launderThrowable(t, resp, "");
-
-            }
-
-        } catch (Exception ex) {
-
-            // Will be rendered as an INTERNAL_ERROR.
-            throw new RuntimeException(ex);
+            launderThrowable(t, resp, "SHARDS: access path: (s=" + s + ", p="
+                    + p + ", o=" + o + ", c=" + c + ")");
 
         }
 
+    }
+
+    /**
+     * Task to report on the SHARDS used by a scale-out deployment.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     */
+    private static class ShardsTask extends AbstractRestApiTask<Void> {
+
+        private final Resource s;
+        private final URI p;
+        private final Value o;
+        private final Resource c;
+        private final boolean doRangeCount;
+        
+        public ShardsTask(final HttpServletRequest req,
+                final HttpServletResponse resp, final String namespace,
+                final long timestamp, final Resource s, final URI p,
+                final Value o, final Resource c, final boolean doRangeCount) {
+
+            super(req, resp, namespace, timestamp);
+
+            this.s = s;
+            this.p = p;
+            this.o = o;
+            this.c = c;
+            this.doRangeCount = doRangeCount;
+            
+        }
+
+        @Override
+        public boolean isReadOnly() {
+            return true;
+        }
+
+        @Override
+        public Void call() throws Exception {
+
+            final long begin = System.currentTimeMillis();
+            
+            BigdataSailRepositoryConnection conn = null;
+            try {
+
+                conn = getQueryConnection();
+
+                final AccessPath<?> accessPath = (AccessPath<?>) conn
+                        .getSailConnection().getBigdataSail().getDatabase()
+                        .getAccessPath(s, p, o, c);
+                
+                final ClientIndexView ndx = (ClientIndexView) accessPath
+                        .getIndex();
+                
+                final String charset = "utf-8";// TODO from request.
+
+                resp.setContentType(BigdataServlet.MIME_TEXT_HTML);
+                resp.setCharacterEncoding(charset);
+                final Writer w = resp.getWriter();
+                try {
+
+                    final HTMLBuilder doc = new HTMLBuilder(charset, w);
+                    
+                    XMLBuilder.Node current = doc.root("html");
+                    {
+                        current = current.node("head");
+                        current.node("meta")
+                                .attr("http-equiv", "Content-Type")
+                                .attr("content",
+                                        "text/html;charset=utf-8")
+                                .close();
+                        current.node("title")
+                                .textNoEncode("bigdata&#174;").close();
+                        current = current.close();// close the head.
+                    }
+
+                    // open the body
+                    current = current.node("body");
+
+                    final IBigdataFederation<?> fed = (IBigdataFederation<?>)// getBigdataRDFContext()
+                            getIndexManager();
+                    
+                    final Iterator<PartitionLocator> itr = ndx.locatorScan(
+                            timestamp, accessPath.getFromKey(),
+                            accessPath.getToKey(), false/* reverseScan */);
+
+                    int nlocators = 0;
+
+                    // The distinct hosts on which the shards are located.
+                    final Map<String,AtomicInteger> hosts = new TreeMap<String,AtomicInteger>();
+                    
+                    // The host+locators in key order.
+                    final StringBuilder sb = new StringBuilder();
+                    
+                    while (itr.hasNext()) {
+
+                        final PartitionLocator loc = itr.next();
+
+                        final IDataService ds = fed.getDataService(loc
+                                .getDataServiceUUID());
+                        
+                        final String hostname = ds == null ? "N/A" : ds
+                                .getHostname();
+
+                        AtomicInteger nshards = hosts.get(hostname);
+
+                        if (nshards == null) {
+
+                            hosts.put(hostname,
+                                    nshards = new AtomicInteger());
+                        
+                        }
+                        
+                        nshards.incrementAndGet();
+                        
+                        sb.append("\nhost=" + hostname);
+                        sb.append(", locator=" + loc);
+                        
+                        nlocators++;
+
+                    } // while(itr.hasNext())
+
+                    // elapsed locator scan time
+                    final long begin2 = System.currentTimeMillis();
+                    final long elapsed = begin2 - begin;
+                    
+                    // fast range count (requires visiting shards)
+                    final long rangeCount = doRangeCount ? accessPath
+                            .rangeCount(false/* exact */) : -1;
+
+                    // elapsed time for the fast range count
+                    final long elapsed2 = System.currentTimeMillis()
+                            - begin2;
+
+                    current = current.node("H2", "summary");
+                    {
+                        current.node("p", "index="
+                                + ndx.getIndexMetadata().getName()
+                                + ", locators=" + nlocators + ", hosts="
+                                + hosts.size() + ", elapsed=" + elapsed
+                                + "ms");
+                        if (doRangeCount) {
+                            current.node("p", "rangeCount=" + rangeCount
+                                    + ", elapsed=" + elapsed2 + "ms");
+                        }
+//                      current = current.close();
+                    }
+
+                    // host + locators in key order.
+                    current.node("H2","shards").node("pre", sb.toString());
+                    
+                    // hosts + #shards in host name order
+                    {
+
+                        sb.setLength(0); // clear buffer.
+
+                        for (Map.Entry<String, AtomicInteger> e : hosts
+                                .entrySet()) {
+
+                            sb.append("\nhost=" + e.getKey());
+                            
+                            sb.append(", #shards=" + e.getValue());
+                            
+                        }
+
+                        current.node("H2","hosts").node("pre", sb.toString());
+
+                    }
+
+                    doc.closeAll(current);
+                    
+                } finally {
+                    w.flush();
+                    w.close();
+                }
+
+                return null;
+
+            } finally {
+
+                if (conn != null) {
+
+                    conn.close();
+                    
+                }
+
+            }
+
+        }
+        
     }
 
 //    /**

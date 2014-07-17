@@ -74,6 +74,7 @@ public class FilterNode extends GroupMemberValueExpressionNodeBase implements
 	    
 	}
 	
+    @Override
     public IValueExpressionNode getValueExpressionNode() {
 
         return (IValueExpressionNode) get(0);

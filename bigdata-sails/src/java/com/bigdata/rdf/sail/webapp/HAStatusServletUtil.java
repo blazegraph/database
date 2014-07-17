@@ -25,11 +25,13 @@ package com.bigdata.rdf.sail.webapp;
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.math.BigInteger;
 import java.net.InetSocketAddress;
 import java.security.DigestException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.Date;
 import java.util.Iterator;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
@@ -41,6 +43,7 @@ import org.apache.log4j.Logger;
 import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.ZooKeeper;
 
+import com.bigdata.Banner;
 import com.bigdata.BigdataStatics;
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.HAStatusEnum;
@@ -65,6 +68,8 @@ import com.bigdata.quorum.zk.ZKQuorumClient;
 import com.bigdata.quorum.zk.ZKQuorumImpl;
 import com.bigdata.rdf.sail.webapp.StatusServlet.DigestEnum;
 import com.bigdata.zookeeper.DumpZookeeper;
+import com.fasterxml.jackson.core.JsonFactory;
+import com.fasterxml.jackson.core.JsonGenerator;
 
 /**
  * Class supports the {@link StatusServlet} and isolates code that has a
@@ -885,6 +890,93 @@ public class HAStatusServletUtil {
 
     }
 
+   /**
+    * Basic server health info
+    * 
+    * @param req
+    * @param resp
+    * @throws TimeoutException
+    * @throws InterruptedException
+    * @throws AsynchronousQuorumCloseException
+    * @throws IOException
+    */
+   public void doHealthStatus(final HttpServletRequest req,
+         final HttpServletResponse resp) throws IOException {
+
+      StringWriter writer = new StringWriter();
+      JsonFactory factory = new JsonFactory();
+      JsonGenerator json = factory.createGenerator(writer);
+
+      json.writeStartObject();
+      json.writeStringField("version", Banner.getVersion());
+      json.writeNumberField("timestamp", new Date().getTime());
+
+      if (!(indexManager instanceof HAJournal)) {
+
+         // standalone
+         json.writeStringField("deployment", "standalone");
+
+      } else {
+
+         // HA
+         json.writeStringField("deployment", "HA");
+
+         final HAJournal journal = (HAJournal) indexManager;
+
+         final Quorum<HAGlue, QuorumService<HAGlue>> quorum = journal
+               .getQuorum();
+
+         if (quorum.isQuorumFullyMet(quorum.token())) {
+            json.writeStringField("status", "Good");
+            json.writeStringField("details",
+                  "All servers (" + quorum.replicationFactor() + ") joined");
+         } else {
+            // at least one server is not available
+            // status is either Warning or Bad
+            if (quorum.isQuorumMet()) {
+               json.writeStringField("status", "Warning");
+            } else {
+               json.writeStringField("status", "Bad");
+            }
+            json.writeStringField(
+                  "details",
+                  "Only " + quorum.getJoined().length + " of target "
+                        + quorum.replicationFactor() + " servers joined");
+         }
+
+         json.writeFieldName("services");
+         json.writeStartArray();
+
+         final UUID[] members = quorum.getMembers();
+         final UUID[] joined = quorum.getJoined();
+
+         for (UUID serviceId : members) {
+            final boolean isLeader = serviceId.equals(quorum.getLeaderId());
+            final boolean isFollower = indexOf(serviceId, joined) > 0;
+
+            json.writeStartObject();
+            json.writeStringField("id", serviceId.toString());
+            json.writeStringField("status", isLeader ? "leader"
+                  : (isFollower ? "follower" : "unready"));
+            json.writeEndObject();
+         }
+
+         json.writeEndArray();
+      }
+
+      json.writeEndObject();
+      json.close();
+
+      // TODO Alternatively "max-age=1" for max-age in seconds.
+      resp.addHeader("Cache-Control", "no-cache");
+
+      BigdataRDFServlet.buildResponse(resp, BigdataRDFServlet.HTTP_OK,
+            BigdataRDFServlet.MIME_APPLICATION_JSON, writer.toString());
+
+      return;
+
+   }
+    
 //    /**
 //     * Impose a lexical ordering on the file names. This is used for the HALog
 //     * and snapshot file names. The main component of those file names is the

@@ -37,7 +37,6 @@ import com.bigdata.rdf.store.AbstractTripleStore;
  * {@link ServiceCall} instance.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public interface ServiceCallCreateParams {
 

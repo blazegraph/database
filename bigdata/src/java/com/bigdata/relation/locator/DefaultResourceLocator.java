@@ -482,7 +482,7 @@ public class DefaultResourceLocator<T extends ILocatableResource> //
     protected Properties locateResource(final String namespace,
             final long timestamp, final AtomicReference<IIndexManager> foundOn) {
 
-        synchronized (seeAlso) {
+        synchronized (seeAlso) { // FIXME Probably a read/write lock since [seeAlso] normally empty.
 
             for (IIndexManager indexManager : seeAlso.keySet()) {
 
@@ -915,10 +915,8 @@ public class DefaultResourceLocator<T extends ILocatableResource> //
      * @param indexManager
      *            The {@link IIndexManager} that will be used to resolve the
      *            named indices for the relation.
-     * @param namespace
-     *            The namespace for the relation.
-     * @param timestamp
-     *            The timestamp for the view of the relation.
+     * @param nt
+     *            The namespace and timestamp for the view of the relation.
      * @param properties
      *            Configuration properties for the relation.
      * 
@@ -1126,7 +1124,7 @@ public class DefaultResourceLocator<T extends ILocatableResource> //
      * 
      * @see #locateResource(String)
      */
-    public void add(IIndexManager indexManager) {
+    public void add(final IIndexManager indexManager) {
 
         if (indexManager == null)
             throw new IllegalArgumentException();

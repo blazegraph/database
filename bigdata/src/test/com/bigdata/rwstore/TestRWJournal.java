@@ -27,23 +27,16 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rwstore;
 
-import java.io.EOFException;
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Properties;
 import java.util.Random;
 import java.util.TreeMap;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
-import java.util.zip.GZIPInputStream;
-import java.util.zip.GZIPOutputStream;
 
 import junit.extensions.proxy.ProxyTestSuite;
 import junit.framework.Test;
@@ -82,7 +75,6 @@ import com.bigdata.util.InnerCause;
  * Test suite for {@link BufferMode#DiskRW} journals.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class TestRWJournal extends AbstractJournalTestCase {
 
@@ -577,8 +569,6 @@ public class TestRWJournal extends AbstractJournalTestCase {
 	 * 
 	 * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
 	 *         Thompson</a>
-	 * @version $Id: TestRWJournal.java 4010 2010-12-16 12:44:43Z martyncutcher
-	 *          $
 	 */
 	public static class TestRawStore extends AbstractRestartSafeTestCase {
 
@@ -2011,6 +2001,135 @@ public class TestRWJournal extends AbstractJournalTestCase {
             	store.destroy();
             }
 		}
+
+        /**
+         * Verify that we correctly restore the RWStore commit state if
+         * {@link RWStore#commit()} is followed by {@link RWStore#reset()}
+         * rather than {@link RWStore#postCommit()}.
+         * 
+         * @see <a href="http://trac.bigdata.com/ticket/973" >RWStore commit is
+         *      not robust to internal failure.</a>
+         */
+		public void test_commitState() {
+			Journal store = (Journal) getStore();
+            try {
+
+            	final RWStrategy bs = (RWStrategy) store.getBufferStrategy();
+            	
+            	final RWStore rws = bs.getStore();
+            	
+            	final long addr = bs.write(randomData(78));
+
+            	// do 1st half of the RWStore commit protocol.
+            	rws.commit();
+            	            	
+            	// then discard write set.
+            	store.abort();
+            	
+            	assertFalse(bs.isCommitted(addr)); // rolled back
+            	
+            	// now cycle standard commit to confirm correct reset
+            	for (int c = 0; c < 50; c++) {
+            		bs.write(randomData(78));
+            		store.commit();
+            	}
+           	
+            	
+            } finally {
+            	store.destroy();
+            }
+		}
+		
+        /**
+         * Test verifies that a failure to retain the commit state in
+         * {@link RWStore#commit()} will cause problems if the write set is
+         * discarded by {@link RWStore#reset()} such that subsequent write sets
+         * run into persistent addressing errors.
+         * 
+         * @see <a href="http://trac.bigdata.com/ticket/973" >RWStore commit is
+         *      not robust to internal failure.</a>
+         */
+		public void test_commitStateError() {
+			Journal store = (Journal) getStore();
+            try {
+
+            	RWStrategy bs = (RWStrategy) store.getBufferStrategy();
+            	
+            	RWStore rws = bs.getStore();
+            	
+            	final long addr = bs.write(randomData(78));
+            	
+            	// do first half of the RWStore protocol.
+            	rws.commit();
+
+            /*
+             * remove the commit state such that subsequent abort()/reset()
+             * will fail to correctly restore the pre-commit state.
+             */
+            rws.clearCommitStateRef();
+
+            // abort() succeeds because it is allowed even if commit() was
+            // not called.
+            	store.abort();
+            	
+            	assertFalse(bs.isCommitted(addr)); // rolled back
+            	
+            	try {
+	            	// now cycle standard commit to force an error from bad reset
+	            	for (int c = 0; c < 50; c++) {
+	            		bs.write(randomData(78));
+	            		store.commit();
+	            	}
+	            	fail("Expected failure");
+            	} catch (Exception e) {
+            		// expected
+            		log.info("Expected!");
+            	}
+           	
+            } finally {
+            	store.destroy();
+            }
+		}
+		
+        /**
+         * Verify that a double-commit causes an illegal state exception.
+         * Further verify that an {@link RWStore#reset()} allwos us to then
+         * apply and commit new write sets.
+         * 
+         * @see <a href="http://trac.bigdata.com/ticket/973" >RWStore commit is
+         *      not robust to internal failure.</a>
+         */
+		public void test_commitStateIllegal() {
+			final Journal store = (Journal) getStore();
+            try {
+
+            final RWStrategy bs = (RWStrategy) store.getBufferStrategy();
+            	
+            	final RWStore rws = bs.getStore();
+            	
+            	bs.write(randomData(78));
+            	
+            	rws.commit();
+            	
+            	try {
+            		store.commit();
+            		
+            		fail("Expected failure");
+            	} catch (Exception ise) {
+            		if (InnerCause.isInnerCause(ise, IllegalStateException.class)) {
+	            		store.abort();
+	            		
+	            		store.commit();
+            		} else {
+            			fail("Unexpected Exception");
+            		}
+            	}
+           	
+            	
+            } finally {
+            	store.destroy();
+            }
+		}
 		
 		public void test_allocCommitFreeWithHistory() {
 			Journal store = (Journal) getStore(4);
@@ -2959,8 +3078,6 @@ public class TestRWJournal extends AbstractJournalTestCase {
 	 * 
 	 * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
 	 *         Thompson</a>
-	 * @version $Id: TestRWJournal.java 4010 2010-12-16 12:44:43Z martyncutcher
-	 *          $
 	 */
 	public static class TestMROW extends AbstractMROWTestCase {
 
@@ -2995,8 +3112,6 @@ public class TestRWJournal extends AbstractJournalTestCase {
 	 * 
 	 * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
 	 *         Thompson</a>
-	 * @version $Id: TestRWJournal.java 4010 2010-12-16 12:44:43Z martyncutcher
-	 *          $
 	 */
 	public static class TestMRMW extends AbstractMRMWTestCase {
 
@@ -3031,8 +3146,6 @@ public class TestRWJournal extends AbstractJournalTestCase {
 	 * 
 	 * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
 	 *         Thompson</a>
-	 * @version $Id: TestRWJournal.java 4010 2010-12-16 12:44:43Z martyncutcher
-	 *          $
 	 */
 	public static class TestInterrupts extends AbstractInterruptsTestCase {
 	

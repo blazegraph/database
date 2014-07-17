@@ -29,19 +29,27 @@ package com.bigdata.rdf.sparql.ast.service;
 
 /**
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 abstract public class ServiceOptionsBase implements IServiceOptions {
 
     private boolean isRunFirst = false;
-    
+    private boolean useLBS = false;
+
     @Override
     public boolean isRunFirst() {
         return isRunFirst;
     }
-    
-    public void setRunFirst(final boolean newValue) { 
+
+    public void setRunFirst(final boolean newValue) {
         this.isRunFirst = newValue;
     }
 
+    @Override
+    public boolean isBigdataLBS() {
+        return useLBS;
+    }
+
+    public void setBigdataLBS(final boolean newValue) {
+        this.useLBS = newValue;
+    }
 }

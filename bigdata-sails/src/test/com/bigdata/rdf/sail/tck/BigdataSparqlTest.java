@@ -90,7 +90,6 @@ import com.bigdata.rdf.sparql.ast.QueryRoot;
  * a {@link Journal} without full read/write transaction support.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class BigdataSparqlTest 
 extends SPARQLQueryTest // Sesame TupleExpr based evaluation 

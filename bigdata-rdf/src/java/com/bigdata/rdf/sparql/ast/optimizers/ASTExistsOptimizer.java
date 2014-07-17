@@ -167,6 +167,7 @@ public class ASTExistsOptimizer implements IASTOptimizer {
 
                 final FilterNode filter = (FilterNode) child;
 
+                // rewrite filter.
                 rewrite(sa, exogenousVars, query, p, filter,
                         filter.getValueExpressionNode());
 
@@ -181,9 +182,12 @@ public class ASTExistsOptimizer implements IASTOptimizer {
             }
 
             if (child instanceof SubqueryRoot) {
+                
                 // Recursion.
-                SubqueryRoot subquery = (SubqueryRoot)child;
-				rewrite(sa, exogenousVars, subquery, subquery.getWhereClause() );
+                final SubqueryRoot subquery = (SubqueryRoot) child;
+
+                rewrite(sa, exogenousVars, subquery, subquery.getWhereClause());
+                
             }
 
         }
@@ -223,6 +227,15 @@ public class ASTExistsOptimizer implements IASTOptimizer {
 
                     final SubqueryRoot subquery = new SubqueryRoot(QueryType.ASK);
 
+                    /**
+                     * Propagate the FILTER EXISTS mode query hint to the ASK
+                     * subquery.
+                     * 
+                     * @see <a href="http://trac.bigdata.com/ticket/988"> bad
+                     *      performance for FILTER EXISTS </a>
+                     */
+                    subquery.setFilterExistsMode(subqueryFunction.getFilterExistsMode());
+                    
                     final ProjectionNode projection = new ProjectionNode();
                     subquery.setProjection(projection);
 

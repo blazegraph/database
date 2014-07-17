@@ -322,6 +322,13 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
      */
     public IQueryNode findParent(final GraphPatternGroup<?> group) {
 
+        return findParent(queryRoot, group);
+
+    }
+
+    public static IQueryNode findParent(final QueryRoot queryRoot,
+            final GraphPatternGroup<?> group) {
+
         if (group == null)
             throw new IllegalArgumentException();
 
@@ -399,7 +406,7 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
      * @return The {@link QueryBase}, {@link ServiceNode}, or {@link FilterNode}
      *         which is the "parent" of <i>theGroup</i>.
      */
-    private IQueryNode findParent2(
+    static public IQueryNode findParent2(
             final GraphPatternGroup<IGroupMemberNode> aGroup,
             final GraphPatternGroup<?> theGroup) {
 

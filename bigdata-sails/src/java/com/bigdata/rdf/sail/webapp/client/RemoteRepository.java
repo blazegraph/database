@@ -234,6 +234,16 @@ public class RemoteRepository {
     private volatile String queryMethod;
 
     /**
+     * The name of the property whose value is the namespace of the KB to be
+     * created.
+     * <p>
+     * Note: This string is identicial to one defined by the BigdataSail
+     * options, but the client API must not include a dependency on the Sail so
+     * it is given by value again here in a package local scope.
+     */
+    static final String OPTION_CREATE_KB_NAMESPACE = "com.bigdata.rdf.sail.namespace";
+
+    /**
      * Return the maximum requestURL length before the request is converted into
      * a POST using a <code>application/x-www-form-urlencoded</code> request
      * entity.
@@ -297,6 +307,20 @@ public class RemoteRepository {
 
     }
     
+    /**
+     * 
+     * @param sparqlEndpointURL
+     * @param httpClient
+     * @param executor
+     * 
+     * @deprecated This version does not force the caller to decide whether or
+     *             not the LBS pattern will be used. In general, it should be
+     *             used if the end point is bigdata. This class is generally,
+     *             but not always, used with a bigdata end point. The main
+     *             exception is SPARQL Basic Federated Query. For that use case
+     *             we can not assume that the end point is bigdata and thus we
+     *             can not use the LBS prefix.
+     */
     public RemoteRepository(final String sparqlEndpointURL,
             final HttpClient httpClient, final Executor executor) {
 
@@ -855,7 +879,7 @@ public class RemoteRepository {
         }
             
         if (add.uri != null) {
-            // set the resource to load.
+            // set the resource to load : FIXME REST API allows multiple URIs, but RemoteRepository does not.
             opts.addRequestParam("uri", add.uri);
         }
         

@@ -42,10 +42,35 @@ public class TestCommitCounterUtility extends TestCase2 {
     public TestCommitCounterUtility() {
     }
 
-    public TestCommitCounterUtility(String name) {
+    public TestCommitCounterUtility(final String name) {
         super(name);
     }
 
+    /**
+     * Verify the value of specific constants. These constants must not be
+     * modified since they define the hierarchical structure of the durable data
+     * and a relied upon to generate and parse the fully qualified names of the
+     * files within a managed commit counter based directory system.
+     */
+    public void test_constants() {
+        
+        assertEquals("filesPerDirectory", 1000,
+                CommitCounterUtility.getFilesPerDirectory());
+
+        assertEquals("digitsPerDirectory", 3,
+                CommitCounterUtility.getDigitsPerDirectory());
+
+        assertEquals("basenameDigits", 21,
+                CommitCounterUtility.getBasenameDigits());
+        
+        assertEquals("rootDirectoryDepth", 0,
+                CommitCounterUtility.getRootDirectoryDepth());
+
+        assertEquals("leafDirectoryDepth", 6,
+                CommitCounterUtility.getLeafDirectoryDepth());
+
+    }
+    
     public void test01() {
         
         final File dir = new File("/tmp");

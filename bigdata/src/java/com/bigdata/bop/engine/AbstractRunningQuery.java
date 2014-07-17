@@ -99,7 +99,6 @@ import cutthecrap.utils.striterators.ICloseableIterator;
  * first result when compared with pipelined evaluation.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 abstract public class AbstractRunningQuery implements IRunningQuery {
 
@@ -146,13 +145,13 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
     /** The unique identifier for this query. */
     final private UUID queryId;
 
-    /**
-     * The query deadline. The value is the system clock time in milliseconds
-     * when the query is due and {@link Long#MAX_VALUE} if there is no deadline.
-     * In order to have a guarantee of a consistent clock, the deadline is
-     * interpreted by the query controller.
-     */
-    final private AtomicLong deadline = new AtomicLong(Long.MAX_VALUE);
+//    /**
+//     * The query deadline. The value is the system clock time in milliseconds
+//     * when the query is due and {@link Long#MAX_VALUE} if there is no deadline.
+//     * In order to have a guarantee of a consistent clock, the deadline is
+//     * interpreted by the query controller.
+//     */
+//    final private AtomicLong deadline = new AtomicLong(Long.MAX_VALUE);
 
     /**
      * The timestamp (ms) when the query begins to execute.
@@ -1744,7 +1743,7 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
         lock.lock();
         try {
             sb.append(",elapsed=" + getElapsed());
-            sb.append(",deadline=" + deadline.get());
+            sb.append(",deadline=" + runState.getDeadline());
             sb.append(",isDone=" + isDone());
             sb.append(",isCancelled=" + isCancelled());
             sb.append(",runState=" + runState);

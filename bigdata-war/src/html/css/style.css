@@ -158,7 +158,6 @@ h2 {
 
 .modal {
    display: none;
-   z-index: 1;
    position: fixed;
    top: 0;
    left: 0;
@@ -167,6 +166,7 @@ h2 {
    margin-left: 25%;
    background-color: white;
    padding: 20px;
+   z-index: 4;
 }
 
 #overlay {
@@ -178,6 +178,7 @@ h2 {
    height: 100%;
    background-color: grey;
    opacity: 0.5;
+   z-index: 3;
 }
 
 .modal-open #overlay {
@@ -188,29 +189,13 @@ h2 {
    overflow: hidden;
 }
 
+#query-form, #update-box-container {
+   clear: both;
+}
+
 .namespace-shortcuts {
    float: right;
    margin-bottom: 20px;
-}
-
-.namespace-shortcuts li {
-   display: inline-block;
-   border: 1px solid #e4e4e4;
-   padding: 5px;
-   margin-left: 5px;
-   cursor: pointer;
-   width: 40px;
-   text-align: center;
-}
-
-.namespace-shortcuts li:hover {
-   border-color: #b7b7b7;
-   background-color: #b7b7b7;
-   color: #ededed;
-}
-
-#query-form, #update-box-container {
-   clear: both;
 }
 
 #large-file-message {
@@ -264,7 +249,7 @@ hr {
    border: none;
 }
 
-.advanced-features, #query-response, #query-pagination, #query-explanation, #query-export-container, #update-response, #update-clear-container, #explore-results, #namespace-properties {
+.advanced-features, #query-response, #query-pagination, #query-explanation, #query-history, #query-export-container, #update-response, #update-clear-container, #explore-results, #namespace-properties {
    display: none;
 }
 
@@ -279,6 +264,19 @@ th {
 
 pre {
    font-family: monospace;
+}
+
+/* make cursor visible in error highlighting */
+div.CodeMirror-cursors {
+   z-index: 3;
+}
+
+.error-line {
+   background: red;
+}
+
+.error-character {
+   background: green;
 }
 
 #page-selector {
@@ -329,6 +327,10 @@ pre {
    border: 1px solid #e1e1e1;
 }
 
+#query-history .query {
+   white-space: pre;
+}
+
 #query-export-container {
    text-align: right;
 }
@@ -343,4 +345,26 @@ iframe {
    height: 300px;
    border: 1px solid #e1e1e1;
    box-sizing: border-box;
+}
+
+.health-good {
+   background-color: lightgreen;
+}
+
+.health-warning {
+   background-color: orange;
+}
+
+.health-bad {
+   background-color: tomato;
+}
+
+#inference-quads-incompatible {
+   display: none;
+   font-style: italic;
+}
+
+#links {
+   text-align: center;
+   margin-top: 20px;
 }

@@ -137,7 +137,6 @@ public class SampleServiceFactory extends AbstractServiceFactory
 
     }
     
-
     /*
      * Note: This could extend the base class to allow for search service
      * configuration options.
@@ -158,6 +157,7 @@ public class SampleServiceFactory extends AbstractServiceFactory
         
     }
     
+    @Override
     public BigdataServiceCall create(
     		final ServiceCallCreateParams params, 
     		final ServiceParams serviceParams) {

@@ -935,6 +935,9 @@ ${postInstallMessage}</echo>
       <property name="dist.doc" location="${dist.dir}/doc" />
       <property name="dist.doc.api" location="${dist.dir}/doc/api" />
       <property name="dist.doc.legal" location="${dist.dir}/doc/LEGAL" />
+    	<!-- deployment directories having stuff to be staged. -->
+      <property name="deploy" location="src/resources/deployment"/>
+      <property name="deploy.nss" location="${deploy}/nss"/>
 
       <delete dir="${dist.dir}" quiet="true" />
       <mkdir dir="${dist.dir}" />
@@ -966,7 +969,7 @@ ${postInstallMessage}</echo>
       <property name="bigdata-jini.lib" location="${bigdata.dir}/bigdata-jini/lib/jini/lib" />
       <property name="bigdata-rdf.lib" location="${bigdata.dir}/bigdata-rdf/lib" />
       <property name="bigdata-sails.lib" location="${bigdata.dir}/bigdata-sails/lib" />
-        <property name="bigdata-blueprints.lib" location="${bigdata.dir}/bigdata-blueprints/lib" />
+      <property name="bigdata-blueprints.lib" location="${bigdata.dir}/bigdata-blueprints/lib" />
       <property name="bigdata-gom.lib" location="${bigdata.dir}/bigdata-gom/lib" />
       <property name="bigdata-jetty.lib" location="${bigdata.dir}/bigdata/lib/jetty" />
       <property name="bigdata-http.lib" location="${bigdata.dir}/bigdata-sails/lib/httpcomponents" />
@@ -983,7 +986,7 @@ ${postInstallMessage}</echo>
             tofile="${dist.lib}/lgplutils.jar" />
       <copy file="${bigdata.lib}/unimi/fastutil-${fastutil.version}.jar"
             tofile="${dist.lib}/fastutil.jar" />
-      <copy file="${bigdata.lib}/bigdata-ganglia-${ganglia-version}.jar"
+      <copy file="${bigdata.lib}/bigdata-ganglia-${ganglia.version}.jar"
             tofile="${dist.lib}/bigdata-ganglia.jar" />
       <!--copy file="${bigdata.lib}/bigdata-gas-${gas.version}.jar"
             tofile="${dist.lib}/bigdata-gas.jar" -->
@@ -1013,8 +1016,11 @@ ${postInstallMessage}</echo>
       <!-- Blueprints library -->
         <copy file="${bigdata-blueprints.lib}/blueprints-core-${blueprints.version}.jar"
               tofile="${dist.lib}/blueprints-core.jar" />
-    	
 
+    	<!-- JSON -->
+      <copy file="${bigdata-sails.lib}/jackson-core-${jackson.version}.jar"
+            tofile="${dist.lib}/jackson-core.jar" />
+    
       <!-- jetty library -->
      <copy file="${bigdata-jetty.lib}/jetty-continuation-${jetty.version}.jar"
             tofile="${dist.lib}/jetty-continuation.jar" />
@@ -1165,6 +1171,7 @@ ${postInstallMessage}</echo>
 
       <property name="logging.to.path" location="${dist.var.config.logging}" />
 
+      <!-- Note: normal server logging files. -->
       <property name="log4j.from.file" location="${bigdata.dir}/bigdata/src/resources/logging/log4j.properties" />
       <copy file="${log4j.from.file}"
             todir="${logging.to.path}" />
@@ -1173,15 +1180,18 @@ ${postInstallMessage}</echo>
       <copy file="${logging.from.file}"
             todir="${logging.to.path}" />
 
+    	<!-- Note: scale-out logging files (standalone mode). -->
       <property name="standalone.log4j.from.file" location="${src.resources.config}/standalone/log4j.properties" />
       <property name="standalone.log4j.to.file" location="${logging.to.path}/log4jStandalone.properties" />
       <copy file="${standalone.log4j.from.file}"
             tofile="${standalone.log4j.to.file}" />
 
+      <!-- Note: scale-out logging files (cluster mode). -->
       <property name="server.log4j.from.file" location="${src.resources.config}/log4jServer.properties" />
       <copy file="${server.log4j.from.file}"
             todir="${logging.to.path}" />
 
+      <!-- Note: HA replication cluster logging files. -->
       <property name="haserver.log4j.from.file" location="${src.resources}/HAJournal/log4jHA.properties" />
       <copy file="${haserver.log4j.from.file}"
             todir="${logging.to.path}" />
@@ -1265,6 +1275,30 @@ ${postInstallMessage}</echo>
           src="http://wiki.bigdata.com/wiki/index.php/NanoSparqlServer?printable=yes"
          />
 
+      <!-- Stage files specific to NSS deployments provided by Brew and Chef. -->
+      <chmod file="${dist.bin}/bigdata" perm="755" />
+      <copy file="${deploy.nss}/bin/bigdataNSS"
+            todir="${dist.bin}" />
+      <chmod file="${dist.bin}/bigdataNSS" perm="755" />
+      <copy file="${deploy.nss}/bin/startNSS"
+            todir="${dist.bin}" />
+      <chmod file="${dist.bin}/startNSS" perm="755" />
+<!-- 
+TODO These lines were removed per #951 (Deployments branch merge). They
+break the other deployment models by introducing metavariables for regex
+substitutions.
+
+ bigdata-war/src/WEB-INF/RWStore.properties (staged into bigdata/var/jetty/bigdata/WEB-INF/RWStore.properties)
+ 
+ and
+ 
+ bigdata/src/resources/log4j.properties (staged into dist/var/config/logging/log4j.properties).
+    	<copy file="${deploy.nss}/WEB-INF/RWStore.properties"
+            todir="${dist.var.jetty}/WEB-INF" overwrite="true" />
+      <copy file="${deploy.nss}/WEB-INF/classes/log4j.properties"
+            todir="${dist.var.jetty}/WEB-INF/classes" overwrite="true" />
+-->
+
     </target>
 
     <!--                                                    -->
@@ -1344,8 +1378,41 @@ ${postInstallMessage}</echo>
 
     </target>
 
+    <target name="package-nss-brew" depends="clean, stage"
+           description="Create compressed tar file for Jetty based deployment via Brew and Chef installers.">
 
-    <!-- FIXME DEBUG and add 'depends="javadoc, stage" (should stage stage javadoc?)' -->
+     <tar destfile="${bigdata.dir}/REL-NSS.${version}.tgz"
+          compression="gzip">
+
+       <tarfileset dir="${bigdata.dir}/dist">
+         <include name="bigdata/doc/**" />
+         <exclude name="bigdata/doc/api/**" />
+         <exclude name="bigdata/doc/HAJournalServer.html" />
+         <include name="bigdata/lib/**" />
+         <exclude name="bigdata/lib/bigdata-ganglia.jar" />
+         <exclude name="bigdata/lib/browser.jar" />
+         <exclude name="bigdata/lib/reggie.jar" />
+         <exclude name="bigdata/lib/zookeeper.jar" />
+         <exclude name="bigdata/lib/jsk-*.jar" />
+         <exclude name="bigdata/lib-dl" />
+         <exclude name="bigdata/lib-ext" />
+         <include name="bigdata/var/jetty/**" />
+         <include name="bigdata/var/config/logging/logging.properties" />
+         <exclude name="bigdata/var/jetty/html/new.html" />
+         <exclude name="bigdata/var/jetty/html/old.html" />
+       </tarfileset>
+
+       <!-- Add scripts separately, making them executable -->
+
+       <tarfileset dir="${bigdata.dir}/dist" filemode="755">
+         <include name="bigdata/bin/bigdataNSS" />
+         <include name="bigdata/bin/startNSS" />
+       </tarfileset>
+     </tar>
+
+   </target>
+
+	<!-- FIXME DEBUG and add 'depends="javadoc, stage" (should stage stage javadoc?)' -->
     <!-- Note: can require 'rpm' and 'rpm-build. -->
     <!-- TODO: We do not need both this and "deploy-artifact". -->
     <target name="rpm" depends="prepare" description="Build RPM installer.">
@@ -1810,7 +1877,7 @@ ${postInstallMessage}</echo>
 
         <!-- TODO ${path.separator}${dist.lib}/bigdata-gas.jar -->
       <property name="javac.test.classpath"
-         value="${classes.dir}${path.separator}${junit.jar}${path.separator}${hamcrest.jar}${path.separator}${junit-ext.jar}${path.separator}${sesame-sparql-test.jar}${path.separator}${sesame-store-test.jar}${path.separator}${sesame-rio-test.jar}${path.separator}${dist.lib}/classserver.jar${path.separator}${dist.lib}/highscalelib.jar${path.separator}${dist.lib}/dsiutils.jar${path.separator}${dist.lib}/lgplutils.jar${path.separator}${dist.lib}/fastutil.jar${path.separator}${dist.lib}/bigdata-ganglia.jar${path.separator}${dist.lib}/icu4j.jar${path.separator}${dist.lib}/icu4j-charset.jar${path.separator}${dist.lib}/log4j.jar${path.separator}${dist.lib}/lucene-analyzer.jar${path.separator}${dist.lib}/lucene-core.jar${path.separator}${path.separator}${dist.lib}/openrdf-sesame.jar${path.separator}${dist.lib}/slf4j.jar${path.separator}${dist.lib}/jsk-lib.jar${path.separator}${dist.lib}/jsk-platform.jar${path.separator}${dist.lib}/nxparser.jar${path.separator}${dist.lib}/zookeeper.jar${path.separator}${dist.lib}/jetty-continuation.jar${path.separator}${dist.lib}/jetty-http.jar${path.separator}${dist.lib}/jetty-io.jar${path.separator}${dist.lib}/jetty-jmx.jar${path.separator}${dist.lib}/jetty-jndi.jar${path.separator}${dist.lib}/jetty-server.jar${path.separator}${dist.lib}/jetty-util.jar${path.separator}${dist.lib}/jetty-webapp.jar${path.separator}${dist.lib}/jetty-servlet.jar${path.separator}${dist.lib}/jetty-security.jar${path.separator}${dist.lib}/jetty-xml.jar${path.separator}${dist.lib}/jetty-rewrite.jar${path.separator}${dist.lib}/jetty-client.jar${path.separator}${dist.lib}/jetty-proxy.jar${path.separator}${dist.lib}/servlet-api.jar${path.separator}${dist.lib}/commons-codec.jar${path.separator}${dist.lib}/commons-fileupload.jar${path.separator}${dist.lib}/commons-io.jar${path.separator}${dist.lib}/commons-logging.jar${path.separator}${dist.lib}/httpclient.jar${path.separator}${dist.lib}/httpclient-cache.jar${path.separator}${dist.lib}/httpcore.jar${path.separator}${dist.lib}/httpmime.jar${path.separator}${dist.lib}/blueprints-core.jar${path.separator}${blueprints-test.jar}${path.separator}${jettison.jar}" />
+         value="${classes.dir}${path.separator}${junit.jar}${path.separator}${hamcrest.jar}${path.separator}${junit-ext.jar}${path.separator}${sesame-sparql-test.jar}${path.separator}${sesame-store-test.jar}${path.separator}${sesame-rio-test.jar}${path.separator}${dist.lib}/classserver.jar${path.separator}${dist.lib}/highscalelib.jar${path.separator}${dist.lib}/dsiutils.jar${path.separator}${dist.lib}/lgplutils.jar${path.separator}${dist.lib}/fastutil.jar${path.separator}${dist.lib}/bigdata-ganglia.jar${path.separator}${dist.lib}/icu4j.jar${path.separator}${dist.lib}/icu4j-charset.jar${path.separator}${dist.lib}/log4j.jar${path.separator}${dist.lib}/lucene-analyzer.jar${path.separator}${dist.lib}/lucene-core.jar${path.separator}${path.separator}${dist.lib}/openrdf-sesame.jar${path.separator}${dist.lib}/slf4j.jar${path.separator}${dist.lib}/jsk-lib.jar${path.separator}${dist.lib}/jsk-platform.jar${path.separator}${dist.lib}/nxparser.jar${path.separator}${dist.lib}/zookeeper.jar${path.separator}${dist.lib}/jetty-continuation.jar${path.separator}${dist.lib}/jetty-http.jar${path.separator}${dist.lib}/jetty-io.jar${path.separator}${dist.lib}/jetty-jmx.jar${path.separator}${dist.lib}/jetty-jndi.jar${path.separator}${dist.lib}/jetty-server.jar${path.separator}${dist.lib}/jetty-util.jar${path.separator}${dist.lib}/jetty-webapp.jar${path.separator}${dist.lib}/jetty-servlet.jar${path.separator}${dist.lib}/jetty-security.jar${path.separator}${dist.lib}/jetty-xml.jar${path.separator}${dist.lib}/jetty-rewrite.jar${path.separator}${dist.lib}/jetty-client.jar${path.separator}${dist.lib}/jetty-proxy.jar${path.separator}${dist.lib}/servlet-api.jar${path.separator}${dist.lib}/commons-codec.jar${path.separator}${dist.lib}/commons-fileupload.jar${path.separator}${dist.lib}/commons-io.jar${path.separator}${dist.lib}/commons-logging.jar${path.separator}${dist.lib}/httpclient.jar${path.separator}${dist.lib}/httpclient-cache.jar${path.separator}${dist.lib}/httpcore.jar${path.separator}${dist.lib}/httpmime.jar${path.separator}${dist.lib}/blueprints-core.jar${path.separator}${dist.lib}/jackson-core.jar${path.separator}${blueprints-test.jar}${path.separator}${jettison.jar}" />
             
         <echo>javac
 </echo>
@@ -2199,12 +2266,13 @@ ${postInstallMessage}</echo>
         <pathelement location="${dist.lib}/httpcore.jar" />
         <pathelement location="${dist.lib}/httpmime.jar" />
         <pathelement location="${dist.lib}/blueprints-core.jar" />
+        <pathelement location="${dist.lib}/jackson-core.jar" />
         <pathelement location="${blueprints-test.jar}" />
         <pathelement location="${jettison.jar}" />
       </path>
 
       <property name="run.class.path"
-         value="${junit.jar}${path.separator}${hamcrest.jar}${path.separator}${bigdata-test.jar}${path.separator}${junit-ext.jar}${path.separator}${sesame-sparql-test.jar}${path.separator}${sesame-store-test.jar}${path.separator}${sesame-rio-test.jar}${path.separator}${dist.lib}/bigdata.jar${path.separator}${dist.lib}/colt.jar${path.separator}${dist.lib}/highscalelib.jar${path.separator}${dist.lib}/dsiutils.jar${path.separator}${dist.lib}/lgplutils.jar${path.separator}${dist.lib}/fastutil.jar${path.separator}${dist.lib}/bigdata-ganglia.jar${path.separator}${dist.lib}/bigdata-gas${path.separator}${dist.lib}/icu4j.jar${path.separator}${dist.lib}/icu4j-charset.jar${path.separator}${dist.lib}/jsk-lib.jar${path.separator}${dist.lib}/jsk-platform.jar${path.separator}${dist.lib}/log4j.jar${path.separator}${dist.lib}/lucene-analyzer.jar${path.separator}${dist.lib}/lucene-core.jar${path.separator}${dist.lib}/openrdf-sesame.jar${path.separator}${dist.lib}/slf4j.jar${path.separator}${dist.lib}/slf4j-log4j.jar${path.separator}${dist.lib}/nxparser.jar${path.separator}${dist.lib}/zookeeper.jar${path.separator}${dist.lib}/jetty-continuation.jar${path.separator}${dist.lib}/jetty-http.jar${path.separator}${dist.lib}/jetty-io.jar${path.separator}${dist.lib}/jetty-jmx.jar${path.separator}${dist.lib}/jetty-jndi.jar${path.separator}${dist.lib}/jetty-server.jar${path.separator}${dist.lib}/jetty-util.jar${path.separator}${dist.lib}/jetty-webapp.jar${path.separator}${dist.lib}/jetty-servlet.jar${path.separator}${dist.lib}/jetty-security.jar${path.separator}${dist.lib}/jetty-xml.jar${path.separator}${dist.lib}/jetty-rewrite.jar${path.separator}${dist.lib}/jetty-client.jar${path.separator}${dist.lib}/jetty-proxy.jar${path.separator}${dist.lib}/servlet-api.jar${path.separator}${dist.lib}/commons-codec.jar${path.separator}${dist.lib}/commons-fileupload.jar${path.separator}${dist.lib}/commons-io.jar${path.separator}${dist.lib}/commons-logging.jar${path.separator}${dist.lib}/httpclient.jar${path.separator}${dist.lib}/httpclient-cache.jar${path.separator}${dist.lib}/httpcore.jar${path.separator}${dist.lib}/httpmime.jar${path.separator}${dist.lib}/blueprints-core.jar${path.separator}${blueprints-test.jar}${path.separator}${jettison.jar}" />
+         value="${junit.jar}${path.separator}${hamcrest.jar}${path.separator}${bigdata-test.jar}${path.separator}${junit-ext.jar}${path.separator}${sesame-sparql-test.jar}${path.separator}${sesame-store-test.jar}${path.separator}${sesame-rio-test.jar}${path.separator}${dist.lib}/bigdata.jar${path.separator}${dist.lib}/colt.jar${path.separator}${dist.lib}/highscalelib.jar${path.separator}${dist.lib}/dsiutils.jar${path.separator}${dist.lib}/lgplutils.jar${path.separator}${dist.lib}/fastutil.jar${path.separator}${dist.lib}/bigdata-ganglia.jar${path.separator}${dist.lib}/bigdata-gas${path.separator}${dist.lib}/icu4j.jar${path.separator}${dist.lib}/icu4j-charset.jar${path.separator}${dist.lib}/jsk-lib.jar${path.separator}${dist.lib}/jsk-platform.jar${path.separator}${dist.lib}/log4j.jar${path.separator}${dist.lib}/lucene-analyzer.jar${path.separator}${dist.lib}/lucene-core.jar${path.separator}${dist.lib}/openrdf-sesame.jar${path.separator}${dist.lib}/slf4j.jar${path.separator}${dist.lib}/slf4j-log4j.jar${path.separator}${dist.lib}/nxparser.jar${path.separator}${dist.lib}/zookeeper.jar${path.separator}${dist.lib}/jetty-continuation.jar${path.separator}${dist.lib}/jetty-http.jar${path.separator}${dist.lib}/jetty-io.jar${path.separator}${dist.lib}/jetty-jmx.jar${path.separator}${dist.lib}/jetty-jndi.jar${path.separator}${dist.lib}/jetty-server.jar${path.separator}${dist.lib}/jetty-util.jar${path.separator}${dist.lib}/jetty-webapp.jar${path.separator}${dist.lib}/jetty-servlet.jar${path.separator}${dist.lib}/jetty-security.jar${path.separator}${dist.lib}/jetty-xml.jar${path.separator}${dist.lib}/jetty-rewrite.jar${path.separator}${dist.lib}/jetty-client.jar${path.separator}${dist.lib}/jetty-proxy.jar${path.separator}${dist.lib}/servlet-api.jar${path.separator}${dist.lib}/commons-codec.jar${path.separator}${dist.lib}/commons-fileupload.jar${path.separator}${dist.lib}/commons-io.jar${path.separator}${dist.lib}/commons-logging.jar${path.separator}${dist.lib}/httpclient.jar${path.separator}${dist.lib}/httpclient-cache.jar${path.separator}${dist.lib}/httpcore.jar${path.separator}${dist.lib}/httpmime.jar${path.separator}${dist.lib}/blueprints-core.jar${path.separator}${dist.lib}/jackson-core.jar${path.separator}${blueprints-test.jar}${path.separator}${jettison.jar}" />
         
       <echo>    classpath:    ${run.class.path}
 </echo>
@@ -2366,6 +2434,7 @@ ${postInstallMessage}</echo>
         <sysproperty key="jetty-proxy.jar" value="${dist.lib}/jetty-proxy.jar" />
         <sysproperty key="servlet-api.jar" value="${dist.lib}/servlet-api.jar" />
         <sysproperty key="blueprints-core.jar" value="${dist.lib}/blueprints-core.jar" />
+        <sysproperty key="jackson-core.jar" value="${dist.lib}/jackson-core.jar" />
 
         <!-- Jini group name -->
         <sysproperty key="bigdata.fedname" value="${bigdata.fedname}" />
@@ -2570,7 +2639,14 @@ ${postInstallMessage}</echo>
 </java>
 </target>
 
-    <target name="start-bigdata" depends="compile" description="Start the Bigdata Server.">
+	 <!-- This is NOT recommended for development or deployment. It is a    -->
+	 <!-- fast and simple bootstrap for people getting started with bigdata -->
+	 <!-- for the first time.  bigdata is developed using eclipse, so that  -->
+	 <!-- makes the most sense for development.  The recommended deployers  -->
+	 <!-- are documented at the following links:                            -->
+	 <!-- http://wiki.bigdata.com/wiki/index.php/NanoSparqlServer           -->
+	 <!-- http://wiki.bigdata.com/wiki/index.php/HAJournalServer            -->
+    <target name="start-bigdata" depends="compile" description="Start the Bigdata Server (simple triples mode start).">
         <java classname="com.bigdata.rdf.sail.webapp.NanoSparqlServer" failonerror="true" fork="true" logerror="true">
             <classpath refid="runtime.classpath" />
             <jvmarg value="-server"/>

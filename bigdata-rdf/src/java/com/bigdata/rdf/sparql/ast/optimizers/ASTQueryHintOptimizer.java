@@ -45,6 +45,7 @@ import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.sparql.ast.ASTBase;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
+import com.bigdata.rdf.sparql.ast.FilterNode;
 import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.IQueryNode;
@@ -55,6 +56,7 @@ import com.bigdata.rdf.sparql.ast.QueryBase;
 import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
+import com.bigdata.rdf.sparql.ast.SubqueryFunctionNodeBase;
 import com.bigdata.rdf.sparql.ast.SubqueryRoot;
 import com.bigdata.rdf.sparql.ast.TermNode;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
@@ -104,8 +106,6 @@ import com.bigdata.rdf.sparql.ast.service.ServiceNode;
  * @see QueryHintScope
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id: ASTQueryHintOptimizer.java 5733 2011-11-22 20:08:09Z
- *          thompsonbry $
  */
 public class ASTQueryHintOptimizer implements IASTOptimizer {
 
@@ -223,7 +223,8 @@ public class ASTQueryHintOptimizer implements IASTOptimizer {
 
         for (ASTBase t : list) {
 
-            applyQueryHints(context, QueryHintScope.Query, t, queryHints);
+            applyQueryHints(context, queryRoot, QueryHintScope.Query, t,
+                    queryHints);
 
         }
         
@@ -238,6 +239,7 @@ public class ASTQueryHintOptimizer implements IASTOptimizer {
      *            The query hints.
      */
     private void applyQueryHints(final AST2BOpContext context,
+            final QueryRoot queryRoot,
             final QueryHintScope scope, final ASTBase t,
             final Properties queryHints) {
 
@@ -254,7 +256,7 @@ public class ASTQueryHintOptimizer implements IASTOptimizer {
 
             final String value = queryHints.getProperty(name);
 
-            _applyQueryHint(context, scope, t, name, value);
+            _applyQueryHint(context, queryRoot, scope, t, name, value);
 
         }
         
@@ -271,7 +273,7 @@ public class ASTQueryHintOptimizer implements IASTOptimizer {
      *            The value.
      */
     @SuppressWarnings("unchecked")
-    private void _applyQueryHint(final AST2BOpContext context,
+    private void _applyQueryHint(final AST2BOpContext context, final QueryRoot queryRoot,
             final QueryHintScope scope, final ASTBase t, final String name,
             final String value) {
 
@@ -293,7 +295,7 @@ public class ASTQueryHintOptimizer implements IASTOptimizer {
                     + value2 + ", node=" + t.getClass().getName());
 
         // Apply the query hint.
-        queryHint.handle(context, scope, t, value2);
+        queryHint.handle(context, queryRoot, scope, t, value2);
 
 //        if (scope == QueryHintScope.Query) {
 //            /*
@@ -429,6 +431,17 @@ public class ASTQueryHintOptimizer implements IASTOptimizer {
                 } else if (child instanceof ServiceNode) {
                     processGroup(context, queryRoot, queryBase,
                             ((ServiceNode) child).getGraphPattern());
+                } else if (child instanceof FilterNode
+                        && ((FilterNode) child).getValueExpressionNode() instanceof SubqueryFunctionNodeBase) {
+                    /**
+                     * @see <a href="http://trac.bigdata.com/ticket/990"> Query hint not recognized in FILTER</a>
+                     */
+                    final GraphPatternGroup<IGroupMemberNode> filterGraphPattern = ((SubqueryFunctionNodeBase) ((FilterNode) child)
+                            .getValueExpressionNode()).getGraphPattern();
+
+                    processGroup(context, queryRoot, queryBase,
+                            filterGraphPattern);
+                    
                 }
                 
                 prior = (ASTBase) child;
@@ -651,19 +664,19 @@ public class ASTQueryHintOptimizer implements IASTOptimizer {
 
         switch (scope) {
         case Query: {
-            applyToQuery(context, scope, queryRoot, name, value);
+            applyToQuery(context, queryRoot, scope, name, value);
             break;
         }
         case SubQuery: {
-            applyToSubQuery(context, scope, queryBase, group, name, value);
+            applyToSubQuery(context, queryRoot, scope, queryBase, group, name, value);
             break;
         }
         case Group: {
-            applyToGroup(context, scope, group, name, value);
+            applyToGroup(context, queryRoot, scope, group, name, value);
             break;
         }
         case GroupAndSubGroups: {
-            applyToGroupAndSubGroups(context, scope, group, name, value);
+            applyToGroupAndSubGroups(context, queryRoot, scope, group, name, value);
             break;
         }
         case Prior: {
@@ -672,7 +685,7 @@ public class ASTQueryHintOptimizer implements IASTOptimizer {
                         "Query hint with Prior scope must follow the AST node to which it will bind.");
             }
             // Apply to just the last SP.
-            _applyQueryHint(context, scope, prior, name, value);
+            _applyQueryHint(context, queryRoot, scope, prior, name, value);
             break;
         }
         default:
@@ -687,6 +700,7 @@ public class ASTQueryHintOptimizer implements IASTOptimizer {
      * @param value
      */
     private void applyToSubQuery(final AST2BOpContext context,
+            final QueryRoot queryRoot,
             final QueryHintScope scope,
             final QueryBase queryBase,
             GraphPatternGroup<IGroupMemberNode> group, final String name,
@@ -706,11 +720,11 @@ public class ASTQueryHintOptimizer implements IASTOptimizer {
         }
 
         // Apply to all child groups of that top-level group.
-        applyToGroupAndSubGroups(context, scope, group, name, value);
+        applyToGroupAndSubGroups(context, queryRoot, scope, group, name, value);
 
 //        if (isNodeAcceptingQueryHints(queryBase)) {
 
-        _applyQueryHint(context, scope, (ASTBase) queryBase, name, value);
+        _applyQueryHint(context, queryRoot, scope, (ASTBase) queryBase, name, value);
 
 //        }
 
@@ -724,7 +738,8 @@ public class ASTQueryHintOptimizer implements IASTOptimizer {
      * @param value
      */
     private void applyToQuery(final AST2BOpContext context,
-            final QueryHintScope scope, final QueryRoot queryRoot,
+            final QueryRoot queryRoot, 
+            final QueryHintScope scope, 
             final String name, final String value) {
 
         if (false && context.queryHints != null) {
@@ -772,7 +787,7 @@ public class ASTQueryHintOptimizer implements IASTOptimizer {
         
         for(ASTBase t : list) {
 
-            _applyQueryHint(context, scope, t, name, value);
+            _applyQueryHint(context, queryRoot, scope, t, name, value);
             
         }
         
@@ -787,17 +802,18 @@ public class ASTQueryHintOptimizer implements IASTOptimizer {
      */
     @SuppressWarnings("unchecked")
     private void applyToGroupAndSubGroups(final AST2BOpContext context,
+            final QueryRoot queryRoot,
             final QueryHintScope scope,
             final GraphPatternGroup<IGroupMemberNode> group, final String name,
             final String value) {
 
         for (IGroupMemberNode child : group) {
 
-            _applyQueryHint(context, scope, (ASTBase) child, name, value);
+            _applyQueryHint(context, queryRoot, scope, (ASTBase) child, name, value);
 
             if (child instanceof GraphPatternGroup<?>) {
 
-                applyToGroupAndSubGroups(context, scope,
+                applyToGroupAndSubGroups(context, queryRoot, scope,
                         (GraphPatternGroup<IGroupMemberNode>) child, name,
                         value);
 
@@ -807,7 +823,7 @@ public class ASTQueryHintOptimizer implements IASTOptimizer {
 
 //        if(isNodeAcceptingQueryHints(group)) {
 
-        _applyQueryHint(context, scope, (ASTBase) group, name, value);
+        _applyQueryHint(context, queryRoot, scope, (ASTBase) group, name, value);
             
 //        }
 
@@ -821,19 +837,20 @@ public class ASTQueryHintOptimizer implements IASTOptimizer {
      * @param value
      */
     private void applyToGroup(final AST2BOpContext context,
+            final QueryRoot queryRoot,
             final QueryHintScope scope,
             final GraphPatternGroup<IGroupMemberNode> group, final String name,
             final String value) {
 
         for (IGroupMemberNode child : group) {
 
-            _applyQueryHint(context, scope, (ASTBase) child, name, value);
+            _applyQueryHint(context, queryRoot, scope, (ASTBase) child, name, value);
 
         }
 
 //        if (isNodeAcceptingQueryHints(group)) {
 
-        _applyQueryHint(context, scope, (ASTBase) group, name, value);
+        _applyQueryHint(context, queryRoot, scope, (ASTBase) group, name, value);
             
 //        }
 

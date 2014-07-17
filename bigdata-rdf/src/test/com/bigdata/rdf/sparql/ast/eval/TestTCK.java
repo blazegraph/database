@@ -38,7 +38,6 @@ import com.bigdata.rdf.sparql.ast.optimizers.ASTSimpleOptionalOptimizer;
  * Test driver for debugging Sesame or DAWG manifest tests.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class TestTCK extends AbstractDataDrivenSPARQLTestCase {
 

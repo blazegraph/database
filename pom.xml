@@ -187,10 +187,6 @@ dependencies.
       <id>nxparser-snapshots</id>
       <url>http://nxparser.googlecode.com/svn/snapshots</url>
     </repository>
-    <repository>
-      <id>aduna-opensource.releases</id>
-      <url>http://repo.aduna-software.org/maven2/releases/</url>
-    </repository>
     <!-- 
     <repository>
       <id>jetty.releases</id>

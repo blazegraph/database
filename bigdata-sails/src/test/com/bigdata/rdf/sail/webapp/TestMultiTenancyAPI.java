@@ -10,6 +10,8 @@ import java.util.Properties;
 import java.util.TreeMap;
 import java.util.UUID;
 
+import javax.servlet.http.HttpServletResponse;
+
 import org.openrdf.model.Graph;
 import org.openrdf.model.Literal;
 import org.openrdf.model.Resource;
@@ -346,11 +348,11 @@ public class TestMultiTenancyAPI<S extends IIndexManager> extends
 
             m_repo.createRepository(namespace2, properties);
             
-            fail("Expecting: " + BigdataServlet.HTTP_BADREQUEST);
+            fail("Expecting: " + HttpServletResponse.SC_CONFLICT);
             
         } catch (HttpException ex) {
             
-            assertEquals(BigdataServlet.HTTP_BADREQUEST, ex.getStatusCode());
+            assertEquals(HttpServletResponse.SC_CONFLICT, ex.getStatusCode());
             
         }
 

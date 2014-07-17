@@ -31,6 +31,7 @@ import java.io.OutputStream;
 import java.io.Writer;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.concurrent.Future;
 
 import javax.servlet.ServletContext;
 import javax.servlet.http.HttpServlet;
@@ -45,6 +46,7 @@ import com.bigdata.journal.IIndexManager;
 import com.bigdata.quorum.AbstractQuorum;
 import com.bigdata.rdf.sail.webapp.client.IMimeTypes;
 import com.bigdata.rdf.sail.webapp.lbs.IHALoadBalancerPolicy;
+import com.bigdata.rdf.task.AbstractApiTask;
 
 /**
  * Useful glue for implementing service actions, but does not directly implement
@@ -190,6 +192,32 @@ abstract public class BigdataServlet extends HttpServlet implements IMimeTypes {
 
     }
 
+    /**
+     * Submit a task and return a {@link Future} for that task. The task will be
+     * run on the appropriate executor service depending on the nature of the
+     * backing database and the view required by the task.
+     * 
+     * @param task
+     *            The task.
+     * 
+     * @return The {@link Future} for that task.
+     * 
+     * @throws DatasetNotFoundException
+     * 
+     * @see <a href="http://sourceforge.net/apps/trac/bigdata/ticket/753" > HA
+     *      doLocalAbort() should interrupt NSS requests and AbstractTasks </a>
+     * @see <a href="- http://sourceforge.net/apps/trac/bigdata/ticket/566" >
+     *      Concurrent unisolated operations against multiple KBs </a>
+     */
+    protected <T> Future<T> submitApiTask(final AbstractRestApiTask<T> task)
+            throws DatasetNotFoundException {
+
+        final IIndexManager indexManager = getIndexManager();
+
+        return AbstractApiTask.submitApiTask(indexManager, task);
+        
+    }
+    
 //    /**
 //     * Return the {@link Quorum} -or- <code>null</code> if the
 //     * {@link IIndexManager} is not participating in an HA {@link Quorum}.
