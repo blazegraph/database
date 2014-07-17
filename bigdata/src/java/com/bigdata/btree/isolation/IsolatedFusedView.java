@@ -101,7 +101,6 @@ import com.bigdata.service.IBigdataFederation;
  * {@link ITx#UNISOLATED} {@link AbstractTask} which handles this process. </p>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class IsolatedFusedView extends FusedView {
 

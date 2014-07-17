@@ -202,6 +202,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
 
     }
 
+    /** Guarded by <code>synchronized(AbstractTask)</code>. */
     private IJournal journal;
     
     /**
@@ -454,8 +455,8 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
      */
     private class DirtyListener implements IDirtyListener {
         
-        final String name;
-        final ICheckpointProtocol btree;
+        private final String name;
+        private final ICheckpointProtocol ndx;
         
         @Override
         public String toString() {
@@ -473,7 +474,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
             
             this.name = name;
             
-            this.btree = ndx;
+            this.ndx = ndx;
             
         }
         
@@ -486,7 +487,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
         @Override
         public void dirtyEvent(final ICheckpointProtocol btree) {
 
-            assert btree == this.btree;
+            assert btree == this.ndx;
 
             if (commitList.put(name, this) != null) {
 
@@ -940,7 +941,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
      *             
      * @see IIndexManager#dropIndex(String)
      */
-    synchronized public void dropIndex(String name) {
+    synchronized public void dropIndex(final String name) {
 
         if (name == null)
             throw new IllegalArgumentException();
@@ -986,7 +987,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
         
     }
 
-    /**
+   /**
      * {@link Callable} checkpoints an index.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
@@ -1013,7 +1014,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
             
             try {
 
-                l.btree.writeCheckpoint();
+                l.ndx.writeCheckpoint();
                 
             } catch (Throwable t) {
                 
@@ -1192,7 +1193,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
                                 + entry.name);
 
                     name2Addr.registerIndex(entry.name, (BTree)commitList
-                            .get(entry.name).btree);
+                            .get(entry.name).ndx);
 
                 } else {
 
@@ -1223,7 +1224,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
                                     + entry.name);
 
                         name2Addr
-                                .putOnCommitList(l.name, l.btree, false/*needsCheckpoint*/);
+                                .putOnCommitList(l.name, l.ndx, false/*needsCheckpoint*/);
 
                     }
                     
@@ -2549,6 +2550,12 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
 
         }
 
+        /**
+         * FIXME GIST This needs to use logic to handle the different types of
+         * index objects that we can create. That logic is currently centralized
+         * in {@link AbstractJournal#register(String, IndexMetadata)}. The same
+         * pattern needs to be put to use here.
+         */
         @Override
         public IIndex registerIndex(final String name,
                 final IndexMetadata indexMetadata) {
@@ -2754,12 +2761,12 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
          * {@link AbstractTask} will be imposed on access to the
          * {@link ILocatableResource}s.
          * 
-         * FIXME Reconsider the inner journal classes on AbstractTask. This is a
-         * heavy weight mechanism for enforcing isolation for temporary stores.
-         * It would be better to have isolation in the locator mechanism itself.
-         * This will especially effect scale-out query using temporary stores
-         * and will break semantics when the task is isolated by a transaction
-         * rather than unisolated.
+         * FIXME GIST Reconsider the inner journal classes on AbstractTask. This
+         * is a heavy weight mechanism for enforcing isolation for temporary
+         * stores. It would be better to have isolation in the locator mechanism
+         * itself. This will especially effect scale-out query using temporary
+         * stores and will break semantics when the task is isolated by a
+         * transaction rather than unisolated.
          */
         @Override
         public TemporaryStore getTempStore() {
@@ -2767,7 +2774,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
             return tempStoreFactory.getTempStore();
             
         }
-        private TemporaryStoreFactory tempStoreFactory = new TemporaryStoreFactory();
+        final private TemporaryStoreFactory tempStoreFactory = new TemporaryStoreFactory();
         
         @Override
         public IResourceLocator<?> getResourceLocator() {

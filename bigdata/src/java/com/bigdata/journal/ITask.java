@@ -39,7 +39,6 @@ import com.bigdata.util.concurrent.TaskCounters;
  * Interface available to tasks running under the {@link ConcurrencyManager}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public interface ITask<T> extends Callable<T> {
 
@@ -47,7 +46,7 @@ public interface ITask<T> extends Callable<T> {
      * The object used to manage access to the resources from which views of the
      * indices are created.
      */
-    public IResourceManager getResourceManager();
+    IResourceManager getResourceManager();
 
     /**
      * The journal against which the operation will be carried out.
@@ -75,12 +74,12 @@ public interface ITask<T> extends Callable<T> {
      * 
      * @see IResourceManager#getJournal(long)
      */
-    public IJournal getJournal();
+    IJournal getJournal();
 
     /**
      * Returns a copy of the array of resources declared to the constructor.
      */
-    public String[] getResource();
+    String[] getResource();
 
     /**
      * Return the only declared resource.
@@ -90,12 +89,13 @@ public interface ITask<T> extends Callable<T> {
      * @exception IllegalStateException
      *                if more than one resource was declared.
      */
-    public String getOnlyResource();
+    String getOnlyResource();
 
     /**
-     * Returns Task{taskName,timestamp,resource[]}
+     * Returns <code>Task{taskName,timestamp,resource[]}</code>
      */
-    public String toString();
+    @Override
+    String toString();
 
     /**
      * Return an appropriate view of the named index for the operation.
@@ -137,12 +137,14 @@ public interface ITask<T> extends Callable<T> {
      * @exception IllegalStateException
      *                if the named index is not one of the resources declared to
      *                the constructor.
+     * 
+     * @see IGISTLocalManager
      */
-    public IIndex getIndex(String name);
+    IIndex getIndex(String name); // non-GIST
 
     /**
      * The object used to track events and times for the task.
      */
-    public TaskCounters getTaskCounters();
+    TaskCounters getTaskCounters();
     
 }
