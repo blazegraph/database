@@ -198,8 +198,6 @@ public abstract class RepositoryConnectionTest extends TestCase {
 
 	protected Literal mboxBob;
 
-	protected Literal Александър;
-
 	public RepositoryConnectionTest(String name) {
 	    super(name);
 	}
@@ -232,8 +230,6 @@ public abstract class RepositoryConnectionTest extends TestCase {
 
 		mboxAlice = vf.createLiteral("alice@example.org");
 		mboxBob = vf.createLiteral("bob@example.org");
-
-		Александър = vf.createLiteral("Александър");
 
 		unknownContext = new URIImpl("urn:unknownContext");
 
@@ -598,44 +594,6 @@ public abstract class RepositoryConnectionTest extends TestCase {
 		}
 	}
 
-//	@Test
-//	public void testPrepareSeRQLQuery()
-//		throws Exception
-//	{
-//
-//		StringBuilder queryBuilder = new StringBuilder();
-//		queryBuilder.append(" SELECT ?person");
-//		queryBuilder.append(" FROM {person} foaf:name {").append(Александър.getLabel()).append("}");
-//		queryBuilder.append(" USING NAMESPACE foaf = <" + FOAF_NS + ">");
-//
-//		try {
-//			testCon.prepareQuery(QueryLanguage.SERQL, queryBuilder.toString());
-//		}
-//		catch (UnsupportedOperationException e) {
-//			fail(UNSUPPORTED_OP + e.getMessage());
-//		}
-//		catch (ClassCastException e) {
-//			fail(UNEXPECTED_TYPE + e.getMessage());
-//		}
-//
-//		queryBuilder = new StringBuilder();
-//		queryBuilder.append(" (SELECT person");
-//		queryBuilder.append(" FROM {person} foaf:name {").append(Александър.getLabel()).append("}");
-//		queryBuilder.append(") UNION ");
-//		queryBuilder.append("(SELECT x FROM {x} p {y} )");
-//		queryBuilder.append(" USING NAMESPACE foaf = <" + FOAF_NS + ">");
-//
-//		try {
-//			testCon.prepareQuery(QueryLanguage.SERQL, queryBuilder.toString());
-//		}
-//		catch (UnsupportedOperationException e) {
-//			fail(UNSUPPORTED_OP + e.getMessage());
-//		}
-//		catch (ClassCastException e) {
-//			fail(UNEXPECTED_TYPE + e.getMessage());
-//		}
-//	}
-
 	@Test
 	public void testPrepareSPARQLQuery()
 		throws Exception
@@ -672,30 +630,6 @@ public abstract class RepositoryConnectionTest extends TestCase {
 		}
 		catch (ClassCastException e) {
 			fail(UNEXPECTED_TYPE + e.getMessage());
-		}
-	}
-
-	@Test
-	public void testSimpleTupleQueryUnicode()
-		throws Exception
-	{
-		testCon.add(alexander, name, Александър);
-		StringBuilder queryBuilder = new StringBuilder(128);
-        queryBuilder.append(" prefix foaf: <" + FOAF_NS + ">");
-        queryBuilder.append(" SELECT ?person");
-        queryBuilder.append(" where { ?person foaf:name \"").append(Александър.getLabel()).append("\"}");
-		TupleQueryResult result = testCon.prepareTupleQuery(QueryLanguage.SPARQL, queryBuilder.toString()).evaluate();
-		try {
-			assertThat(result, is(notNullValue()));
-			assertThat(result.hasNext(), is(equalTo(true)));
-			while (result.hasNext()) {
-				BindingSet solution = result.next();
-				assertThat(solution.hasBinding(PERSON), is(equalTo(true)));
-				assertThat(solution.getValue(PERSON), is(equalTo((Value)alexander)));
-			}
-		}
-		finally {
-			result.close();
 		}
 	}
 
@@ -762,37 +696,6 @@ public abstract class RepositoryConnectionTest extends TestCase {
 				Value mboxResult = solution.getValue(MBOX);
 				assertEquals("unexpected value for name: " + nameResult, nameBob, nameResult);
 				assertEquals("unexpected value for mbox: " + mboxResult, mboxBob, mboxResult);
-			}
-		}
-		finally {
-			result.close();
-		}
-	}
-
-	@Test
-	public void testPreparedTupleQueryUnicode()
-		throws Exception
-	{
-		testCon.add(alexander, name, Александър);
-
-		StringBuilder queryBuilder = new StringBuilder();
-        queryBuilder.append(" prefix foaf: <" + FOAF_NS + ">");
-        queryBuilder.append(" SELECT ?person");
-        queryBuilder.append(" where { ?person foaf:name ?name }");
-
-		TupleQuery query = testCon.prepareTupleQuery(QueryLanguage.SPARQL, queryBuilder.toString());
-		query.setBinding(NAME, Александър);
-
-		TupleQueryResult result = query.evaluate();
-
-		try {
-			assertThat(result, is(notNullValue()));
-			assertThat(result.hasNext(), is(equalTo(true)));
-
-			while (result.hasNext()) {
-				BindingSet solution = result.next();
-				assertThat(solution.hasBinding(PERSON), is(equalTo(true)));
-				assertThat(solution.getValue(PERSON), is(equalTo((Value)alexander)));
 			}
 		}
 		finally {
