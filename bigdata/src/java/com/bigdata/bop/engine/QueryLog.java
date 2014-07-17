@@ -64,7 +64,6 @@ import com.bigdata.bop.solutions.ProjectionOp;
 import com.bigdata.bop.solutions.SliceOp;
 import com.bigdata.btree.Tuple;
 import com.bigdata.counters.render.XHTMLRenderer;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpJoins;
 import com.bigdata.striterator.IKeyOrder;
 
@@ -73,7 +72,6 @@ import com.bigdata.striterator.IKeyOrder;
  * written.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id: RuleLog.java 3448 2010-08-18 20:55:58Z thompsonbry $
  */
 public class QueryLog {
 
@@ -101,75 +99,84 @@ public class QueryLog {
             log.info(QueryLog.getTableHeader());
     }
 
-    /**
-     * A single buffer is reused to keep down the heap churn.
-     */
-    final private static StringBuilder sb = new StringBuilder(
-            Bytes.kilobyte32 * 4);
+//    /**
+//     * A single buffer is reused to keep down the heap churn.
+//     */
+//    final private static StringBuilder sb = new StringBuilder(
+//            Bytes.kilobyte32 * 4);
 
     /**
-     * Log rule execution statistics.
+     * Log rule execution statistics @ INFO.
      * 
      * @param q
      *            The running query.
      */
     static public void log(final IRunningQuery q) {
 
-        if (log.isInfoEnabled()) {
+        if (!log.isInfoEnabled())
+            return;
             
-            try {
+        try {
 
-                final IRunningQuery[] children = (q instanceof AbstractRunningQuery) ? ((AbstractRunningQuery) q)
-                        .getChildren() : null;
+            final IRunningQuery[] children = (q instanceof AbstractRunningQuery) ? ((AbstractRunningQuery) q)
+                    .getChildren() : null;
 
-                /*
-                 * Note: We could use a striped lock here over a small pool of
-                 * StringBuilder's to decrease contention for the single buffer
-                 * while still avoiding heap churn for buffer allocation. Do
-                 * this if the monitor for this StringBuilder shows up as a hot
-                 * spot when query logging is enabled.
-                 */
-                synchronized (sb) {
+            /**
+             * Note: The static StringBuilder can not be used if the parent
+             * query has child subqueries without running into a deadlock on
+             * the [sb] object. If there are no children, we could reuse the
+             * global static [sb] and the AbstractRunningQuery.lock().
+             * However, log(IRunningQuery) is ONLY invoke by
+             * AbstractRunningQuery.cancel() and then only runs IFF QueryLog
+             * is @ INFO. Since this is a rare combination, allocating a new
+             * StringBuilder object here will not have an adverse impact on
+             * the heap and avoids the possibility of a deadlock.
+             * 
+             * @see <a href="http://trac.bigdata.com/ticket/992" > Deadlock
+             *      between AbstractRunningQuery.cancel(), QueryLog.log(),
+             *      and ArbitraryLengthPathTask</a>
+             */
+            final StringBuilder sb = new StringBuilder();
+//                synchronized (sb) 
+            {
 
-                    // clear the buffer.
-                    sb.setLength(0);
+                // clear the buffer.
+                sb.setLength(0);
 
-                    {
-                        final Map<Integer/* bopId */, QueueStats> queueStats = ((ChunkedRunningQuery) q)
-                                .getQueueStats();
+                {
+                    final Map<Integer/* bopId */, QueueStats> queueStats = ((ChunkedRunningQuery) q)
+                            .getQueueStats();
 
-                        logSummaryRow(q, queueStats, sb);
+                    logSummaryRow(q, queueStats, sb);
 
-                        logDetailRows(q, queueStats, sb);
-                    }
-
-                    if (children != null) {
-
-                        for (int i = 0; i < children.length; i++) {
-
-                            final IRunningQuery c = children[i];
-                            
-                            final Map<Integer/* bopId */, QueueStats> queueStats = ((ChunkedRunningQuery) c)
-                                    .getQueueStats();
-                            
-                            logSummaryRow(c, queueStats, sb);
-                            
-                            logDetailRows(c, queueStats, sb);
-
-                        }
-                        
-                    }
-
-                    log.info(sb);
-
+                    logDetailRows(q, queueStats, sb);
                 }
-                
-            } catch (RuntimeException t) {
 
-                log.error(t,t);
-                
+                if (children != null) {
+
+                    for (int i = 0; i < children.length; i++) {
+
+                        final IRunningQuery c = children[i];
+                        
+                        final Map<Integer/* bopId */, QueueStats> queueStats = ((ChunkedRunningQuery) c)
+                                .getQueueStats();
+                        
+                        logSummaryRow(c, queueStats, sb);
+                        
+                        logDetailRows(c, queueStats, sb);
+
+                    }
+                    
+                }
+
+                log.info(sb);
+
             }
+            
+        } catch (RuntimeException t) {
 
+            log.error(t,t);
+            
         }
 
     }
