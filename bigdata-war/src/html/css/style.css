@@ -347,6 +347,11 @@ iframe {
    box-sizing: border-box;
 }
 
+/* workbench checks if we're in HA mode and shows health tab if we are */
+#tab-selector a[data-target=health] {
+   display: none;
+}
+
 .health-good {
    background-color: lightgreen;
 }

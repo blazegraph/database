@@ -1545,6 +1545,15 @@ function getHealth(e) {
    })
 }
 
+function showHealthTab() {
+   $.get('/status?health', function(data) {
+      if(data.deployment == 'HA') {
+         $('#tab-selector a[data-target=health]').show();
+      }
+   });
+}
+showHealthTab();
+
 /* Performance */
 
 $('#tab-selector a[data-target=performance]').click(loadPerformance);
