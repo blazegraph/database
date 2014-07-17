@@ -673,9 +673,6 @@ public class DumpJournal {
     
     /**
      * Dump metadata about each named index as of the specified commit record.
-     * 
-     * @param journal
-     * @param commitRecord
      */
     private void dumpNamedIndicesMetadata(final PrintWriter out,
             final List<String> namespaces, final ICommitRecord commitRecord,

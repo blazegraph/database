@@ -27,7 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.journal;
 
-import com.bigdata.btree.IndexMetadata;
+import com.bigdata.btree.IIndex;
 import com.bigdata.counters.ICounterSetAccess;
 
 /**
@@ -35,45 +35,22 @@ import com.bigdata.counters.ICounterSetAccess;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
-public interface IIndexManager extends IIndexStore, ICounterSetAccess {
+public interface IIndexManager extends IIndexStore, IGISTManager, ICounterSetAccess {
 
     /**
-     * Register a named index.
-     * <p>
-     * Note: The <i>name</i> property MUST be set on the {@link IndexMetadata}
-     * and the index will be registered under that name.
-     * 
-     * @param indexMetadata
-     *            The metadata describing the index.
-     * 
-     * @throws IllegalArgumentException
-     *             if the argument is <code>null</code>.
-     * @throws IllegalArgumentException
-     *             if the name argument was not specified when the
-     *             {@link IndexMetadata} was created.
-     * 
-     * @exception IndexExistsException
-     *                if there is an index already registered under the name
-     *                returned by {@link IndexMetadata#getName()}. Use
-     *                {@link IIndexStore#getIndex(String)} to test whether there
-     *                is an index registered under a given name.
-     */
-    public void registerIndex(IndexMetadata indexMetadata);
-
-    /**
-     * Drops the named index.
-     * <p>
-     * Note: Whether or not and when index resources are reclaimed is dependent
-     * on the store. For example, an immortal store will retain all historical
-     * states for all indices. Likewise, a store that uses index partitions may
-     * be able to delete index segments immediately.
+     * Return a view of the named index as of the specified timestamp.
      * 
      * @param name
-     *            The name of the index to be dropped.
+     *            The index name.
+     * @param timestamp
+     *            A timestamp which represents either a possible commit time on
+     *            the store or a read-only transaction identifier.
      * 
-     * @exception NoSuchIndexException
-     *                if <i>name</i> does not identify a registered index.
+     * @return The index or <code>null</code> iff there is no index registered
+     *         with that name for that timestamp.
+     * 
+     * @see IBTreeManager#getIndexLocal(String, long)
      */
-    public void dropIndex(String name);
+    IIndex getIndex(String name, long timestamp); // non-GIST
 
 }

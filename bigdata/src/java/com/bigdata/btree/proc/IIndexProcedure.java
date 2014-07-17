@@ -99,7 +99,7 @@ import com.bigdata.sparse.SparseRowStore;
  * @todo add generic type for {@link #apply(IIndex)} 's return value (much like
  *       {@link Callable}).
  */
-public interface IIndexProcedure extends IReadOnly, Serializable {
+public interface IIndexProcedure<T> extends IReadOnly, Serializable {
 
 //    /**
 //     * Return <code>true</code> iff the procedure asserts that it will not
@@ -127,6 +127,6 @@ public interface IIndexProcedure extends IReadOnly, Serializable {
      *         this MUST be {@link Serializable} since it may have to pass
      *         across a network interface.
      */
-    public Object apply(IIndex ndx);
+    public T apply(IIndex ndx);
 
 }

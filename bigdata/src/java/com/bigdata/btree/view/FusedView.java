@@ -91,7 +91,6 @@ import cutthecrap.utils.striterators.IFilter;
  *       could be transparent at that point.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class FusedView implements IIndex, ILocalBTreeView {//, IValueAge {
 

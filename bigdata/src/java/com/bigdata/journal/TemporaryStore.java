@@ -64,7 +64,6 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * weight precisely because it does not provide concurrency control.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  * 
  * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/585" > GIST </a>
  */
