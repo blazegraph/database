@@ -1171,6 +1171,7 @@ ${postInstallMessage}</echo>
 
       <property name="logging.to.path" location="${dist.var.config.logging}" />
 
+      <!-- Note: normal server logging files. -->
       <property name="log4j.from.file" location="${bigdata.dir}/bigdata/src/resources/logging/log4j.properties" />
       <copy file="${log4j.from.file}"
             todir="${logging.to.path}" />
@@ -1179,15 +1180,18 @@ ${postInstallMessage}</echo>
       <copy file="${logging.from.file}"
             todir="${logging.to.path}" />
 
+    	<!-- Note: scale-out logging files (standalone mode). -->
       <property name="standalone.log4j.from.file" location="${src.resources.config}/standalone/log4j.properties" />
       <property name="standalone.log4j.to.file" location="${logging.to.path}/log4jStandalone.properties" />
       <copy file="${standalone.log4j.from.file}"
             tofile="${standalone.log4j.to.file}" />
 
+      <!-- Note: scale-out logging files (cluster mode). -->
       <property name="server.log4j.from.file" location="${src.resources.config}/log4jServer.properties" />
       <copy file="${server.log4j.from.file}"
             todir="${logging.to.path}" />
 
+      <!-- Note: HA replication cluster logging files. -->
       <property name="haserver.log4j.from.file" location="${src.resources}/HAJournal/log4jHA.properties" />
       <copy file="${haserver.log4j.from.file}"
             todir="${logging.to.path}" />
