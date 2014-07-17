@@ -749,7 +749,7 @@ function submitQuery(e) {
 
    // see if this query is already in the history
    $('#query-history tbody tr').each(function(i, row) {
-      if($(row).find('.query')[0].innerText == query && $(row).find('.query-namespace').text() == NAMESPACE) {
+      if($(row).find('.query')[0].innerText == query) {
          // clear the old results and set the time to now
          $(row).find('.query-time').text(new Date().toISOString());
          $(row).find('.query-results').text('...');
