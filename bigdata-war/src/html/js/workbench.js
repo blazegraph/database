@@ -132,27 +132,27 @@ function getNamespaces() {
          } else {
             use = '<a href="#" class="use-namespace">Use</a>';
          }
-         $('#namespaces-list').append('<li data-name="' + title + '">' + titleText + ' - ' + use + ' - <a href="#" class="delete-namespace">Delete</a> - <a href="#" class="namespace-properties">Properties</a> - <a href="#" class="clone-namespace">Clone</a> - <a href="' + RO_URL_PREFIX + 'namespace/' + title + '/sparql" class="namespace-service-description">Service Description</a></li>');
+         $('#namespaces-list').append('<tr data-name="' + title + '">><td>' + titleText + '</td><td>' + use + '</td><td><a href="#" class="delete-namespace">Delete</a></td><td><a href="#" class="namespace-properties">Properties</a></td><td><a href="#" class="clone-namespace">Clone</a></td><td><a href="' + RO_URL_PREFIX + 'namespace/' + title + '/sparql" class="namespace-service-description">Service Description</a></td></tr>');
       }
       $('.use-namespace').click(function(e) {
          e.preventDefault();
-         useNamespace($(this).parent().data('name'));
+         useNamespace($(this).parents('tr').data('name'));
       });
       $('.delete-namespace').click(function(e) {
          e.preventDefault();
-         deleteNamespace($(this).parent().data('name'));
+         deleteNamespace($(this).parents('tr').data('name'));
       });
       $('.namespace-properties').click(function(e) {
          e.preventDefault();
-         getNamespaceProperties($(this).parent().data('name'));
+         getNamespaceProperties($(this).parents('tr').data('name'));
       });
       $('.namespace-properties-java').click(function(e) {
          e.preventDefault();
-         getNamespaceProperties($(this).parent().data('name'), 'java');
+         getNamespaceProperties($(this).parents('tr').data('name'), 'java');
       });
       $('.clone-namespace').click(function(e) {
          e.preventDefault();
-         cloneNamespace($(this).parent().data('name'));
+         cloneNamespace($(this).parents('tr').data('name'));
          $('#namespace-create-errors').html('');
       });
       $('.namespace-service-description').click(function(e) {
@@ -167,7 +167,7 @@ function selectNamespace(name) {
    if(!NAMESPACES_READY) {
       setTimeout(function() { selectNamespace(name); }, 10);
    } else {
-      $('#namespaces-list li[data-name=' + name + '] a.use-namespace').click();
+      $('#namespaces-list tr[data-name=' + name + '] a.use-namespace').click();
    }
 }
 
@@ -257,12 +257,9 @@ function validateNamespaceOptions() {
    if(!name) {
       errors.push('Enter a name');
    }
-   $('#namespaces-list li').each(function() {
-      if(name == $(this).data('name')) {
-         errors.push('Name already in use');
-         return false;
-      }
-   });
+   if($('#namespaces-list tr[data-name=' + name + ']').length != 0) {
+      errors.push('Name already in use');
+   }
    if($('#new-namespace-mode').val() == 'quads' && $('#new-namespace-inference').is(':checked')) {
       errors.push('Inference is incompatible with quads mode');
    }
