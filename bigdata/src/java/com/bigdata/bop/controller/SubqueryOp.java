@@ -92,20 +92,28 @@ import cutthecrap.utils.striterators.ICloseableIterator;
  * evaluation semantics under these conditions. This is handled by "projecting"
  * only those variables into the subquery which it will project out.
  * 
+ * <h3>Efficiency</h3>
+ * 
+ * This non-vectored operator issues one sub-query per source solution flowing
+ * into the operator. In general, it is MUCH more efficient to vector the
+ * solutions into a sub-plan. The latter is accomplished by building a hash
+ * index over the source solutions, flooding them into the sub-plan, and then
+ * executing the appropriate hash join back against the source solutions after
+ * the sub-plan.
+ * <p>
+ * There are a few cases where it may make sense to use the non-vectored
+ * operator. For example, for EXISTS where LIMIT ONE can be imposed on the
+ * subquery. However, there can still be cases where the vectored sub-plan is
+ * more efficient.
+ * 
  * @see AbstractSubqueryOp
  * @see JVMNamedSubqueryOp
  * @see HTreeNamedSubqueryOp
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * 
- * @deprecated This operator is no longer in use. The last use case which we had
- *             for this was in support of ASK subquery evaluation for (NOT)
- *             EXISTS.
- *             <p>
- *             It is possible that another use case MIGHT be found to support
- *             parallel evaluation of named subqueries. However, that also might
- *             be handled by a thread pool if we move to interleaved query plan
- *             generation and query plan evaluation in support of the RTO.
+ * @see <a href="http://trac.bigdata.com/ticket/988"> bad performance for FILTER
+ *      EXISTS </a>
  */
 public class SubqueryOp extends PipelineOp {
 
@@ -222,6 +230,7 @@ public class SubqueryOp extends PipelineOp {
         
     }
 
+    @Override
     public FutureTask<Void> eval(final BOpContext<IBindingSet> context) {
 
         return new FutureTask<Void>(new ControllerTask(this, context));
@@ -287,6 +296,7 @@ public class SubqueryOp extends PipelineOp {
         /**
          * Evaluate the subquery.
          */
+        @Override
         public Void call() throws Exception {
             
             try {

@@ -37,7 +37,6 @@ import com.bigdata.rdf.internal.IV;
  * Options and metadata for service end points.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public interface IServiceOptions {
 
@@ -78,5 +77,13 @@ public interface IServiceOptions {
      * query planner has locked in the join evaluation order.
      */
     boolean isRunFirst();
+
+    /**
+     * Return <code>true</code> if the remote service is known to be a bigdata
+     * service that exposes the HA load balancer servlet (default
+     * <code>false</code>). The default may be overridden iff the end point is
+     * known to expose the bigdata LBS pattern.
+     */
+    boolean isBigdataLBS();
     
 }

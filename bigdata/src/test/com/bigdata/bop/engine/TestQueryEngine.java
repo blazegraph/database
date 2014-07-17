@@ -87,7 +87,6 @@ import cutthecrap.utils.striterators.ICloseableIterator;
  * </pre>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  * 
  * @see TestFederatedQueryEngine
  */

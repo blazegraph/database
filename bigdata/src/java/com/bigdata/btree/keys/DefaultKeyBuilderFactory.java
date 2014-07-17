@@ -409,6 +409,7 @@ public class DefaultKeyBuilderFactory implements IKeyBuilderFactory, Serializabl
         
     }
 
+    @Override
     public IKeyBuilder getKeyBuilder() {
 
         if(log.isDebugEnabled()) {
@@ -419,6 +420,20 @@ public class DefaultKeyBuilderFactory implements IKeyBuilderFactory, Serializabl
         
         return KeyBuilder.newInstance(initialCapacity, collator, locale,
                 strength, decompositionMode);
+
+    }
+    
+    @Override
+    public IKeyBuilder getPrimaryKeyBuilder() {
+        
+        if(log.isDebugEnabled()) {
+            
+            log.debug(toString());
+            
+        }
+        
+        return KeyBuilder.newInstance(initialCapacity, collator, locale,
+                StrengthEnum.Primary, decompositionMode);
 
     }
     

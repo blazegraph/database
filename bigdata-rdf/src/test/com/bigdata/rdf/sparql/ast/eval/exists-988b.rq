@@ -1,0 +1,11 @@
+prefix eg: <http://www.bigdata.com/>
+
+SELECT ?t
+FROM eg:g
+{ BIND (1 as ?t)
+  FILTER EXISTS {
+    ?a eg:p/eg:p/eg:p/eg:p/eg:p/eg:p/eg:p/eg:p ?b .
+    # Note: Query hint specifies sub-query LIMIT ONE plan.
+    hint:SubQuery hint:filterExists "SubQueryLimitOne" .
+ }
+}

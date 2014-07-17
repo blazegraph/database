@@ -178,6 +178,13 @@ public class GlobalRowStoreHelper {
         if (log.isInfoEnabled())
             log.info(TimestampUtility.toString(timestamp));
 
+        if (timestamp == ITx.UNISOLATED) {
+
+            /* This version does an implicit create if the GRS does not exist. */
+            return getGlobalRowStore();
+
+        }
+        
         final IIndex ndx;
         
         /**

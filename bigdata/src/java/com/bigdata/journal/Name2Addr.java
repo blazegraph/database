@@ -62,7 +62,6 @@ import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
-import com.bigdata.btree.keys.CollatorEnum;
 import com.bigdata.btree.keys.DefaultKeyBuilderFactory;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.IKeyBuilderFactory;
@@ -82,9 +81,7 @@ import com.bigdata.rawstore.IRawStore;
 import com.bigdata.resources.IndexManager;
 import com.bigdata.resources.ResourceManager;
 import com.bigdata.util.concurrent.ExecutionExceptions;
-import com.ibm.icu.text.Collator;
 
-import cutthecrap.utils.striterators.Filter;
 import cutthecrap.utils.striterators.IStriterator;
 import cutthecrap.utils.striterators.Resolver;
 import cutthecrap.utils.striterators.Striterator;
@@ -185,7 +182,6 @@ public class Name2Addr extends BTree {
      * reference to the index and we need both on hand to do the commit.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     private class DirtyListener implements IDirtyListener, Comparable<DirtyListener> {
         
@@ -194,6 +190,7 @@ public class Name2Addr extends BTree {
         boolean needsCheckpoint;
         long checkpointAddr = 0L;
         
+        @Override
         public String toString() {
             
             return "DirtyListener{name="
@@ -204,7 +201,8 @@ public class Name2Addr extends BTree {
             
         }
         
-        private DirtyListener(String name, ICheckpointProtocol btree, boolean needsCheckpoint) {
+        private DirtyListener(final String name,
+                final ICheckpointProtocol btree, final boolean needsCheckpoint) {
             
             assert name!=null;
             
@@ -253,6 +251,7 @@ public class Name2Addr extends BTree {
          * 
          * @param btree
          */
+        @Override
         public void dirtyEvent(final ICheckpointProtocol btree) {
 
             assert btree == this.btree;
@@ -549,6 +548,7 @@ public class Name2Addr extends BTree {
         /**
          * @return <i>self</i>
          */
+        @Override
         public CommitIndexTask call() throws Exception {
 
             if (log.isInfoEnabled())
@@ -666,6 +666,7 @@ public class Name2Addr extends BTree {
      *      >Flush indices in parallel during checkpoint to reduce IO
      *      latency</a>
      */
+    @Override
     synchronized
     public long handleCommit(final long commitTime) {
 
@@ -1394,6 +1395,7 @@ public class Name2Addr extends BTree {
             
         }
         
+        @Override
         public String toString() {
 
             return "Entry{name=" + name + ",checkpointAddr=" + checkpointAddr
@@ -1558,6 +1560,7 @@ public class Name2Addr extends BTree {
          */
         private final static transient byte VERSION = VERSION0;
 
+        @Override
         public void readExternal(final ObjectInput in) throws IOException,
                 ClassNotFoundException {
 
@@ -1575,6 +1578,7 @@ public class Name2Addr extends BTree {
 
         }
 
+        @Override
         public void writeExternal(final ObjectOutput out) throws IOException {
 
             super.writeExternal(out);
@@ -1596,34 +1600,11 @@ public class Name2Addr extends BTree {
      * 
      * @return The names of the indices spanned by that prefix in that index.
      * 
-     *         FIXME There is a problem with the prefix scan. It appears that we
-     *         are not able to generate the key for a prefix correctly. This
-     *         problem is being worked around by scanning the entire
-     *         {@link Name2Addr} index and then filter for those entries that
-     *         start with the specified prefix. This is not very scalable.
-     *         <p>
-     *         If you change {@link Name2Addr} to use {@link CollatorEnum#ASCII}
-     *         then the prefix scan works correctly without that filter. The
-     *         problem is related to how the {@link Collator} is encoding the
-     *         keys. Neither the ICU nor the JDK collators work for this right
-     *         now. At least the ICU collator winds up with some additional
-     *         bytes after the "end" of the prefix that do not appear when you
-     *         encode the entire index name. For example, compare "kb" and
-     *         "kb.red". See TestName2Addr for more about this issue.
-     *         <p>
-     *         Fixing this problem MIGHT require a data migration. Or we might
-     *         be able to handle this entirely by using an appropriate
-     *         {@link Name2Addr#getKey(String)} and
-     *         {@link Name2AddrTupleSerializer#serializeKey(Object)}
-     *         implementation (depending on how the keys are being encoded).
-     *         <p>
-     *         Update: See <a
-     *         href="https://sourceforge.net/apps/trac/bigdata/ticket/743">
-     *         AbstractTripleStore.destroy() does not filter for correct prefix
-     *         </a> as well. Maybe the problem is just that we need to have the
-     *         "." appended to the namespace. This could be something that is
-     *         done automatically if the caller does not take care of it
-     *         themselves.
+     * @see <a href="http://trac.bigdata.com/ticket/974" >
+     *      Name2Addr.indexNameScan(prefix) uses scan + filter </a>
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/743">
+     *      AbstractTripleStore.destroy() does not filter for correct prefix
+     *      </a>
      */
     public static final Iterator<String> indexNameScan(final String prefix,
             final IIndex n2a) {
@@ -1631,27 +1612,37 @@ public class Name2Addr extends BTree {
         final byte[] fromKey;
         final byte[] toKey;
         final boolean hasPrefix = prefix != null && prefix.length() > 0;
-        final boolean restrictScan = false;
+//        final boolean restrictScan = true;
 
-        if (hasPrefix && restrictScan) {
+        if (hasPrefix ) //&& restrictScan) 
+        {
 
             /*
              * When the namespace prefix was given, generate the toKey as the
              * fixed length successor of the fromKey.
+             * 
+             * Note: We MUST use StrengthEnum:=PRIMARY for the prefix scan in
+             * order to avoid the secondary collation ordering effects.
              */
 
-            log.error("prefix=" + prefix);
+//            final IKeyBuilder keyBuilder = n2a.getIndexMetadata()
+//                    .getTupleSerializer().getKeyBuilder();
 
+//            final Properties properties = new Properties();
+//
+//            properties.setProperty(KeyBuilder.Options.STRENGTH,
+//                    StrengthEnum.Primary.toString());
+//
+//            final IKeyBuilder keyBuilder = new DefaultKeyBuilderFactory(
+//                    properties).getKeyBuilder();
             final IKeyBuilder keyBuilder = n2a.getIndexMetadata()
-                    .getTupleSerializer().getKeyBuilder();
-
+                    .getPrimaryKeyBuilder();
+                    
             fromKey = keyBuilder.reset().append(prefix).getKey();
 
-            // toKey =
-            // keyBuilder.reset().append(prefix).appendNul().getKey();
             toKey = SuccessorUtil.successor(fromKey.clone());
 
-            if (true || log.isDebugEnabled()) {
+            if (log.isDebugEnabled()) {
 
                 log.error("fromKey=" + BytesUtil.toString(fromKey));
 
@@ -1670,6 +1661,9 @@ public class Name2Addr extends BTree {
         @SuppressWarnings("unchecked")
         final ITupleIterator<Entry> itr = n2a.rangeIterator(fromKey, toKey);
 
+        /*
+         * Add resolver from the tuple to the name of the index.
+         */
         IStriterator sitr = new Striterator(itr);
 
         sitr = sitr.addFilter(new Resolver() {
@@ -1686,38 +1680,63 @@ public class Name2Addr extends BTree {
 
         });
 
-        if (hasPrefix && !restrictScan) {
-
-            /*
-             * Only report the names that match the prefix.
-             * 
-             * Note: For the moment, the filter is hacked by examining the
-             * de-serialized Entry objects and only reporting those that start
-             * with the [prefix].
-             */
-            
-            sitr = sitr.addFilter(new Filter() {
-
-                private static final long serialVersionUID = 1L;
-
-                @Override
-                public boolean isValid(final Object obj) {
-                    
-                    final String name = (String) obj;
-
-                    if (name.startsWith(prefix)) {
-
-                        // acceptable.
-                        return true;
-                    }
-                    return false;
-                }
-            });
-
-        }
+//        if (hasPrefix && !restrictScan) {
+//
+//            /*
+//             * Only report the names that match the prefix.
+//             * 
+//             * Note: For the moment, the filter is hacked by examining the
+//             * de-serialized Entry objects and only reporting those that start
+//             * with the [prefix].
+//             */
+//            
+//            sitr = sitr.addFilter(new Filter() {
+//
+//                private static final long serialVersionUID = 1L;
+//
+//                @Override
+//                public boolean isValid(final Object obj) {
+//                    
+//                    final String name = (String) obj;
+//
+//                    if (name.startsWith(prefix)) {
+//
+//                        // acceptable.
+//                        return true;
+//                    }
+//                    return false;
+//                }
+//            });
+//
+//        }
 
         return sitr;
 
     }
 
+//    /**
+//     * The SuccessorUtil does not work with CollatedKeys since it bumps the "meta/control" data
+//     * at the end of the key, rather than the "value" data of the key.
+//     * 
+//     * It has been observed that the key data is delimited with a 01 byte, followed by meta/control
+//     * data with the key itself delimited by a 00 byte.
+//     * 
+//     * Note that this has only been analyzed for the ICU collator, the standard Java collator does include 
+//     * 00 bytes in the key.  However, it too appears to delimit the value key with a 01 byte so the
+//     * same method should work.
+//     * 
+//     * @param src - original key
+//     * @return the next key
+//     */
+//    private static byte[] successor(final byte[] src) {
+//        final byte[] nxt = src.clone();
+//        for (int i = 1; i < nxt.length; i++) {
+//            if (nxt[i] == 01) { // end of data
+//                nxt[i-1]++;
+//                break;
+//            }
+//        }
+//        
+//        return nxt;
+//    }
 }

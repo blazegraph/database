@@ -29,11 +29,10 @@ package com.bigdata.rdf.sparql.ast.eval;
 
 import java.util.Collections;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 import org.openrdf.model.vocabulary.RDF;
 
-import com.bigdata.bop.IVariable;
-import com.bigdata.bop.Var;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
@@ -45,6 +44,7 @@ import com.bigdata.rdf.sparql.ast.GlobalAnnotations;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.NotExistsNode;
 import com.bigdata.rdf.sparql.ast.ProjectionNode;
+import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryType;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
@@ -59,7 +59,6 @@ import com.bigdata.rdf.spo.SPOKeyOrder;
  * Test suite for SPARQL negation (EXISTS and MINUS).
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class TestNegation extends AbstractDataDrivenSPARQLTestCase {
 
@@ -578,6 +577,7 @@ public class TestNegation extends AbstractDataDrivenSPARQLTestCase {
                 }
                 
                 notExistsSubquery2.setAskVar(askVar2.getValueExpression());
+                notExistsSubquery2.setFilterExistsMode(QueryHints.DEFAULT_FILTER_EXISTS);
 
             } // not-exists-2
 
@@ -667,6 +667,7 @@ public class TestNegation extends AbstractDataDrivenSPARQLTestCase {
                     }
                     
                     notExistsSubquery1.setAskVar(askVar1.getValueExpression());
+                    notExistsSubquery1.setFilterExistsMode(QueryHints.DEFAULT_FILTER_EXISTS);
        
                 } // not-exists-1
 
@@ -798,4 +799,172 @@ public class TestNegation extends AbstractDataDrivenSPARQLTestCase {
         
     }
 
+    /**
+     * Performance related test for EXISTS. This is NOT an EXISTS query.
+     * However, EXISTS is translated into an ASK sub-query. This runs the
+     * equivalent ASK query.
+     * 
+     * <pre>
+     * prefix eg: <eg:>
+     * ASK
+     * FROM eg:g
+     * { BIND (1 as ?t)
+     *   ?a eg:p/eg:p/eg:p/eg:p/eg:p/eg:p/eg:p/eg:p ?b
+     * }
+     * 
+     * <pre>
+     * 
+     * @throws Exception 
+     * 
+     * @see <a href="http://trac.bigdata.com/ticket/988"> bad
+     * performance for FILTER EXISTS </a>
+     */
+    public void test_exists_988a() throws Exception {
+        
+        new TestHelper(
+                "exists-988a", // testURI,
+                "exists-988a.rq",// queryFileURL
+                "exists-988.trig",// dataFileURL
+                "exists-988a.srx" // resultFileURL,
+//                false, // laxCardinality
+//                true // checkOrder
+                ).runTest();
+
+    }
+    
+    /**
+     * Performance related test for EXISTS.
+     * 
+     * <pre>
+     * prefix eg: <eg:>
+     * SELET *
+     * FROM eg:g
+     * { BIND (1 as ?t)
+     *   FILTER EXISTS {
+     *     ?a eg:p/eg:p/eg:p/eg:p/eg:p/eg:p/eg:p/eg:p ?b
+     *  }
+     * }
+     * 
+     * <pre>
+     * 
+     * @throws Exception 
+     * 
+     * @see <a href="http://trac.bigdata.com/ticket/988"> bad
+     * performance for FILTER EXISTS </a>
+     */
+    public void test_exists_988b() throws Exception {
+
+        final long beginNanos = System.nanoTime();
+        
+        new TestHelper(
+                "exists-988b", // testURI,
+                "exists-988b.rq",// queryFileURL
+                "exists-988.trig",// dataFileURL
+                "exists-988b.srx" // resultFileURL,
+//                false, // laxCardinality
+//                true // checkOrder
+                ).runTest();
+
+        final long elapsedNanos = System.nanoTime() - beginNanos;
+        
+        final long timeoutNanos = TimeUnit.MILLISECONDS.toNanos(1500);
+
+        if (timeoutNanos < elapsedNanos) {
+
+            fail("Timeout exceeded: Query hint not recognized?");
+            
+        }
+        
+    }
+
+    /**
+     * Performance related test for EXISTS.
+     * 
+     * <pre>
+     * prefix eg: <eg:>
+     * SELET DISTINCT ?a
+     * FROM eg:g
+     * { ?a eg:p ?c
+     *   FILTER EXISTS {
+     *     ?a eg:p/eg:p/eg:p/eg:p/eg:p/eg:p/eg:p/eg:p ?b
+     *  }
+     * }
+     * 
+     * <pre>
+     * 
+     * @throws Exception 
+     * 
+     * @see <a href="http://trac.bigdata.com/ticket/988"> bad
+     * performance for FILTER EXISTS </a>
+     */
+    public void test_exists_988c() throws Exception {
+
+        final long beginNanos = System.nanoTime();
+        
+        new TestHelper(
+                "exists-988c", // testURI,
+                "exists-988c.rq",// queryFileURL
+                "exists-988.trig",// dataFileURL
+                "exists-988c.srx" // resultFileURL,
+//                false, // laxCardinality
+//                true // checkOrder
+                ).runTest();
+
+        final long elapsedNanos = System.nanoTime() - beginNanos;
+        
+        final long timeoutNanos = TimeUnit.MILLISECONDS.toNanos(2500);
+
+        if (timeoutNanos < elapsedNanos) {
+
+            fail("Timeout exceeded: Query hint not recognized?");
+            
+        }
+        
+    }
+    /**
+     * Performance related test for EXISTS.
+     * 
+     * <pre>
+     * prefix eg: <eg:>
+     * SELET DISTINCT ?a
+     * FROM eg:g
+     * { { BIND( eg:d as ?a ) }
+     *   UNION
+     *   { BIND ( eg:z as ?a ) }
+     *   FILTER EXISTS {
+     *     ?a eg:p/eg:p/eg:p/eg:p/eg:p/eg:p/eg:p/eg:p ?b
+     *  }
+     * }
+     * 
+     * <pre>
+     * 
+     * @throws Exception 
+     * 
+     * @see <a href="http://trac.bigdata.com/ticket/988"> bad
+     * performance for FILTER EXISTS </a>
+     */
+    public void test_exists_988d() throws Exception {
+
+        final long beginNanos = System.nanoTime();
+        
+        new TestHelper(
+                "exists-988d", // testURI,
+                "exists-988d.rq",// queryFileURL
+                "exists-988.trig",// dataFileURL
+                "exists-988d.srx" // resultFileURL,
+//                false, // laxCardinality
+//                true // checkOrder
+                ).runTest();
+
+        final long elapsedNanos = System.nanoTime() - beginNanos;
+        
+        final long timeoutNanos = TimeUnit.MILLISECONDS.toNanos(1500);
+
+        if (timeoutNanos < elapsedNanos) {
+
+            fail("Timeout exceeded: Query hint not recognized?");
+            
+        }
+        
+    }
 }

@@ -27,30 +27,20 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.journal;
 
-import java.io.ByteArrayOutputStream;
-import java.io.EOFException;
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
-import java.nio.ByteBuffer;
 import java.util.Properties;
-import java.util.zip.GZIPInputStream;
-import java.util.zip.GZIPOutputStream;
 
 import junit.extensions.proxy.ProxyTestSuite;
 import junit.framework.Test;
 
 import com.bigdata.io.DirectBufferPool;
-import com.bigdata.rawstore.IPSOutputStream;
 import com.bigdata.rawstore.IRawStore;
 
 /**
  * Test suite for {@link WORMStrategy} journal.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  * 
  * @see TestWORMStrategyNoCache
  * @see TestWORMStrategyOneCacheBuffer
@@ -106,6 +96,7 @@ public class TestWORMStrategy extends AbstractJournalTestCase {
 
     }
 
+    @Override
     public Properties getProperties() {
 
         final Properties properties = super.getProperties();
@@ -207,7 +198,6 @@ public class TestWORMStrategy extends AbstractJournalTestCase {
      * Test suite integration for {@link AbstractRestartSafeTestCase}.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     public static class TestRawStore extends AbstractRestartSafeTestCase {
         
@@ -219,6 +209,7 @@ public class TestWORMStrategy extends AbstractJournalTestCase {
             super(name);
         }
 
+        @Override
         protected BufferMode getBufferMode() {
             
             return BufferMode.DiskWORM;
@@ -231,7 +222,6 @@ public class TestWORMStrategy extends AbstractJournalTestCase {
      * Test suite integration for {@link AbstractInterruptsTestCase}.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     public static class TestInterrupts extends AbstractInterruptsTestCase {
         
@@ -243,6 +233,7 @@ public class TestWORMStrategy extends AbstractJournalTestCase {
             super(name);
         }
 
+        @Override
         protected IRawStore getStore() {
 
             final Properties properties = getProperties();
@@ -268,7 +259,6 @@ public class TestWORMStrategy extends AbstractJournalTestCase {
      * Test suite integration for {@link AbstractMROWTestCase}.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     public static class TestMROW extends AbstractMROWTestCase {
         
@@ -280,6 +270,7 @@ public class TestWORMStrategy extends AbstractJournalTestCase {
             super(name);
         }
         
+        @Override
         protected Journal getStore() {
 
             final Properties properties = getProperties();
@@ -304,7 +295,6 @@ public class TestWORMStrategy extends AbstractJournalTestCase {
      * Test suite integration for {@link AbstractMRMWTestCase}.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     public static class TestMRMW extends AbstractMRMWTestCase {
         
@@ -316,6 +306,7 @@ public class TestWORMStrategy extends AbstractJournalTestCase {
             super(name);
         }
 
+        @Override
         protected IRawStore getStore() {
 
             final Properties properties = getProperties();

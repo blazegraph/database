@@ -34,7 +34,6 @@ import org.apache.log4j.Logger;
 import com.bigdata.blueprints.BigdataGraphBulkLoad;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
 import com.bigdata.rdf.sail.webapp.client.MiniMime;
-import com.bigdata.rdf.store.AbstractTripleStore;
 import com.tinkerpop.blueprints.util.io.graphml.GraphMLReader;
 
 /**
@@ -69,16 +68,8 @@ public class BlueprintsServlet extends BigdataRDFServlet {
     protected void doPost(final HttpServletRequest req,
             final HttpServletResponse resp) throws IOException {
 
-        final long begin = System.currentTimeMillis();
-        
-        final String namespace = getNamespace(req);
-
-        final long timestamp = getTimestamp(req);
-
-        final AbstractTripleStore tripleStore = getBigdataRDFContext()
-                .getTripleStore(namespace, timestamp);
-        
-        if (tripleStore == null) {
+        if (getBigdataRDFContext().getTripleStore(getNamespace(req),
+                getTimestamp(req)) == null) {
             /*
              * There is no such triple/quad store instance.
              */
@@ -104,11 +95,42 @@ public class BlueprintsServlet extends BigdataRDFServlet {
         
         try {
             
+            submitApiTask(
+                    new BlueprintsPostTask(req, resp, getNamespace(req),
+                            getTimestamp(req))).get();
+
+        } catch (Throwable t) {
+
+            throw BigdataRDFServlet.launderThrowable(t, resp, "");
+            
+        }
+        
+    }
+
+    private static class BlueprintsPostTask extends AbstractRestApiTask<Void> {
+
+        public BlueprintsPostTask(HttpServletRequest req,
+                HttpServletResponse resp, String namespace, long timestamp) {
+
+            super(req, resp, namespace, timestamp);
+
+        }
+
+        @Override
+        public boolean isReadOnly() {
+            return false;
+        }
+
+        @Override
+        public Void call() throws Exception {
+
+            final long begin = System.currentTimeMillis();
+            
             BigdataSailRepositoryConnection conn = null;
+            boolean success = false;
             try {
 
-                conn = getBigdataRDFContext()
-                        .getUnisolatedConnection(namespace);
+                conn = getUnisolatedConnection();
                 
                 final BigdataGraphBulkLoad graph = new BigdataGraphBulkLoad(conn);
 
@@ -116,35 +138,32 @@ public class BlueprintsServlet extends BigdataRDFServlet {
                 
                 graph.commit();
                 
+                success = true;
+                
                 final long nmodified = graph.getMutationCountLastCommit();
 
                 final long elapsed = System.currentTimeMillis() - begin;
                 
-                reportModifiedCount(resp, nmodified, elapsed);
-                
-                return;
+                reportModifiedCount(nmodified, elapsed);
 
-            } catch(Throwable t) {
-                
-                if(conn != null)
-                    conn.rollback();
-                
-                throw new RuntimeException(t);
+                // Done.
+                return null;
 
             } finally {
 
-                if (conn != null)
+                if (conn != null) {
+
+                    if (!success)
+                        conn.rollback();
+
                     conn.close();
-                
+
+                }
+
             }
 
-        } catch (Exception ex) {
-
-            // Will be rendered as an INTERNAL_ERROR.
-            throw new RuntimeException(ex);
-            
         }
-        
+
     }
 
 }

@@ -37,6 +37,7 @@ public interface IMimeTypes {
         MIME_DEFAULT_BINARY = "application/octet-stream",
         MIME_APPLICATION_XML = "application/xml",
         MIME_TEXT_JAVASCRIPT = "text/javascript",
+        MIME_APPLICATION_JSON = "application/json",
         /**
          * The traditional encoding of URL query parameters within a POST
          * message body.

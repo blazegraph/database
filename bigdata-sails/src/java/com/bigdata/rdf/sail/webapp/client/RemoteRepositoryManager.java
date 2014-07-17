@@ -89,7 +89,7 @@ public class RemoteRepositoryManager extends RemoteRepository {
     public RemoteRepositoryManager(final String serviceURL,
             final HttpClient httpClient, final Executor executor) {
 
-        this(serviceURL, false/* useLBS */, httpClient, executor);
+        this(serviceURL, true/* useLBS */, httpClient, executor);
 
     }
     
@@ -246,6 +246,14 @@ public class RemoteRepositoryManager extends RemoteRepository {
      */
     public void createRepository(final String namespace,
             final Properties properties) throws Exception {
+
+        if (namespace == null)
+            throw new IllegalArgumentException();
+        if (properties == null)
+            throw new IllegalArgumentException();
+        if (properties.getProperty(OPTION_CREATE_KB_NAMESPACE) == null)
+            throw new IllegalArgumentException("Property not defined: "
+                    + OPTION_CREATE_KB_NAMESPACE);
 
         final ConnectOptions opts = newConnectOptions(baseServiceURL
                 + "/namespace");

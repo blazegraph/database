@@ -22,8 +22,13 @@
 # size of the direct memory heap (used for the write cache buffers and
 # some related things).
 ##
-export JVM_OPTS="-server -Xmx4G -XX:MaxDirectMemorySize=3000m"
-#export JVM_OPTS="-server -Xmx4G -XX:MaxDirectMemorySize=3000m -Xdebug -Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=1046"
+if [ -z "$JVM_OPTS" ]; then
+   export JVM_OPTS="-server -Xmx4G -XX:MaxDirectMemorySize=3000m"
+#  export JVM_OPTS="-server -Xmx4G -XX:MaxDirectMemorySize=3000m -Xdebug -Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=1046"
+   echo "Set JVM_OPTS=${JVM_OPTS}"
+else
+   echo "Using JVM_OPTS=${JVM_OPTS}"
+fi
 
 ##
 # The following variables configure the startHAServices script, which 
@@ -55,6 +60,10 @@ export GROUPS="$FEDNAME"
 #export JETTY_PORT=8080
 #export JETTY_XML=var/jetty/WEB-INF/jetty.xml
 #export JETTY_RESOURCE_BASE=var/jetty
+#export WRITE_CACHE_BUFFER_COUNT=2000
+#export DATA_DIR=
+#export HALOG_DIR=
+#export SNAPSHOT_DIR=
 #export COLLECT_QUEUE_STATISTICS=
 #export COLLECT_PLATFORM_STATISTICS=
 #export GANGLIA_REPORT=

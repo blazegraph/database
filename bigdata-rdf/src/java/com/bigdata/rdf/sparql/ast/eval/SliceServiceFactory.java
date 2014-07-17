@@ -65,7 +65,6 @@ import com.bigdata.rdf.sparql.ast.service.BigdataNativeServiceOptions;
 import com.bigdata.rdf.sparql.ast.service.BigdataServiceCall;
 import com.bigdata.rdf.sparql.ast.service.IServiceOptions;
 import com.bigdata.rdf.sparql.ast.service.ServiceCallCreateParams;
-import com.bigdata.rdf.sparql.ast.service.ServiceFactory;
 import com.bigdata.rdf.sparql.ast.service.ServiceNode;
 import com.bigdata.rdf.spo.DistinctMultiTermAdvancer;
 import com.bigdata.rdf.spo.ISPO;
@@ -100,8 +99,7 @@ import cutthecrap.utils.striterators.ICloseableIterator;
  * 
  * @see RangeBOp
  */
-public class SliceServiceFactory extends AbstractServiceFactory 
-		implements ServiceFactory {
+public class SliceServiceFactory extends AbstractServiceFactory {
 
     private static final Logger log = Logger
             .getLogger(SliceServiceFactory.class);

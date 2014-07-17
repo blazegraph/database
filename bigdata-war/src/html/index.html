@@ -25,6 +25,7 @@
         <a data-target="update">Update</a>
         <a data-target="explore">Explore</a>
         <a data-target="status">Status</a>
+        <a data-target="health">Health</a>
         <a data-target="performance">Performance</a>
         <a data-target="namespaces">Namespaces</a>
         <p>Current namespace: <span id="current-namespace"></span></p>
@@ -65,6 +66,7 @@
           <div class="advanced-features">
             <input type="checkbox" id="update-analytic"> <label for="update-analytic">Analytic</label>
             <input type="checkbox" id="update-monitor"> <label for="update-monitor">Monitor</label>
+            <input type="checkbox" id="use-lbs-update" class="use-lbs"> <label for="use-lbs-update">LBS</label>
           </div>
           <hr class="shadow">
           <button id="update-update">Update</button>
@@ -98,6 +100,7 @@
               <input type="checkbox" id="query-details"> <label for="query-explain">(Details)</label>
               <input type="checkbox" name="analytic" value="true" id="query-analytic"> <label for="query-analytic">Analytic</label>
               <input type="checkbox" name="RTO" value="true" id="query-rto"> <label for="query-rto">Runtime Query Optimizer</label>
+              <input type="checkbox" id="use-lbs-query" class="use-lbs"> <label for="use-lbs-query">LBS</label>
             </div>
 
             <hr class="shadow">
@@ -130,6 +133,21 @@
         </div>
 
         <div id="query-explanation" class="box">
+        </div>
+
+        <div id="query-history" class="box">
+          <table>
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Query</th>
+                <th>Results</th>
+                <th>Execution Time</th>
+                <th>Delete</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
         </div>
 
         <div id="query-export-container" class="box">
@@ -167,8 +185,8 @@
 
         <div id="explore-results">
           <div class="box" id="explore-header"></div>
-          <div class="box" id="explore-incoming"></div>
           <div class="box" id="explore-outgoing"></div>
+          <div class="box" id="explore-incoming"></div>
           <div class="box" id="explore-attributes"></div>
         </div>
 
@@ -179,6 +197,26 @@
         <div class="box">
           <div id="status-text"></div>
           <ul id="running-queries"></ul>
+        </div>
+
+      </div>
+
+      <div class="tab" id="health-tab">
+
+        <div class="box" id="health-overview">
+          <div class="box">
+            <h1>Overview</h1>
+            <p class="health-status">Status: <span></span></p>
+            <p class="health-details">Details: <span></span></p>
+            <p class="health-version">Version: <span></span></p>
+            <p class="health-timestamp">Timestamp: <span></span></p>
+          </div>
+        </div>
+
+        <div id="health-services"></div>
+
+        <div class="box">
+          <p><a href="#" id="health-refresh">Refresh</a></p>
         </div>
 
       </div>
@@ -204,12 +242,33 @@
         </div>
 
         <div class="box">
-          <form id="namespace-create"><input type="text"> <input type="submit" value="Create namespace"></form>
+          <h1>Create namespace</h1>
+          <form id="namespace-create">
+            <label for="new-namespace-name">Name:</label>
+            <input type="text" id="new-namespace-name">
+            <br>
+            <label for="new-namespace-mode">Mode:</label>
+            <select id="new-namespace-mode">
+              <option>triples</option>
+              <option>rdr</option>
+              <option>quads</option>
+            </select>
+            <br>
+            <label for="new-namespace-inference">Inference:</label>
+            <input type="checkbox" id="new-namespace-inference">
+            <span id="inference-quads-incompatible">Inference is incompatible with quads mode</span>
+            <br>
+            <label for="new-namespace-index">Full text index:</label>
+            <input type="checkbox" id="new-namespace-index">
+            <br>
+            <input type="submit" value="Create namespace">
+          </form>
+          <ul id="namespace-create-errors"></ul>
         </div>
 
       </div>
 
-      <div class="clear">&nbsp;</div>
+      <div id="links"><a href="http://www.bigdata.com" target="_blank">Bigdata</a> - <a href="http://wiki.bigdata.com/" target="_blank">Wiki</a></div>
 
     </div>
 

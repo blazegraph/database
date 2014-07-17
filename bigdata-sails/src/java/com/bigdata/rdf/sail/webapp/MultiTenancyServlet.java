@@ -45,7 +45,6 @@ import com.bigdata.rdf.properties.PropertiesParser;
 import com.bigdata.rdf.properties.PropertiesParserFactory;
 import com.bigdata.rdf.properties.PropertiesParserRegistry;
 import com.bigdata.rdf.sail.BigdataSail;
-import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
 import com.bigdata.rdf.sail.webapp.client.ConnectOptions;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.ScaleOutTripleStore;
@@ -64,6 +63,16 @@ import com.bigdata.util.PropertyUtil;
  *      NanoSparqlServer Admin API for Multi-tenant deployments</a>
  * 
  * @author thompsonbry
+ * 
+ *         FIXME GROUP COMMIT: The CREATE and DESTROY operations require special
+ *         attention. Define DropKBTask and CreateKBTask for use by the
+ *         multi-tenancy API and fix up the callers of CreateKBTask and
+ *         tripleStore.destroy() to use these tasks. This means that the base
+ *         implementations of those tasks must not require the servlet
+ *         parameters.
+ * 
+ *         FIXME GROUP COMMIT: The other operations in this class also should
+ *         use the new REST API pattern, but are not intrinsically sensitive.
  */
 public class MultiTenancyServlet extends BigdataRDFServlet {
 
@@ -346,19 +355,26 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
                 BigdataSail.Options.NAMESPACE,
                 BigdataSail.Options.DEFAULT_NAMESPACE);
 
-        final long timestamp = ITx.UNISOLATED;
+        {
 
-        // resolve the namespace.
-        final AbstractTripleStore tripleStore = (AbstractTripleStore) getIndexManager()
-                .getResourceLocator().locate(namespace, timestamp);
+            final long timestamp = ITx.UNISOLATED;
+            
+            // resolve the namespace.
+            final AbstractTripleStore tripleStore = (AbstractTripleStore) getIndexManager()
+                    .getResourceLocator().locate(namespace, timestamp);
 
-        if (tripleStore != null) {
-            /*
-             * Already exists.
-             */
-            buildResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN, "EXISTS: "
-                    + namespace);
-            return;
+            if (tripleStore != null) {
+                /*
+                 * The namespace already exists.
+                 * 
+                 * Note: The response code is defined as 409 (Conflict) since
+                 * 1.3.2.
+                 */
+                buildResponse(resp, HttpServletResponse.SC_CONFLICT, MIME_TEXT_PLAIN,
+                        "EXISTS: " + namespace);
+                return;
+            }
+            
         }
 
         try {
@@ -392,14 +408,15 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
 
             }
 
-            buildResponse(resp, HTTP_OK, MIME_TEXT_PLAIN, "CREATED: "
-                    + namespace);
+            /*
+             * Note: The response code is defined as 201 (Created) since 1.3.2.
+             */
+            buildResponse(resp, HttpServletResponse.SC_CREATED,
+                    MIME_TEXT_PLAIN, "CREATED: " + namespace);
 
         } catch (Throwable e) {
 
-            log.error(e, e);
-
-            throw launderThrowable(e, resp, "");
+            throw launderThrowable(e, resp, "namespace=" + namespace);
 
         }
         
@@ -419,54 +436,105 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
 
         final long timestamp = ITx.UNISOLATED;
 
-        final AbstractTripleStore tripleStore = getBigdataRDFContext()
-                .getTripleStore(namespace, timestamp);
-
-        if (tripleStore == null) {
-            /*
-             * There is no such triple/quad store instance.
-             */
-            buildResponse(resp, HTTP_NOTFOUND, MIME_TEXT_PLAIN);
-            return;
-        }
-
+        boolean acquiredConnection = false;
         try {
-
-            final BigdataSail sail = new BigdataSail(tripleStore);
-
-            BigdataSailConnection con = null;
-
-            try {
-
-                sail.initialize();
-                // This basically puts a lock on the KB instance.
-                con = sail.getUnisolatedConnection();
-                // Destroy the KB instance.
-                tripleStore.destroy();
-                // Commit.
-                con.commit();
-
-            } finally {
-
-                if (con != null)
-                    con.close();
-
-                sail.shutDown();
-                
+            
+            if (getIndexManager() instanceof Journal) {
+                // acquire permit from Journal.
+                ((Journal) getIndexManager()).acquireUnisolatedConnection();
+                acquiredConnection = true;
             }
 
+            final AbstractTripleStore tripleStore = getBigdataRDFContext()
+                    .getTripleStore(namespace, timestamp); 
+
+            if (tripleStore == null) {
+                /*
+                 * There is no such triple/quad store instance.
+                 */
+                buildResponse(resp, HTTP_NOTFOUND, MIME_TEXT_PLAIN);
+                return;
+            }
+
+            // Destroy the KB instance.
+            tripleStore.destroy();
+            
+            tripleStore.commit();
+            
             buildResponse(resp, HTTP_OK, MIME_TEXT_PLAIN, "DELETED: "
                     + namespace);
 
         } catch (Throwable e) {
 
-            log.error(e, e);
-            
             throw launderThrowable(e, resp, "");
+
+        } finally {
+
+            if (acquiredConnection) {
+            
+                ((Journal) getIndexManager()).releaseUnisolatedConnection();
+                
+            }
             
         }
 
     }
+    
+//    private void doDeleteNamespace(final HttpServletRequest req,
+//            final HttpServletResponse resp) throws IOException {
+//
+//        final String namespace = getNamespace(req);
+//
+//        final long timestamp = ITx.UNISOLATED;
+//
+//        final AbstractTripleStore tripleStore = getBigdataRDFContext()
+//                .getTripleStore(namespace, timestamp);
+//
+//        if (tripleStore == null) {
+//            /*
+//             * There is no such triple/quad store instance.
+//             */
+//            buildResponse(resp, HTTP_NOTFOUND, MIME_TEXT_PLAIN);
+//            return;
+//        }
+//
+//        try {
+//
+//            final BigdataSail sail = new BigdataSail(tripleStore);
+//
+//            BigdataSailConnection con = null;
+//
+//            try {
+//
+//                sail.initialize();
+//                // This basically puts a lock on the KB instance.
+//                con = sail.getUnisolatedConnection();
+//                // Destroy the KB instance.
+//                tripleStore.destroy();
+//                // Commit.
+//                con.commit();
+//
+//            } finally {
+//
+//                if (con != null)
+//                    con.close();
+//
+//                sail.shutDown();
+//                
+//            }
+//
+//            buildResponse(resp, HTTP_OK, MIME_TEXT_PLAIN, "DELETED: "
+//                    + namespace);
+//
+//        } catch (Throwable e) {
+//
+//            log.error(e, e);
+//            
+//            throw launderThrowable(e, resp, "");
+//            
+//        }
+//
+//    }
 
     /**
      * Send the configuration properties for the addressed KB instance.
@@ -480,21 +548,14 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
 
 		final String namespace = getNamespace(req);
 
-		long timestamp = getTimestamp(req);
-
-		if (timestamp == ITx.READ_COMMITTED) {
-
-			// Use the last commit point.
-			timestamp = getIndexManager().getLastCommitTime();
-
-		}
+		final long timestamp = getTimestamp(req);
 
 		final long tx = getBigdataRDFContext().newTx(timestamp);
 		
 		try {
 		    
 			final AbstractTripleStore tripleStore = getBigdataRDFContext()
-					.getTripleStore(namespace, timestamp);
+					.getTripleStore(namespace, tx);
 
 			if (tripleStore == null) {
 				/*
@@ -523,14 +584,7 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
     private void doDescribeNamespaces(final HttpServletRequest req,
             final HttpServletResponse resp) throws IOException {
 
-        long timestamp = getTimestamp(req);
-
-        if (timestamp == ITx.READ_COMMITTED) {
-        
-            // Use the last commit point.
-            timestamp = getIndexManager().getLastCommitTime();
-            
-        }
+        final long timestamp = getTimestamp(req);
         
         final boolean describeEachNamedGraph;
         {
@@ -565,8 +619,8 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
 
                 final String namespace = getBigdataRDFContext().getConfig().namespace;
 
-                describeNamespace(req, g, namespace, describeEachNamedGraph,
-                        timestamp);
+                describeNamespaceTx(req, g, namespace, describeEachNamedGraph,
+                        tx);
 
             } else {
 
@@ -574,12 +628,12 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
                  * The set of registered namespaces for KBs.
                  */
                 final List<String> namespaces = getBigdataRDFContext()
-                        .getNamespaces(timestamp);
+                        .getNamespacesTx(tx);
 
                 for (String namespace : namespaces) {
 
-                    describeNamespace(req, g, namespace,
-                            describeEachNamedGraph, timestamp);
+                    describeNamespaceTx(req, g, namespace,
+                            describeEachNamedGraph, tx);
 
                 }
 
@@ -598,14 +652,14 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
     /**
      * Describe a namespace into the supplied Graph object.
      */
-    private void describeNamespace(final HttpServletRequest req,
+    private void describeNamespaceTx(final HttpServletRequest req,
             final Graph g, final String namespace,
-            final boolean describeEachNamedGraph, final long timestamp) 
+            final boolean describeEachNamedGraph, final long tx) 
                     throws IOException {
         
         // Get a view onto that KB instance for that timestamp.
         final AbstractTripleStore tripleStore = getBigdataRDFContext()
-                .getTripleStore(namespace, timestamp);
+                .getTripleStore(namespace, tx);
 
         if (tripleStore == null) {
 
@@ -625,9 +679,7 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
 
         final VoID v = new VoID(g, tripleStore, serviceURI, aDataSet);
 
-        v.describeDataSet(false/* describeStatistics */,
-//                getBigdataRDFContext().getConfig().describeEachNamedGraph);
-                describeEachNamedGraph);
+        v.describeDataSet(false/* describeStatistics */, describeEachNamedGraph);
         
     }
 

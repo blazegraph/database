@@ -39,7 +39,6 @@ import com.sun.jini.admin.DestroyAdmin;
  * Common service interface.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public interface IService extends Remote {
 

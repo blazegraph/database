@@ -1,0 +1,8 @@
+PREFIX : <http://example.org/book/>
+
+SELECT ?book ?title ?price
+{
+   SERVICE <http://www.bigdata.com/rdf/stored-query#test_stored_query_002> {
+       bd:serviceParam :book :book1
+   }
+} 

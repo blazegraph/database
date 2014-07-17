@@ -39,6 +39,8 @@ import java.security.NoSuchAlgorithmException;
 import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.Callable;
+import java.util.concurrent.CancellationException;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.locks.Lock;
@@ -420,6 +422,16 @@ public class HAJournal extends Journal {
         // Snapshot manager.
         snapshotManager = new SnapshotManager(server, this, config);
 
+        try {
+            getExecutorService().submit(snapshotManager.init()).get();
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e); // TODO Do not wrap.
+        } catch (CancellationException e) {
+            throw e;
+        } catch (ExecutionException e) {
+            throw new RuntimeException(e);
+        }
+        
     }
 
     /**

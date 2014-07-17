@@ -102,12 +102,14 @@ public class DefaultTupleSerializer<K extends Object, V extends Object>
     private IRabaCoder leafKeysCoder;
     private IRabaCoder leafValsCoder;
 
+    @Override
     final public IRabaCoder getLeafKeysCoder() {
         
         return leafKeysCoder;
         
     }
 
+    @Override
     final public IRabaCoder getLeafValuesCoder() {
 
         return leafValsCoder;
@@ -213,6 +215,7 @@ public class DefaultTupleSerializer<K extends Object, V extends Object>
         
     }
 
+    @Override
     public String toString() {
 
         final StringBuilder sb = new StringBuilder();
@@ -237,6 +240,7 @@ public class DefaultTupleSerializer<K extends Object, V extends Object>
      * that the specific configuration values are persisted, even when the
      * {@link DefaultTupleSerializer} is de-serialized on a different host.
      */
+    @Override
     final public IKeyBuilder getKeyBuilder() {
 
         if(threadLocalKeyBuilderFactory == null) {
@@ -259,6 +263,30 @@ public class DefaultTupleSerializer<K extends Object, V extends Object>
 
     }
 
+    @Override
+    final public IKeyBuilder getPrimaryKeyBuilder() {
+
+        if(threadLocalKeyBuilderFactory == null) {
+            
+            /*
+             * This can happen if you use the de-serialization ctor by mistake.
+             */
+            
+            throw new IllegalStateException();
+            
+        }
+        
+        /*
+         * TODO This should probably to a reset() before returning the object.
+         * However, we need to verify that no callers are assuming that it does
+         * NOT do a reset and implicitly relying on passing the intermediate key
+         * via the return value (which would be very bad style).
+         */
+        return threadLocalKeyBuilderFactory.getPrimaryKeyBuilder();
+
+    }
+    
+    @Override
     public byte[] serializeKey(final Object obj) {
 
         if (obj == null)
@@ -277,6 +305,7 @@ public class DefaultTupleSerializer<K extends Object, V extends Object>
      * @return The serialized representation of the object as a byte[] -or-
      *         <code>null</code> if the reference is <code>null</code>.
      */
+    @Override
     public byte[] serializeVal(final V obj) {
 
         return SerializerUtil.serialize(obj);
@@ -287,6 +316,7 @@ public class DefaultTupleSerializer<K extends Object, V extends Object>
      * De-serializes an object from the {@link ITuple#getValue() value} stored
      * in the tuple (ignores the key stored in the tuple).
      */
+    @Override
     public V deserialize(ITuple tuple) {
 
         if (tuple == null)
@@ -308,6 +338,7 @@ public class DefaultTupleSerializer<K extends Object, V extends Object>
      * @throws UnsupportedOperationException
      *             always.
      */
+    @Override
     public K deserializeKey(ITuple tuple) {
         
         throw new UnsupportedOperationException();
@@ -327,6 +358,7 @@ public class DefaultTupleSerializer<K extends Object, V extends Object>
      */
     private final static transient byte VERSION = VERSION0;
 
+    @Override
     public void readExternal(final ObjectInput in) throws IOException,
             ClassNotFoundException {
 
@@ -346,6 +378,7 @@ public class DefaultTupleSerializer<K extends Object, V extends Object>
 
     }
 
+    @Override
     public void writeExternal(final ObjectOutput out) throws IOException {
 
         out.writeByte(VERSION);

@@ -1730,7 +1730,8 @@ abstract public class AbstractTripleStore extends
 
     }
 
-    public void destroy() {
+    @Override
+    final public void destroy() {
 
         assertWritable();
 
@@ -2142,6 +2143,7 @@ abstract public class AbstractTripleStore extends
      * @throws IllegalStateException
      *             if the view is read only.
      */
+    @Override
     public long commit() {
         
         if (isReadOnly())
@@ -2163,6 +2165,7 @@ abstract public class AbstractTripleStore extends
 
     }
 
+    @Override
     final public long getTermCount() {
 
         long rangeCount = 0L;
@@ -2175,6 +2178,7 @@ abstract public class AbstractTripleStore extends
 
     }
 
+    @Override
     final public long getURICount() {
 
         long rangeCount = 0L;

@@ -41,7 +41,6 @@ import com.bigdata.rdf.sparql.ast.FunctionRegistry.Factory;
  * {@link IHashJoinUtility} implementation classes).
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class QueryHintRegistry {
 
@@ -94,6 +93,7 @@ public class QueryHintRegistry {
 
         add(new QueryIdHint());
 
+        // Optimizer hints.
         add(new RunFirstHint());
         add(new RunLastHint());
         add(new RunOnceHint());
@@ -103,17 +103,22 @@ public class QueryHintRegistry {
         add(new RTONEdgesQueryHint());
         add(new OptimisticQueryHint());
 
+        // Analytic query mode.
         add(new AnalyticQueryHint());
         add(new NativeDistinctQueryHint());
         add(new NativeDistinctSPOHint());
         add(new NativeDistinctSPOThresholdHint());
         add(new NativeHashJoinsHint());
+        
+        // JOIN hints.
         add(new MergeJoinHint());
         add(new HashJoinHint());
         add(new KeyOrderHint());
         add(new RemoteAPHint());
         add(new AccessPathSampleLimitHint());
         add(new AccessPathScanAndFilterHint());
+        
+        // DESCRIBE
         add(new DescribeModeHint());
         add(new DescribeIterationLimitHint());
         add(new DescribeStatementLimitHint());
@@ -157,6 +162,11 @@ public class QueryHintRegistry {
          */
         add(new CutoffLimitHint());
 
+        /**
+         * FILTER (NOT) EXISTS evaluation strategy hint.
+         */
+        add(new FilterExistsHint());
+        
     }
 
 }

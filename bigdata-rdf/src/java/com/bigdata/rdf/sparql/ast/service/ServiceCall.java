@@ -44,7 +44,6 @@ import cutthecrap.utils.striterators.ICloseableIterator;
  *            common ancestor other than {@link Object}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public interface ServiceCall<E> {
 

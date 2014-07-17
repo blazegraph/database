@@ -417,7 +417,7 @@ public class ASTEvalHelper {
         }
 
     }
-
+    
     /**
      * Optimize a SELECT query.
      * 

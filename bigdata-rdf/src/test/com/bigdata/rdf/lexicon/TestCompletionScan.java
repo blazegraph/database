@@ -63,7 +63,6 @@ import com.bigdata.rdf.store.AbstractTripleStoreTestCase;
  * {@link LexiconRelation#prefixScan(org.openrdf.model.Literal[])}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class TestCompletionScan extends AbstractTripleStoreTestCase {
 
@@ -85,7 +84,7 @@ public class TestCompletionScan extends AbstractTripleStoreTestCase {
      */
     public void test_completionScan() {
         
-        AbstractTripleStore store = getStore();
+        final AbstractTripleStore store = getStore();
 
         try {
 

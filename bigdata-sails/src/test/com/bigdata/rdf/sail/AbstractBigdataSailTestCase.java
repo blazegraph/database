@@ -128,6 +128,7 @@ abstract public class AbstractBigdataSailTestCase extends TestCase2 {
      * 
      * @return A new properties object.
      */
+    @Override
     public Properties getProperties() {
         
         if( m_properties == null ) {

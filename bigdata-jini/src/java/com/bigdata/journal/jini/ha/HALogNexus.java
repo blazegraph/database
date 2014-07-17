@@ -128,11 +128,11 @@ public class HALogNexus implements IHALogWriter {
      */
     volatile IHAWriteMessage lastLiveHAWriteMessage = null;
     
-    /*
-     * Set to protect log files against deletion while a digest is
-     * computed.  This is checked by deleteHALogs.
+    /**
+     * Set to protect log files against deletion while a digest is computed.
+     * This is checked by {@link #deleteHALogs(long, long)}.
      */
-    private  final AtomicInteger logAccessors = new AtomicInteger();
+    private final AtomicInteger logAccessors = new AtomicInteger();
 
     /**
      * Filter visits all HALog files <strong>except</strong> the current HALog
@@ -1042,23 +1042,26 @@ public class HALogNexus implements IHALogWriter {
     
     /**
      * Protects logs from removal while a digest is being computed
-     * @param earliestDigest
      */
     void addAccessor() {
-    	if (logAccessors.incrementAndGet() == 1) {
-    		if (log.isInfoEnabled())
-    			log.info("Access protection added");
-    	}
+        if (logAccessors.incrementAndGet() == 1) {
+            if (log.isDebugEnabled())
+                log.debug("Access protection added");
+        }
     }
-    
+
     /**
      * Releases current protection against log removal
      */
     void releaseAccessor() {
-    	if (logAccessors.decrementAndGet() == 0) {
-    		if (log.isInfoEnabled())
-    			log.info("Access protection removed");
-    	}
+        final long tmp;
+        if ((tmp = logAccessors.decrementAndGet()) == 0) {
+            if (log.isDebugEnabled())
+                log.debug("Access protection removed");
+        }
+        if (tmp < 0)
+            throw new RuntimeException("Decremented to a negative value: "
+                    + tmp);
     }
     
     /**

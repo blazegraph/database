@@ -1,0 +1,7 @@
+prefix eg: <http://www.bigdata.com/>
+
+ASK
+FROM eg:g
+{ BIND (1 as ?t)
+  ?a eg:p/eg:p/eg:p/eg:p/eg:p/eg:p/eg:p/eg:p ?b
+}

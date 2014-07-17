@@ -47,8 +47,6 @@ import org.openrdf.model.Graph;
 import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
 import org.openrdf.model.impl.URIImpl;
-import org.openrdf.repository.RepositoryException;
-import org.openrdf.repository.RepositoryResult;
 import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFHandlerException;
 import org.openrdf.rio.RDFWriter;
@@ -59,7 +57,6 @@ import com.bigdata.rdf.properties.PropertiesFormat;
 import com.bigdata.rdf.properties.PropertiesWriter;
 import com.bigdata.rdf.properties.PropertiesWriterRegistry;
 import com.bigdata.rdf.rules.ConstraintViolationException;
-import com.bigdata.rdf.sail.webapp.XMLBuilder.Node;
 import com.bigdata.util.InnerCause;
 
 /**
@@ -146,17 +143,35 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
      * client's response. This code path should be used iff we have already
      * begun writing the response. Otherwise, an HTTP error status should be
      * used instead.
+     * <p>
+     * This method is invoked as follows:
+     * 
+     * <pre>
+     * throw launderThrowable(...)
+     * </pre>
+     * 
+     * This keeps the compiler happy since it will understand that the caller's
+     * method always exits with a thrown cause.
      * 
      * @param t
      *            The thrown error.
      * @param os
      *            The stream on which the response will be written.
      * @param queryStr
-     *            The SPARQL Query -or- SPARQL Update command (if available).
+     *            The SPARQL Query -or- SPARQL Update command (if available)
+     *            -or- a summary of the REST API command -or- an empty string if
+     *            nothing else is more appropriate.
      * 
-     * @return The laundered exception.
+     * @return Nothing. The pattern of the returned throwable is used to make
+     *         the compiler happy.
      * 
-     * @throws Exception
+     * @throws IOException
+     *             if the cause was an {@link IOException}
+     * @throws Error
+     *             if the cause was an {@link Error}.
+     * @throws RuntimeException
+     *             if the cause was a {@link RuntimeException} or anything not
+     *             declared to be thrown by this method.
      */
     protected static RuntimeException launderThrowable(final Throwable t,
             final HttpServletResponse resp, final String queryStr)
@@ -217,7 +232,7 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
             }
         }
         if (t instanceof RuntimeException) {
-            return (RuntimeException) t;
+            throw (RuntimeException) t;
         } else if (t instanceof Error) {
             throw (Error) t;
         } else if (t instanceof IOException) {
@@ -239,10 +254,12 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
      *       namespace (or it should be configured for each graph explicitly, or
      *       we should bundle the (namespace,timestamp) together as a single
      *       object).
+     * 
+     * @see QueryServlet#ATTR_TIMESTAMP;
      */
     protected long getTimestamp(final HttpServletRequest req) {
         
-        final String timestamp = req.getParameter("timestamp");
+        final String timestamp = req.getParameter(QueryServlet.ATTR_TIMESTAMP);
         
         if (timestamp == null) {
             
@@ -339,10 +356,10 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
      * 
      * @throws IOException
      */
-    protected void reportModifiedCount(final HttpServletResponse resp,
+    static protected void reportModifiedCount(final HttpServletResponse resp,
             final long nmodified, final long elapsed) throws IOException {
 
-    	final StringWriter w = new StringWriter();
+        final StringWriter w = new StringWriter();
     	
         final XMLBuilder t = new XMLBuilder(w);
 
@@ -365,7 +382,7 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
      * 
      * @throws IOException
      */
-    protected void reportRangeCount(final HttpServletResponse resp,
+    static protected void reportRangeCount(final HttpServletResponse resp,
             final long rangeCount, final long elapsed) throws IOException {
 
         final StringWriter w = new StringWriter();
@@ -378,39 +395,7 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
         buildResponse(resp, HTTP_OK, MIME_APPLICATION_XML, w.toString());
 
     }
-    
-    /**
-     * Report the contexts back to the user agent.
-     * 
-     * @param resp
-     *            The response.
-     * @param it
-     *            The iteration of contexts.
-     * @param elapsed
-     *            The elapsed time (milliseconds).
-     * 
-     * @throws IOException
-     */
-    protected void reportContexts(final HttpServletResponse resp,
-            final RepositoryResult<Resource> contexts, final long elapsed) 
-            		throws IOException, RepositoryException {
-
-        final StringWriter w = new StringWriter();
         
-        final XMLBuilder t = new XMLBuilder(w);
-
-        final Node root = t.root("contexts");
-        while (contexts.hasNext()) {
-        	root.node("context")
-        		.attr("uri", contexts.next())
-        		.close();
-        }
-        root.close();
-
-        buildResponse(resp, HTTP_OK, MIME_APPLICATION_XML, w.toString());
-
-    }
-    
     /**
      * Send an RDF Graph as a response using content negotiation.
      * 
@@ -422,40 +407,37 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
         /*
          * CONNEG for the MIME type.
          */
-        {
+        final String acceptStr = req.getHeader("Accept");
 
-            final String acceptStr = req.getHeader("Accept");
+        final ConnegUtil util = new ConnegUtil(acceptStr);
 
-            final ConnegUtil util = new ConnegUtil(acceptStr);
+        // The best RDFFormat for that Accept header.
+        RDFFormat format = util.getRDFFormat();
 
-            // The best RDFFormat for that Accept header. 
-            RDFFormat format = util.getRDFFormat();
-            
-            if (format == null)
-                format = RDFFormat.RDFXML;
+        if (format == null)
+            format = RDFFormat.RDFXML;
 
-            resp.setStatus(HTTP_OK);
+        resp.setStatus(HTTP_OK);
 
-            resp.setContentType(format.getDefaultMIMEType());
+        resp.setContentType(format.getDefaultMIMEType());
 
-            final OutputStream os = resp.getOutputStream();
-            try {
-                final RDFWriter writer = RDFWriterRegistry.getInstance()
-                        .get(format).getWriter(os);
-                writer.startRDF();
-                final Iterator<Statement> itr = g.iterator();
-                while (itr.hasNext()) {
-                    final Statement stmt = itr.next();
-                    writer.handleStatement(stmt);
-                }
-                writer.endRDF();
-                os.flush();
-            } catch (RDFHandlerException e) {
-                log.error(e, e);
-                throw launderThrowable(e, resp, "");
-            } finally {
-                os.close();
+        final OutputStream os = resp.getOutputStream();
+        try {
+            final RDFWriter writer = RDFWriterRegistry.getInstance()
+                    .get(format).getWriter(os);
+            writer.startRDF();
+            final Iterator<Statement> itr = g.iterator();
+            while (itr.hasNext()) {
+                final Statement stmt = itr.next();
+                writer.handleStatement(stmt);
             }
+            writer.endRDF();
+            os.flush();
+        } catch (RDFHandlerException e) {
+            // log.error(e, e);
+            throw launderThrowable(e, resp, "");
+        } finally {
+            os.close();
         }
     }
 
@@ -471,34 +453,31 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
         /*
          * CONNEG for the MIME type.
          */
-        {
+        final String acceptStr = req.getHeader("Accept");
 
-            final String acceptStr = req.getHeader("Accept");
+        final ConnegUtil util = new ConnegUtil(acceptStr);
 
-            final ConnegUtil util = new ConnegUtil(acceptStr);
+        // The best format for that Accept header.
+        PropertiesFormat format = util.getPropertiesFormat();
 
-            // The best format for that Accept header. 
-            PropertiesFormat format = util.getPropertiesFormat();
-            
-            if (format == null)
-                format = PropertiesFormat.XML;
+        if (format == null)
+            format = PropertiesFormat.XML;
 
-            resp.setStatus(HTTP_OK);
+        resp.setStatus(HTTP_OK);
 
-            resp.setContentType(format.getDefaultMIMEType());
+        resp.setContentType(format.getDefaultMIMEType());
 
-            final OutputStream os = resp.getOutputStream();
-            try {
-                final PropertiesWriter writer = PropertiesWriterRegistry.getInstance()
-                        .get(format).getWriter(os);
-                writer.write(properties);
-                os.flush();
-            } catch (IOException e) {
-                log.error(e, e);
-                throw launderThrowable(e, resp, "");
-            } finally {
-                os.close();
-            }
+        final OutputStream os = resp.getOutputStream();
+        try {
+            final PropertiesWriter writer = PropertiesWriterRegistry
+                    .getInstance().get(format).getWriter(os);
+            writer.write(properties);
+            os.flush();
+        } catch (IOException e) {
+            // log.error(e, e);
+            throw launderThrowable(e, resp, "");
+        } finally {
+            os.close();
         }
     }
 

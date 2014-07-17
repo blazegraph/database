@@ -31,6 +31,7 @@ import com.bigdata.rdf.sparql.ast.ASTBase;
 import com.bigdata.rdf.sparql.ast.DescribeModeEnum;
 import com.bigdata.rdf.sparql.ast.ProjectionNode;
 import com.bigdata.rdf.sparql.ast.QueryHints;
+import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 
 /**
@@ -50,6 +51,7 @@ final class DescribeModeHint extends AbstractQueryHint<DescribeModeEnum> {
 
     @Override
     public void handle(final AST2BOpContext context,
+            final QueryRoot queryRoot,
             final QueryHintScope scope, final ASTBase op,
             final DescribeModeEnum value) {
 

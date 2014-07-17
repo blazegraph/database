@@ -325,6 +325,9 @@ public class AST2BOpContext implements IdFactory, IEvaluationContext {
     /**
      * Static analysis object initialized once we apply the AST optimizers and
      * used by {@link AST2BOpUtility}.
+     * <p>
+     * Note: This is not initialized earlier since it holds a reference to the
+     * optimized AST.
      */
     StaticAnalysis sa = null;
 
