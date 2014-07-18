@@ -43,7 +43,6 @@ import com.bigdata.service.Split;
  * </p>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public interface IIndex extends ISimpleBTree, IAutoboxBTree, IRangeQuery,
 		IIndexLocalCounter, ICounterSetAccess {

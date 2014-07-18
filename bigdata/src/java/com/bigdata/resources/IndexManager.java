@@ -90,20 +90,18 @@ import com.bigdata.util.NT;
  * stores) on an LRU basis by the {@link ResourceManager}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 abstract public class IndexManager extends StoreManager {
 
     /**
      * Logger.
      */
-    protected static final Logger log = Logger.getLogger(IndexManager.class);
+    private static final Logger log = Logger.getLogger(IndexManager.class);
 
     /**
      * Options understood by the {@link IndexManager}.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     public static interface Options extends StoreManager.Options {
      
@@ -211,7 +209,6 @@ abstract public class IndexManager extends StoreManager {
      * Performance counters for the {@link IndexManager}.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     public static interface IIndexManagerCounters {
 
@@ -379,6 +376,7 @@ abstract public class IndexManager extends StoreManager {
      * 
      * @see StoreManager#indexCacheLock
      */
+    @Override
     protected long getIndexRetentionTime() {
 
         final long t = indexCache.getRetentionTime();
@@ -477,7 +475,6 @@ abstract public class IndexManager extends StoreManager {
      * Statistics about the {@link IndexSegment}s open in the cache.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     public static class IndexSegmentStats {
 
@@ -565,6 +562,7 @@ abstract public class IndexManager extends StoreManager {
      * partition split/move/join changes somehow outpace the cache size then
      * the client would see a {@link NoSuchIndexException} instead.
      */
+    @Override
     public StaleLocatorReason getIndexPartitionGone(final String name) {
     
         return staleLocatorCache.get(name);
@@ -934,6 +932,7 @@ abstract public class IndexManager extends StoreManager {
         
     }
 
+    @Override
     public AbstractBTree[] getIndexSources(final String name,
             final long timestamp) {
 
@@ -980,6 +979,7 @@ abstract public class IndexManager extends StoreManager {
 
     }
 
+    @Override
     public AbstractBTree[] getIndexSources(final String name,
             final long timestamp, final BTree btree) {
         
@@ -1870,6 +1870,7 @@ abstract public class IndexManager extends StoreManager {
      */
     private Map<String/*name*/, BTreeCounters> mark = new HashMap<String, BTreeCounters>(); 
 
+    @Override
     public BTreeCounters getIndexCounters(final String name) {
 
         if (name == null)
