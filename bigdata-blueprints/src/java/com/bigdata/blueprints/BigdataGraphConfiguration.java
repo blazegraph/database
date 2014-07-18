@@ -110,7 +110,7 @@ public class BigdataGraphConfiguration implements GraphConfiguration {
             
                 final String journal = config.getString(Options.FILE);
             
-                return BigdataGraphFactory.create(journal);
+                return BigdataGraphFactory.open(journal, true);
                 
             } else {
                 

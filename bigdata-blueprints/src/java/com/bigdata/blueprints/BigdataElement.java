@@ -85,28 +85,28 @@ public abstract class BigdataElement implements Element {
 
 	}
 	
-	/**
-	 * Simple extension for multi-valued properties.
-	 */
-	public void addProperty(final String prop, final Object val) {
-	    
-        if (prop == null || blacklist.contains(prop)) {
-            throw new IllegalArgumentException();
-        }
-        
-        graph.addProperty(uri, prop, val);
-	    
-	}
-
-	/**
-	 * Simple extension for multi-valued properties.
-	 */
-    @SuppressWarnings("unchecked")
-    public <T> List<T> getProperties(final String property) {
-        
-        return (List<T>) graph.getProperties(uri, property);
-        
-    }
+//	/**
+//	 * Simple extension for multi-valued properties.
+//	 */
+//	public void addProperty(final String prop, final Object val) {
+//	    
+//        if (prop == null || blacklist.contains(prop)) {
+//            throw new IllegalArgumentException();
+//        }
+//        
+//        graph.addProperty(uri, prop, val);
+//	    
+//	}
+//
+//	/**
+//	 * Simple extension for multi-valued properties.
+//	 */
+//    @SuppressWarnings("unchecked")
+//    public <T> List<T> getProperties(final String property) {
+//        
+//        return (List<T>) graph.getProperties(uri, property);
+//        
+//    }
 
 	/**
 	 * Generated code.
