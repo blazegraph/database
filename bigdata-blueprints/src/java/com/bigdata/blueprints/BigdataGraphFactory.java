@@ -63,10 +63,12 @@ public class BigdataGraphFactory  {
     }
 
     /**
-     * Open an existing persistent local bigdata instance.
+     * Open an existing persistent local bigdata instance.  If a journal does
+     * not exist at the specified location and the boolean create flag is true
+     * a journal will be created at that location.
      */
-    public static BigdataGraph open(final String file) throws Exception {
-        final BigdataSail sail = BigdataSailFactory.openSail(file);
+    public static BigdataGraph open(final String file, final boolean create) throws Exception {
+        final BigdataSail sail = BigdataSailFactory.openSail(file, create);
         sail.initialize();
         return new BigdataGraphEmbedded(sail);
     }
@@ -80,14 +82,14 @@ public class BigdataGraphFactory  {
         return new BigdataGraphEmbedded(sail);
     }
     
-    /**
-     * Create a new persistent local bigdata instance.
-     */
-    public static BigdataGraph create(final String file) 
-            throws Exception {
-        final BigdataSail sail = BigdataSailFactory.createSail(file);
-        sail.initialize();
-        return new BigdataGraphEmbedded(sail);
-    }
+//    /**
+//     * Create a new persistent local bigdata instance.
+//     */
+//    public static BigdataGraph create(final String file) 
+//            throws Exception {
+//        final BigdataSail sail = BigdataSailFactory.createSail(file);
+//        sail.initialize();
+//        return new BigdataGraphEmbedded(sail);
+//    }
     
 }

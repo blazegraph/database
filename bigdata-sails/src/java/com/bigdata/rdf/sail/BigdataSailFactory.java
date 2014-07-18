@@ -118,29 +118,43 @@ public class BigdataSailFactory {
     }
 
     /**
-     * Open an existing persistent bigdata instance.
+     * Open an existing persistent bigdata instance. If a journal does
+     * not exist at the specified location and the boolean create flag is true
+     * a journal will be created at that location with the default set of
+     * options.
      */
-    public static BigdataSailRepository openRepository(final String file) {
+    public static BigdataSailRepository openRepository(final String file, final boolean create) {
         
-        return new BigdataSailRepository(openSail(file));
+        return new BigdataSailRepository(openSail(file, create));
         
     }
         
     /**
-     * Open an existing persistent bigdata instance.
+     * Open an existing persistent bigdata instance. If a journal does
+     * not exist at the specified location and the boolean create flag is true
+     * a journal will be created at that location with the default set of
+     * options.
      */
-    public static BigdataSail openSail(final String file) {
+    public static BigdataSail openSail(final String file, final boolean create) {
         
         if (!new File(file).exists()) {
-            throw new IllegalArgumentException("file does not exist - use create() method instead");
+            
+            if (!create) {
+                throw new IllegalArgumentException("journal does not exist at specified location");
+            } else {
+                return createSail(file);
+            }
+            
+        } else {
+        
+            final Properties props = new Properties();
+            props.setProperty(BigdataSail.Options.FILE, file);
+            
+            final BigdataSail sail = new BigdataSail(props);
+            
+            return sail;
+            
         }
-        
-        final Properties props = new Properties();
-        props.setProperty(BigdataSail.Options.FILE, file);
-        
-        final BigdataSail sail = new BigdataSail(props);
-        
-        return sail;
         
     }
     

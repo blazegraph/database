@@ -22,32 +22,24 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.blueprints;
 
-import java.io.UnsupportedEncodingException;
-import java.net.URLDecoder;
-import java.net.URLEncoder;
-
-import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
-import org.openrdf.model.ValueFactory;
+import org.openrdf.model.impl.URIImpl;
 import org.openrdf.model.impl.ValueFactoryImpl;
+import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
 
-import com.bigdata.rdf.internal.XSD;
-import com.tinkerpop.blueprints.Edge;
-import com.tinkerpop.blueprints.Element;
+import com.bigdata.rdf.store.BD;
 
 /**
- * Default implementation of a {@link BlueprintsRDFFactory} for converting 
+ * Default implementation of a {@link BlueprintsValueFactory} for converting 
  * blueprints data to RDF and back again.  Uses simple namespacing and URL
  * encoding to round trip URIs.
  * 
  * @author mikepersonick
  *
  */
-public class BigdataRDFFactory implements BlueprintsRDFFactory {
+public class BigdataRDFFactory extends DefaultBlueprintsValueFactory {
 
-	public static BigdataRDFFactory INSTANCE = new BigdataRDFFactory();
-	
 	/**
 	 * Namespace for non vertex and edge data (property names).
 	 */
@@ -63,249 +55,25 @@ public class BigdataRDFFactory implements BlueprintsRDFFactory {
      */
 	public static final String EDGE_NAMESPACE = "http://www.bigdata.com/rdf/graph/edge/";
 	
-	
-	private final ValueFactory vf;
-	
+    /**
+     * URI used to represent a Vertex.
+     */
+    public static final URI VERTEX = new URIImpl(BD.NAMESPACE + "Vertex");
+    
+    /**
+     * URI used to represent a Edge.
+     */
+    public static final URI EDGE = new URIImpl(BD.NAMESPACE + "Edge");
+    
+    public static BigdataRDFFactory INSTANCE = new BigdataRDFFactory();
+    
 	/**
 	 * Construct an instance with a simple Sesame ValueFactoryImpl.
 	 */
 	private BigdataRDFFactory() {
-		this.vf = new ValueFactoryImpl();
+		super(new ValueFactoryImpl(), 
+		        GRAPH_NAMESPACE, VERTEX_NAMESPACE, EDGE_NAMESPACE,
+		        RDF.TYPE, VERTEX, EDGE, RDFS.LABEL);
 	}
 	
-	/**
-	 * {@inheritDoc}
-	 */
-	@Override
-	public URI toVertexURI(final Object key) {
-		
-		try {
-
-			final String id = key.toString();
-			
-			return vf.createURI(VERTEX_NAMESPACE, URLEncoder.encode(id, "UTF-8"));
-				
-		} catch (UnsupportedEncodingException e) {
-			
-			throw new RuntimeException(e);
-			
-		}
-		
-	}
-
-    /**
-     * {@inheritDoc}
-     */
-	@Override
-	public URI toEdgeURI(final Object key) {
-		
-		try {
-
-			final String id = key.toString();
-			
-			return vf.createURI(EDGE_NAMESPACE, URLEncoder.encode(id, "UTF-8"));
-				
-		} catch (UnsupportedEncodingException e) {
-			
-			throw new RuntimeException(e);
-			
-		}
-		
-	}
-
-    /**
-     * {@inheritDoc}
-     */
-	@Override
-	public URI toURI(final Element e) {
-		
-		if (e instanceof Edge) {
-			
-			return toEdgeURI(e.getId());
-			
-		} else {
-			
-			return toVertexURI(e.getId());
-			
-		}
-		
-	}
-
-    /**
-     * {@inheritDoc}
-     */
-	@Override
-	public URI toPropertyURI(final String property) {
-		
-		try {
-
-		    if (property.equals("label")) {
-		     
-		        /*
-		         * Label is a reserved property for edge labels, we use
-		         * rdfs:label for that.
-		         */
-		        return RDFS.LABEL;
-		        
-		    } else {
-			
-		        return vf.createURI(GRAPH_NAMESPACE, URLEncoder.encode(property, "UTF-8"));
-		        
-		    }
-				
-		} catch (UnsupportedEncodingException e) {
-			
-			throw new RuntimeException(e);
-			
-		}
-		
-	}
-
-	/**
-	 * Returns true if the URI is part of the vertex namespace.
-	 */
-	public boolean isVertex(final URI uri) {
-		
-		final String s = uri.stringValue();
-		
-		return s.startsWith(VERTEX_NAMESPACE);
-		
-	}
-	
-	/**
-	 * Returns true if the URI is part of the edge namespace.
-	 */
-	public boolean isEdge(final URI uri) {
-		
-		final String s = uri.stringValue();
-		
-		return s.startsWith(EDGE_NAMESPACE);
-		
-	}
-	
-    /**
-     * {@inheritDoc}
-     */
-	@Override
-	public String fromVertexURI(final URI uri) {
-		
-		return fromURI(uri);
-		
-	}
-
-    /**
-     * {@inheritDoc}
-     */
-	@Override
-	public String fromEdgeURI(final URI uri) {
-		
-		return fromURI(uri);
-		
-	}
-
-    /**
-     * {@inheritDoc}
-     */
-	@Override
-	public String fromPropertyURI(final URI uri) {
-		
-		return fromURI(uri);
-		
-	}
-
-	/**
-	 * Round-trip a URI back into a graph element ID or property name.
-	 */
-	public static String fromURI(final URI uri) {
-		
-		if (uri == null) {
-			throw new IllegalArgumentException();
-		}
-		
-		try {
-
-			return URLDecoder.decode(uri.getLocalName(), "UTF-8");
-			
-		} catch (UnsupportedEncodingException e) {
-			
-			throw new RuntimeException(e);
-			
-		}
-		
-	}
-	
-    /**
-     * {@inheritDoc}
-     * <p>
-     * Supports: Float, Double, Integer, Long, Boolean, Short, Byte, and String.
-     */
-	@Override
-	public Literal toLiteral(final Object value) {
-
-//		/*
-//		 * Need to handle this better.
-//		 */
-//		if (value instanceof Collection) {
-//			return vf.createLiteral(Arrays.toString(((Collection<?>) value).toArray()));
-//		}
-		
-		if (value instanceof Float) {
-			return vf.createLiteral((Float) value);
-		} else if (value instanceof Double) {
-			return vf.createLiteral((Double) value);
-		} else if (value instanceof Integer) {
-			return vf.createLiteral((Integer) value);
-		} else if (value instanceof Long) {
-			return vf.createLiteral((Long) value);
-		} else if (value instanceof Boolean) {
-			return vf.createLiteral((Boolean) value);
-		} else if (value instanceof Short) {
-			return vf.createLiteral((Short) value);
-		} else if (value instanceof Byte) {
-			return vf.createLiteral((Byte) value);
-		} else if (value instanceof String) { // treat as string by default
-			return vf.createLiteral((String) value);
-		} else {
-		    throw new IllegalArgumentException();
-		}
-		
-	}
-	
-	/**
-     * {@inheritDoc}
-     * <p>
-	 * Return a graph property from a datatyped literal using its
-	 * XSD datatype.
-     * <p>
-     * Supports: Float, Double, Integer, Long, Boolean, Short, Byte, and String.
-     */
-	@Override
-	public Object fromLiteral(final Literal l) {
-		
-		final URI datatype = l.getDatatype();
-		
-		if (datatype == null) {
-			return l.getLabel();
-		} else if (datatype.equals(XSD.FLOAT)) {
-			return l.floatValue();
-		} else if (datatype.equals(XSD.DOUBLE)) {
-			return l.doubleValue();
-		} else if (datatype.equals(XSD.INT)) {
-			return l.intValue();
-		} else if (datatype.equals(XSD.LONG)) {
-			return l.longValue();
-		} else if (datatype.equals(XSD.BOOLEAN)) {
-			return l.booleanValue();
-		} else if (datatype.equals(XSD.SHORT)) {
-			return l.shortValue();
-		} else if (datatype.equals(XSD.BYTE)) {
-			return l.byteValue();
-		} else {
-			return l.getLabel();
-		}
-		
-	}
-
-
-
 }
