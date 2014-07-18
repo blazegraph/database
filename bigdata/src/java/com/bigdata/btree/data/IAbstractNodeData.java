@@ -34,7 +34,6 @@ import com.bigdata.io.IDataRecordAccess;
  * Interface for low-level data access.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public interface IAbstractNodeData extends IDataRecordAccess {
 
@@ -59,6 +58,7 @@ public interface IAbstractNodeData extends IDataRecordAccess {
      * @throws UnsupportedOperationException
      *             unless {@link #isCoded()} returns <code>true</code>.
      */
+    @Override
     AbstractFixedByteArrayBuffer data();
     
     /**
