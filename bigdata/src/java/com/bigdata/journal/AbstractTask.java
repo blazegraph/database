@@ -56,6 +56,7 @@ import com.bigdata.bfs.BigdataFileSystem;
 import com.bigdata.bfs.GlobalFileSystemHelper;
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.BTree;
+import com.bigdata.btree.Checkpoint;
 import com.bigdata.btree.ICheckpointProtocol;
 import com.bigdata.btree.IDirtyListener;
 import com.bigdata.btree.IIndex;
@@ -64,6 +65,7 @@ import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.view.FusedView;
 import com.bigdata.concurrent.NonBlockingLockManager;
 import com.bigdata.counters.CounterSet;
+import com.bigdata.htree.AbstractHTree;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.rawstore.IAllocationContext;
 import com.bigdata.rawstore.IPSOutputStream;
@@ -114,9 +116,6 @@ import cutthecrap.utils.striterators.Striterator;
  * {@link ConcurrencyManager#submit(AbstractTask)} it.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * 
- * @todo declare generic type for the return as <? extends Object> to be compatible
- * with {@link ConcurrencyManager#submit(AbstractTask)}
  */
 public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
 
@@ -264,6 +263,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
      * Cache of named indices resolved by this task for its {@link #timestamp}.
      * 
      * @see #getIndex(String name)
+     * @see #getIndexLocal(String)
      */
     final private Map<String,ILocalBTreeView> indexCache;
 
@@ -543,8 +543,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
     }
 
     /**
-     * Return a view of the named index appropriate for the timestamp associated
-     * with this task.
+     * {@inheritDoc}
      * <p>
      * Note: There are two ways in which a task may access an
      * {@link ITx#UNISOLATED} index, but in all cases access to the index is
@@ -553,37 +552,13 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
      * {@link IJournal#getIndex(String)} on that journal, which is simply
      * delegated to this method. See {@link IsolatedActionJournal}.
      * 
-     * @param name
-     *            The name of the index.
-     * 
-     * @throws NullPointerException
-     *             if <i>name</i> is <code>null</code>.
-     * @throws IllegalStateException
-     *             if <i>name</i> is not a declared resource.
-     * @throws StaleLocatorException
-     *             if <i>name</i> identifies an index partition which has been
-     *             split, joined, or moved.
-     * @throws NoSuchIndexException
-     *             if the named index is not registered as of the timestamp.
-     * 
-     * @return The index.
-     * 
-     * @todo modify to return <code>null</code> if the index is not registered?
-     * 
-     *       FIXME GIST. This will throw a ClassCastException if the returned
-     *       index is an ILocalBTreeView.
-     * 
      * @see http://trac.bigdata.com/ticket/585 (GIST)
      */
     @Override
     synchronized final public ILocalBTreeView getIndex(final String name) {
 
-        if (name == null) {
-
-            // @todo change to IllegalArgumentException for API consistency?
+        if (name == null)
             throw new NullPointerException();
-            
-        }
         
         // validate that this is a declared index.
         assertResource(name);
@@ -636,10 +611,11 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
              * index from the store, set the [lastCommitTime], and enter it into
              * the unisolated Name2Addr's cache of unisolated indices.
              */
-            BTree btree;
+            ICheckpointProtocol ndx;
             
             // the unisolated name2Addr object.
-            final Name2Addr name2Addr = resourceManager.getLiveJournal()._getName2Addr();
+            final Name2Addr name2Addr = resourceManager.getLiveJournal()
+                    ._getName2Addr();
 
             synchronized (name2Addr) {
 
@@ -680,46 +656,61 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
                      * But, fetch the btree from the cache to ensure we use the
                      * most recent checkpoint
                      */
-                    btree = null;
+                    ndx = null;
 
-                    final BTree tmpbtree = (BTree) name2Addr.getIndexCache(name);
-                    if (tmpbtree != null)
-                        checkpointAddr = tmpbtree.getCheckpoint().getCheckpointAddr();
+                    final ICheckpointProtocol tmp_ndx = name2Addr
+                            .getIndexCache(name);
+
+                    if (tmp_ndx != null) {
+
+                        checkpointAddr = tmp_ndx.getCheckpoint()
+                                .getCheckpointAddr();
+
+                    }
                     
                 } else {
-                    // recover from unisolated index cache.
-                    btree = (BTree) name2Addr.getIndexCache(name);
+
+                    // Recover from unisolated index cache.
+                    ndx = name2Addr.getIndexCache(name);
+                    
                 }
                 
-                if (btree == null) {
+                if (ndx == null) {
 
-                    final IJournal tmp;
-//                    tmp = resourceManager.getLiveJournal();
-                    tmp = getJournal();// wrap with the IsolatedActionJournal.
+                    // wrap with the IsolatedActionJournal.
+                    final IJournal tmp = getJournal();
+//                  tmp = resourceManager.getLiveJournal();
                     
                     // re-load btree from the store.
-                    btree = BTree.load(//
+                    ndx = Checkpoint.loadFromCheckpoint(//
                             tmp, // backing store.
                             checkpointAddr,//
                             false// readOnly
                             );
 
                     // set the lastCommitTime on the index.
-                    btree.setLastCommitTime(entry.commitTime);
+                    ndx.setLastCommitTime(entry.commitTime);
 
                     // add to the unisolated index cache (must not exist).
-                    name2Addr.putIndexCache(name, btree, false/* replace */);
+                    name2Addr.putIndexCache(name, ndx, false/* replace */);
 
-                    btree.setBTreeCounters(resourceManager
-                            .getIndexCounters(name));
+                    // set performance counters iff the class supports it.
+                    if (ndx instanceof AbstractBTree) {
+                        ((AbstractBTree) ndx).setBTreeCounters(resourceManager
+                                .getIndexCounters(name));
+                    } else if (ndx instanceof AbstractHTree) {
+                        ((AbstractHTree) ndx).setBTreeCounters(resourceManager
+                                .getIndexCounters(name));
+                    }
                     
                 }
 
             }
 
             try {
-             
-                return getUnisolatedIndexView(name, btree);
+
+                // wrap B+Tree as FusedView: FIXME GIST : BTree specific code path.
+                return getUnisolatedIndexView(name, (BTree) ndx);
                 
             } catch (NoSuchStoreException ex) {
                 
@@ -760,10 +751,12 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
     /**
      * Given the name of an index and a {@link BTree}, obtain the view for all
      * source(s) described by the {@link BTree}s index partition metadata (if
-     * any), inserts that view into the {@link #indexCache}, and return the view.
+     * any), inserts that view into the {@link #indexCache}, and return the
+     * view.
      * <p>
-     * Note: This method is used both when registering a new index ({@link #registerIndex(String, BTree)})
-     * and when reading an index view from the source ({@link #getIndex(String)}).
+     * Note: This method is used both when registering a new index (
+     * {@link #registerIndex(String, BTree)}) and when reading an index view
+     * from the source ({@link #getIndex(String)}).
      * 
      * @param name
      *            The index name.
