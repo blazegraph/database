@@ -296,16 +296,7 @@ public interface IResourceManager extends IServiceShutdown {
      */
     public IBigdataFederation<?> getFederation();
     
-//    /**
-//     * Return the ordered {@link UUID}[] of the physical {@link IDataService}
-//     * failover chain for the logical {@link IDataService} whose resources are
-//     * under management by this class.
-//     * 
-//     * @deprecated This is not used right now and might go away.
-//     */
-//    public UUID[] getDataServiceUUIDs();
-
-	    /**
+    /**
      * Return the {@link BTreeCounters} for the named index. If none exist, then
      * a new instance is atomically created and returned to the caller. This
      * facilitates the reuse of the same {@link BTreeCounters} instance for all
@@ -315,11 +306,6 @@ public interface IResourceManager extends IServiceShutdown {
      *            The name of the index.
      * 
      * @return The counters for that index and never <code>null</code>.
-     * 
-     *         FIXME GIST The HTree class and other durable data structures
-     *         should also have published performance counters. This is the
-     *         simplest for the HTree since it has a lot in common with the
-     *         BTree.
      */
     BTreeCounters getIndexCounters(final String name); // non-GIST
     
