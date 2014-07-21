@@ -1,9 +1,67 @@
 $(function() {
 
-// global variables
-var RW_URL_PREFIX, RO_URL_PREFIX, DEFAULT_NAMESPACE, NAMESPACE, NAMESPACES_READY, NAMESPACE_SHORTCUTS, FILE_CONTENTS, QUERY_RESULTS;
-var CODEMIRROR_DEFAULTS, EDITORS = {}, ERROR_LINE_MARKERS = {}, ERROR_CHARACTER_MARKERS = {};
-var PAGE_SIZE = 50, TOTAL_PAGES, CURRENT_PAGE;
+/* Global variables */
+
+// LBS/non-LBS URL prefixes
+var RW_URL_PREFIX, RO_URL_PREFIX
+
+// query/update editors
+var EDITORS = {}, ERROR_LINE_MARKERS = {}, ERROR_CHARACTER_MARKERS = {};
+var CODEMIRROR_DEFAULTS = {};
+CodeMirror.defaults = {
+   lineNumbers: true,
+   mode: 'sparql',
+   extraKeys: {'Ctrl-,': moveTabLeft, 'Ctrl-.': moveTabRight}
+};
+// key is value of RDF type selector, value is name of CodeMirror mode
+var RDF_MODES = {
+   'n-triples': 'ntriples',
+   'rdf/xml': 'xml',
+   'json': 'json',
+   'turtle': 'turtle'
+};
+var FILE_CONTENTS;
+// file/update editor type handling
+// .xml is used for both RDF and TriX, assume it's RDF
+// We could check the parent element to see which it is
+var RDF_TYPES = {
+   'nq': 'n-quads',
+   'nt': 'n-triples',
+   'n3': 'n3',
+   'rdf': 'rdf/xml',
+   'rdfs': 'rdf/xml',
+   'owl': 'rdf/xml',
+   'xml': 'rdf/xml',
+   'json': 'json',
+   'trig': 'trig',
+   'trix': 'trix',
+   //'xml': 'trix',
+   'ttl': 'turtle'
+};               
+var RDF_CONTENT_TYPES = {
+   'n-quads': 'text/x-nquads',
+   'n-triples': 'text/plain',
+   'n3': 'text/rdf+n3',
+   'rdf/xml': 'application/rdf+xml',
+   'json': 'application/sparql-results+json',
+   'trig': 'application/x-trig',
+   'trix': 'application/trix',
+   'turtle': 'application/x-turtle'
+};
+var SPARQL_UPDATE_COMMANDS = [
+   'INSERT',
+   'DELETE',
+   'LOAD',
+   'CLEAR'
+];
+
+// pagination
+var QUERY_RESULTS, PAGE_SIZE = 50, TOTAL_PAGES, CURRENT_PAGE;
+
+// namespaces
+var DEFAULT_NAMESPACE, NAMESPACE, NAMESPACES_READY;
+
+// namespace creation
 var NAMESPACE_PARAMS = {
    'name': 'com.bigdata.rdf.sail.namespace',
    'index': 'com.bigdata.rdf.store.AbstractTripleStore.textIndex',
@@ -13,14 +71,50 @@ var NAMESPACE_PARAMS = {
    'axioms': 'com.bigdata.rdf.store.AbstractTripleStore.axiomsClass'
 };
 
-CODEMIRROR_DEFAULTS = {
-   lineNumbers: true,
-   mode: 'sparql',
-   extraKeys: {'Ctrl-,': moveTabLeft, 'Ctrl-.': moveTabRight}
+var NAMESPACE_SHORTCUTS = {
+   'Bigdata': {
+      'bd': 'http://www.bigdata.com/rdf#',
+      'bds': 'http://www.bigdata.com/rdf/search#',
+      'gas': 'http://www.bigdata.com/rdf/gas#',
+      'hint': 'http://www.bigdata.com/queryHints#'
+   },
+   'W3C': {
+      'rdf': 'http://www.w3.org/1999/02/22-rdf-syntax-ns#',
+      'rdfs': 'http://www.w3.org/2000/01/rdf-schema#',
+      'owl': 'http://www.w3.org/2002/07/owl#',
+      'skos': 'http://www.w3.org/2004/02/skos/core#',
+      'xsd': 'http://www.w3.org/2001/XMLSchema#'
+   },
+   'Dublin Core': {
+      'dc': 'http://purl.org/dc/elements/1.1/',
+      'dcterm': 'http://purl.org/dc/terms/',
+      'void': 'http://rdfs.org/ns/void#'
+   },
+   'Social/Other': {
+      'foaf': 'http://xmlns.com/foaf/0.1/',
+      'schema': 'http://schema.org/',
+      'sioc': 'http://rdfs.org/sioc/ns#'
+   }
 };
 
-// debug to access closure variables
-$('html, textarea, select').bind('keydown', 'ctrl+d', function() { debugger; });
+// data export
+var EXPORT_EXTENSIONS = {
+   "application/rdf+xml": ['RDF/XML', 'rdf', true],
+   "application/n-triples": ['N-Triples', 'nt', true],
+   "application/x-turtle": ['Turtle', 'ttl', true],
+   "text/rdf+n3": ['N3', 'n3', true],
+   "application/trix": ['TriX', 'trix', true],
+   "application/x-trig": ['TRIG', 'trig', true],
+   "text/x-nquads": ['NQUADS', 'nq', true],
+
+   "text/csv": ['CSV', 'csv', false, exportCSV],
+   "application/sparql-results+json": ['JSON', 'json', false, exportJSON],
+   // "text/tab-separated-values": ['TSV', 'tsv', false, exportTSV],
+   "application/sparql-results+xml": ['XML', 'xml', false, exportXML]
+};
+
+
+/* Load balancing */
 
 function useLBS(state) {
    // allows passing in of boolean, or firing on event
@@ -36,8 +130,7 @@ function useLBS(state) {
    }
    $('.use-lbs').prop('checked', state);
 }
-useLBS(true);
-$('.use-lbs').change(useLBS);
+
 
 /* Modal functions */
 
@@ -46,14 +139,15 @@ function showModal(id) {
    $('body').addClass('modal-open');
 }
 
-$('.modal-cancel').click(function() {
+function closeModal() {
    $('body').removeClass('modal-open');
    $(this).parents('.modal').hide();
-});
+}
+
 
 /* Search */
 
-$('#search-form').submit(function(e) {
+function submitSearch(e) {
    e.preventDefault();
    var term = $(this).find('input').val();
    if(!term) {
@@ -64,13 +158,14 @@ $('#search-form').submit(function(e) {
    $('#query-errors').hide();
    $('#query-form').submit();
    showTab('query');
-});
+}
+
 
 /* Tab selection */
 
-$('#tab-selector a').click(function(e) {
+function clickTab(e) {
    showTab($(this).data('target'));
-});
+}
 
 function showTab(tab, nohash) {
    $('.tab').hide();
@@ -111,9 +206,6 @@ function moveTab(next) {
    }
 }
 
-// these should be , and . but Hotkeys views those keypresses as these characters
-$('html, textarea, select').bind('keydown', 'ctrl+¼', moveTabLeft);
-$('html, textarea, select').bind('keydown', 'ctrl+¾', moveTabRight);
 
 /* Namespaces */
 
@@ -270,14 +362,14 @@ function validateNamespaceOptions() {
    return errors.length == 0;
 }
 
-$('#new-namespace-mode').change(function() {
+function changeNamespaceMode() {
    var quads = this.value == 'quads';
    $('#new-namespace-inference').prop('disabled', quads);
    $('#inference-quads-incompatible').toggle(quads);
    if(quads) {
       $('#new-namespace-inference').prop('checked', false);
    }
-});
+}
 
 function createNamespace(e) {
    e.preventDefault();
@@ -327,7 +419,6 @@ function createNamespace(e) {
    };
    $.ajax(RW_URL_PREFIX + 'namespace', settings);
 }
-$('#namespace-create').submit(createNamespace);
 
 function getDefaultNamespace() {
    $.get(RO_URL_PREFIX + 'namespace?describe-each-named-graph=false&describe-default-namespace=true', function(data) {
@@ -339,58 +430,32 @@ function getDefaultNamespace() {
    });
 }
 
-getDefaultNamespace();
-
 
 /* Namespace shortcuts */
 
-NAMESPACE_SHORTCUTS = {
-   'Bigdata': {
-      'bd': 'http://www.bigdata.com/rdf#',
-      'bds': 'http://www.bigdata.com/rdf/search#',
-      'gas': 'http://www.bigdata.com/rdf/gas#',
-      'hint': 'http://www.bigdata.com/queryHints#'
-   },
-   'W3C': {
-      'rdf': 'http://www.w3.org/1999/02/22-rdf-syntax-ns#',
-      'rdfs': 'http://www.w3.org/2000/01/rdf-schema#',
-      'owl': 'http://www.w3.org/2002/07/owl#',
-      'skos': 'http://www.w3.org/2004/02/skos/core#',
-      'xsd': 'http://www.w3.org/2001/XMLSchema#'
-   },
-   'Dublin Core': {
-      'dc': 'http://purl.org/dc/elements/1.1/',
-      'dcterm': 'http://purl.org/dc/terms/',
-      'void': 'http://rdfs.org/ns/void#'
-   },
-   'Social/Other': {
-      'foaf': 'http://xmlns.com/foaf/0.1/',
-      'schema': 'http://schema.org/',
-      'sioc': 'http://rdfs.org/sioc/ns#'
+function createNamespaceShortcuts() {
+   $('.namespace-shortcuts').html('Namespace shortcuts: ');
+   for(var category in NAMESPACE_SHORTCUTS) {
+      var select = $('<select><option>' + category + '</option></select>').appendTo($('.namespace-shortcuts'));
+      for(var ns in NAMESPACE_SHORTCUTS[category]) {
+         select.append('<option value="' + NAMESPACE_SHORTCUTS[category][ns] + '">' + ns + '</option>');
+      }
    }
-};
 
-$('.namespace-shortcuts').html('Namespace shortcuts: ');
-for(var category in NAMESPACE_SHORTCUTS) {
-   var select = $('<select><option>' + category + '</option></select>').appendTo($('.namespace-shortcuts'));
-   for(var ns in NAMESPACE_SHORTCUTS[category]) {
-      select.append('<option value="' + NAMESPACE_SHORTCUTS[category][ns] + '">' + ns + '</option>');
-   }
+   $('.namespace-shortcuts select').change(function() {
+      var uri = this.value;
+      var tab = $(this).parents('.tab').attr('id').split('-')[0];
+      var current = EDITORS[tab].getValue();
+
+      if(current.indexOf(uri) == -1) {
+         var ns = $(this).find(':selected').text();
+         EDITORS[tab].setValue('prefix ' + ns + ': <' + uri + '>\n' + current);
+      }
+
+      // reselect group label
+      this.selectedIndex = 0;
+   });
 }
-
-$('.namespace-shortcuts select').change(function() {
-   var uri = this.value;
-   var tab = $(this).parents('.tab').attr('id').split('-')[0];
-   var current = EDITORS[tab].getValue();
-
-   if(current.indexOf(uri) == -1) {
-      var ns = $(this).find(':selected').text();
-      EDITORS[tab].setValue('prefix ' + ns + ': <' + uri + '>\n' + current);
-   }
-
-   // reselect group label
-   this.selectedIndex = 0;
-});
 
 
 /* Update */
@@ -466,9 +531,9 @@ function guessType(extension, content) {
    if(extension == 'rq') {
       // SPARQL
       setType('sparql');
-   } else if(extension in rdf_types) {
+   } else if(extension in RDF_TYPES) {
       // RDF
-      setType('rdf', rdf_types[extension]);
+      setType('rdf', RDF_TYPES[extension]);
    } else {
       // extension is no help, see if we can find some SPARQL commands
       setType(identify(content));
@@ -491,8 +556,8 @@ function identify(text, considerPath) {
    }
    
    text = text.toUpperCase();
-   for(var i=0; i<sparql_update_commands.length; i++) {
-      if(text.indexOf(sparql_update_commands[i]) != -1) {
+   for(var i=0; i<SPARQL_UPDATE_COMMANDS.length; i++) {
+      if(text.indexOf(SPARQL_UPDATE_COMMANDS[i]) != -1) {
          return 'sparql';
       }
    }
@@ -516,9 +581,6 @@ function setType(type, format) {
    setUpdateSettings(type);
 }
 
-$('#update-type').change(function() { setUpdateSettings(this.value); });
-$('#rdf-type').change(function() { setUpdateMode('rdf'); });
-
 function setUpdateSettings(type) {
    $('#rdf-type, label[for="rdf-type"]').attr('disabled', type != 'rdf');
    $('#update-tab .advanced-features input').attr('disabled', type != 'sparql');
@@ -531,62 +593,26 @@ function setUpdateMode(type) {
       mode = 'sparql';
    } else if(type == 'rdf') {
       type = $('#rdf-type').val();
-      if(type in rdf_modes) {
-         mode = rdf_modes[type];
+      if(type in RDF_MODES) {
+         mode = RDF_MODES[type];
       }
    }
    EDITORS.update.setOption('mode', mode);
 }
 
-// .xml is used for both RDF and TriX, assume it's RDF
-// We could check the parent element to see which it is
-var rdf_types = {'nq': 'n-quads',
-                 'nt': 'n-triples',
-                 'n3': 'n3',
-                 'rdf': 'rdf/xml',
-                 'rdfs': 'rdf/xml',
-                 'owl': 'rdf/xml',
-                 'xml': 'rdf/xml',
-                 'json': 'json',
-                 'trig': 'trig',
-                 'trix': 'trix',
-                 //'xml': 'trix',
-                 'ttl': 'turtle'};
-                 
-var rdf_content_types = {'n-quads': 'text/x-nquads',
-                         'n-triples': 'text/plain',
-                         'n3': 'text/rdf+n3',
-                         'rdf/xml': 'application/rdf+xml',
-                         'json': 'application/sparql-results+json',
-                         'trig': 'application/x-trig',
-                         'trix': 'application/trix',
-                         'turtle': 'application/x-turtle'};
-
-// key is value of RDF type selector, value is name of CodeMirror mode
-var rdf_modes = {'n-triples': 'ntriples', 'rdf/xml': 'xml', 'json': 'json', 'turtle': 'turtle'};
-
-var sparql_update_commands = ['INSERT', 'DELETE', 'LOAD', 'CLEAR'];
-
-$('#update-file').change(handleFileInput);
-// $('#update-box').on('dragover', handleDragOver)
-//    .on('drop', handleFile)
-//    .on('paste', handlePaste)
-//    .on('input propertychange', function() { $('#update-errors').hide(); });
-$('#clear-file').click(clearFile);
-
-$('#update-update').click(submitUpdate);
-
-EDITORS.update = CodeMirror.fromTextArea($('#update-box')[0], CODEMIRROR_DEFAULTS);
-EDITORS.update.on('change', function() { 
-   if(ERROR_LINE_MARKERS.update) {
-      ERROR_LINE_MARKERS.update.clear();
-      ERROR_CHARACTER_MARKERS.update.clear();
-   }
-});
-EDITORS.update.on('dragover', handleDragOver);
-EDITORS.update.on('drop', handleDrop);
-EDITORS.update.on('paste', handlePaste);
-EDITORS.update.addKeyMap({'Ctrl-Enter': submitUpdate});
+function createUpdateEditor() {
+   EDITORS.update = CodeMirror.fromTextArea($('#update-box')[0], CODEMIRROR_DEFAULTS);
+   EDITORS.update.on('change', function() { 
+      if(ERROR_LINE_MARKERS.update) {
+         ERROR_LINE_MARKERS.update.clear();
+         ERROR_CHARACTER_MARKERS.update.clear();
+      }
+   });
+   EDITORS.update.on('dragover', handleDragOver);
+   EDITORS.update.on('drop', handleDrop);
+   EDITORS.update.on('paste', handlePaste);
+   EDITORS.update.addKeyMap({'Ctrl-Enter': submitUpdate});
+}
 
 function submitUpdate(e) {
    // Updates are submitted as a regular form for SPARQL updates in monitor mode, and via AJAX for non-monitor SPARQL, RDF & file path updates.
@@ -639,7 +665,7 @@ function submitUpdate(e) {
             alert('Please select an RDF content type.');
             return;
          }
-         settings.contentType = rdf_content_types[type];
+         settings.contentType = RDF_CONTENT_TYPES[type];
          break;
       case 'path':
          // if no scheme is specified, assume a local path
@@ -655,16 +681,17 @@ function submitUpdate(e) {
    $.ajax(url, settings);
 }
 
-$('#update-clear').click(function() {
+function clearUpdateOutput() {
    $('#update-response, #update-clear-container').hide();
    $('#update-response pre').text('');
    $('#update-response iframe').attr('src', 'about:blank');
-});
+}
 
-$('.advanced-features-toggle').click(function() {
+// also for query panel
+function toggleAdvancedFeatures(e) {
+   e.preventDefault();
    $(this).next('.advanced-features').toggle();
-   return false;
-});
+}
 
 function updateResponseHTML(data) {
    $('#update-response, #update-clear-container').show();
@@ -690,32 +717,30 @@ function updateResponseError(jqXHR, textStatus, errorThrown) {
 
 /* Query */
 
-$('#query-box').on('input propertychange', function() { $('#query-errors').hide(); });
-$('#query-form').submit(submitQuery);
-
-$('#query-explain').change(function() {
+// details needs explain, so turn details off if explain is unchecked,
+// and turn explain on if details is checked
+function handleExplain() {
    if(!this.checked) {
       $('#query-details').prop('checked', false);
    }
-});
+}
 
-$('#query-details').change(function() {
+function handleDetails() {
    if(this.checked) {
       $('#query-explain').prop('checked', true);
    }
-});
+}
 
-EDITORS.query = CodeMirror.fromTextArea($('#query-box')[0], CODEMIRROR_DEFAULTS);
-EDITORS.query.on('change', function() { 
-   if(ERROR_LINE_MARKERS.query) {
-      ERROR_LINE_MARKERS.query.clear();
-      ERROR_CHARACTER_MARKERS.query.clear();
-   }
-});
-EDITORS.query.addKeyMap({'Ctrl-Enter': submitQuery});
-
-$('#query-history').on('click', '.query a', loadHistory);
-$('#query-history').on('click', '.query-delete a', deleteHistoryRow)
+function createQueryEditor() {
+   EDITORS.query = CodeMirror.fromTextArea($('#query-box')[0], CODEMIRROR_DEFAULTS);
+   EDITORS.query.on('change', function() { 
+      if(ERROR_LINE_MARKERS.query) {
+         ERROR_LINE_MARKERS.query.clear();
+         ERROR_CHARACTER_MARKERS.query.clear();
+      }
+   });
+   EDITORS.query.addKeyMap({'Ctrl-Enter': submitQuery});
+}
 
 function loadHistory(e) {
    e.preventDefault();
@@ -805,49 +830,39 @@ function submitQuery(e) {
    }
 }
 
-$('#query-response-clear').click(function() {
+function clearQueryResponse() {
    $('#query-response, #query-explanation').empty('');
    $('#query-response, #query-pagination, #query-explanation, #query-export-container').hide();
-});
-
-$('#query-export').click(function() { updateExportFileExtension(); showModal('query-export-modal'); });
-
-var export_extensions = {
-   "application/rdf+xml": ['RDF/XML', 'rdf', true],
-   "application/n-triples": ['N-Triples', 'nt', true],
-   "application/x-turtle": ['Turtle', 'ttl', true],
-   "text/rdf+n3": ['N3', 'n3', true],
-   "application/trix": ['TriX', 'trix', true],
-   "application/x-trig": ['TRIG', 'trig', true],
-   "text/x-nquads": ['NQUADS', 'nq', true],
-
-   "text/csv": ['CSV', 'csv', false, exportCSV],
-   "application/sparql-results+json": ['JSON', 'json', false, exportJSON],
-   // "text/tab-separated-values": ['TSV', 'tsv', false, exportTSV],
-   "application/sparql-results+xml": ['XML', 'xml', false, exportXML]
-};
-
-for(var contentType in export_extensions) {
-   var optgroup = export_extensions[contentType][2] ? '#rdf-formats' : '#non-rdf-formats';
-   $(optgroup).append('<option value="' + contentType + '">' + export_extensions[contentType][0] + '</option>');
 }
 
-$('#export-format option:first').prop('selected', true);
+function showQueryExportModal() {
+   updateExportFileExtension();
+   showModal('query-export-modal');
+}
 
-$('#export-format').change(updateExportFileExtension);
+function createExportOptions() {
+   for(var contentType in EXPORT_EXTENSIONS) {
+      var optgroup = EXPORT_EXTENSIONS[contentType][2] ? '#rdf-formats' : '#non-rdf-formats';
+      $(optgroup).append('<option value="' + contentType + '">' + EXPORT_EXTENSIONS[contentType][0] + '</option>');
+   }
+
+   $('#export-format option:first').prop('selected', true);
+
+   $('#export-format').change(updateExportFileExtension);
+}
 
 function updateExportFileExtension() {
-   $('#export-filename-extension').html(export_extensions[$('#export-format').val()][1]);
+   $('#export-filename-extension').html(EXPORT_EXTENSIONS[$('#export-format').val()][1]);
 }
 
-$('#query-download').click(function() {
+function queryExport() {
    var dataType = $('#export-format').val();
    var filename = $('#export-filename').val();
    if(filename == '') {
       filename = 'export';
    }
-   filename += '.' + export_extensions[dataType][1];
-   if(export_extensions[dataType][2]) {
+   filename += '.' + EXPORT_EXTENSIONS[dataType][1];
+   if(EXPORT_EXTENSIONS[dataType][2]) {
       // RDF
       var settings = {
          type: 'POST',
@@ -860,10 +875,10 @@ $('#query-download').click(function() {
       $.ajax(RO_URL_PREFIX + 'sparql?workbench&convert', settings);
    } else {
       // not RDF
-      export_extensions[dataType][3](filename);
+      EXPORT_EXTENSIONS[dataType][3](filename);
    }
    $(this).siblings('.modal-cancel').click();
-});
+}
 
 function downloadRDFError(jqXHR, textStatus, errorThrown) {
    alert(jqXHR.statusText);
@@ -935,7 +950,7 @@ function downloadFile(data, type, filename) {
    $('#download-link').remove();
 }
 
-function updateresultCountAndExecutionTime(count) {
+function updateResultCountAndExecutionTime(count) {
    $('#query-history tbody tr:first td.query-results').text(count);
 
    var ms = Date.now() - Date.parse($('#query-history tbody tr:first td.query-time').html());
@@ -987,7 +1002,7 @@ function showQueryResults(data) {
             table.append(tr);
          }
       }
-      updateresultCountAndExecutionTime(rows.length);
+      updateResultCountAndExecutionTime(rows.length);
    } else {
       // JSON
       // save data for export and pagination
@@ -996,7 +1011,7 @@ function showQueryResults(data) {
       if(typeof(data.boolean) != 'undefined') {
          // ASK query
          table.append('<tr><td>' + data.boolean + '</td></tr>').addClass('boolean');
-         updateresultCountAndExecutionTime('' + data.boolean);
+         updateResultCountAndExecutionTime('' + data.boolean);
          return;
       }
 
@@ -1038,7 +1053,7 @@ function showQueryResults(data) {
       table.append(thead);
 
       $('#total-results').html(data.results.bindings.length);
-      updateresultCountAndExecutionTime(data.results.bindings.length);
+      updateResultCountAndExecutionTime(data.results.bindings.length);
       setNumberOfPages();
       showPage(1);
 
@@ -1070,7 +1085,8 @@ function highlightError(description, pane) {
    }
 }
 
-/* Pagination */
+
+/* Query result pagination */
 
 function setNumberOfPages() {
    TOTAL_PAGES = Math.ceil(QUERY_RESULTS.results.bindings.length / PAGE_SIZE);
@@ -1093,10 +1109,7 @@ function setPageSize(n) {
    showPage(1);
 }
 
-$('#results-per-page').change(function() { setPageSize(this.value); });
-$('#previous-page').click(function() { showPage(CURRENT_PAGE - 1); });
-$('#next-page').click(function() { showPage(CURRENT_PAGE + 1); });
-$('#current-page').keyup(function(e) {
+function handlePageSelector(e) {
    if(e.which == 13) {
       var n = parseInt(this.value, 10);
       if(typeof n != 'number' || n % 1 != 0 || n < 1 || n > TOTAL_PAGES) {
@@ -1105,7 +1118,7 @@ $('#current-page').keyup(function(e) {
          showPage(n);
       }
    }
-});
+}
 
 function showPage(n) {
    if(typeof n != 'number' || n % 1 != 0 || n < 1 || n > TOTAL_PAGES) {
@@ -1162,9 +1175,10 @@ function showPage(n) {
    $('#current-page').val(n);
 }
 
+
 /* Explore */
 
-$('#explore-form').submit(function(e) {
+function exploreSubmit(e) {
    e.preventDefault();
    var uri = $(this).find('input[type="text"]').val().trim();
    if(uri) {
@@ -1186,7 +1200,6 @@ $('#explore-form').submit(function(e) {
       loadURI(uri);
 
       // if this is a SID, make the components clickable
-      // var re = /<< *(<[^<>]*>) *(<[^<>]*>) *(<[^<>]*>) *>>/;
       var re = /<< *([^ ]+) +([^ ]+) +([^ ]+) *>>/;
       var match = uri.match(re);
       if(match) {
@@ -1201,7 +1214,7 @@ $('#explore-form').submit(function(e) {
          $('#explore-header').html($('<h1>').text(uri));
       }
    }
-});
+}
 
 function buildExploreHash(uri) {
    return '#explore:' + NAMESPACE + ':' + uri;
@@ -1367,10 +1380,6 @@ function parseHash(hash) {
    return hash.match(re);
 }
 
-// handle history buttons and initial display of first tab
-window.addEventListener("popstate", handlePopState);
-$(handlePopState);
-
 function handlePopState() {
    var hash = parseHash(this.location.hash);
    if(!hash) {
@@ -1390,9 +1399,8 @@ function updateExploreError(jqXHR, textStatus, errorThrown) {
    $('#explore-results, #explore-header').show();
 }
 
-/* Status */
 
-$('#tab-selector a[data-target=status]').click(getStatus);
+/* Status */
 
 function getStatus(e) {
    if(e) {
@@ -1411,16 +1419,6 @@ function getStatusNumbers(data) {
    $('p:contains(Show queries, query details)').find('a').eq(0).click(function(e) { e.preventDefault(); showQueries(false); });
    $('p:contains(Show queries, query details)').find('a').eq(1).click(function(e) { e.preventDefault(); showQueries(true); });
 }
-
-$('#show-queries').click(function(e) {
-   e.preventDefault();
-   showQueries(false);
-});
-
-$('#show-query-details').click(function(e) {
-   e.preventDefault();
-   showQueries(true);
-});
 
 function showQueries(details) {
    var url = RO_URL_PREFIX + 'status?showQueries';
@@ -1500,9 +1498,8 @@ function getQueryDetails(e) {
    });
 }
 
-/* Health */
 
-$('#tab-selector a[data-target=health], #health-refresh').click(getHealth);
+/* Health */
 
 function getHealth(e) {
    e.preventDefault();
@@ -1552,11 +1549,9 @@ function showHealthTab() {
       }
    });
 }
-showHealthTab();
+
 
 /* Performance */
-
-$('#tab-selector a[data-target=performance]').click(loadPerformance);
 
 function loadPerformance(path) {
    if(typeof(path) == 'undefined') {
@@ -1588,6 +1583,7 @@ function abbreviate(uri) {
    return '<' + uri + '>';
 }
 
+// currently unused
 function unabbreviate(uri) {
    if(uri.charAt(0) == '<') {
       // not abbreviated
@@ -1598,6 +1594,7 @@ function unabbreviate(uri) {
    return '<' + uri.replace(namespace, NAMESPACE_SHORTCUTS[namespace]) + '>';
 }
 
+// currently unused
 function parseSID(sid) {
    // var re = /<< <([^<>]*)> <([^<>]*)> <([^<>]*)> >>/;
    var re = /<< *([^ ]+) +([^ ]+) +([^ ]+) *>>/;
@@ -1608,5 +1605,84 @@ function parseSID(sid) {
 function escapeHTML(text) {
    return $('<div/>').text(text).html();
 }
+
+
+/* Startup functions */
+
+function setupHandlers() {
+   // debug to access closure variables
+   $('html, textarea, select').bind('keydown', 'ctrl+d', function() { debugger; });
+
+   $('.use-lbs').change(useLBS);
+
+   $('.modal-cancel').click(closeModal);
+
+   $('#search-form').submit(submitSearch);
+
+   $('#tab-selector a').click(clickTab);
+   // these should be , and . but Hotkeys views those keypresses as these characters
+   $('html, textarea, select').bind('keydown', 'ctrl+¼', moveTabLeft);
+   $('html, textarea, select').bind('keydown', 'ctrl+¾', moveTabRight);
+   $('#tab-selector a[data-target=status]').click(getStatus);
+   $('#tab-selector a[data-target=health], #health-refresh').click(getHealth);
+   $('#tab-selector a[data-target=performance]').click(loadPerformance);
+
+   $('#new-namespace-mode').change(changeNamespaceMode);
+   $('#namespace-create').submit(createNamespace);
+
+   $('#update-type').change(function() { setUpdateSettings(this.value); });
+   $('#rdf-type').change(function() { setUpdateMode('rdf'); });
+   $('#update-file').change(handleFileInput);
+   // $('#update-box').on('dragover', handleDragOver)
+   //    .on('drop', handleFile)
+   //    .on('paste', handlePaste)
+   //    .on('input propertychange', function() { $('#update-errors').hide(); });
+   $('#clear-file').click(clearFile);
+   $('#update-update').click(submitUpdate);
+   $('#update-clear').click(clearUpdateOutput);
+
+   $('.advanced-features-toggle').click(toggleAdvancedFeatures);
+
+   $('#query-box').on('input propertychange', function() { $('#query-errors').hide(); });
+   $('#query-form').submit(submitQuery);
+   $('#query-explain').change(handleExplain);
+   $('#query-details').change(handleDetails);
+   $('#query-history').on('click', '.query a', loadHistory);
+   $('#query-history').on('click', '.query-delete a', deleteHistoryRow)
+   $('#query-response-clear').click(clearQueryResponse);
+   $('#query-export').click(showQueryExportModal);
+   $('#query-download').click(queryExport);
+
+   $('#results-per-page').change(function() { setPageSize(this.value); });
+   $('#previous-page').click(function() { showPage(CURRENT_PAGE - 1); });
+   $('#next-page').click(function() { showPage(CURRENT_PAGE + 1); });
+   $('#current-page').keyup(handlePageSelector);
+
+   $('#explore-form').submit(exploreSubmit);
+
+   // handle browser history buttons and initial display of first tab
+   window.addEventListener("popstate", handlePopState);
+   $(handlePopState);
+}
+
+function startup() {
+   setupHandlers();
+
+   useLBS(true);
+
+   showHealthTab();
+
+   getDefaultNamespace();
+
+   createNamespaceShortcuts();
+
+   createUpdateEditor();
+
+   createQueryEditor();
+
+   createExportOptions();
+}
+
+startup();
 
 });
