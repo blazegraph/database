@@ -1084,6 +1084,26 @@ function highlightError(description, pane) {
    }
 }
 
+function showDatatypes() {
+   if(this.checked) {
+      $('#query-response td[data-datatype]').each(function(i, el) {
+         $(this).html($(this).html() + ' <span class="datatype">' + $(this).data('datatype').split('#')[1] + '</span>');
+      });
+   } else {
+      $('#query-response table .datatype').remove();
+   }
+}
+
+function showLanguages() {
+   if(this.checked) {
+      $('#query-response td[data-lang]').each(function(i, el) {
+         $(this).html($(this).html() + ' <span class="language">' + $(this).data('lang') + '</span>');
+      });
+   } else {
+      $('#query-response table .language').remove();
+   }
+}
+
 
 /* Query result pagination */
 
@@ -1670,6 +1690,8 @@ function setupHandlers() {
    $('#previous-page').click(function() { showPage(CURRENT_PAGE - 1); });
    $('#next-page').click(function() { showPage(CURRENT_PAGE + 1); });
    $('#current-page').keyup(handlePageSelector);
+   $('#show-datatypes').click(showDatatypes);
+   $('#show-languages').click(showLanguages);
 
    $('#explore-form').submit(exploreSubmit);
 
