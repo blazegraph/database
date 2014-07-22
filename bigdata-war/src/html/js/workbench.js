@@ -1087,20 +1087,26 @@ function highlightError(description, pane) {
 function showDatatypes() {
    if(this.checked) {
       $('#query-response td[data-datatype]').each(function(i, el) {
-         $(this).html($(this).html() + ' <span class="datatype">' + $(this).data('datatype').split('#')[1] + '</span>');
+         $(this).html('"' + $(this).html() + '"<span class="datatype">^^' + abbreviate($(this).data('datatype')) + '</span>');
       });
    } else {
-      $('#query-response table .datatype').remove();
+      $('#query-response table td[data-datatype]').each(function(i, el) {
+         $(this).find('.datatype').remove();
+         $(this).html($(this).html().slice(1, -1));
+      });
    }
 }
 
 function showLanguages() {
    if(this.checked) {
       $('#query-response td[data-lang]').each(function(i, el) {
-         $(this).html($(this).html() + ' <span class="language">' + $(this).data('lang') + '</span>');
+         $(this).html('"' + $(this).html() + '"<span class="language">@' + $(this).data('lang') + '</span>');
       });
    } else {
-      $('#query-response table .language').remove();
+      $('#query-response table td[data-lang]').each(function(i, el) {
+         $(this).find('.language').remove();
+         $(this).html($(this).html().slice(1, -1));         
+      });
    }
 }
 
