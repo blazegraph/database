@@ -7,8 +7,7 @@ var RW_URL_PREFIX, RO_URL_PREFIX
 
 // query/update editors
 var EDITORS = {}, ERROR_LINE_MARKERS = {}, ERROR_CHARACTER_MARKERS = {};
-var CODEMIRROR_DEFAULTS = {};
-CodeMirror.defaults = {
+var CODEMIRROR_DEFAULTS = {
    lineNumbers: true,
    mode: 'sparql',
    extraKeys: {'Ctrl-,': moveTabLeft, 'Ctrl-.': moveTabRight}
@@ -601,7 +600,7 @@ function setUpdateMode(type) {
 }
 
 function createUpdateEditor() {
-   EDITORS.update = CodeMirror.fromTextArea($('#update-box')[0], CODEMIRROR_DEFAULTS);
+   EDITORS.update = CodeMirror.fromTextArea($('#update-box')[0], copyObject(CODEMIRROR_DEFAULTS));
    EDITORS.update.on('change', function() { 
       if(ERROR_LINE_MARKERS.update) {
          ERROR_LINE_MARKERS.update.clear();
@@ -732,7 +731,7 @@ function handleDetails() {
 }
 
 function createQueryEditor() {
-   EDITORS.query = CodeMirror.fromTextArea($('#query-box')[0], CODEMIRROR_DEFAULTS);
+   EDITORS.query = CodeMirror.fromTextArea($('#query-box')[0], copyObject(CODEMIRROR_DEFAULTS));
    EDITORS.query.on('change', function() { 
       if(ERROR_LINE_MARKERS.query) {
          ERROR_LINE_MARKERS.query.clear();
@@ -1606,6 +1605,18 @@ function parseSID(sid) {
 
 function escapeHTML(text) {
    return $('<div/>').text(text).html();
+}
+
+function copyObject(src) {
+   // this returns a new object with the same keys & values as the input one.
+   // It is used to get around CodeMirror updating the default config object 
+   // passed to it with the values used, which are then applied to later uses
+   // of the default config object.
+   dest = {};
+   for(var key in src) {
+      dest[key] = src[key];
+   }
+   return dest;
 }
 
 
