@@ -327,11 +327,6 @@ div.CodeMirror-cursors {
    border: 1px solid #e1e1e1;
 }
 
-.datatype, .language {
-   font-style: italic;
-   color: grey;
-}
-
 #query-history .query {
    white-space: pre;
 }
