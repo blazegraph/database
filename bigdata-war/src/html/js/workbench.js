@@ -1546,6 +1546,8 @@ function showHealthTab() {
    $.get('/status?health', function(data) {
       if(data.deployment == 'HA') {
          $('#tab-selector a[data-target=health]').show();
+      } else {
+         $('#tab-selector a[data-target=health]').remove();
       }
    });
 }
