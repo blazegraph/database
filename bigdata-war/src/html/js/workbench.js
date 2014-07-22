@@ -58,7 +58,7 @@ var SPARQL_UPDATE_COMMANDS = [
 var QUERY_RESULTS, PAGE_SIZE = 50, TOTAL_PAGES, CURRENT_PAGE;
 
 // namespaces
-var DEFAULT_NAMESPACE, NAMESPACE, NAMESPACES_READY;
+var DEFAULT_NAMESPACE, NAMESPACE, NAMESPACES_READY = false, DEFAULT_NAMESPACE_READY = false;
 
 // namespace creation
 var NAMESPACE_PARAMS = {
@@ -253,19 +253,32 @@ function getNamespaces() {
    });
 }
 
+// waits for namespaces to be loaded, then tries to use the supplied namespace
 function selectNamespace(name) {
-   // for programmatically selecting a namespace with just its name
    if(!NAMESPACES_READY) {
       setTimeout(function() { selectNamespace(name); }, 10);
    } else {
-      $('#namespaces-list tr[data-name=' + name + '] a.use-namespace').click();
+      useNamespace(name);
+   }
+}
+
+// waits for default namespace to be loaded, then uses it
+function selectDefaultNamespace() {
+   if(!DEFAULT_NAMESPACE_READY) {
+      setTimeout(function() { selectDefaultNamespace(); }, 10);
+   } else {
+      selectNamespace(DEFAULT_NAMESPACE);
    }
 }
 
 function useNamespace(name) {
+   if(!namespaceExists(name)) {
+      return;
+   }
    $('#current-namespace').html(name);
    NAMESPACE = name;
    getNamespaces();
+   localStorage['lastNamespace'] = name;
 }
 
 function deleteNamespace(namespace) {
@@ -342,13 +355,17 @@ function cloneNamespace(namespace) {
    });
 }
 
+function namespaceExists(name) {
+   return $('#namespaces-list tr[data-name=' + name + ']').length != 0;
+}
+
 function validateNamespaceOptions() {
    var errors = [];
    var name = $('#new-namespace-name').val().trim();
    if(!name) {
       errors.push('Enter a name');
    }
-   if($('#namespaces-list tr[data-name=' + name + ']').length != 0) {
+   if(namespaceExists(name)) {
       errors.push('Name already in use');
    }
    if($('#new-namespace-mode').val() == 'quads' && $('#new-namespace-inference').is(':checked')) {
@@ -424,8 +441,7 @@ function getDefaultNamespace() {
       // Chrome does not work with rdf\:Description, so look for Description too
       var defaultDataset = $(data).find('rdf\\:Description, Description');
       DEFAULT_NAMESPACE = defaultDataset.find('title')[0].textContent;
-      var url = defaultDataset.find('sparqlEndpoint')[0].attributes['rdf:resource'].textContent;
-      useNamespace(DEFAULT_NAMESPACE);
+      DEFAULT_NAMESPACE_READY = true;
    });
 }
 
@@ -1646,6 +1662,18 @@ function copyObject(src) {
 }
 
 
+/* Local storage functions */
+
+function loadLastNamespace() {
+   if(localStorage['lastNamespace']) {
+      selectNamespace(localStorage['lastNamespace']);
+   } else {
+      // no previously selected namespace, or it doesn't exist - use the default
+      selectDefaultNamespace();
+   }
+}
+
+
 /* Startup functions */
 
 function setupHandlers() {
@@ -1713,6 +1741,8 @@ function startup() {
 
    showHealthTab();
 
+   getNamespaces();
+
    getDefaultNamespace();
 
    createNamespaceShortcuts();
@@ -1722,6 +1752,8 @@ function startup() {
    createQueryEditor();
 
    createExportOptions();
+
+   loadLastNamespace();
 }
 
 startup();
