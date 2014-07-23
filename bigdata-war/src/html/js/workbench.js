@@ -58,7 +58,7 @@ var SPARQL_UPDATE_COMMANDS = [
 var QUERY_RESULTS, PAGE_SIZE = 50, TOTAL_PAGES, CURRENT_PAGE;
 
 // namespaces
-var DEFAULT_NAMESPACE, NAMESPACE, NAMESPACES_READY = false, DEFAULT_NAMESPACE_READY = false;
+var DEFAULT_NAMESPACE, NAMESPACE;
 
 // namespace creation
 var NAMESPACE_PARAMS = {
@@ -116,7 +116,7 @@ var EXPORT_EXTENSIONS = {
 /* Load balancing */
 
 function useLBS(state) {
-   // allows passing in of boolean, or firing on event
+   // allows passing in of boolean, or firing on checkbox change
    if(typeof(state) != 'boolean') {
       state = this.checked;
    }
@@ -208,67 +208,54 @@ function moveTab(next) {
 
 /* Namespaces */
 
-function getNamespaces() {
-   $.get(RO_URL_PREFIX + 'namespace?describe-each-named-graph=false', function(data) {
-      $('#namespaces-list').empty();
-      var rdf = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#';
-      var namespaces = namespaces = data.getElementsByTagNameNS(rdf, 'Description')
-      for(var i=0; i<namespaces.length; i++) {
-         var title = namespaces[i].getElementsByTagName('title')[0].textContent;
-         var titleText = title == DEFAULT_NAMESPACE ? title + ' (default)' : title;
-         var url = namespaces[i].getElementsByTagName('sparqlEndpoint')[0].getAttributeNS(rdf, 'resource');
-         var use;
-         if(title == NAMESPACE) {
-            use = 'In use';
-         } else {
-            use = '<a href="#" class="use-namespace">Use</a>';
+function getNamespaces(synchronous) {
+   // synchronous mode is for startup only, and is false by default
+   var settings = {
+      async: !synchronous,
+      url: RO_URL_PREFIX + 'namespace?describe-each-named-graph=false',
+      success: function(data) {
+         $('#namespaces-list').empty();
+         var rdf = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#';
+         var namespaces = namespaces = data.getElementsByTagNameNS(rdf, 'Description')
+         for(var i=0; i<namespaces.length; i++) {
+            var title = namespaces[i].getElementsByTagName('title')[0].textContent;
+            var titleText = title == DEFAULT_NAMESPACE ? title + ' (default)' : title;
+            var url = namespaces[i].getElementsByTagName('sparqlEndpoint')[0].getAttributeNS(rdf, 'resource');
+            var use;
+            if(title == NAMESPACE) {
+               use = 'In use';
+            } else {
+               use = '<a href="#" class="use-namespace">Use</a>';
+            }
+            $('#namespaces-list').append('<tr data-name="' + title + '">><td>' + titleText + '</td><td>' + use + '</td><td><a href="#" class="delete-namespace">Delete</a></td><td><a href="#" class="namespace-properties">Properties</a></td><td><a href="#" class="clone-namespace">Clone</a></td><td><a href="' + RO_URL_PREFIX + 'namespace/' + title + '/sparql" class="namespace-service-description">Service Description</a></td></tr>');
          }
-         $('#namespaces-list').append('<tr data-name="' + title + '">><td>' + titleText + '</td><td>' + use + '</td><td><a href="#" class="delete-namespace">Delete</a></td><td><a href="#" class="namespace-properties">Properties</a></td><td><a href="#" class="clone-namespace">Clone</a></td><td><a href="' + RO_URL_PREFIX + 'namespace/' + title + '/sparql" class="namespace-service-description">Service Description</a></td></tr>');
+         $('.use-namespace').click(function(e) {
+            e.preventDefault();
+            useNamespace($(this).parents('tr').data('name'));
+         });
+         $('.delete-namespace').click(function(e) {
+            e.preventDefault();
+            deleteNamespace($(this).parents('tr').data('name'));
+         });
+         $('.namespace-properties').click(function(e) {
+            e.preventDefault();
+            getNamespaceProperties($(this).parents('tr').data('name'));
+         });
+         $('.namespace-properties-java').click(function(e) {
+            e.preventDefault();
+            getNamespaceProperties($(this).parents('tr').data('name'), 'java');
+         });
+         $('.clone-namespace').click(function(e) {
+            e.preventDefault();
+            cloneNamespace($(this).parents('tr').data('name'));
+            $('#namespace-create-errors').html('');
+         });
+         $('.namespace-service-description').click(function(e) {
+            return confirm('This can be an expensive operation. Proceed anyway?');
+         });
       }
-      $('.use-namespace').click(function(e) {
-         e.preventDefault();
-         useNamespace($(this).parents('tr').data('name'));
-      });
-      $('.delete-namespace').click(function(e) {
-         e.preventDefault();
-         deleteNamespace($(this).parents('tr').data('name'));
-      });
-      $('.namespace-properties').click(function(e) {
-         e.preventDefault();
-         getNamespaceProperties($(this).parents('tr').data('name'));
-      });
-      $('.namespace-properties-java').click(function(e) {
-         e.preventDefault();
-         getNamespaceProperties($(this).parents('tr').data('name'), 'java');
-      });
-      $('.clone-namespace').click(function(e) {
-         e.preventDefault();
-         cloneNamespace($(this).parents('tr').data('name'));
-         $('#namespace-create-errors').html('');
-      });
-      $('.namespace-service-description').click(function(e) {
-         return confirm('This can be an expensive operation. Proceed anyway?');
-      });
-      NAMESPACES_READY = true;
-   });
-}
-
-// waits for namespaces to be loaded, then tries to use the supplied namespace
-function selectNamespace(name) {
-   if(!NAMESPACES_READY) {
-      setTimeout(function() { selectNamespace(name); }, 10);
-   } else {
-      useNamespace(name);
-   }
-}
-
-// waits for default namespace to be loaded, then uses it
-function selectDefaultNamespace() {
-   if(!DEFAULT_NAMESPACE_READY) {
-      setTimeout(function() { selectDefaultNamespace(); }, 10);
-   } else {
-      selectNamespace(DEFAULT_NAMESPACE);
-   }
+   };
+   $.ajax(settings);
 }
 
 function useNamespace(name) {
@@ -437,12 +424,16 @@ function createNamespace(e) {
 }
 
 function getDefaultNamespace() {
-   $.get(RO_URL_PREFIX + 'namespace?describe-each-named-graph=false&describe-default-namespace=true', function(data) {
-      // Chrome does not work with rdf\:Description, so look for Description too
-      var defaultDataset = $(data).find('rdf\\:Description, Description');
-      DEFAULT_NAMESPACE = defaultDataset.find('title')[0].textContent;
-      DEFAULT_NAMESPACE_READY = true;
-   });
+   var settings = {
+      async: false,
+      url: RO_URL_PREFIX + 'namespace?describe-each-named-graph=false&describe-default-namespace=true',
+      success: function(data) {
+         // Chrome does not work with rdf\:Description, so look for Description too
+         var defaultDataset = $(data).find('rdf\\:Description, Description');
+         DEFAULT_NAMESPACE = defaultDataset.find('title')[0].textContent;
+      }
+   };
+   $.ajax(settings);
 }
 
 
@@ -1396,12 +1387,8 @@ function updateExploreStart(data) {
 }
 
 function exploreNamespacedURI(namespace, uri, nopush) {
-   if(!NAMESPACES_READY) {
-      setTimeout(function() { exploreNamespacedURI(namespace, uri, nopush); }, 10);
-   } else {
-      selectNamespace(namespace);
-      explore(uri, nopush);
-   }
+   useNamespace(namespace);
+   explore(uri, nopush);
 }
 
 function explore(uri, nopush) {
@@ -1584,13 +1571,18 @@ function getHealth(e) {
 }
 
 function showHealthTab() {
-   $.get('/status?health', function(data) {
-      if(data.deployment == 'HA') {
-         $('#tab-selector a[data-target=health]').show();
-      } else {
-         $('#tab-selector a[data-target=health]').remove();
+   var settings = {
+      async: false,
+      url: '/status?health',
+      success: function(data) {
+         if(data.deployment == 'HA') {
+            $('#tab-selector a[data-target=health]').show();
+         } else {
+            $('#tab-selector a[data-target=health]').remove();
+         }
       }
-   });
+   };
+   $.ajax(settings);
 }
 
 
@@ -1665,11 +1657,11 @@ function copyObject(src) {
 /* Local storage functions */
 
 function loadLastNamespace() {
-   if(localStorage['lastNamespace']) {
-      selectNamespace(localStorage['lastNamespace']);
+   if(localStorage['lastNamespace'] && namespaceExists(localStorage['lastNamespace'])) {
+      useNamespace(localStorage['lastNamespace']);
    } else {
       // no previously selected namespace, or it doesn't exist - use the default
-      selectDefaultNamespace();
+      useNamespace(DEFAULT_NAMESPACE);
    }
 }
 
@@ -1735,24 +1727,20 @@ function setupHandlers() {
 }
 
 function startup() {
-   setupHandlers();
-
+   // load namespaces, default namespace, HA status
    useLBS(true);
-
+   getNamespaces(true);
+   getDefaultNamespace();
    showHealthTab();
 
-   getNamespaces();
-
-   getDefaultNamespace();
-
+   // complete setup
+   setupHandlers();
    createNamespaceShortcuts();
-
    createUpdateEditor();
-
    createQueryEditor();
-
    createExportOptions();
 
+   // restore last used namespace
    loadLastNamespace();
 }
 
