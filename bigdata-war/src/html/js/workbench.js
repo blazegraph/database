@@ -1654,7 +1654,7 @@ function copyObject(src) {
    // It is used to get around CodeMirror updating the default config object 
    // passed to it with the values used, which are then applied to later uses
    // of the default config object.
-   dest = {};
+   var dest = {};
    for(var key in src) {
       dest[key] = src[key];
    }
