@@ -1,9 +1,11 @@
 $(function() {
 
+'use strict';
+
 /* Global variables */
 
 // LBS/non-LBS URL prefixes
-var RW_URL_PREFIX, RO_URL_PREFIX
+var RW_URL_PREFIX, RO_URL_PREFIX;
 
 // query/update editors
 var EDITORS = {}, ERROR_LINE_MARKERS = {}, ERROR_CHARACTER_MARKERS = {};
@@ -36,7 +38,7 @@ var RDF_TYPES = {
    'trix': 'trix',
    //'xml': 'trix',
    'ttl': 'turtle'
-};               
+};
 var RDF_CONTENT_TYPES = {
    'n-quads': 'text/x-nquads',
    'n-triples': 'text/plain',
@@ -98,18 +100,18 @@ var NAMESPACE_SHORTCUTS = {
 
 // data export
 var EXPORT_EXTENSIONS = {
-   "application/rdf+xml": ['RDF/XML', 'rdf', true],
-   "application/n-triples": ['N-Triples', 'nt', true],
-   "application/x-turtle": ['Turtle', 'ttl', true],
-   "text/rdf+n3": ['N3', 'n3', true],
-   "application/trix": ['TriX', 'trix', true],
-   "application/x-trig": ['TRIG', 'trig', true],
-   "text/x-nquads": ['NQUADS', 'nq', true],
+   'application/rdf+xml': ['RDF/XML', 'rdf', true],
+   'application/n-triples': ['N-Triples', 'nt', true],
+   'application/x-turtle': ['Turtle', 'ttl', true],
+   'text/rdf+n3': ['N3', 'n3', true],
+   'application/trix': ['TriX', 'trix', true],
+   'application/x-trig': ['TRIG', 'trig', true],
+   'text/x-nquads': ['NQUADS', 'nq', true],
 
-   "text/csv": ['CSV', 'csv', false, exportCSV],
-   "application/sparql-results+json": ['JSON', 'json', false, exportJSON],
-   // "text/tab-separated-values": ['TSV', 'tsv', false, exportTSV],
-   "application/sparql-results+xml": ['XML', 'xml', false, exportXML]
+   'text/csv': ['CSV', 'csv', false, exportCSV],
+   'application/sparql-results+json': ['JSON', 'json', false, exportJSON],
+   // 'text/tab-separated-values': ['TSV', 'tsv', false, exportTSV],
+   'application/sparql-results+xml': ['XML', 'xml', false, exportXML]
 };
 
 
@@ -117,7 +119,7 @@ var EXPORT_EXTENSIONS = {
 
 function useLBS(state) {
    // allows passing in of boolean, or firing on checkbox change
-   if(typeof(state) != 'boolean') {
+   if(typeof state != 'boolean') {
       state = this.checked;
    }
    if(state) {
@@ -152,7 +154,7 @@ function submitSearch(e) {
    if(!term) {
       return;
    }
-   var query = 'select ?s ?p ?o { ?o bds:search "' + term + '" . ?s ?p ?o . }'
+   var query = 'select ?s ?p ?o { ?o bds:search "' + term + '" . ?s ?p ?o . }';
    EDITORS.query.setValue(query);
    $('#query-errors').hide();
    $('#query-form').submit();
@@ -162,7 +164,7 @@ function submitSearch(e) {
 
 /* Tab selection */
 
-function clickTab(e) {
+function clickTab() {
    showTab($(this).data('target'));
 }
 
@@ -171,7 +173,7 @@ function showTab(tab, nohash) {
    $('#' + tab + '-tab').show();
    $('#tab-selector a').removeClass();
    $('a[data-target=' + tab + ']').addClass('active');
-   if(!nohash && window.location.hash.substring(1).indexOf(tab) != 0) {
+   if(!nohash && window.location.hash.substring(1).indexOf(tab) !== 0) {
       window.location.hash = tab;
    }
    if(EDITORS[tab]) {
@@ -216,12 +218,11 @@ function getNamespaces(synchronous) {
       success: function(data) {
          $('#namespaces-list').empty();
          var rdf = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#';
-         var namespaces = namespaces = data.getElementsByTagNameNS(rdf, 'Description')
-         for(var i=0; i<namespaces.length; i++) {
-            var title = namespaces[i].getElementsByTagName('title')[0].textContent;
-            var titleText = title == DEFAULT_NAMESPACE ? title + ' (default)' : title;
-            var url = namespaces[i].getElementsByTagName('sparqlEndpoint')[0].getAttributeNS(rdf, 'resource');
-            var use;
+         var namespaces = data.getElementsByTagNameNS(rdf, 'Description');
+         var i, title, titleText, use;
+         for(i=0; i<namespaces.length; i++) {
+            title = namespaces[i].getElementsByTagName('title')[0].textContent;
+            titleText = title == DEFAULT_NAMESPACE ? title + ' (default)' : title;
             if(title == NAMESPACE) {
                use = 'In use';
             } else {
@@ -250,7 +251,7 @@ function getNamespaces(synchronous) {
             cloneNamespace($(this).parents('tr').data('name'));
             $('#namespace-create-errors').html('');
          });
-         $('.namespace-service-description').click(function(e) {
+         $('.namespace-service-description').click(function() {
             return confirm('This can be an expensive operation. Proceed anyway?');
          });
       }
@@ -265,7 +266,7 @@ function useNamespace(name) {
    $('#current-namespace').html(name);
    NAMESPACE = name;
    getNamespaces();
-   localStorage['lastNamespace'] = name;
+   localStorage.lastNamespace = name;
 }
 
 function deleteNamespace(namespace) {
@@ -277,7 +278,7 @@ function deleteNamespace(namespace) {
 
    if(confirm('Are you sure you want to delete the namespace ' + namespace + '?')) {
       if(namespace == NAMESPACE) {
-         // FIXME: what is the desired behaviour when deleting the current namespace?
+         useNamespace(DEFAULT_NAMESPACE);
       }
       var url = RW_URL_PREFIX + 'namespace/' + namespace;
       var settings = {
@@ -343,11 +344,11 @@ function cloneNamespace(namespace) {
 }
 
 function namespaceExists(name) {
-   return $('#namespaces-list tr[data-name=' + name + ']').length != 0;
+   return $('#namespaces-list tr[data-name=' + name + ']').length !== 0;
 }
 
 function validateNamespaceOptions() {
-   var errors = [];
+   var errors = [], i;
    var name = $('#new-namespace-name').val().trim();
    if(!name) {
       errors.push('Enter a name');
@@ -359,10 +360,10 @@ function validateNamespaceOptions() {
       errors.push('Inference is incompatible with quads mode');
    }
    $('#namespace-create-errors').html('');
-   for(var i=0; i<errors.length; i++) {
+   for(i=0; i<errors.length; i++) {
       $('#namespace-create-errors').append('<li>' + errors[i] + '</li>');
    }
-   return errors.length == 0;
+   return errors.length === 0;
 }
 
 function changeNamespaceMode() {
@@ -408,7 +409,7 @@ function createNamespace(e) {
 
    // TODO: allow for other options to be specified
    var data = '<?xml version="1.0" encoding="UTF-8" standalone="no"?>\n<!DOCTYPE properties SYSTEM "http://java.sun.com/dtd/properties.dtd">\n<properties>\n';
-   for(key in NAMESPACE_PARAMS) {
+   for(var key in NAMESPACE_PARAMS) {
       data += '<entry key="' + NAMESPACE_PARAMS[key] + '">' + params[key] + '</entry>\n';
    }
    data += '</properties>';
@@ -500,16 +501,16 @@ function handleFile(files) {
       alert('File too large, enter local path to file');
       EDITORS.update.setValue('/path/to/' + f.name);
       setType('path');
-      EDITORS.update.setOption('readOnly', false)
+      EDITORS.update.setOption('readOnly', false);
       $('#large-file-message, #clear-file').hide();
    } else {
       var fr = new FileReader();
       fr.onload = function(e) {
          if(f.size > 10240) {
             // do not use textarea
-            EDITORS.update.setOption('readOnly', true)
+            EDITORS.update.setOption('readOnly', true);
             $('#filename').html(f.name);
-            $('#large-file-message, #clear-file').show()
+            $('#large-file-message, #clear-file').show();
             EDITORS.update.setValue('');
             FILE_CONTENTS = e.target.result;
          } else {
@@ -527,8 +528,8 @@ function clearFile(e) {
    if(e) {
       e.preventDefault();
    }
-   $('#update-box').prop('disabled', false)
-   $('#large-file-message, #clear-file').hide()
+   $('#update-box').prop('disabled', false);
+   $('#large-file-message, #clear-file').hide();
    FILE_CONTENTS = null;
 }
 
@@ -574,7 +575,7 @@ function identify(text, considerPath) {
 function handlePaste(e) {   
    // if the input is currently empty, try to identify the pasted content
    var that = this;
-   if(this.value == '') {
+   if(this.value === '') {
       setTimeout(function() { setType(identify(that.value, true)); }, 10);
    } 
 }
@@ -627,17 +628,17 @@ function submitUpdate(e) {
 
    try {
       e.preventDefault();
-   } catch(e) {}
+   } catch(ex) {}
 
    $('#update-response').show();
 
    var url = RW_URL_PREFIX + 'namespace/' + NAMESPACE + '/sparql';
    var settings = {
       type: 'POST',
-      data: FILE_CONTENTS == null ? EDITORS.update.getValue() : FILE_CONTENTS,
+      data: FILE_CONTENTS === null ? EDITORS.update.getValue() : FILE_CONTENTS,
       success: updateResponseXML,
       error: updateResponseError
-   }
+   };
 
    // determine action based on type
    switch($('#update-type').val()) {
@@ -650,7 +651,7 @@ function submitUpdate(e) {
                .append($('<input name="update">').val(settings.data))
                .append('<input name="monitor" value="true">');
             if($('#update-analytic').is(':checked')) {
-               form.append('<input name="analytic" value="true">')
+               form.append('<input name="analytic" value="true">');
             }
             form.appendTo($('body'));
             form.submit();
@@ -706,8 +707,8 @@ function updateResponseHTML(data) {
 }
 
 function updateResponseXML(data) {
-   var modified = data.childNodes[0].attributes['modified'].value;
-   var milliseconds = data.childNodes[0].attributes['milliseconds'].value;
+   var modified = data.childNodes[0].attributes.modified.value;
+   var milliseconds = data.childNodes[0].attributes.milliseconds.value;
    $('#update-response, #update-clear-container').show();
    $('#update-response iframe').attr('src', 'about:blank').hide();
    $('#update-response pre').text('Modified: ' + modified + '\nMilliseconds: ' + milliseconds);
@@ -757,7 +758,7 @@ function loadHistory(e) {
 function deleteHistoryRow(e) {
    e.preventDefault();
    $(this).parents('tr').remove();
-   if($('#query-history tbody tr').length == 0) {
+   if($('#query-history tbody tr').length === 0) {
       $('#query-history').hide();
    }
 }
@@ -765,14 +766,14 @@ function deleteHistoryRow(e) {
 function submitQuery(e) {
    try {
       e.preventDefault();
-   } catch(e) {}
+   } catch(ex) {}
 
    // transfer CodeMirror content to textarea
    EDITORS.query.save();
 
    // do nothing if query is empty
    var query = $('#query-box').val();
-   if(query.trim() == '') {
+   if(query.trim() === '') {
       return;
    }
 
@@ -802,7 +803,7 @@ function submitQuery(e) {
       a.html(a.html().replace(/\n/g, '<br>'));
       row.append('<td class="query-results">...</td>');
       row.append('<td class="query-execution-time">...</td>');
-      row.append('<td class="query-delete"><a href="#">X</a></td>')
+      row.append('<td class="query-delete"><a href="#">X</a></td>');
    }
 
    $('#query-history').show();
@@ -814,7 +815,7 @@ function submitQuery(e) {
       headers: { 'Accept': 'application/sparql-results+json, application/rdf+xml' },
       success: showQueryResults,
       error: queryResultsError
-   }
+   };
 
    $('#query-response').show().html('Query running...');
    $('#query-pagination').hide();
@@ -864,7 +865,7 @@ function updateExportFileExtension() {
 function queryExport() {
    var dataType = $('#export-format').val();
    var filename = $('#export-filename').val();
-   if(filename == '') {
+   if(filename === '') {
       filename = 'export';
    }
    filename += '.' + EXPORT_EXTENSIONS[dataType][1];
@@ -984,14 +985,15 @@ function showQueryResults(data) {
    $('#query-export-rdf').hide();
    $('#query-response, #query-pagination, #query-export-container').show();
    var table = $('<table>').appendTo($('#query-response'));
+   var i, tr;
    if(this.dataTypes[1] == 'xml') {
       // RDF
       table.append($('<thead><tr><td>s</td><td>p</td><td>o</td></tr></thead>'));
       var rows = $(data).find('Description');
-      for(var i=0; i<rows.length; i++) {
+      for(i=0; i<rows.length; i++) {
          // FIXME: are about and nodeID the only possible attributes here?
          var s = rows[i].attributes['rdf:about'];
-         if(typeof(s) == 'undefined') {
+         if(typeof s == 'undefined') {
             s = rows[i].attributes['rdf:nodeID'];
          }
          s = s.textContent;
@@ -999,12 +1001,12 @@ function showQueryResults(data) {
             var p = rows[i].children[j].tagName;
             var o = rows[i].children[j].attributes['rdf:resource'];
             // FIXME: is this the correct behaviour?
-            if(typeof(o) == 'undefined') {
+            if(typeof o == 'undefined') {
                o = rows[i].children[j].textContent;
             } else {
                o = o.textContent;
             }
-            var tr = $('<tr><td>' + (j == 0 ? s : '') + '</td><td>' + p + '</td><td>' + o + '</td>');
+            tr = $('<tr><td>' + (j === 0 ? s : '') + '</td><td>' + p + '</td><td>' + o + '</td>');
             table.append(tr);
          }
       }
@@ -1014,7 +1016,7 @@ function showQueryResults(data) {
       // save data for export and pagination
       QUERY_RESULTS = data;
 
-      if(typeof(data.boolean) != 'undefined') {
+      if(typeof data.boolean != 'undefined') {
          // ASK query
          table.append('<tr><td>' + data.boolean + '</td></tr>').addClass('boolean');
          updateResultCountAndExecutionTime('' + data.boolean);
@@ -1027,7 +1029,7 @@ function showQueryResults(data) {
          isRDF = true;
       } else if(data.head.vars.length == 4 && data.head.vars[0] == 's' && data.head.vars[1] == 'p' && data.head.vars[2] == 'o' && data.head.vars[3] == 'c') {
          // see if c is used or not
-         for(var i=0; i<data.results.bindings.length; i++) {
+         for(i=0; i<data.results.bindings.length; i++) {
             if('c' in data.results.bindings[i]) {
                isRDF = false;
                break;
@@ -1051,8 +1053,8 @@ function showQueryResults(data) {
 
       // put query variables in table header
       var thead = $('<thead>').appendTo(table);
-      var tr = $('<tr>');
-      for(var i=0; i<data.head.vars.length; i++) {
+      tr = $('<tr>');
+      for(i=0; i<data.head.vars.length; i++) {
          tr.append('<th>' + data.head.vars[i] + '</th>');
       }
       thead.append(tr);
@@ -1130,7 +1132,7 @@ function setPageSize(n) {
       n = QUERY_RESULTS.results.bindings.length;
    } else {
       n = parseInt(n, 10);
-      if(typeof n != 'number' || n % 1 != 0 || n < 1 || n == PAGE_SIZE) {
+      if(typeof n != 'number' || n % 1 !== 0 || n < 1 || n === PAGE_SIZE) {
          return;
       }
    }
@@ -1144,7 +1146,7 @@ function setPageSize(n) {
 function handlePageSelector(e) {
    if(e.which == 13) {
       var n = parseInt(this.value, 10);
-      if(typeof n != 'number' || n % 1 != 0 || n < 1 || n > TOTAL_PAGES) {
+      if(typeof n != 'number' || n % 1 !== 0 || n < 1 || n > TOTAL_PAGES) {
          this.value = CURRENT_PAGE;
       } else {
          showPage(n);
@@ -1153,7 +1155,7 @@ function handlePageSelector(e) {
 }
 
 function showPage(n) {
-   if(typeof n != 'number' || n % 1 != 0 || n < 1 || n > TOTAL_PAGES) {
+   if(typeof n != 'number' || n % 1 !== 0 || n < 1 || n > TOTAL_PAGES) {
       return;
    }
 
@@ -1168,27 +1170,28 @@ function showPage(n) {
 
    // add matching bindings
    var table = $('#query-response table');
+   var text, tdData;
    for(var i=start; i<end; i++) {
          var tr = $('<tr>');
          for(var j=0; j<QUERY_RESULTS.head.vars.length; j++) {
             if(QUERY_RESULTS.head.vars[j] in QUERY_RESULTS.results.bindings[i]) {
                var binding = QUERY_RESULTS.results.bindings[i][QUERY_RESULTS.head.vars[j]];
                if(binding.type == 'sid') {
-                  var text = getSID(binding);
+                  text = getSID(binding);
                } else {
-                  var text = binding.value;
+                  text = binding.value;
                   if(binding.type == 'uri') {
                      text = abbreviate(text);
                   }
                }
                linkText = escapeHTML(text).replace(/\n/g, '<br>');
                if(binding.type == 'typed-literal') {
-                  var tdData = ' class="literal" data-datatype="' + binding.datatype + '"';
+                  tdData = ' class="literal" data-datatype="' + binding.datatype + '"';
                } else {
                   if(binding.type == 'uri' || binding.type == 'sid') {
                      text = '<a href="' + buildExploreHash(text) + '">' + linkText + '</a>';
                   }
-                  var tdData = ' class="' + binding.type + '"';
+                  tdData = ' class="' + binding.type + '"';
                   if(binding['xml:lang']) {
                      tdData += ' data-lang="' + binding['xml:lang'] + '"';
                   }
@@ -1259,6 +1262,7 @@ function loadURI(target) {
    var re = /<< *([^ ]+) +([^ ]+) +([^ ]+) *>>/;
    var vertex = !target.match(re);
 
+   // jshint multistr:true
    var vertexQuery = '\
 select ?col1 ?col2 ?incoming (count(?star) as ?star) {\n\
   bind (URI as ?explore ) .\n\
@@ -1303,10 +1307,11 @@ where {\n\
 }\n\
 group by ?col1 ?col2 ?incoming';
 
+   var query;
    if(vertex) {
-      var query = vertexQuery.replace('URI', target);
+      query = vertexQuery.replace('URI', target);
    } else {
-      var query = edgeQuery.replace('SID', target);
+      query = edgeQuery.replace('SID', target);
    }
    var settings = {
       type: 'POST',
@@ -1329,10 +1334,11 @@ function updateExploreStart(data) {
    // go through each binding, adding it to the appropriate table
    $.each(data.results.bindings, function(i, binding) {
       var cols = [binding.col1, binding.col2].map(function(col) {
+         var uri;
          if(col.type == 'sid') {
-            var uri = getSID(col);
+            uri = getSID(col);
          } else {
-            var uri = col.value;
+            uri = col.value;
             if(col.type == 'uri') {
                uri = abbreviate(uri);
             }
@@ -1345,10 +1351,11 @@ function updateExploreStart(data) {
       });
       var star = parseInt(binding.star.value);
       if(star > 0) {
+         var sid;
          if(binding.incoming.value == 'true') {
-            var sid = '<< <' +  binding.col1.value + '> <' + binding.col2.value + '> ' + $('#explore-form input[type=text]').val() + ' >>';
+            sid = '<< <' +  binding.col1.value + '> <' + binding.col2.value + '> ' + $('#explore-form input[type=text]').val() + ' >>';
          } else {
-            var sid = '<< ' + $('#explore-form input[type=text]').val() + ' <' +  binding.col1.value + '> <' + binding.col2.value + '> >>';
+            sid = '<< ' + $('#explore-form input[type=text]').val() + ' <' +  binding.col1.value + '> <' + binding.col2.value + '> >>';
          }
          star = '<a href="' + buildExploreHash(sid) + '"><< * (' + star + ') >></a>';
       } else {
@@ -1372,7 +1379,7 @@ function updateExploreStart(data) {
    var sections = {incoming: 'Incoming Links', outgoing: 'Outgoing Links', attributes: 'Attributes'};
    for(var k in sections) {
       var id = '#explore-' + k;
-      if($(id + ' table tr').length == 0) {
+      if($(id + ' table tr').length === 0) {
          $(id).html('No ' + sections[k]);
       } else {
          $(id).prepend('<h1>' + sections[k] + '</h1>');
@@ -1480,10 +1487,11 @@ function showQueries(details) {
          var sparqlContainer = form.next().next();
          var sparql = sparqlContainer.html();
 
+         var queryDetails;
          if(details) {
-            var queryDetails = $('<div>').append(sparqlContainer.nextUntil('h1')).html();
+            queryDetails = $('<div>').append(sparqlContainer.nextUntil('h1')).html();
          } else {
-            var queryDetails = '<a href="#">Details</a>';
+            queryDetails = '<a href="#">Details</a>';
          }
 
          // got all data, create a li for each query
@@ -1567,7 +1575,7 @@ function getHealth(e) {
          container.addClass('box health-' + health);
          container.appendTo($('#health-services'));
       }
-   })
+   });
 }
 
 function showHealthTab() {
@@ -1589,7 +1597,7 @@ function showHealthTab() {
 /* Performance */
 
 function loadPerformance(path) {
-   if(typeof(path) == 'undefined') {
+   if(typeof path == 'undefined') {
       path = '';
    }
    $.get(RO_URL_PREFIX + 'counters?' + path, function(data) {
@@ -1604,13 +1612,13 @@ function loadPerformance(path) {
 /* Utility functions */
 
 function getSID(binding) {
-   return '<<\n ' + abbreviate(binding.value['s'].value) + '\n ' + abbreviate(binding.value['p'].value) + '\n ' + abbreviate(binding.value['o'].value) + '\n>>';
+   return '<<\n ' + abbreviate(binding.value.s.value) + '\n ' + abbreviate(binding.value.p.value) + '\n ' + abbreviate(binding.value.o.value) + '\n>>';
 }
 
 function abbreviate(uri) {
    for(var nsGroup in NAMESPACE_SHORTCUTS) {
       for(var ns in NAMESPACE_SHORTCUTS[nsGroup]) {
-         if(uri.indexOf(NAMESPACE_SHORTCUTS[nsGroup][ns]) == 0) {
+         if(uri.indexOf(NAMESPACE_SHORTCUTS[nsGroup][ns]) === 0) {
             return uri.replace(NAMESPACE_SHORTCUTS[nsGroup][ns], ns + ':');
          }
       }
@@ -1657,8 +1665,8 @@ function copyObject(src) {
 /* Local storage functions */
 
 function loadLastNamespace() {
-   if(localStorage['lastNamespace'] && namespaceExists(localStorage['lastNamespace'])) {
-      useNamespace(localStorage['lastNamespace']);
+   if(localStorage.lastNamespace && namespaceExists(localStorage.lastNamespace)) {
+      useNamespace(localStorage.lastNamespace);
    } else {
       // no previously selected namespace, or it doesn't exist - use the default
       useNamespace(DEFAULT_NAMESPACE);
@@ -1670,6 +1678,7 @@ function loadLastNamespace() {
 
 function setupHandlers() {
    // debug to access closure variables
+   // jshint debug:true
    $('html, textarea, select').bind('keydown', 'ctrl+d', function() { debugger; });
 
    $('.use-lbs').change(useLBS);
@@ -1707,7 +1716,7 @@ function setupHandlers() {
    $('#query-explain').change(handleExplain);
    $('#query-details').change(handleDetails);
    $('#query-history').on('click', '.query a', loadHistory);
-   $('#query-history').on('click', '.query-delete a', deleteHistoryRow)
+   $('#query-history').on('click', '.query-delete a', deleteHistoryRow);
    $('#query-response-clear').click(clearQueryResponse);
    $('#query-export').click(showQueryExportModal);
    $('#query-download').click(queryExport);
