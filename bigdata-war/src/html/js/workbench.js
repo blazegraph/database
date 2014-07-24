@@ -259,14 +259,18 @@ function getNamespaces(synchronous) {
    $.ajax(settings);
 }
 
-function useNamespace(name) {
-   if(!namespaceExists(name)) {
+function useNamespace(name, leaveLast) {
+   if(!namespaceExists(name) || name === NAMESPACE) {
       return;
    }
    $('#current-namespace').html(name);
    NAMESPACE = name;
    getNamespaces();
-   localStorage.lastNamespace = name;
+   // this is for loading the last explored URI, which might otherwise
+   // overwrite the last used namespace
+   if(!leaveLast) {
+      localStorage.lastNamespace = name;
+   }
 }
 
 function deleteNamespace(namespace) {
@@ -1067,7 +1071,7 @@ function showQueryResults(data) {
 
       $('#query-response a').click(function(e) {
          e.preventDefault();
-         explore(this.textContent);
+         explore(NAMESPACE, this.textContent);
       });
    }
 }
@@ -1170,7 +1174,7 @@ function showPage(n) {
 
    // add matching bindings
    var table = $('#query-response table');
-   var text, tdData;
+   var text, tdData, linkText;
    for(var i=start; i<end; i++) {
          var tr = $('<tr>');
          for(var j=0; j<QUERY_RESULTS.head.vars.length; j++) {
@@ -1389,22 +1393,22 @@ function updateExploreStart(data) {
    $('#explore-results a').click(function(e) {
       e.preventDefault();
       var components = parseHash(this.hash);
-      exploreNamespacedURI(components[2], components[3]);
+      explore(components[2], components[3]);
    });
 }
 
-function exploreNamespacedURI(namespace, uri, nopush) {
-   useNamespace(namespace);
-   explore(uri, nopush);
-}
-
-function explore(uri, nopush) {
+function explore(namespace, uri, noPush, loadLast) {
+   useNamespace(namespace, loadLast);
    $('#explore-form input[type=text]').val(uri);
    $('#explore-form').submit();
-   showTab('explore', true);
-   if(!nopush) {
+   if(!loadLast) {
+      showTab('explore', true);
+   }
+   if(!noPush) {
       history.pushState(null, null, '#explore:' + NAMESPACE + ':' + uri);
    }
+   localStorage.lastExploreNamespace = namespace;
+   localStorage.lastExploreURI = uri;
 }
 
 function parseHash(hash) {
@@ -1420,8 +1424,8 @@ function handlePopState() {
    if(!hash) {
       $('#tab-selector a:first').click();
    } else {
-      if(hash[1] == 'explore') {
-         exploreNamespacedURI(hash[2], hash[3], true);
+      if(hash[1] == 'explore' && typeof hash[2] !== 'undefined') {
+         explore(hash[2], hash[3], true);
       } else {
          $('a[data-target=' + hash[1] + ']').click();
       }
@@ -1673,6 +1677,12 @@ function loadLastNamespace() {
    }
 }
 
+function loadLastExplore() {
+   if(localStorage.lastExploreURI) {
+      explore(localStorage.lastExploreNamespace, localStorage.lastExploreURI, true, true);
+   }
+}
+
 
 /* Startup functions */
 
@@ -1749,7 +1759,8 @@ function startup() {
    createQueryEditor();
    createExportOptions();
 
-   // restore last used namespace
+   // restore last used namespace and explored URI
+   loadLastExplore();
    loadLastNamespace();
 }
 
