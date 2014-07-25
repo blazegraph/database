@@ -759,12 +759,51 @@ function loadHistory(e) {
    EDITORS.query.focus();
 }
 
+function addQueryHistoryRow(time, query, results, executionTime) {
+   var row = $('<tr>').prependTo($('#query-history tbody'));
+   row.append('<td class="query-time">' + time + '</td>');
+   var cell = $('<td class="query">').appendTo(row);
+   var a = $('<a href="#">').appendTo(cell);
+   a.text(query);
+   a.html(a.html().replace(/\n/g, '<br>'));
+   row.append('<td class="query-results">' + results + '</td>');
+   row.append('<td class="query-execution-time">' + executionTime + '</td>');
+   row.append('<td class="query-delete"><a href="#">X</a></td>');
+}
+
+function storeQueryHistory() {
+   // clear existing store
+   for(var i=0; i<localStorage.historyCount; i++) {
+      localStorage.removeItem('history.time.' + i);
+      localStorage.removeItem('history.query.' + i);
+      localStorage.removeItem('history.results.' + i);
+      localStorage.removeItem('history.executionTime.' + i);
+   }
+
+   // output each current row
+   $('#query-history tbody tr').each(function(i, el) {
+      localStorage['history.time.' + i] = $(el).find('.query-time').html();
+      localStorage['history.query.' + i] = $(el).find('.query a')[0].innerText;
+      localStorage['history.results.' + i] = $(el).find('.query-results').html();
+      localStorage['history.executionTime.' + i] = $(el).find('.query-execution-time').html();
+   });
+   
+   localStorage.historyCount = $('#query-history tbody tr').length;
+}
+
 function deleteHistoryRow(e) {
    e.preventDefault();
    $(this).parents('tr').remove();
    if($('#query-history tbody tr').length === 0) {
       $('#query-history').hide();
    }
+   storeQueryHistory();
+}
+
+function clearHistory(e) {
+   $('#query-history tbody tr').remove();
+   $('#query-history').hide();
+   storeQueryHistory();
 }
 
 function submitQuery(e) {
@@ -798,17 +837,10 @@ function submitQuery(e) {
    });
 
    if(!queryExists) {
-      // add this query to the history
-      var row = $('<tr>').prependTo($('#query-history tbody'));
-      row.append('<td class="query-time">' + new Date().toISOString() + '</td>');
-      var cell = $('<td class="query">').appendTo(row);
-      var a = $('<a href="#">').appendTo(cell);
-      a.text(query);
-      a.html(a.html().replace(/\n/g, '<br>'));
-      row.append('<td class="query-results">...</td>');
-      row.append('<td class="query-execution-time">...</td>');
-      row.append('<td class="query-delete"><a href="#">X</a></td>');
+      addQueryHistoryRow(new Date().toISOString(), query, '...', '...', true);
    }
+
+   storeQueryHistory();
 
    $('#query-history').show();
 
@@ -982,6 +1014,8 @@ function updateResultCountAndExecutionTime(count) {
    }
    executionTime += ms + 'ms';
    $('#query-history tbody tr:first td.query-execution-time').html(executionTime);
+
+   storeQueryHistory();
 }
 
 function showQueryResults(data) {
@@ -1683,6 +1717,18 @@ function loadLastExplore() {
    }
 }
 
+function loadQueryHistory() {
+   if(typeof localStorage.historyCount === 'undefined') {
+      localStorage.historyCount = 0;
+   } else {
+      for(var i=localStorage.historyCount - 1; i>=0; i--) {
+         addQueryHistoryRow(localStorage['history.time.' + i], localStorage['history.query.' + i],
+            localStorage['history.results.' + i], localStorage['history.executionTime.' + i], false);
+      }
+      $('#query-history').show();
+   }
+}
+
 
 /* Startup functions */
 
@@ -1727,6 +1773,7 @@ function setupHandlers() {
    $('#query-details').change(handleDetails);
    $('#query-history').on('click', '.query a', loadHistory);
    $('#query-history').on('click', '.query-delete a', deleteHistoryRow);
+   $('#query-history-clear').click(clearHistory);
    $('#query-response-clear').click(clearQueryResponse);
    $('#query-export').click(showQueryExportModal);
    $('#query-download').click(queryExport);
@@ -1759,9 +1806,10 @@ function startup() {
    createQueryEditor();
    createExportOptions();
 
-   // restore last used namespace and explored URI
+   // restore last used namespace, last explored URI and query history
    loadLastExplore();
    loadLastNamespace();
+   loadQueryHistory();
 }
 
 startup();
