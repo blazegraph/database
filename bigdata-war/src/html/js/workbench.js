@@ -1732,7 +1732,9 @@ function loadQueryHistory() {
          addQueryHistoryRow(localStorage['history.time.' + i], localStorage['history.query.' + i],
             localStorage['history.results.' + i], localStorage['history.executionTime.' + i], false);
       }
-      $('#query-history').show();
+      if(localStorage.historyCount > 0) {
+         $('#query-history').show();
+      }
    }
 }
 
