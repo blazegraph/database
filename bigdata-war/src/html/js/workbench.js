@@ -1142,8 +1142,8 @@ function highlightError(description, pane) {
       // highlight character at error position
       var line = match[1] - 1;
       var character = match[2] - 1;
-      ERROR_LINE_MARKERS[pane] = EDITORS.query.doc.markText({line: line, ch: 0}, {line: line}, {className: 'error-line'});
-      ERROR_CHARACTER_MARKERS[pane] = EDITORS.query.doc.markText({line: line, ch: character}, {line: line, ch: character + 1}, {className: 'error-character'});
+      ERROR_LINE_MARKERS[pane] = EDITORS[pane].doc.markText({line: line, ch: 0}, {line: line}, {className: 'error-line'});
+      ERROR_CHARACTER_MARKERS[pane] = EDITORS[pane].doc.markText({line: line, ch: character}, {line: line, ch: character + 1}, {className: 'error-character'});
    }
 }
 
