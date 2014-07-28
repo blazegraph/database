@@ -1116,8 +1116,15 @@ function showQueryExplanation(data) {
 
 function queryResultsError(jqXHR, textStatus, errorThrown) {
    $('#query-response, #query-export-container').show();
-   $('#query-response').text('Error! ' + textStatus + ' ' + jqXHR.responseText);
-   highlightError(jqXHR.responseText, 'query');
+   var message = 'ERROR: ';
+   if(jqXHR.status === 0) {
+      message += 'Could not contact server';
+   } else {
+      var response = $('<div>').append(jqXHR.responseText);
+      message += response.find('pre').text();
+      highlightError(jqXHR.responseText, 'query');
+   }
+   $('#query-response').text(message);
 }
 
 function highlightError(description, pane) {
