@@ -21,7 +21,7 @@ var RDF_MODES = {
    'json': 'json',
    'turtle': 'turtle'
 };
-var FILE_CONTENTS;
+var FILE_CONTENTS = null;
 // file/update editor type handling
 // .xml is used for both RDF and TriX, assume it's RDF
 // We could check the parent element to see which it is
@@ -639,7 +639,7 @@ function submitUpdate(e) {
    var url = RW_URL_PREFIX + 'namespace/' + NAMESPACE + '/sparql';
    var settings = {
       type: 'POST',
-      data: FILE_CONTENTS === null ? EDITORS.update.getValue() : FILE_CONTENTS,
+      data: FILE_CONTENTS == null ? EDITORS.update.getValue() : FILE_CONTENTS,
       success: updateResponseXML,
       error: updateResponseError
    };
@@ -661,7 +661,7 @@ function submitUpdate(e) {
             form.submit();
             $('#update-monitor-form').remove();
             $('#update-response iframe, #update-clear-container').show();
-            $('#update-response pre').hide();
+            $('#update-response span').hide();
             return;
          }
          settings.data = 'update=' + encodeURIComponent(settings.data);
@@ -687,14 +687,14 @@ function submitUpdate(e) {
          break;
    }
 
-   $('#update-response pre').show().html('Running update...');   
+   $('#update-response span').show().html('Running update...');   
 
    $.ajax(url, settings);
 }
 
 function clearUpdateOutput() {
    $('#update-response, #update-clear-container').hide();
-   $('#update-response pre').text('');
+   $('#update-response span').text('');
    $('#update-response iframe').attr('src', 'about:blank');
 }
 
@@ -707,7 +707,7 @@ function toggleAdvancedFeatures(e) {
 function updateResponseHTML(data) {
    $('#update-response, #update-clear-container').show();
    $('#update-response iframe').attr('src', 'about:blank').hide();
-   $('#update-response pre').html(data);
+   $('#update-response span').html(data);
 }
 
 function updateResponseXML(data) {
@@ -715,14 +715,23 @@ function updateResponseXML(data) {
    var milliseconds = data.childNodes[0].attributes.milliseconds.value;
    $('#update-response, #update-clear-container').show();
    $('#update-response iframe').attr('src', 'about:blank').hide();
-   $('#update-response pre').text('Modified: ' + modified + '\nMilliseconds: ' + milliseconds);
+   $('#update-response span').text('Modified: ' + modified + '\nMilliseconds: ' + milliseconds);
 }
 
 function updateResponseError(jqXHR, textStatus, errorThrown) {
    $('#update-response, #update-clear-container').show();
    $('#update-response iframe').attr('src', 'about:blank').hide();
-   $('#update-response pre').text('Error! ' + textStatus + ' ' + jqXHR.statusText);
-   highlightError(jqXHR.statusText, 'update');
+
+   var message = 'ERROR: ';
+   if(jqXHR.status === 0) {
+      message += 'Could not contact server';
+   } else {
+      var response = $('<div>').append(jqXHR.responseText);
+      message += response.find('pre').text();
+      highlightError(jqXHR.responseText, 'update');
+   }
+
+   $('#update-response span').text(message);
 }
 
 
@@ -787,7 +796,7 @@ function storeQueryHistory() {
       localStorage['history.results.' + i] = $(el).find('.query-results').html();
       localStorage['history.executionTime.' + i] = $(el).find('.query-execution-time').html();
    });
-   
+
    localStorage.historyCount = $('#query-history tbody tr').length;
 }
 
