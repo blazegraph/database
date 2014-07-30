@@ -726,8 +726,11 @@ function updateResponseError(jqXHR, textStatus, errorThrown) {
    if(jqXHR.status === 0) {
       message += 'Could not contact server';
    } else {
-      var response = $('<div>').append(jqXHR.responseText);
-      message += response.find('pre').text();
+      if(response.find('pre').length == 0) {
+         message += response.text();
+      } else {
+         message += response.find('pre').text();
+      }
       highlightError(jqXHR.responseText, 'update');
    }
 
@@ -1130,7 +1133,11 @@ function queryResultsError(jqXHR, textStatus, errorThrown) {
       message += 'Could not contact server';
    } else {
       var response = $('<div>').append(jqXHR.responseText);
-      message += response.find('pre').text();
+      if(response.find('pre').length == 0) {
+         message += response.text();
+      } else {
+         message += response.find('pre').text();
+      }
       highlightError(jqXHR.responseText, 'query');
    }
    $('#query-response').text(message);
