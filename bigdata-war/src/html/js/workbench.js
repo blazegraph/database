@@ -482,6 +482,7 @@ function createNamespaceShortcut() {
 
    // add namespace & URI, and clear form & error message
    NAMESPACE_SHORTCUTS.Custom[ns] = uri;
+   saveCustomNamespaces();
    $('#custom-namespace-modal p').html('');
    $(this).siblings('input').val('');
    populateNamespaceShortcuts();
@@ -510,9 +511,19 @@ function deleteCustomNamespace(e) {
    if(confirm('Delete this namespace shortcut?')) {
       delete NAMESPACE_SHORTCUTS.Custom[$(this).data('ns')];
       populateNamespaceShortcuts();
+      saveCustomNamespaces();
    }
 }
 
+function saveCustomNamespaces() {
+   localStorage.customNamespaces = JSON.stringify(NAMESPACE_SHORTCUTS.Custom);
+}
+
+function loadCustomNamespaces() {
+   if(typeof localStorage.customNamespaces !== 'undefined') {
+      NAMESPACE_SHORTCUTS.Custom = JSON.parse(localStorage.customNamespaces);
+   }
+}
 
 /* Update */
 
@@ -1875,6 +1886,7 @@ function startup() {
    showHealthTab();
 
    // complete setup
+   loadCustomNamespaces();
    populateNamespaceShortcuts();
    createUpdateEditor();
    createQueryEditor();
