@@ -95,7 +95,8 @@ var NAMESPACE_SHORTCUTS = {
       'foaf': 'http://xmlns.com/foaf/0.1/',
       'schema': 'http://schema.org/',
       'sioc': 'http://rdfs.org/sioc/ns#'
-   }
+   },
+   'Custom': {}
 };
 
 // data export
@@ -444,28 +445,72 @@ function getDefaultNamespace() {
 
 /* Namespace shortcuts */
 
-function createNamespaceShortcuts() {
+function selectNamespace() {
+   var uri = this.value;
+   var tab = $(this).parents('.tab').attr('id').split('-')[0];
+   var current = EDITORS[tab].getValue();
+
+   if(current.indexOf(uri) == -1) {
+      var ns = $(this).find(':selected').text();
+      EDITORS[tab].setValue('prefix ' + ns + ': <' + uri + '>\n' + current);
+   }
+
+   // reselect group label
+   this.selectedIndex = 0;
+}
+
+function showCustomNamespacesModal() {
+   showModal('custom-namespace-modal');
+}
+
+function createNamespaceShortcut() {
+   var ns = $('#custom-namespace-namespace').val().trim();
+   var uri = $('#custom-namespace-uri').val().trim();
+
+   // check namespace & URI are not empty, and namespace does not already exist
+   if(ns === '' || uri === '') {
+      return;
+   }
+   for(var category in NAMESPACE_SHORTCUTS) {
+      for(var oldNS in NAMESPACE_SHORTCUTS[category]) {
+         if(ns === oldNS) {
+            $('#custom-namespace-modal p').html(ns + ' is already in use for the URI ' + NAMESPACE_SHORTCUTS[category][ns]);
+            return;
+         }
+      }
+   }
+
+   // add namespace & URI, and clear form & error message
+   NAMESPACE_SHORTCUTS.Custom[ns] = uri;
+   $('#custom-namespace-modal p').html('');
+   $(this).siblings('input').val('');
+   populateNamespaceShortcuts();
+   $(this).siblings('.modal-cancel').click();
+}
+
+function populateNamespaceShortcuts() {
+   // add namespaces to dropdowns, and add namespaces to modal to allow deletion
    $('.namespace-shortcuts').html('Namespace shortcuts: ');
+   $('#custom-namespace-modal li').remove();
    for(var category in NAMESPACE_SHORTCUTS) {
       var select = $('<select><option>' + category + '</option></select>').appendTo($('.namespace-shortcuts'));
       for(var ns in NAMESPACE_SHORTCUTS[category]) {
          select.append('<option value="' + NAMESPACE_SHORTCUTS[category][ns] + '">' + ns + '</option>');
+         if(category === 'Custom') {
+            // add custom namespaces to list for editing
+            $('#custom-namespace-modal ul').append('<li>' + ns + ' (' + NAMESPACE_SHORTCUTS[category][ns] + ') <a href="#" data-ns="' + ns + '"">Delete</a>');
+         }
       }
    }
+   var edit = $('<button>Edit</button>').appendTo($('.namespace-shortcuts'));
+}
 
-   $('.namespace-shortcuts select').change(function() {
-      var uri = this.value;
-      var tab = $(this).parents('.tab').attr('id').split('-')[0];
-      var current = EDITORS[tab].getValue();
-
-      if(current.indexOf(uri) == -1) {
-         var ns = $(this).find(':selected').text();
-         EDITORS[tab].setValue('prefix ' + ns + ': <' + uri + '>\n' + current);
-      }
-
-      // reselect group label
-      this.selectedIndex = 0;
-   });
+function deleteCustomNamespace(e) {
+   e.preventDefault();
+   if(confirm('Delete this namespace shortcut?')) {
+      delete NAMESPACE_SHORTCUTS.Custom[$(this).data('ns')];
+      populateNamespaceShortcuts();
+   }
 }
 
 
@@ -1776,6 +1821,11 @@ function setupHandlers() {
    $('#tab-selector a[data-target=health], #health-refresh').click(getHealth);
    $('#tab-selector a[data-target=performance]').click(loadPerformance);
 
+   $('.namespace-shortcuts').on('change', 'select', selectNamespace);
+   $('#custom-namespace-modal ul').on('click', 'a', deleteCustomNamespace);
+   $('#add-custom-namespace').click(createNamespaceShortcut);
+   $('.namespace-shortcuts').on('click', 'button', showCustomNamespacesModal);
+
    $('#new-namespace-mode').change(changeNamespaceMode);
    $('#namespace-create').submit(createNamespace);
 
@@ -1825,11 +1875,11 @@ function startup() {
    showHealthTab();
 
    // complete setup
-   setupHandlers();
-   createNamespaceShortcuts();
+   populateNamespaceShortcuts();
    createUpdateEditor();
    createQueryEditor();
    createExportOptions();
+   setupHandlers();
 
    // restore last used namespace, last explored URI and query history
    loadLastExplore();
