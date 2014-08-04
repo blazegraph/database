@@ -106,7 +106,7 @@ public class BigdataGraphEmbedded extends BigdataGraph implements TransactionalG
 	    return cxn.get();
 	}
 	
-	protected RepositoryConnection getReadOnlyConnection() throws Exception {
+	protected RepositoryConnection getReadConnection() throws Exception {
 	    return repo.getReadOnlyConnection();
 	}
 	

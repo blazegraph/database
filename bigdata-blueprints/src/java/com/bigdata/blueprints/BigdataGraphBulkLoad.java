@@ -70,7 +70,7 @@ public class BigdataGraphBulkLoad extends BigdataGraph
 	    return cxn;
 	}
 	
-    protected RepositoryConnection getReadOnlyConnection() throws Exception {
+    protected RepositoryConnection getReadConnection() throws Exception {
         return cxn;
     }
     
