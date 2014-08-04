@@ -100,7 +100,7 @@ public class BigdataGraphClient extends BigdataGraph {
      * Get a {@link BigdataSailRemoteRepositoryConnection}. No difference in
      * connection for remote clients.
      */
-    protected BigdataSailRemoteRepositoryConnection getReadOnlyConnection() throws Exception {
+    protected BigdataSailRemoteRepositoryConnection getReadConnection() throws Exception {
         return getWriteConnection();
     }
     

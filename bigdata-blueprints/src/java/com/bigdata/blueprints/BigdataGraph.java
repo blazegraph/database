@@ -45,6 +45,7 @@ import org.openrdf.query.GraphQueryResult;
 import org.openrdf.query.QueryLanguage;
 import org.openrdf.query.TupleQuery;
 import org.openrdf.query.TupleQueryResult;
+import org.openrdf.query.Update;
 import org.openrdf.query.parser.QueryParserUtil;
 import org.openrdf.repository.RepositoryConnection;
 import org.openrdf.repository.RepositoryResult;
@@ -153,7 +154,7 @@ public abstract class BigdataGraph implements Graph {
 	 * A read-only connection can be used for read operations without blocking
 	 * or being blocked by writers.
 	 */
-    protected abstract RepositoryConnection getReadOnlyConnection() throws Exception;
+    protected abstract RepositoryConnection getReadConnection() throws Exception;
 	
 	/**
 	 * Return a single-valued property for an edge or vertex.
@@ -176,7 +177,7 @@ public abstract class BigdataGraph implements Graph {
 		try {
 			
 			final RepositoryResult<Statement> result = 
-					getWriteConnection().getStatements(uri, prop, null, false);
+					getReadConnection().getStatements(uri, prop, null, false);
 			
 			if (result.hasNext()) {
 				
@@ -297,7 +298,7 @@ public abstract class BigdataGraph implements Graph {
 		try {
 			
 			final RepositoryResult<Statement> result = 
-					getWriteConnection().getStatements(uri, null, null, false);
+					getReadConnection().getStatements(uri, null, null, false);
 			
 			final Set<String> properties = new LinkedHashSet<String>();
 			
@@ -1201,16 +1202,16 @@ public abstract class BigdataGraph implements Graph {
 	 */
 	public BigdataGraphlet project(final String queryStr) throws Exception {
 	    
-        final String operation = 
-                QueryParserUtil.removeSPARQLQueryProlog(queryStr).toLowerCase();
-        
-        if (!operation.startsWith("construct")) {
-            throw new IllegalArgumentException("not a graph query");
-        }
+//        final String operation = 
+//                QueryParserUtil.removeSPARQLQueryProlog(queryStr).toLowerCase();
+//        
+//        if (!operation.startsWith("construct")) {
+//            throw new IllegalArgumentException("not a graph query");
+//        }
 	    
         try {
             
-            final RepositoryConnection cxn = getReadOnlyConnection();
+            final RepositoryConnection cxn = getReadConnection();
             
             try {
                 
@@ -1248,16 +1249,16 @@ public abstract class BigdataGraph implements Graph {
      */
     public BigdataSelection select(final String queryStr) throws Exception {
         
-        final String operation = 
-                QueryParserUtil.removeSPARQLQueryProlog(queryStr).toLowerCase();
-        
-        if (!operation.startsWith("select")) {
-            throw new IllegalArgumentException("not a tuple query");
-        }
+//        final String operation = 
+//                QueryParserUtil.removeSPARQLQueryProlog(queryStr).toLowerCase();
+//        
+//        if (!operation.startsWith("select")) {
+//            throw new IllegalArgumentException("not a tuple query");
+//        }
         
         try {
             
-            final RepositoryConnection cxn = getReadOnlyConnection();
+            final RepositoryConnection cxn = getReadConnection();
             
             try {
                 
@@ -1281,6 +1282,28 @@ public abstract class BigdataGraph implements Graph {
                 cxn.close();
                 
             }
+            
+        } catch (RuntimeException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+
+    }
+    
+    /**
+     * Update graph using SPARQL Update.
+     */
+    public void update(final String queryStr) throws Exception {
+        
+        try {
+            
+            final RepositoryConnection cxn = getWriteConnection();
+            
+            final Update update = 
+                    cxn.prepareUpdate(QueryLanguage.SPARQL, queryStr);
+            
+            update.execute();
             
         } catch (RuntimeException e) {
             throw e;
