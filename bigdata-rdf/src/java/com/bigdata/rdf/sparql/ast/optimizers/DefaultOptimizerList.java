@@ -139,6 +139,10 @@ public class DefaultOptimizerList extends ASTOptimizerList {
     private static final long serialVersionUID = 1L;
 
     public DefaultOptimizerList() {
+        this(true);
+    }
+
+    public DefaultOptimizerList(final boolean bottomUpEvaluation) {
 
     	/**
     	 * Converts a BDS.SEARCH_IN_SEARCH function call (inside a filter)
@@ -419,7 +423,9 @@ public class DefaultOptimizerList extends ASTOptimizerList {
          * Rewrites aspects of queries where bottom-up evaluation would produce
          * different results.
          */
-        add(new ASTBottomUpOptimizer());
+        if (bottomUpEvaluation) {
+            add(new ASTBottomUpOptimizer());
+        }
 
         /**
          * Lifts a simple optional out of the child group.
