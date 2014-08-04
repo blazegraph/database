@@ -123,6 +123,7 @@ import com.bigdata.rdf.rules.InferenceEngine;
 import com.bigdata.rdf.rules.MatchRule;
 import com.bigdata.rdf.rules.RDFJoinNexusFactory;
 import com.bigdata.rdf.rules.RuleContextEnum;
+import com.bigdata.rdf.sparql.ast.optimizers.ASTBottomUpOptimizer;
 import com.bigdata.rdf.spo.BulkCompleteConverter;
 import com.bigdata.rdf.spo.BulkFilterConverter;
 import com.bigdata.rdf.spo.ExplicitSPOFilter;
@@ -316,6 +317,11 @@ abstract public class AbstractTripleStore extends
     final private boolean constrainXXXCShards;
     
     /**
+     * @see Options#BOTTOM_UP_EVALUATION
+     */
+    final private boolean bottomUpEvaluation;
+    
+    /**
      * Return an instance of the class that is used to compute the closure of
      * the database.
      */
@@ -391,6 +397,15 @@ abstract public class AbstractTripleStore extends
     final public boolean isConstrainXXXCShards() {
         
         return constrainXXXCShards;
+        
+    }
+    
+    /**
+     * @see Options#CONSTRAIN_XXXC_SHARDS
+     */
+    final public boolean isBottomUpEvaluation() {
+        
+        return bottomUpEvaluation;
         
     }
     
@@ -1182,6 +1197,16 @@ abstract public class AbstractTripleStore extends
 
         public static String DEFAULT_HISTORY_SERVICE_MIN_RELEASE_AGE = Long
                 .toString(Long.MAX_VALUE);
+        
+        /**
+         * If this option is set to false, turn off the ASTBottomUpOptimizer.
+         * 
+         * @see {@link ASTBottomUpOptimizer}
+         */
+        public static String BOTTOM_UP_EVALUATION = AbstractTripleStore.class
+                .getName() + ".bottomUpEvaluation";
+
+        public static String DEFAULT_BOTTOM_UP_EVALUATION = "true";
 
     }
 
@@ -1404,6 +1429,10 @@ abstract public class AbstractTripleStore extends
         this.constrainXXXCShards = Boolean.valueOf(getProperty(
                 Options.CONSTRAIN_XXXC_SHARDS,
                 Options.DEFAULT_CONSTRAIN_XXXC_SHARDS)); 
+        
+        this.bottomUpEvaluation = Boolean.valueOf(getProperty(
+                Options.BOTTOM_UP_EVALUATION,
+                Options.DEFAULT_BOTTOM_UP_EVALUATION)); 
         
         /*
          * Setup namespace mapping for serialization utility methods.
