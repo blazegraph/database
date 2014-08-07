@@ -51,6 +51,7 @@ import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.vocab.BaseVocabularyDecl;
+import com.bigdata.rdf.vocab.DefaultBigdataVocabulary;
 import com.bigdata.rdf.vocab.RDFSVocabulary;
 
 /**
@@ -379,7 +380,7 @@ public class TestInlineURIs extends ProxyBigdataSailTestCase {
 
     public static final String CUSTOM_NAMESPACE = "application:id:"; 
     
-    public static class CustomVocab extends RDFSVocabulary {
+    public static class CustomVocab extends DefaultBigdataVocabulary {
         
         public CustomVocab() {
             super();
