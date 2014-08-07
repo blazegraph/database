@@ -89,6 +89,8 @@ public abstract class AbstractTestBigdataGraph extends AbstractBigdataSailTestCa
         props.setProperty(BigdataSail.Options.QUADS, "false");
         props.setProperty(BigdataSail.Options.STATEMENT_IDENTIFIERS, "false");
         
+        props.setProperty(BigdataGraph.Options.READ_FROM_WRITE_CONNECTION, "true");
+        
         return props;
         
     }
