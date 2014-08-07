@@ -332,7 +332,11 @@ public enum DTE {
          * etc. Also, the match will always be on the local name once we proof
          * the namespace.
          */
-//        if (datatype == null) {
+        
+        if (datatype == null) {
+            return null;
+        }
+        
         if (datatype.equals(XSD.IPV4)) {
             /*
              * Note: This is a bit of a rough spot in the API. There is no
