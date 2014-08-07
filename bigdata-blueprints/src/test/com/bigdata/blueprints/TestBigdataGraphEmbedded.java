@@ -24,28 +24,24 @@ package com.bigdata.blueprints;
 
 import java.io.File;
 import java.lang.reflect.Method;
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Date;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CountDownLatch;
+import java.util.Properties;
 
 import org.apache.log4j.Logger;
 
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSailRepository;
+import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
 import com.tinkerpop.blueprints.Edge;
 import com.tinkerpop.blueprints.Element;
 import com.tinkerpop.blueprints.Graph;
 import com.tinkerpop.blueprints.TestSuite;
-import com.tinkerpop.blueprints.TransactionalGraph;
 import com.tinkerpop.blueprints.TransactionalGraphTestSuite;
 import com.tinkerpop.blueprints.Vertex;
 import com.tinkerpop.blueprints.impls.GraphTest;
-import com.tinkerpop.blueprints.util.io.MockSerializable;
 import com.tinkerpop.blueprints.util.io.graphml.GraphMLReader;
 
 /**
@@ -83,17 +79,19 @@ public class TestBigdataGraphEmbedded extends AbstractTestBigdataGraph {
 //}
 
 
-//    public void testDataTypeValidationOnProperties() throws Exception {
+//    public void testAddVertexProperties() throws Exception {
 //        final BigdataGraphTest test = new BigdataGraphTest();
 //        test.stopWatch();
 //        final BigdataTestSuite testSuite = new BigdataTestSuite(test);
 //        try {
-//            testSuite.testDataTypeValidationOnProperties();
+//            testSuite.testAddVertexProperties();
 //        } finally {
 //            test.shutdown();
 //        }
 //        
 //    }
+    
+
     
     private static class BigdataTestSuite extends TestSuite {
         
@@ -101,96 +99,41 @@ public class TestBigdataGraphEmbedded extends AbstractTestBigdataGraph {
             super(graphTest);
         }
         
-        public void testDataTypeValidationOnProperties() {
-            
-            final Graph graph = graphTest.generateGraph();
-            if (graph.getFeatures().supportsElementProperties() && !graph.getFeatures().isWrapper) {
-                final Vertex vertexA = graph.addVertex(null);
-                final Vertex vertexB = graph.addVertex(null);
-                final Edge edge = graph.addEdge(null, vertexA, vertexB, graphTest.convertLabel("knows"));
+        public void testAddVertexProperties() throws Exception {
+            BigdataGraphEmbedded graph = (BigdataGraphEmbedded) graphTest.generateGraph();
+            if (graph.getFeatures().supportsVertexProperties) {
+                Vertex v1 = graph.addVertex(graphTest.convertId("1"));
+                Vertex v2 = graph.addVertex(graphTest.convertId("2"));
+                
+//                graph.commit();
+                
+                for (Vertex v : graph.getVertices()) {
+                    System.err.println(v);
+                }
 
-                trySetProperty(vertexA, "keyString", "value", graph.getFeatures().supportsStringProperty);
-                trySetProperty(edge, "keyString", "value", graph.getFeatures().supportsStringProperty);
+                System.err.println("\n"+((BigdataSailRepositoryConnection)
+                        graph.getWriteConnection()).getTripleStore().dumpStore());
+                
+                if (graph.getFeatures().supportsStringProperty) {
+                    v1.setProperty("key1", "value1");
+                    graph.commit();
+                    System.err.println("\n"+((BigdataSailRepositoryConnection)
+                            graph.getWriteConnection()).getTripleStore().dumpStore());
+                    assertEquals("value1", v1.getProperty("key1"));
+                }
 
-                trySetProperty(vertexA, "keyInteger", 100, graph.getFeatures().supportsIntegerProperty);
-                trySetProperty(edge, "keyInteger", 100, graph.getFeatures().supportsIntegerProperty);
+                if (graph.getFeatures().supportsIntegerProperty) {
+                    v1.setProperty("key2", 10);
+                    v2.setProperty("key2", 20);
 
-                trySetProperty(vertexA, "keyLong", 10000L, graph.getFeatures().supportsLongProperty);
-                trySetProperty(edge, "keyLong", 10000L, graph.getFeatures().supportsLongProperty);
-
-                trySetProperty(vertexA, "keyDouble", 100.321d, graph.getFeatures().supportsDoubleProperty);
-                trySetProperty(edge, "keyDouble", 100.321d, graph.getFeatures().supportsDoubleProperty);
-
-                trySetProperty(vertexA, "keyFloat", 100.321f, graph.getFeatures().supportsFloatProperty);
-                trySetProperty(edge, "keyFloat", 100.321f, graph.getFeatures().supportsFloatProperty);
-
-                trySetProperty(vertexA, "keyBoolean", true, graph.getFeatures().supportsBooleanProperty);
-                trySetProperty(edge, "keyBoolean", true, graph.getFeatures().supportsBooleanProperty);
-
-                System.err.println("supportsSerializableObjectProperty" + graph.getFeatures().supportsSerializableObjectProperty);
-                trySetProperty(vertexA, "keyDate", new Date(), graph.getFeatures().supportsSerializableObjectProperty);
-                trySetProperty(edge, "keyDate", new Date(), graph.getFeatures().supportsSerializableObjectProperty);
-
-                final ArrayList<String> listA = new ArrayList<String>();
-                listA.add("try1");
-                listA.add("try2");
-
-                trySetProperty(vertexA, "keyListString", listA, graph.getFeatures().supportsUniformListProperty);
-                trySetProperty(edge, "keyListString", listA, graph.getFeatures().supportsUniformListProperty);
-
-
-                tryGetProperty(vertexA, "keyListString", listA, graph.getFeatures().supportsUniformListProperty);
-                tryGetProperty(edge, "keyListString", listA, graph.getFeatures().supportsUniformListProperty);
-
-
-                final ArrayList listB = new ArrayList();
-                listB.add("try1");
-                listB.add(2);
-
-                trySetProperty(vertexA, "keyListMixed", listB, graph.getFeatures().supportsMixedListProperty);
-                trySetProperty(edge, "keyListMixed", listB, graph.getFeatures().supportsMixedListProperty);
-
-                tryGetProperty(vertexA, "keyListString", listA, graph.getFeatures().supportsMixedListProperty);
-                tryGetProperty(edge, "keyListString", listA, graph.getFeatures().supportsMixedListProperty);
-
-
-                trySetProperty(vertexA, "keyArrayString", new String[]{"try1", "try2"}, graph.getFeatures().supportsPrimitiveArrayProperty);
-                trySetProperty(edge, "keyArrayString", new String[]{"try1", "try2"}, graph.getFeatures().supportsPrimitiveArrayProperty);
-
-                trySetProperty(vertexA, "keyArrayInteger", new int[]{1, 2}, graph.getFeatures().supportsPrimitiveArrayProperty);
-                trySetProperty(edge, "keyArrayInteger", new int[]{1, 2}, graph.getFeatures().supportsPrimitiveArrayProperty);
-
-                trySetProperty(vertexA, "keyArrayLong", new long[]{1000l, 2000l}, graph.getFeatures().supportsPrimitiveArrayProperty);
-                trySetProperty(edge, "keyArrayLong", new long[]{1000l, 2000l}, graph.getFeatures().supportsPrimitiveArrayProperty);
-
-                trySetProperty(vertexA, "keyArrayFloat", new float[]{1000.321f, 2000.321f}, graph.getFeatures().supportsPrimitiveArrayProperty);
-                trySetProperty(edge, "keyArrayFloat", new float[]{1000.321f, 2000.321f}, graph.getFeatures().supportsPrimitiveArrayProperty);
-
-                trySetProperty(vertexA, "keyArrayDouble", new double[]{1000.321d, 2000.321d}, graph.getFeatures().supportsPrimitiveArrayProperty);
-                trySetProperty(edge, "keyArrayDouble", new double[]{1000.321d, 2000.321d}, graph.getFeatures().supportsPrimitiveArrayProperty);
-
-                trySetProperty(vertexA, "keyArrayBoolean", new boolean[]{false, true}, graph.getFeatures().supportsPrimitiveArrayProperty);
-                trySetProperty(edge, "keyArrayBoolean", new boolean[]{false, true}, graph.getFeatures().supportsPrimitiveArrayProperty);
-
-                trySetProperty(vertexA, "keyArrayEmpty", new int[0], graph.getFeatures().supportsPrimitiveArrayProperty);
-                trySetProperty(edge, "keyArrayEmpty", new int[0], graph.getFeatures().supportsPrimitiveArrayProperty);
-
-                final Map map = new HashMap();
-                map.put("testString", "try");
-                map.put("testInteger", "string");
-
-                trySetProperty(vertexA, "keyMap", map, graph.getFeatures().supportsMapProperty);
-                trySetProperty(edge, "keyMap", map, graph.getFeatures().supportsMapProperty);
-
-                final MockSerializable mockSerializable = new MockSerializable();
-                mockSerializable.setTestField("test");
-                trySetProperty(vertexA, "keySerializable", mockSerializable, graph.getFeatures().supportsSerializableObjectProperty);
-                trySetProperty(edge, "keySerializable", mockSerializable, graph.getFeatures().supportsSerializableObjectProperty);
+                    assertEquals(10, v1.getProperty("key2"));
+                    assertEquals(20, v2.getProperty("key2"));
+                }
 
             }
-
             graph.shutdown();
         }
+
         
         private void trySetProperty(final Element element, final String key, final Object value, final boolean allowDataType) {
             boolean exceptionTossed = false;
@@ -262,10 +205,12 @@ public class TestBigdataGraphEmbedded extends AbstractTestBigdataGraph {
 			
 			try {
 	            if (testGraphs.containsKey(key) == false) {
-	                final BigdataSail testSail = getSail();
+	                final Properties props = getProperties();
+	                final BigdataSail testSail = getSail(props);
 	                testSail.initialize();
 	                final BigdataSailRepository repo = new BigdataSailRepository(testSail);
-	                final BigdataGraphEmbedded graph = new BigdataGraphEmbedded(repo) {
+	                final BigdataGraphEmbedded graph = new BigdataGraphEmbedded(
+	                        repo, BigdataRDFFactory.INSTANCE, props) {
 	    
 	                    /**
 	                     * Test cases have weird semantics for shutdown.
