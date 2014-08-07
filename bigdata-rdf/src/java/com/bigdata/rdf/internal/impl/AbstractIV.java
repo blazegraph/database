@@ -680,7 +680,7 @@ public abstract class AbstractIV<V extends BigdataValue, T>
                 // The namespaceIV (a Vocabulary item).
                 IVUtility.encode(keyBuilder, extension.getExtensionIV());
 
-                // The inline localName (Unicode data).
+                // The inline localName (any inline literal data).
                 IVUtility.encode(keyBuilder, extension.getLocalNameIV());
 
                 return keyBuilder;
@@ -857,6 +857,9 @@ public abstract class AbstractIV<V extends BigdataValue, T>
                     .setByteLength(1/* flags */+ 1/* termCode */+ b.length);
             return keyBuilder;
         }
+//        case Extension: {
+            // handled by IPv4AddrIV.encode()
+//        }
         default:
             throw new AssertionError(toString());
         }

@@ -59,7 +59,7 @@ import com.bigdata.rdf.internal.impl.literal.XSDUnsignedIntIV;
 import com.bigdata.rdf.internal.impl.literal.XSDUnsignedLongIV;
 import com.bigdata.rdf.internal.impl.literal.XSDUnsignedShortIV;
 import com.bigdata.rdf.internal.impl.uri.FullyInlineURIIV;
-import com.bigdata.rdf.internal.impl.uri.IPAddrIV;
+import com.bigdata.rdf.internal.impl.uri.IPv4AddrIV;
 import com.bigdata.rdf.internal.impl.uri.URIExtensionIV;
 import com.bigdata.rdf.lexicon.LexiconKeyOrder;
 import com.bigdata.rdf.model.BigdataBNode;
@@ -152,7 +152,7 @@ public class LexiconConfiguration<V extends BigdataValue>
      * @see AbstractTripleStore.Options#EXTENSION_FACTORY_CLASS
      */
     private final IExtensionFactory xFactory;
-
+    
     /**
      * @see AbstractTripleStore.Options#VOCABULARY_CLASS
      */
@@ -162,6 +162,11 @@ public class LexiconConfiguration<V extends BigdataValue>
      * The value factory for the lexicon.
      */
     private final BigdataValueFactory valueFactory;
+    
+    /**
+     * The inline URI factory for the lexicon.
+     */
+    private final IInlineURIFactory uriFactory;
     
     /**
      * Mapping from the {@link IV} for the datatype URI of a registered
@@ -255,6 +260,9 @@ public class LexiconConfiguration<V extends BigdataValue>
 		sb.append(", " + AbstractTripleStore.Options.VOCABULARY_CLASS + "="
 				+ vocab.getClass().getName());
 
+        sb.append(", " + AbstractTripleStore.Options.INLINE_URI_FACTORY_CLASS + "="
+                + uriFactory.getClass().getName());
+
 		sb.append("}");
 		
     	return sb.toString();
@@ -273,7 +281,8 @@ public class LexiconConfiguration<V extends BigdataValue>
             final boolean rejectInvalidXSDValues,
             final IExtensionFactory xFactory,//
             final Vocabulary vocab,
-            final BigdataValueFactory valueFactory//
+            final BigdataValueFactory valueFactory,//
+            final IInlineURIFactory uriFactory
             ) {
 
         if (blobsThreshold < 0)
@@ -299,6 +308,7 @@ public class LexiconConfiguration<V extends BigdataValue>
         this.xFactory = xFactory;
         this.vocab = vocab;
         this.valueFactory = valueFactory;
+        this.uriFactory = uriFactory;
 
 		/*
 		 * Note: These collections are read-only so we do NOT need additional
@@ -435,24 +445,35 @@ public class LexiconConfiguration<V extends BigdataValue>
 	 * @return The inline {@link IV} -or- <code>null</code> if the {@link URI}
 	 *         can not be inlined into the statement indices.
 	 */
+    @SuppressWarnings("unchecked")
     private IV<BigdataURI, ?> createInlineURIIV(final URI value) {
 
-    	try {
-    		
-    		final String s = value.stringValue();
-    		
-	    	if (s.startsWith(IPAddrIV.NAMESPACE)) {
-	    		
-	    		return new IPAddrIV(s.substring(IPAddrIV.NAMESPACE_LEN));
-	    		
-	    	}
-	    	
-    	} catch (UnknownHostException ex) { 
-    		
-    		log.warn("unknown host exception, will not inline: " + value);
-    		
-    	}
-    	
+// deprecated in favor of the extensible InlineURIFactory mechanism
+//    	try {
+//    		
+//    		final String s = value.stringValue();
+//    		
+//	    	if (s.startsWith("ip:")) {
+//	    		return new IPAddrIV(s.substring(3));
+//	    	}
+//	    	
+//    	} catch (UnknownHostException ex) { 
+//    		
+//    		log.warn("unknown host exception, will not inline: " + value);
+//    		
+//    	}
+
+        /*
+         * See if there is a handler for inline URIs for this namespace.
+         */
+        @SuppressWarnings("rawtypes")
+        final URIExtensionIV inline = uriFactory.createInlineURIIV(value);
+        if (inline != null) {
+            
+            return inline;
+            
+        }
+        
         if (maxInlineTextLength == 0) {
             
             return null;
@@ -476,8 +497,9 @@ public class LexiconConfiguration<V extends BigdataValue>
 
             if (namespaceIV != null) {
 
-                final FullyInlineTypedLiteralIV<BigdataLiteral> localNameIV = new FullyInlineTypedLiteralIV<BigdataLiteral>(
-                        localName);
+                final FullyInlineTypedLiteralIV<BigdataLiteral> localNameIV = 
+                        new FullyInlineTypedLiteralIV<BigdataLiteral>(
+                                localName);
 
                 return new URIExtensionIV<BigdataURI>(localNameIV, namespaceIV);
 
@@ -659,11 +681,16 @@ public class LexiconConfiguration<V extends BigdataValue>
         // get the native DTE
         final DTE dte = DTE.valueOf(datatype);
 
-        if (dte == DTE.Extension || dte == null) {
-            /*
-             * Either a registered IExtension datatype or a datatype for which
-             * there is no native DTE support.
-             */
+// DTE.Extension being used for IPv4 now
+//        if (dte == DTE.Extension || dte == null) {
+//            /*
+//             * Either a registered IExtension datatype or a datatype for which
+//             * there is no native DTE support.
+//             */
+//            return null;
+//        }
+        
+        if (dte == null) {
             return null;
         }
 
@@ -712,6 +739,12 @@ public class LexiconConfiguration<V extends BigdataValue>
                 return new XSDUnsignedIntIV<BigdataLiteral>(parseUnsignedInt(v));
             case XSDUnsignedLong: 
                 return new XSDUnsignedLongIV<BigdataLiteral>(parseUnsignedLong(v));
+            case Extension:
+                /*
+                 * Hijacking DTE.Extension for IPv4.  Throws UnknownHostException
+                 * if not parseable as an IPv4. 
+                 */
+                return new IPv4AddrIV<BigdataLiteral>(v);
             default:
                 // Not handled.
                 return null;
@@ -735,7 +768,26 @@ public class LexiconConfiguration<V extends BigdataValue>
 
             return null;
             
+        } catch (UnknownHostException ex) {
+    
+            if (rejectInvalidXSDValues) {
+            
+                throw new RuntimeException(ex + ": value=" + v, ex);
+                
+            }
+    
+            /*
+             * Note: By falling through here, we wind up accepting the Value,
+             * but it gets handled as a TermId instead of being inlined.
+             */
+    
+            if (log.isInfoEnabled())
+                log.warn("Value does not validate against datatype: " + value);
+    
+            return null;
+            
         }
+    
 
     }
     
@@ -931,6 +983,7 @@ public class LexiconConfiguration<V extends BigdataValue>
             case XSDInteger:
             case XSDDecimal:
             case UUID:
+            case Extension:  // Extension being used for IPv4
                 return true;
             case XSDString:
             /*

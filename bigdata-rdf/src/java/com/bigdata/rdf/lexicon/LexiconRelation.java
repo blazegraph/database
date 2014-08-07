@@ -82,13 +82,16 @@ import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.internal.IDatatypeURIResolver;
 import com.bigdata.rdf.internal.IExtensionFactory;
+import com.bigdata.rdf.internal.IInlineURIFactory;
 import com.bigdata.rdf.internal.ILexiconConfiguration;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVUtility;
 import com.bigdata.rdf.internal.LexiconConfiguration;
 import com.bigdata.rdf.internal.NoExtensionFactory;
+import com.bigdata.rdf.internal.NoInlineURIFactory;
 import com.bigdata.rdf.internal.NoSuchVocabularyItem;
 import com.bigdata.rdf.internal.VTE;
+import com.bigdata.rdf.internal.XSD;
 import com.bigdata.rdf.internal.impl.BlobIV;
 import com.bigdata.rdf.internal.impl.TermId;
 import com.bigdata.rdf.internal.impl.bnode.SidIV;
@@ -268,6 +271,47 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
         }
 
         return (Class<IExtensionFactory>) cls;
+
+    }
+
+    @SuppressWarnings("unchecked")
+    protected Class<IInlineURIFactory> determineInlineURIFactoryClass() {
+
+        final String defaultClassName;
+        if (vocab == null || vocab.get(XSD.IPV4) == null) {
+            /*
+             * If there is no vocabulary then you can not use an inline URI
+             * factory because the namespaces must be in the vocabulary. If the
+             * XSD.IPV4 uri is not present in the vocabulary then either you are
+             * using NoVocabulary.class or an older version of the vocabulary
+             * that does not have that URI in it. Newer journals should be using
+             * DefaultBigdataVocabulary.
+             */
+            defaultClassName = NoInlineURIFactory.class.getName();
+        } else {
+            defaultClassName = AbstractTripleStore.Options.DEFAULT_INLINE_URI_FACTORY_CLASS;
+        }
+
+        final String className = getProperty(
+                AbstractTripleStore.Options.INLINE_URI_FACTORY_CLASS,
+                defaultClassName);
+        
+        final Class<?> cls;
+        try {
+            cls = Class.forName(className);
+        } catch (ClassNotFoundException e) {
+            throw new RuntimeException("Bad option: "
+                    + AbstractTripleStore.Options.INLINE_URI_FACTORY_CLASS, e);
+        }
+
+        if (!IInlineURIFactory.class.isAssignableFrom(cls)) {
+            throw new RuntimeException(
+                    AbstractTripleStore.Options.INLINE_URI_FACTORY_CLASS
+                            + ": Must implement: "
+                            + IInlineURIFactory.class.getName());
+        }
+
+        return (Class<IInlineURIFactory>) cls;
 
     }
 
@@ -551,6 +595,26 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
                         AbstractTripleStore.Options.EXTENSION_FACTORY_CLASS, e);
             }
 
+            final IInlineURIFactory uriFactory;
+            try {
+                
+                /*
+                 * Setup the inline URI factory.
+                 */
+                final Class<IInlineURIFactory> urifc = 
+                    determineInlineURIFactoryClass();
+
+                uriFactory = urifc.newInstance();
+                uriFactory.init(vocab);
+
+            } catch (InstantiationException e) {
+                throw new IllegalArgumentException(
+                        AbstractTripleStore.Options.INLINE_URI_FACTORY_CLASS, e);
+            } catch (IllegalAccessException e) {
+                throw new IllegalArgumentException(
+                        AbstractTripleStore.Options.INLINE_URI_FACTORY_CLASS, e);
+            }
+
             /*
              * Setup the lexicon configuration.
              */
@@ -560,7 +624,8 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
                     inlineLiterals, inlineTextLiterals,
                     maxInlineTextLength, inlineBNodes, inlineDateTimes,
                     inlineDateTimesTimeZone,
-                    rejectInvalidXSDValues, xFactory, vocab, valueFactory);
+                    rejectInvalidXSDValues, xFactory, vocab, valueFactory,
+                    uriFactory);
 
         }
         
