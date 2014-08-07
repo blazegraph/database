@@ -72,6 +72,13 @@ public class XSD extends XMLSchema {
 	 */
 	static public final URI UUID = new URIImpl(NAMESPACE + "uuid");
 
+    /**
+     * Not sure if there is a better solution for this.  Perhaps XSSLT?
+     * 
+     * http://www.codesynthesis.com/projects/xsstl/
+     */
+    static public final URI IPV4 = new URIImpl(NAMESPACE + "IPv4Address");
+    
 //	URI DATETIME = XMLSchema.DATETIME;
     
 }

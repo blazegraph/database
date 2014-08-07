@@ -1,6 +1,6 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2011.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-Infinity.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
@@ -33,9 +33,10 @@ import java.net.UnknownHostException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import org.openrdf.model.URI;
-import org.openrdf.model.Value;
+import org.apache.log4j.Logger;
+import org.openrdf.model.Literal;
 
+import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.BytesUtil.UnsignedByteArrayComparator;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.io.LongPacker;
@@ -43,9 +44,10 @@ import com.bigdata.rdf.internal.DTE;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.Inet4Address;
 import com.bigdata.rdf.internal.VTE;
-import com.bigdata.rdf.internal.impl.AbstractInlineIV;
+import com.bigdata.rdf.internal.XSD;
+import com.bigdata.rdf.internal.impl.literal.AbstractLiteralIV;
 import com.bigdata.rdf.lexicon.LexiconRelation;
-import com.bigdata.rdf.model.BigdataURI;
+import com.bigdata.rdf.model.BigdataLiteral;
 
 /**
  * Internal value representing an inline IP address.  Uses the InetAddress
@@ -56,20 +58,17 @@ import com.bigdata.rdf.model.BigdataURI;
  * <p>
  * {@inheritDoc}
  */
-public class IPAddrIV<V extends BigdataURI> extends AbstractInlineIV<V, Inet4Address>
-        implements Serializable, URI {
+public class IPv4AddrIV<V extends BigdataLiteral> 
+        extends AbstractLiteralIV<V, Inet4Address>
+            implements Serializable, Literal {
 
     /**
 	 * 
 	 */
 	private static final long serialVersionUID = 685148537376856907L;
 	
-//	private static final transient Logger log = Logger.getLogger(SidIV.class);
+	private static final transient Logger log = Logger.getLogger(IPv4AddrIV.class);
 
-	public static final String NAMESPACE = "ip:/";
-	
-	public static final int NAMESPACE_LEN = NAMESPACE.length();
-	
 	/**
 	 * The inline IP address.
 	 */
@@ -92,7 +91,7 @@ public class IPAddrIV<V extends BigdataURI> extends AbstractInlineIV<V, Inet4Add
 
     public IV<V, Inet4Address> clone(final boolean clearCache) {
 
-        final IPAddrIV<V> tmp = new IPAddrIV<V>(value);//, prefix);
+        final IPv4AddrIV<V> tmp = new IPv4AddrIV<V>(value);//, prefix);
 
         // Propagate the cached byte[] key.
         tmp.key = key;
@@ -113,13 +112,9 @@ public class IPAddrIV<V extends BigdataURI> extends AbstractInlineIV<V, Inet4Add
     /**
 	 * Ctor with internal value specified.
 	 */
-	public IPAddrIV(final Inet4Address value) {//, final byte prefix) {
+	public IPv4AddrIV(final Inet4Address value) {//, final byte prefix) {
 
-        /*
-         * TODO Using XSDBoolean so that we can know how to decode this thing
-         * as an IPAddrIV.  We need to fix the Extension mechanism for URIs. 
-         */
-        super(VTE.URI, DTE.XSDBoolean);
+        super(DTE.Extension);
         
         this.value = value;
         
@@ -134,13 +129,9 @@ public class IPAddrIV<V extends BigdataURI> extends AbstractInlineIV<V, Inet4Add
     /**
 	 * Ctor with host address specified.
 	 */
-	public IPAddrIV(final String hostAddress) throws UnknownHostException {
+	public IPv4AddrIV(final String hostAddress) throws UnknownHostException {
 
-        /*
-         * Note: XSDBoolean happens to be assigned the code value of 0, which is
-         * the value we we want when the data type enumeration will be ignored.
-         */
-        super(VTE.URI, DTE.XSDBoolean);
+        super(DTE.Extension);
         
         this.hostAddress = hostAddress;
         
@@ -152,11 +143,13 @@ public class IPAddrIV<V extends BigdataURI> extends AbstractInlineIV<V, Inet4Add
 		
 			final String ip = matcher.group(1);
 			
-//			log.debug(ip);
+			if (log.isDebugEnabled())
+			    log.debug(ip);
 			
 			final String suffix = matcher.group(4);
 			
-//			log.debug(suffix);
+            if (log.isDebugEnabled())
+                log.debug(suffix);
 
 			final String[] s;
 			if (suffix != null) {
@@ -173,11 +166,19 @@ public class IPAddrIV<V extends BigdataURI> extends AbstractInlineIV<V, Inet4Add
 			
 			this.value = Inet4Address.textToAddr(s);
 			
+			if (value == null) {
+	            throw new UnknownHostException("not a valid IP: " + hostAddress);
+			}
+			
+	        if (log.isDebugEnabled()) {
+                log.debug(value);
+                log.debug(byteLength());
+                log.debug(BytesUtil.toString(key()));
+    		}
+	        
 		} else {
 			
-			throw new IllegalArgumentException("not an IP: " + hostAddress);
-			
-//			log.debug("no match");
+			throw new UnknownHostException("not a valid IP: " + hostAddress);
 			
 		}
         
@@ -191,11 +192,12 @@ public class IPAddrIV<V extends BigdataURI> extends AbstractInlineIV<V, Inet4Add
 	}
 
 	/**
-	 * Returns the URI representation of this IV.
+	 * Returns the Literal representation of this IV.
 	 */
+    @SuppressWarnings("unchecked")
     public V asValue(final LexiconRelation lex) {
     	if (uri == null) {
-	        uri = (V) lex.getValueFactory().createURI(getNamespace(), getLocalName());
+	        uri = (V) lex.getValueFactory().createLiteral(getLabel(), XSD.IPV4);
 	        uri.setIV(this);
     	}
         return uri;
@@ -210,7 +212,7 @@ public class IPAddrIV<V extends BigdataURI> extends AbstractInlineIV<V, Inet4Add
 	}
 
 	public String toString() {
-		return "IP("+getLocalName()+")";
+		return "IPv4("+getLabel()+")";
 	}
 	
 	public int hashCode() {
@@ -236,27 +238,35 @@ public class IPAddrIV<V extends BigdataURI> extends AbstractInlineIV<V, Inet4Add
 //		return 's' + bi.toString();
 //	}
 
-	@Override
-	public String getNamespace() {
-		return NAMESPACE;
-	}
+//	@Override
+//	public String getNamespace() {
+//		return NAMESPACE;
+//	}
+//	
+//	@Override
+//	public String getLocalName() {
+//		if (hostAddress == null) {
+//			hostAddress = value.toString();
+//		}
+//		return hostAddress;
+//	}
 	
-	@Override
-	public String getLocalName() {
-		if (hostAddress == null) {
-			hostAddress = value.toString();
-		}
-		return hostAddress;
-	}
-	
+    @Override
+    public String getLabel() {
+        if (hostAddress == null) {
+            hostAddress = value.toString();
+        }
+        return hostAddress;
+    }
+    
 	/**
-	 * Two {@link IPAddrIV} are equal if their InetAddresses are equal.
+	 * Two {@link IPv4AddrIV} are equal if their InetAddresses are equal.
 	 */
 	public boolean equals(final Object o) {
         if (this == o)
             return true;
-        if (o instanceof IPAddrIV) {
-        		final Inet4Address value2 = ((IPAddrIV<?>) o).value;
+        if (o instanceof IPv4AddrIV) {
+        		final Inet4Address value2 = ((IPv4AddrIV<?>) o).value;
         		return value.equals(value2);
         }
         return false;
@@ -267,14 +277,13 @@ public class IPAddrIV<V extends BigdataURI> extends AbstractInlineIV<V, Inet4Add
 	    /*
 	     * Note: This works, but it might be more expensive.
 	     */
-	    return UnsignedByteArrayComparator.INSTANCE.compare(key(), ((IPAddrIV)o).key());
+	    return UnsignedByteArrayComparator.INSTANCE.compare(key(), ((IPv4AddrIV)o).key());
 
 	}
 	
     /**
      * Encode this internal value into the supplied key builder.  Emits the
-     * flags, following by the encoded byte[] representing the spo, in SPO
-     * key order.
+     * flags, following by the encoded byte[] representing the IPv4 address.
      * <p>
      * {@inheritDoc}
      */
@@ -302,7 +311,7 @@ public class IPAddrIV<V extends BigdataURI> extends AbstractInlineIV<V, Inet4Add
     }
 
     /**
-     * Object provides serialization for {@link IPAddrIV} via the write-replace
+     * Object provides serialization for {@link IPv4AddrIV} via the write-replace
      * and read-replace pattern.
      */
     private static class IPAddrIVState implements Externalizable {
@@ -319,7 +328,7 @@ public class IPAddrIV<V extends BigdataURI> extends AbstractInlineIV<V, Inet4Add
             
         }
         
-        private IPAddrIVState(final IPAddrIV iv) {
+        private IPAddrIVState(final IPv4AddrIV iv) {
 //            this.flags = flags;
             this.key = iv.key();
         }
@@ -345,30 +354,25 @@ public class IPAddrIV<V extends BigdataURI> extends AbstractInlineIV<V, Inet4Add
     }
     
     private Object writeReplace() throws ObjectStreamException {
-        
         return new IPAddrIVState(this);
-        
     }
     
-    /**
-     * Implements {@link Value#stringValue()}.
-     */
-    @Override
-    public String stringValue() {
-        
-        return getLocalName();
-
-    }
+//    /**
+//     * Implements {@link Value#stringValue()}.
+//     */
+//    @Override
+//    public String stringValue() {
+//        
+//        return getLocalName();
+//
+//    }
 
     /**
      * Does not need materialization to answer URI interface methods.
      */
 	@Override
 	public boolean needsMaterialization() {
-		
 		return false;
-		
 	}
-
 
 }

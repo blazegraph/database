@@ -264,12 +264,10 @@ public class BigdataSailFactory {
         
         if (options.contains(Option.Inference)) {
             props.setProperty(BigdataSail.Options.AXIOMS_CLASS, OwlAxioms.class.getName());
-            props.setProperty(BigdataSail.Options.VOCABULARY_CLASS, RDFSVocabulary.class.getName());
             props.setProperty(BigdataSail.Options.TRUTH_MAINTENANCE, "true");
             props.setProperty(BigdataSail.Options.JUSTIFY, "true");
         } else {
             props.setProperty(BigdataSail.Options.AXIOMS_CLASS, NoAxioms.class.getName());
-            props.setProperty(BigdataSail.Options.VOCABULARY_CLASS, RDFSVocabulary.class.getName());
             props.setProperty(BigdataSail.Options.TRUTH_MAINTENANCE, "false");
             props.setProperty(BigdataSail.Options.JUSTIFY, "false");
         }

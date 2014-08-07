@@ -332,11 +332,16 @@ public enum DTE {
          * etc. Also, the match will always be on the local name once we proof
          * the namespace.
          */
-        if (datatype == null) {
+//        if (datatype == null) {
+        if (datatype.equals(XSD.IPV4)) {
             /*
              * Note: This is a bit of a rough spot in the API. There is no
              * datatype associated with [Extension] since it is a place holder
              * for any an extension for any datatype.
+             * 
+             * Right now I am hijacking Extension for IPv4.
+             * 
+             * TODO FIXME
              */
             return Extension;
         }

@@ -94,7 +94,9 @@ import com.bigdata.rdf.internal.DefaultExtensionFactory;
 import com.bigdata.rdf.internal.IDatatypeURIResolver;
 import com.bigdata.rdf.internal.IExtension;
 import com.bigdata.rdf.internal.IExtensionFactory;
+import com.bigdata.rdf.internal.IInlineURIFactory;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.InlineURIFactory;
 import com.bigdata.rdf.internal.NotMaterializedException;
 import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.internal.constraints.RangeBOp;
@@ -138,7 +140,7 @@ import com.bigdata.rdf.spo.StatementWriter;
 import com.bigdata.rdf.spo.XXXCShardSplitHandler;
 import com.bigdata.rdf.vocab.BaseVocabulary;
 import com.bigdata.rdf.vocab.NoVocabulary;
-import com.bigdata.rdf.vocab.RDFSVocabulary;
+import com.bigdata.rdf.vocab.DefaultBigdataVocabulary;
 import com.bigdata.rdf.vocab.Vocabulary;
 import com.bigdata.rdf.vocab.VocabularyDecl;
 import com.bigdata.relation.AbstractResource;
@@ -636,7 +638,7 @@ abstract public class AbstractTripleStore extends
          * which it provides for {@link AbstractTripleStore}s created using that
          * class.
          */
-        String DEFAULT_VOCABULARY_CLASS = RDFSVocabulary.class.getName();
+        String DEFAULT_VOCABULARY_CLASS = DefaultBigdataVocabulary.class.getName();
         
         /**
          * The {@link Axioms} model that will be used (default
@@ -1207,6 +1209,17 @@ abstract public class AbstractTripleStore extends
                 .getName() + ".bottomUpEvaluation";
 
         public static String DEFAULT_BOTTOM_UP_EVALUATION = "true";
+
+        /**
+         * The name of the {@link IInlineURIFactory} class.
+         * 
+         * @see #DEFAULT_EXTENSION_FACTORY_CLASS
+         */
+        String INLINE_URI_FACTORY_CLASS = AbstractTripleStore.class.getName()
+                + ".inlineURIFactory";
+
+        String DEFAULT_INLINE_URI_FACTORY_CLASS = InlineURIFactory.class
+                .getName();
 
     }
 
