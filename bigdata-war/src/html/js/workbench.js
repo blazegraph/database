@@ -1,6 +1,7 @@
 $(function() {
 
 'use strict';
+/* jshint validthis: true */
 
 /* Global variables */
 
@@ -695,7 +696,7 @@ function submitUpdate(e) {
    var url = RW_URL_PREFIX + 'namespace/' + NAMESPACE + '/sparql';
    var settings = {
       type: 'POST',
-      data: FILE_CONTENTS == null ? EDITORS.update.getValue() : FILE_CONTENTS,
+      data: FILE_CONTENTS === null ? EDITORS.update.getValue() : FILE_CONTENTS,
       success: updateResponseXML,
       error: updateResponseError
    };
@@ -782,7 +783,7 @@ function updateResponseError(jqXHR, textStatus, errorThrown) {
    if(jqXHR.status === 0) {
       message += 'Could not contact server';
    } else {
-      if(response.find('pre').length == 0) {
+      if(response.find('pre').length === 0) {
          message += response.text();
       } else {
          message += response.find('pre').text();
@@ -1189,7 +1190,7 @@ function queryResultsError(jqXHR, textStatus, errorThrown) {
       message += 'Could not contact server';
    } else {
       var response = $('<div>').append(jqXHR.responseText);
-      if(response.find('pre').length == 0) {
+      if(response.find('pre').length === 0) {
          message += response.text();
       } else {
          message += response.find('pre').text();
