@@ -347,6 +347,14 @@ iframe {
    box-sizing: border-box;
 }
 
+#status-text {
+   word-break: break-all;
+}
+
+#zookeeper, #counter-set {
+   white-space: pre;
+}
+
 /* workbench checks if we're in HA mode and shows health tab if we are */
 #tab-selector a[data-target=health] {
    display: none;
