@@ -895,8 +895,8 @@ function submitQuery(e) {
       if($(row).find('.query')[0].innerText == query) {
          // clear the old results and set the time to now
          $(row).find('.query-time').text(new Date().toISOString());
-         $(row).find('.query-results').text('...');
-         $(row).find('.query-execution-time').text('...');
+         $(row).find('.query-results').text('');
+         $(row).find('.query-execution-time').html('<a href="#">Running...</a>');
          // move it to the top
          $(row).prependTo('#query-history tbody');
          queryExists = true;
@@ -905,7 +905,7 @@ function submitQuery(e) {
    });
 
    if(!queryExists) {
-      addQueryHistoryRow(new Date().toISOString(), query, '...', '...', true);
+      addQueryHistoryRow(new Date().toISOString(), query, '', '<a href="#">Running...</a>', true);
    }
 
    storeQueryHistory();
@@ -1572,6 +1572,12 @@ function getStatusNumbers(data) {
    $('p:contains(Show queries, query details)').find('a').eq(1).click(function(e) { e.preventDefault(); showQueries(true); });
 }
 
+function showRunningQueries(e) {
+   e.preventDefault();
+   showTab('status');
+   showQueries();
+}
+
 function showQueries(details) {
    var url = RO_URL_PREFIX + 'status?showQueries';
    if(details) {
@@ -1858,6 +1864,7 @@ function setupHandlers() {
    $('#query-explain').change(handleExplain);
    $('#query-details').change(handleDetails);
    $('#query-history').on('click', '.query a', loadHistory);
+   $('#query-history').on('click', '.query-execution-time a', showRunningQueries);
    $('#query-history').on('click', '.query-delete a', deleteHistoryRow);
    $('#query-history-clear').click(clearHistory);
    $('#query-response-clear').click(clearQueryResponse);
