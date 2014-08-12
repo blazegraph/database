@@ -128,7 +128,7 @@ public class TestJournalBasics extends TestCase {
         // test suite for hierarchical locking (namespace prefixes).
         suite.addTestSuite(TestHierarchicalLockingTasks.class);
         // test suite for GIST operations using group commit.
-//        suite.addTestSuite(TestGISTTasks.class);
+        //suite.addTestSuite(TestGISTTasks.class);
         // stress test of throughput when lock contention serializes unisolated writers.
         suite.addTestSuite(StressTestLockContention.class);
         // stress test of group commit.
@@ -138,11 +138,8 @@ public class TestJournalBasics extends TestCase {
         /*
          * Stress tests of writes on unisolated named indices using
          * UnisolatedReadWriteIndex.
-         * 
-         * FIXME This test appears to cause #343 (Stochastic assert in
-         * AbstractBTree#writeNodeOrLeaf() in CI)
          */
-//        suite.addTestSuite(StressTestUnisolatedReadWriteIndex.class);
+        suite.addTestSuite(StressTestUnisolatedReadWriteIndex.class);
         /*
          * Stress test of concurrent transactions.
          * 
