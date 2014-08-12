@@ -3623,7 +3623,24 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
         assert node.dirty;
         assert !node.deleted;
         assert !node.isPersistent();
-        assert !node.isReadOnly(); // FIXME Occasional CI errors on this assert for TestMROWTransactions. Also StressTestUnisolatedReadWriteIndex.  See http://trac.bigdata.com/ticket/343
+        /**
+         * Occasional CI errors on this assert for have been observed for
+         * StressTestUnisolatedReadWriteIndex. This has been traced to a test
+         * error. The test was interrupting the tasks, but the tasks were not
+         * being cancelled simultaneously. This meant that one task could be
+         * interrupted during an eviction from the write retention queue and
+         * that another task could obtain the UnisolatedReadWriteIndex lock and
+         * then hit the error since the BTree, the write retention queue, and
+         * the nodes that were being evicted would an inconsistent state state.
+         * The test does not fail if it is run to completion (no timeout).
+         * 
+         * @see <a href="http://trac.bigdata.com/ticket/343" >Stochastic assert
+         *      in AbstractBTree#writeNodeOrLeaf() in CI </a>
+         * 
+         *      TestMROWTransactions might also demonstrate an issue
+         *      occasionally. If so, then check for the same root cause.
+         */
+        assert !node.isReadOnly();
         assertNotReadOnly();
         
         /*
