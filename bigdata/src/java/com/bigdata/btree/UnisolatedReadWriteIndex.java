@@ -118,8 +118,6 @@ import cutthecrap.utils.striterators.IFilter;
  * computing the fix point of a rule set) is significantly lower.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id: UnisolatedReadWriteIndex.java 4054 2011-01-05 13:51:25Z
- *          thompsonbry $
  */
 public class UnisolatedReadWriteIndex implements IIndex, ILinearList {
 
@@ -230,7 +228,7 @@ public class UnisolatedReadWriteIndex implements IIndex, ILinearList {
      *            
      * @return The acquired lock.
      */
-    private Lock lock(final IIndexProcedure proc) {
+    private Lock lock(final IIndexProcedure<?> proc) {
      
         if (proc == null)
             throw new IllegalArgumentException();
@@ -274,7 +272,7 @@ public class UnisolatedReadWriteIndex implements IIndex, ILinearList {
      * Canonicalizing mapping for the locks used to control access to the
      * unisolated index.
      */
-    static final private WeakHashMap<ICommitter, ReadWriteLock> locks = new WeakHashMap<ICommitter,ReadWriteLock>();
+    static final private WeakHashMap<ICommitter, ReentrantReadWriteLock> locks = new WeakHashMap<ICommitter,ReentrantReadWriteLock>();
     
     /**
      * The default capacity for iterator reads against the underlying index. The
@@ -371,7 +369,7 @@ public class UnisolatedReadWriteIndex implements IIndex, ILinearList {
 		
 		synchronized (locks) {
 
-			ReadWriteLock readWriteLock = locks.get(btree);
+		    ReentrantReadWriteLock readWriteLock = locks.get(btree);
 
 			if (readWriteLock == null) {
 
@@ -386,24 +384,28 @@ public class UnisolatedReadWriteIndex implements IIndex, ILinearList {
 
 	}   
     
+    @Override
     public String toString() {
         
         return getClass().getSimpleName() + "{" + ndx.toString() + "}";
         
     }
     
+    @Override
     public IndexMetadata getIndexMetadata() {
 
         return ndx.getIndexMetadata();
         
     }
 
+    @Override
     public IResourceMetadata[] getResourceMetadata() {
 
         return getIndexMetadata().getPartitionMetadata().getResources();
 
     }
 
+    @Override
     public CounterSet getCounters() {
 
         return ndx.getCounters();
@@ -416,12 +418,14 @@ public class UnisolatedReadWriteIndex implements IIndex, ILinearList {
      * 
      * @throws UnsupportedOperationException
      */
+    @Override
     public ICounter getCounter() {
         
         throw new UnsupportedOperationException();
         
     }
 
+    @Override
     public boolean contains(final Object key) {
 
         final Lock lock = readLock();
@@ -438,6 +442,7 @@ public class UnisolatedReadWriteIndex implements IIndex, ILinearList {
         
     }
 
+    @Override
     public Object insert(final Object key, final Object value) {
 
         final Lock lock = writeLock();
@@ -454,6 +459,7 @@ public class UnisolatedReadWriteIndex implements IIndex, ILinearList {
     
     }
 
+    @Override
     public Object lookup(final Object key) {
         
         final Lock lock = readLock();
@@ -470,6 +476,7 @@ public class UnisolatedReadWriteIndex implements IIndex, ILinearList {
         
     }
 
+    @Override
     public Object remove(final Object key) {
 
         final Lock lock = writeLock();
@@ -486,6 +493,7 @@ public class UnisolatedReadWriteIndex implements IIndex, ILinearList {
     
     }
 
+    @Override
     public boolean contains(final byte[] key) {
 
         final Lock lock = readLock();
@@ -502,6 +510,7 @@ public class UnisolatedReadWriteIndex implements IIndex, ILinearList {
         
     }
     
+    @Override
     public byte[] lookup(final byte[] key) {
 
         final Lock lock = readLock();
@@ -518,6 +527,7 @@ public class UnisolatedReadWriteIndex implements IIndex, ILinearList {
         
     }
 
+    @Override
     public byte[] insert(final byte[] key, final byte[] value) {
 
         final Lock lock = writeLock();
@@ -534,6 +544,7 @@ public class UnisolatedReadWriteIndex implements IIndex, ILinearList {
         
     }
 
+    @Override
     public byte[] remove(final byte[] key) {
 
         final Lock lock = writeLock();
@@ -550,6 +561,7 @@ public class UnisolatedReadWriteIndex implements IIndex, ILinearList {
 
     }
 
+    @Override
     public long rangeCount() {
 
         final Lock lock = readLock();
@@ -566,6 +578,7 @@ public class UnisolatedReadWriteIndex implements IIndex, ILinearList {
         
     }
     
+    @Override
     public long rangeCount(final byte[] fromKey, final byte[] toKey) {
 
         final Lock lock = readLock();
@@ -582,6 +595,7 @@ public class UnisolatedReadWriteIndex implements IIndex, ILinearList {
 
     }
 
+    @Override
     public long rangeCountExact(final byte[] fromKey, final byte[] toKey) {
 
         final Lock lock = readLock();
@@ -598,6 +612,7 @@ public class UnisolatedReadWriteIndex implements IIndex, ILinearList {
         
     }
 
+    @Override
     public long rangeCountExactWithDeleted(final byte[] fromKey, final byte[] toKey) {
 
         final Lock lock = readLock();
@@ -614,12 +629,16 @@ public class UnisolatedReadWriteIndex implements IIndex, ILinearList {
         
     }
 
+    @Override
+    @SuppressWarnings("rawtypes")
     final public ITupleIterator rangeIterator() {
 
         return rangeIterator(null, null);
 
     }
     
+    @Override
+    @SuppressWarnings("rawtypes")
     public ITupleIterator rangeIterator(final byte[] fromKey, final byte[] toKey) {
 
         return rangeIterator(fromKey, toKey, 0/* capacity */,
@@ -636,6 +655,8 @@ public class UnisolatedReadWriteIndex implements IIndex, ILinearList {
      * from the underlying index. Likewise, the mutation methods on the iterator
      * will acquire the exclusive write lock.
      */
+    @Override
+    @SuppressWarnings("rawtypes")
     public ITupleIterator rangeIterator(final byte[] fromKey, final byte[] toKey,
             int capacity, int flags, final IFilter filter) {
 
@@ -681,7 +702,6 @@ public class UnisolatedReadWriteIndex implements IIndex, ILinearList {
      * for the {@link Lock}.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * 
      */
     private class ChunkedIterator<E> extends ChunkedLocalRangeIterator<E> {
 
@@ -757,8 +777,9 @@ public class UnisolatedReadWriteIndex implements IIndex, ILinearList {
             
         }
         
-    }
+    } // ChunkedIterator
     
+    @Override
     public Object submit(final byte[] key, final ISimpleIndexProcedure proc) {
 
         final Lock lock = lock(proc);
@@ -780,6 +801,8 @@ public class UnisolatedReadWriteIndex implements IIndex, ILinearList {
 
     }
 
+    @Override
+    @SuppressWarnings("rawtypes")
     public void submit(final byte[] fromKey, final byte[] toKey,
             final IKeyRangeIndexProcedure proc, final IResultHandler handler) {
 
@@ -802,7 +825,8 @@ public class UnisolatedReadWriteIndex implements IIndex, ILinearList {
 
     }
 
-    @SuppressWarnings("unchecked")
+    @Override
+    @SuppressWarnings({ "rawtypes", "unchecked" })
     public void submit(final int fromIndex, final int toIndex, final byte[][] keys,
             final byte[][] vals, final AbstractKeyArrayIndexProcedureConstructor ctor,
             final IResultHandler aggregator) {
