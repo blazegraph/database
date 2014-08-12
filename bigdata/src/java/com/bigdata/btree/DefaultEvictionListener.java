@@ -33,11 +33,11 @@ import com.bigdata.cache.IHardReferenceQueue;
  * persistence store.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class DefaultEvictionListener implements
         IEvictionListener {
 
+    @Override
     public void evicted(final IHardReferenceQueue<PO> cache, final PO ref) {
 
         final AbstractNode<?> node = (AbstractNode<?>) ref;
