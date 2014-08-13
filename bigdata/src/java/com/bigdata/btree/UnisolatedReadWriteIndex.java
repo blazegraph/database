@@ -362,7 +362,7 @@ public class UnisolatedReadWriteIndex implements IIndex, ILinearList {
 	 *             if the argument is <code>null</code>.
 	 */
     // Note: Exposed to HTree, at least for now.
-	public static ReadWriteLock getReadWriteLock(final ICommitter btree) {
+	public static ReentrantReadWriteLock getReadWriteLock(final ICommitter btree) {
 
 		if (btree == null)
 			throw new IllegalArgumentException();
