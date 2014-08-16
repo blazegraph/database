@@ -40,6 +40,7 @@ import com.bigdata.bop.BOpEvaluationContext;
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IQueryAttributes;
+import com.bigdata.bop.ISingleThreadedOp;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
@@ -73,7 +74,8 @@ import cutthecrap.utils.striterators.SingleValueIterator;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
-public class HTreeNamedSubqueryOp extends PipelineOp implements INamedSubqueryOp {
+public class HTreeNamedSubqueryOp extends PipelineOp implements
+        INamedSubqueryOp, ISingleThreadedOp {
 
     static private final transient Logger log = Logger
             .getLogger(HTreeNamedSubqueryOp.class);
@@ -123,11 +125,7 @@ public class HTreeNamedSubqueryOp extends PipelineOp implements INamedSubqueryOp
                             + getEvaluationContext());
         }
 
-        if (getMaxParallel() != 1) {
-            throw new IllegalArgumentException(
-                    PipelineOp.Annotations.MAX_PARALLEL + "="
-                            + getMaxParallel());
-        }
+        assertMaxParallelOne();
 
         if (!isAtOnceEvaluation())
             throw new IllegalArgumentException();
