@@ -19,6 +19,7 @@ import com.bigdata.bop.IBind;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IConstraint;
+import com.bigdata.bop.ISingleThreadedOp;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.PipelineOp;
@@ -58,10 +59,9 @@ import cutthecrap.utils.striterators.ICloseableIterator;
  * the operator can still be invoked multiple times).
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id: DistinctElementFilter.java 3466 2010-08-27 14:28:04Z
- *          thompsonbry $
  */
-public class PipelinedAggregationOp extends GroupByOp {
+public class PipelinedAggregationOp extends GroupByOp implements
+        ISingleThreadedOp {
 
 	private final static transient Logger log = Logger
 			.getLogger(PipelinedAggregationOp.class);
@@ -136,14 +136,11 @@ public class PipelinedAggregationOp extends GroupByOp {
                     + "=" + isLastPassRequested());
         }
         
-        if (getMaxParallel() != 1) {
-            /*
-             * Note: The operator MUST be single threaded in order to receive
-             * the isLastInvocation notice.
-             */
-            throw new UnsupportedOperationException(Annotations.MAX_PARALLEL
-                    + "=" + getMaxParallel());
-        }
+        /*
+         * Note: The operator MUST be single threaded in order to receive the
+         * isLastInvocation notice.
+         */
+        assertMaxParallelOne();
 
     }
 

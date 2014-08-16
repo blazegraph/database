@@ -142,9 +142,9 @@ public class StressTestUnisolatedReadWriteIndex extends ProxyTestCase<Journal> {
                 3, // 3,// nresources // 20
                 1, // minLocks
                 2, // 5 // maxLocks // 3
-                1000, //5000, // ntrials // 1000
+                500, // ntrials // Note: fails in CI @ 1000 (java.lang.OutOfMemoryError: unable to create new native thread)
                 3, // keyLen
-                1000, // 1000, // nops
+                1000, // nops
                 0.02d,// failureRate
                 0.10d // commitRate
         );

@@ -41,8 +41,6 @@ import com.bigdata.bop.Var;
  * Unit tests for {@link HTreeDistinctBindingSetsOp}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id: TestDistinctBindingSets.java 4259 2011-02-28 16:24:53Z
- *          thompsonbry $
  */
 public class TestHTreeDistinctBindingSets extends
         AbstractDistinctSolutionsTestCase {
@@ -161,8 +159,8 @@ public class TestHTreeDistinctBindingSets extends
 //                    new NV(PipelineOp.Annotations.MAX_PARALLEL,
 //                            1),//
                 }));
-        fail("Expecting: "+UnsupportedOperationException.class);
-        } catch(UnsupportedOperationException ex) {
+        fail("Expecting: "+IllegalArgumentException.class);
+        } catch(IllegalArgumentException ex) {
         	if(log.isInfoEnabled())
         		log.info("Ignoring expected exception: "+ex);
         }
