@@ -4645,7 +4645,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
                 	
                 }
                 
-                if (op instanceof UUIDBOp || op instanceof NowBOp) {
+                if (op instanceof UUIDBOp) {// || op instanceof NowBOp) {
                     
                     /*
                      * We cannot pre-generate these, they need to be unique
