@@ -1469,6 +1469,19 @@ public class AST2BOpUtility extends AST2BOpRTO {
     }
 
     /**
+     * TODO Grab the binding sets from the BindingsClause, attach them to
+     * the query as a named subquery with a hash index, and then add a 
+     * named subquery include to the pipeline right here.
+     */
+    private static PipelineOp addValues(PipelineOp left,
+            final BindingsClause bc,
+            final Set<IVariable<?>> doneSet, final AST2BOpContext ctx) {
+
+        return left;
+        
+    }
+
+    /**
 	 * Return <code>true</code> if we can optimize this INCLUDE with a SCAN of
 	 * the named solution set and a nested inner loop to join against left
 	 * solutions from the pipeline having a known low cardinality.
@@ -2656,6 +2669,13 @@ public class AST2BOpUtility extends AST2BOpRTO {
                  */
                 left = addNamedSubqueryInclude(left,
                         (NamedSubqueryInclude) child, doneSet, ctx);
+                continue;
+            } else if (child instanceof BindingsClause) {
+                /*
+                 * VALUES clause
+                 */
+                left = addValues(left,
+                        (BindingsClause) child, doneSet, ctx);
                 continue;
             } else if (child instanceof SubqueryRoot) {
                 final SubqueryRoot subquery = (SubqueryRoot) child;
