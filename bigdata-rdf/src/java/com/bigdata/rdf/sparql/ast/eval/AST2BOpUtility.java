@@ -90,6 +90,7 @@ import com.bigdata.rdf.internal.constraints.ContextNotAvailableException;
 import com.bigdata.rdf.internal.constraints.INeedsMaterialization.Requirement;
 import com.bigdata.rdf.internal.constraints.InBOp;
 import com.bigdata.rdf.internal.constraints.IsBoundBOp;
+import com.bigdata.rdf.internal.constraints.NowBOp;
 import com.bigdata.rdf.internal.constraints.ProjectedConstraint;
 import com.bigdata.rdf.internal.constraints.SPARQLConstraint;
 import com.bigdata.rdf.internal.constraints.TryBeforeMaterializationConstraint;
@@ -4624,7 +4625,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
                 	
                 }
                 
-                if (op instanceof UUIDBOp) {
+                if (op instanceof UUIDBOp || op instanceof NowBOp) {
                     
                     /*
                      * We cannot pre-generate these, they need to be unique
