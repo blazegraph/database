@@ -12,6 +12,7 @@ var RW_URL_PREFIX, RO_URL_PREFIX;
 var EDITORS = {}, ERROR_LINE_MARKERS = {}, ERROR_CHARACTER_MARKERS = {};
 var CODEMIRROR_DEFAULTS = {
    lineNumbers: true,
+   matchBrackets: true,
    mode: 'sparql',
    extraKeys: {'Ctrl-,': moveTabLeft, 'Ctrl-.': moveTabRight}
 };
