@@ -193,6 +193,10 @@ h2 {
    clear: both;
 }
 
+.links {
+   float: left;
+}
+
 .namespace-shortcuts {
    float: right;
    margin-bottom: 20px;
