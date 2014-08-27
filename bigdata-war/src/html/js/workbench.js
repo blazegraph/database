@@ -14,7 +14,6 @@ var CODEMIRROR_DEFAULTS = {
    lineNumbers: true,
    matchBrackets: true,
    mode: 'sparql',
-   extraKeys: {'Ctrl-,': moveTabLeft, 'Ctrl-.': moveTabRight}
 };
 // key is value of RDF type selector, value is name of CodeMirror mode
 var RDF_MODES = {
