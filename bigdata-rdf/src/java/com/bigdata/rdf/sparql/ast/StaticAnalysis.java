@@ -912,8 +912,14 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
 
             // NOP.
 
-        } else {
+        } else if(node instanceof BindingsClause) {
+
+            final BindingsClause bc = (BindingsClause) node;
             
+            vars.addAll(bc.getDeclaredVariables());
+            
+        } else {
+
             throw new AssertionError(node.toString());
             
         }
@@ -1180,8 +1186,10 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
                 
             } else if(child instanceof BindingsClause) {
 
-                // NOP
+                final BindingsClause bc = (BindingsClause) child;
                 
+                vars.addAll(bc.getDeclaredVariables());
+
             } else {
 
                 throw new AssertionError(child.toString());
