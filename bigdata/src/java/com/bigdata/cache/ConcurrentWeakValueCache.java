@@ -9,8 +9,6 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.util.StackInfoReport;
-
 /**
  * A low-contention/high concurrency weak value cache. This class can offer
  * substantially less lock contention and hence greater performance than the
@@ -28,7 +26,6 @@ import com.bigdata.util.StackInfoReport;
  * {@link ConcurrentHashMap} which is a relatively expensive operation.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  * @param <K>
  *            The generic type of the keys.
  * @param <V>
@@ -473,15 +470,8 @@ public class ConcurrentWeakValueCache<K, V> implements
             final WeakReference<V> oldRef = map.putIfAbsent(k, ref);
 
             final V oldVal = oldRef == null ? null : oldRef.get();
-            
-            if (oldRef != null && oldVal == null) {
 
-            	// Potential race, let's make it more likely
-//                try {
-//    				Thread.sleep(50);
-//    			} catch (InterruptedException e) {
-//    				throw new RuntimeException("Unexpected?", e);
-//    			}
+            if (oldRef != null && oldVal == null) {
 
                 /*
                  * There was an entry under the key but its reference has been
@@ -494,7 +484,7 @@ public class ConcurrentWeakValueCache<K, V> implements
                  */
 
                 if (map.replace(k, oldRef, ref)) {
-                	
+
                     if (queue != null) {
 
                         // no reference under that key.
@@ -517,11 +507,18 @@ public class ConcurrentWeakValueCache<K, V> implements
                     // the old value for the key was a cleared reference.
                     return null;
 
-                } else { // lost potential concurrent race, so make recursive call to ensure correct value is returned
-                	log.warn("REMOVE: Lost Race... try again", new StackInfoReport());
-                	
-                	// throw new IllegalStateException("REMOVE: WTF?");
-                	return putIfAbsent(k, v);
+                } else {
+                    
+                    /**
+                     * We lost a potential concurrent data race, so make
+                     * recursive call to ensure correct value is returned.
+                     * 
+                     * @see <a href="http://trac.bigdata.com/ticket/1004">
+                     *      Concurrent binding problem </a>
+                     */
+
+                    return putIfAbsent(k, v);
+                    
                 }
 
             }
@@ -779,7 +776,6 @@ public class ConcurrentWeakValueCache<K, V> implements
      * Adds the key to the weak reference.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      * @param <K>
      * @param <V>
      */
