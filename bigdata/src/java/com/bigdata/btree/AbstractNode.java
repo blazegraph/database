@@ -23,6 +23,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 /*
  * Created on Nov 15, 2006
+ * 
  */
 package com.bigdata.btree;
 
@@ -92,12 +93,6 @@ public abstract class AbstractNode<T extends AbstractNode
      * on hand so that we can set this field.
      */
     final transient protected AbstractBTree btree;
-    
-    /**
-     * Can be used in debugging, testing or high integrity live scenarios to check
-     * for concurrent writes triggered by evictions.  This is currently disabled.
-     */
-    // volatile transient Throwable writing = null;
 
     /**
      * The parent of this node. This is null for the root node. The parent is
@@ -543,11 +538,8 @@ public abstract class AbstractNode<T extends AbstractNode
                  */
                 parent = (Node) parent.copyOnWrite(oldId);
 
-                assert !parent.isPersistent();
-            } else {
-            	assert !parent.isPersistent();
             }
-            
+
             /*
              * Replace the reference to this child with the reference to the
              * new child. This makes the old child inaccessible via
