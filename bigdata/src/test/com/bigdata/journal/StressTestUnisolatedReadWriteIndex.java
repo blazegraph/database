@@ -127,19 +127,24 @@ public class StressTestUnisolatedReadWriteIndex extends ProxyTestCase<Journal> {
              * number of spurious extensions from the failureRate. However,
              * there are clearly problems which emerge when the timeout is less
              * than the time required to complete the scheduled tasks. A variety
-             * of errors can be emerged when the scheduled tasks are all
+             * of errors can emerged when the scheduled tasks are all
              * cancelled. It is difficult to say whether any of those problems
              * could be observed by an application outside of a shutdownNow()
              * scenario.
+             * 
+             * TODO We could write this using a task queue feeding an executor
+             * pool so we could make it into a longer running test. If I simply
+             * increase the number of trials, it attempts to schedule them all
+             * concurrently and hits an out of memory error (too many native threads).
              */
             doConcurrentClientTest(journal,//
-                30,// timeout
+                Long.MAX_VALUE,// timeout : MUST BE INFINITE OR WILL HIT FALSE ERRORS.
                 3, // 3,// nresources // 20
                 1, // minLocks
                 2, // 5 // maxLocks // 3
-                1000, //5000, // ntrials // 1000
+                500, // ntrials // Note: fails in CI @ 1000 (java.lang.OutOfMemoryError: unable to create new native thread)
                 3, // keyLen
-                1000, // 1000, // nops
+                1000, // nops
                 0.02d,// failureRate
                 0.10d // commitRate
         );
@@ -449,7 +454,7 @@ public class StressTestUnisolatedReadWriteIndex extends ProxyTestCase<Journal> {
         @Override
         public Void call() throws Exception {
 
-            final IIndex[] indices = new IIndex[resource.length];
+            final UnisolatedReadWriteIndex[] indices = new UnisolatedReadWriteIndex[resource.length];
 
             final Thread t = Thread.currentThread();
 
@@ -496,7 +501,27 @@ public class StressTestUnisolatedReadWriteIndex extends ProxyTestCase<Journal> {
 
                         ndx.remove(key);
 
-                    }
+                    } 
+                    /**
+                     * FIXME Add a probability of a read-only operation, e.g.,
+                     * lookup() or rangeIterator(key,val). The latter can also
+                     * do chunked resolution. This will provide test coverage
+                     * for the case where the close() of the iterator interrupts
+                     * the producer. This happens especially in the case where a
+                     * range iterator is used and the iterator is closed after
+                     * the first result since the producer could still be
+                     * running. If it is in the middle of evicting a dirty node
+                     * from the write retention queue then that can leave the
+                     * nodes and the queue in an inconsistent state. (We might
+                     * need to write that test at the SAIL level since it is the
+                     * AbstractedChunkedResolverator pattern for which we have
+                     * observed the issue.  Perhaps through a modification of the
+                     * csem stress test.)
+                     * 
+                     * @see <a href="http://trac.bigdata.com/ticket/855">
+                     *      AssertionError: Child does not have persistent
+                     *      identity </a>
+                     */
 
                 } // for( i : nops )
 
@@ -562,7 +587,6 @@ public class StressTestUnisolatedReadWriteIndex extends ProxyTestCase<Journal> {
      * {@link TestOptions#FAILURE_RATE}.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     private static class SpuriousException extends RuntimeException {
 

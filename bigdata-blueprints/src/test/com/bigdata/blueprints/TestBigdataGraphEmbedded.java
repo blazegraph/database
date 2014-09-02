@@ -28,16 +28,17 @@ import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CountDownLatch;
+import java.util.Properties;
 
 import org.apache.log4j.Logger;
 
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSailRepository;
+import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
 import com.tinkerpop.blueprints.Edge;
+import com.tinkerpop.blueprints.Element;
 import com.tinkerpop.blueprints.Graph;
 import com.tinkerpop.blueprints.TestSuite;
-import com.tinkerpop.blueprints.TransactionalGraph;
 import com.tinkerpop.blueprints.TransactionalGraphTestSuite;
 import com.tinkerpop.blueprints.Vertex;
 import com.tinkerpop.blueprints.impls.GraphTest;
@@ -78,17 +79,19 @@ public class TestBigdataGraphEmbedded extends AbstractTestBigdataGraph {
 //}
 
 
-//    public void testGetEdgesByLabel() throws Exception {
+//    public void testAddVertexProperties() throws Exception {
 //        final BigdataGraphTest test = new BigdataGraphTest();
 //        test.stopWatch();
 //        final BigdataTestSuite testSuite = new BigdataTestSuite(test);
 //        try {
-//            testSuite.testGetEdgesByLabel();
+//            testSuite.testAddVertexProperties();
 //        } finally {
 //            test.shutdown();
 //        }
 //        
 //    }
+    
+
     
     private static class BigdataTestSuite extends TestSuite {
         
@@ -96,26 +99,68 @@ public class TestBigdataGraphEmbedded extends AbstractTestBigdataGraph {
             super(graphTest);
         }
         
-        public void testGetEdgesByLabel() {
-            Graph graph = graphTest.generateGraph();
-            if (graph.getFeatures().supportsEdgeIteration) {
-              Vertex v1 = graph.addVertex(null);
-              Vertex v2 = graph.addVertex(null);
-              Vertex v3 = graph.addVertex(null);
-      
-              Edge e1 = graph.addEdge(null, v1, v2, graphTest.convertLabel("test1"));
-              Edge e2 = graph.addEdge(null, v2, v3, graphTest.convertLabel("test2"));
-              Edge e3 = graph.addEdge(null, v3, v1, graphTest.convertLabel("test3"));
-      
-              assertEquals(e1, getOnlyElement(graph.query().has("label", graphTest.convertLabel("test1")).edges()));
-              assertEquals(e2, getOnlyElement(graph.query().has("label", graphTest.convertLabel("test2")).edges()));
-              assertEquals(e3, getOnlyElement(graph.query().has("label", graphTest.convertLabel("test3")).edges()));
-      
-              assertEquals(e1, getOnlyElement(graph.getEdges("label", graphTest.convertLabel("test1"))));
-              assertEquals(e2, getOnlyElement(graph.getEdges("label", graphTest.convertLabel("test2"))));
-              assertEquals(e3, getOnlyElement(graph.getEdges("label", graphTest.convertLabel("test3"))));
+        public void testAddVertexProperties() throws Exception {
+            BigdataGraphEmbedded graph = (BigdataGraphEmbedded) graphTest.generateGraph();
+            if (graph.getFeatures().supportsVertexProperties) {
+                Vertex v1 = graph.addVertex(graphTest.convertId("1"));
+                Vertex v2 = graph.addVertex(graphTest.convertId("2"));
+                
+//                graph.commit();
+                
+                for (Vertex v : graph.getVertices()) {
+                    System.err.println(v);
+                }
+
+                System.err.println("\n"+((BigdataSailRepositoryConnection)
+                        graph.getWriteConnection()).getTripleStore().dumpStore());
+                
+                if (graph.getFeatures().supportsStringProperty) {
+                    v1.setProperty("key1", "value1");
+                    graph.commit();
+                    System.err.println("\n"+((BigdataSailRepositoryConnection)
+                            graph.getWriteConnection()).getTripleStore().dumpStore());
+                    assertEquals("value1", v1.getProperty("key1"));
+                }
+
+                if (graph.getFeatures().supportsIntegerProperty) {
+                    v1.setProperty("key2", 10);
+                    v2.setProperty("key2", 20);
+
+                    assertEquals(10, v1.getProperty("key2"));
+                    assertEquals(20, v2.getProperty("key2"));
+                }
+
+            }
+            graph.shutdown();
+        }
+
+        
+        private void trySetProperty(final Element element, final String key, final Object value, final boolean allowDataType) {
+            boolean exceptionTossed = false;
+            try {
+                element.setProperty(key, value);
+            } catch (Throwable t) {
+                exceptionTossed = true;
+                if (!allowDataType) {
+                    assertTrue(t instanceof IllegalArgumentException);
+                } else {
+                    fail("setProperty should not have thrown an exception as this data type is accepted according to the GraphTest settings.\n\n" +
+                            "Exception was " + t);
+                }
+            }
+
+            if (!allowDataType && !exceptionTossed) {
+                fail("setProperty threw an exception but the data type should have been accepted.");
             }
         }
+
+        private void tryGetProperty(final Element element, final String key, final Object value, final boolean allowDataType) {
+
+            if (allowDataType) {
+                assertEquals(element.getProperty(key), value);
+            }
+        }
+
 
 
     }
@@ -160,10 +205,12 @@ public class TestBigdataGraphEmbedded extends AbstractTestBigdataGraph {
 			
 			try {
 	            if (testGraphs.containsKey(key) == false) {
-	                final BigdataSail testSail = getSail();
+	                final Properties props = getProperties();
+	                final BigdataSail testSail = getSail(props);
 	                testSail.initialize();
 	                final BigdataSailRepository repo = new BigdataSailRepository(testSail);
-	                final BigdataGraphEmbedded graph = new BigdataGraphEmbedded(repo) {
+	                final BigdataGraphEmbedded graph = new BigdataGraphEmbedded(
+	                        repo, BigdataRDFFactory.INSTANCE, props) {
 	    
 	                    /**
 	                     * Test cases have weird semantics for shutdown.
@@ -254,7 +301,7 @@ public class TestBigdataGraphEmbedded extends AbstractTestBigdataGraph {
         
         { // create a persistent instance
             
-            final BigdataGraph graph = BigdataGraphFactory.create(jnl.getAbsolutePath());
+            final BigdataGraph graph = BigdataGraphFactory.open(jnl.getAbsolutePath(), true);
             
             GraphMLReader.inputGraph(graph, TestBigdataGraphEmbedded.class.getResourceAsStream("graph-example-1.xml"));
             
@@ -279,7 +326,7 @@ public class TestBigdataGraphEmbedded extends AbstractTestBigdataGraph {
         
         { // re-open the persistent instance
             
-            final BigdataGraph graph = BigdataGraphFactory.open(jnl.getAbsolutePath());
+            final BigdataGraph graph = BigdataGraphFactory.open(jnl.getAbsolutePath(), true);
             
             System.err.println("persistent graph re-opened.");
             System.err.println("graph:");

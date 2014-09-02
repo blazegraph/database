@@ -22,6 +22,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.blueprints;
 
+import java.util.Arrays;
+import java.util.Set;
+
+import org.apache.log4j.Logger;
 import org.openrdf.model.URI;
 
 import com.tinkerpop.blueprints.Direction;
@@ -39,6 +43,8 @@ import com.tinkerpop.blueprints.util.DefaultVertexQuery;
  */
 public class BigdataVertex extends BigdataElement implements Vertex {
 
+    private static final transient Logger log = Logger.getLogger(BigdataVertex.class);
+    
 	public BigdataVertex(final URI uri, final BigdataGraph graph) {
 		super(uri, graph);
 	}
@@ -46,13 +52,19 @@ public class BigdataVertex extends BigdataElement implements Vertex {
 	@Override
 	public Object getId() {
 	    
-		return graph.factory.fromVertexURI(uri);
+        if (log.isInfoEnabled())
+            log.info("()");
+	    
+		return graph.factory.fromURI(uri);
 		
 	}
 	
 	@Override
 	public void remove() {
 	    
+        if (log.isInfoEnabled())
+            log.info("()");
+
 		graph.removeVertex(this);
 		
 	}
@@ -60,6 +72,9 @@ public class BigdataVertex extends BigdataElement implements Vertex {
 	@Override
 	public Edge addEdge(final String label, final Vertex to) {
 	    
+        if (log.isInfoEnabled())
+            log.info("("+label+", "+to+")");
+        
 		return graph.addEdge(null, this, to, label);
 		
 	}
@@ -68,6 +83,11 @@ public class BigdataVertex extends BigdataElement implements Vertex {
 	@SuppressWarnings("unchecked")
 	public Iterable<Edge> getEdges(final Direction dir, final String... labels) {
 	    
+        if (log.isInfoEnabled())
+            log.info("("+dir+
+                    (labels != null ? (", "+Arrays.toString(labels)) : "")
+                            +")");
+        
 		final URI wild = null;
 		
 		if (dir == Direction.OUT) {
@@ -92,6 +112,11 @@ public class BigdataVertex extends BigdataElement implements Vertex {
 	@SuppressWarnings("unchecked")
 	public Iterable<Vertex> getVertices(final Direction dir, final String... labels) {
 	    
+        if (log.isInfoEnabled())
+            log.info("("+dir+
+                    (labels != null ? (", "+Arrays.toString(labels)) : "")
+                            +")");
+        
 		final URI wild = null;
 		
 		if (dir == Direction.OUT) {
@@ -120,6 +145,9 @@ public class BigdataVertex extends BigdataElement implements Vertex {
 	@Override
 	public VertexQuery query() {
 	    
+        if (log.isInfoEnabled())
+            log.info("()");
+        
 		return new DefaultVertexQuery(this);
 		
 	}
@@ -130,5 +158,64 @@ public class BigdataVertex extends BigdataElement implements Vertex {
 	    return "v["+uri.getLocalName()+"]";
 	    
 	}
+
+    @Override
+    public <T> T getProperty(final String prop) {
+        
+        if (log.isInfoEnabled())
+            log.info("("+prop+")");
+        
+        return super.getProperty(prop);
+    }
+
+    @Override
+    public Set<String> getPropertyKeys() {
+        
+        if (log.isInfoEnabled())
+            log.info("()");
+        
+        return super.getPropertyKeys();
+        
+    }
+
+    @Override
+    public <T> T removeProperty(final String prop) {
+        
+        if (log.isInfoEnabled())
+            log.info("("+prop+")");
+        
+        return super.removeProperty(prop);
+        
+    }
+
+    @Override
+    public void setProperty(final String prop, final Object val) {
+        
+        if (log.isInfoEnabled())
+            log.info("("+prop+", "+val+")");
+        
+        super.setProperty(prop, val);
+        
+    }
+
+//    @Override
+//    public void addProperty(final String prop, final Object val) {
+//        
+//        if (log.isInfoEnabled())
+//            log.info("("+prop+", "+val+")");
+//        
+//        super.addProperty(prop, val);
+//        
+//    }
+//
+//    @Override
+//    public <T> List<T> getProperties(final String prop) {
+//        
+//        if (log.isInfoEnabled())
+//            log.info("("+prop+")");
+//        
+//        return super.getProperties(prop);
+//        
+//    }
 	
 }

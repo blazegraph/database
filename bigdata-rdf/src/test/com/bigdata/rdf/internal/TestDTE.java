@@ -60,6 +60,10 @@ public class TestDTE extends TestCase {
 
         for(DTE e : DTE.values()) {
 
+            if (e == DTE.Extension) {
+                continue;
+            }
+            
             // verify can decode from [v].
             {
 

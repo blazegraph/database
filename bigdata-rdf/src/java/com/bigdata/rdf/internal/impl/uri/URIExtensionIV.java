@@ -9,10 +9,10 @@ import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.internal.impl.AbstractInlineExtensionIV;
 import com.bigdata.rdf.internal.impl.AbstractInlineIV;
 import com.bigdata.rdf.internal.impl.literal.AbstractLiteralIV;
-import com.bigdata.rdf.internal.impl.literal.FullyInlineTypedLiteralIV;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataURI;
+import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.vocab.Vocabulary;
 
 /**
@@ -44,7 +44,7 @@ public class URIExtensionIV<V extends BigdataURI>
     /**
      * The localName.
      */
-    private final FullyInlineTypedLiteralIV<BigdataLiteral> delegateIV;
+    private final AbstractLiteralIV<BigdataLiteral, ?> delegateIV;
 
     /**
      * {@inheritDoc}
@@ -72,7 +72,7 @@ public class URIExtensionIV<V extends BigdataURI>
     
     /**
      * 
-     * @param localNameIV
+     * @param delegateIV
      *            The {@link IV} which represents the localName.
      * @param namespaceIV
      *            The {@link IV} which represents the namespace. This MUST be a
@@ -80,10 +80,10 @@ public class URIExtensionIV<V extends BigdataURI>
      */
     @SuppressWarnings("unchecked")
     public URIExtensionIV(
-    		final FullyInlineTypedLiteralIV<BigdataLiteral> localNameIV, 
+    		final AbstractLiteralIV<BigdataLiteral, ?> delegateIV, 
     		final IV<?,?> namespaceIV) {
         
-        super(VTE.URI, true/* extension */, localNameIV.getDTE());
+        super(VTE.URI, true/* extension */, delegateIV.getDTE());
 
         if (namespaceIV == null)
             throw new IllegalArgumentException();
@@ -91,32 +91,28 @@ public class URIExtensionIV<V extends BigdataURI>
         if (!namespaceIV.isInline())
             throw new IllegalArgumentException();
 
-        this.delegateIV = localNameIV;
+        this.delegateIV = delegateIV;
 
         this.namespaceIV = (AbstractInlineIV<BigdataURI, ?>) namespaceIV;
 
     }
     
     /**
-     * Even though Literal extension IVs are fully inline (no data in the 
-     * lexicon indices), we do need materialization to answer the openrdf
-     * Literal interface correctly. We cannot properly interpret what the
-     * delegate IV means without the materialized value.
+     * The namespace IV does need materialization, although it will not need
+     * to go to the index to get the value (it just needs access to the lexicon's
+     * vocabulary).
      */
     public boolean needsMaterialization() {
-    	return true;
+    	return delegateIV.needsMaterialization() 
+    	            || namespaceIV.needsMaterialization();
     }
     
     public AbstractLiteralIV<BigdataLiteral, ?> getLocalNameIV() {
-        
         return delegateIV;
-        
     }
     
     public Object getInlineValue() { // TODO TEST
-
         return new URIImpl(stringValue());
-
     }
     
     /**
@@ -124,18 +120,14 @@ public class URIExtensionIV<V extends BigdataURI>
      */
     @Override
     public IV<BigdataURI, ?> getExtensionIV() {
-        
         return namespaceIV;
-        
     }
     
     /**
      * 
      */
     public int hashCode() {// TODO Inspect distribution.
-        
         return namespaceIV.hashCode() ^ delegateIV.hashCode();
-        
     }
 
     public boolean equals(final Object o) {
@@ -146,6 +138,10 @@ public class URIExtensionIV<V extends BigdataURI>
                     && this.namespaceIV.equals(((URIExtensionIV<?>) o).namespaceIV);
         }
         return false;
+    }
+    
+    public String toString() {
+        return this.namespaceIV.toString() + ":" + this.delegateIV.toString();
     }
     
     @SuppressWarnings("rawtypes")
@@ -183,12 +179,18 @@ public class URIExtensionIV<V extends BigdataURI>
 		
 		if (v == null) {
 			
-//			final BigdataValueFactory f = lex.getValueFactory();
+			final BigdataValueFactory f = lex.getValueFactory();
 			
-			final ILexiconConfiguration config = lex.getLexiconConfiguration();
+//			final ILexiconConfiguration config = lex.getLexiconConfiguration();
+//
+//            v = setValue((V) config.asValueFromVocab(this));
 
-			v = setValue((V) config.asValueFromVocab(this));
-
+			final URI namespace = namespaceIV.asValue(lex);
+			
+			final String localName = delegateIV.getInlineValue().toString();
+			
+			v = setValue((V) f.createURI(namespace.stringValue(), localName));
+			
 			v.setIV(this);
 
 		}
@@ -197,25 +199,23 @@ public class URIExtensionIV<V extends BigdataURI>
 		
     }
 
+	////////////////////////
+	// OpenRDF URI methods
+	////////////////////////
+	
 	@Override
 	public String stringValue() {
-	
         return getNamespace() + getLocalName();
-	    
 	}
 
     @Override
     public String getNamespace() {
-
-        return ((URI) namespaceIV.getInlineValue()).stringValue();
-        
+        return namespaceIV.getValue().stringValue();
     }
 
     @Override
     public String getLocalName() {
-
-        return delegateIV.getLabel();
-        
+        return delegateIV.getInlineValue().toString();
     }
     
 }

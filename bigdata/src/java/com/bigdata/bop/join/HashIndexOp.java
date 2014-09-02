@@ -38,6 +38,7 @@ import com.bigdata.bop.BOpEvaluationContext;
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IQueryAttributes;
+import com.bigdata.bop.ISingleThreadedOp;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
@@ -77,7 +78,7 @@ import cutthecrap.utils.striterators.SingleValueIterator;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
-abstract public class HashIndexOp extends PipelineOp {
+abstract public class HashIndexOp extends PipelineOp implements ISingleThreadedOp {
 
 //    static private final transient Logger log = Logger
 //            .getLogger(HashIndexOp.class);
@@ -150,11 +151,17 @@ abstract public class HashIndexOp extends PipelineOp {
                     BOp.Annotations.EVALUATION_CONTEXT + "="
                             + getEvaluationContext());
         }
-        if (getEvaluationContext() != BOpEvaluationContext.CONTROLLER) {
-            throw new IllegalArgumentException(
-                    BOp.Annotations.EVALUATION_CONTEXT + "="
-                            + getEvaluationContext());
-        }
+//        if (getEvaluationContext() != BOpEvaluationContext.CONTROLLER) {
+//            throw new IllegalArgumentException(
+//                    BOp.Annotations.EVALUATION_CONTEXT + "="
+//                            + getEvaluationContext());
+//        }
+
+        /*
+         * This operator writes on an object that is not thread-safe for
+         * mutation.
+         */
+        assertMaxParallelOne();
 
         if (!isLastPassRequested()) {
             /*

@@ -63,6 +63,26 @@ public class BigdataGraphQuery implements GraphQuery {
     private final BigdataGraph graph;
     
     /**
+     * URI used for typing elements.
+     */
+    protected final URI TYPE;
+    
+    /**
+     * URI used to represent a Vertex.
+     */
+    protected final URI VERTEX;
+    
+    /**
+     * URI used to represent a Edge.
+     */
+    protected final URI EDGE;
+
+    /**
+     * URI used for labeling edges.
+     */
+    protected final URI LABEL;
+
+    /**
      * The list of criteria.  Bigdata's query optimizer will re-order the
      * criteria based on selectivity and execute for maximum performance and
      * minimum IO.
@@ -76,6 +96,10 @@ public class BigdataGraphQuery implements GraphQuery {
     
     public BigdataGraphQuery(final BigdataGraph graph) {
         this.graph = graph;
+        this.TYPE = graph.getValueFactory().getTypeURI();
+        this.VERTEX = graph.getValueFactory().getVertexURI();
+        this.EDGE = graph.getValueFactory().getEdgeURI();
+        this.LABEL = graph.getValueFactory().getLabelURI();
     }
     
     /**
@@ -204,7 +228,7 @@ public class BigdataGraphQuery implements GraphQuery {
      */
     @Override
     public Iterable<Edge> edges() {
-        final String queryStr = toQueryStr(BigdataGraph.EDGE);
+        final String queryStr = toQueryStr(EDGE);
         return graph.getEdges(queryStr);
     }
 
@@ -215,7 +239,7 @@ public class BigdataGraphQuery implements GraphQuery {
      */
     @Override
     public Iterable<Vertex> vertices() {
-        final String queryStr = toQueryStr(BigdataGraph.VERTEX);
+        final String queryStr = toQueryStr(VERTEX);
         return graph.getVertices(queryStr, true);
     }
     
@@ -226,8 +250,8 @@ public class BigdataGraphQuery implements GraphQuery {
         
         final StringBuilder sb = new StringBuilder();
 
-        if (type == BigdataGraph.VERTEX) {
-            sb.append("construct { ?x rdf:type <"+type+"> . }\n");
+        if (type == VERTEX) {
+            sb.append("construct { ?x <"+TYPE+"> <"+type+"> . }\n");
             sb.append("{\n  select distinct ?x where {\n");
         } else {
             sb.append("construct { ?from ?x ?to . }\n");
@@ -235,7 +259,7 @@ public class BigdataGraphQuery implements GraphQuery {
             sb.append("    ?from ?x ?to .\n");
         }
         
-        final BlueprintsRDFFactory factory = graph.factory;
+        final BlueprintsValueFactory factory = graph.factory;
         
         boolean hasHas = false;
         
@@ -304,7 +328,7 @@ public class BigdataGraphQuery implements GraphQuery {
         // need a statement pattern for the filter not exists
         if (!hasHas) {
             
-            sb.append("    ?x rdf:type <").append(type).append("> .\n");
+            sb.append("    ?x <"+TYPE+"> <").append(type).append("> .\n");
             
         }
         
@@ -334,7 +358,7 @@ public class BigdataGraphQuery implements GraphQuery {
     private String toFilterStr(final BigdataPredicate pred, final String var,
             final Object val) {
         
-        final BlueprintsRDFFactory factory = graph.factory;
+        final BlueprintsValueFactory factory = graph.factory;
         
         final StringBuilder sb = new StringBuilder();
         

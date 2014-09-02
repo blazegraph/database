@@ -1,3 +1,29 @@
+/**
+
+Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
+
+Contact:
+     SYSTAP, LLC
+     4501 Tower Road
+     Greensboro, NC 27410
+     licenses@bigdata.com
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; version 2 of the License.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+*/
+/*
+ * Created on Oct 10, 2007
+ */
 package com.bigdata.journal;
 
 import java.util.Collection;
@@ -86,27 +112,25 @@ import com.bigdata.util.concurrent.WriteTaskCounters;
  * </dd>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class ConcurrencyManager implements IConcurrencyManager {
 
-    final protected static Logger log = Logger.getLogger(ConcurrencyManager.class);
+    static final private Logger log = Logger.getLogger(ConcurrencyManager.class);
     
 //    /**
 //     * True iff the {@link #log} level is INFO or less.
 //     */
 //    final protected static boolean INFO = log.isInfoEnabled();
-
-    /**
-     * True iff the {@link #log} level is DEBUG or less.
-     */
-    final protected static boolean DEBUG = log.isDebugEnabled();
+//
+//    /**
+//     * True iff the {@link #log} level is DEBUG or less.
+//     */
+//    final private static boolean DEBUG = log.isDebugEnabled();
     
     /**
      * Options for the {@link ConcurrentManager}.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     public static interface Options extends IServiceShutdown.Options {
 
@@ -423,6 +447,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
 //        
 //    }
     
+    @Override
     public ILocalTransactionManager getTransactionManager() {
         
         assertOpen();
@@ -430,7 +455,8 @@ public class ConcurrencyManager implements IConcurrencyManager {
         return transactionManager;
         
     }
-    
+
+    @Override
     public IResourceManager getResourceManager() {
         
         assertOpen();
@@ -439,6 +465,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
         
     }
 
+    @Override
     public boolean isOpen() {
         
         return open;
@@ -449,6 +476,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
      * Shutdown the thread pools (running tasks will run to completion, but no
      * new tasks will start).
      */
+    @Override
     synchronized public void shutdown() {
 
         if(!isOpen()) return;
@@ -552,6 +580,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
      * 
      * @see #shutdown()
      */
+    @Override
     public void shutdownNow() {
 
         if(!isOpen()) return;
@@ -942,7 +971,6 @@ public class ConcurrencyManager implements IConcurrencyManager {
      * the {@link ConcurrencyManager}.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     public static interface IConcurrencyManagerCounters {
        
@@ -977,7 +1005,6 @@ public class ConcurrencyManager implements IConcurrencyManager {
      * Reports the elapsed time since the service was started.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     private static class ServiceElapsedTimeInstrument extends Instrument<Long> {
      
@@ -989,6 +1016,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
             
         }
         
+        @Override
         public void sample() {
             
             setValue(System.currentTimeMillis() - serviceStartTime);
@@ -1000,11 +1028,13 @@ public class ConcurrencyManager implements IConcurrencyManager {
     /**
      * Return the {@link CounterSet}.
      */
-    synchronized public CounterSet getCounters() {
+    @Override
+//    synchronized 
+    public CounterSet getCounters() {
         
 //        if (countersRoot == null){
 
-            CounterSet countersRoot = new CounterSet();
+            final CounterSet countersRoot = new CounterSet();
 
             // elapsed time since the service started (milliseconds).
             countersRoot.addCounter("elapsed",
@@ -1114,6 +1144,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
      * @exception NullPointerException
      *                if task null
      */
+    @Override
     public <T> Future<T> submit(final AbstractTask<T> task) {
 
         assertOpen();
@@ -1191,7 +1222,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
      * @param task
      *            The task.
      */
-    private void journalOverextended(final AbstractTask task) {
+    private void journalOverextended(final AbstractTask<?> task) {
 
         final double overextension = getJournalOverextended();
 
@@ -1404,6 +1435,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
      * @exception RejectedExecutionException
      *                if any task cannot be scheduled for execution
      */
+    @Override
     public <T> List<Future<T>> invokeAll(
             final Collection<? extends AbstractTask<T>> tasks)
             throws InterruptedException {
@@ -1501,6 +1533,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
      * @exception RejectedExecutionException
      *                if any task cannot be scheduled for execution
      */
+    @Override
     public List<Future> invokeAll(
             final Collection<? extends AbstractTask> tasks, final long timeout,
             final TimeUnit unit) throws InterruptedException {

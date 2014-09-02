@@ -118,29 +118,64 @@ public class BigdataSailFactory {
     }
 
     /**
-     * Open an existing persistent bigdata instance.
+     * Open an existing persistent bigdata instance. If a journal does
+     * not exist at the specified location then an exception will be thrown.
      */
     public static BigdataSailRepository openRepository(final String file) {
         
-        return new BigdataSailRepository(openSail(file));
+        return new BigdataSailRepository(openSail(file, false));
         
     }
         
     /**
-     * Open an existing persistent bigdata instance.
+     * Open an existing persistent bigdata instance. If a journal does
+     * not exist at the specified location and the boolean create flag is true
+     * a journal will be created at that location with the default set of
+     * options.
+     */
+    public static BigdataSailRepository openRepository(final String file, 
+            final boolean create) {
+        
+        return new BigdataSailRepository(openSail(file, create));
+        
+    }
+        
+    /**
+     * Open an existing persistent bigdata instance. If a journal does
+     * not exist at the specified location then an exception will be thrown.
      */
     public static BigdataSail openSail(final String file) {
         
+        return openSail(file, false);
+        
+    }
+        
+    /**
+     * Open an existing persistent bigdata instance. If a journal does
+     * not exist at the specified location and the boolean create flag is true
+     * a journal will be created at that location with the default set of
+     * options.
+     */
+    public static BigdataSail openSail(final String file, final boolean create) {
+        
         if (!new File(file).exists()) {
-            throw new IllegalArgumentException("file does not exist - use create() method instead");
+            
+            if (!create) {
+                throw new IllegalArgumentException("journal does not exist at specified location");
+            } else {
+                return createSail(file);
+            }
+            
+        } else {
+        
+            final Properties props = new Properties();
+            props.setProperty(BigdataSail.Options.FILE, file);
+            
+            final BigdataSail sail = new BigdataSail(props);
+            
+            return sail;
+            
         }
-        
-        final Properties props = new Properties();
-        props.setProperty(BigdataSail.Options.FILE, file);
-        
-        final BigdataSail sail = new BigdataSail(props);
-        
-        return sail;
         
     }
     
@@ -150,7 +185,18 @@ public class BigdataSailFactory {
      */
     public static BigdataSailRepository createRepository(final Option... args) {
         
-        return new BigdataSailRepository(createSail(null, args));
+        return createRepository(new Properties(), null, args);
+        
+    }
+    
+    /**
+     * Create a new bigdata instance using the specified options.  Since no
+     * journal file is specified this must be an in-memory instance.
+     */
+    public static BigdataSailRepository createRepository(final Properties props,
+            final Option... args) {
+        
+        return createRepository(props, null, args);
         
     }
     
@@ -160,7 +206,18 @@ public class BigdataSailFactory {
     public static BigdataSailRepository createRepository(final String file,
             final Option... args) {
         
-        return new BigdataSailRepository(createSail(file, args));
+        return createRepository(new Properties(), file, args);
+        
+    }
+    
+    /**
+     * Create a new bigdata instance using the specified options.  Since no
+     * journal file is specified this must be an in-memory instance.
+     */
+    public static BigdataSailRepository createRepository(final Properties props,
+            final String file, final Option... args) {
+        
+        return new BigdataSailRepository(createSail(props, file, args));
         
     }
     
@@ -170,22 +227,33 @@ public class BigdataSailFactory {
      */
     public static BigdataSail createSail(final Option... args) {
         
-        return createSail(null, args);
+        return createSail(new Properties(), null, args);
+        
+    }
+    
+    /**
+     * Create a new bigdata instance using the specified options.  Since no
+     * journal file is specified this must be an in-memory instance.
+     */
+    public static BigdataSail createSail(final String file, 
+            final Option... args) {
+        
+        return createSail(new Properties(), null, args);
         
     }
     
     /**
      * Create a new bigdata instance using the specified options.
      */
-    public static BigdataSail createSail(final String file,
-            final Option... args) {
+    public static BigdataSail createSail(final Properties props,
+            final String file, final Option... args) {
         
         final List<Option> options = args != null ? 
                 Arrays.asList(args) : new LinkedList<Option>();
 
         checkArgs(file, options);
                 
-        final Properties props = new Properties();
+//        final Properties props = new Properties();
         
         if (file != null) {
             props.setProperty(BigdataSail.Options.FILE, file);
@@ -196,12 +264,10 @@ public class BigdataSailFactory {
         
         if (options.contains(Option.Inference)) {
             props.setProperty(BigdataSail.Options.AXIOMS_CLASS, OwlAxioms.class.getName());
-            props.setProperty(BigdataSail.Options.VOCABULARY_CLASS, RDFSVocabulary.class.getName());
             props.setProperty(BigdataSail.Options.TRUTH_MAINTENANCE, "true");
             props.setProperty(BigdataSail.Options.JUSTIFY, "true");
         } else {
             props.setProperty(BigdataSail.Options.AXIOMS_CLASS, NoAxioms.class.getName());
-            props.setProperty(BigdataSail.Options.VOCABULARY_CLASS, RDFSVocabulary.class.getName());
             props.setProperty(BigdataSail.Options.TRUTH_MAINTENANCE, "false");
             props.setProperty(BigdataSail.Options.JUSTIFY, "false");
         }

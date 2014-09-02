@@ -54,7 +54,7 @@ public class BigdataGraphClient extends BigdataGraph {
     }
     
     public BigdataGraphClient(final String bigdataEndpoint, 
-            final BlueprintsRDFFactory factory) {
+            final BlueprintsValueFactory factory) {
         this(new BigdataSailRemoteRepository(bigdataEndpoint), factory);
     }
 	
@@ -63,7 +63,7 @@ public class BigdataGraphClient extends BigdataGraph {
 	}
 	
 	public BigdataGraphClient(final RemoteRepository repo, 
-			final BlueprintsRDFFactory factory) {
+			final BlueprintsValueFactory factory) {
 	    this(new BigdataSailRemoteRepository(repo), factory);
 	}
 	
@@ -72,7 +72,7 @@ public class BigdataGraphClient extends BigdataGraph {
     }
     
     public BigdataGraphClient(final BigdataSailRemoteRepository repo, 
-            final BlueprintsRDFFactory factory) {
+            final BlueprintsValueFactory factory) {
         super(factory);
         
         this.repo = repo;
@@ -89,13 +89,21 @@ public class BigdataGraphClient extends BigdataGraph {
     /**
      * Get a {@link BigdataSailRemoteRepositoryConnection}.
      */
-	protected BigdataSailRemoteRepositoryConnection cxn() throws Exception {
+	protected BigdataSailRemoteRepositoryConnection getWriteConnection() throws Exception {
 	    if (cxn == null) {
 	        cxn = repo.getConnection();
 	    }
 	    return cxn;
 	}
 	
+    /**
+     * Get a {@link BigdataSailRemoteRepositoryConnection}. No difference in
+     * connection for remote clients.
+     */
+    protected BigdataSailRemoteRepositoryConnection getReadConnection() throws Exception {
+        return getWriteConnection();
+    }
+    
 	/**
 	 * Shutdown the connection and repository (client-side, not server-side).
 	 */

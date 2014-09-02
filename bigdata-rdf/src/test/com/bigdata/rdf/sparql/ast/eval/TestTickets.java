@@ -334,4 +334,14 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
         
     }
 
+    public void test_ticket_765() throws Exception {
+        new TestHelper("ticket-765",// testURI,
+                "ticket-765.rq",// queryFileURL
+                "ticket-765.trig",// dataFileURL
+                "ticket-765.srx",// resultFileURL
+                false // checkOrder (because only one solution)
+        ).runTest();
+	
+    }
+
 }

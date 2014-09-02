@@ -57,7 +57,6 @@ import cutthecrap.utils.striterators.Striterator;
  * Abstract base class for a persistence capable extensible hash tree.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 abstract public class AbstractHTree implements ICounterSetAccess,
         ICheckpointProtocol, ISimpleTreeIndexAccess {

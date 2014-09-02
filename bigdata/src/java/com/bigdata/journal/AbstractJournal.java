@@ -245,7 +245,6 @@ import com.bigdata.util.StackInfoReport;
  * </p>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  * 
  * @todo There are lots of annoying ways in which asynchronously closing the
  *       journal, e.g., using {@link #close()} or {@link #shutdown()} can cause
@@ -5069,7 +5068,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
      *      cache for access to historical index views on the Journal by name
      *      and commitTime. </a>
      * 
-     *      TODO Reconcile API tension with {@link IIndex} and
+     *      FIXME GIST Reconcile API tension with {@link IIndex} and
      *      {@link ICheckpointProtocol}, however this method is overridden by
      *      {@link Journal} and is also implemented by
      *      {@link IBigdataFederation}. The central remaining tensions are
@@ -5654,8 +5653,10 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 	}
 	
     /**
+     * {@inheritDoc}
+     * <p>
      * Drops the named index. The index will no longer participate in atomic
-     * commits and will not be visible to new transactions.  Storage will be
+     * commits and will not be visible to new transactions. Storage will be
      * reclaimed IFF the backing store support that functionality.
      */
     @Override

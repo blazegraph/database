@@ -467,7 +467,7 @@ public class StatusServlet extends BigdataRDFServlet {
                 final PrintWriter out = new PrintWriter(resp.getOutputStream(),
                         true/* autoFlush */);
 
-                out.print("<pre>\n");
+                out.print("<pre id=\"journal-dump\">\n");
 
                 final DumpJournal dump = new DumpJournal(
                         (Journal) getIndexManager());
@@ -508,12 +508,13 @@ public class StatusServlet extends BigdataRDFServlet {
                 dump.dumpJournal(out, namespaces, dumpHistory, dumpPages,
                         dumpIndices, dumpTuples);
 
+                out.print("\n</pre>");
+
                 // flush PrintStream before resuming writes on Writer.
                 out.flush();
 
                 // close section.
                 // section.close();
-                out.print("\n</pre>");
 
             }
 
@@ -533,11 +534,16 @@ public class StatusServlet extends BigdataRDFServlet {
 
             }
 
-            current.node("br", "Accepted query count="
-                    + getBigdataRDFContext().getQueryIdFactory().get());
+            current.node("p").text("Accepted query count=")
+               .node("span").attr("id", "accepted-query-count")
+               .text("" +getBigdataRDFContext().getQueryIdFactory().get())
+               .close()
+            .close();
 
-            current.node("br", "Running query count="
-                    + getBigdataRDFContext().getQueries().size());
+            current.node("p").text("Running query count=")
+               .node("span").attr("id", "running-query-count")
+               .text("" + getBigdataRDFContext().getQueries().size()).close()
+            .close();
 
             // Offer a link to the "showQueries" page.
             {
@@ -551,11 +557,12 @@ public class StatusServlet extends BigdataRDFServlet {
 
                 current.node("p").text("Show ")
                         //
-                        .node("a").attr("href", showQueriesURL).text("queries")
-                        .close()//
+                        .node("a").attr("href", showQueriesURL)
+                        .attr("id", "show-queries").text("queries").close()
                         .text(", ")//
-                        .node("a").attr("href", showQueriesDetailsURL)//
-                        .text("query details").close()//
+                        .node("a").attr("href", showQueriesDetailsURL)
+                        .attr("id", "show-query-details").text("query details")
+                        .close()//
                         .text(".").close();
 
             }
@@ -566,12 +573,16 @@ public class StatusServlet extends BigdataRDFServlet {
                         .getNamespaces(getTimestamp(req));
 
                 current.node("h3", "Namespaces: ");
+                
+                XMLBuilder.Node ul = current.node("ul").attr("id", "namespaces");
 
                 for (String s : namespaces) {
 
-                    current.node("p", s);
+                    ul.node("li", s);
 
                 }
+                
+                ul.close();
 
 			}
 
@@ -621,7 +632,8 @@ public class StatusServlet extends BigdataRDFServlet {
                 //
                 // }
 
-                current.node("pre", counterSet.toString());
+                current.node("p").attr("id",  "counter-set")
+                .text(counterSet.toString()).close();
 
             }
 
@@ -910,6 +922,7 @@ public class StatusServlet extends BigdataRDFServlet {
             
             // Open <p>.
             current.node("p")
+            .attr("class", "update")
             //
 //            .text("solutions=" + solutionsOut)
 //            //
@@ -917,9 +930,12 @@ public class StatusServlet extends BigdataRDFServlet {
 //            //
 //            .text(", children=" + children.length)
             //
-            .text("elapsed=" + elapsedMillis + "ms")
+            .text("elapsed=").node("span")
+               .attr("class", "elapsed").text("" + elapsedMillis).close()
+            .text("ms")
             //
             .text(", ").node("a").attr("href", detailsURL)
+            .attr("class", "details-url")
             .text("details").close()//
             .close();
 
@@ -952,7 +968,8 @@ public class StatusServlet extends BigdataRDFServlet {
 
                 current.node("h2", "SPARQL");
 
-                current.node("pre", queryString);
+                current.node("p").attr("class", "query-string")
+                .text(queryString).close();
 
             }
 
@@ -965,7 +982,8 @@ public class StatusServlet extends BigdataRDFServlet {
 
                     current.node("h2", "Parse Tree");
 
-                    current.node("pre", parseTree.dump(""));
+                    current.node("p").attr("class", "parse-tree")
+                    .text(parseTree.dump("")).close();
 
                 }
 
@@ -976,7 +994,8 @@ public class StatusServlet extends BigdataRDFServlet {
 
                     current.node("h2", "Original AST");
 
-                    current.node("pre", originalAST.toString());
+                    current.node("p").attr("class", "original-ast")
+                    .text(originalAST.toString()).close();
 
                 }
                 
@@ -1078,15 +1097,21 @@ public class StatusServlet extends BigdataRDFServlet {
 
             current.node("p")
                     //
-                    .text("solutions=" + solutionsOut)
+                    .text("solutions=").node("span").attr("class", "solutions")
+                       .text(""+ solutionsOut).close()
                     //
-                    .text(", chunks=" + chunksOut)
+                    .text(", chunks=").node("span").attr("class", "chunks")
+                       .text(""+ chunksOut).close()
                     //
-                    .text(", children=" + children.length)
+                    .text(", children=").node("span").attr("class", "children")
+                       .text("" + children.length).close()
                     //
-                    .text(", elapsed=" + elapsedMillis + "ms")
+                    .text(", elapsed=").node("span").attr("class", "elapsed")
+                       .text("" + elapsedMillis).close()
+                    .text("ms, ")
                     //
-                    .text(", ").node("a").attr("href", detailsURL)
+                    .node("a").attr("href", detailsURL)
+                    .attr("class",  "details-url")
                     .text("details").close()//
                     .close();
 
@@ -1121,7 +1146,8 @@ public class StatusServlet extends BigdataRDFServlet {
 
                 current.node("h2", "SPARQL");
 
-                current.node("pre", queryString);
+                current.node("p").attr("class", "query-string").text(queryString)
+                .close();
 
             }
 
@@ -1134,7 +1160,8 @@ public class StatusServlet extends BigdataRDFServlet {
 
                     current.node("h2", "Parse Tree");
 
-                    current.node("pre", parseTree.dump(""));
+                    current.node("p").attr("class", "parse-tree")
+                    .text(parseTree.dump("")).close();
 
                 }
 
@@ -1145,7 +1172,8 @@ public class StatusServlet extends BigdataRDFServlet {
 
                     current.node("h2", "Original AST");
 
-                    current.node("pre", originalAST.toString());
+                    current.node("p").attr("class", "original-ast")
+                    .text(originalAST.toString()).close();
 
                 }
 
@@ -1156,7 +1184,8 @@ public class StatusServlet extends BigdataRDFServlet {
 
                     current.node("h2", "Optimized AST");
 
-                    current.node("pre", optimizedAST.toString());
+                    current.node("p").attr("class", "optimized-ast")
+                    .text(optimizedAST.toString()).close();
 
                 }
 
@@ -1167,8 +1196,8 @@ public class StatusServlet extends BigdataRDFServlet {
 
                     current.node("h2", "Query Plan");
 
-                    current.node("pre", BOpUtility
-                            .toString(queryPlan));
+                    current.node("p").attr("class", "query-plan")
+                    .text(BOpUtility.toString(queryPlan)).close();
 
                 }
 

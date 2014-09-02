@@ -409,7 +409,7 @@ public class AST2BOpContext implements IdFactory, IEvaluationContext {
 
         this.db = db;
 
-        this.optimizers = new DefaultOptimizerList();
+        this.optimizers = new DefaultOptimizerList(db.isBottomUpEvaluation());
 
         this.idFactory = idFactory;
         

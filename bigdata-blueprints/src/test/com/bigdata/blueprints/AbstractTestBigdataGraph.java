@@ -22,11 +22,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.blueprints;
 
-import java.io.File;
-import java.lang.reflect.Method;
-import java.util.Arrays;
-import java.util.LinkedHashMap;
-import java.util.List;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 
@@ -35,21 +33,19 @@ import org.apache.log4j.Logger;
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.sail.AbstractBigdataSailTestCase;
 import com.bigdata.rdf.sail.BigdataSail;
-import com.bigdata.rdf.sail.BigdataSailRepository;
 import com.bigdata.rdf.vocab.NoVocabulary;
-import com.tinkerpop.blueprints.Contains;
 import com.tinkerpop.blueprints.Edge;
 import com.tinkerpop.blueprints.EdgeTestSuite;
+import com.tinkerpop.blueprints.Element;
 import com.tinkerpop.blueprints.Graph;
 import com.tinkerpop.blueprints.GraphQueryTestSuite;
 import com.tinkerpop.blueprints.GraphTestSuite;
-import com.tinkerpop.blueprints.KeyIndexableGraph;
 import com.tinkerpop.blueprints.TestSuite;
 import com.tinkerpop.blueprints.Vertex;
 import com.tinkerpop.blueprints.VertexQueryTestSuite;
 import com.tinkerpop.blueprints.VertexTestSuite;
 import com.tinkerpop.blueprints.impls.GraphTest;
-import com.tinkerpop.blueprints.util.io.graphml.GraphMLReader;
+import com.tinkerpop.blueprints.util.io.MockSerializable;
 
 /**
  */
@@ -92,6 +88,8 @@ public abstract class AbstractTestBigdataGraph extends AbstractBigdataSailTestCa
         // triples mode
         props.setProperty(BigdataSail.Options.QUADS, "false");
         props.setProperty(BigdataSail.Options.STATEMENT_IDENTIFIERS, "false");
+        
+        props.setProperty(BigdataGraph.Options.READ_FROM_WRITE_CONNECTION, "true");
         
         return props;
         
@@ -164,7 +162,8 @@ public abstract class AbstractTestBigdataGraph extends AbstractBigdataSailTestCa
         test.doTestSuite(new GraphQueryTestSuite(test));
         GraphTest.printTestPerformance("GraphQueryTestSuite", test.stopWatch());
     }
-//
+
+    
 //    public void testTransactionalGraphTestSuite() throws Exception {
 //    	final GraphTest test = newBigdataGraphTest();
 //    	test.stopWatch();
@@ -184,78 +183,15 @@ public abstract class AbstractTestBigdataGraph extends AbstractBigdataSailTestCa
 //        
 //    }
     
-//    private static class BigdataTestSuite extends TestSuite {
-//        
-//        public BigdataTestSuite(final BigdataGraphTest graphTest) {
-//            super(graphTest);
-//        }
-//        
-//        public void testGraphQueryForHasOR() {
-//            Graph graph = graphTest.generateGraph();
-//            if (graph.getFeatures().supportsEdgeIndex && graph instanceof KeyIndexableGraph) {
-//                ((KeyIndexableGraph) graph).createKeyIndex("type", Edge.class);
-//            }
-//            if (graph.getFeatures().supportsEdgeIteration  && graph.getFeatures().supportsEdgeProperties && graph.getFeatures().supportsVertexProperties) {
-//                Vertex marko = graph.addVertex(null);
-//                marko.setProperty("name", "marko");
-//                Vertex matthias = graph.addVertex(null);
-//                matthias.setProperty("name", "matthias");
-//                Vertex stephen = graph.addVertex(null);
-//                stephen.setProperty("name", "stephen");
-//
-//                Edge edge = marko.addEdge("knows", stephen);
-//                edge.setProperty("type", "tinkerpop");
-//                edge.setProperty("weight", 1.0);
-//                edge = marko.addEdge("knows", matthias);
-//                edge.setProperty("type", "aurelius");
-//
-//                assertEquals(count(graph.query().has("type", Contains.IN, Arrays.asList("tinkerpop", "aurelius")).edges()), 2);
-//                assertEquals(count(graph.query().has("type", Contains.IN, Arrays.asList("tinkerpop", "aurelius")).has("type", "tinkerpop").edges()), 1);
-//                assertEquals(count(graph.query().has("type", Contains.IN, Arrays.asList("tinkerpop", "aurelius")).has("type", "tinkerpop").has("type", "aurelius").edges()), 0);
-//                assertEquals(graph.query().has("weight").edges().iterator().next().getProperty("type"), "tinkerpop");
-//                assertEquals(graph.query().has("weight").edges().iterator().next().getProperty("weight"), 1.0);
-//                assertEquals(graph.query().hasNot("weight").edges().iterator().next().getProperty("type"), "aurelius");
-//                assertNull(graph.query().hasNot("weight").edges().iterator().next().getProperty("weight"));
-//
-//                List result = asList(graph.query().has("name", Contains.IN, Arrays.asList("marko", "stephen")).vertices());
-//                for (Object o : result) {
-//                    final Vertex v = (Vertex) o;
-//                    log.trace(v.getProperty("name"));
-//                }
-//                assertEquals(result.size(), 2);
-//                assertTrue(result.contains(marko));
-//                assertTrue(result.contains(stephen));
-//                result = asList(graph.query().has("name", Contains.IN, Arrays.asList("marko", "stephen", "matthias", "josh", "peter")).vertices());
-//                assertEquals(result.size(), 3);
-//                assertTrue(result.contains(marko));
-//                assertTrue(result.contains(stephen));
-//                assertTrue(result.contains(matthias));
-//                result = asList(graph.query().has("name").vertices());
-//                assertEquals(result.size(), 3);
-//                assertTrue(result.contains(marko));
-//                assertTrue(result.contains(stephen));
-//                assertTrue(result.contains(matthias));
-//                result = asList(graph.query().hasNot("name").vertices());
-//                assertEquals(result.size(), 0);
-//                result = asList(graph.query().hasNot("blah").vertices());
-//                assertEquals(result.size(), 3);
-//                assertTrue(result.contains(marko));
-//                assertTrue(result.contains(stephen));
-//                assertTrue(result.contains(matthias));
-//                result = asList(graph.query().has("name", Contains.NOT_IN, Arrays.asList("bill", "sam")).vertices());
-//                assertEquals(result.size(), 3);
-//                assertTrue(result.contains(marko));
-//                assertTrue(result.contains(stephen));
-//                assertTrue(result.contains(matthias));
-//                result = asList(graph.query().has("name", Contains.IN, Arrays.asList("bill", "matthias", "stephen", "marko")).vertices());
-//                assertEquals(result.size(), 3);
-//                assertTrue(result.contains(marko));
-//                assertTrue(result.contains(stephen));
-//                assertTrue(result.contains(matthias));
-//            }
-//            graph.shutdown();
-//        }        
-//    }
+    private static class BigdataTestSuite extends TestSuite {
+        
+        public BigdataTestSuite(final GraphTest graphTest) {
+            super(graphTest);
+        }
+        
+
+
+    }
 //    
 //    
 //    private class BigdataGraphTest extends GraphTest {

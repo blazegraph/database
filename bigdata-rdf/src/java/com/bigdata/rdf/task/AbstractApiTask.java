@@ -24,8 +24,6 @@
  */
 package com.bigdata.rdf.task;
 
-import java.util.HashSet;
-import java.util.Set;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.atomic.AtomicReference;
@@ -314,24 +312,12 @@ abstract public class AbstractApiTask<T> implements IApiTask<T>, IReadOnly {
              * locks and will have exclusive access to the resources guarded by
              * those locks when they run.
              * 
-             * FIXME GROUP COMMIT: The {@link AbstractTask} was written to
-             * require the exact set of resource lock declarations. However, for
-             * the REST API, we want to operate on all indices associated with a
-             * KB instance. This requires either:
-             * <p>
-             * (a) pre-resolving the names of those indices and passing them all
-             * into the AbstractTask; or
-             * <P>
-             * (b) allowing the caller to only declare the namespace and then to
-             * be granted access to all indices whose names are in that
-             * namespace.
-             * 
-             * (b) is now possible with the fix to the Name2Addr prefix scan.
-             * 
-             * Note: We also need to isolate any named solution sets in the
-             * namespace of the KB. Those will be discovered along with the
-             * indices, but they may require changes to {@link AbstractTask}
-             * for GIST support.
+             * FIXME GROUP COMMIT: The hierarchical locking mechanisms will fail
+             * on durable named solution sets because they use either HTree or
+             * Stream and AbstractTask does not yet support those durable data
+             * structures (it is still being refactored to support the
+             * ICheckpointProtocol rather than the BTree in its Name2Addr
+             * isolation logic).
              */
 
             // Obtain the necessary locks for R/w access to KB indices.
@@ -350,7 +336,8 @@ abstract public class AbstractApiTask<T> implements IApiTask<T>, IReadOnly {
     }
     
     /**
-     * Acquire the locks for the named indices associated with the specified KB.
+     * Return the set of locks that the task must acquire in order to operate on
+     * the specified namespace.
      * 
      * @param indexManager
      *            The {@link Journal}.
@@ -360,51 +347,40 @@ abstract public class AbstractApiTask<T> implements IApiTask<T>, IReadOnly {
      * @return The locks for the named indices associated with that KB instance.
      * 
      * @throws DatasetNotFoundException
-     * 
-     *             FIXME GROUP COMMIT : [This should be replaced by the use of
-     *             the namespace and hierarchical locking support in
-     *             AbstractTask.] This could fail to discover a recently create
-     *             KB between the time when the KB is created and when the group
-     *             commit for that create becomes visible. This data race exists
-     *             because we are using [lastCommitTime] rather than the
-     *             UNISOLATED view of the GRS.
-     *             <p>
-     *             Note: This data race MIGHT be closed by the default locator
-     *             cache. If it records the new KB properties when they are
-     *             created, then they should be visible. If they are not
-     *             visible, then we have a data race. (But if it records them
-     *             before the group commit for the KB create, then the actual KB
-     *             indices will not be durable until the that group commit...).
-     *             <p>
-     *             Note: The problem can obviously be resolved by using the
-     *             UNISOLATED index to obtain the KB properties, but that would
-     *             serialize ALL updates. What we need is a suitable caching
-     *             mechanism that (a) ensures that newly create KB instances are
-     *             visible; and (b) has high concurrency for read-only requests
-     *             for the properties for those KB instances.
      */
     private static String[] getLocksForKB(final Journal indexManager,
             final String namespace) throws DatasetNotFoundException {
 
-        final long timestamp = indexManager.getLastCommitTime();
-
-        final AbstractTripleStore tripleStore = (AbstractTripleStore) indexManager
-                .getResourceLocator().locate(namespace, timestamp);
-
-        if (tripleStore == null)
-            throw new DatasetNotFoundException("Not found: namespace="
-                    + namespace + ", timestamp="
-                    + TimestampUtility.toString(timestamp));
-
-        final Set<String> lockSet = new HashSet<String>();
-
-        lockSet.addAll(tripleStore.getSPORelation().getIndexNames());
-
-        lockSet.addAll(tripleStore.getLexiconRelation().getIndexNames());
-
-        final String[] locks = lockSet.toArray(new String[lockSet.size()]);
-
-        return locks;
+        /*
+         * Note: There are two possible approaches here. One is to explicitly
+         * enumerate the index names for the triple store. The other is to
+         * specify the namespace of the triple store and use hierarchical
+         * locking.
+         * 
+         * This is now using hierarchical locking, so it just returns the
+         * namespace.
+         */
+        return new String[]{namespace};
+        
+//        final long timestamp = indexManager.getLastCommitTime();
+//
+//        final AbstractTripleStore tripleStore = (AbstractTripleStore) indexManager
+//                .getResourceLocator().locate(namespace, timestamp);
+//
+//        if (tripleStore == null)
+//            throw new DatasetNotFoundException("Not found: namespace="
+//                    + namespace + ", timestamp="
+//                    + TimestampUtility.toString(timestamp));
+//
+//        final Set<String> lockSet = new HashSet<String>();
+//
+//        lockSet.addAll(tripleStore.getSPORelation().getIndexNames());
+//
+//        lockSet.addAll(tripleStore.getLexiconRelation().getIndexNames());
+//
+//        final String[] locks = lockSet.toArray(new String[lockSet.size()]);
+//
+//        return locks;
 
     }
     

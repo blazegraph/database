@@ -33,14 +33,13 @@ import com.bigdata.btree.proc.IIndexProcedure;
  * on an {@link IConcurrencyManager}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
-public class IndexProcedureTask extends AbstractTask {
+public class IndexProcedureTask<T> extends AbstractTask<T> {
 
-    protected final IIndexProcedure proc;
+    private final IIndexProcedure<T> proc;
 
     public IndexProcedureTask(ConcurrencyManager concurrencyManager,
-            long startTime, String name, IIndexProcedure proc) {
+            long startTime, String name, IIndexProcedure<T> proc) {
 
         super(concurrencyManager, startTime, name);
 
@@ -51,7 +50,8 @@ public class IndexProcedureTask extends AbstractTask {
 
     }
 
-    final public Object doTask() throws Exception {
+    @Override
+    final public T doTask() throws Exception {
 
         return proc.apply(getIndex(getOnlyResource()));
 
@@ -60,6 +60,7 @@ public class IndexProcedureTask extends AbstractTask {
     /**
      * Returns the name of the {@link IIndexProcedure} that is being executed.
      */
+    @Override
     final protected String getTaskName() {
         
         return proc.getClass().getName();

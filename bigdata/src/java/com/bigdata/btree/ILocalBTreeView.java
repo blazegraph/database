@@ -36,7 +36,6 @@ import com.bigdata.btree.view.FusedView;
  * {@link AbstractBTree}s.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public interface ILocalBTreeView extends IIndex {
 

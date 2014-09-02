@@ -1,0 +1,5 @@
+SELECT ?bound ?unbound
+{ 
+  BIND ( "somevalue" as ?bound )
+} 
+ORDER BY LCASE(?unbound)

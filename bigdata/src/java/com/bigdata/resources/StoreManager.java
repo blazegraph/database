@@ -132,7 +132,6 @@ import com.bigdata.util.config.NicUtil;
  *       {@link #getDataDirFreeSpace(File)}
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 abstract public class StoreManager extends ResourceEvents implements
         IResourceManager {
@@ -140,13 +139,12 @@ abstract public class StoreManager extends ResourceEvents implements
     /**
      * Logger.
      */
-    protected static final Logger log = Logger.getLogger(StoreManager.class);
+    private static final Logger log = Logger.getLogger(StoreManager.class);
 
     /**
      * Options for the {@link StoreManager}.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     public static interface Options extends com.bigdata.journal.Options {
 
@@ -267,7 +265,6 @@ abstract public class StoreManager extends ResourceEvents implements
      * Performance counters for the {@link StoreManager}.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     public static interface IStoreManagerCounters {
        
@@ -1351,10 +1348,10 @@ abstract public class StoreManager extends ResourceEvents implements
      * then the {@link StoreManager} will be {@link StoreManager#shutdownNow()}.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     private class Startup implements Runnable {
 
+        @Override
         public void run() {
 
             try {
@@ -1885,6 +1882,7 @@ abstract public class StoreManager extends ResourceEvents implements
      * remains <code>true</code> until either {@link #shutdown()} or
      * {@link #shutdownNow()} is invoked.
      */
+    @Override
     public boolean isOpen() {
 
         return open.get();
@@ -1900,6 +1898,7 @@ abstract public class StoreManager extends ResourceEvents implements
 //        
 //    }
     
+    @Override
     synchronized public void shutdown() {
 
         if (log.isInfoEnabled())
@@ -1944,6 +1943,7 @@ abstract public class StoreManager extends ResourceEvents implements
         
     }
 
+    @Override
     synchronized public void shutdownNow() {
 
         if(log.isInfoEnabled())
@@ -1991,7 +1991,6 @@ abstract public class StoreManager extends ResourceEvents implements
      * Helper class gathers statistics about files during a scan.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     private static class Stats {
 
@@ -2077,7 +2076,8 @@ abstract public class StoreManager extends ResourceEvents implements
 
     }
 
-    private void scanFile(File file, Stats stats) throws InterruptedException {
+    private void scanFile(final File file, final Stats stats)
+            throws InterruptedException {
 
         if (Thread.interrupted())
             throw new InterruptedException();
@@ -2229,6 +2229,7 @@ abstract public class StoreManager extends ResourceEvents implements
 
     }
 
+    @Override
     public File getTmpDir() {
 
         return tmpDir;
@@ -2238,6 +2239,7 @@ abstract public class StoreManager extends ResourceEvents implements
     /**
      * Note: The returned {@link File} is in canonical form.
      */
+    @Override
     public File getDataDir() {
 
         return dataDir;
@@ -2476,7 +2478,6 @@ abstract public class StoreManager extends ResourceEvents implements
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
      *         Thompson</a>
-     * @version $Id$
      */
     public class ManagedJournal extends AbstractJournal {
 
@@ -2516,6 +2517,7 @@ abstract public class StoreManager extends ResourceEvents implements
  
         }
 
+        @Override
         public String toString() {
             
             /*
@@ -2721,25 +2723,26 @@ abstract public class StoreManager extends ResourceEvents implements
         }
         
         @Override
-    	public ScheduledFuture<?> addScheduledTask(Runnable task,
-    			long initialDelay, long delay, TimeUnit unit) {
-    		return getFederation().addScheduledTask(task, initialDelay, delay, unit);
-    	}
+        public ScheduledFuture<?> addScheduledTask(Runnable task,
+                long initialDelay, long delay, TimeUnit unit) {
+            return getFederation().addScheduledTask(task, initialDelay, delay,
+                    unit);
+        }
 
         @Override
-    	public boolean getCollectPlatformStatistics() {
-    		return getFederation().getCollectPlatformStatistics();
-    	}
+        public boolean getCollectPlatformStatistics() {
+            return getFederation().getCollectPlatformStatistics();
+        }
 
         @Override
-    	public boolean getCollectQueueStatistics() {
-    		return getFederation().getCollectQueueStatistics();
-    	}
+        public boolean getCollectQueueStatistics() {
+            return getFederation().getCollectQueueStatistics();
+        }
 
         @Override
-    	public int getHttpdPort() {
-    		return getFederation().getHttpdPort();
-    	}
+        public int getHttpdPort() {
+            return getFederation().getHttpdPort();
+        }
 
     } // class ManagedJournal
 
@@ -2751,6 +2754,7 @@ abstract public class StoreManager extends ResourceEvents implements
      * @throws IllegalStateException
      *             if the {@link StoreManager} is still starting up.
      */
+    @Override
     public ManagedJournal getLiveJournal() {
         
         assertRunning();
@@ -2798,6 +2802,7 @@ abstract public class StoreManager extends ResourceEvents implements
      *       (there should not be since we do a commit when we register the
      *       indices on the new store).
      */
+    @Override
     public AbstractJournal getJournal(final long timestamp) {
 
         assertRunning();
@@ -2870,6 +2875,7 @@ abstract public class StoreManager extends ResourceEvents implements
      *       something goes wrong (except that I was planning to drop the file
      *       name from that interface).
      */
+    @Override
     public IRawStore openStore(final UUID uuid) {
 
         assertRunning();
@@ -3103,6 +3109,7 @@ abstract public class StoreManager extends ResourceEvents implements
 
     }
     
+    @Override
     public void deleteResources() {
 
         assertNotOpen();
@@ -4582,6 +4589,7 @@ abstract public class StoreManager extends ResourceEvents implements
 
     }
 
+    @Override
     public File getIndexSegmentFile(final IndexMetadata indexMetadata) {
 
         if (indexMetadata == null)
