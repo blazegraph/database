@@ -49,6 +49,7 @@ import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.UnsyncLocalOutputBuffer;
 
 import cutthecrap.utils.striterators.ICloseableIterator;
+import cutthecrap.utils.striterators.SingleValueIterator;
 
 /**
  * Operator builds a hash index from the source solutions. Once all source
@@ -100,6 +101,17 @@ abstract public class HashIndexOp extends PipelineOp {
          */
         final String NAMED_SET_SOURCE_REF = "namedSetSourceRef";
 
+        /**
+         * An optional attribute specifying the <em>source</em> IBindingSet[]
+         * for the index build operation. Normally, the hash index is built from
+         * the solutions flowing through the pipeline. When this attribute is
+         * specified, the hash index is instead built from the solutions in the
+         * specified IBindingSet[]. Regardless, the solutions flowing through
+         * the pipeline are copied to the sink once the hash index has been
+         * built.
+         */
+        final String BINDING_SETS_SOURCE = "bindingSets";
+        
     }
 
     /**
@@ -138,20 +150,10 @@ abstract public class HashIndexOp extends PipelineOp {
                     BOp.Annotations.EVALUATION_CONTEXT + "="
                             + getEvaluationContext());
         }
-//        if (getEvaluationContext() != BOpEvaluationContext.CONTROLLER) {
-//            throw new IllegalArgumentException(
-//                    BOp.Annotations.EVALUATION_CONTEXT + "="
-//                            + getEvaluationContext());
-//        }
-
-        if (getMaxParallel() != 1) {
-            /*
-             * Parallel evaluation is not allowed. This operator writes on an
-             * object that is not thread-safe for mutation.
-             */
+        if (getEvaluationContext() != BOpEvaluationContext.CONTROLLER) {
             throw new IllegalArgumentException(
-                    PipelineOp.Annotations.MAX_PARALLEL + "="
-                            + getMaxParallel());
+                    BOp.Annotations.EVALUATION_CONTEXT + "="
+                            + getEvaluationContext());
         }
 
         if (!isLastPassRequested()) {
@@ -224,11 +226,11 @@ abstract public class HashIndexOp extends PipelineOp {
         
     }
     
-	/**
-	 * Evaluates the subquery for each source binding set. If the controller
-	 * operator is interrupted, then the subqueries are cancelled. If a subquery
-	 * fails, then all subqueries are cancelled.
-	 */
+    /**
+     * Evaluates the subquery for each source binding set. If the controller
+     * operator is interrupted, then the subqueries are cancelled. If a subquery
+     * fails, then all subqueries are cancelled.
+     */
     private static class ChunkTask implements Callable<Void> {
 
         private final BOpContext<IBindingSet> context;
@@ -268,7 +270,7 @@ abstract public class HashIndexOp extends PipelineOp {
             
             this.stats = ((NamedSolutionSetStats) context.getStats());
 
-            // Metadata to identify the named solution set.
+            // Metadata to identify the target named solution set.
             final INamedSolutionSetRef namedSetRef = (INamedSolutionSetRef) op
                     .getRequiredProperty(Annotations.NAMED_SET_REF);
 
@@ -312,8 +314,10 @@ abstract public class HashIndexOp extends PipelineOp {
             }
             
             // true iff we will build the index from the pipeline.
-            this.sourceIsPipeline = null == op
-                    .getProperty(Annotations.NAMED_SET_SOURCE_REF);
+            this.sourceIsPipeline //
+                = (op.getProperty(Annotations.NAMED_SET_SOURCE_REF) == null)
+                && (op.getProperty(Annotations.BINDING_SETS_SOURCE) == null)
+                ;
 
         }
         
@@ -390,7 +394,7 @@ abstract public class HashIndexOp extends PipelineOp {
             
                 src = context.getSource();
                 
-            } else {
+            } else if (op.getProperty(Annotations.NAMED_SET_SOURCE_REF) != null) {
                 
                 /*
                  * Metadata to identify the optional *source* solution set. When
@@ -402,6 +406,22 @@ abstract public class HashIndexOp extends PipelineOp {
                         .getRequiredProperty(Annotations.NAMED_SET_SOURCE_REF);
 
                 src = context.getAlternateSource(namedSetSourceRef);
+                
+            } else if (op.getProperty(Annotations.BINDING_SETS_SOURCE) != null) {
+
+                /*
+                 * The IBindingSet[] is directly given. Just wrap it up as an
+                 * iterator. It will visit a single chunk of solutions.
+                 */
+                final IBindingSet[] bindingSets = (IBindingSet[]) op
+                        .getProperty(Annotations.BINDING_SETS_SOURCE);
+
+                src = new SingleValueIterator<IBindingSet[]>(bindingSets);
+                
+            } else {
+
+                throw new UnsupportedOperationException(
+                        "Source was not specified");
                 
             }
 

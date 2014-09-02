@@ -29,12 +29,17 @@ package com.bigdata.rdf.sail.tck;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.util.Properties;
 
 import org.apache.log4j.Logger;
 import org.junit.Test;
+import org.openrdf.model.Literal;
 import org.openrdf.model.Resource;
+import org.openrdf.model.URI;
+import org.openrdf.model.Value;
+import org.openrdf.query.BindingSet;
+import org.openrdf.query.QueryLanguage;
+import org.openrdf.query.TupleQueryResult;
 import org.openrdf.query.parser.sparql.ComplexSPARQLQueryTest;
 import org.openrdf.repository.Repository;
 import org.openrdf.repository.RepositoryException;
@@ -42,11 +47,14 @@ import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFParseException;
 
 import com.bigdata.BigdataStatics;
+import com.bigdata.bop.BOpUtility;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSail.Options;
 import com.bigdata.rdf.sail.BigdataSailRepository;
+import com.bigdata.rdf.sail.BigdataSailTupleQuery;
+import com.bigdata.rdf.sparql.ast.eval.AST2BOpUtility;
 
 /**
  * Bigdata integration for the {@link ComplexSPARQLQueryTest}.
@@ -301,11 +309,55 @@ public class BigdataComplexSparqlQueryTest extends ComplexSPARQLQueryTest {
         super.testSES1991RANDEvaluation();
     }
 
+    /**
+     * The one is fixed now.
+     */
     @Override
     @Test
     public void testValuesInOptional() throws Exception {
-        if (runKnownBadTests)
         super.testValuesInOptional();
+    }
+    
+    /**
+     * TODO Write optimizer to pull this BindingsClause out of the join
+     * group and make it global.
+     */
+    public void testRequiredValues() throws Exception {
+        loadTestData("/testdata-query/dataset-ses1692.trig");
+        StringBuilder query = new StringBuilder();
+        query.append(" PREFIX : <http://example.org/>\n");
+        query.append(" SELECT DISTINCT ?a ?name ?isX WHERE { ?b :p1 ?a . ?a :name ?name. ?a a :X . VALUES(?isX) { (:X) } } ");
+
+        BigdataSailTupleQuery tq = (BigdataSailTupleQuery)
+                conn.prepareTupleQuery(QueryLanguage.SPARQL, query.toString());
+        
+        if (logger.isInfoEnabled()) {
+            logger.info("optimized ast:\n"+tq.optimize());
+            logger.info("query plan:\n"+BOpUtility.toString(tq.getASTContainer().getQueryPlan()));
+        }
+
+        TupleQueryResult result = tq.evaluate();
+        assertNotNull(result);
+        assertTrue(result.hasNext());
+
+        int count = 0;
+        while (result.hasNext()) {
+            count++;
+            BindingSet bs = result.next();
+            System.out.println(bs);
+            URI a = (URI)bs.getValue("a");
+            assertNotNull(a);
+            Value isX = bs.getValue("isX");
+            Literal name = (Literal)bs.getValue("name");
+            assertNotNull(name);
+            if (a.stringValue().endsWith("a1")) {
+                assertNotNull(isX);
+            }
+            else if (a.stringValue().endsWith(("a2"))) {
+                assertNull(isX);
+            }
+        }
+        assertEquals(1, count);
     }
 
 }

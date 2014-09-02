@@ -166,6 +166,7 @@ public class BindingsClause extends GroupMemberNodeBase<BindingsClause>
 
     }
 
+    @Override
     public String toString(final int indent) {
 
         final LinkedHashSet<IVariable<?>> declaredVars = getDeclaredVariables();

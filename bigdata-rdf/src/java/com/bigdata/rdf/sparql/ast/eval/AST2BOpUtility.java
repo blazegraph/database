@@ -61,6 +61,7 @@ import com.bigdata.bop.join.JVMSolutionSetHashJoinOp;
 import com.bigdata.bop.join.JoinAnnotations;
 import com.bigdata.bop.join.JoinTypeEnum;
 import com.bigdata.bop.join.NestedLoopJoinOp;
+import com.bigdata.bop.join.SolutionSetHashJoinOp;
 import com.bigdata.bop.paths.ArbitraryLengthPathOp;
 import com.bigdata.bop.paths.ZeroLengthPathOp;
 import com.bigdata.bop.rdf.join.ChunkedMaterializationOp;
@@ -90,7 +91,6 @@ import com.bigdata.rdf.internal.constraints.ContextNotAvailableException;
 import com.bigdata.rdf.internal.constraints.INeedsMaterialization.Requirement;
 import com.bigdata.rdf.internal.constraints.InBOp;
 import com.bigdata.rdf.internal.constraints.IsBoundBOp;
-import com.bigdata.rdf.internal.constraints.NowBOp;
 import com.bigdata.rdf.internal.constraints.ProjectedConstraint;
 import com.bigdata.rdf.internal.constraints.SPARQLConstraint;
 import com.bigdata.rdf.internal.constraints.TryBeforeMaterializationConstraint;
@@ -154,6 +154,7 @@ import com.bigdata.rdf.spo.ExplicitSPOFilter;
 import com.bigdata.rdf.spo.SPOPredicate;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.relation.accesspath.ElementFilter;
+import com.bigdata.striterator.Chunkerator;
 
 import cutthecrap.utils.striterators.FilterBase;
 import cutthecrap.utils.striterators.IFilter;
@@ -1469,13 +1470,183 @@ public class AST2BOpUtility extends AST2BOpRTO {
     }
 
     /**
-     * TODO Grab the binding sets from the BindingsClause, attach them to
-     * the query as a named subquery with a hash index, and then add a 
-     * named subquery include to the pipeline right here.
+     * This handles a VALUES clause. It grabs the binding sets from the
+     * BindingsClause, attach them to the query as a named subquery with a hash
+     * index, and then add a named subquery include to the pipeline right here.
+     * <p>
+     * The VALUES are interpreted using a solution set hash join. The "plan" for
+     * the hash join of the VALUES with the solutions flowing through the
+     * pipeline is: (a) we take the IBindingSet[] and use a {@link HashIndexOp}
+     * to generate the hash index; and (b) we use a
+     * {@link SolutionSetHashJoinOp} to join the solutions from the pipeline
+     * with those in the hash index. Both JVM and HTree versions of this plan
+     * are supported.
+     * <p>
+     * 1. {@link HashIndexOp} (JVM or HTree): Specify the IBindingSet[] as the
+     * source. When the HashIndexOp runs, it will build a hash index from the
+     * IBindingSet[].
+     * <p>
+     * Note: The join variables need to be set based on the known bound
+     * variables in the context where we will evaluate the solution set hash
+     * join (head of the sub-SELECT, OPTIONAL) and those that are bound by the
+     * solution set hash join.
+     * <p>
+     * Note: The static analysis code needs to examine the definitely, and maybe
+     * produced bindings for the {@link BindingsClause}. See the
+     * {@link ISolutionSetStats} interface and
+     * {@link SolutionSetStatserator#get(IBindingSet[])} for a convenience
+     * method.
+     * <p>
+     * 2. {@link SolutionSetHashJoinOp} (JVM or HTree): Joins the solutions
+     * flowing into the sub-query or update with the solutions from the
+     * HashIndexOp. This will take each solution from the pipeline, probe the
+     * hash index for solutions specified by the VALUES clause, and then do a
+     * JOIN for each such solution that is discovered.
      */
     private static PipelineOp addValues(PipelineOp left,
-            final BindingsClause bc,
+            final BindingsClause bindingsClause,
             final Set<IVariable<?>> doneSet, final AST2BOpContext ctx) {
+
+        // Convert solutions from VALUES clause to an IBindingSet[].
+        final IBindingSet[] bindingSets = BOpUtility.toArray(
+                new Chunkerator<IBindingSet>(bindingsClause.getBindingSets().iterator()),//
+                null/*stats*/
+                );
+        
+        // Static analysis of the VALUES solutions.
+        final ISolutionSetStats bindingsClauseStats = SolutionSetStatserator
+                .get(bindingSets);
+        
+        @SuppressWarnings("rawtypes")
+        final Map<IConstraint, Set<IVariable<IV>>> needsMaterialization = new LinkedHashMap<IConstraint, Set<IVariable<IV>>>();
+
+        /*
+         * BindingsClause is an IBindingsProducer, but it should also be
+         * an IJoinNode. That will let us attach constraints
+         * (getJoinConstraints()) and identify the join variables for the VALUES
+         * sub-plan (getJoinVars()).
+         */
+        final IConstraint[] joinConstraints = getJoinConstraints(
+                getJoinConstraints(bindingsClause), needsMaterialization);
+
+        /*
+         * Model the VALUES JOIN by building a hash index over the IBindingSet[]
+         * from the VALUES clause. Then use a solution set hash join to join the
+         * solutions flowing through the pipeline with those in the hash index.
+         */
+        final String solutionSetName = "--values-" + ctx.nextId(); // Unique name.
+
+        final Set<IVariable<?>> joinVarSet = ctx.sa.getJoinVars(bindingsClause,
+                bindingsClauseStats, new LinkedHashSet<IVariable<?>>());
+
+        @SuppressWarnings("rawtypes")
+        final IVariable[] joinVars = joinVarSet.toArray(new IVariable[0]);
+
+//            if (joinVars.length == 0) {
+//
+//                /*
+//                 * Note: If there are no join variables then the join will
+//                 * examine the full N x M cross product of solutions. That is
+//                 * very inefficient, so we are logging a warning.
+//                 */
+//
+//                log.warn("No join variables: " + subqueryRoot);
+//                
+//            }
+        
+        final INamedSolutionSetRef namedSolutionSet = NamedSolutionSetRefUtility.newInstance(
+                ctx.queryId, solutionSetName, joinVars);
+
+        // VALUES is not optional.
+        final JoinTypeEnum joinType = JoinTypeEnum.Normal;
+
+        // lastPass is required except for normal joins.
+        final boolean lastPass = false; 
+
+        // true if we will release the HTree as soon as the join is done.
+        // Note: also requires lastPass.
+        final boolean release = lastPass;
+
+        // join can be pipelined unless last pass evaluation is required
+        final int maxParallel = lastPass ? 1
+                : ctx.maxParallelForSolutionSetHashJoin;
+
+        // Generate the hash index operator.
+        if(ctx.nativeHashJoins) {
+            left = applyQueryHints(new HTreeHashIndexOp(leftOrEmpty(left),//
+                new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
+                new NV(BOp.Annotations.EVALUATION_CONTEXT,
+                        BOpEvaluationContext.CONTROLLER),//
+                new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),// required for lastPass
+                new NV(PipelineOp.Annotations.LAST_PASS, true),// required
+                new NV(PipelineOp.Annotations.SHARED_STATE, true),// live stats.
+                new NV(HTreeHashIndexOp.Annotations.RELATION_NAME, new String[]{ctx.getLexiconNamespace()}),//                    new NV(HTreeHashIndexOp.Annotations.JOIN_VARS, joinVars),//
+                new NV(HTreeHashIndexOp.Annotations.JOIN_TYPE, joinType),//
+                new NV(HTreeHashIndexOp.Annotations.JOIN_VARS, joinVars),//
+                new NV(HTreeHashIndexOp.Annotations.CONSTRAINTS, joinConstraints),// Note: will be applied by the solution set hash join.
+//                    new NV(HTreeHashIndexOp.Annotations.SELECT, projectedVars),//
+                new NV(HTreeHashIndexOp.Annotations.BINDING_SETS_SOURCE, bindingSets),// source solutions from VALUES.
+                new NV(HTreeHashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)// output named solution set.
+            ), bindingsClause, ctx);
+        } else {
+            left = applyQueryHints(new JVMHashIndexOp(leftOrEmpty(left),//
+                new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
+                new NV(BOp.Annotations.EVALUATION_CONTEXT,
+                        BOpEvaluationContext.CONTROLLER),//
+                new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),// required for lastPass
+                new NV(PipelineOp.Annotations.LAST_PASS, true),// required
+                new NV(PipelineOp.Annotations.SHARED_STATE, true),// live stats.
+                new NV(JVMHashIndexOp.Annotations.JOIN_TYPE, joinType),//
+                new NV(JVMHashIndexOp.Annotations.JOIN_VARS, joinVars),//
+                new NV(JVMHashIndexOp.Annotations.CONSTRAINTS, joinConstraints),// Note: will be applied by the solution set hash join.
+//                    new NV(HTreeHashIndexOp.Annotations.SELECT, projectedVars),//
+                new NV(HTreeHashIndexOp.Annotations.BINDING_SETS_SOURCE, bindingSets),// source solutions from VALUES.
+                new NV(JVMHashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)// output named solution set.
+            ), bindingsClause, ctx);
+        }
+
+        // Generate the solution set hash join operator.
+        if(ctx.nativeHashJoins) {
+            left = applyQueryHints(new HTreeSolutionSetHashJoinOp(
+                leftOrEmpty(left),//
+                new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
+                new NV(BOp.Annotations.EVALUATION_CONTEXT,
+                        BOpEvaluationContext.CONTROLLER),//
+                new NV(PipelineOp.Annotations.MAX_PARALLEL, maxParallel),//
+                new NV(PipelineOp.Annotations.SHARED_STATE, true),// live stats.
+//                    new NV(HTreeSolutionSetHashJoinOp.Annotations.OPTIONAL, optional),//
+//                    new NV(HTreeSolutionSetHashJoinOp.Annotations.JOIN_VARS, joinVars),//
+//                    new NV(HTreeSolutionSetHashJoinOp.Annotations.SELECT, null/*all*/),// 
+//                    new NV(HTreeSolutionSetHashJoinOp.Annotations.CONSTRAINTS, joinConstraints),//
+                new NV(HTreeSolutionSetHashJoinOp.Annotations.RELEASE, release),//
+                new NV(HTreeSolutionSetHashJoinOp.Annotations.LAST_PASS, lastPass),//
+                new NV(HTreeSolutionSetHashJoinOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
+            ), bindingsClause, ctx);
+        } else {
+            left = applyQueryHints(new JVMSolutionSetHashJoinOp(
+                leftOrEmpty(left),//
+                new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
+                new NV(BOp.Annotations.EVALUATION_CONTEXT,
+                        BOpEvaluationContext.CONTROLLER),//
+                new NV(PipelineOp.Annotations.MAX_PARALLEL, maxParallel),//
+                new NV(PipelineOp.Annotations.SHARED_STATE, true),// live stats.
+//                    new NV(JVMSolutionSetHashJoinOp.Annotations.OPTIONAL, optional),//
+//                    new NV(JVMSolutionSetHashJoinOp.Annotations.JOIN_VARS, joinVars),//
+//                    new NV(JVMSolutionSetHashJoinOp.Annotations.SELECT, null/*all*/),//
+//                    new NV(JVMSolutionSetHashJoinOp.Annotations.CONSTRAINTS, joinConstraints),//
+                new NV(JVMSolutionSetHashJoinOp.Annotations.RELEASE, release),//
+                new NV(JVMSolutionSetHashJoinOp.Annotations.LAST_PASS, lastPass),//
+                new NV(JVMSolutionSetHashJoinOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
+            ), bindingsClause, ctx);
+        }
+
+        /*
+         * For each filter which requires materialization steps, add the
+         * materializations steps to the pipeline and then add the filter to the
+         * pipeline.
+         */
+        left = addMaterializationSteps3(left, doneSet, needsMaterialization,
+                bindingsClause.getQueryHints(), ctx);
 
         return left;
         
@@ -2672,7 +2843,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
                 continue;
             } else if (child instanceof BindingsClause) {
                 /*
-                 * VALUES clause
+                 * FIXME Support VALUES clause
                  */
                 left = addValues(left,
                         (BindingsClause) child, doneSet, ctx);
