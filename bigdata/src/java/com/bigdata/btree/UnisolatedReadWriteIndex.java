@@ -30,6 +30,7 @@ package com.bigdata.btree;
 import java.util.Iterator;
 import java.util.WeakHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -159,7 +160,7 @@ public class UnisolatedReadWriteIndex implements IIndex, ILinearList {
                 
             }
             
-//            writeLock.lock();
+            // writeLock.lock();
             
             if(!writeLock.tryLock( LOCK_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)) {
                 
@@ -189,8 +190,6 @@ public class UnisolatedReadWriteIndex implements IIndex, ILinearList {
      */
     public Lock readLock() {
         
-        final Lock readLock = readWriteLock.readLock();
-
         try {
 
             if(log.isDebugEnabled()) {
@@ -201,7 +200,7 @@ public class UnisolatedReadWriteIndex implements IIndex, ILinearList {
                 
             }
             
-//            readLock.lock();
+            // readLock.lock();
             
             if(!readLock.tryLock( LOCK_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)) {
                 
@@ -214,9 +213,70 @@ public class UnisolatedReadWriteIndex implements IIndex, ILinearList {
             throw new RuntimeException(ex);
             
         }
+        
+        // We have attained the read lock
             
         return readLock;
         
+    }
+    
+    /**
+     * WrappedLock is used to intercept lock/unlock calls to the readLock to
+     * trigger calls to the AbstractBTree thread lock management that can be
+     * used to identify whether the readlock is held by the current thread.
+     * <p>
+     * This is tested in AbstractBTree.touch() to determine whether the touch
+     * should be ignored or trigger potential evictions.
+     */
+    class WrappedLock implements Lock {
+    	
+    	final Lock delegate;
+    	
+    	WrappedLock(Lock delegate) {
+    		this.delegate = delegate;
+    	}
+
+		@Override
+		public void lock() {
+			delegate.lock();
+			
+			ndx.readLockedThread();
+		}
+
+		@Override
+		public void lockInterruptibly() throws InterruptedException {
+			delegate.lockInterruptibly();
+		}
+
+		@Override
+		public boolean tryLock() {
+			final boolean ret = delegate.tryLock();
+			if (ret) {
+				ndx.readLockedThread();
+			}
+			return ret;
+		}
+
+		@Override
+		public boolean tryLock(long time, TimeUnit unit)
+				throws InterruptedException {
+			final boolean ret = delegate.tryLock(time, unit);
+			if (ret) {
+				ndx.readLockedThread();
+			}
+			return ret;
+		}
+
+		@Override
+		public void unlock() {
+			delegate.unlock();
+			ndx.readUnlockedThread();
+		}
+
+		@Override
+		public Condition newCondition() {
+			return delegate.newCondition();
+		}   	
     }
     
     /**
@@ -268,7 +328,9 @@ public class UnisolatedReadWriteIndex implements IIndex, ILinearList {
      */
     final private ReadWriteLock readWriteLock;
 
-    /**
+	final private Lock readLock;
+
+	/**
      * Canonicalizing mapping for the locks used to control access to the
      * unisolated index.
      */
@@ -349,6 +411,8 @@ public class UnisolatedReadWriteIndex implements IIndex, ILinearList {
 
         this.readWriteLock = getReadWriteLock(ndx);
         
+        this.readLock = new WrappedLock(readWriteLock.readLock());
+        
     }
 
 	/**
@@ -382,8 +446,8 @@ public class UnisolatedReadWriteIndex implements IIndex, ILinearList {
 			return readWriteLock;
 		}
 
-	}   
-    
+	} 
+	    
     @Override
     public String toString() {
         

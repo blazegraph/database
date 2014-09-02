@@ -29,6 +29,7 @@ package com.bigdata.btree;
 import java.lang.ref.WeakReference;
 import java.lang.reflect.Constructor;
 import java.util.Iterator;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Lock;
 
@@ -899,22 +900,23 @@ public class BTree extends AbstractBTree implements //ICommitter,
 		 * @see https://sourceforge.net/apps/trac/bigdata/ticket/343
 		 * @see https://sourceforge.net/apps/trac/bigdata/ticket/440
 		 */
-//        final Lock lock = new UnisolatedReadWriteIndex(this).writeLock();
-        final Lock lock = UnisolatedReadWriteIndex.getReadWriteLock(this).writeLock();
-        lock.lock();
-        try {
-
-			if (/* autoCommit && */needsCheckpoint()) {
-
-				/*
-				 * Flush the btree, write a checkpoint record, and return the
-				 * address of that checkpoint record. The [checkpoint] reference
-				 * is also updated.
-				 */
-
-				return _writeCheckpoint2();
-
-			}
+		final Lock lock = new UnisolatedReadWriteIndex(this).writeLock();
+		//final Lock lock = UnisolatedReadWriteIndex.getReadWriteLock(this).writeLock();
+		//lock.lock();
+		try {
+			//synchronized(this) {
+				if (/* autoCommit && */needsCheckpoint()) {
+	
+					/*
+					 * Flush the btree, write a checkpoint record, and return the
+					 * address of that checkpoint record. The [checkpoint] reference
+					 * is also updated.
+					 */
+	
+					return _writeCheckpoint2();
+	
+				}
+			//}
 
 			/*
 			 * There have not been any writes on this btree or auto-commit is
@@ -1109,14 +1111,14 @@ public class BTree extends AbstractBTree implements //ICommitter,
     @Override
     final public long getRecordVersion() {
     	
-        return recordVersion;
+    	return recordVersion;
 
     }
     
     @Override
     final public long getMetadataAddr() {
 
-        return metadata.getMetadataAddr();
+    	return metadata.getMetadataAddr();
 
     }
     
@@ -1312,7 +1314,7 @@ public class BTree extends AbstractBTree implements //ICommitter,
     @Override
     public long handleCommit(final long commitTime) {
 
-        return writeCheckpoint2().getCheckpointAddr();
+    	return writeCheckpoint2().getCheckpointAddr();
     	
     }
 
