@@ -65,7 +65,6 @@ import cutthecrap.utils.striterators.ICloseableIterator;
  * which join are output.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 abstract public class HashJoinOp<E> extends PipelineOp implements
         IShardwisePipelineOp<E> {

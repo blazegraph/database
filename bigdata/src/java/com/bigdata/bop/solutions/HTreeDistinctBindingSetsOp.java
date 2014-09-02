@@ -9,6 +9,7 @@ import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.HTreeAnnotations;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IQueryAttributes;
+import com.bigdata.bop.ISingleThreadedOp;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
@@ -42,10 +43,9 @@ import cutthecrap.utils.striterators.ICloseableIterator;
  * on the native heap and eventually the machine will begin to swap.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id: DistinctElementFilter.java 3466 2010-08-27 14:28:04Z
- *          thompsonbry $
  */
-public class HTreeDistinctBindingSetsOp extends PipelineOp {
+public class HTreeDistinctBindingSetsOp extends PipelineOp implements
+        ISingleThreadedOp {
 
 //	private final static transient Logger log = Logger
 //			.getLogger(DistinctBindingSetsWithHTreeOp.class);
@@ -96,9 +96,7 @@ public class HTreeDistinctBindingSetsOp extends PipelineOp {
 							+ getEvaluationContext());
 		}
 
-		if (getMaxParallel() != 1)
-			throw new UnsupportedOperationException(Annotations.MAX_PARALLEL
-					+ "=" + getMaxParallel());
+		assertMaxParallelOne();
 
 //		// shared state is used to share the hash table.
 //		if (!isSharedState()) {

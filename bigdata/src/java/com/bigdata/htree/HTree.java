@@ -68,13 +68,11 @@ import com.bigdata.rawstore.IRawStore;
  * An mutable persistence capable extensible hash tree.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  * 
  * @see <a
  *      href="A robust scheme for multilevel extendible hashing (2003)">
  *      A Robust Scheme for Multilevel Extendible Hashing </a> by Sven Helmer,
  *      Thomas Neumann, Guido Moerkotte. ISCIS 2003: 220-227.
- * 
  * 
  *      TODO It should be possible to define an native int32 hash table in
  *      parallel to the unsigned byte[] hash table simply by having an

@@ -1,9 +1,69 @@
 $(function() {
 
-// global variables
-var RW_URL_PREFIX, RO_URL_PREFIX, DEFAULT_NAMESPACE, NAMESPACE, NAMESPACES_READY, NAMESPACE_SHORTCUTS, FILE_CONTENTS, QUERY_RESULTS;
-var CODEMIRROR_DEFAULTS, EDITORS = {}, ERROR_LINE_MARKERS = {}, ERROR_CHARACTER_MARKERS = {};
-var PAGE_SIZE = 50, TOTAL_PAGES, CURRENT_PAGE;
+'use strict';
+/* jshint validthis: true */
+
+/* Global variables */
+
+// LBS/non-LBS URL prefixes
+var RW_URL_PREFIX, RO_URL_PREFIX;
+
+// query/update editors
+var EDITORS = {}, ERROR_LINE_MARKERS = {}, ERROR_CHARACTER_MARKERS = {};
+var CODEMIRROR_DEFAULTS = {
+   lineNumbers: true,
+   matchBrackets: true,
+   mode: 'sparql',
+};
+// key is value of RDF type selector, value is name of CodeMirror mode
+var RDF_MODES = {
+   'n-triples': 'ntriples',
+   'rdf/xml': 'xml',
+   'json': 'json',
+   'turtle': 'turtle'
+};
+var FILE_CONTENTS = null;
+// file/update editor type handling
+// .xml is used for both RDF and TriX, assume it's RDF
+// We could check the parent element to see which it is
+var RDF_TYPES = {
+   'nq': 'n-quads',
+   'nt': 'n-triples',
+   'n3': 'n3',
+   'rdf': 'rdf/xml',
+   'rdfs': 'rdf/xml',
+   'owl': 'rdf/xml',
+   'xml': 'rdf/xml',
+   'json': 'json',
+   'trig': 'trig',
+   'trix': 'trix',
+   //'xml': 'trix',
+   'ttl': 'turtle'
+};
+var RDF_CONTENT_TYPES = {
+   'n-quads': 'text/x-nquads',
+   'n-triples': 'text/plain',
+   'n3': 'text/rdf+n3',
+   'rdf/xml': 'application/rdf+xml',
+   'json': 'application/sparql-results+json',
+   'trig': 'application/x-trig',
+   'trix': 'application/trix',
+   'turtle': 'application/x-turtle'
+};
+var SPARQL_UPDATE_COMMANDS = [
+   'INSERT',
+   'DELETE',
+   'LOAD',
+   'CLEAR'
+];
+
+// pagination
+var QUERY_RESULTS, PAGE_SIZE = 50, TOTAL_PAGES, CURRENT_PAGE;
+
+// namespaces
+var DEFAULT_NAMESPACE, NAMESPACE;
+
+// namespace creation
 var NAMESPACE_PARAMS = {
    'name': 'com.bigdata.rdf.sail.namespace',
    'index': 'com.bigdata.rdf.store.AbstractTripleStore.textIndex',
@@ -13,18 +73,55 @@ var NAMESPACE_PARAMS = {
    'axioms': 'com.bigdata.rdf.store.AbstractTripleStore.axiomsClass'
 };
 
-CODEMIRROR_DEFAULTS = {
-   lineNumbers: true,
-   mode: 'sparql',
-   extraKeys: {'Ctrl-,': moveTabLeft, 'Ctrl-.': moveTabRight}
+var NAMESPACE_SHORTCUTS = {
+   'Bigdata': {
+      'bd': 'http://www.bigdata.com/rdf#',
+      'bds': 'http://www.bigdata.com/rdf/search#',
+      'gas': 'http://www.bigdata.com/rdf/gas#',
+      'hint': 'http://www.bigdata.com/queryHints#'
+   },
+   'W3C': {
+      'rdf': 'http://www.w3.org/1999/02/22-rdf-syntax-ns#',
+      'rdfs': 'http://www.w3.org/2000/01/rdf-schema#',
+      'owl': 'http://www.w3.org/2002/07/owl#',
+      'skos': 'http://www.w3.org/2004/02/skos/core#',
+      'xsd': 'http://www.w3.org/2001/XMLSchema#'
+   },
+   'Dublin Core': {
+      'dc': 'http://purl.org/dc/elements/1.1/',
+      'dcterm': 'http://purl.org/dc/terms/',
+      'void': 'http://rdfs.org/ns/void#'
+   },
+   'Social/Other': {
+      'foaf': 'http://xmlns.com/foaf/0.1/',
+      'schema': 'http://schema.org/',
+      'sioc': 'http://rdfs.org/sioc/ns#'
+   },
+   'Custom': {}
 };
 
-// debug to access closure variables
-$('html, textarea, select').bind('keydown', 'ctrl+d', function() { debugger; });
+// data export
+var EXPORT_EXTENSIONS = {
+   'application/rdf+xml': ['RDF/XML', 'rdf', true],
+   'application/n-triples': ['N-Triples', 'nt', true],
+   'application/x-turtle': ['Turtle', 'ttl', true],
+   'text/rdf+n3': ['N3', 'n3', true],
+   'application/trix': ['TriX', 'trix', true],
+   'application/x-trig': ['TRIG', 'trig', true],
+   'text/x-nquads': ['NQUADS', 'nq', true],
+
+   'text/csv': ['CSV', 'csv', false, exportCSV],
+   'application/sparql-results+json': ['JSON', 'json', false, exportJSON],
+   // 'text/tab-separated-values': ['TSV', 'tsv', false, exportTSV],
+   'application/sparql-results+xml': ['XML', 'xml', false, exportXML]
+};
+
+
+/* Load balancing */
 
 function useLBS(state) {
-   // allows passing in of boolean, or firing on event
-   if(typeof(state) != 'boolean') {
+   // allows passing in of boolean, or firing on checkbox change
+   if(typeof state != 'boolean') {
       state = this.checked;
    }
    if(state) {
@@ -36,8 +133,7 @@ function useLBS(state) {
    }
    $('.use-lbs').prop('checked', state);
 }
-useLBS(true);
-$('.use-lbs').change(useLBS);
+
 
 /* Modal functions */
 
@@ -46,38 +142,40 @@ function showModal(id) {
    $('body').addClass('modal-open');
 }
 
-$('.modal-cancel').click(function() {
+function closeModal() {
    $('body').removeClass('modal-open');
    $(this).parents('.modal').hide();
-});
+}
+
 
 /* Search */
 
-$('#search-form').submit(function(e) {
+function submitSearch(e) {
    e.preventDefault();
    var term = $(this).find('input').val();
    if(!term) {
       return;
    }
-   var query = 'select ?s ?p ?o { ?o bds:search "' + term + '" . ?s ?p ?o . }'
+   var query = 'select ?s ?p ?o { ?o bds:search "' + term + '" . ?s ?p ?o . }';
    EDITORS.query.setValue(query);
    $('#query-errors').hide();
    $('#query-form').submit();
    showTab('query');
-});
+}
+
 
 /* Tab selection */
 
-$('#tab-selector a').click(function(e) {
+function clickTab() {
    showTab($(this).data('target'));
-});
+}
 
 function showTab(tab, nohash) {
    $('.tab').hide();
    $('#' + tab + '-tab').show();
    $('#tab-selector a').removeClass();
    $('a[data-target=' + tab + ']').addClass('active');
-   if(!nohash && window.location.hash.substring(1).indexOf(tab) != 0) {
+   if(!nohash && window.location.hash.substring(1).indexOf(tab) !== 0) {
       window.location.hash = tab;
    }
    if(EDITORS[tab]) {
@@ -111,70 +209,70 @@ function moveTab(next) {
    }
 }
 
-// these should be , and . but Hotkeys views those keypresses as these characters
-$('html, textarea, select').bind('keydown', 'ctrl+¼', moveTabLeft);
-$('html, textarea, select').bind('keydown', 'ctrl+¾', moveTabRight);
 
 /* Namespaces */
 
-function getNamespaces() {
-   $.get(RO_URL_PREFIX + 'namespace?describe-each-named-graph=false', function(data) {
-      $('#namespaces-list').empty();
-      var rdf = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#';
-      var namespaces = namespaces = data.getElementsByTagNameNS(rdf, 'Description')
-      for(var i=0; i<namespaces.length; i++) {
-         var title = namespaces[i].getElementsByTagName('title')[0].textContent;
-         var titleText = title == DEFAULT_NAMESPACE ? title + ' (default)' : title;
-         var url = namespaces[i].getElementsByTagName('sparqlEndpoint')[0].getAttributeNS(rdf, 'resource');
-         var use;
-         if(title == NAMESPACE) {
-            use = 'In use';
-         } else {
-            use = '<a href="#" class="use-namespace">Use</a>';
+function getNamespaces(synchronous) {
+   // synchronous mode is for startup only, and is false by default
+   var settings = {
+      async: !synchronous,
+      url: RO_URL_PREFIX + 'namespace?describe-each-named-graph=false',
+      success: function(data) {
+         $('#namespaces-list').empty();
+         var rdf = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#';
+         var namespaces = data.getElementsByTagNameNS(rdf, 'Description');
+         var i, title, titleText, use;
+         for(i=0; i<namespaces.length; i++) {
+            title = namespaces[i].getElementsByTagName('title')[0].textContent;
+            titleText = title == DEFAULT_NAMESPACE ? title + ' (default)' : title;
+            if(title == NAMESPACE) {
+               use = 'In use';
+            } else {
+               use = '<a href="#" class="use-namespace">Use</a>';
+            }
+            $('#namespaces-list').append('<tr data-name="' + title + '">><td>' + titleText + '</td><td>' + use + '</td><td><a href="#" class="delete-namespace">Delete</a></td><td><a href="#" class="namespace-properties">Properties</a></td><td><a href="#" class="clone-namespace">Clone</a></td><td><a href="' + RO_URL_PREFIX + 'namespace/' + title + '/sparql" class="namespace-service-description">Service Description</a></td></tr>');
          }
-         $('#namespaces-list').append('<li data-name="' + title + '">' + titleText + ' - ' + use + ' - <a href="#" class="delete-namespace">Delete</a> - <a href="#" class="namespace-properties">Properties</a> - <a href="#" class="clone-namespace">Clone</a> - <a href="' + RO_URL_PREFIX + 'namespace/' + title + '/sparql" class="namespace-service-description">Service Description</a></li>');
+         $('.use-namespace').click(function(e) {
+            e.preventDefault();
+            useNamespace($(this).parents('tr').data('name'));
+         });
+         $('.delete-namespace').click(function(e) {
+            e.preventDefault();
+            deleteNamespace($(this).parents('tr').data('name'));
+         });
+         $('.namespace-properties').click(function(e) {
+            e.preventDefault();
+            getNamespaceProperties($(this).parents('tr').data('name'));
+         });
+         $('.namespace-properties-java').click(function(e) {
+            e.preventDefault();
+            getNamespaceProperties($(this).parents('tr').data('name'), 'java');
+         });
+         $('.clone-namespace').click(function(e) {
+            e.preventDefault();
+            cloneNamespace($(this).parents('tr').data('name'));
+            $('#namespace-create-errors').html('');
+         });
+         $('.namespace-service-description').click(function() {
+            return confirm('This can be an expensive operation. Proceed anyway?');
+         });
       }
-      $('.use-namespace').click(function(e) {
-         e.preventDefault();
-         useNamespace($(this).parent().data('name'));
-      });
-      $('.delete-namespace').click(function(e) {
-         e.preventDefault();
-         deleteNamespace($(this).parent().data('name'));
-      });
-      $('.namespace-properties').click(function(e) {
-         e.preventDefault();
-         getNamespaceProperties($(this).parent().data('name'));
-      });
-      $('.namespace-properties-java').click(function(e) {
-         e.preventDefault();
-         getNamespaceProperties($(this).parent().data('name'), 'java');
-      });
-      $('.clone-namespace').click(function(e) {
-         e.preventDefault();
-         cloneNamespace($(this).parent().data('name'));
-         $('#namespace-create-errors').html('');
-      });
-      $('.namespace-service-description').click(function(e) {
-         return confirm('This can be an expensive operation. Proceed anyway?');
-      });
-      NAMESPACES_READY = true;
-   });
+   };
+   $.ajax(settings);
 }
 
-function selectNamespace(name) {
-   // for programmatically selecting a namespace with just its name
-   if(!NAMESPACES_READY) {
-      setTimeout(function() { selectNamespace(name); }, 10);
-   } else {
-      $('#namespaces-list li[data-name=' + name + '] a.use-namespace').click();
+function useNamespace(name, leaveLast) {
+   if(!namespaceExists(name) || name === NAMESPACE) {
+      return;
    }
-}
-
-function useNamespace(name) {
    $('#current-namespace').html(name);
    NAMESPACE = name;
    getNamespaces();
+   // this is for loading the last explored URI, which might otherwise
+   // overwrite the last used namespace
+   if(!leaveLast) {
+      localStorage.lastNamespace = name;
+   }
 }
 
 function deleteNamespace(namespace) {
@@ -186,7 +284,7 @@ function deleteNamespace(namespace) {
 
    if(confirm('Are you sure you want to delete the namespace ' + namespace + '?')) {
       if(namespace == NAMESPACE) {
-         // FIXME: what is the desired behaviour when deleting the current namespace?
+         useNamespace(DEFAULT_NAMESPACE);
       }
       var url = RW_URL_PREFIX + 'namespace/' + namespace;
       var settings = {
@@ -251,36 +349,37 @@ function cloneNamespace(namespace) {
    });
 }
 
+function namespaceExists(name) {
+   return $('#namespaces-list tr[data-name=' + name + ']').length !== 0;
+}
+
 function validateNamespaceOptions() {
-   var errors = [];
+   var errors = [], i;
    var name = $('#new-namespace-name').val().trim();
    if(!name) {
       errors.push('Enter a name');
    }
-   $('#namespaces-list li').each(function() {
-      if(name == $(this).data('name')) {
-         errors.push('Name already in use');
-         return false;
-      }
-   });
+   if(namespaceExists(name)) {
+      errors.push('Name already in use');
+   }
    if($('#new-namespace-mode').val() == 'quads' && $('#new-namespace-inference').is(':checked')) {
       errors.push('Inference is incompatible with quads mode');
    }
    $('#namespace-create-errors').html('');
-   for(var i=0; i<errors.length; i++) {
+   for(i=0; i<errors.length; i++) {
       $('#namespace-create-errors').append('<li>' + errors[i] + '</li>');
    }
-   return errors.length == 0;
+   return errors.length === 0;
 }
 
-$('#new-namespace-mode').change(function() {
+function changeNamespaceMode() {
    var quads = this.value == 'quads';
    $('#new-namespace-inference').prop('disabled', quads);
    $('#inference-quads-incompatible').toggle(quads);
    if(quads) {
       $('#new-namespace-inference').prop('checked', false);
    }
-});
+}
 
 function createNamespace(e) {
    e.preventDefault();
@@ -316,7 +415,7 @@ function createNamespace(e) {
 
    // TODO: allow for other options to be specified
    var data = '<?xml version="1.0" encoding="UTF-8" standalone="no"?>\n<!DOCTYPE properties SYSTEM "http://java.sun.com/dtd/properties.dtd">\n<properties>\n';
-   for(key in NAMESPACE_PARAMS) {
+   for(var key in NAMESPACE_PARAMS) {
       data += '<entry key="' + NAMESPACE_PARAMS[key] + '">' + params[key] + '</entry>\n';
    }
    data += '</properties>';
@@ -330,58 +429,24 @@ function createNamespace(e) {
    };
    $.ajax(RW_URL_PREFIX + 'namespace', settings);
 }
-$('#namespace-create').submit(createNamespace);
 
 function getDefaultNamespace() {
-   $.get(RO_URL_PREFIX + 'namespace?describe-each-named-graph=false&describe-default-namespace=true', function(data) {
-      // Chrome does not work with rdf\:Description, so look for Description too
-      var defaultDataset = $(data).find('rdf\\:Description, Description');
-      DEFAULT_NAMESPACE = defaultDataset.find('title')[0].textContent;
-      var url = defaultDataset.find('sparqlEndpoint')[0].attributes['rdf:resource'].textContent;
-      useNamespace(DEFAULT_NAMESPACE);
-   });
+   var settings = {
+      async: false,
+      url: RO_URL_PREFIX + 'namespace?describe-each-named-graph=false&describe-default-namespace=true',
+      success: function(data) {
+         // Chrome does not work with rdf\:Description, so look for Description too
+         var defaultDataset = $(data).find('rdf\\:Description, Description');
+         DEFAULT_NAMESPACE = defaultDataset.find('title')[0].textContent;
+      }
+   };
+   $.ajax(settings);
 }
-
-getDefaultNamespace();
 
 
 /* Namespace shortcuts */
 
-NAMESPACE_SHORTCUTS = {
-   'Bigdata': {
-      'bd': 'http://www.bigdata.com/rdf#',
-      'bds': 'http://www.bigdata.com/rdf/search#',
-      'gas': 'http://www.bigdata.com/rdf/gas#',
-      'hint': 'http://www.bigdata.com/queryHints#'
-   },
-   'W3C': {
-      'rdf': 'http://www.w3.org/1999/02/22-rdf-syntax-ns#',
-      'rdfs': 'http://www.w3.org/2000/01/rdf-schema#',
-      'owl': 'http://www.w3.org/2002/07/owl#',
-      'skos': 'http://www.w3.org/2004/02/skos/core#',
-      'xsd': 'http://www.w3.org/2001/XMLSchema#'
-   },
-   'Dublin Core': {
-      'dc': 'http://purl.org/dc/elements/1.1/',
-      'dcterm': 'http://purl.org/dc/terms/',
-      'void': 'http://rdfs.org/ns/void#'
-   },
-   'Social/Other': {
-      'foaf': 'http://xmlns.com/foaf/0.1/',
-      'schema': 'http://schema.org/',
-      'sioc': 'http://rdfs.org/sioc/ns#'
-   }
-};
-
-$('.namespace-shortcuts').html('Namespace shortcuts: ');
-for(var category in NAMESPACE_SHORTCUTS) {
-   var select = $('<select><option>' + category + '</option></select>').appendTo($('.namespace-shortcuts'));
-   for(var ns in NAMESPACE_SHORTCUTS[category]) {
-      select.append('<option value="' + NAMESPACE_SHORTCUTS[category][ns] + '">' + ns + '</option>');
-   }
-}
-
-$('.namespace-shortcuts select').change(function() {
+function selectNamespace() {
    var uri = this.value;
    var tab = $(this).parents('.tab').attr('id').split('-')[0];
    var current = EDITORS[tab].getValue();
@@ -393,8 +458,73 @@ $('.namespace-shortcuts select').change(function() {
 
    // reselect group label
    this.selectedIndex = 0;
-});
+}
 
+function showCustomNamespacesModal() {
+   showModal('custom-namespace-modal');
+}
+
+function createNamespaceShortcut() {
+   var ns = $('#custom-namespace-namespace').val().trim();
+   var uri = $('#custom-namespace-uri').val().trim();
+
+   // check namespace & URI are not empty, and namespace does not already exist
+   if(ns === '' || uri === '') {
+      return;
+   }
+   for(var category in NAMESPACE_SHORTCUTS) {
+      for(var oldNS in NAMESPACE_SHORTCUTS[category]) {
+         if(ns === oldNS) {
+            $('#custom-namespace-modal p').html(ns + ' is already in use for the URI ' + NAMESPACE_SHORTCUTS[category][ns]);
+            return;
+         }
+      }
+   }
+
+   // add namespace & URI, and clear form & error message
+   NAMESPACE_SHORTCUTS.Custom[ns] = uri;
+   saveCustomNamespaces();
+   $('#custom-namespace-modal p').html('');
+   $(this).siblings('input').val('');
+   populateNamespaceShortcuts();
+   $(this).siblings('.modal-cancel').click();
+}
+
+function populateNamespaceShortcuts() {
+   // add namespaces to dropdowns, and add namespaces to modal to allow deletion
+   $('.namespace-shortcuts').html('Namespace shortcuts: ');
+   $('#custom-namespace-modal li').remove();
+   for(var category in NAMESPACE_SHORTCUTS) {
+      var select = $('<select><option>' + category + '</option></select>').appendTo($('.namespace-shortcuts'));
+      for(var ns in NAMESPACE_SHORTCUTS[category]) {
+         select.append('<option value="' + NAMESPACE_SHORTCUTS[category][ns] + '">' + ns + '</option>');
+         if(category === 'Custom') {
+            // add custom namespaces to list for editing
+            $('#custom-namespace-modal ul').append('<li>' + ns + ' (' + NAMESPACE_SHORTCUTS[category][ns] + ') <a href="#" data-ns="' + ns + '"">Delete</a>');
+         }
+      }
+   }
+   var edit = $('<button>Edit</button>').appendTo($('.namespace-shortcuts'));
+}
+
+function deleteCustomNamespace(e) {
+   e.preventDefault();
+   if(confirm('Delete this namespace shortcut?')) {
+      delete NAMESPACE_SHORTCUTS.Custom[$(this).data('ns')];
+      populateNamespaceShortcuts();
+      saveCustomNamespaces();
+   }
+}
+
+function saveCustomNamespaces() {
+   localStorage.customNamespaces = JSON.stringify(NAMESPACE_SHORTCUTS.Custom);
+}
+
+function loadCustomNamespaces() {
+   if(typeof localStorage.customNamespaces !== 'undefined') {
+      NAMESPACE_SHORTCUTS.Custom = JSON.parse(localStorage.customNamespaces);
+   }
+}
 
 /* Update */
 
@@ -432,16 +562,16 @@ function handleFile(files) {
       alert('File too large, enter local path to file');
       EDITORS.update.setValue('/path/to/' + f.name);
       setType('path');
-      EDITORS.update.setOption('readOnly', false)
+      EDITORS.update.setOption('readOnly', false);
       $('#large-file-message, #clear-file').hide();
    } else {
       var fr = new FileReader();
       fr.onload = function(e) {
          if(f.size > 10240) {
             // do not use textarea
-            EDITORS.update.setOption('readOnly', true)
+            EDITORS.update.setOption('readOnly', true);
             $('#filename').html(f.name);
-            $('#large-file-message, #clear-file').show()
+            $('#large-file-message, #clear-file').show();
             EDITORS.update.setValue('');
             FILE_CONTENTS = e.target.result;
          } else {
@@ -459,8 +589,8 @@ function clearFile(e) {
    if(e) {
       e.preventDefault();
    }
-   $('#update-box').prop('disabled', false)
-   $('#large-file-message, #clear-file').hide()
+   $('#update-box').prop('disabled', false);
+   $('#large-file-message, #clear-file').hide();
    FILE_CONTENTS = null;
 }
 
@@ -469,9 +599,9 @@ function guessType(extension, content) {
    if(extension == 'rq') {
       // SPARQL
       setType('sparql');
-   } else if(extension in rdf_types) {
+   } else if(extension in RDF_TYPES) {
       // RDF
-      setType('rdf', rdf_types[extension]);
+      setType('rdf', RDF_TYPES[extension]);
    } else {
       // extension is no help, see if we can find some SPARQL commands
       setType(identify(content));
@@ -494,8 +624,8 @@ function identify(text, considerPath) {
    }
    
    text = text.toUpperCase();
-   for(var i=0; i<sparql_update_commands.length; i++) {
-      if(text.indexOf(sparql_update_commands[i]) != -1) {
+   for(var i=0; i<SPARQL_UPDATE_COMMANDS.length; i++) {
+      if(text.indexOf(SPARQL_UPDATE_COMMANDS[i]) != -1) {
          return 'sparql';
       }
    }
@@ -506,7 +636,7 @@ function identify(text, considerPath) {
 function handlePaste(e) {   
    // if the input is currently empty, try to identify the pasted content
    var that = this;
-   if(this.value == '') {
+   if(this.value === '') {
       setTimeout(function() { setType(identify(that.value, true)); }, 10);
    } 
 }
@@ -518,9 +648,6 @@ function setType(type, format) {
    }
    setUpdateSettings(type);
 }
-
-$('#update-type').change(function() { setUpdateSettings(this.value); });
-$('#rdf-type').change(function() { setUpdateMode('rdf'); });
 
 function setUpdateSettings(type) {
    $('#rdf-type, label[for="rdf-type"]').attr('disabled', type != 'rdf');
@@ -534,62 +661,26 @@ function setUpdateMode(type) {
       mode = 'sparql';
    } else if(type == 'rdf') {
       type = $('#rdf-type').val();
-      if(type in rdf_modes) {
-         mode = rdf_modes[type];
+      if(type in RDF_MODES) {
+         mode = RDF_MODES[type];
       }
    }
    EDITORS.update.setOption('mode', mode);
 }
 
-// .xml is used for both RDF and TriX, assume it's RDF
-// We could check the parent element to see which it is
-var rdf_types = {'nq': 'n-quads',
-                 'nt': 'n-triples',
-                 'n3': 'n3',
-                 'rdf': 'rdf/xml',
-                 'rdfs': 'rdf/xml',
-                 'owl': 'rdf/xml',
-                 'xml': 'rdf/xml',
-                 'json': 'json',
-                 'trig': 'trig',
-                 'trix': 'trix',
-                 //'xml': 'trix',
-                 'ttl': 'turtle'};
-                 
-var rdf_content_types = {'n-quads': 'text/x-nquads',
-                         'n-triples': 'text/plain',
-                         'n3': 'text/rdf+n3',
-                         'rdf/xml': 'application/rdf+xml',
-                         'json': 'application/sparql-results+json',
-                         'trig': 'application/x-trig',
-                         'trix': 'application/trix',
-                         'turtle': 'application/x-turtle'};
-
-// key is value of RDF type selector, value is name of CodeMirror mode
-var rdf_modes = {'n-triples': 'ntriples', 'rdf/xml': 'xml', 'json': 'json', 'turtle': 'turtle'};
-
-var sparql_update_commands = ['INSERT', 'DELETE', 'LOAD', 'CLEAR'];
-
-$('#update-file').change(handleFileInput);
-// $('#update-box').on('dragover', handleDragOver)
-//    .on('drop', handleFile)
-//    .on('paste', handlePaste)
-//    .on('input propertychange', function() { $('#update-errors').hide(); });
-$('#clear-file').click(clearFile);
-
-$('#update-update').click(submitUpdate);
-
-EDITORS.update = CodeMirror.fromTextArea($('#update-box')[0], CODEMIRROR_DEFAULTS);
-EDITORS.update.on('change', function() { 
-   if(ERROR_LINE_MARKERS.update) {
-      ERROR_LINE_MARKERS.update.clear();
-      ERROR_CHARACTER_MARKERS.update.clear();
-   }
-});
-EDITORS.update.on('dragover', handleDragOver);
-EDITORS.update.on('drop', handleDrop);
-EDITORS.update.on('paste', handlePaste);
-EDITORS.update.addKeyMap({'Ctrl-Enter': submitUpdate});
+function createUpdateEditor() {
+   EDITORS.update = CodeMirror.fromTextArea($('#update-box')[0], copyObject(CODEMIRROR_DEFAULTS));
+   EDITORS.update.on('change', function() { 
+      if(ERROR_LINE_MARKERS.update) {
+         ERROR_LINE_MARKERS.update.clear();
+         ERROR_CHARACTER_MARKERS.update.clear();
+      }
+   });
+   EDITORS.update.on('dragover', handleDragOver);
+   EDITORS.update.on('drop', handleDrop);
+   EDITORS.update.on('paste', handlePaste);
+   EDITORS.update.addKeyMap({'Ctrl-Enter': submitUpdate});
+}
 
 function submitUpdate(e) {
    // Updates are submitted as a regular form for SPARQL updates in monitor mode, and via AJAX for non-monitor SPARQL, RDF & file path updates.
@@ -598,17 +689,17 @@ function submitUpdate(e) {
 
    try {
       e.preventDefault();
-   } catch(e) {}
+   } catch(ex) {}
 
    $('#update-response').show();
 
    var url = RW_URL_PREFIX + 'namespace/' + NAMESPACE + '/sparql';
    var settings = {
       type: 'POST',
-      data: FILE_CONTENTS == null ? EDITORS.update.getValue() : FILE_CONTENTS,
+      data: FILE_CONTENTS === null ? EDITORS.update.getValue() : FILE_CONTENTS,
       success: updateResponseXML,
       error: updateResponseError
-   }
+   };
 
    // determine action based on type
    switch($('#update-type').val()) {
@@ -621,13 +712,13 @@ function submitUpdate(e) {
                .append($('<input name="update">').val(settings.data))
                .append('<input name="monitor" value="true">');
             if($('#update-analytic').is(':checked')) {
-               form.append('<input name="analytic" value="true">')
+               form.append('<input name="analytic" value="true">');
             }
             form.appendTo($('body'));
             form.submit();
             $('#update-monitor-form').remove();
             $('#update-response iframe, #update-clear-container').show();
-            $('#update-response pre').hide();
+            $('#update-response span').hide();
             return;
          }
          settings.data = 'update=' + encodeURIComponent(settings.data);
@@ -642,7 +733,7 @@ function submitUpdate(e) {
             alert('Please select an RDF content type.');
             return;
          }
-         settings.contentType = rdf_content_types[type];
+         settings.contentType = RDF_CONTENT_TYPES[type];
          break;
       case 'path':
          // if no scheme is specified, assume a local path
@@ -653,72 +744,83 @@ function submitUpdate(e) {
          break;
    }
 
-   $('#update-response pre').show().html('Running update...');   
+   $('#update-response span').show().html('Running update...');   
 
    $.ajax(url, settings);
 }
 
-$('#update-clear').click(function() {
+function clearUpdateOutput() {
    $('#update-response, #update-clear-container').hide();
-   $('#update-response pre').text('');
+   $('#update-response span').text('');
    $('#update-response iframe').attr('src', 'about:blank');
-});
+}
 
-$('.advanced-features-toggle').click(function() {
+// also for query panel
+function toggleAdvancedFeatures(e) {
+   e.preventDefault();
    $(this).next('.advanced-features').toggle();
-   return false;
-});
+}
 
 function updateResponseHTML(data) {
    $('#update-response, #update-clear-container').show();
    $('#update-response iframe').attr('src', 'about:blank').hide();
-   $('#update-response pre').html(data);
+   $('#update-response span').html(data);
 }
 
 function updateResponseXML(data) {
-   var modified = data.childNodes[0].attributes['modified'].value;
-   var milliseconds = data.childNodes[0].attributes['milliseconds'].value;
+   var modified = data.childNodes[0].attributes.modified.value;
+   var milliseconds = data.childNodes[0].attributes.milliseconds.value;
    $('#update-response, #update-clear-container').show();
    $('#update-response iframe').attr('src', 'about:blank').hide();
-   $('#update-response pre').text('Modified: ' + modified + '\nMilliseconds: ' + milliseconds);
+   $('#update-response span').text('Modified: ' + modified + '\nMilliseconds: ' + milliseconds);
 }
 
 function updateResponseError(jqXHR, textStatus, errorThrown) {
    $('#update-response, #update-clear-container').show();
    $('#update-response iframe').attr('src', 'about:blank').hide();
-   $('#update-response pre').text('Error! ' + textStatus + ' ' + jqXHR.statusText);
-   highlightError(jqXHR.statusText, 'update');
+
+   var message = 'ERROR: ';
+   if(jqXHR.status === 0) {
+      message += 'Could not contact server';
+   } else {
+      if(response.find('pre').length === 0) {
+         message += response.text();
+      } else {
+         message += response.find('pre').text();
+      }
+      highlightError(jqXHR.responseText, 'update');
+   }
+
+   $('#update-response span').text(message);
 }
 
 
 /* Query */
 
-$('#query-box').on('input propertychange', function() { $('#query-errors').hide(); });
-$('#query-form').submit(submitQuery);
-
-$('#query-explain').change(function() {
+// details needs explain, so turn details off if explain is unchecked,
+// and turn explain on if details is checked
+function handleExplain() {
    if(!this.checked) {
       $('#query-details').prop('checked', false);
    }
-});
+}
 
-$('#query-details').change(function() {
+function handleDetails() {
    if(this.checked) {
       $('#query-explain').prop('checked', true);
    }
-});
+}
 
-EDITORS.query = CodeMirror.fromTextArea($('#query-box')[0], CODEMIRROR_DEFAULTS);
-EDITORS.query.on('change', function() { 
-   if(ERROR_LINE_MARKERS.query) {
-      ERROR_LINE_MARKERS.query.clear();
-      ERROR_CHARACTER_MARKERS.query.clear();
-   }
-});
-EDITORS.query.addKeyMap({'Ctrl-Enter': submitQuery});
-
-$('#query-history').on('click', '.query a', loadHistory);
-$('#query-history').on('click', '.query-delete a', deleteHistoryRow)
+function createQueryEditor() {
+   EDITORS.query = CodeMirror.fromTextArea($('#query-box')[0], copyObject(CODEMIRROR_DEFAULTS));
+   EDITORS.query.on('change', function() { 
+      if(ERROR_LINE_MARKERS.query) {
+         ERROR_LINE_MARKERS.query.clear();
+         ERROR_CHARACTER_MARKERS.query.clear();
+      }
+   });
+   EDITORS.query.addKeyMap({'Ctrl-Enter': submitQuery});
+}
 
 function loadHistory(e) {
    e.preventDefault();
@@ -726,25 +828,64 @@ function loadHistory(e) {
    EDITORS.query.focus();
 }
 
+function addQueryHistoryRow(time, query, results, executionTime) {
+   var row = $('<tr>').prependTo($('#query-history tbody'));
+   row.append('<td class="query-time">' + time + '</td>');
+   var cell = $('<td class="query">').appendTo(row);
+   var a = $('<a href="#">').appendTo(cell);
+   a.text(query);
+   a.html(a.html().replace(/\n/g, '<br>'));
+   row.append('<td class="query-results">' + results + '</td>');
+   row.append('<td class="query-execution-time">' + executionTime + '</td>');
+   row.append('<td class="query-delete"><a href="#">X</a></td>');
+}
+
+function storeQueryHistory() {
+   // clear existing store
+   for(var i=0; i<localStorage.historyCount; i++) {
+      localStorage.removeItem('history.time.' + i);
+      localStorage.removeItem('history.query.' + i);
+      localStorage.removeItem('history.results.' + i);
+      localStorage.removeItem('history.executionTime.' + i);
+   }
+
+   // output each current row
+   $('#query-history tbody tr').each(function(i, el) {
+      localStorage['history.time.' + i] = $(el).find('.query-time').html();
+      localStorage['history.query.' + i] = $(el).find('.query a')[0].innerText;
+      localStorage['history.results.' + i] = $(el).find('.query-results').html();
+      localStorage['history.executionTime.' + i] = $(el).find('.query-execution-time').html();
+   });
+
+   localStorage.historyCount = $('#query-history tbody tr').length;
+}
+
 function deleteHistoryRow(e) {
    e.preventDefault();
    $(this).parents('tr').remove();
-   if($('#query-history tbody tr').length == 0) {
+   if($('#query-history tbody tr').length === 0) {
       $('#query-history').hide();
    }
+   storeQueryHistory();
+}
+
+function clearHistory(e) {
+   $('#query-history tbody tr').remove();
+   $('#query-history').hide();
+   storeQueryHistory();
 }
 
 function submitQuery(e) {
    try {
       e.preventDefault();
-   } catch(e) {}
+   } catch(ex) {}
 
    // transfer CodeMirror content to textarea
    EDITORS.query.save();
 
    // do nothing if query is empty
    var query = $('#query-box').val();
-   if(query.trim() == '') {
+   if(query.trim() === '') {
       return;
    }
 
@@ -752,11 +893,11 @@ function submitQuery(e) {
 
    // see if this query is already in the history
    $('#query-history tbody tr').each(function(i, row) {
-      if($(row).find('.query')[0].innerText == query && $(row).find('.query-namespace').text() == NAMESPACE) {
+      if($(row).find('.query')[0].innerText == query) {
          // clear the old results and set the time to now
          $(row).find('.query-time').text(new Date().toISOString());
-         $(row).find('.query-results').text('...');
-         $(row).find('.query-execution-time').text('...');
+         $(row).find('.query-results').text('');
+         $(row).find('.query-execution-time').html('<a href="#">Running...</a>');
          // move it to the top
          $(row).prependTo('#query-history tbody');
          queryExists = true;
@@ -765,17 +906,10 @@ function submitQuery(e) {
    });
 
    if(!queryExists) {
-      // add this query to the history
-      var row = $('<tr>').prependTo($('#query-history tbody'));
-      row.append('<td class="query-time">' + new Date().toISOString() + '</td>');
-      var cell = $('<td class="query">').appendTo(row);
-      var a = $('<a href="#">').appendTo(cell);
-      a.text(query);
-      a.html(a.html().replace(/\n/g, '<br>'));
-      row.append('<td class="query-results">...</td>');
-      row.append('<td class="query-execution-time">...</td>');
-      row.append('<td class="query-delete"><a href="#">X</a></td>')
+      addQueryHistoryRow(new Date().toISOString(), query, '', '<a href="#">Running...</a>', true);
    }
+
+   storeQueryHistory();
 
    $('#query-history').show();
 
@@ -786,7 +920,7 @@ function submitQuery(e) {
       headers: { 'Accept': 'application/sparql-results+json, application/rdf+xml' },
       success: showQueryResults,
       error: queryResultsError
-   }
+   };
 
    $('#query-response').show().html('Query running...');
    $('#query-pagination').hide();
@@ -808,49 +942,39 @@ function submitQuery(e) {
    }
 }
 
-$('#query-response-clear').click(function() {
+function clearQueryResponse() {
    $('#query-response, #query-explanation').empty('');
    $('#query-response, #query-pagination, #query-explanation, #query-export-container').hide();
-});
-
-$('#query-export').click(function() { updateExportFileExtension(); showModal('query-export-modal'); });
-
-var export_extensions = {
-   "application/rdf+xml": ['RDF/XML', 'rdf', true],
-   "application/n-triples": ['N-Triples', 'nt', true],
-   "application/x-turtle": ['Turtle', 'ttl', true],
-   "text/rdf+n3": ['N3', 'n3', true],
-   "application/trix": ['TriX', 'trix', true],
-   "application/x-trig": ['TRIG', 'trig', true],
-   "text/x-nquads": ['NQUADS', 'nq', true],
-
-   "text/csv": ['CSV', 'csv', false, exportCSV],
-   "application/sparql-results+json": ['JSON', 'json', false, exportJSON],
-   // "text/tab-separated-values": ['TSV', 'tsv', false, exportTSV],
-   "application/sparql-results+xml": ['XML', 'xml', false, exportXML]
-};
-
-for(var contentType in export_extensions) {
-   var optgroup = export_extensions[contentType][2] ? '#rdf-formats' : '#non-rdf-formats';
-   $(optgroup).append('<option value="' + contentType + '">' + export_extensions[contentType][0] + '</option>');
 }
 
-$('#export-format option:first').prop('selected', true);
+function showQueryExportModal() {
+   updateExportFileExtension();
+   showModal('query-export-modal');
+}
 
-$('#export-format').change(updateExportFileExtension);
+function createExportOptions() {
+   for(var contentType in EXPORT_EXTENSIONS) {
+      var optgroup = EXPORT_EXTENSIONS[contentType][2] ? '#rdf-formats' : '#non-rdf-formats';
+      $(optgroup).append('<option value="' + contentType + '">' + EXPORT_EXTENSIONS[contentType][0] + '</option>');
+   }
+
+   $('#export-format option:first').prop('selected', true);
+
+   $('#export-format').change(updateExportFileExtension);
+}
 
 function updateExportFileExtension() {
-   $('#export-filename-extension').html(export_extensions[$('#export-format').val()][1]);
+   $('#export-filename-extension').html(EXPORT_EXTENSIONS[$('#export-format').val()][1]);
 }
 
-$('#query-download').click(function() {
+function queryExport() {
    var dataType = $('#export-format').val();
    var filename = $('#export-filename').val();
-   if(filename == '') {
+   if(filename === '') {
       filename = 'export';
    }
-   filename += '.' + export_extensions[dataType][1];
-   if(export_extensions[dataType][2]) {
+   filename += '.' + EXPORT_EXTENSIONS[dataType][1];
+   if(EXPORT_EXTENSIONS[dataType][2]) {
       // RDF
       var settings = {
          type: 'POST',
@@ -863,10 +987,10 @@ $('#query-download').click(function() {
       $.ajax(RO_URL_PREFIX + 'sparql?workbench&convert', settings);
    } else {
       // not RDF
-      export_extensions[dataType][3](filename);
+      EXPORT_EXTENSIONS[dataType][3](filename);
    }
    $(this).siblings('.modal-cancel').click();
-});
+}
 
 function downloadRDFError(jqXHR, textStatus, errorThrown) {
    alert(jqXHR.statusText);
@@ -938,7 +1062,7 @@ function downloadFile(data, type, filename) {
    $('#download-link').remove();
 }
 
-function updateresultCountAndExecutionTime(count) {
+function updateResultCountAndExecutionTime(count) {
    $('#query-history tbody tr:first td.query-results').text(count);
 
    var ms = Date.now() - Date.parse($('#query-history tbody tr:first td.query-time').html());
@@ -959,6 +1083,8 @@ function updateresultCountAndExecutionTime(count) {
    }
    executionTime += ms + 'ms';
    $('#query-history tbody tr:first td.query-execution-time').html(executionTime);
+
+   storeQueryHistory();
 }
 
 function showQueryResults(data) {
@@ -966,14 +1092,15 @@ function showQueryResults(data) {
    $('#query-export-rdf').hide();
    $('#query-response, #query-pagination, #query-export-container').show();
    var table = $('<table>').appendTo($('#query-response'));
+   var i, tr;
    if(this.dataTypes[1] == 'xml') {
       // RDF
       table.append($('<thead><tr><td>s</td><td>p</td><td>o</td></tr></thead>'));
       var rows = $(data).find('Description');
-      for(var i=0; i<rows.length; i++) {
+      for(i=0; i<rows.length; i++) {
          // FIXME: are about and nodeID the only possible attributes here?
          var s = rows[i].attributes['rdf:about'];
-         if(typeof(s) == 'undefined') {
+         if(typeof s == 'undefined') {
             s = rows[i].attributes['rdf:nodeID'];
          }
          s = s.textContent;
@@ -981,25 +1108,25 @@ function showQueryResults(data) {
             var p = rows[i].children[j].tagName;
             var o = rows[i].children[j].attributes['rdf:resource'];
             // FIXME: is this the correct behaviour?
-            if(typeof(o) == 'undefined') {
+            if(typeof o == 'undefined') {
                o = rows[i].children[j].textContent;
             } else {
                o = o.textContent;
             }
-            var tr = $('<tr><td>' + (j == 0 ? s : '') + '</td><td>' + p + '</td><td>' + o + '</td>');
+            tr = $('<tr><td>' + (j === 0 ? s : '') + '</td><td>' + p + '</td><td>' + o + '</td>');
             table.append(tr);
          }
       }
-      updateresultCountAndExecutionTime(rows.length);
+      updateResultCountAndExecutionTime(rows.length);
    } else {
       // JSON
       // save data for export and pagination
       QUERY_RESULTS = data;
 
-      if(typeof(data.boolean) != 'undefined') {
+      if(typeof data.boolean != 'undefined') {
          // ASK query
          table.append('<tr><td>' + data.boolean + '</td></tr>').addClass('boolean');
-         updateresultCountAndExecutionTime('' + data.boolean);
+         updateResultCountAndExecutionTime('' + data.boolean);
          return;
       }
 
@@ -1009,7 +1136,7 @@ function showQueryResults(data) {
          isRDF = true;
       } else if(data.head.vars.length == 4 && data.head.vars[0] == 's' && data.head.vars[1] == 'p' && data.head.vars[2] == 'o' && data.head.vars[3] == 'c') {
          // see if c is used or not
-         for(var i=0; i<data.results.bindings.length; i++) {
+         for(i=0; i<data.results.bindings.length; i++) {
             if('c' in data.results.bindings[i]) {
                isRDF = false;
                break;
@@ -1033,21 +1160,21 @@ function showQueryResults(data) {
 
       // put query variables in table header
       var thead = $('<thead>').appendTo(table);
-      var tr = $('<tr>');
-      for(var i=0; i<data.head.vars.length; i++) {
+      tr = $('<tr>');
+      for(i=0; i<data.head.vars.length; i++) {
          tr.append('<th>' + data.head.vars[i] + '</th>');
       }
       thead.append(tr);
       table.append(thead);
 
       $('#total-results').html(data.results.bindings.length);
-      updateresultCountAndExecutionTime(data.results.bindings.length);
+      updateResultCountAndExecutionTime(data.results.bindings.length);
       setNumberOfPages();
       showPage(1);
 
       $('#query-response a').click(function(e) {
          e.preventDefault();
-         explore(this.textContent);
+         explore(NAMESPACE, this.textContent);
       });
    }
 }
@@ -1058,8 +1185,19 @@ function showQueryExplanation(data) {
 
 function queryResultsError(jqXHR, textStatus, errorThrown) {
    $('#query-response, #query-export-container').show();
-   $('#query-response').text('Error! ' + textStatus + ' ' + jqXHR.responseText);
-   highlightError(jqXHR.responseText, 'query');
+   var message = 'ERROR: ';
+   if(jqXHR.status === 0) {
+      message += 'Could not contact server';
+   } else {
+      var response = $('<div>').append(jqXHR.responseText);
+      if(response.find('pre').length === 0) {
+         message += response.text();
+      } else {
+         message += response.find('pre').text();
+      }
+      highlightError(jqXHR.responseText, 'query');
+   }
+   $('#query-response').text(message);
 }
 
 function highlightError(description, pane) {
@@ -1068,12 +1206,39 @@ function highlightError(description, pane) {
       // highlight character at error position
       var line = match[1] - 1;
       var character = match[2] - 1;
-      ERROR_LINE_MARKERS[pane] = EDITORS.query.doc.markText({line: line, ch: 0}, {line: line}, {className: 'error-line'});
-      ERROR_CHARACTER_MARKERS[pane] = EDITORS.query.doc.markText({line: line, ch: character}, {line: line, ch: character + 1}, {className: 'error-character'});
+      ERROR_LINE_MARKERS[pane] = EDITORS[pane].doc.markText({line: line, ch: 0}, {line: line}, {className: 'error-line'});
+      ERROR_CHARACTER_MARKERS[pane] = EDITORS[pane].doc.markText({line: line, ch: character}, {line: line, ch: character + 1}, {className: 'error-character'});
    }
 }
 
-/* Pagination */
+function showDatatypes() {
+   if(this.checked) {
+      $('#query-response td[data-datatype]').each(function(i, el) {
+         $(this).html('"' + $(this).html() + '"<span class="datatype">^^' + abbreviate($(this).data('datatype')) + '</span>');
+      });
+   } else {
+      $('#query-response table td[data-datatype]').each(function(i, el) {
+         $(this).find('.datatype').remove();
+         $(this).html($(this).html().slice(1, -1));
+      });
+   }
+}
+
+function showLanguages() {
+   if(this.checked) {
+      $('#query-response td[data-lang]').each(function(i, el) {
+         $(this).html('"' + $(this).html() + '"<span class="language">@' + $(this).data('lang') + '</span>');
+      });
+   } else {
+      $('#query-response table td[data-lang]').each(function(i, el) {
+         $(this).find('.language').remove();
+         $(this).html($(this).html().slice(1, -1));         
+      });
+   }
+}
+
+
+/* Query result pagination */
 
 function setNumberOfPages() {
    TOTAL_PAGES = Math.ceil(QUERY_RESULTS.results.bindings.length / PAGE_SIZE);
@@ -1085,7 +1250,7 @@ function setPageSize(n) {
       n = QUERY_RESULTS.results.bindings.length;
    } else {
       n = parseInt(n, 10);
-      if(typeof n != 'number' || n % 1 != 0 || n < 1 || n == PAGE_SIZE) {
+      if(typeof n != 'number' || n % 1 !== 0 || n < 1 || n === PAGE_SIZE) {
          return;
       }
    }
@@ -1096,22 +1261,19 @@ function setPageSize(n) {
    showPage(1);
 }
 
-$('#results-per-page').change(function() { setPageSize(this.value); });
-$('#previous-page').click(function() { showPage(CURRENT_PAGE - 1); });
-$('#next-page').click(function() { showPage(CURRENT_PAGE + 1); });
-$('#current-page').keyup(function(e) {
+function handlePageSelector(e) {
    if(e.which == 13) {
       var n = parseInt(this.value, 10);
-      if(typeof n != 'number' || n % 1 != 0 || n < 1 || n > TOTAL_PAGES) {
+      if(typeof n != 'number' || n % 1 !== 0 || n < 1 || n > TOTAL_PAGES) {
          this.value = CURRENT_PAGE;
       } else {
          showPage(n);
       }
    }
-});
+}
 
 function showPage(n) {
-   if(typeof n != 'number' || n % 1 != 0 || n < 1 || n > TOTAL_PAGES) {
+   if(typeof n != 'number' || n % 1 !== 0 || n < 1 || n > TOTAL_PAGES) {
       return;
    }
 
@@ -1126,27 +1288,28 @@ function showPage(n) {
 
    // add matching bindings
    var table = $('#query-response table');
+   var text, tdData, linkText;
    for(var i=start; i<end; i++) {
          var tr = $('<tr>');
          for(var j=0; j<QUERY_RESULTS.head.vars.length; j++) {
             if(QUERY_RESULTS.head.vars[j] in QUERY_RESULTS.results.bindings[i]) {
                var binding = QUERY_RESULTS.results.bindings[i][QUERY_RESULTS.head.vars[j]];
                if(binding.type == 'sid') {
-                  var text = getSID(binding);
+                  text = getSID(binding);
                } else {
-                  var text = binding.value;
+                  text = binding.value;
                   if(binding.type == 'uri') {
                      text = abbreviate(text);
                   }
                }
                linkText = escapeHTML(text).replace(/\n/g, '<br>');
                if(binding.type == 'typed-literal') {
-                  var tdData = ' class="literal" data-datatype="' + binding.datatype + '"';
+                  tdData = ' class="literal" data-datatype="' + binding.datatype + '"';
                } else {
                   if(binding.type == 'uri' || binding.type == 'sid') {
                      text = '<a href="' + buildExploreHash(text) + '">' + linkText + '</a>';
                   }
-                  var tdData = ' class="' + binding.type + '"';
+                  tdData = ' class="' + binding.type + '"';
                   if(binding['xml:lang']) {
                      tdData += ' data-lang="' + binding['xml:lang'] + '"';
                   }
@@ -1165,14 +1328,22 @@ function showPage(n) {
    $('#current-page').val(n);
 }
 
+
 /* Explore */
 
-$('#explore-form').submit(function(e) {
+function exploreSubmit(e) {
    e.preventDefault();
    var uri = $(this).find('input[type="text"]').val().trim();
    if(uri) {
-      // add < > if they're not present and this is not a namespaced URI
-      if(uri[0] != '<' && uri.match(/^\w+:\//)) {
+      // add < > if they're not present and this is not a URI with a recognised namespace
+      var namespaces = [];
+      for(var cat in NAMESPACE_SHORTCUTS) {
+         for(var namespace in NAMESPACE_SHORTCUTS[cat]) {
+            namespaces.push(namespace);
+         }
+      }
+      var namespaced = '^(' + namespaces.join('|') + '):';
+      if(uri[0] != '<' && !uri.match(namespaced)) {
          uri = '<' + uri;
          if(uri.slice(-1) != '>') {
             uri += '>';
@@ -1182,7 +1353,6 @@ $('#explore-form').submit(function(e) {
       loadURI(uri);
 
       // if this is a SID, make the components clickable
-      // var re = /<< *(<[^<>]*>) *(<[^<>]*>) *(<[^<>]*>) *>>/;
       var re = /<< *([^ ]+) +([^ ]+) +([^ ]+) *>>/;
       var match = uri.match(re);
       if(match) {
@@ -1197,7 +1367,7 @@ $('#explore-form').submit(function(e) {
          $('#explore-header').html($('<h1>').text(uri));
       }
    }
-});
+}
 
 function buildExploreHash(uri) {
    return '#explore:' + NAMESPACE + ':' + uri;
@@ -1210,6 +1380,7 @@ function loadURI(target) {
    var re = /<< *([^ ]+) +([^ ]+) +([^ ]+) *>>/;
    var vertex = !target.match(re);
 
+   // jshint multistr:true
    var vertexQuery = '\
 select ?col1 ?col2 ?incoming (count(?star) as ?star) {\n\
   bind (URI as ?explore ) .\n\
@@ -1254,10 +1425,11 @@ where {\n\
 }\n\
 group by ?col1 ?col2 ?incoming';
 
+   var query;
    if(vertex) {
-      var query = vertexQuery.replace('URI', target);
+      query = vertexQuery.replace('URI', target);
    } else {
-      var query = edgeQuery.replace('SID', target);
+      query = edgeQuery.replace('SID', target);
    }
    var settings = {
       type: 'POST',
@@ -1280,10 +1452,11 @@ function updateExploreStart(data) {
    // go through each binding, adding it to the appropriate table
    $.each(data.results.bindings, function(i, binding) {
       var cols = [binding.col1, binding.col2].map(function(col) {
+         var uri;
          if(col.type == 'sid') {
-            var uri = getSID(col);
+            uri = getSID(col);
          } else {
-            var uri = col.value;
+            uri = col.value;
             if(col.type == 'uri') {
                uri = abbreviate(uri);
             }
@@ -1296,10 +1469,11 @@ function updateExploreStart(data) {
       });
       var star = parseInt(binding.star.value);
       if(star > 0) {
+         var sid;
          if(binding.incoming.value == 'true') {
-            var sid = '<< <' +  binding.col1.value + '> <' + binding.col2.value + '> ' + $('#explore-form input[type=text]').val() + ' >>';
+            sid = '<< <' +  binding.col1.value + '> <' + binding.col2.value + '> ' + $('#explore-form input[type=text]').val() + ' >>';
          } else {
-            var sid = '<< ' + $('#explore-form input[type=text]').val() + ' <' +  binding.col1.value + '> <' + binding.col2.value + '> >>';
+            sid = '<< ' + $('#explore-form input[type=text]').val() + ' <' +  binding.col1.value + '> <' + binding.col2.value + '> >>';
          }
          star = '<a href="' + buildExploreHash(sid) + '"><< * (' + star + ') >></a>';
       } else {
@@ -1323,7 +1497,7 @@ function updateExploreStart(data) {
    var sections = {incoming: 'Incoming Links', outgoing: 'Outgoing Links', attributes: 'Attributes'};
    for(var k in sections) {
       var id = '#explore-' + k;
-      if($(id + ' table tr').length == 0) {
+      if($(id + ' table tr').length === 0) {
          $(id).html('No ' + sections[k]);
       } else {
          $(id).prepend('<h1>' + sections[k] + '</h1>');
@@ -1333,26 +1507,22 @@ function updateExploreStart(data) {
    $('#explore-results a').click(function(e) {
       e.preventDefault();
       var components = parseHash(this.hash);
-      exploreNamespacedURI(components[2], components[3]);
+      explore(components[2], components[3]);
    });
 }
 
-function exploreNamespacedURI(namespace, uri, nopush) {
-   if(!NAMESPACES_READY) {
-      setTimeout(function() { exploreNamespacedURI(namespace, uri, nopush); }, 10);
-   } else {
-      selectNamespace(namespace);
-      explore(uri, nopush);
-   }
-}
-
-function explore(uri, nopush) {
+function explore(namespace, uri, noPush, loadLast) {
+   useNamespace(namespace, loadLast);
    $('#explore-form input[type=text]').val(uri);
    $('#explore-form').submit();
-   showTab('explore', true);
-   if(!nopush) {
+   if(!loadLast) {
+      showTab('explore', true);
+   }
+   if(!noPush) {
       history.pushState(null, null, '#explore:' + NAMESPACE + ':' + uri);
    }
+   localStorage.lastExploreNamespace = namespace;
+   localStorage.lastExploreURI = uri;
 }
 
 function parseHash(hash) {
@@ -1363,17 +1533,13 @@ function parseHash(hash) {
    return hash.match(re);
 }
 
-// handle history buttons and initial display of first tab
-window.addEventListener("popstate", handlePopState);
-$(handlePopState);
-
 function handlePopState() {
    var hash = parseHash(this.location.hash);
    if(!hash) {
       $('#tab-selector a:first').click();
    } else {
-      if(hash[1] == 'explore') {
-         exploreNamespacedURI(hash[2], hash[3], true);
+      if(hash[1] == 'explore' && typeof hash[2] !== 'undefined') {
+         explore(hash[2], hash[3], true);
       } else {
          $('a[data-target=' + hash[1] + ']').click();
       }
@@ -1386,9 +1552,8 @@ function updateExploreError(jqXHR, textStatus, errorThrown) {
    $('#explore-results, #explore-header').show();
 }
 
-/* Status */
 
-$('#tab-selector a[data-target=status]').click(getStatus);
+/* Status */
 
 function getStatus(e) {
    if(e) {
@@ -1408,15 +1573,11 @@ function getStatusNumbers(data) {
    $('p:contains(Show queries, query details)').find('a').eq(1).click(function(e) { e.preventDefault(); showQueries(true); });
 }
 
-$('#show-queries').click(function(e) {
+function showRunningQueries(e) {
    e.preventDefault();
-   showQueries(false);
-});
-
-$('#show-query-details').click(function(e) {
-   e.preventDefault();
-   showQueries(true);
-});
+   showTab('status');
+   showQueries();
+}
 
 function showQueries(details) {
    var url = RO_URL_PREFIX + 'status?showQueries';
@@ -1450,10 +1611,11 @@ function showQueries(details) {
          var sparqlContainer = form.next().next();
          var sparql = sparqlContainer.html();
 
+         var queryDetails;
          if(details) {
-            var queryDetails = $('<div>').append(sparqlContainer.nextUntil('h1')).html();
+            queryDetails = $('<div>').append(sparqlContainer.nextUntil('h1')).html();
          } else {
-            var queryDetails = '<a href="#">Details</a>';
+            queryDetails = '<a href="#">Details</a>';
          }
 
          // got all data, create a li for each query
@@ -1496,9 +1658,8 @@ function getQueryDetails(e) {
    });
 }
 
-/* Health */
 
-$('#tab-selector a[data-target=health], #health-refresh').click(getHealth);
+/* Health */
 
 function getHealth(e) {
    e.preventDefault();
@@ -1538,15 +1699,29 @@ function getHealth(e) {
          container.addClass('box health-' + health);
          container.appendTo($('#health-services'));
       }
-   })
+   });
 }
+
+function showHealthTab() {
+   var settings = {
+      async: false,
+      url: '/status?health',
+      success: function(data) {
+         if(data.deployment == 'HA') {
+            $('#tab-selector a[data-target=health]').show();
+         } else {
+            $('#tab-selector a[data-target=health]').remove();
+         }
+      }
+   };
+   $.ajax(settings);
+}
+
 
 /* Performance */
 
-$('#tab-selector a[data-target=performance]').click(loadPerformance);
-
 function loadPerformance(path) {
-   if(typeof(path) == 'undefined') {
+   if(typeof path == 'undefined') {
       path = '';
    }
    $.get(RO_URL_PREFIX + 'counters?' + path, function(data) {
@@ -1561,13 +1736,13 @@ function loadPerformance(path) {
 /* Utility functions */
 
 function getSID(binding) {
-   return '<<\n ' + abbreviate(binding.value['s'].value) + '\n ' + abbreviate(binding.value['p'].value) + '\n ' + abbreviate(binding.value['o'].value) + '\n>>';
+   return '<<\n ' + abbreviate(binding.value.s.value) + '\n ' + abbreviate(binding.value.p.value) + '\n ' + abbreviate(binding.value.o.value) + '\n>>';
 }
 
 function abbreviate(uri) {
    for(var nsGroup in NAMESPACE_SHORTCUTS) {
       for(var ns in NAMESPACE_SHORTCUTS[nsGroup]) {
-         if(uri.indexOf(NAMESPACE_SHORTCUTS[nsGroup][ns]) == 0) {
+         if(uri.indexOf(NAMESPACE_SHORTCUTS[nsGroup][ns]) === 0) {
             return uri.replace(NAMESPACE_SHORTCUTS[nsGroup][ns], ns + ':');
          }
       }
@@ -1575,6 +1750,7 @@ function abbreviate(uri) {
    return '<' + uri + '>';
 }
 
+// currently unused
 function unabbreviate(uri) {
    if(uri.charAt(0) == '<') {
       // not abbreviated
@@ -1585,6 +1761,7 @@ function unabbreviate(uri) {
    return '<' + uri.replace(namespace, NAMESPACE_SHORTCUTS[namespace]) + '>';
 }
 
+// currently unused
 function parseSID(sid) {
    // var re = /<< <([^<>]*)> <([^<>]*)> <([^<>]*)> >>/;
    var re = /<< *([^ ]+) +([^ ]+) +([^ ]+) *>>/;
@@ -1595,5 +1772,141 @@ function parseSID(sid) {
 function escapeHTML(text) {
    return $('<div/>').text(text).html();
 }
+
+function copyObject(src) {
+   // this returns a new object with the same keys & values as the input one.
+   // It is used to get around CodeMirror updating the default config object 
+   // passed to it with the values used, which are then applied to later uses
+   // of the default config object.
+   var dest = {};
+   for(var key in src) {
+      dest[key] = src[key];
+   }
+   return dest;
+}
+
+
+/* Local storage functions */
+
+function loadLastNamespace() {
+   if(localStorage.lastNamespace && namespaceExists(localStorage.lastNamespace)) {
+      useNamespace(localStorage.lastNamespace);
+   } else {
+      // no previously selected namespace, or it doesn't exist - use the default
+      useNamespace(DEFAULT_NAMESPACE);
+   }
+}
+
+function loadLastExplore() {
+   if(localStorage.lastExploreURI) {
+      explore(localStorage.lastExploreNamespace, localStorage.lastExploreURI, true, true);
+   }
+}
+
+function loadQueryHistory() {
+   if(typeof localStorage.historyCount === 'undefined') {
+      localStorage.historyCount = 0;
+   } else {
+      for(var i=localStorage.historyCount - 1; i>=0; i--) {
+         addQueryHistoryRow(localStorage['history.time.' + i], localStorage['history.query.' + i],
+            localStorage['history.results.' + i], localStorage['history.executionTime.' + i], false);
+      }
+      if(localStorage.historyCount > 0) {
+         $('#query-history').show();
+      }
+   }
+}
+
+
+/* Startup functions */
+
+function setupHandlers() {
+   // debug to access closure variables
+   // jshint debug:true
+   $('html, textarea, select').bind('keydown', 'ctrl+d', function() { debugger; });
+
+   $('.use-lbs').change(useLBS);
+
+   $('.modal-cancel').click(closeModal);
+
+   $('#search-form').submit(submitSearch);
+
+   $('#tab-selector a').click(clickTab);
+   // these should be , and . but Hotkeys views those keypresses as these characters
+   $('html, textarea, select').bind('keydown', 'ctrl+¼', moveTabLeft);
+   $('html, textarea, select').bind('keydown', 'ctrl+¾', moveTabRight);
+   $('#tab-selector a[data-target=status]').click(getStatus);
+   $('#tab-selector a[data-target=health], #health-refresh').click(getHealth);
+   $('#tab-selector a[data-target=performance]').click(loadPerformance);
+
+   $('.namespace-shortcuts').on('change', 'select', selectNamespace);
+   $('#custom-namespace-modal ul').on('click', 'a', deleteCustomNamespace);
+   $('#add-custom-namespace').click(createNamespaceShortcut);
+   $('.namespace-shortcuts').on('click', 'button', showCustomNamespacesModal);
+
+   $('#new-namespace-mode').change(changeNamespaceMode);
+   $('#namespace-create').submit(createNamespace);
+
+   $('#update-type').change(function() { setUpdateSettings(this.value); });
+   $('#rdf-type').change(function() { setUpdateMode('rdf'); });
+   $('#update-file').change(handleFileInput);
+   // $('#update-box').on('dragover', handleDragOver)
+   //    .on('drop', handleFile)
+   //    .on('paste', handlePaste)
+   //    .on('input propertychange', function() { $('#update-errors').hide(); });
+   $('#clear-file').click(clearFile);
+   $('#update-update').click(submitUpdate);
+   $('#update-clear').click(clearUpdateOutput);
+
+   $('.advanced-features-toggle').click(toggleAdvancedFeatures);
+
+   $('#query-box').on('input propertychange', function() { $('#query-errors').hide(); });
+   $('#query-form').submit(submitQuery);
+   $('#query-explain').change(handleExplain);
+   $('#query-details').change(handleDetails);
+   $('#query-history').on('click', '.query a', loadHistory);
+   $('#query-history').on('click', '.query-execution-time a', showRunningQueries);
+   $('#query-history').on('click', '.query-delete a', deleteHistoryRow);
+   $('#query-history-clear').click(clearHistory);
+   $('#query-response-clear').click(clearQueryResponse);
+   $('#query-export').click(showQueryExportModal);
+   $('#query-download').click(queryExport);
+
+   $('#results-per-page').change(function() { setPageSize(this.value); });
+   $('#previous-page').click(function() { showPage(CURRENT_PAGE - 1); });
+   $('#next-page').click(function() { showPage(CURRENT_PAGE + 1); });
+   $('#current-page').keyup(handlePageSelector);
+   $('#show-datatypes').click(showDatatypes);
+   $('#show-languages').click(showLanguages);
+
+   $('#explore-form').submit(exploreSubmit);
+
+   // handle browser history buttons and initial display of first tab
+   window.addEventListener("popstate", handlePopState);
+   $(handlePopState);
+}
+
+function startup() {
+   // load namespaces, default namespace, HA status
+   useLBS(true);
+   getNamespaces(true);
+   getDefaultNamespace();
+   showHealthTab();
+
+   // complete setup
+   loadCustomNamespaces();
+   populateNamespaceShortcuts();
+   createUpdateEditor();
+   createQueryEditor();
+   createExportOptions();
+   setupHandlers();
+
+   // restore last used namespace, last explored URI and query history
+   loadLastExplore();
+   loadLastNamespace();
+   loadQueryHistory();
+}
+
+startup();
 
 });

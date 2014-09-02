@@ -23,6 +23,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 /*
  * Created on Nov 15, 2006
+ * 
  */
 package com.bigdata.btree;
 
@@ -155,7 +156,6 @@ import com.bigdata.rwstore.IRWStrategy;
  *       several published papers.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class BTree extends AbstractBTree implements //ICommitter,
         ICheckpointProtocol {// ILocalBTreeView {
@@ -167,18 +167,21 @@ public class BTree extends AbstractBTree implements //ICommitter,
         
     }
 
+    @Override
     final public long getNodeCount() {
         
         return nnodes;
         
     }
 
+    @Override
     final public long getLeafCount() {
         
         return nleaves;
         
     }
 
+    @Override
     final public long getEntryCount() {
         
         return nentries;
@@ -201,6 +204,7 @@ public class BTree extends AbstractBTree implements //ICommitter,
      * counter will assign values within a namespace defined by the partition
      * identifier.
      */
+    @Override
     public ICounter getCounter() {
 
         ICounter counter = new Counter(this);
@@ -628,12 +632,14 @@ public class BTree extends AbstractBTree implements //ICommitter,
 //    }
 //    final private boolean readOnly;
     
+    @Override
     final public long getLastCommitTime() {
         
         return lastCommitTime;
         
     }
 
+    @Override
     final public long getRevisionTimestamp() {
         
         if (readOnly)
@@ -643,6 +649,7 @@ public class BTree extends AbstractBTree implements //ICommitter,
         
     }
     
+    @Override
     final public void setLastCommitTime(final long lastCommitTime) {
         
         if (lastCommitTime == 0L)
@@ -685,6 +692,7 @@ public class BTree extends AbstractBTree implements //ICommitter,
     /**
      * Return the {@link IDirtyListener}.
      */
+    @Override
     final public IDirtyListener getDirtyListener() {
         
         return listener;
@@ -696,6 +704,7 @@ public class BTree extends AbstractBTree implements //ICommitter,
      * 
      * @param listener The listener.
      */
+    @Override
     final public void setDirtyListener(final IDirtyListener listener) {
 
         assertNotReadOnly();
@@ -847,6 +856,7 @@ public class BTree extends AbstractBTree implements //ICommitter,
      *      
      * @see #load(IRawStore, long, boolean)
      */
+    @Override
     final public long writeCheckpoint() {
     
         // write checkpoint and return address of that checkpoint record.
@@ -859,6 +869,7 @@ public class BTree extends AbstractBTree implements //ICommitter,
      * 
      * @see #load(IRawStore, long, boolean)
      */
+    @Override
     final public Checkpoint writeCheckpoint2() {
         
         assertNotTransient();
@@ -889,8 +900,10 @@ public class BTree extends AbstractBTree implements //ICommitter,
 		 * @see https://sourceforge.net/apps/trac/bigdata/ticket/343
 		 * @see https://sourceforge.net/apps/trac/bigdata/ticket/440
 		 */
-		final Lock lock = new UnisolatedReadWriteIndex(this).writeLock();
-		try {
+//        final Lock lock = new UnisolatedReadWriteIndex(this).writeLock();
+        final Lock lock = UnisolatedReadWriteIndex.getReadWriteLock(this).writeLock();
+        lock.lock();
+        try {
 
 			if (/* autoCommit && */needsCheckpoint()) {
 
@@ -1084,6 +1097,7 @@ public class BTree extends AbstractBTree implements //ICommitter,
         
     }
 
+    @Override
     final public Checkpoint getCheckpoint() {
 
         if (checkpoint == null)
@@ -1093,18 +1107,21 @@ public class BTree extends AbstractBTree implements //ICommitter,
         
     }
     
+    @Override
     final public long getRecordVersion() {
     	
-    	return recordVersion;
+        return recordVersion;
 
     }
     
+    @Override
     final public long getMetadataAddr() {
 
-    	return metadata.getMetadataAddr();
+        return metadata.getMetadataAddr();
 
     }
     
+    @Override
     final public long getRootAddr() {
     	
 		return (root == null ? getCheckpoint().getRootAddr() : root
@@ -1293,9 +1310,10 @@ public class BTree extends AbstractBTree implements //ICommitter,
      * @return The address of a {@link Checkpoint} record from which the btree
      *         may be reloaded.
      */
+    @Override
     public long handleCommit(final long commitTime) {
 
-    	return writeCheckpoint2().getCheckpointAddr();
+        return writeCheckpoint2().getCheckpointAddr();
     	
     }
 
@@ -1316,6 +1334,7 @@ public class BTree extends AbstractBTree implements //ICommitter,
      * and dropping indices vs removing the entries in an individual
      * {@link BTree}.
      */
+    @Override
     final public void removeAll() {
 
         assertNotReadOnly();
@@ -1892,6 +1911,7 @@ public class BTree extends AbstractBTree implements //ICommitter,
         private NodeFactory() {
         }
 
+        @Override
         public Leaf allocLeaf(final AbstractBTree btree, final long addr,
                 final ILeafData data) {
 
@@ -1899,6 +1919,7 @@ public class BTree extends AbstractBTree implements //ICommitter,
 
         }
 
+        @Override
         public Node allocNode(final AbstractBTree btree, final long addr,
                 final INodeData data) {
 
@@ -1926,12 +1947,14 @@ public class BTree extends AbstractBTree implements //ICommitter,
             
         }
         
+        @Override
         public long get() {
             
             return btree.counter.get();
             
         }
 
+        @Override
         public long incrementAndGet() {
             
             final long counter = btree.counter.incrementAndGet();
@@ -2035,12 +2058,14 @@ public class BTree extends AbstractBTree implements //ICommitter,
             
         }
         
+        @Override
         public long get() {
             
             return wrap( src.get() );
             
         }
 
+        @Override
         public long incrementAndGet() {
 
             return wrap(src.incrementAndGet());
@@ -2098,6 +2123,7 @@ public class BTree extends AbstractBTree implements //ICommitter,
     /**
      * Returns ONE (1).
      */
+    @Override
     final public int getSourceCount() {
         
         return 1;
@@ -2107,24 +2133,28 @@ public class BTree extends AbstractBTree implements //ICommitter,
     /**
      * An array containing this {@link BTree}.
      */
+    @Override
     final public AbstractBTree[] getSources() {
         
         return new AbstractBTree[]{this};
         
     }
     
+    @Override
     final public BTree getMutableBTree() {
         
         return this;
         
     }
 
+    @Override
     public LeafCursor newLeafCursor(final SeekEnum where) {
 
         return new LeafCursor(where);
 
     }
 
+    @Override
     public LeafCursor newLeafCursor(final byte[] key) {
 
         return new LeafCursor(key);
@@ -2400,18 +2430,21 @@ public class BTree extends AbstractBTree implements //ICommitter,
          */
         private Leaf leaf;
 
+        @Override
         public Leaf leaf() {
             
             return leaf;
             
         }
 
+        @Override
         public BTree getBTree() {
             
             return BTree.this;
             
         }
         
+        @Override
         public LeafCursor clone() {
             
             return new LeafCursor(this);
@@ -2464,6 +2497,7 @@ public class BTree extends AbstractBTree implements //ICommitter,
             
         }
         
+        @Override
         public Leaf first() {
 
             stack.clear();
@@ -2485,6 +2519,7 @@ public class BTree extends AbstractBTree implements //ICommitter,
             
         }
 
+        @Override
         public Leaf last() {
             
             stack.clear();
@@ -2511,6 +2546,7 @@ public class BTree extends AbstractBTree implements //ICommitter,
          * the leaf may not actually contain the key, in which case it is the
          * leaf that contains the insertion point for the key.
          */
+        @Override
         public Leaf seek(final byte[] key) {
 
             stack.clear();
@@ -2533,6 +2569,7 @@ public class BTree extends AbstractBTree implements //ICommitter,
             
         }
 
+        @Override
         public Leaf seek(final ILeafCursor<Leaf> src) {
 
             if (src == null)
@@ -2558,6 +2595,7 @@ public class BTree extends AbstractBTree implements //ICommitter,
             
         }
         
+        @Override
         public Leaf next() {
 
             // make sure that the current leaf is valid.
@@ -2658,6 +2696,7 @@ public class BTree extends AbstractBTree implements //ICommitter,
          * @return The prior leaf -or- <code>null</code> if there is no
          *         predecessor of this leaf.
          */
+        @Override
         public Leaf prior() {
 
             // make sure that the current leaf is valid.

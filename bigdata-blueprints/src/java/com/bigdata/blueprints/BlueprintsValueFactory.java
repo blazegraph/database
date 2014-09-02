@@ -33,8 +33,28 @@ import com.tinkerpop.blueprints.Element;
  * @author mikepersonick
  *
  */
-public interface BlueprintsRDFFactory {
+public interface BlueprintsValueFactory {
 
+    /**
+     * Return the URI used for typing elements.
+     */
+    URI getTypeURI();
+    
+    /**
+     * Return the URI used to identify vertices.
+     */
+    URI getVertexURI();
+    
+    /**
+     * Return the URI used to identify edges.
+     */
+    URI getEdgeURI();
+    
+    /**
+     * Return the URI used for labeling edges.
+     */
+    URI getLabelURI();
+    
     /**
      * Create a vertex URI from a blueprints vertex id.
      */
@@ -55,20 +75,22 @@ public interface BlueprintsRDFFactory {
      */
 	URI toPropertyURI(String property);
 	
-    /**
-     * Create a blueprints vertex id from a vertex URI.
-     */
-	String fromVertexURI(URI uri);
+//    /**
+//     * Create a blueprints vertex id from a vertex URI.
+//     */
+//	String fromVertexURI(URI uri);
+//
+//    /**
+//     * Create a blueprints edge id from an edge URI.
+//     */
+//	String fromEdgeURI(URI uri);
+//	
+//    /**
+//     * Create a blueprints property name from a property URI.
+//     */
+//	String fromPropertyURI(URI uri);
 
-    /**
-     * Create a blueprints edge id from an edge URI.
-     */
-	String fromEdgeURI(URI uri);
-	
-    /**
-     * Create a blueprints property name from a property URI.
-     */
-	String fromPropertyURI(URI uri);
+	String fromURI(URI uri);
 	
 	/**
 	 * Create a datatyped literal from a blueprints property value.
@@ -80,4 +102,19 @@ public interface BlueprintsRDFFactory {
 	 */
 	Object fromLiteral(Literal lit);
 	
+//	/**
+//	 * Is the URI a vertex?
+//	 */
+//	boolean isVertex(URI uri);
+//	
+//    /**
+//     * Is the URI an edge?
+//     */
+//	boolean isEdge(URI uri);
+//	
+//    /**
+//     * Is the URI an edge?
+//     */
+//    boolean isProperty(URI uri);
+    
 }

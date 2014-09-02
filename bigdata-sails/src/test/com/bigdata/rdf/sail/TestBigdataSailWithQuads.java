@@ -135,6 +135,8 @@ public class TestBigdataSailWithQuads extends AbstractBigdataSailTestCase {
 
         suite.addTestSuite(com.bigdata.rdf.sail.TestNoExceptions.class);
 
+        suite.addTestSuite(com.bigdata.rdf.sail.TestInlineURIs.class);
+        
         // The Sesame TCK, including the SPARQL test suite.
         {
 

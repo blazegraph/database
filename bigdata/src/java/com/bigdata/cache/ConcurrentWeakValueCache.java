@@ -26,7 +26,6 @@ import org.apache.log4j.Logger;
  * {@link ConcurrentHashMap} which is a relatively expensive operation.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  * @param <K>
  *            The generic type of the keys.
  * @param <V>
@@ -508,6 +507,18 @@ public class ConcurrentWeakValueCache<K, V> implements
                     // the old value for the key was a cleared reference.
                     return null;
 
+                } else {
+                    
+                    /**
+                     * We lost a potential concurrent data race, so make
+                     * recursive call to ensure correct value is returned.
+                     * 
+                     * @see <a href="http://trac.bigdata.com/ticket/1004">
+                     *      Concurrent binding problem </a>
+                     */
+
+                    return putIfAbsent(k, v);
+                    
                 }
 
             }
@@ -765,7 +776,6 @@ public class ConcurrentWeakValueCache<K, V> implements
      * Adds the key to the weak reference.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      * @param <K>
      * @param <V>
      */

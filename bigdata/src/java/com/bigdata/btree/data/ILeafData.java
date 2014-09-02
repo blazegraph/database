@@ -35,7 +35,6 @@ import com.bigdata.rawstore.IRawStore;
  * Interface for low-level data access for the leaves of a B+-Tree.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public interface ILeafData extends IAbstractNodeData, IKeysData {
 
@@ -124,6 +123,7 @@ public interface ILeafData extends IAbstractNodeData, IKeysData {
     /**
      * Return <code>true</code> iff the leaf maintains version timestamps.
      */
+    @Override
     public boolean hasVersionTimestamps();
     
     /**

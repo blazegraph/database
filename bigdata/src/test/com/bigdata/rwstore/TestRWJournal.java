@@ -639,6 +639,26 @@ public class TestRWJournal extends AbstractJournalTestCase {
 
 		}
 
+		protected IRawStore getSmallSlotStore() {
+
+			return getSmallSlotStore(0);
+
+		}
+
+		protected IRawStore getSmallSlotStore(final int slotSize) {
+
+            final Properties properties = new Properties(getProperties());
+
+            properties.setProperty(
+                    AbstractTransactionService.Options.MIN_RELEASE_AGE, "0");
+
+            properties.setProperty(
+                    RWStore.Options.SMALL_SLOT_TYPE, "" + slotSize);
+
+            return getStore(properties);
+
+		}
+
         protected Journal getStore(final long retentionMillis) {
 
             final Properties properties = new Properties(getProperties());
@@ -820,6 +840,114 @@ public class TestRWJournal extends AbstractJournalTestCase {
 					final long pa = rw.physicalAddress(a);
 					paddrs.put(pa, a);
 				}
+
+			} finally {
+
+				store.destroy();
+
+			}
+
+		}
+
+		/**
+		 * Ensures the allocation of unique addresses by mapping allocated
+		 * address with uniqueness assertion against physical address.
+		 */
+		public void test_addressingContiguous() {
+
+			final Journal store = (Journal) getStore();
+
+			try {
+
+			    final RWStrategy bufferStrategy = (RWStrategy) store.getBufferStrategy();
+
+				final RWStore rw = bufferStrategy.getStore();
+				final int cSlotSize = 128;
+				final int cAllocSize = 99;
+				
+				long pap = rw.physicalAddress(rw.alloc(cAllocSize, null));
+				for (int i = 0; i < 500000; i++) {
+					final int a = rw.alloc(cAllocSize, null);
+					final long pa = rw.physicalAddress(a);
+					
+					if (pa != (pap+cSlotSize)) {
+						// for debug
+						rw.physicalAddress(a);
+						fail("Non-Contiguous slots: " + i + ", " + pa + "!=" + (pap+cSlotSize));
+					}
+					
+					pap = pa;
+					
+				}
+				
+				store.commit();
+				
+				final StringBuilder sb = new StringBuilder();
+				rw.showAllocators(sb);
+				
+				log.warn(sb.toString());
+
+			} finally {
+
+				store.destroy();
+
+			}
+
+		}
+
+		/**
+		 * Tests the recycling of small slot alloctors and outputs statistics related
+		 * to contiguous allocations indicative of reduced IOPS.
+		 */
+		public void test_smallSlotRecycling() {
+
+			final Journal store = (Journal) getSmallSlotStore(1024);
+
+			try {
+
+			    final RWStrategy bufferStrategy = (RWStrategy) store.getBufferStrategy();
+
+				final RWStore rw = bufferStrategy.getStore();
+				final int cSlotSize = 128;
+				final int cAllocSize = 99;
+				
+				int breaks = 0;
+				int contiguous = 0;
+				
+				ArrayList<Integer> recycle = new ArrayList<Integer>();
+				
+				long pap = rw.physicalAddress(rw.alloc(cAllocSize, null));
+				for (int i = 0; i < 500000; i++) {
+					final int a = rw.alloc(cSlotSize, null);
+					final long pa = rw.physicalAddress(a);
+					
+					if (r.nextInt(7) < 5) { // more than 50% recycle
+						recycle.add(a);
+					}
+					
+					if (pa == (pap+cSlotSize)) {
+						contiguous++;
+					} else {
+						breaks++;
+					}
+					
+					pap = pa;
+					
+					if (recycle.size() > 5000) {
+						log.warn("Transient Frees for immediate recyling");
+						for (int e : recycle) {
+							rw.free(e, cAllocSize);
+						}
+						recycle.clear();
+					}
+				}
+				
+				store.commit();
+				
+				final StringBuilder sb = new StringBuilder();
+				rw.showAllocators(sb);
+				
+				log.warn("Contiguous: " + contiguous + ", breaks: " + breaks + "\n" + sb.toString());
 
 			} finally {
 

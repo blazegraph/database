@@ -22,6 +22,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.blueprints;
 
+import java.util.Properties;
+
 import org.openrdf.repository.RepositoryConnection;
 
 import com.bigdata.rdf.sail.BigdataSail;
@@ -53,11 +55,11 @@ public class BigdataGraphEmbedded extends BigdataGraph implements TransactionalG
     
     /**
      * Create a Blueprints wrapper around a {@link BigdataSail} instance with
-     * a non-standard {@link BlueprintsRDFFactory} implementation.
+     * a non-standard {@link BlueprintsValueFactory} implementation.
      */
     public BigdataGraphEmbedded(final BigdataSail sail, 
-            final BlueprintsRDFFactory factory) {
-        this(new BigdataSailRepository(sail), factory);
+            final BlueprintsValueFactory factory) {
+        this(new BigdataSailRepository(sail), factory, new Properties());
     }
     
     /**
@@ -65,18 +67,22 @@ public class BigdataGraphEmbedded extends BigdataGraph implements TransactionalG
      * instance.
      */
 	public BigdataGraphEmbedded(final BigdataSailRepository repo) {
-		this(repo, BigdataRDFFactory.INSTANCE);
+		this(repo, BigdataRDFFactory.INSTANCE, new Properties());
 	}
 	
     /**
      * Create a Blueprints wrapper around a {@link BigdataSailRepository} 
-     * instance with a non-standard {@link BlueprintsRDFFactory} implementation.
+     * instance with a non-standard {@link BlueprintsValueFactory} implementation.
      */
 	public BigdataGraphEmbedded(final BigdataSailRepository repo, 
-			final BlueprintsRDFFactory factory) {
-	    super(factory);
+			final BlueprintsValueFactory factory, final Properties props) {
+	    super(factory, props);
 	    
 	    this.repo = repo;
+	}
+	
+	public BigdataSailRepository getRepository() {
+	    return repo;
 	}
 	
     protected final ThreadLocal<RepositoryConnection> cxn = new ThreadLocal<RepositoryConnection>() {
@@ -92,12 +98,16 @@ public class BigdataGraphEmbedded extends BigdataGraph implements TransactionalG
         }
     };
 
-	protected RepositoryConnection cxn() throws Exception {
+	protected RepositoryConnection getWriteConnection() throws Exception {
 //	    if (cxn == null) {
 //	        cxn = repo.getUnisolatedConnection();
 //	        cxn.setAutoCommit(false);
 //	    }
 	    return cxn.get();
+	}
+	
+	protected RepositoryConnection getReadConnection() throws Exception {
+	    return repo.getReadOnlyConnection();
 	}
 	
 	@Override

@@ -67,6 +67,7 @@ import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.cache.ConcurrentWeakValueCache;
+import com.bigdata.counters.CAT;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
 import com.bigdata.counters.striped.StripedCounters;
@@ -355,6 +356,24 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
         String FREE_BITS_THRESHOLD = RWStore.class.getName() + ".freeBitsThreshold";
 
         String DEFAULT_FREE_BITS_THRESHOLD = "300";
+
+        /**
+         * Defines the size of a slot that defines it as a small slot.
+         * <p>
+         * Any slot equal to or less than this is considered a small slot and
+         * its availability for allocation is restricted to ensure a high
+         * chance that contiguous allocations can be made.
+         * <p>
+         * This is arranged by only returning small slot allocators to the free list
+         * if they have greater than 50% available slots, and then only allocating
+         * slots from sparse regions with >= 50% free/committed bits.
+         * <p>
+         * Small slot processing can be disabled by setting the smallSlotType to zero.
+         */
+        String SMALL_SLOT_TYPE = RWStore.class.getName() + ".smallSlotType";
+
+        // String DEFAULT_SMALL_SLOT_TYPE = "1024"; // standard default
+        String DEFAULT_SMALL_SLOT_TYPE = "0"; // initial default to no special processing
 
         /**
          * When <code>true</code>, scattered writes which are strictly ascending
@@ -820,7 +839,16 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
             throw new IllegalArgumentException(Options.FREE_BITS_THRESHOLD
                     + " : Must be between 1 and 5000");
         }
-
+        
+        cSmallSlot = Integer.valueOf(fileMetadata.getProperty(
+                Options.SMALL_SLOT_TYPE,
+                Options.DEFAULT_SMALL_SLOT_TYPE));
+        
+        if (cSmallSlot < 0 || cSmallSlot > 2048) {
+            throw new IllegalArgumentException(Options.SMALL_SLOT_TYPE
+                    + " : Must be between 0 and 2048");
+        }
+        
         m_metaBits = new int[m_metaBitsSize];
         
         m_metaTransientBits = new int[m_metaBitsSize];
@@ -2117,36 +2145,12 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
                     // With a non-null WCS, the actual read should be via a callback to readRaw, it should not get here
                     //  unless it is not possible to cache - but maybe even then the WCS should read into a temporary
                     //  buffer
-                    final long beginDisk = System.nanoTime();
-                    // If checksum is required then the buffer should be sized to include checksum in final 4 bytes
+
+                	// If checksum is required then the buffer should be sized to include checksum in final 4 bytes
                     final ByteBuffer bb = ByteBuffer.wrap(buf, offset, length);
                     
                     // Use ReadRaw - should be the same read all
                     readRaw(paddr, bb);
-                    
-                    // enable for debug
-                    if (false) {//FIXME EXTENSION_LOCK REQUIRED FOR IO.
-                        final byte[] nbuf = new byte[buf.length];
-                        final ByteBuffer nbb = ByteBuffer.wrap(nbuf, offset, length);
-                        FileChannelUtility.readAll(m_reopener, nbb, paddr);
-                        if (!Arrays.equals(buf, nbuf))
-                            throw new AssertionError();
-                        
-                        m_diskReads++;
-                        // Update counters.
-                        final StoreCounters<?> c = (StoreCounters<?>) storeCounters.get()
-                                .acquire();
-                        try {
-                            final int nbytes = length;
-                            c.nreads++;
-                            c.bytesRead += nbytes;
-                            c.bytesReadFromDisk += nbytes;
-                            c.elapsedReadNanos += (System.nanoTime() - begin);
-                            c.elapsedDiskReadNanos += (System.nanoTime() - beginDisk);
-                        } finally {
-                            c.release();
-                        }
-                    }
                     
                     final int chk = ChecksumUtility.getCHK().checksum(buf, offset, length-4); // read checksum
                     final int tstchk = bb.getInt(offset + length-4);
@@ -2669,6 +2673,10 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
                 }
                 
                 final int addr = allocator.alloc(this, size, context);
+                
+                if (addr == 0) {
+                	throw new IllegalStateException("Free Allocator unable to allocate address: " + allocator.getSummaryStats());
+                }
 
                 if (allocator.isUnlocked() && !m_commitList.contains(allocator)) {
                     m_commitList.add(allocator);
@@ -3360,7 +3368,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
                     + m_metaBitsAddr + ", active contexts: "
                     + m_contexts.size());
 
-        if (log.isDebugEnabled() && m_quorum.isHighlyAvailable()) {
+        if (log.isDebugEnabled() && m_quorum != null && m_quorum.isHighlyAvailable()) {
             
             log.debug(showAllocatorList());
 
@@ -3623,6 +3631,10 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
      * @see Options#META_BITS_SIZE
      */
     final int cDefaultFreeBitsThreshold;
+    
+	final int cSmallSlotThreshold = 4096; // debug test
+	
+	int cSmallSlot = 1024; // @see from Options#SMALL_SLOT_TYPE
     
     /**
      * Each "metaBit" is a file region
@@ -3952,7 +3964,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
     private void extendFile() {
         
         final int adjust = -1200 + (m_fileSize / 10);
-        
+                
         extendFile(adjust);
     }
     
@@ -4050,12 +4062,21 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
     static int fndBit(final int[] bits, final int offset, final int size) {
         final int eob = size + offset;
         
-        for (int i = offset; i < eob; i++) {
-            if (bits[i] != 0xFFFFFFFF) {
-                for (int k = 0; k < 32; k++) {
-                    if ((bits[i] & (1 << k)) == 0) {
-                        return (i * 32) + k;
-                    }
+        for (int i = offset; i < eob; i++) {            
+            final int b = fndBit(bits[i]);
+            if (b != -1) {
+            	return (i * 32) + b;
+            }
+        }
+
+        return -1;
+    }
+    
+    static int fndBit(final int bits) {
+        if (bits != 0xFFFFFFFF) {
+            for (int k = 0; k < 32; k++) {
+                if ((bits & (1 << k)) == 0) {
+                    return k;
                 }
             }
         }
@@ -5493,19 +5514,27 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
          * #of times one of the root blocks has been written.
          */
         public volatile long nwriteRootBlock;
+        
+        /**
+         * buffer counters
+         */
+        public volatile long bufferDataBytes;
+        public volatile long bufferDataWrites;
+        public volatile long bufferFileWrites;
 
         /**
          * {@inheritDoc}
          */
         public StoreCounters() {
-            super();
+            super();            
         }
 
-        /**
+         /**
          * {@inheritDoc}
          */
         public StoreCounters(final int batchSize) {
             super(batchSize);
+            
         }
 
         /**
@@ -5602,7 +5631,6 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
             ntruncate = 0;
             nreopen = 0;
             nwriteRootBlock = 0;
-
         }
         
         @Override
@@ -5695,9 +5723,25 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
                     }
                 });
 
+
             } // IRawStore
 
-            // disk statistics
+            // BufferedWriter
+    		final CounterSet bc = root.makePath("buffer");
+    		
+    		bc.addCounter("ndataWrites", new Instrument<Long>() {
+                public void sample() {
+                    setValue(bufferDataWrites);
+                }
+            });
+
+    		bc.addCounter("nfileWrites", new Instrument<Long>() {
+                public void sample() {
+                    setValue(bufferFileWrites);
+                }
+            });
+            
+        	// disk statistics
             {
                 final CounterSet disk = root.makePath("disk");
 
@@ -6180,19 +6224,32 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
             final int position = dst.position();
             try {
  
+                final long beginDisk = System.nanoTime();
+
                 // the offset into the disk file.
                 // final long pos = FileMetadata.headerSize0 + offset;
                 final long pos = offset;
+                final int length = dst.limit();
 
                 // read on the disk.
                 final int ndiskRead = FileChannelUtility.readAll(m_reopener,
                         dst, pos);
 
+                m_diskReads += ndiskRead;
+                
+                final long now = System.nanoTime();
+                
                 // update performance counters.
                 final StoreCounters<?> c = (StoreCounters<?>) storeCounters
                         .get().acquire();
                 try {
                     c.ndiskRead += ndiskRead;
+                    final int nbytes = length;
+                    c.nreads++;
+                    c.bytesRead += nbytes;
+                    c.bytesReadFromDisk += nbytes;
+                    c.elapsedReadNanos += now - beginDisk;
+                    c.elapsedDiskReadNanos += now - beginDisk;
                 } finally {
                     c.release();
                 }

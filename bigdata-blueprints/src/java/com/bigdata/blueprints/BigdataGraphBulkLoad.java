@@ -35,7 +35,6 @@ import com.bigdata.rdf.changesets.IChangeLog;
 import com.bigdata.rdf.changesets.IChangeRecord;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
 import com.tinkerpop.blueprints.Edge;
-import com.tinkerpop.blueprints.Features;
 import com.tinkerpop.blueprints.GraphQuery;
 import com.tinkerpop.blueprints.TransactionalGraph;
 import com.tinkerpop.blueprints.Vertex;
@@ -60,17 +59,21 @@ public class BigdataGraphBulkLoad extends BigdataGraph
 	}
 	
 	public BigdataGraphBulkLoad(final BigdataSailRepositoryConnection cxn, 
-			final BlueprintsRDFFactory factory) {
+			final BlueprintsValueFactory factory) {
 	    super(factory);
 	    
 	    this.cxn = cxn;
 	    this.cxn.addChangeLog(this);
 	}
 	
-	protected RepositoryConnection cxn() throws Exception {
+	protected RepositoryConnection getWriteConnection() throws Exception {
 	    return cxn;
 	}
 	
+    protected RepositoryConnection getReadConnection() throws Exception {
+        return cxn;
+    }
+    
 	@Override
 	public void commit() {
 		try {
@@ -167,7 +170,7 @@ public class BigdataGraphBulkLoad extends BigdataGraph
             
 //            cxn().remove(s, p, null);
             
-            cxn().add(s, p, o);
+            getWriteConnection().add(s, p, o);
             
         } catch (Exception e) {
             throw new RuntimeException(e);
@@ -193,7 +196,7 @@ public class BigdataGraphBulkLoad extends BigdataGraph
 //              throw new IllegalArgumentException("vertex " + vid + " already exists");
 //          }
             
-            cxn().add(uri, RDF.TYPE, VERTEX);
+            getWriteConnection().add(uri, RDF.TYPE, VERTEX);
 
             return new BigdataVertex(uri, this);
             
@@ -241,9 +244,9 @@ public class BigdataGraphBulkLoad extends BigdataGraph
             final URI fromURI = factory.toVertexURI(from.getId().toString());
             final URI toURI = factory.toVertexURI(to.getId().toString());
             
-            cxn().add(fromURI, edgeURI, toURI);
-            cxn().add(edgeURI, RDF.TYPE, EDGE);
-            cxn().add(edgeURI, RDFS.LABEL, factory.toLiteral(label));
+            getWriteConnection().add(fromURI, edgeURI, toURI);
+            getWriteConnection().add(edgeURI, RDF.TYPE, EDGE);
+            getWriteConnection().add(edgeURI, RDFS.LABEL, factory.toLiteral(label));
             
             return new BigdataEdge(new StatementImpl(fromURI, edgeURI, toURI), this);
             

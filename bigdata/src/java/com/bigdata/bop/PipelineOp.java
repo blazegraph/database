@@ -122,6 +122,8 @@ abstract public class PipelineOp extends BOpBase {
 		 * {@link #MAX_MESSAGES_PER_TASK} and {@link #PIPELINE_QUEUE_CAPACITY}
 		 * have less effect and performance tends to be best around a modest
 		 * value (10) for those annotations.
+		 * 
+		 * @see ISingleThreadedOp
 		 */
 		String MAX_PARALLEL = PipelineOp.class.getName() + ".maxParallel";
 
@@ -505,17 +507,49 @@ abstract public class PipelineOp extends BOpBase {
 //        
 //    }
 
-	/**
-	 * The maximum parallelism with which tasks may be evaluated for this
-	 * operator (this is a per-shard limit in scale-out). A value of ONE (1)
-	 * indicates that at most ONE (1) instance of this task may be executing in
-	 * parallel for a given shard and may be used to indicate that the operator
-	 * evaluation task is not thread-safe.
-	 * 
-	 * @see Annotations#MAX_PARALLEL
-	 */
+    /**
+     * If parallel evaluation is not allowed, then throws
+     * {@link IllegalArgumentException}.
+     */
+    final protected void assertMaxParallelOne() {
+
+        /*
+         * Note: Tests the annotation, not getMaxParallel(), since we want to
+         * make sure the annotation is valid and getMaxParallel() also tests for
+         * the ISingleThreadedOp interface.
+         */
+        if (getProperty(PipelineOp.Annotations.MAX_PARALLEL,
+                PipelineOp.Annotations.DEFAULT_MAX_PARALLEL) != 1) {
+
+            throw new IllegalArgumentException(
+                    PipelineOp.Annotations.MAX_PARALLEL + "="
+                            + getMaxParallel());
+
+        }
+        
+    }
+    
+    /**
+     * The maximum parallelism with which tasks may be evaluated for this
+     * operator (this is a per-shard limit in scale-out). A value of ONE (1)
+     * indicates that at most ONE (1) instance of this task may be executing in
+     * parallel for a given shard and may be used to indicate that the operator
+     * evaluation task is not thread-safe.
+     * 
+     * @see Annotations#MAX_PARALLEL
+     * @see ISingleThreadedOp
+     * 
+     * @see <a href="http://trac.bigdata.com/ticket/1002"> </a>
+     */
 	final public int getMaxParallel() {
 
+	    if(this instanceof ISingleThreadedOp) {
+	        
+	        // Ignore the annotation value.
+	        return 1;
+	        
+	    }
+	    
 		return getProperty(PipelineOp.Annotations.MAX_PARALLEL,
 				PipelineOp.Annotations.DEFAULT_MAX_PARALLEL);
 

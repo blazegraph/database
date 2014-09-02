@@ -2978,6 +2978,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
      * Always returns the {@link BTree} as the sole element of the array since
      * partitioned indices are not supported.
      */
+    @Override
     public AbstractBTree[] getIndexSources(final String name,
             final long timestamp, final BTree btree) {
         
