@@ -107,7 +107,7 @@ public class TestGroupGraphPatternBuilder extends
         {
 
             {
-                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
                 expected.setPrefixDecls(prefixDecls);
             }
 
@@ -141,7 +141,7 @@ public class TestGroupGraphPatternBuilder extends
         {
 
             {
-                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
                 expected.setPrefixDecls(prefixDecls);
             }
 
@@ -184,7 +184,7 @@ public class TestGroupGraphPatternBuilder extends
         {
 
             {
-                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
                 expected.setPrefixDecls(prefixDecls);
             }
 
@@ -225,7 +225,7 @@ public class TestGroupGraphPatternBuilder extends
         {
 
             {
-                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
                 expected.setPrefixDecls(prefixDecls);
             }
 
@@ -277,7 +277,7 @@ public class TestGroupGraphPatternBuilder extends
         {
 
             {
-                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
                 expected.setPrefixDecls(prefixDecls);
             }
             
@@ -330,7 +330,7 @@ public class TestGroupGraphPatternBuilder extends
         {
 
             {
-                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
                 expected.setPrefixDecls(prefixDecls);
             }
 
@@ -385,7 +385,7 @@ public class TestGroupGraphPatternBuilder extends
         {
 
             {
-                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
                 expected.setPrefixDecls(prefixDecls);
             }
 
@@ -447,7 +447,7 @@ public class TestGroupGraphPatternBuilder extends
             final VarNode o = new VarNode("o");
 
             {
-                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
                 expected.setPrefixDecls(prefixDecls);
             }
 
@@ -522,7 +522,7 @@ public class TestGroupGraphPatternBuilder extends
             final VarNode o = new VarNode("o");
 
             {
-                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
                 expected.setPrefixDecls(prefixDecls);
             }
 
@@ -599,7 +599,7 @@ public class TestGroupGraphPatternBuilder extends
             final VarNode o = new VarNode("o");
 
             {
-                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
                 expected.setPrefixDecls(prefixDecls);
             }
 
@@ -659,7 +659,7 @@ public class TestGroupGraphPatternBuilder extends
         {
 
             {
-                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
                 expected.setPrefixDecls(prefixDecls);
             }
 
@@ -702,7 +702,7 @@ public class TestGroupGraphPatternBuilder extends
         {
 
             {
-                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
                 expected.setPrefixDecls(prefixDecls);
             }
             
@@ -747,7 +747,7 @@ public class TestGroupGraphPatternBuilder extends
         {
 
             {
-                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
                 expected.setPrefixDecls(prefixDecls);
             }
 
@@ -794,7 +794,7 @@ public class TestGroupGraphPatternBuilder extends
         {
 
             {
-                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
                 expected.setPrefixDecls(prefixDecls);
             }
 
@@ -844,7 +844,7 @@ public class TestGroupGraphPatternBuilder extends
         {
 
             {
-                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
                 expected.setPrefixDecls(prefixDecls);
             }
 
@@ -895,7 +895,7 @@ public class TestGroupGraphPatternBuilder extends
         {
             
             {
-                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
                 expected.setPrefixDecls(prefixDecls);
             }
 
@@ -941,7 +941,7 @@ public class TestGroupGraphPatternBuilder extends
         {
 
             {
-                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
                 expected.setPrefixDecls(prefixDecls);
             }
 
@@ -989,7 +989,7 @@ public class TestGroupGraphPatternBuilder extends
         {
 
             {
-                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
                 expected.setPrefixDecls(prefixDecls);
             }
 
@@ -1038,7 +1038,7 @@ public class TestGroupGraphPatternBuilder extends
         {
 
             {
-                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
                 expected.setPrefixDecls(prefixDecls);
             }
 
@@ -1092,7 +1092,7 @@ public class TestGroupGraphPatternBuilder extends
         {
 
             {
-                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
                 expected.setPrefixDecls(prefixDecls);
             }
 
@@ -1148,7 +1148,7 @@ public class TestGroupGraphPatternBuilder extends
         {
 
             {
-                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
                 expected.setPrefixDecls(prefixDecls);
             }
 
@@ -1203,7 +1203,7 @@ public class TestGroupGraphPatternBuilder extends
         {
 
             {
-                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
                 expected.setPrefixDecls(prefixDecls);
             }
 
@@ -1259,7 +1259,7 @@ public class TestGroupGraphPatternBuilder extends
         final QueryRoot expected = new QueryRoot(QueryType.SELECT);
         {
 
-            final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+            final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
             {
                 prefixDecls.put("", "http://www.bigdata.com/");
                 expected.setPrefixDecls(prefixDecls);
@@ -1314,8 +1314,8 @@ public class TestGroupGraphPatternBuilder extends
         {
 
             {
-                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
-                expected.setPrefixDecls(prefixDecls);
+//                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
+//                expected.setPrefixDecls(prefixDecls);
             }
 
             {

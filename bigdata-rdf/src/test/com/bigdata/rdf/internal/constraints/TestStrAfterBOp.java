@@ -143,7 +143,7 @@ public class TestStrAfterBOp extends ProxyTestCase {
             // strbefore("abc"^^xsd:string,"") -> ""^^xsd:string
             {
                 final IV expected = DummyConstantNode.toDummyIV(vf
-                        .createLiteral("", XSD.STRING));
+                        .createLiteral("abc", XSD.STRING));
 
                 final IV arg1 = DummyConstantNode.toDummyIV(vf
                         .createLiteral("abc", XSD.STRING));
