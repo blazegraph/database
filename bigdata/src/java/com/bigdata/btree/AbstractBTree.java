@@ -36,9 +36,14 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.UUID;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.FutureTask;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
@@ -87,6 +92,7 @@ import com.bigdata.resources.OverflowManager;
 import com.bigdata.service.DataService;
 import com.bigdata.service.Split;
 import com.bigdata.util.InnerCause;
+import com.bigdata.util.StackInfoReport;
 import com.bigdata.util.concurrent.Computable;
 import com.bigdata.util.concurrent.Memoizer;
 
@@ -249,6 +255,8 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
      * mutation.
      */
     final protected boolean readOnly;
+    
+    final ReentrantReadWriteLock lock;
 
     /**
      * Optional cache for {@link INodeData} and {@link ILeafData} instances and
@@ -959,6 +967,8 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
         this.store = store;
         
         this.readOnly = readOnly;
+        
+        this.lock = UnisolatedReadWriteIndex.getReadWriteLock(this);
 
 //        /*
 //         * The Memoizer is not used by the mutable B+Tree since it is not safe
@@ -1976,6 +1986,8 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
         }
         
     };
+
+	volatile Throwable error;
     
     final public Object insert(Object key, Object value) {
 
@@ -3368,7 +3380,14 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 
         }
 
-        doSyncTouch(node);
+    	// If a mutable tree and a read-only operation then ensure there are no evictions from this thread
+        final Integer rcount = threadLockMap.get(Thread.currentThread().getId());
+        if (!isReadOnly() && rcount != null /* && false this should stochastically fail!*/) {
+        	// NOP
+        	assert rcount.intValue() > 0;
+        } else {
+    		doSyncTouch(node);
+    	}
         
     }
 
@@ -3432,7 +3451,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
          */
 
 //        assert isReadOnly() || ndistinctOnWriteRetentionQueue > 0;
-
+    	
         node.referenceCount++;
 
         if (!writeRetentionQueue.add(node)) {
@@ -3597,6 +3616,15 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
         
     }
 
+    private void badNode(final AbstractNode<?> node) {
+//    	try {
+//			Thread.sleep(50);
+//		} catch (InterruptedException e) {
+//			// ignore;
+//		}
+    	throw new AssertionError("ReadOnly and identity: " + node.identity);
+    }
+    
     /**
      * Codes the node and writes the coded record on the store (non-recursive).
      * The node MUST be dirty. If the node has a parent, then the parent is
@@ -3616,7 +3644,31 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
      * @return The persistent identity assigned by the store.
      */
     protected long writeNodeOrLeaf(final AbstractNode<?> node) {
-
+    	
+    	/*
+    	 * The check for the writeLock held on an update is currently disabled since
+    	 * a number of Unit tests failed with it active.  The exception information
+    	 * indicates that the writeLock is not held in any of the test failure scenarios, so
+    	 * the thread check does not fail due to submitted tasks.
+    	 * TODO: we need to clarify the requirements for holding the writeLock across any update
+    	 */
+    	if (false && !lock.isWriteLockedByCurrentThread()) {
+    		throw new AssertionError("WriteLock not held, readOnly: " + this.isReadOnly() + ", locked by other: " + lock.isWriteLocked());
+    	}
+    	
+    	if (error != null) {
+    		throw new IllegalStateException("BTree is in an error state", error);
+    	}
+    	
+//    	if (node.writing != null) {
+//    		final Throwable remote = node.writing;
+//    		node.writing = null;
+//    		
+//    		throw new AssertionError("Duplicate Call - ", remote);
+//    	}
+//    	
+    	// node.writing = new StackInfoReport("Write Guard");
+    	
         assert root != null; // i.e., isOpen().
         assert node != null;
         assert node.btree == this;
@@ -3640,7 +3692,10 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
          *      TestMROWTransactions might also demonstrate an issue
          *      occasionally. If so, then check for the same root cause.
          */
-        assert !node.isReadOnly();
+        if (node.isReadOnly()) {
+        	badNode(node); // supports debugging
+        }
+        assert !node.isReadOnly(); // FIXME Occasional CI errors on this assert for TestMROWTransactions. Also StressTestUnisolatedReadWriteIndex.  See http://trac.bigdata.com/ticket/343
         assertNotReadOnly();
         
         /*
@@ -3740,6 +3795,14 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
             // No longer dirty (prevents re-coding on re-eviction).
             node.setDirty(false);
 
+//            if (node.writing == null) {
+//            	log.warn("Concurrent modification of thread guard", new RuntimeException("WTF2: " + node.hashCode()));
+//            	
+//            	throw new AssertionError("Concurrent modification of thread guard");
+//            }
+
+//            node.writing = null;
+        	
             return 0L;
             
         }
@@ -3829,6 +3892,14 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
             
         }
         
+//        if (node.writing == null) {
+//        	log.warn("Concurrent modification of thread guard", new RuntimeException("WTF2: " + node.hashCode()));
+//        	
+//        	throw new AssertionError("Concurrent modification of thread guard");
+//        }
+//
+//        node.writing = null;
+
         return addr;
 
     }
@@ -3855,40 +3926,6 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
         if (addr == IRawStore.NULL)
             throw new IllegalArgumentException();
         
-//        final Long addr2 = Long.valueOf(addr); 
-//
-//        if (storeCache != null) {
-//
-//            // test cache : will touch global LRU iff found.
-//            final IAbstractNodeData data = (IAbstractNodeData) storeCache
-//                    .get(addr);
-//
-//            if (data != null) {
-//
-//                // Node and Leaf MUST NOT make it into the global LRU or store
-//                // cache!
-//                assert !(data instanceof AbstractNode<?>);
-//                
-//                final AbstractNode<?> node;
-//                
-//                if (data.isLeaf()) {
-//
-//                    node = nodeSer.nodeFactory.allocLeaf(this, addr,
-//                            (ILeafData) data);
-//
-//                } else {
-//
-//                    node = nodeSer.nodeFactory.allocNode(this, addr,
-//                            (INodeData) data);
-//
-//                }
-//
-//                // cache hit.
-//                return node;
-//                
-//            }
-//            
-//        }
         
         final ByteBuffer tmp;
         {
@@ -3944,21 +3981,6 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
                 }
 
             }
-
-//            if (storeCache != null) {
-//             
-//                // update cache : will touch global LRU iff cache is modified.
-//                final IAbstractNodeData data2 = (IAbstractNodeData) storeCache
-//                        .putIfAbsent(addr2, data);
-//
-//                if (data2 != null) {
-//
-//                    // concurrent insert, use winner's value.
-//                    data = data2;
-//
-//                } 
-//                
-//            }
 
             // wrap as Node or Leaf.
             final AbstractNode<?> node = nodeSer.wrap(this, addr, data);
@@ -4303,4 +4325,35 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 
     }
 
+
+    /**
+     * Maintain count of readLocks on this Thread.  Use ThreadLocal for now, but
+     * could switch to HashMap if necessary
+     */
+//    ThreadLocal<AtomicInteger> threadReadLockCount = new ThreadLocal<AtomicInteger>();
+    ConcurrentHashMap<Long, Integer> threadLockMap = new ConcurrentHashMap<Long, Integer>();
+
+	public void readLockedThread() {
+//		final AtomicInteger ai = threadReadLockCount.get();
+//		if (ai == null) {
+//			threadReadLockCount.set(new AtomicInteger(1));
+//		} else {
+//			ai.incrementAndGet();
+//		}
+		final long thisThreadId = Thread.currentThread().getId();
+		final Integer entry = threadLockMap.get(thisThreadId);
+		final Integer newVal = entry == null ? 1 : 1 + entry.intValue();
+		threadLockMap.put(thisThreadId, newVal);
+	}
+
+	public void readUnlockedThread() {
+		final long thisThreadId = Thread.currentThread().getId();
+		final Integer entry = threadLockMap.get(thisThreadId);
+		assert entry != null;
+		if (entry.intValue() == 1) {
+			threadLockMap.remove(thisThreadId);
+		} else {
+			threadLockMap.put(thisThreadId, entry.intValue() - 1);
+		}
+	}
 }
