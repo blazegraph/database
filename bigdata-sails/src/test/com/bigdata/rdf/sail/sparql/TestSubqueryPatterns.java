@@ -104,7 +104,7 @@ public class TestSubqueryPatterns extends
         {
 
             {
-                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
                 expected.setPrefixDecls(prefixDecls);
             }
 
@@ -169,7 +169,7 @@ public class TestSubqueryPatterns extends
         {
 
             {
-                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
                 expected.setPrefixDecls(prefixDecls);
             }
 
@@ -235,7 +235,7 @@ public class TestSubqueryPatterns extends
         {
 
             {
-                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
                 expected.setPrefixDecls(prefixDecls);
             }
 
@@ -301,7 +301,7 @@ public class TestSubqueryPatterns extends
         {
 
             {
-                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
                 expected.setPrefixDecls(prefixDecls);
             }
 
@@ -371,7 +371,7 @@ public class TestSubqueryPatterns extends
         {
 
             {
-                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
                 expected.setPrefixDecls(prefixDecls);
             }
 
@@ -454,7 +454,7 @@ public class TestSubqueryPatterns extends
                     makeIV(valueFactory.createLiteral("12", XSD.INTEGER)));
             
             {
-                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
                 expected.setPrefixDecls(prefixDecls);
             }
 
@@ -566,7 +566,7 @@ public class TestSubqueryPatterns extends
             final VarNode anonvar = mockAnonVar("-exists-1");
 
             {
-                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
                 prefixDecls.put("rdf", RDF.NAMESPACE);
                 prefixDecls.put("foaf", FOAFVocabularyDecl.NAMESPACE);
                 expected.setPrefixDecls(prefixDecls);
@@ -643,7 +643,7 @@ public class TestSubqueryPatterns extends
             final VarNode anonvar = mockAnonVar("-exists-1");
 
             {
-                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
                 prefixDecls.put("rdf", RDF.NAMESPACE);
                 prefixDecls.put("foaf", FOAFVocabularyDecl.NAMESPACE);
                 expected.setPrefixDecls(prefixDecls);
@@ -732,7 +732,7 @@ public class TestSubqueryPatterns extends
                             .stringValue())));
             
             {
-                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
                 prefixDecls.put("rdfs", RDFS.NAMESPACE);
                 expected.setPrefixDecls(prefixDecls);
             }
@@ -839,7 +839,7 @@ public class TestSubqueryPatterns extends
 //                            .stringValue())));
 //            
 //            {
-//                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+//                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
 //                prefixDecls.put("rdfs", RDFS.NAMESPACE);
 //                expected.setPrefixDecls(prefixDecls);
 //            }
@@ -947,7 +947,7 @@ public class TestSubqueryPatterns extends
 //                            .stringValue())));
 //            
 //            {
-//                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+//                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
 //                prefixDecls.put("rdfs", RDFS.NAMESPACE);
 //                expected.setPrefixDecls(prefixDecls);
 //            }

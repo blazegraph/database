@@ -1573,7 +1573,7 @@ public class TestUpdateExprBuilder extends AbstractBigdataExprBuilderTestCase {
                 + "{\n"
                 + "  <http://example/book1> dc:title \"A new book\" .\n"
                 + "  <http://example/book1> dc:creator \"A.N.Other\" .\n" //
-                + "  GRAPH <http://example/bookStore> { <http://example/book1>  ns:price  42 }\n"
+                + "  <http://example/book1>  ns:price 42 <http://example/bookStore> .\n"
                 + "}";
 
         final UpdateRoot expected = new UpdateRoot();

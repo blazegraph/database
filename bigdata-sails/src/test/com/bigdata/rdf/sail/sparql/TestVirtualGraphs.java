@@ -191,7 +191,7 @@ public class TestVirtualGraphs extends AbstractBigdataExprBuilderTestCase {
         {
 
             {
-                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
                 prefixDecls.put("foaf", FOAFVocabularyDecl.NAMESPACE);
                 prefixDecls.put("dc", DC.NAMESPACE);
                 expected.setPrefixDecls(prefixDecls);
@@ -345,7 +345,7 @@ public class TestVirtualGraphs extends AbstractBigdataExprBuilderTestCase {
         {
 
             {
-                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
                 prefixDecls.put("foaf", FOAFVocabularyDecl.NAMESPACE);
                 prefixDecls.put("dc", DC.NAMESPACE);
                 expected.setPrefixDecls(prefixDecls);
