@@ -953,6 +953,10 @@ public class ASTEvalHelper {
 //            final Map<String, BindingsClause> nsBindingsClauses,
             final List<BindingsClause> bindingsClauses) {
         
+        if (group == null) {
+            return;
+        }
+        
         if (group instanceof JoinGroupNode && ((JoinGroupNode) group).isOptional()) {
             return;
         }
