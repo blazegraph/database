@@ -33,7 +33,6 @@ package com.bigdata.journal;
  * {@link ICommitter} when it was registered.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  * 
  * @see IAtomicStore#setCommitter(int, ICommitter)
  */

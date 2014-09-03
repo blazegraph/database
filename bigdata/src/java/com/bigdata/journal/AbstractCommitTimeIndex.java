@@ -24,8 +24,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.journal;
 
 import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock.ReadLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock.WriteLock;
 
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.DelegateBTree;
@@ -51,11 +51,11 @@ public class AbstractCommitTimeIndex<T extends ICommitTimeEntry> extends
      */
     private final BTree btree;
 
-    /**
-     * The {@link ReadWriteLock} used by the {@link UnisolatedReadWriteIndex} to
-     * make operations on the underlying {@link #btree} thread-safe.
-     */
-    private final ReadWriteLock readWriteLock;
+//    /**
+//     * The {@link ReadWriteLock} used by the {@link UnisolatedReadWriteIndex} to
+//     * make operations on the underlying {@link #btree} thread-safe.
+//     */
+//    private final ReadWriteLock readWriteLock;
     
     @SuppressWarnings("unchecked")
     private Tuple<T> getLookupTuple() {
@@ -75,11 +75,6 @@ public class AbstractCommitTimeIndex<T extends ICommitTimeEntry> extends
         super(new UnisolatedReadWriteIndex(ndx));
         
         this.btree = ndx;
-        
-//        this.delegate = new UnisolatedReadWriteIndex(ndx);
-        
-        // Save reference to lock for extended synchronization patterns.
-        this.readWriteLock = UnisolatedReadWriteIndex.getReadWriteLock(ndx);
         
     }
     
@@ -102,8 +97,8 @@ public class AbstractCommitTimeIndex<T extends ICommitTimeEntry> extends
      * Returns (but does not take) the {@link ReadLock}.
      */
     public Lock readLock() {
-        
-        return readWriteLock.readLock();
+
+        return btree.readLock();
         
     }
     
@@ -112,7 +107,7 @@ public class AbstractCommitTimeIndex<T extends ICommitTimeEntry> extends
      */
     public Lock writeLock() {
 
-        return readWriteLock.writeLock();
+        return btree.writeLock();
         
     }
 

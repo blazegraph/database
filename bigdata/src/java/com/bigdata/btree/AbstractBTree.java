@@ -24,6 +24,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 /*
  * Created on Dec 19, 2006
  * 
+ * RESYNC
  */
 
 package com.bigdata.btree;
@@ -40,6 +41,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.FutureTask;
+import java.util.concurrent.locks.Lock;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
@@ -133,7 +135,6 @@ import cutthecrap.utils.striterators.IFilter;
  * </p>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  * 
  * @see KeyBuilder
  */
@@ -167,6 +168,15 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
      */
     final protected static String ERROR_TRANSIENT = "Transient";
     
+    /**
+     * An unisolated index view is in an error state. It must be discarded and
+     * reloaded from the current checkpoint record.
+     * 
+     * @see <a href="http://trac.bigdata.com/ticket/1005"> Invalidate BTree
+     *      objects if error occurs during eviction </a>
+     */
+    final protected static String ERROR_ERROR_STATE = "Index is in error state";
+
     /**
      * Log for btree opeations.
      */
@@ -250,13 +260,21 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
      * mutation.
      */
     final protected boolean readOnly;
-
+    
     /**
      * Optional cache for {@link INodeData} and {@link ILeafData} instances and
      * always <code>null</code> if the B+Tree is transient.
      */
     protected final ILRUCache<Long, Object> storeCache;
 
+    /**
+     * Hard reference iff the index is mutable (aka unisolated) allows us to
+     * avoid patterns that create short life time versions of the object to
+     * protect {@link ICheckpointProtocol#writeCheckpoint2()} and similar
+     * operations.
+     */
+    private final IReadWriteLockManager lockManager;
+    
     /**
      * The branching factor for the btree.
      */
@@ -545,6 +563,21 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
      * @see http://en.wikipedia.org/wiki/Double-checked_locking
      */
     protected volatile AbstractNode<?> root;
+
+    /**
+     * This field is set if an error is encountered that renders an unisolated
+     * index object unusable. For example, this can occur if an error was
+     * detected during incremental eviction of dirty nodes for a mutable index
+     * view since that means that there are partly serialized (and possibly
+     * inconsistenly serialized) evicted pages. Once this becomes non-
+     * <code>null</code> the index MUST be reloaded from the most recent
+     * checkpoint before it can be used (that is, you need to obtain a new view
+     * of the unisolated index since this field is sticky once set).
+     * 
+     * @see <a href="http://trac.bigdata.com/ticket/1005"> Invalidate BTree
+     *      objects if error occurs during eviction </a>
+     */
+    protected volatile Throwable error;
 
     /**
      * An optional bloom filter that will be used to filter point tests against
@@ -960,7 +993,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
         this.store = store;
         
         this.readOnly = readOnly;
-
+        
 //        /*
 //         * The Memoizer is not used by the mutable B+Tree since it is not safe
 //         * for concurrent operations.
@@ -1042,6 +1075,8 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
         
         }
 
+        lockManager = ReadWriteLockManager.getLockManager(this);
+        
     }
 
     /**
@@ -1977,7 +2012,8 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
         }
         
     };
-    
+
+	@Override
     final public Object insert(Object key, Object value) {
 
         key = metadata.getTupleSerializer().serializeKey(key);
@@ -1999,6 +2035,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
         
     }
 
+    @Override
     final public byte[] insert(final byte[] key, final byte[] value) {
 
         if (key == null)
@@ -2120,6 +2157,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 
     }
 
+    @Override
     final public Object remove(Object key) {
 
         key = metadata.getTupleSerializer().serializeKey(key);
@@ -2147,6 +2185,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
      * Remove the tuple under that key (will write a delete marker if delete
      * markers are enabled).
      */
+    @Override
     final public byte[] remove(final byte[] key) {
 
         final Tuple tuple;
@@ -2232,8 +2271,10 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
      * and dropping indices vs removing the entries in an individual
      * {@link AbstractBTree}.
      */
+    @Override
     abstract public void removeAll();
     
+    @Override
     public Object lookup(Object key) {
 
         key = metadata.getTupleSerializer().serializeKey(key);
@@ -2252,6 +2293,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 
     }
 
+    @Override
     public byte[] lookup(final byte[] key) {
 
         final Tuple tuple = lookup(key, getLookupTuple());
@@ -2339,6 +2381,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 
     }
 
+    @Override
     public boolean contains(Object key) {
         
         key = metadata.getTupleSerializer().serializeKey(key);
@@ -2359,6 +2402,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
      * 
      * @todo add unit test to btree suite w/ and w/o delete markers.
      */
+    @Override
     public boolean contains(final byte[] key) {
 
         if (key == null)
@@ -2405,6 +2449,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 
     }
 
+    @Override
     public long indexOf(final byte[] key) {
 
         if (key == null)
@@ -2419,6 +2464,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 
     }
 
+    @Override
     public byte[] keyAt(final long index) {
 
         if (index < 0)
@@ -2433,6 +2479,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 
     }
 
+    @Override
     public byte[] valueAt(final long index) {
 
         final Tuple tuple = getLookupTuple();
@@ -2466,6 +2513,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
      * IRangeQuery
      */
 
+    @Override
     final public long rangeCountExact(final byte[] fromKey, final byte[] toKey) {
 
         if (!metadata.getDeleteMarkers()) {
@@ -2509,6 +2557,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 
     }
 
+    @Override
     final public long rangeCount() {
         
         return rangeCount(null, null);
@@ -2546,6 +2595,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
      * lookup of the both keys. If both keys are <code>null</code>, then the
      * cost is zero (no IOs).
      */
+    @Override
     final public long rangeCount(final byte[] fromKey, final byte[] toKey) {
 
         if (fromKey == null && toKey == null) {
@@ -2604,6 +2654,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
      * considering all sources at once. It uses a range iterator scan visiting
      * both deleted and undeleted tuples for that.
      */
+    @Override
     public long rangeCountExactWithDeleted(final byte[] fromKey,
             final byte[] toKey) {
 
@@ -2649,6 +2700,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
         
     }
     
+    @Override
     final public ITupleIterator rangeIterator() {
 
         return rangeIterator(null, null);
@@ -2675,6 +2727,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
         
     }
     
+    @Override
     final public ITupleIterator rangeIterator(byte[] fromKey, byte[] toKey) {
 
         return rangeIterator(fromKey, toKey, 0/* capacity */,
@@ -2767,6 +2820,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 	 * @todo add support to the iterator construct for filtering by a tuple
 	 *       revision timestamp range.
 	 */
+    @Override
     public ITupleIterator rangeIterator(//
             final byte[] fromKey,//
             final byte[] toKey,//
@@ -3115,6 +3169,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 
     }
     
+    @Override
     public Object submit(final byte[] key, final ISimpleIndexProcedure proc) {
 
         // conditional range check on the key.
@@ -3126,6 +3181,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
     }
 
     @SuppressWarnings("unchecked")
+    @Override
     public void submit(final byte[] fromKey, final byte[] toKey,
             final IKeyRangeIndexProcedure proc, final IResultHandler handler) {
 
@@ -3147,6 +3203,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
     }
     
     @SuppressWarnings("unchecked")
+    @Override
     public void submit(final int fromIndex, final int toIndex,
             final byte[][] keys, final byte[][] vals,
             final AbstractKeyArrayIndexProcedureConstructor ctor,
@@ -3369,8 +3426,68 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 
         }
 
-        doSyncTouch(node);
+        /**
+         * At this point we know that the B+Tree object is a mutable data
+         * structure (!readOnly). If we can prove that the current thread is
+         * conducting a read-only operation on the B+Tree, then we DO NOT touch
+         * the node in order to prevent having read-only operations drive
+         * evictions. This test relies on the UnisolatedReadWriteIndex class to
+         * provide concurrency control for such interleaved read-only and
+         * mutation operations on an unisolated (aka mutable) index.
+         * 
+         * There are three broad ways in which concurrency controls for the
+         * index classes are realized:
+         * 
+         * (1) Explicit synchronization. For example, the AbstractJournal uses
+         * explicit synchronization to protect operations on the unisolated
+         * Name2Addr.
+         * 
+         * (2) Explicit pre-declaration of ordered locks. The ConcurrencyManager
+         * and AbstractTask support this protection mechanism. The task runs
+         * once it has acquired the locks for the declared unisolated indices.
+         * 
+         * (3) UnisolatedReadWriteIndex. This is used to provide transparent
+         * concurrency control for unisolated indices for the triple and quad
+         * store classes.
+         * 
+         * The index is mutable (unisolated view). If the thread owns a
+         * read-only lock then the operation is read-only and we MUST NOT drive
+         * evictions from this thread.
+         * 
+         * Note: The order in which we obtain the real read lock and increment
+         * (and decrement) the per-thread read lock counter on the AbstractBTree
+         * is not critical because AbstractBTree.touch() relies on the thread
+         * both owning the read lock and having the per-thread read lock counter
+         * incremented for that thread.
+         * 
+         * @see <a href="http://trac.bigdata.com/ticket/855"> AssertionError:
+         *      Child does not have persistent identity </a>
+         */
+        final int rcount = lockManager.getReadLockCount();
+    
+        if (rcount > 0) {
+            
+            /*
+             * The current thread is executing a read-only operation against the
+             * mutable index view. DO NOT TOUCH THE EVICTION QUEUE.
+             */
+
+            // NOP
+
+        } else {
         
+            /*
+             * The current thread has not promised that it is using a read-only
+             * operation. Either the operation is a mutation or the index is
+             * being managed by one of the other two concurrency control
+             * patterns. In any of these cases, we touch the write retention
+             * queue for this node reference.
+             */
+
+            doSyncTouch(node);
+            
+        }
+
     }
 
     /**
@@ -3433,7 +3550,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
          */
 
 //        assert isReadOnly() || ndistinctOnWriteRetentionQueue > 0;
-
+    	
         node.referenceCount++;
 
         if (!writeRetentionQueue.add(node)) {
@@ -3598,6 +3715,15 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
         
     }
 
+//    private void badNode(final AbstractNode<?> node) {
+////    	try {
+////			Thread.sleep(50);
+////		} catch (InterruptedException e) {
+////			// ignore;
+////		}
+//    	throw new AssertionError("ReadOnly and identity: " + node.identity);
+//    }
+    
     /**
      * Codes the node and writes the coded record on the store (non-recursive).
      * The node MUST be dirty. If the node has a parent, then the parent is
@@ -3617,7 +3743,10 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
      * @return The persistent identity assigned by the store.
      */
     protected long writeNodeOrLeaf(final AbstractNode<?> node) {
-
+    	
+        if (error != null)
+            throw new IllegalStateException(ERROR_ERROR_STATE, error);
+    	
         assert root != null; // i.e., isOpen().
         assert node != null;
         assert node.btree == this;
@@ -3641,6 +3770,9 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
          *      TestMROWTransactions might also demonstrate an issue
          *      occasionally. If so, then check for the same root cause.
          */
+//        if (node.isReadOnly()) {
+//        	badNode(node); // supports debugging
+//        }
         assert !node.isReadOnly();
         assertNotReadOnly();
         
@@ -3741,6 +3873,14 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
             // No longer dirty (prevents re-coding on re-eviction).
             node.setDirty(false);
 
+//            if (node.writing == null) {
+//            	log.warn("Concurrent modification of thread guard", new RuntimeException("WTF2: " + node.hashCode()));
+//            	
+//            	throw new AssertionError("Concurrent modification of thread guard");
+//            }
+
+//            node.writing = null;
+        	
             return 0L;
             
         }
@@ -3768,7 +3908,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
     
             btreeCounters.bytesWritten += nbytes;
 
-    		btreeCounters.bytesOnStore_nodesAndLeaves.addAndGet(nbytes);
+            btreeCounters.bytesOnStore_nodesAndLeaves.addAndGet(nbytes);
 
         }
 
@@ -3830,6 +3970,14 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
             
         }
         
+//        if (node.writing == null) {
+//        	log.warn("Concurrent modification of thread guard", new RuntimeException("WTF2: " + node.hashCode()));
+//        	
+//        	throw new AssertionError("Concurrent modification of thread guard");
+//        }
+//
+//        node.writing = null;
+
         return addr;
 
     }
@@ -3856,40 +4004,6 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
         if (addr == IRawStore.NULL)
             throw new IllegalArgumentException();
         
-//        final Long addr2 = Long.valueOf(addr); 
-//
-//        if (storeCache != null) {
-//
-//            // test cache : will touch global LRU iff found.
-//            final IAbstractNodeData data = (IAbstractNodeData) storeCache
-//                    .get(addr);
-//
-//            if (data != null) {
-//
-//                // Node and Leaf MUST NOT make it into the global LRU or store
-//                // cache!
-//                assert !(data instanceof AbstractNode<?>);
-//                
-//                final AbstractNode<?> node;
-//                
-//                if (data.isLeaf()) {
-//
-//                    node = nodeSer.nodeFactory.allocLeaf(this, addr,
-//                            (ILeafData) data);
-//
-//                } else {
-//
-//                    node = nodeSer.nodeFactory.allocNode(this, addr,
-//                            (INodeData) data);
-//
-//                }
-//
-//                // cache hit.
-//                return node;
-//                
-//            }
-//            
-//        }
         
         final ByteBuffer tmp;
         {
@@ -3945,21 +4059,6 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
                 }
 
             }
-
-//            if (storeCache != null) {
-//             
-//                // update cache : will touch global LRU iff cache is modified.
-//                final IAbstractNodeData data2 = (IAbstractNodeData) storeCache
-//                        .putIfAbsent(addr2, data);
-//
-//                if (data2 != null) {
-//
-//                    // concurrent insert, use winner's value.
-//                    data = data2;
-//
-//                } 
-//                
-//            }
 
             // wrap as Node or Leaf.
             final AbstractNode<?> node = nodeSer.wrap(this, addr, data);
@@ -4061,6 +4160,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
         /**
          * Returns the hard reference.
          */
+        @Override
         public T get() {
             
             return ref;
@@ -4070,6 +4170,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
         /**
          * Overridden as a NOP.
          */
+        @Override
         public void clear() {
 
             // NOP
@@ -4163,7 +4264,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 	 */
     int getMaxRecLen() {
     	
-    	return metadata.getMaxRecLen();
+        return metadata.getMaxRecLen();
     	
     }
 
@@ -4304,4 +4405,24 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 
     }
 
+    @Override
+    final public Lock readLock() {
+
+        return lockManager.readLock();
+        
+    }
+
+    @Override
+    final public Lock writeLock() {
+
+        return lockManager.writeLock();
+
+    }
+
+    @Override
+    final public int getReadLockCount() {
+        
+        return lockManager.getReadLockCount();
+    }
+    
 }
