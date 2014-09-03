@@ -8,6 +8,7 @@ import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.concurrent.FutureTask;
+import java.util.concurrent.locks.Lock;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
@@ -23,12 +24,14 @@ import com.bigdata.btree.HTreeIndexMetadata;
 import com.bigdata.btree.ICheckpointProtocol;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IRangeQuery;
+import com.bigdata.btree.IReadWriteLockManager;
 import com.bigdata.btree.ISimpleTreeIndexAccess;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.Node;
 import com.bigdata.btree.PO;
+import com.bigdata.btree.ReadWriteLockManager;
 import com.bigdata.btree.UnisolatedReadWriteIndex;
 import com.bigdata.btree.data.IAbstractNodeData;
 import com.bigdata.cache.HardReferenceQueue;
@@ -91,6 +94,15 @@ abstract public class AbstractHTree implements ICounterSetAccess,
 	 * operation that requires persistence was requested.
 	 */
 	final protected static String ERROR_TRANSIENT = "Transient";
+
+    /**
+     * An unisolated index view is in an error state. It must be discarded and
+     * reloaded from the current checkpoint record.
+     * 
+     * @see <a href="http://trac.bigdata.com/ticket/1005"> Invalidate BTree
+     *      objects if error occurs during eviction </a>
+     */
+    final protected static String ERROR_ERROR_STATE = "Index is in error state";
 
 	final public int MIN_ADDRESS_BITS = 1;
     /**
@@ -327,6 +339,13 @@ abstract public class AbstractHTree implements ICounterSetAccess,
      */
     protected final int bucketSlots;
 
+    /**
+     * Hard reference iff the index is mutable (aka unisolated) allows us to
+     * avoid patterns that create short life time versions of the object to
+     * protect {@link #writeCheckpoint2()} and similar operations.
+     */
+    private final IReadWriteLockManager lockManager;
+
 //	/**
 //	 * The #of entries in a directory bucket, which is 2^{@link #addressBits}
 //	 * (aka <code>1<<addressBits</code>).
@@ -553,7 +572,22 @@ abstract public class AbstractHTree implements ICounterSetAccess,
      */
     protected volatile DirectoryPage root;
 
-	/**
+    /**
+     * This field is set if an error is encountered that renders an unisolated
+     * index object unusable. For example, this can occur if an error was
+     * detected during incremental eviction of dirty nodes for a mutable index
+     * view since that means that there are partly serialized (and possibly
+     * inconsistenly serialized) evicted pages. Once this becomes non-
+     * <code>null</code> the index MUST be reloaded from the most recent
+     * checkpoint before it can be used (that is, you need to obtain a new view
+     * of the unisolated index since this field is sticky once set).
+     * 
+     * @see <a href="http://trac.bigdata.com/ticket/1005"> Invalidate BTree
+     *      objects if error occurs during eviction </a>
+     */
+    protected volatile Throwable error;
+
+    /**
 	 * Nodes (that is nodes or leaves) are added to a hard reference queue when
 	 * they are created or read from the store. On eviction from the queue a
 	 * dirty node is serialized by a listener against the {@link IRawStore}. The
@@ -1184,6 +1218,8 @@ abstract public class AbstractHTree implements ICounterSetAccess,
 //        
 //        }
 
+        lockManager = ReadWriteLockManager.getLockManager(this);
+
     }
 
     /**
@@ -1393,7 +1429,67 @@ abstract public class AbstractHTree implements ICounterSetAccess,
 
 		}
 
-		doSyncTouch(node);
+        /**
+         * At this point we know that the B+Tree object is a mutable data
+         * structure (!readOnly). If we can prove that the current thread is
+         * conducting a read-only operation on the B+Tree, then we DO NOT touch
+         * the node in order to prevent having read-only operations drive
+         * evictions. This test relies on the UnisolatedReadWriteIndex class to
+         * provide concurrency control for such interleaved read-only and
+         * mutation operations on an unisolated (aka mutable) index.
+         * 
+         * There are three broad ways in which concurrency controls for the
+         * index classes are realized:
+         * 
+         * (1) Explicit synchronization. For example, the AbstractJournal uses
+         * explicit synchronization to protect operations on the unisolated
+         * Name2Addr.
+         * 
+         * (2) Explicit pre-declaration of ordered locks. The ConcurrencyManager
+         * and AbstractTask support this protection mechanism. The task runs
+         * once it has acquired the locks for the declared unisolated indices.
+         * 
+         * (3) UnisolatedReadWriteIndex. This is used to provide transparent
+         * concurrency control for unisolated indices for the triple and quad
+         * store classes.
+         * 
+         * The index is mutable (unisolated view). If the thread owns a
+         * read-only lock then the operation is read-only and we MUST NOT drive
+         * evictions from this thread.
+         * 
+         * Note: The order in which we obtain the real read lock and increment
+         * (and decrement) the per-thread read lock counter on the AbstractBTree
+         * is not critical because AbstractBTree.touch() relies on the thread
+         * both owning the read lock and having the per-thread read lock counter
+         * incremented for that thread.
+         * 
+         * @see <a href="http://trac.bigdata.com/ticket/855"> AssertionError:
+         *      Child does not have persistent identity </a>
+         */
+        final int rcount = lockManager.getReadLockCount();
+    
+        if (rcount > 0) {
+            
+            /*
+             * The current thread is executing a read-only operation against the
+             * mutable index view. DO NOT TOUCH THE EVICTION QUEUE.
+             */
+
+            // NOP
+
+        } else {
+        
+            /*
+             * The current thread has not promised that it is using a read-only
+             * operation. Either the operation is a mutation or the index is
+             * being managed by one of the other two concurrency control
+             * patterns. In any of these cases, we touch the write retention
+             * queue for this node reference.
+             */
+
+            doSyncTouch(node);
+            
+        }
 
 	}
 
@@ -1645,6 +1741,9 @@ abstract public class AbstractHTree implements ICounterSetAccess,
      * @return The persistent identity assigned by the store.
      */
     protected long writeNodeOrLeaf(final AbstractPage node) {
+
+        if (error != null)
+            throw new IllegalStateException(ERROR_ERROR_STATE, error);
 
         assert root != null; // i.e., isOpen().
         assert node != null;
@@ -2370,4 +2469,24 @@ abstract public class AbstractHTree implements ICounterSetAccess,
 		}
 	}
 	
+    @Override
+    final public Lock readLock() {
+
+        return lockManager.readLock();
+        
+    }
+
+    @Override
+    final public Lock writeLock() {
+
+        return lockManager.writeLock();
+        
+    }
+
+    @Override
+    final public int getReadLockCount() {
+        
+        return lockManager.getReadLockCount();
+    }
+    
 }

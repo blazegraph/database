@@ -695,6 +695,7 @@ abstract public class LoadBalancerService extends AbstractService
          * writes.
          */
         final Lock tmpLock = eventReceiver.getWriteLock();
+        tmpLock.lock();
         try {
 
             // Flush any buffered writes to the event store.

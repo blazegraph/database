@@ -23,7 +23,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 /*
  * Created on Nov 15, 2006
- * 
  */
 package com.bigdata.btree;
 
@@ -37,7 +36,6 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.btree.data.IAbstractNodeData;
 import com.bigdata.btree.data.IKeysData;
-import com.bigdata.btree.data.ISpannedTupleCountData;
 import com.bigdata.btree.filter.EmptyTupleIterator;
 import com.bigdata.btree.raba.IRaba;
 import com.bigdata.btree.raba.MutableKeyBuffer;
@@ -51,7 +49,6 @@ import cutthecrap.utils.striterators.Striterator;
  * Abstract node supporting incremental persistence and copy-on-write semantics.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public abstract class AbstractNode<T extends AbstractNode
 /*
@@ -539,7 +536,7 @@ public abstract class AbstractNode<T extends AbstractNode
                 parent = (Node) parent.copyOnWrite(oldId);
 
             }
-
+            
             /*
              * Replace the reference to this child with the reference to the
              * new child. This makes the old child inaccessible via
