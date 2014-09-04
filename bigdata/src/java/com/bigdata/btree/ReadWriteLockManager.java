@@ -65,10 +65,14 @@ public class ReadWriteLockManager implements IReadWriteLockManager {
      */
     private static final long LOCK_TIMEOUT_MILLIS = Long.MAX_VALUE;// 10000;
     
-    /**
-     * The unisolated persistence capable data structure.
+    /*
+     * Note: This creates a hard reference that defeats the weak keys in the
+     * hash map.
      */
-    final private ICheckpointProtocol committer;
+//    /**
+//     * The unisolated persistence capable data structure.
+//     */
+//    final private ICheckpointProtocol committer;
     
     /**
      * True iff the caller's {@link ICheckpointProtocol} object was read-only.
@@ -461,7 +465,7 @@ public class ReadWriteLockManager implements IReadWriteLockManager {
      */
     private ReadWriteLockManager(final ICheckpointProtocol index) {
 
-        this.committer = index;
+//        this.committer = index;
         
         if (this.readOnly = index.isReadOnly()) {
 
@@ -513,12 +517,12 @@ public class ReadWriteLockManager implements IReadWriteLockManager {
 
     }
 
-    @Override
-    final public String toString() {
-
-        return getClass().getName() + "{committer=" + committer + ",readOnly="
-                + readOnly + "}";
-        
-    }
+//    @Override
+//    final public String toString() {
+//
+//        return getClass().getName() + "{committer=" + committer + ",readOnly="
+//                + readOnly + "}";
+//        
+//    }
 
 }
