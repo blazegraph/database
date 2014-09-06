@@ -558,8 +558,8 @@ abstract public class DataService extends AbstractService
                  * report that it is closed. At that point the data service can
                  * not start and will shutdown.
                  */
-
-                log.fatal("Store manager not open - will shutdown.");
+                if(log.isInfoEnabled())
+                log.info("Store manager not open - will shutdown.");
 
                 // shutdown the data service.
                 dataService.shutdownNow();
