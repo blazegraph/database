@@ -144,7 +144,8 @@ public abstract class ProxyTestCase<S extends IIndexManager>
      */
     
     private int startupActiveThreads = 0;
-    
+
+    @Override
     public void setUp() throws Exception {
 
         startupActiveThreads = Thread.currentThread().getThreadGroup().activeCount();
@@ -155,58 +156,62 @@ public abstract class ProxyTestCase<S extends IIndexManager>
 
     private static boolean s_checkThreads = true;
     
+    @Override
     public void tearDown() throws Exception {
 
         getOurDelegate().tearDown(this);
-        
+
         if (s_checkThreads) {
 
-	        final ThreadGroup grp = Thread.currentThread().getThreadGroup();
-	    	final int tearDownActiveThreads = grp.activeCount();
-	    	int nremaining = 0;
-	    	if (startupActiveThreads != tearDownActiveThreads) {
-	    		final Thread[] threads = new Thread[tearDownActiveThreads];
-	    		grp.enumerate(threads);
-	    		final StringBuilder info = new StringBuilder();
-	    		boolean first = true;
+            final ThreadGroup grp = Thread.currentThread().getThreadGroup();
+            final int tearDownActiveThreads = grp.activeCount();
+            int nremaining = 0;
+            if (startupActiveThreads != tearDownActiveThreads) {
+                final Thread[] threads = new Thread[tearDownActiveThreads];
+                grp.enumerate(threads);
+                final StringBuilder info = new StringBuilder();
+                boolean first = true;
                 for (Thread t : threads) {
                     if (t == null)
                         continue;
-	    		    if(!first)
-	    		        info.append(',');
+                    if (!first)
+                        info.append(',');
                     info.append("[" + t.getName() + "]");
                     first = false;
                     nremaining++;
-	    		}
-	    		
-	    		final String failMessage = "Threads left active after task"
-	    		        +": test=" + getName()//
-	    	            + ", delegate="+getOurDelegate().getClass().getName()
-	    	            + ", startupCount=" + startupActiveThreads
-	    				+ ", teardownCount=" + nremaining
-	    				+ ", thisThread="+Thread.currentThread().getName()
-	    				+ ", threads: " + info;
-	    		
+                }
+
+                final String failMessage = "Threads left active after task"
+                        + ": test="
+                        + getName()//
+                        + ", delegate=" + getOurDelegate().getClass().getName()
+                        + ", startupCount=" + startupActiveThreads
+                        + ", teardownCount=" + nremaining + ", thisThread="
+                        + Thread.currentThread().getName() + ", threads: "
+                        + info;
+
                 if (nremaining > startupActiveThreads)
-                    log.error(failMessage);  
+                    log.error(failMessage);
 
                 /*
                  * Wait up to 2 seconds for threads to die off so the next test
                  * will run more cleanly.
                  */
-	    		for (int i = 0; i < 20; i++) {
-	    			Thread.sleep(100);
-	    			if (grp.activeCount() != startupActiveThreads)
-	    				break;
-	    		}
+                for (int i = 0; i < 20; i++) {
+                    Thread.sleep(100);
+                    if (grp.activeCount() != startupActiveThreads)
+                        break;
+                }
 
-	    	}
-	    	
+            }
+
         }
-    	
-    	super.tearDown();
+
+        super.tearDown();
+
     }
 
+    @Override
     public Properties getProperties() {
         return getOurDelegate().getProperties();
     }
