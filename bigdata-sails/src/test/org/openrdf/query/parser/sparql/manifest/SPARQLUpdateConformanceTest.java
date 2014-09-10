@@ -207,6 +207,11 @@ public abstract class SPARQLUpdateConformanceTest extends TestCase {
 			dataRep.shutDown();
 			dataRep = null;
 		}
+		
+		if (expectedResultRepo != null) {
+			expectedResultRepo.shutDown();
+			expectedResultRepo = null;
+		}
 	}
 
 	@Override
