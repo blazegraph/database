@@ -51,10 +51,11 @@ import com.bigdata.btree.BTreeCounters;
 import com.bigdata.btree.Checkpoint;
 import com.bigdata.btree.ICheckpointProtocol;
 import com.bigdata.btree.IDirtyListener;
+import com.bigdata.btree.IReadWriteLockManager;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexTypeEnum;
 import com.bigdata.btree.Node;
-import com.bigdata.btree.UnisolatedReadWriteIndex;
+import com.bigdata.btree.ReadWriteLockManager;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.OneShotInstrument;
 import com.bigdata.htree.HTree;
@@ -118,6 +119,13 @@ abstract public class Stream implements ICheckpointProtocol {
      */
     private final boolean readOnly;
     
+    /**
+     * Hard reference iff the index is mutable (aka unisolated) allows us to
+     * avoid patterns that create short life time versions of the object to
+     * protect {@link #writeCheckpoint2()} and similar operations.
+     */
+    private final IReadWriteLockManager lockManager;
+
     /**
      * <code>true</code> iff the {@link Stream} is open.
      */
@@ -197,6 +205,8 @@ abstract public class Stream implements ICheckpointProtocol {
 
         setCheckpoint(checkpoint);
         
+        this.lockManager = ReadWriteLockManager.getLockManager(this);
+
     }
 
     /**
@@ -872,8 +882,7 @@ abstract public class Stream implements ICheckpointProtocol {
          * @see https://sourceforge.net/apps/trac/bigdata/ticket/343
          * @see https://sourceforge.net/apps/trac/bigdata/ticket/440
          */
-        final Lock lock = UnisolatedReadWriteIndex.getReadWriteLock(this).writeLock();
-//      final Lock lock = new UnisolatedReadWriteIndex(this).writeLock();
+        final Lock lock = writeLock();
         lock.lock();
         try {
 
@@ -1259,7 +1268,8 @@ abstract public class Stream implements ICheckpointProtocol {
      * read.
      */
     volatile private long lastCommitTime = 0L;// Until the first commit.
-    
+
+    @Override
     final public void setDirtyListener(final IDirtyListener listener) {
 
         assertNotReadOnly();
@@ -1337,5 +1347,25 @@ abstract public class Stream implements ICheckpointProtocol {
      *            An iterator visiting the entries.
      */
     abstract public void write(ICloseableIterator<?> src);
+
+    @Override
+    final public Lock readLock() {
+
+        return lockManager.readLock();
+        
+    }
+
+    @Override
+    final public Lock writeLock() {
+
+        return lockManager.writeLock();
+        
+    }
+
+    @Override
+    final public int getReadLockCount() {
+        
+        return lockManager.getReadLockCount();
+    }
 
 }

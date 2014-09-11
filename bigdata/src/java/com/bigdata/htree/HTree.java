@@ -56,7 +56,6 @@ import com.bigdata.btree.IndexTypeEnum;
 import com.bigdata.btree.Leaf;
 import com.bigdata.btree.Node;
 import com.bigdata.btree.ReadOnlyCounter;
-import com.bigdata.btree.UnisolatedReadWriteIndex;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.io.SerializerUtil;
@@ -165,18 +164,21 @@ public class HTree extends AbstractHTree
 	 */
     private final ByteArrayBuffer recordAddrBuf;
     
+    @Override
     final public long getNodeCount() {
         
         return nnodes;
         
     }
 
+    @Override
     final public long getLeafCount() {
         
         return nleaves;
         
     }
 
+    @Override
     final public long getEntryCount() {
         
         return nentries;
@@ -192,6 +194,7 @@ public class HTree extends AbstractHTree
      */
     private Checkpoint checkpoint = null;
     
+    @Override
     final public Checkpoint getCheckpoint() {
 
         if (checkpoint == null)
@@ -201,18 +204,21 @@ public class HTree extends AbstractHTree
         
     }
     
+    @Override
     final public long getRecordVersion() {
     	
     	return recordVersion;
 
     }
     
+    @Override
     final public long getMetadataAddr() {
 
     	return metadata.getMetadataAddr();
 
     }
         
+    @Override
     final public long getRootAddr() {
     	
 		return (root == null ? getCheckpoint().getRootAddr() : root
@@ -499,7 +505,7 @@ public class HTree extends AbstractHTree
 		
 		this.rawRecords = metadata.getRawRecords();
 
-	}
+    }
 
 	/**
 	 * Encode a raw record address into a byte[] suitable for storing in the
@@ -852,6 +858,7 @@ public class HTree extends AbstractHTree
      *       
      * @see #load(IRawStore, long)
      */
+    @Override
     final public long writeCheckpoint() {
     
         // write checkpoint and return address of that checkpoint record.
@@ -864,6 +871,7 @@ public class HTree extends AbstractHTree
      * 
      * @see #load(IRawStore, long)
      */
+    @Override
     final public Checkpoint writeCheckpoint2() {
     	
         assertNotTransient();
@@ -894,11 +902,18 @@ public class HTree extends AbstractHTree
 		 * @see https://sourceforge.net/apps/trac/bigdata/ticket/343
 		 * @see https://sourceforge.net/apps/trac/bigdata/ticket/440
 		 */
-		final Lock lock = UnisolatedReadWriteIndex.getReadWriteLock(this).writeLock();
-//		final Lock lock = new UnisolatedReadWriteIndex(this).writeLock();
+		final Lock lock = writeLock();
 		lock.lock();
 		try {
-
+            /**
+             * Do not permit checkpoint if the index is in an error state.
+             * 
+             * @see <a href="http://trac.bigdata.com/ticket/1005"> Invalidate
+             *      BTree objects if error occurs during eviction </a>
+             */
+            if (error != null)
+                throw new IllegalStateException(ERROR_ERROR_STATE, error);
+            
 			if (/* autoCommit && */needsCheckpoint()) {
 
 				/*

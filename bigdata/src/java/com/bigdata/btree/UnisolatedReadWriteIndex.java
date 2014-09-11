@@ -23,19 +23,13 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 /*
  * Created on Jan 10, 2008
- * 
  */
 
 package com.bigdata.btree;
 
 import java.util.Iterator;
-import java.util.WeakHashMap;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
-
-import org.apache.log4j.Logger;
 
 import com.bigdata.bop.cost.BTreeCostModel;
 import com.bigdata.bop.cost.DiskCostModel;
@@ -48,10 +42,7 @@ import com.bigdata.btree.proc.ISimpleIndexProcedure;
 import com.bigdata.btree.view.FusedView;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.journal.ConcurrencyManager;
-import com.bigdata.journal.ICommitter;
 import com.bigdata.journal.IConcurrencyManager;
-import com.bigdata.journal.Journal;
-import com.bigdata.journal.TemporaryStore;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.service.Split;
 
@@ -120,124 +111,52 @@ import cutthecrap.utils.striterators.IFilter;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
-public class UnisolatedReadWriteIndex implements IIndex, ILinearList {
+public class UnisolatedReadWriteIndex implements IIndex, ILinearList,
+        IReadWriteLockManager {
 
-    private static final Logger log = Logger.getLogger(UnisolatedReadWriteIndex.class);
-  
     /**
-     * The #of milliseconds that the class will wait for a read or write lock. A
-     * (wrapped) {@link InterruptedException} will be thrown if this timeout is
-     * exceeded. The default is {@value #LOCK_TIMEOUT_MILLIS} milliseconds. Use
-     * {@link Long#MAX_VALUE} for no timeout.
-     * 
-     * @todo There may be no reason to have a timeout when waiting for a lock in
-     *       which case we can get rid of this field. Also, there is no means
-     *       available to configure the timeout (in a similar fashion you can
-     *       not configure the fairness policy for the
-     *       {@link ReentrantReadWriteLock}).
+     * The object that manages the locks for the associated index.
      */
-    protected static final long LOCK_TIMEOUT_MILLIS = Long.MAX_VALUE;// 10000;
+    private final ReadWriteLockManager lockManager;
     
-    /**
-     * An exclusive write lock used (in the absence of other concurrency control
-     * mechanisms) to serialize all processes accessing an unisolated index when
-     * a writer must run. This is automatically obtained by methods on this
-     * class which will write on the underlying {@link IIndex}. It is exposed
-     * for processes which need to obtain the write lock to coordinate external
-     * operations.
-     * 
-     * @return The acquired lock.
-     */
-    public Lock writeLock() {
-       
-        final Lock writeLock = readWriteLock.writeLock();
-        
-        try {
-            
-            if(log.isDebugEnabled()) {
-                
-                log.debug(ndx.toString());
-                
-            }
-            
-//            writeLock.lock();
-            
-            if(!writeLock.tryLock( LOCK_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)) {
-                
-                throw new RuntimeException("Timeout");
-                
-            }
-            
-        } catch(InterruptedException ex) {
-            
-            throw new RuntimeException(ex);
-            
-        }
-        
-        return writeLock;
-        
-    }
-    
-    /**
-     * A shared read lock used (in the absence of other concurrency control
-     * mechanisms) to permit concurrent readers on an unisolated index while
-     * serializing access to that index when a writer must run. This is
-     * automatically obtained by methods on this class which will write on the
-     * underlying {@link IIndex}. It is exposed for processes which need to
-     * obtain the write lock to coordinate external operations.
-     * 
-     * @return The acquired lock.
-     */
+    @Override
     public Lock readLock() {
-        
-        final Lock readLock = readWriteLock.readLock();
-
-        try {
-
-            if(log.isDebugEnabled()) {
-                
-                log.debug(ndx.toString()
-//                        , new RuntimeException()
-                        );
-                
-            }
-            
-//            readLock.lock();
-            
-            if(!readLock.tryLock( LOCK_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)) {
-                
-                throw new RuntimeException("Timeout");
-
-            }
-            
-        } catch(InterruptedException ex) {
-            
-            throw new RuntimeException(ex);
-            
-        }
-            
-        return readLock;
-        
+        return lockManager.readLock();
     }
-    
+
+    @Override
+    public Lock writeLock() {
+        return lockManager.writeLock();
+    }
+
+    @Override
+    public int getReadLockCount() {
+        return lockManager.getReadLockCount();
+    }
+
+    @Override
+    public boolean isReadOnly() {
+        return lockManager.isReadOnly();
+    }
+
     /**
-     * Acquire an appropriate lock depending on whether or not the procedure
+     * Return the appropriate lock depending on whether or not the procedure
      * asserts that it is read-only.
      * 
      * @param proc
      *            The procedure.
      *            
-     * @return The acquired lock.
+     * @return The lock.
      */
     private Lock lock(final IIndexProcedure<?> proc) {
-     
+
         if (proc == null)
             throw new IllegalArgumentException();
-        
-        if(proc.isReadOnly()) {
-            
+
+        if (proc.isReadOnly()) {
+
             return readLock();
-            
+
         }
         
         return writeLock();
@@ -248,12 +167,6 @@ public class UnisolatedReadWriteIndex implements IIndex, ILinearList {
         
         lock.unlock();
         
-        if(log.isDebugEnabled()) {
-            
-            log.debug(ndx.toString());
-            
-        }
-
     }
     
     /**
@@ -263,32 +176,19 @@ public class UnisolatedReadWriteIndex implements IIndex, ILinearList {
     final private BTree ndx;
     
     /**
-     * The {@link ReadWriteLock} used to permit concurrent readers on an
-     * unisolated index while serializing access to that index when a writer
-     * must run.
-     */
-    final private ReadWriteLock readWriteLock;
-
-    /**
-     * Canonicalizing mapping for the locks used to control access to the
-     * unisolated index.
-     */
-    static final private WeakHashMap<ICommitter, ReentrantReadWriteLock> locks = new WeakHashMap<ICommitter,ReentrantReadWriteLock>();
-    
-    /**
-     * The default capacity for iterator reads against the underlying index. The
-     * main purpose of the capacity is to reduce the contention for the
-     * {@link ReadWriteLock}.
-     */
-    final static private int DEFAULT_CAPACITY = 1000;// 10000;
-
-    /**
      * The default capacity for iterator reads against the underlying index. The
      * main purpose of the capacity is to reduce the contention for the
      * {@link ReadWriteLock}.
      */
     final private int defaultCapacity;
     
+    /**
+     * The default capacity for iterator reads against the underlying index. The
+     * main purpose of the capacity is to reduce the contention for the
+     * {@link ReadWriteLock}.
+     */
+    final static protected int DEFAULT_CAPACITY = 1000;// 10000;
+
     /**
      * Creates a view of an unisolated index that will enforce the concurrency
      * constraints of the {@link BTree} class, but only among other instances of
@@ -321,20 +221,6 @@ public class UnisolatedReadWriteIndex implements IIndex, ILinearList {
      * 
      * @throws IllegalArgumentException
      *             if the index is <code>null</code>.
-     * 
-     * @todo This is using an internal canonicalizing map for the
-     *       {@link ReadWriteLock}s. It would be as easy to provide a
-     *       canonicalizing factory for these objects on the {@link Journal} and
-     *       {@link TemporaryStore}.
-     * 
-     * @todo fairness is NOT required for the locks. I believe that this is
-     *       supposed to provide better throughput, but that has not been
-     *       tested. Also, this has not been tested with a simple mutex lock vs
-     *       a read-write lock. The use case for which this class was originally
-     *       developed was computing the fix point of a set of rules. In that
-     *       use case, we do a lot of concurrent reading and periodically flush
-     *       the computed solutions onto the relations. It is likely that a
-     *       read-write lock will do well for this situation.
      */
     public UnisolatedReadWriteIndex(final BTree ndx, final int defaultCapacity) {
 
@@ -348,43 +234,10 @@ public class UnisolatedReadWriteIndex implements IIndex, ILinearList {
 
         this.defaultCapacity = defaultCapacity;
 
-        this.readWriteLock = getReadWriteLock(ndx);
+        this.lockManager = ReadWriteLockManager.getLockManager(ndx);
         
     }
 
-	/**
-	 * Canonicalizing factory for the {@link ReadWriteLock} for an {@link ICommitter}.
-	 * 
-	 * @param btree
-	 *            The btree.
-	 * @return The lock.
-	 * 
-	 * @throws IllegalArgumentException
-	 *             if the argument is <code>null</code>.
-	 */
-    // Note: Exposed to HTree, at least for now.
-	public static ReentrantReadWriteLock getReadWriteLock(final ICommitter btree) {
-
-		if (btree == null)
-			throw new IllegalArgumentException();
-		
-		synchronized (locks) {
-
-		    ReentrantReadWriteLock readWriteLock = locks.get(btree);
-
-			if (readWriteLock == null) {
-
-				readWriteLock = new ReentrantReadWriteLock(false/* fair */);
-
-				locks.put(btree, readWriteLock);
-
-			}
-
-			return readWriteLock;
-		}
-
-	}   
-    
     @Override
     public String toString() {
         
@@ -430,7 +283,7 @@ public class UnisolatedReadWriteIndex implements IIndex, ILinearList {
     public boolean contains(final Object key) {
 
         final Lock lock = readLock();
-        
+        lock.lock();        
         try {
             
             return ndx.contains(key);
@@ -447,7 +300,7 @@ public class UnisolatedReadWriteIndex implements IIndex, ILinearList {
     public Object insert(final Object key, final Object value) {
 
         final Lock lock = writeLock();
-        
+        lock.lock();
         try {
             
             return ndx.insert(key,value);
@@ -464,7 +317,7 @@ public class UnisolatedReadWriteIndex implements IIndex, ILinearList {
     public Object lookup(final Object key) {
         
         final Lock lock = readLock();
-        
+        lock.lock();
         try {
             
             return ndx.lookup(key);
@@ -481,7 +334,7 @@ public class UnisolatedReadWriteIndex implements IIndex, ILinearList {
     public Object remove(final Object key) {
 
         final Lock lock = writeLock();
-        
+        lock.lock();
         try {
             
             return ndx.remove(key);
@@ -498,7 +351,7 @@ public class UnisolatedReadWriteIndex implements IIndex, ILinearList {
     public boolean contains(final byte[] key) {
 
         final Lock lock = readLock();
-        
+        lock.lock();        
         try {
             
             return ndx.contains(key);
@@ -515,7 +368,7 @@ public class UnisolatedReadWriteIndex implements IIndex, ILinearList {
     public byte[] lookup(final byte[] key) {
 
         final Lock lock = readLock();
-        
+        lock.lock();
         try {
             
             return ndx.lookup(key);
@@ -532,7 +385,7 @@ public class UnisolatedReadWriteIndex implements IIndex, ILinearList {
     public byte[] insert(final byte[] key, final byte[] value) {
 
         final Lock lock = writeLock();
-        
+        lock.lock();        
         try {
             
             return ndx.insert(key,value);
@@ -549,7 +402,7 @@ public class UnisolatedReadWriteIndex implements IIndex, ILinearList {
     public byte[] remove(final byte[] key) {
 
         final Lock lock = writeLock();
-        
+        lock.lock();
         try {
             
             return ndx.remove(key);
@@ -566,7 +419,7 @@ public class UnisolatedReadWriteIndex implements IIndex, ILinearList {
     public long rangeCount() {
 
         final Lock lock = readLock();
-
+        lock.lock();
         try {
         
             return ndx.rangeCount();
@@ -583,7 +436,7 @@ public class UnisolatedReadWriteIndex implements IIndex, ILinearList {
     public long rangeCount(final byte[] fromKey, final byte[] toKey) {
 
         final Lock lock = readLock();
-
+        lock.lock();
         try {
         
             return ndx.rangeCount(fromKey, toKey);
@@ -600,7 +453,7 @@ public class UnisolatedReadWriteIndex implements IIndex, ILinearList {
     public long rangeCountExact(final byte[] fromKey, final byte[] toKey) {
 
         final Lock lock = readLock();
-
+        lock.lock();
         try {
         
             return ndx.rangeCountExact(fromKey, toKey);
@@ -617,7 +470,7 @@ public class UnisolatedReadWriteIndex implements IIndex, ILinearList {
     public long rangeCountExactWithDeleted(final byte[] fromKey, final byte[] toKey) {
 
         final Lock lock = readLock();
-
+        lock.lock();
         try {
         
             return ndx.rangeCountExactWithDeleted(fromKey, toKey);
@@ -720,7 +573,7 @@ public class UnisolatedReadWriteIndex implements IIndex, ILinearList {
         protected void deleteBehind(final int n, final Iterator<byte[]> keys) {
 
             final Lock lock = writeLock();
-            
+            lock.lock();
             try {
             
                 super.deleteBehind(n, keys);
@@ -740,7 +593,7 @@ public class UnisolatedReadWriteIndex implements IIndex, ILinearList {
         protected void deleteLast(final byte[] key) {
 
             final Lock lock = writeLock();
-            
+            lock.lock();
             try {
             
                 super.deleteLast(key);
@@ -764,7 +617,7 @@ public class UnisolatedReadWriteIndex implements IIndex, ILinearList {
             final boolean mutation = (flags & IRangeQuery.REMOVEALL) != 0;
 
             final Lock lock = mutation ? writeLock() : readLock();
-
+            lock.lock();
             try {
 
                 return super.getResultSet(timestamp, fromKey, toKey, capacity,
@@ -784,7 +637,7 @@ public class UnisolatedReadWriteIndex implements IIndex, ILinearList {
     public Object submit(final byte[] key, final ISimpleIndexProcedure proc) {
 
         final Lock lock = lock(proc);
-
+        lock.lock();
         try {
 
             /*
@@ -808,7 +661,7 @@ public class UnisolatedReadWriteIndex implements IIndex, ILinearList {
             final IKeyRangeIndexProcedure proc, final IResultHandler handler) {
 
         final Lock lock = lock(proc);
-
+        lock.lock();
         try {
 
             /*
@@ -839,7 +692,7 @@ public class UnisolatedReadWriteIndex implements IIndex, ILinearList {
                 keys, vals);
 
         final Lock lock = lock(proc);
-
+        lock.lock();
         try {
             
             /*
@@ -891,6 +744,7 @@ public class UnisolatedReadWriteIndex implements IIndex, ILinearList {
     @Override
     public long indexOf(final byte[] key) {
         final Lock lock = readLock();
+        lock.lock();
         try {
             return ndx.indexOf(key);
         } finally {
@@ -901,6 +755,7 @@ public class UnisolatedReadWriteIndex implements IIndex, ILinearList {
     @Override
     public byte[] keyAt(final long index) {
         final Lock lock = readLock();
+        lock.lock();
         try {
             return ndx.keyAt(index);
         } finally {
@@ -911,6 +766,7 @@ public class UnisolatedReadWriteIndex implements IIndex, ILinearList {
     @Override
     public byte[] valueAt(final long index) {
         final Lock lock = readLock();
+        lock.lock();
         try {
             return ndx.valueAt(index);
         } finally {

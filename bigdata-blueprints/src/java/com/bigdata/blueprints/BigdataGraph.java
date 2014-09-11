@@ -46,7 +46,6 @@ import org.openrdf.query.QueryLanguage;
 import org.openrdf.query.TupleQuery;
 import org.openrdf.query.TupleQueryResult;
 import org.openrdf.query.Update;
-import org.openrdf.query.parser.QueryParserUtil;
 import org.openrdf.repository.RepositoryConnection;
 import org.openrdf.repository.RepositoryResult;
 
@@ -80,6 +79,11 @@ public abstract class BigdataGraph implements Graph {
          * This is necessary to pass the test suites.
          */
         String READ_FROM_WRITE_CONNECTION = BigdataGraph.class.getName() + ".readFromWriteConnection";
+        
+        /**
+         * Use an append model for properties (rather than replace).
+         */
+        String LAX_PROPERTIES = BigdataGraph.class.getName() + ".laxProperties";
         
     }
     
@@ -118,6 +122,11 @@ public abstract class BigdataGraph implements Graph {
 	 */
 	private final boolean readFromWriteConnection;
 	
+    /**
+     * If true, use pure append mode (don't check old property values).
+     */
+    private final boolean laxProperties;
+    
     public BigdataGraph(final BlueprintsValueFactory factory) {
         this(factory, new Properties());
     }
@@ -131,6 +140,8 @@ public abstract class BigdataGraph implements Graph {
 	            Options.LAX_EDGES, "false"));
         this.readFromWriteConnection = Boolean.valueOf(props.getProperty(
                 Options.READ_FROM_WRITE_CONNECTION, "false"));
+        this.laxProperties = Boolean.valueOf(props.getProperty(
+                Options.LAX_PROPERTIES, "false"));
 	    
 	    this.TYPE = factory.getTypeURI();
 	    this.VERTEX = factory.getVertexURI();
@@ -451,8 +462,12 @@ public abstract class BigdataGraph implements Graph {
 
 		    final RepositoryConnection cxn = getWriteConnection();
 		    
-		    // remove the old value
-		    cxn.remove(uri, prop, null);
+		    if (!laxProperties) {
+		        
+    		    // remove the old value
+    		    cxn.remove(uri, prop, null);
+    		    
+		    }
 		    
 		    // add the new value
 			cxn.add(uri, prop, val);
@@ -478,8 +493,12 @@ public abstract class BigdataGraph implements Graph {
 
             final RepositoryConnection cxn = getWriteConnection();
             
-            // remove the old value
-            cxn.remove(uri, prop, null);
+            if (!laxProperties) {
+                
+                // remove the old value
+                cxn.remove(uri, prop, null);
+                
+            }
             
             // add the new values
             for (Literal val : vals) {
@@ -723,13 +742,13 @@ public abstract class BigdataGraph implements Graph {
 	    
         final StringBuilder sb = new StringBuilder();
         sb.append("construct { ?from ?edge ?to . } where {\n");
-        sb.append("  ?edge rdf:type bd:Edge .\n");
+        sb.append("  ?edge <"+TYPE+"> <"+EDGE+"> .\n");
         sb.append("  ?from ?edge ?to .\n");
         if (labels != null && labels.length > 0) {
             if (labels.length == 1) {
-                sb.append("  ?edge rdfs:label \"").append(labels[0]).append("\" .\n");
+                sb.append("  ?edge <"+LABEL+"> \"").append(labels[0]).append("\" .\n");
             } else {
-                sb.append("  ?edge rdfs:label ?label .\n");
+                sb.append("  ?edge <"+LABEL+"> ?label .\n");
                 sb.append("  filter(?label in (");
                 for (String label : labels) {
                     sb.append("\""+label+"\", ");

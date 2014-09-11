@@ -23,7 +23,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 /*
  * Created on Nov 15, 2006
- * 
  */
 package com.bigdata.btree;
 
@@ -288,7 +287,7 @@ public class BTree extends AbstractBTree implements //ICommitter,
 	 * and otherwise <code>null</code>.
 	 */
     private final ByteArrayBuffer recordAddrBuf;
-    
+
 //    /**
 //     * The last address from which the {@link IndexMetadata} record was read or
 //     * on which it was written.
@@ -385,7 +384,7 @@ public class BTree extends AbstractBTree implements //ICommitter,
          */
 		recordAddrBuf = readOnly ? null
 				: new ByteArrayBuffer(Bytes.SIZEOF_LONG);
-        
+
     }
 
 	/**
@@ -900,22 +899,30 @@ public class BTree extends AbstractBTree implements //ICommitter,
 		 * @see https://sourceforge.net/apps/trac/bigdata/ticket/343
 		 * @see https://sourceforge.net/apps/trac/bigdata/ticket/440
 		 */
-//        final Lock lock = new UnisolatedReadWriteIndex(this).writeLock();
-        final Lock lock = UnisolatedReadWriteIndex.getReadWriteLock(this).writeLock();
-        lock.lock();
-        try {
-
-			if (/* autoCommit && */needsCheckpoint()) {
-
-				/*
-				 * Flush the btree, write a checkpoint record, and return the
-				 * address of that checkpoint record. The [checkpoint] reference
-				 * is also updated.
-				 */
-
-				return _writeCheckpoint2();
-
-			}
+		final Lock lock = writeLock();
+		lock.lock();
+		try {
+            /**
+             * Do not permit checkpoint if the index is in an error state.
+             * 
+             * @see <a href="http://trac.bigdata.com/ticket/1005"> Invalidate
+             *      BTree objects if error occurs during eviction </a>
+             */
+            if (error != null)
+                throw new IllegalStateException(ERROR_ERROR_STATE, error);
+			//synchronized(this) {
+				if (/* autoCommit && */needsCheckpoint()) {
+	
+					/*
+					 * Flush the btree, write a checkpoint record, and return the
+					 * address of that checkpoint record. The [checkpoint] reference
+					 * is also updated.
+					 */
+	
+					return _writeCheckpoint2();
+	
+				}
+			//}
 
 			/*
 			 * There have not been any writes on this btree or auto-commit is
@@ -1110,14 +1117,14 @@ public class BTree extends AbstractBTree implements //ICommitter,
     @Override
     final public long getRecordVersion() {
     	
-        return recordVersion;
+    	return recordVersion;
 
     }
     
     @Override
     final public long getMetadataAddr() {
 
-        return metadata.getMetadataAddr();
+    	return metadata.getMetadataAddr();
 
     }
     
@@ -1313,7 +1320,7 @@ public class BTree extends AbstractBTree implements //ICommitter,
     @Override
     public long handleCommit(final long commitTime) {
 
-        return writeCheckpoint2().getCheckpointAddr();
+    	return writeCheckpoint2().getCheckpointAddr();
     	
     }
 

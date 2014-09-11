@@ -48,7 +48,7 @@ import com.bigdata.journal.Name2Addr.Entry;
  * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/585" > GIST </a>
   */
 public interface ICheckpointProtocol extends ICommitter, ICounterSetAccess,
-        ISimpleIndexAccess {
+        ISimpleIndexAccess, IReadWriteLockManager {
 
 	/**
 	 * The value of the record version number that will be assigned to the next
