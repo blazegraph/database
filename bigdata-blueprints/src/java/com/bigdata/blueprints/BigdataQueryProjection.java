@@ -144,6 +144,10 @@ public class BigdataQueryProjection {
                     isEdge = true;
                     
                     final PartialEdge edge = elements.edges.get(stmt);
+                    
+                    if (log.isInfoEnabled()) {
+                        log.info("copying properties from: " + uri + " to: " + stmt);
+                    }
                 
                     edge.copyProperties(element);
                     
@@ -207,6 +211,15 @@ public class BigdataQueryProjection {
 //            }
 //            
 //        }
+        
+        if (log.isInfoEnabled()) {
+            for (PartialVertex v : elements.vertices.values()) {
+                log.info(v);
+            }
+            for (PartialEdge e : elements.edges.values()) {
+                log.info(e);
+            }
+        }
 
         return new BigdataGraphlet(
                 elements.vertices.values(), elements.edges.values());
@@ -236,9 +249,9 @@ public class BigdataQueryProjection {
     
     private void handleProperty(final PartialGraph elements, final Statement stmt) {
 
-//        if (log.isInfoEnabled()) {
-//            log.info(stmt);
-//        }
+        if (log.isInfoEnabled()) {
+            log.info(stmt);
+        }
         
         final URI uri = (URI) stmt.getSubject();
         
@@ -350,159 +363,4 @@ public class BigdataQueryProjection {
         
     }
     
-    private static class PartialElement implements Element {
-
-        private final String id;
-        
-        private final Map<String, Object> properties = 
-                new LinkedHashMap<String, Object>();
-        
-        public PartialElement(final String id) {
-            this.id = id;
-        }
-        
-        @Override
-        public Object getId() {
-            return id;
-        }
-
-        @Override
-        @SuppressWarnings("unchecked")
-        public Object getProperty(final String name) {
-            return properties.get(name);
-        }
-
-        @Override
-        public Set<String> getPropertyKeys() {
-            return properties.keySet();
-        }
-
-        @Override
-        public void remove() {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        @SuppressWarnings("unchecked")
-        public Object removeProperty(final String key) {
-            return properties.remove(key);
-        }
-
-        @Override
-        public void setProperty(final String key, final Object value) {
-            
-            /*
-             * Gracefully turn a single value property into a 
-             * multi-valued property.
-             */
-            if (properties.containsKey(key)) {
-            
-                final Object o = properties.get(key);
-                
-                if (o instanceof List) {
-                    
-                    @SuppressWarnings("unchecked")
-                    final List<Object> list = (List<Object>) o;
-                    list.add(value);
-                    
-                } else {
-                    
-                    final List<Object> list = new LinkedList<Object>();
-                    list.add(o);
-                    list.add(value);
-                    
-                    properties.put(key, list);
-                    
-                }
-                
-            } else {
-            
-                properties.put(key, value);
-                
-            }
-            
-        }
-        
-        public void copyProperties(final PartialElement element) {
-            properties.putAll(element.properties);
-        }
-        
-    }
-    
-    private static class PartialVertex extends PartialElement implements Vertex {
-        
-        public PartialVertex(final String id) {
-            super(id);
-        }
-
-        @Override
-        public Edge addEdge(String arg0, Vertex arg1) {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public Iterable<Edge> getEdges(Direction arg0, String... arg1) {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public Iterable<Vertex> getVertices(Direction arg0, String... arg1) {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public VertexQuery query() {
-            throw new UnsupportedOperationException();
-        }
-        
-    }
-
-    private static class PartialEdge extends PartialElement implements Edge {
-        
-        private String label;
-        
-        private Vertex from;
-        
-        private Vertex to;
-        
-        public PartialEdge(final String id) {
-            super(id);
-        }
-
-        @Override
-        public String getLabel() {
-            return label;
-        }
-
-        @Override
-        public Vertex getVertex(final Direction dir) throws IllegalArgumentException {
-            
-            if (dir == Direction.OUT) {
-                return from;
-            } else if (dir == Direction.IN) {
-                return to;
-            }
-            
-            throw new IllegalArgumentException();
-            
-        }
-        
-        private boolean isComplete() {
-            return label != null && from != null && to != null;
-        }
-        
-        private void setLabel(final String label) {
-            this.label = label;
-        }
-        
-        private void setFrom(final Vertex v) {
-            this.from = v;
-        }
-        
-        private void setTo(final Vertex v) {
-            this.to = v;
-        }
-        
-    }
-
 }

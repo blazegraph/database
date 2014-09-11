@@ -996,7 +996,7 @@ graph ?g {
          */
 
         dataRep = null;
-    
+        queryString = null;
     }
 
     /**
