@@ -642,7 +642,7 @@ extends SPARQLASTQueryTest // Bigdata native AST based evaluation
          */
 
         dataRep = null;
-    
+        queryString = null;
     }
 
     /**

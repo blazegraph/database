@@ -133,6 +133,8 @@ public class BigdataArbitraryLengthPathTest extends TestCase {
     {
         con.close();
         repo.shutDown();
+        con = null;
+        repo = null;
     }
 
 //    @Test
