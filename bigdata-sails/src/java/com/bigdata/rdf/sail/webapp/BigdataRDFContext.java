@@ -75,6 +75,7 @@ import org.openrdf.sail.SailException;
 import com.bigdata.BigdataStatics;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
+import com.bigdata.bop.fed.QueryEngineFactory;
 import com.bigdata.counters.CAT;
 import com.bigdata.io.NullOutputStream;
 import com.bigdata.journal.IIndexManager;
@@ -1015,6 +1016,30 @@ public class BigdataRDFContext extends BigdataBaseContext {
             m_queries.put(queryId, r);
             m_queries2.put(queryId2, r);
 
+            /**
+             * Handle data races in CANCEL of an UPDATE operation whose
+             * cancellation was requested before it began to execute.
+             * 
+             * @see <a href="http://trac.bigdata.com/ticket/899"> REST API Query
+             *      Cancellation </a>
+             */
+            {
+
+                final QueryEngine queryEngine = QueryEngineFactory
+                        .getQueryController(getIndexManager());
+
+                if (queryEngine.pendingCancel(queryId2)) {
+
+                    /*
+                     * There is a pending CANCEL for this UPDATE request, so
+                     * cancel it now.
+                     */
+                    updateFuture.cancel(true/* mayInterruptIfRunning */);
+
+                }
+
+            }
+            
             return update;
             
         }
