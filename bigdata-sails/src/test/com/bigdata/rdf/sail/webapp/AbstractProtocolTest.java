@@ -129,6 +129,12 @@ public abstract class AbstractProtocolTest  extends AbstractTestNanoSparqlClient
 		client = new DefaultHttpClient(DefaultClientConnectionManagerFactory.getInstance().newInstance());
 		resetDefaultOptions();
 	}
+	@Override
+	public void tearDown() throws Exception {
+		client.getConnectionManager().shutdown();
+		client = null;
+		super.tearDown();
+	}
 	/**
 	 * This method is called automatically after each call to {@link #serviceRequest(String...)}
 	 * so probably is unnecessary.
