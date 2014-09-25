@@ -106,6 +106,7 @@ import com.bigdata.rdf.sparql.ast.Update;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.task.AbstractApiTask;
 import com.bigdata.relation.RelationSchema;
+import com.bigdata.service.IBigdataFederation;
 import com.bigdata.sparse.ITPS;
 import com.bigdata.sparse.SparseRowStore;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
@@ -2350,14 +2351,16 @@ public class BigdataRDFContext extends BigdataBaseContext {
 
     }
 
-	/*package*/ List<String> getNamespacesTx(final long tx) {
+	/*package*/ List<String> getNamespacesTx(long tx) {
 
-//        if (timestamp == ITx.READ_COMMITTED) {
-//
-//            // Use the last commit point.
-//            timestamp = getIndexManager().getLastCommitTime();
-//
-//        }
+		final IIndexManager indexManager = getIndexManager();
+		
+        if (tx == ITx.READ_COMMITTED && indexManager instanceof IBigdataFederation) {
+
+			// Use the last commit point for the federation *only*.
+            tx = getIndexManager().getLastCommitTime();
+
+        }
 
         // the triple store namespaces.
 		final List<String> namespaces = new LinkedList<String>();
