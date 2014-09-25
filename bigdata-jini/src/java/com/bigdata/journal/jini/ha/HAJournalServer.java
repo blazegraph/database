@@ -102,9 +102,7 @@ import com.bigdata.quorum.zk.ZKQuorumClient;
 import com.bigdata.quorum.zk.ZKQuorumImpl;
 import com.bigdata.rdf.sail.CreateKBTask;
 import com.bigdata.rdf.sail.webapp.ConfigParams;
-import com.bigdata.rdf.sail.webapp.HALoadBalancerServlet;
 import com.bigdata.rdf.sail.webapp.NanoSparqlServer;
-import com.bigdata.rdf.sail.webapp.lbs.IHALoadBalancerPolicy;
 import com.bigdata.rwstore.RWStore;
 import com.bigdata.service.AbstractHATransactionService;
 import com.bigdata.service.jini.FakeLifeCycle;
@@ -569,6 +567,22 @@ public class HAJournalServer extends AbstractServer {
      */
     private volatile Server jettyServer;
 
+    /**
+     * Exposed to the test suite.
+     */
+    WebAppContext getWebAppContext() {
+
+        final Server server = jettyServer;
+        
+        if (server == null)
+            throw new IllegalStateException();
+
+        final WebAppContext wac = NanoSparqlServer.getWebApp(server);
+
+        return wac;
+        
+    }
+    
     /**
      * Enum of the run states. The states are labeled by the goal of the run
      * state.
@@ -4612,47 +4626,6 @@ public class HAJournalServer extends AbstractServer {
     int getNSSPort() {
 
         return NanoSparqlServer.getLocalPort(jettyServer);
-
-    }
-    
-    /**
-     * Change the {@link IHALoadBalancerPolicy}.
-     * <p>
-     * TODO There are some intrinsic problems with this method that should be
-     * resolved before exposing it as an administrative API on the
-     * {@link HAGlue} interface.
-     * <p>
-     * (1) This only applies to running instances of the
-     * {@link HALoadBalancerServlet}. If an instance is started after this
-     * method is called, it will run with the as-configured
-     * {@link IHALoadBalancerPolicy} instance of the one specified in the last
-     * invocation of this method.
-     * <p>
-     * (2) There are various race conditions that exist with respect to: (a) the
-     * atomic change over of the {@link IHALoadBalancerPolicy} during an
-     * in-flight request; and (b) the atomic destroy of the old policy once
-     * there are no more in-flight requests using that old policy.
-     * 
-     * TODO Either the {@link IHALoadBalancerPolicy} needs to be serializable or
-     * we need to pass along the class name and the configuration parameters.
-     * For this case, the configuration should be set from the caller specified
-     * values rather than those potentially associated with <code>web.xml</code>
-     * , especially since <code>web.xml</code> might not even have the necessary
-     * configuration parameters defined for the caller specified policy.
-     */
-    public void setHALoadBalancerPolicy(final IHALoadBalancerPolicy policy) {
-        
-        final Server server = this.jettyServer;
-
-        if (server == null)
-            throw new IllegalStateException();
-
-        final WebAppContext wac = NanoSparqlServer.getWebApp(server);
-        
-        if (log.isInfoEnabled())
-            log.info("Will set LBS: wac=" + wac + ", policy: " + policy);
-
-        HALoadBalancerServlet.setLBSPolicy(wac.getServletContext(), policy);
 
     }
     
