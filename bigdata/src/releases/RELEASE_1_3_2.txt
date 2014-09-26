@@ -16,7 +16,7 @@ http://sourceforge.net/projects/bigdata/
 
 You can checkout this release from:
 
-https://svn.code.sf.net/p/bigdata/code/tags/BIGDATA_RELEASE_1_3_1
+https://svn.code.sf.net/p/bigdata/code/tags/BIGDATA_RELEASE_1_3_2
 
 Critical or otherwise of note in this minor release:
 
@@ -68,6 +68,12 @@ Change log:
 
 1.3.2:
 
+- http://trac.bigdata.com/ticket/1016 (Jetty/LBS issues when deployed as WAR under tomcat)
+- http://trac.bigdata.com/ticket/1010 (Upgrade apache http components to 1.3.1 (security))
+- http://trac.bigdata.com/ticket/1005 (Invalidate BTree objects if error occurs during eviction)
+- http://trac.bigdata.com/ticket/1004 (Concurrent binding problem)
+- http://trac.bigdata.com/ticket/1002 (Concurrency issues in JVMHashJoinUtility caused by MAX_PARALLEL query hint override)
+- http://trac.bigdata.com/ticket/1000 (Add configuration option to turn off bottom-up evaluation)
 - http://trac.bigdata.com/ticket/999  (Extend BigdataSailFactory to take arbitrary properties)
 - http://trac.bigdata.com/ticket/998  (SPARQL Update through BigdataGraph)
 - http://trac.bigdata.com/ticket/996  (Add custom prefix support for query results)
@@ -120,11 +126,6 @@ Change log:
 - http://trac.bigdata.com/ticket/765  (order by expr skips invalid expressions)
 - http://trac.bigdata.com/ticket/587  (JSP page to configure KBs)
 - http://trac.bigdata.com/ticket/343  (Stochastic assert in AbstractBTree#writeNodeOrLeaf() in CI)
-- http://trac.bigdata.com/ticket/1010 (Upgrade apache http components to 1.3.1 (security))
-- http://trac.bigdata.com/ticket/1005 (Invalidate BTree objects if error occurs during eviction)
-- http://trac.bigdata.com/ticket/1004 (Concurrent binding problem)
-- http://trac.bigdata.com/ticket/1002 (Concurrency issues in JVMHashJoinUtility caused by MAX_PARALLEL query hint override)
-- http://trac.bigdata.com/ticket/1000 (Add configuration option to turn off bottom-up evaluation)
 
 1.3.1:
 
