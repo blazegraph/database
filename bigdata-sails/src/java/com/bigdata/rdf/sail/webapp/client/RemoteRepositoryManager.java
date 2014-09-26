@@ -214,7 +214,7 @@ public class RemoteRepositoryManager extends RemoteRepository {
         
         opts.setAcceptHeader(ConnectOptions.DEFAULT_GRAPH_ACCEPT_HEADER);
 
-        return graphResults(opts, null/* queryId */);
+        return graphResults(opts, null/* queryId */, null);
         
 //        try {
 //            // check response in try.

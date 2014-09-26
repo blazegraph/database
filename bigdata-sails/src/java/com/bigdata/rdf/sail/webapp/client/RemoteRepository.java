@@ -521,7 +521,7 @@ public class RemoteRepository {
 
 //        checkResponseCode(response = doConnect(opts));
 
-        return graphResults(opts, null);
+        return graphResults(opts, null, null);
 
     }
 
@@ -600,7 +600,7 @@ public class RemoteRepository {
      * 
      *             TODO includeInferred is currently ignored.
      */
-    public GraphQueryResult getStatements(final Resource subj, final URI pred,
+    public IPreparedGraphQuery getStatements2(final Resource subj, final URI pred,
             final Value obj, final boolean includeInferred,
             final Resource... contexts) throws Exception {
 
@@ -673,7 +673,28 @@ public class RemoteRepository {
         
         final IPreparedGraphQuery query = prepareGraphQuery(queryStr);
         
-        return query.evaluate();
+        return query;
+        
+    }
+    
+    /**
+     * Return all matching statements.
+     * 
+     * @param subj
+     * @param pred
+     * @param obj
+     * @param includeInferred
+     * @param contexts
+     * @return
+     * @throws Exception
+     * 
+     *             TODO includeInferred is currently ignored.
+     */
+    public GraphQueryResult getStatements(final Resource subj, final URI pred,
+            final Value obj, final boolean includeInferred,
+            final Resource... contexts) throws Exception {
+
+        return getStatements2(subj, pred, obj, includeInferred, contexts).evaluate();
                 
     }
 
@@ -1238,9 +1259,17 @@ public class RemoteRepository {
         @Override
         public TupleQueryResult evaluate() throws Exception {
             
+            return evaluate(null);
+                
+        }
+        
+        @Override
+        public TupleQueryResult evaluate(final IPreparedQueryListener listener) 
+                throws Exception {
+            
             setupConnectOptions();
 
-            return tupleResults(opts, getQueryId());
+            return tupleResults(opts, getQueryId(), listener);
                 
         }
         
@@ -1268,9 +1297,17 @@ public class RemoteRepository {
         @Override
         public GraphQueryResult evaluate() throws Exception {
 
+            return evaluate(null);
+
+        }
+
+        @Override
+        public GraphQueryResult evaluate(final IPreparedQueryListener listener) 
+                throws Exception {
+
             setupConnectOptions();
             
-            return graphResults(opts, getQueryId());
+            return graphResults(opts, getQueryId(), listener);
 
         }
 
@@ -1300,9 +1337,17 @@ public class RemoteRepository {
         @Override
         public boolean evaluate() throws Exception {
            
+            return evaluate(null);
+            
+        }
+
+        @Override
+        public boolean evaluate(final IPreparedQueryListener listener) 
+                throws Exception {
+           
             setupConnectOptions();
             
-            return booleanResults(opts, getQueryId());
+            return booleanResults(opts, getQueryId(), listener);
 
 //            HttpResponse response = null;
 //            try {
@@ -1344,6 +1389,14 @@ public class RemoteRepository {
         
         @Override
         public void evaluate() throws Exception {
+            
+            evaluate(null);
+            
+        }
+         
+        @Override
+        public void evaluate(final IPreparedQueryListener listener) 
+                throws Exception {
          
             HttpResponse response = null;
             try {
@@ -1365,6 +1418,10 @@ public class RemoteRepository {
                     
                     log.warn(ex);
                     
+                }
+                
+                if (listener != null) {
+                    listener.closed(getQueryId());
                 }
                 
             }
@@ -1797,14 +1854,18 @@ public class RemoteRepository {
      * 
      * @param response
      *            The connection from which to read the results.
+     * @param listener
+     *            The listener to notify when the query result has been
+     *            closed (optional).
      * 
      * @return The results.
      * 
      * @throws Exception
      *             If anything goes wrong.
      */
-    public TupleQueryResult tupleResults(final ConnectOptions opts, final UUID queryId)
-            throws Exception {
+    public TupleQueryResult tupleResults(final ConnectOptions opts, 
+            final UUID queryId, final IPreparedQueryListener listener)
+                    throws Exception {
 
     	HttpResponse response = null;
         HttpEntity entity = null;
@@ -1893,6 +1954,13 @@ public class RemoteRepository {
 		    				
 		    			}
 		    			
+		    			/*
+		    			 * Notify the listener.
+		    			 */
+		    			if (listener != null) {
+		    			    listener.closed(queryId);
+		    			}
+		    			
             		}
         			
             	};
@@ -1935,6 +2003,9 @@ public class RemoteRepository {
      * 
      * @param response
      *            The connection from which to read the results.
+     * @param listener
+     *            The listener to notify when the query result has been
+     *            closed (optional).
      * 
      * @return The graph
      * 
@@ -1942,7 +2013,8 @@ public class RemoteRepository {
      *             If anything goes wrong.
      */
     public GraphQueryResult graphResults(final ConnectOptions opts,
-            final UUID queryId) throws Exception {
+            final UUID queryId, final IPreparedQueryListener listener) 
+                    throws Exception {
 
         HttpResponse response = null;
         HttpEntity entity = null;
@@ -2047,6 +2119,10 @@ public class RemoteRepository {
 		    				
 		    			}
 		    			
+		    			if (listener != null) {
+		    			    listener.closed(queryId);
+		    			}
+		    			
             		}
         			
             	};
@@ -2099,7 +2175,9 @@ public class RemoteRepository {
      *             If anything goes wrong, including if the result set does not
      *             encode a single boolean value.
      */
-    protected boolean booleanResults(final ConnectOptions opts, final UUID queryId) throws Exception {
+    protected boolean booleanResults(final ConnectOptions opts, 
+            final UUID queryId, final IPreparedQueryListener listener) 
+                    throws Exception {
 
     	HttpResponse response = null;
         HttpEntity entity = null;
@@ -2149,6 +2227,10 @@ public class RemoteRepository {
 	            try {
 	            	cancel(queryId);
 	            } catch (Exception ex) {log.warn(ex); }
+        	}
+        	
+        	if (listener != null) {
+        	    listener.closed(queryId);
         	}
 
         }
