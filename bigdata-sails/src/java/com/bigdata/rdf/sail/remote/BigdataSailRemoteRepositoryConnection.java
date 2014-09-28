@@ -110,11 +110,15 @@ public class BigdataSailRemoteRepositoryConnection
             .getLogger(BigdataSailRemoteRepositoryConnection.class);
 
     private final BigdataSailRemoteRepository repo;
+    
+    private boolean openConn;
 
     public BigdataSailRemoteRepositoryConnection(
             final BigdataSailRemoteRepository repo) {
 
         this.repo = repo;
+        
+        this.openConn = true;
 
     }
     
@@ -163,7 +167,7 @@ public class BigdataSailRemoteRepositoryConnection
      *          The query id.
      * @throws Exception
      */
-    public void cancelAll() throws Exception {
+    public void cancelAll() throws RepositoryException {
         
         lock.writeLock().lock();
     
@@ -180,7 +184,11 @@ public class BigdataSailRemoteRepositoryConnection
                 log.debug("All queries cancelled.");
                 log.debug("Queries running: " + Arrays.toString(queryIds.keySet().toArray()));
             }
-            
+         
+        } catch (RepositoryException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            throw new RepositoryException(ex);
         } finally {
             lock.writeLock().unlock();
         }
@@ -255,6 +263,8 @@ public class BigdataSailRemoteRepositoryConnection
 			final Resource... c) 
 			throws RepositoryException {
 
+        assertOpenConn();
+        
 		try {
 		
 			final RemoteRepository remote = repo.getRemoteRepository();
@@ -274,6 +284,8 @@ public class BigdataSailRemoteRepositoryConnection
             final URI p, final Value o, final boolean includeInferred,
             final Resource... c) throws RepositoryException {
 		
+        assertOpenConn();
+        
 		try {
 			
 			final RemoteRepository remote = repo.getRemoteRepository();
@@ -345,6 +357,8 @@ public class BigdataSailRemoteRepositoryConnection
             final boolean includeInferred, final Resource... c)
             throws RepositoryException {
 
+        assertOpenConn();
+        
 		try {
 			
 			final RemoteRepository remote = repo.getRemoteRepository();
@@ -364,6 +378,8 @@ public class BigdataSailRemoteRepositoryConnection
             final String query) throws RepositoryException,
             MalformedQueryException {
 		
+        assertOpenConn();
+        
 		if (ql != QueryLanguage.SPARQL) {
 			
 			throw new UnsupportedOperationException("unsupported query language: " + ql);
@@ -409,6 +425,8 @@ public class BigdataSailRemoteRepositoryConnection
             final String query) throws RepositoryException,
             MalformedQueryException {
 
+        assertOpenConn();
+        
 		if (ql != QueryLanguage.SPARQL) {
 			
 			throw new UnsupportedOperationException("unsupported query language: " + ql);
@@ -474,6 +492,8 @@ public class BigdataSailRemoteRepositoryConnection
             final String query) throws RepositoryException,
             MalformedQueryException {
 
+        assertOpenConn();
+        
 		if (ql != QueryLanguage.SPARQL) {
 			
 			throw new UnsupportedOperationException("unsupported query language: " + ql);
@@ -631,6 +651,8 @@ public class BigdataSailRemoteRepositoryConnection
 	private void add(final AddOp op, final Resource... c)
 			throws RepositoryException {
 
+        assertOpenConn();
+        
 		try {
 			
 			op.setContext(c);
@@ -701,6 +723,8 @@ public class BigdataSailRemoteRepositoryConnection
 	private void remove(final RemoveOp op, final Resource... c)
 			throws RepositoryException {
 
+        assertOpenConn();
+        
 		try {
 			
 			op.setContext(c);
@@ -728,14 +752,20 @@ public class BigdataSailRemoteRepositoryConnection
 
 	@Override
 	public void close() throws RepositoryException {
-		// noop
+		
+        if (!openConn) {
+            return;
+        }
+
+        this.openConn = false;
+        
+        cancelAll();
+        
 	}
 
 	@Override
 	public boolean isOpen() throws RepositoryException {
-		
-		return true;
-		
+		return openConn;
 	}
 
 	@Override
@@ -750,15 +780,34 @@ public class BigdataSailRemoteRepositoryConnection
 
 	@Override
 	public Repository getRepository() {
-		
 		return repo;
-		
 	}
+
+    protected void assertOpenConn() throws RepositoryException {
+        if(!openConn) {
+            throw new RepositoryException("Connection closed");
+        }
+    }
+    
+    /**
+     * Invoke close, which will be harmless if we are already closed. 
+     */
+    @Override
+    protected void finalize() throws Throwable {
+        
+        close();
+        
+        super.finalize();
+
+    }
+
 
 	@Override
 	public RepositoryResult<Resource> getContextIDs()
 			throws RepositoryException {
-		
+
+	    assertOpenConn();
+	    
 		try {
 			
 			final RemoteRepository remote = repo.getRemoteRepository();
@@ -800,6 +849,8 @@ public class BigdataSailRemoteRepositoryConnection
 	@Override
 	public long size(final Resource... c) throws RepositoryException {
 		
+        assertOpenConn();
+        
 		try {
 			
 			final RemoteRepository remote = repo.getRemoteRepository();
@@ -834,18 +885,28 @@ public class BigdataSailRemoteRepositoryConnection
 			boolean includeInferred, RDFHandler handler, Resource... c)
 			throws RepositoryException, RDFHandlerException {
 
+        assertOpenConn();
+        
 		try {
 			
 			final RemoteRepository remote = repo.getRemoteRepository();
 			
-			final GraphQueryResult src = 
-					remote.getStatements(s, p, o, includeInferred, c);
+			final IPreparedGraphQuery query = 
+					remote.getStatements2(s, p, o, includeInferred, c);
 			
-			handler.startRDF();
-			while (src.hasNext()) {
-				handler.handleStatement(src.next());
-			}
-			handler.endRDF();
+            final GraphQueryResult src = query.evaluate(this);
+                    
+            try {
+                
+    			handler.startRDF();
+    			while (src.hasNext()) {
+    				handler.handleStatement(src.next());
+    			}
+    			handler.endRDF();
+    			
+            } finally {
+                src.close();
+            }
 			
 		} catch (Exception ex) {
 			
@@ -874,6 +935,8 @@ public class BigdataSailRemoteRepositoryConnection
     public Update prepareUpdate(final QueryLanguage ql, final String query)
             throws RepositoryException, MalformedQueryException {
 
+        assertOpenConn();
+        
 		if (ql != QueryLanguage.SPARQL) {
 			
 			throw new UnsupportedOperationException("unsupported query language: " + ql);
