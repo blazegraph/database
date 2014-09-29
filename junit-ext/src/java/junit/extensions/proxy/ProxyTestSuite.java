@@ -77,7 +77,7 @@ public class ProxyTestSuite
      * {@link ProxyTestSuite}.
      */
 
-    private Test m_delegate;
+    private final Test m_delegate;
 
     /**
      * <p>
@@ -370,12 +370,6 @@ public class ProxyTestSuite
 
     }
 
-	public void tearDownSuite() {
-		if (m_delegate instanceof AbstractIndexManagerTestCase) {
-		   ((AbstractIndexManagerTestCase)m_delegate).tearDownAfterSuite();
-		}
-		m_delegate = null;
-		
-	}
+	
     
 }

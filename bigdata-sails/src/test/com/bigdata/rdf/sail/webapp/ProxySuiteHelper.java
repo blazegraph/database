@@ -76,7 +76,7 @@ public class ProxySuiteHelper {
 		    		protected void setUp() throws Exception {
 		    		}
 		    		protected void tearDown() throws Exception {
-		    			suite2.tearDownSuite();
+		    			((TestNanoSparqlServerWithProxyIndexManager)suite2.getDelegate()).tearDownAfterSuite();
                         /*
                          * Note: Do not clear. Will not leak unless the
                          * QueryEngine objects are pinned. They will not be
