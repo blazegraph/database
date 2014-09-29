@@ -50,7 +50,7 @@ public class TestRelease123Protocol extends AbstractProtocolTest{
 
 	public void testSelectGetJSON() throws IOException {
 		this.setAccept(BigdataRDFServlet.MIME_SPARQL_RESULTS_JSON);
-		assertTrue(serviceRequest("query",SELECT).contains("\"results\": {"));
+		assertTrue(serviceRequest("query",SELECT).contains("results"));
 		assertEquals(BigdataRDFServlet.MIME_SPARQL_RESULTS_JSON, getResponseContentType());
 		
 	}
