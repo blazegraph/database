@@ -533,4 +533,10 @@ public class TestNanoSparqlServerWithProxyIndexManager<S extends IIndexManager>
         
     }
     
+    @Override
+	public void tearDownAfterSuite() {
+		this.m_indexManager.destroy();
+		this.m_indexManager = null;
+	}
+    
 }

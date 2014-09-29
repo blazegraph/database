@@ -29,6 +29,9 @@ import java.lang.reflect.Method;
 import java.util.Enumeration;
 import java.util.regex.Pattern;
 
+import com.bigdata.bop.fed.QueryEngineFactory;
+
+import junit.extensions.TestSetup;
 import junit.extensions.proxy.ProxyTestSuite;
 import junit.framework.Test;
 import junit.framework.TestCase;
@@ -64,14 +67,21 @@ public class ProxySuiteHelper {
 
 	private static class MultiModeTestSuite extends TestSuite  {
 		private final ProxyTestSuite subs[];
-
+		
 		public MultiModeTestSuite(String name, TestMode ...modes ) {
 			super(name);
 			subs = new ProxyTestSuite[modes.length];
 			int i = 0;
 			for (final TestMode mode: modes) {
 				final ProxyTestSuite suite2 = TestNanoSparqlServerWithProxyIndexManager.createProxyTestSuite(TestNanoSparqlServerWithProxyIndexManager.getTemporaryJournal(),mode);
-				super.addTest(suite2);
+				super.addTest(new TestSetup(suite2) {
+		    		protected void setUp() throws Exception {
+		    		}
+		    		protected void tearDown() throws Exception {
+		    			suite2.tearDownSuite();
+		    			QueryEngineFactory.clearStandAloneQECacheDuringTesting();
+		    		}
+		    	});
 				suite2.setName(mode.name());
 				subs[i++] = suite2;
 			}
