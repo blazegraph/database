@@ -29,8 +29,6 @@ import java.lang.reflect.Method;
 import java.util.Enumeration;
 import java.util.regex.Pattern;
 
-import com.bigdata.bop.fed.QueryEngineFactory;
-
 import junit.extensions.TestSetup;
 import junit.extensions.proxy.ProxyTestSuite;
 import junit.framework.Test;
@@ -79,7 +77,13 @@ public class ProxySuiteHelper {
 		    		}
 		    		protected void tearDown() throws Exception {
 		    			suite2.tearDownSuite();
-		    			QueryEngineFactory.clearStandAloneQECacheDuringTesting();
+                        /*
+                         * Note: Do not clear. Will not leak unless the
+                         * QueryEngine objects are pinned. They will not be
+                         * pinned if you shutdown the Journal correctly for each
+                         * test.
+                         */
+    //		    			QueryEngineFactory.clearStandAloneQECacheDuringTesting();
 		    		}
 		    	});
 				suite2.setName(mode.name());
