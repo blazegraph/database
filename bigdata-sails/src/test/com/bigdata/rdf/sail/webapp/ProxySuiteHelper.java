@@ -81,7 +81,8 @@ public class ProxySuiteHelper {
                          * Note: Do not clear. Will not leak unless the
                          * QueryEngine objects are pinned. They will not be
                          * pinned if you shutdown the Journal correctly for each
-                         * test.
+                         * test; the call to tearDownAfterSuite above calls the destroy() method
+                         * on temporary journals, which appears to do the necessary thing.
                          */
     //		    			QueryEngineFactory.clearStandAloneQECacheDuringTesting();
 		    		}
