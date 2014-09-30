@@ -89,7 +89,6 @@ import cutthecrap.utils.striterators.IFilter;
  * appropriate concurrency controls as imposed by that method.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  * 
  * @see DataServer, which is used to start this service.
  * 
@@ -130,7 +129,6 @@ abstract public class DataService extends AbstractService
      * Options understood by the {@link DataService}.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     public static interface Options extends com.bigdata.journal.Options,
             com.bigdata.journal.ConcurrencyManager.Options,
@@ -147,7 +145,6 @@ abstract public class DataService extends AbstractService
      *       unisolated tasks at the present).
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     protected static class ReadBlockCounters {
         
@@ -339,11 +336,11 @@ abstract public class DataService extends AbstractService
      * on a {@link DataService}.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     public class DataServiceTransactionManager extends
             AbstractLocalTransactionManager {
 
+        @Override
         public ITransactionService getTransactionService() {
 
             return DataService.this.getFederation().getTransactionService();
@@ -353,6 +350,7 @@ abstract public class DataService extends AbstractService
         /**
          * Exposed to {@link DataService#singlePhaseCommit(long)}
          */
+        @Override
         public void deactivateTx(final Tx localState) {
 
             super.deactivateTx(localState);
@@ -422,7 +420,6 @@ abstract public class DataService extends AbstractService
      * {@link AbstractClient} for those additional features to work.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     static public class DataServiceFederationDelegate extends
             DefaultServiceFederationDelegate<DataService> {
@@ -792,7 +789,6 @@ abstract public class DataService extends AbstractService
      * uses.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     public static interface IDataServiceCounters extends
             ConcurrencyManager.IConcurrencyManagerCounters,
@@ -1085,7 +1081,6 @@ abstract public class DataService extends AbstractService
      * {@link IDataService}.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     private static class DistributedCommitTask extends AbstractTask<Void> {
 
@@ -1281,6 +1276,7 @@ abstract public class DataService extends AbstractService
         
     }
 
+    @Override
     public void abort(final long tx) throws IOException {
 
         setupLoggingContext();
@@ -1353,6 +1349,7 @@ abstract public class DataService extends AbstractService
      * Returns either {@link IDataService} or {@link IMetadataService} as
      * appropriate.
      */
+    @Override
     public Class getServiceIface() {
 
         final Class serviceIface;
@@ -1371,7 +1368,8 @@ abstract public class DataService extends AbstractService
 
     }
     
-    public void registerIndex(String name, IndexMetadata metadata)
+    @Override
+    public void registerIndex(final String name, final IndexMetadata metadata)
             throws IOException, InterruptedException, ExecutionException {
 
         setupLoggingContext();
@@ -1394,7 +1392,8 @@ abstract public class DataService extends AbstractService
 
     }
     
-    public void dropIndex(String name) throws IOException,
+    @Override
+    public void dropIndex(final String name) throws IOException,
             InterruptedException, ExecutionException {
 
         setupLoggingContext();
@@ -1414,7 +1413,8 @@ abstract public class DataService extends AbstractService
 
     }
    
-    public IndexMetadata getIndexMetadata(String name, long timestamp)
+    @Override
+    public IndexMetadata getIndexMetadata(final String name, final long timestamp)
             throws IOException, InterruptedException, ExecutionException {
 
         setupLoggingContext();
@@ -1444,7 +1444,6 @@ abstract public class DataService extends AbstractService
      * specified timestamp.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     public static class GetIndexMetadataTask extends AbstractTask {
 
@@ -1474,6 +1473,7 @@ abstract public class DataService extends AbstractService
      * Note: When the {@link DataService} is accessed via RMI the {@link Future}
      * MUST be a proxy. This gets handled by the concrete server implementation.
      */
+    @Override
     public Future submit(final long tx, final String name,
             final IIndexProcedure proc) {
 
@@ -1532,6 +1532,7 @@ abstract public class DataService extends AbstractService
      *       for example, if they use {@link AbstractFederation#shutdownNow()}
      *       then the {@link DataService} itself would be shutdown.
      */
+    @Override
     public Future<? extends Object> submit(final Callable<? extends Object> task) {
 
         setupLoggingContext();
@@ -1591,6 +1592,7 @@ abstract public class DataService extends AbstractService
 //        
 //    }
     
+    @Override
     public ResultSet rangeIterator(long tx, String name, byte[] fromKey,
             byte[] toKey, int capacity, int flags, IFilter filter)
             throws InterruptedException, ExecutionException {
@@ -1662,6 +1664,7 @@ abstract public class DataService extends AbstractService
      * @todo efficient (stream-based) read from the journal (IBlockStore API).
      *       This is a fully buffered read and will cause heap churn.
      */
+    @Override
     public IBlock readBlock(IResourceMetadata resource, final long addr) {
 
         if (resource == null)
@@ -1736,7 +1739,6 @@ abstract public class DataService extends AbstractService
      * Task for running a rangeIterator operation.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     static protected class RangeIteratorTask extends AbstractTask {
 
@@ -1802,6 +1804,7 @@ abstract public class DataService extends AbstractService
      * Overflow processing API 
      */
 
+    @Override
     public void forceOverflow(final boolean immediate,
             final boolean compactingMerge) throws IOException,
             InterruptedException, ExecutionException {
@@ -1883,6 +1886,7 @@ abstract public class DataService extends AbstractService
         
     }
 
+    @Override
     public boolean purgeOldResources(final long timeout,
             final boolean truncateJournal) throws InterruptedException {
 
@@ -1896,7 +1900,6 @@ abstract public class DataService extends AbstractService
      * the next group commit.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     private class ForceOverflowTask implements Callable<Void> {
 
@@ -1908,6 +1911,7 @@ abstract public class DataService extends AbstractService
             
         }
         
+        @Override
         public Void call() throws Exception {
 
 //            final WriteExecutorService writeService = concurrencyManager
@@ -1935,6 +1939,7 @@ abstract public class DataService extends AbstractService
 
     }
 
+    @Override
     public long getAsynchronousOverflowCounter() throws IOException {
 
         setupLoggingContext();
@@ -1957,6 +1962,7 @@ abstract public class DataService extends AbstractService
         
     }
     
+    @Override
     public boolean isOverflowActive() throws IOException {
         
         setupLoggingContext();

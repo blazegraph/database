@@ -35,6 +35,25 @@ package com.bigdata.rdf.sail.webapp.client;
  */
 public interface IPreparedBooleanQuery extends IPreparedQuery {
 
+    /**
+     * Evaluate the boolean query.
+     * 
+     * @param  listener
+     *              The query listener.
+     * @return The result.
+     * 
+     * @throws Exception
+     */
     boolean evaluate() throws Exception;
 
+    /**
+     * Evaluate the boolean query, notify the specified listener when complete.
+     * 
+     * @param  listener
+     *              The query listener.
+     * @return The result.
+     * 
+     * @throws Exception
+     */
+    boolean evaluate(IPreparedQueryListener listener) throws Exception;
 }
