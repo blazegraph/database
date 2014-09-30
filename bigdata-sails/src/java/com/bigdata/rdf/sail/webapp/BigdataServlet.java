@@ -45,7 +45,6 @@ import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.quorum.AbstractQuorum;
 import com.bigdata.rdf.sail.webapp.client.IMimeTypes;
-import com.bigdata.rdf.sail.webapp.lbs.IHALoadBalancerPolicy;
 import com.bigdata.rdf.task.AbstractApiTask;
 
 /**
@@ -77,20 +76,24 @@ abstract public class BigdataServlet extends HttpServlet implements IMimeTypes {
 
     /**
      * The {@link ServletContext} attribute whose value is the prefix for the
-     * {@link HALoadBalancerServlet} iff it is running.
+     * HALoadBalancerServlet (DO NOT LINK JAVADOC) iff it is running.
      * <p>
-     * Note: Do NOT reference the <code>HALoadBalancerServlet</code> here. It
-     * will drag in the jetty dependencies and that breaks the tomcat WAR
-     * deployment.
+     * Note: Do NOT reference the <code>HALoadBalancerServlet</code> or anything
+     * in the <code>com.bigdata.rdf.sail.webapp.lbs</code> package here. It will
+     * drag in the jetty dependencies and that breaks the tomcat WAR deployment.
      */
     static final String ATTRIBUTE_LBS_PREFIX = "com.bigdata.rdf.sail.webapp.HALoadBalancerServlet.prefix";
     
     /**
      * The {@link ServletContext} attribute that is managed by the
-     * {@link HALoadBalancerServlet} and which maintains a collection of the
-     * active instances of that servlet. This is used to administer the
-     * {@link IHALoadBalancerPolicy} associated with the load balancer servlet
-     * instances.
+     * HALoadBalancerServlet (DO NOT LINK JAVADOC) and which maintains a
+     * collection of the active instances of that servlet. This is used to
+     * administer the IHALoadBalancerPolicy associated with the load balancer
+     * servlet instances.
+     * <p>
+     * Note: Do NOT reference the <code>HALoadBalancerServlet</code> or anything
+     * in the <code>com.bigdata.rdf.sail.webapp.lbs</code> package here. It will
+     * drag in the jetty dependencies and that breaks the tomcat WAR deployment.
      */
     static final String ATTRIBUTE_LBS_INSTANCES = "com.bigdata.rdf.sail.webapp.HALoadBalancerServlet.instances";
     

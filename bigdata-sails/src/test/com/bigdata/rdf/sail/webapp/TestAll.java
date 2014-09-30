@@ -55,28 +55,28 @@ public class TestAll extends TestCase {
 
         final TestSuite suite = new TestSuite("WebApp");
 
-        // Test suite of NSS startup behavior and overrides.
-        suite.addTestSuite(TestNanoSparqlServer.class);
-
-        /*
-         * WebApp Client.
-         */
-        suite.addTest(com.bigdata.rdf.sail.webapp.client.TestAll.suite());
-
-        /*
-         * Test suite utility class for building XML/HTML documents.
-         */
-        suite.addTestSuite(TestXMLBuilder.class);
-        
-        /*
-         * Test suite for content negotiation.
-         */
-        suite.addTestSuite(TestConneg.class);
-        
-        /*
-         * Basic LBS unit tests (ranking and scoring hosts).
-         */
-        suite.addTest(com.bigdata.rdf.sail.webapp.lbs.TestAll.suite());
+//        // Test suite of NSS startup behavior and overrides.
+//        suite.addTestSuite(TestNanoSparqlServer.class);
+//
+//        /*
+//         * WebApp Client.
+//         */
+//        suite.addTest(com.bigdata.rdf.sail.webapp.client.TestAll.suite());
+//
+//        /*
+//         * Test suite utility class for building XML/HTML documents.
+//         */
+//        suite.addTestSuite(TestXMLBuilder.class);
+//        
+//        /*
+//         * Test suite for content negotiation.
+//         */
+//        suite.addTestSuite(TestConneg.class);
+//        
+//        /*
+//         * Basic LBS unit tests (ranking and scoring hosts).
+//         */
+//        suite.addTest(com.bigdata.rdf.sail.webapp.lbs.TestAll.suite());
 
         /*
          * Core test suite for REST API behavior. This test suite is run for
@@ -86,9 +86,9 @@ public class TestAll extends TestCase {
          * main() routine in TestNanoSparqlServerWithProxyIndexManager.
          */
         
-        suite.addTest(TestNanoSparqlServerWithProxyIndexManager.suite(TestMode.triples));
-        
-        suite.addTest(TestNanoSparqlServerWithProxyIndexManager.suite(TestMode.sids));
+//        suite.addTest(TestNanoSparqlServerWithProxyIndexManager.suite(TestMode.triples));
+//        
+//        suite.addTest(TestNanoSparqlServerWithProxyIndexManager.suite(TestMode.sids));
         
         suite.addTest(TestNanoSparqlServerWithProxyIndexManager.suite(TestMode.quads));
 

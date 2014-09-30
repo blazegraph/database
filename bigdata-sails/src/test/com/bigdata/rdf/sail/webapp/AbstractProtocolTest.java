@@ -86,7 +86,7 @@ public abstract class AbstractProtocolTest  extends AbstractTestNanoSparqlClient
 	 */
 	final String update       = update();
 
-	final HttpServlet  servlet;
+	HttpServlet  servlet;
 	HttpClient client;
 	private String responseContentType = null;
 	private String accept = null;
@@ -128,6 +128,13 @@ public abstract class AbstractProtocolTest  extends AbstractTestNanoSparqlClient
 		super.setUp();
 		client = new DefaultHttpClient(DefaultClientConnectionManagerFactory.getInstance().newInstance());
 		resetDefaultOptions();
+	}
+	@Override
+	public void tearDown() throws Exception {
+		client.getConnectionManager().shutdown();
+		client = null;
+		servlet = null;
+		super.tearDown();
 	}
 	/**
 	 * This method is called automatically after each call to {@link #serviceRequest(String...)}

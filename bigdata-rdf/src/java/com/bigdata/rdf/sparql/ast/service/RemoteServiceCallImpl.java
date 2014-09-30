@@ -172,7 +172,7 @@ public class RemoteServiceCallImpl implements RemoteServiceCall {
 //            
 ////            queryResult = parseResults(checkResponseCode(doSparqlQuery(opts)));
 
-            queryResult = repo.tupleResults(o, queryId);
+            queryResult = repo.tupleResults(o, queryId, null);
             
         } finally {
 

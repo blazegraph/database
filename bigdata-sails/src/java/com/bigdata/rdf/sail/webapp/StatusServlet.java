@@ -234,17 +234,11 @@ public class StatusServlet extends BigdataRDFServlet {
      * 
      * @throws IOException
      * 
+     * @see <a href="http://trac.bigdata.com/ticket/899"> REST API Query
+     *      Cancellation </a>
+     *      
      *             FIXME GROUP COMMIT: Review cancellation and leader fail
      *             scenarios.
-     * 
-     *             FIXME CANCEL: A remote client can not act to cancel a request
-     *             that is in the queue until it begins to execute. This is
-     *             because the UUID is not assigned until the request begins to
-     *             execute. This is true for both SPARQL QUERY and SPARQL UPDATE
-     *             requests. We need to track the CANCEL requests on a LRU and
-     *             apply them if we observe the query / update arriving after
-     *             the CANCEL. See <a href="http://trac.bigdata.com/ticket/988"
-     *             > REST API cancellation of queries</a>
      */
     static void doCancelQuery(final HttpServletRequest req,
             final HttpServletResponse resp, final IIndexManager indexManager,
@@ -276,6 +270,7 @@ public class StatusServlet extends BigdataRDFServlet {
 
             if (!tryCancelQuery(queryEngine, queryId)) {
                 if (!tryCancelUpdate(context, queryId)) {
+                    queryEngine.addPendingCancel(queryId);
                     if (log.isInfoEnabled()) {
                         log.info("No such QUERY or UPDATE: " + queryId);
                     }

@@ -1,6 +1,6 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2012.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-Infinity.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
@@ -20,33 +20,26 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
- */
-/*
- * Created on Mar 21, 2012
- */
+*/
 
 package com.bigdata.rdf.sail.webapp.client;
 
 import java.util.UUID;
 
 /**
- * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
+ * A listener for IPreparedQuery evaluate objects.
  */
-public interface IPreparedSparqlUpdate {
+public interface IPreparedQueryListener {
 
-    void evaluate() throws Exception;
-    
     /**
-     * Evaluate and notify the specified listener when complete.
+     * Callback method from the query evaluation object (GraphQueryResult,
+     * TupleQueryResult, BooleanQueryResult) notifying that the result object
+     * has been closed and the query has either completed or been 
+     * cancelled.
      * 
-     * @param listener
-     *          The query listener.
-     *          
-     * @throws Exception
+     * @param uuid
+     *          The query id.
      */
-    void evaluate(IPreparedQueryListener listener) throws Exception;
+    void closed(final UUID queryId);
     
-    UUID getQueryId();
-
 }

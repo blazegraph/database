@@ -26,6 +26,8 @@ import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.math.BigInteger;
 import java.net.InetSocketAddress;
 import java.security.DigestException;
@@ -36,6 +38,7 @@ import java.util.Iterator;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 
+import javax.servlet.ServletContext;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
@@ -330,12 +333,35 @@ public class HAStatusServletUtil {
 
                 // HA Load Balancer.
                 {
-
-                    p.text("Service: LBSPolicy=")
-                       .node("span").attr("id", "lbs-policy")
-                       .text(HALoadBalancerServlet.toString(req
-                             .getServletContext())).close()
-                    .node("br").close();
+                    /*
+                     * Note: MUST NOT HAVE A DIRECT REFERENCE TO THIS CLASS OR
+                     * IT WILL BREAK THE WAR ARTIFACT WHEN DEPLOYED TO A
+                     * NON-JETTY CONTAINER SINCE THE JETTY ProxyServlet WILL NOT
+                     * BE FOUND.
+                     */
+                    try {
+                        final Class<?> cls = Class
+                                .forName("com.bigdata.rdf.sail.webapp.HALoadBalancerServlet");
+                        final Method m = cls.getMethod("toString",
+                                new Class[] { ServletContext.class });
+                        final String rep = (String) m.invoke(null/* static */,
+                                new Object[] { req.getServletContext() });
+                        p.text("Service: LBSPolicy=").node("span")
+                                .attr("id", "lbs-policy").text(rep).close()
+                                .node("br").close();
+                    } catch (ClassNotFoundException e) {
+                        throw new RuntimeException(e);
+                    } catch (NoSuchMethodException e) {
+                        throw new RuntimeException(e);
+                    } catch (SecurityException e) {
+                        throw new RuntimeException(e);
+                    } catch (IllegalAccessException e) {
+                        throw new RuntimeException(e);
+                    } catch (IllegalArgumentException e) {
+                        throw new RuntimeException(e);
+                    } catch (InvocationTargetException e) {
+                        throw new RuntimeException(e);
+                    }
                 }
 //                if(true) {
 //                    /*

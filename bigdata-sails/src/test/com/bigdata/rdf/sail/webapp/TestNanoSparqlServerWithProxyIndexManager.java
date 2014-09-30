@@ -204,41 +204,41 @@ public class TestNanoSparqlServerWithProxyIndexManager<S extends IIndexManager>
 		// Protocol
 		suite.addTest(TestProtocolAll.suite());
         
-        // Multi-tenancy API.
-        suite.addTestSuite(TestMultiTenancyAPI.class);
-
-        // RemoteRepository test (nano sparql server client-wrapper)
-        suite.addTestSuite(TestNanoSparqlClient.class);
-
-        // BigdataSailRemoteRepository test (nano sparql server client-wrapper)
-        suite.addTestSuite(TestBigdataSailRemoteRepository.class);
-        
-        // Insert tests from trac issues
-        suite.addTestSuite(TestInsertFilterFalse727.class);
-        suite.addTestSuite(TestCBD731.class);
-        
-        suite.addTestSuite(TestService794.class);
-        
-
-        // SPARQL UPDATE test suite.
-        switch(testMode) {
-        case triples:
-            // TODO TRIPLES mode UPDATE test suite.
-            break;
-        case sids:
-            // TODO SIDS mode UPDATE test suite.
-            break;
-        case quads:
-            // QUADS mode UPDATE test suite. 
-            suite.addTestSuite(TestSparqlUpdate.class);
-            suite.addTestSuite( NativeDistinctNamedGraphUpdateTest.class );
-            suite.addTestSuite( HashDistinctNamedGraphUpdateTest.class );
-            break;
-        default: throw new UnsupportedOperationException();
-        }
-
-        // SPARQL 1.1 Federated Query.
-        suite.addTestSuite(TestFederatedQuery.class);
+//        // Multi-tenancy API.
+//        suite.addTestSuite(TestMultiTenancyAPI.class);
+//
+//        // RemoteRepository test (nano sparql server client-wrapper)
+//        suite.addTestSuite(TestNanoSparqlClient.class);
+//
+//        // BigdataSailRemoteRepository test (nano sparql server client-wrapper)
+//        suite.addTestSuite(TestBigdataSailRemoteRepository.class);
+//        
+//        // Insert tests from trac issues
+//        suite.addTestSuite(TestInsertFilterFalse727.class);
+//        suite.addTestSuite(TestCBD731.class);
+//        
+//        suite.addTestSuite(TestService794.class);
+//        
+//
+//        // SPARQL UPDATE test suite.
+//        switch(testMode) {
+//        case triples:
+//            // TODO TRIPLES mode UPDATE test suite.
+//            break;
+//        case sids:
+//            // TODO SIDS mode UPDATE test suite.
+//            break;
+//        case quads:
+//            // QUADS mode UPDATE test suite. 
+//            suite.addTestSuite(TestSparqlUpdate.class);
+//            suite.addTestSuite( NativeDistinctNamedGraphUpdateTest.class );
+//            suite.addTestSuite( HashDistinctNamedGraphUpdateTest.class );
+//            break;
+//        default: throw new UnsupportedOperationException();
+//        }
+//
+//        // SPARQL 1.1 Federated Query.
+//        suite.addTestSuite(TestFederatedQuery.class);
 
         return suite;
     
@@ -532,5 +532,11 @@ public class TestNanoSparqlServerWithProxyIndexManager<S extends IIndexManager>
 		System.out.println(msg);
         
     }
+    
+    @Override
+	public void tearDownAfterSuite() {
+		this.m_indexManager.destroy();
+		this.m_indexManager = null;
+	}
     
 }

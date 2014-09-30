@@ -49,6 +49,7 @@ import net.jini.config.Configuration;
 import net.jini.config.ConfigurationException;
 
 import org.apache.log4j.Logger;
+import org.eclipse.jetty.webapp.WebAppContext;
 
 import com.bigdata.concurrent.FutureTaskMon;
 import com.bigdata.counters.PIDUtil;
@@ -1444,6 +1445,36 @@ public class HAJournalTest extends HAJournal {
          */
         private AtomicReference<Throwable> lastRootCause = new AtomicReference<Throwable>();
 
+        /**
+         * Change the {@link IHALoadBalancerPolicy}.
+         * <p>
+         * TODO There are some intrinsic problems with this method that should
+         * be resolved before exposing it as an administrative API on the
+         * {@link HAGlue} interface.
+         * <p>
+         * (1) This only applies to running instances of the
+         * {@link HALoadBalancerServlet}. If an instance is started after this
+         * method is called, it will run with the as-configured
+         * {@link IHALoadBalancerPolicy} instance of the one specified in the
+         * last invocation of this method.
+         * <p>
+         * (2) There are various race conditions that exist with respect to: (a)
+         * the atomic change over of the {@link IHALoadBalancerPolicy} during an
+         * in-flight request; and (b) the atomic destroy of the old policy once
+         * there are no more in-flight requests using that old policy.
+         * <p>
+         * (3) Exposing this method is just begging for trouble with the WAR
+         * artifact when deployed under a non-jetty container since it will drag
+         * in the jetty ProxyServlet.
+         * 
+         * TODO Either the {@link IHALoadBalancerPolicy} needs to be
+         * serializable or we need to pass along the class name and the
+         * configuration parameters. For this case, the configuration should be
+         * set from the caller specified values rather than those potentially
+         * associated with <code>web.xml</code> , especially since
+         * <code>web.xml</code> might not even have the necessary configuration
+         * parameters defined for the caller specified policy.
+         */
         @Override
         public void setHALoadBalancerPolicy(final IHALoadBalancerPolicy policy)
                 throws IOException {
@@ -1454,8 +1485,15 @@ public class HAJournalTest extends HAJournal {
             if (log.isInfoEnabled())
                 log.info("Will set LBS policy: " + policy);
             
-            getHAJournalServer().setHALoadBalancerPolicy(policy);
+            final HAJournalServer haJournalServer = getHAJournalServer();
+
+            final WebAppContext wac = haJournalServer.getWebAppContext();
             
+            if (log.isInfoEnabled())
+                log.info("Will set LBS: wac=" + wac + ", policy: " + policy);
+
+            HALoadBalancerServlet.setLBSPolicy(wac.getServletContext(), policy);
+
         }
         
         

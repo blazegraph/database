@@ -56,6 +56,10 @@ public interface IChangeLog {
      * Message issued when preparing for a commit. The next message will be
      * either {@link #transactionCommited(long)} or
      * {@link #transactionAborted()}.
+     * <p>
+     * Note: The listener will have observed all updates by the time this
+     * message is generated. Thus, this message can be used to validate
+     * post-conditions for the transaction.
      */
     void transactionPrepare();
     

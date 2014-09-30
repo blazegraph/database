@@ -1888,7 +1888,7 @@ function setupHandlers() {
 
 function startup() {
    // load namespaces, default namespace, HA status
-   useLBS(true);
+   useLBS(false); // Note: default to false. Otherwise workbench breaks when not deployed into jetty container.
    getNamespaces(true);
    getDefaultNamespace();
    showHealthTab();
