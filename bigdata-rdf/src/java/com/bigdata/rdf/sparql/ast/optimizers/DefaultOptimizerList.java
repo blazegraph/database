@@ -216,7 +216,7 @@ public class DefaultOptimizerList extends ASTOptimizerList {
          * and for non-GRAPH groups:
          * 
          * <pre>
-         * { ... {} } =? { ... }
+         * { ... {} } => { ... }
          * </pre>
          * <p>
          * Note: as a policy decision in bigdata 1.1, we do not WANT to combine
