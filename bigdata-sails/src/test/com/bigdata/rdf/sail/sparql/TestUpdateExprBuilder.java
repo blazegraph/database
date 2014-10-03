@@ -1547,7 +1547,9 @@ public class TestUpdateExprBuilder extends AbstractBigdataExprBuilderTestCase {
 
         final UpdateRoot actual = parseUpdate(sparql, baseURI);
 
-        assertSameAST(sparql, expected, actual);
+        // no null pointer exception, but Sesame 2.7 Sparql parser will
+        // not respect the bnode id, so we cannot assert same AST
+//        assertSameAST(sparql, expected, actual);
 
     }
 
