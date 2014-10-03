@@ -1091,10 +1091,7 @@ public class TestGroupGraphPatternBuilder extends
         final QueryRoot expected = new QueryRoot(QueryType.SELECT);
         {
 
-            {
-                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
-                expected.setPrefixDecls(prefixDecls);
-            }
+            expected.setPrefixDecls(PrefixDeclProcessor.defaultDecls);
 
             final ProjectionNode projection = new ProjectionNode();
             projection.addProjectionVar(new VarNode("s"));
@@ -1116,6 +1113,7 @@ public class TestGroupGraphPatternBuilder extends
                     serviceRefIV), groupNode);
 
             serviceNode.setExprImage(serviceExpr);
+            serviceNode.setPrefixDecls(PrefixDeclProcessor.defaultDecls);
 
             whereClause.addArg(serviceNode);
             
@@ -1174,6 +1172,7 @@ public class TestGroupGraphPatternBuilder extends
             serviceNode.setSilent(true);
 
             serviceNode.setExprImage(serviceExpr);
+            serviceNode.setPrefixDecls(PrefixDeclProcessor.defaultDecls);
 
             whereClause.addArg(serviceNode);
 
@@ -1227,6 +1226,7 @@ public class TestGroupGraphPatternBuilder extends
                     groupNode);
 
             serviceNode.setExprImage(serviceExpr);
+            serviceNode.setPrefixDecls(PrefixDeclProcessor.defaultDecls);
 
             whereClause.addArg(serviceNode);
 
@@ -1314,8 +1314,8 @@ public class TestGroupGraphPatternBuilder extends
         {
 
             {
-//                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
-//                expected.setPrefixDecls(prefixDecls);
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
+                expected.setPrefixDecls(prefixDecls);
             }
 
             {
@@ -1333,6 +1333,7 @@ public class TestGroupGraphPatternBuilder extends
 
                 service = new ServiceNode(new VarNode("s"), serviceGraph);
                 service.setExprImage(serviceExpr);
+                service.setPrefixDecls(PrefixDeclProcessor.defaultDecls);
 
                 final JoinGroupNode wrapperGroup = new JoinGroupNode(true/* optional */);
                 whereClause.addChild(wrapperGroup);
