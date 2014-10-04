@@ -1575,7 +1575,7 @@ public class TestUpdateExprBuilder extends AbstractBigdataExprBuilderTestCase {
                 + "{\n"
                 + "  <http://example/book1> dc:title \"A new book\" .\n"
                 + "  <http://example/book1> dc:creator \"A.N.Other\" .\n" //
-                + "  <http://example/book1>  ns:price 42 <http://example/bookStore> .\n"
+                + "  GRAPH <http://example/bookStore> { <http://example/book1>  ns:price  42 }\n"
                 + "}";
 
         final UpdateRoot expected = new UpdateRoot();
@@ -1622,6 +1622,23 @@ public class TestUpdateExprBuilder extends AbstractBigdataExprBuilderTestCase {
         final UpdateRoot actual = parseUpdate(sparql, baseURI);
 
         assertSameAST(sparql, expected, actual);
+
+    }
+
+    public void test_insert_data_triples_then_quads2() throws MalformedQueryException,
+        TokenMgrError, ParseException {
+
+        final String sparql = "PREFIX dc: <http://purl.org/dc/elements/1.1/>\n"
+                + "PREFIX ns: <http://example.org/ns#>\n"
+                + "INSERT DATA\n"
+                + "{\n"
+                + "    { <a:s1> <a:p1> <a:o1>\n }"
+                + "    GRAPH <a:G> { <a:s> <a:p1> 'o1'; <a:p2> <a:o2> }\n" 
+                + "    GRAPH <a:G1> { <a:s> <a:p1> 'o1'; <a:p2> <a:o2> } \n"
+                + "    <a:s1> <a:p1> <a:o1>\n"
+                + "}";
+
+        parseUpdate(sparql, baseURI);
 
     }
 
@@ -1716,7 +1733,7 @@ public class TestUpdateExprBuilder extends AbstractBigdataExprBuilderTestCase {
                 + "PREFIX ns: <http://example.org/ns#>\n"
                 + "INSERT DATA\n"
                 + "{\n"
-                + "  <http://example/book1> dc:title \"A new book\" .\n"
+                + "  <http://example/book1> dc:title \"A new book\" . "
                 + "  GRAPH <http://example/bookStore> { <http://example/book1>  ns:price  42 }\n"
                 + "  <http://example/book1> dc:creator \"A.N.Other\" .\n" //
                 + "}";
