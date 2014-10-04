@@ -60,32 +60,35 @@ public class TestNumericBNodes extends RemoteGOMTestCase {
 	 * [3] http://sw.deri.org/2009/01/visinav/current.nq.gz (TBL plus 6-degrees of
 	 * freedom)
 	 * 
+	 * In Sesame 2.7 we are no longer rolling our own NQuads parser.  If the
+	 * data is not parseable that is an issue with the Sesame parser.
+	 * 
 	 * @throws Exception
 	 */
-	public void test_nquads_01() throws Exception {
-		
-//		final AbstractTripleStore store = getStore();
-
-		try {
-
-			// Verify that the correct parser will be used.
-			assertEquals("TurtleParserClass",
-					BigdataTurtleParser.class.getName(), RDFParserRegistry
-							.getInstance().get(RDFFormat.TURTLE).getParser()
-							.getClass().getName());
-
-			final String resource = "foaf-tbl-plus-6-degrees-small.nq";
-			
-			load(getClass().getResource(resource), RDFFormat.NQUADS);
-			
-			new Example1(om).call();
-			
-		} finally {
-
-//			store.__tearDownUnitTest();
-
-		}
-
-	}
+//	public void test_nquads_01() throws Exception {
+//		
+////		final AbstractTripleStore store = getStore();
+//
+//		try {
+//
+//			// Verify that the correct parser will be used.
+//			assertEquals("TurtleParserClass",
+//					BigdataTurtleParser.class.getName(), RDFParserRegistry
+//							.getInstance().get(RDFFormat.TURTLE).getParser()
+//							.getClass().getName());
+//
+//			final String resource = "foaf-tbl-plus-6-degrees-small.nq";
+//			
+//			load(getClass().getResource(resource), RDFFormat.NQUADS);
+//			
+//			new Example1(om).call();
+//			
+//		} finally {
+//
+////			store.__tearDownUnitTest();
+//
+//		}
+//
+//	}
 
 }
