@@ -246,5 +246,11 @@ public class LiteralExtensionIV<V extends BigdataLiteral>
 	public short shortValue() {
 		return getValue().shortValue();
 	}
+
+    @Override
+    public String toString() {
+        return "LiteralExtensionIV [delegate=" + delegate + ", datatype="
+                + datatype + "]";
+    }
     
 }
