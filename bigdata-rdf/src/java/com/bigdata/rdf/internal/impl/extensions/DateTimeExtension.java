@@ -24,6 +24,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.internal.impl.extensions;
 
+import java.util.Date;
 import java.util.GregorianCalendar;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -140,18 +141,24 @@ public class DateTimeExtension<V extends BigdataValue> implements IExtension<V> 
         final XMLGregorianCalendar c = XMLDatatypeUtil.parseCalendar(s);
         
         if (c.getTimezone() == DatatypeConstants.FIELD_UNDEFINED) {
+            final GregorianCalendar gc = c.toGregorianCalendar();
+            gc.setGregorianChange(new Date(Long.MIN_VALUE));
+            
             final int offsetInMillis = 
 //                defaultTZ.getRawOffset();
-                defaultTZ.getOffset(c.toGregorianCalendar().getTimeInMillis());
+                defaultTZ.getOffset(gc.getTimeInMillis());
             final int offsetInMinutes = 
                 offsetInMillis / 1000 / 60;
             c.setTimezone(offsetInMinutes);
         }
 
+        final GregorianCalendar gc = c.toGregorianCalendar();
+        gc.setGregorianChange(new Date(Long.MIN_VALUE));
+        
         /*
          * Returns the current time as UTC milliseconds from the epoch
          */
-        final long l = c.toGregorianCalendar().getTimeInMillis();
+        final long l = gc.getTimeInMillis();
 
         final AbstractLiteralIV delegate = new XSDNumericIV(l);
 
@@ -178,6 +185,7 @@ public class DateTimeExtension<V extends BigdataValue> implements IExtension<V> 
         
         final TimeZone tz = BSBMHACK ? TimeZone.getDefault()/*getTimeZone("GMT")*/ : defaultTZ;
         final GregorianCalendar c = new GregorianCalendar(tz);
+        c.setGregorianChange(new Date(Long.MIN_VALUE));
         c.setTimeInMillis(l);
         
         try {
