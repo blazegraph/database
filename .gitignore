@@ -1,0 +1,330 @@
+
+# /
+/ant-build
+/src
+/bin
+/bigdata*.jar
+/ant-release
+/standalone
+/test*
+/countersfinal.xml
+/events.jnl
+/.settings
+/*.jnl
+/TestInsertRate.out
+/SYSTAP-BBT-result.txt
+/U10load+query
+/*.hprof
+/com.bigdata.cache.TestHardReferenceQueueWithBatchingUpdates.exp.csv
+/commit-log.txt
+/eventLog
+/dist
+/bigdata-test
+/com.bigdata.rdf.stress.LoadClosureAndQueryTest.*.csv
+/DIST.*.tgz
+/REL.*.tgz
+
+# /bigdata/
+/bigdata/bin
+/bigdata/*.jnl
+/bigdata/*.mdmp
+/bigdata/*.dump
+/bigdata/*.out
+/bigdata/*.seg
+/bigdata/com_bigdata_btree_BytesUtil_UnsignedByteArrayComparator.h
+/bigdata/com_bigdata_btree_BytesUtil.h
+/bigdata/*.raw2
+/bigdata/*.tmp
+/bigdata/test_*
+/bigdata/com.bigdata.journal.StressTestConcurrent.comparison.csv
+/bigdata/bigdata.jar
+/bigdata/run.bat
+/bigdata/ant-build
+/bigdata/ant-deploy
+/bigdata/log
+/bigdata/TestService.id
+/bigdata/stack-traces
+/bigdata/*.csv
+/bigdata/*.xls
+/bigdata/*.id
+/bigdata/target
+/bigdata/output.tsv
+/bigdata/counters*.xml
+/bigdata/.classpath
+/bigdata/.project
+/bigdata/EDS
+/bigdata/row
+/bigdata/store
+/bigdata/testIndex
+
+# /bigdata/lib/
+/bigdata/lib/rio-1.2.1.jar
+/bigdata/lib/openrdf-model-1.2.1.jar
+/bigdata/lib/bigdata.jar
+
+# /bigdata/src/architecture/
+/bigdata/src/architecture/btree
+/bigdata/src/architecture/(version
+/bigdata/src/architecture/1).xls
+
+# /bigdata/src/java/com/bigdata/cache/
+/bigdata/src/java/com/bigdata/cache/BCHMGlobalLRU.java
+
+# /bigdata/src/java/com/bigdata/relation/accesspath/
+/bigdata/src/java/com/bigdata/relation/accesspath/BlockingBufferRefactorTemp.java
+
+# /bigdata/src/java/com/bigdata/relation/rule/eval/
+/bigdata/src/java/com/bigdata/relation/rule/eval/NestedSubqueryWithAdvancerTask.java
+
+# /bigdata/src/java/com/bigdata/sparse/
+/bigdata/src/java/com/bigdata/sparse/IDistributedLock.java
+
+# /bigdata/src/resources/xml/
+/bigdata/src/resources/xml/counters1.xml
+/bigdata/src/resources/xml/counters0.xml
+/bigdata/src/resources/xml/counters2.xml
+
+# /bigdata/src/samples/com/bigdata/samples/btree/
+/bigdata/src/samples/com/bigdata/samples/btree/JournalTxExample.java
+/bigdata/src/samples/com/bigdata/samples/btree/ReadWriteIndexTxExample.java
+
+# /bigdata/src/test/com/bigdata/util/concurrent/
+/bigdata/src/test/com/bigdata/util/concurrent/TestCompletionService.java
+/bigdata/src/test/com/bigdata/util/concurrent/CompletionServiceImpl.java
+
+# /bigdata-gom/
+/bigdata-gom/bin
+/bigdata-gom/lib
+/bigdata-gom/*.db
+/bigdata-gom/*.lg
+/bigdata-gom/TestNG
+/bigdata-gom/context
+/bigdata-gom/suite.launch
+/bigdata-gom/GOM-suite.xml
+/bigdata-gom/.gom-for-jdbm.GOM-suite.xml.launch
+/bigdata-gom/.project
+/bigdata-gom/.classpath
+/bigdata-gom/target
+/bigdata-gom/TODO
+/bigdata-gom/*.jnl
+/bigdata-gom/*.mdmp
+
+# /bigdata-jini/
+/bigdata-jini/bin
+/bigdata-jini/*.jnl
+/bigdata-jini/*.mdmp
+/bigdata-jini/*.dump
+/bigdata-jini/*.out
+/bigdata-jini/*.seg
+/bigdata-jini/com_bigdata_btree_BytesUtil_UnsignedByteArrayComparator.h
+/bigdata-jini/com_bigdata_btree_BytesUtil.h
+/bigdata-jini/*.raw2
+/bigdata-jini/*.tmp
+/bigdata-jini/test_*
+/bigdata-jini/com.bigdata.journal.StressTestConcurrent.comparison.csv
+/bigdata-jini/bigdata.jar
+/bigdata-jini/run.bat
+/bigdata-jini/ant-build
+/bigdata-jini/ant-deploy
+/bigdata-jini/log
+/bigdata-jini/TestService.id
+/bigdata-jini/stack-traces
+/bigdata-jini/*.csv
+/bigdata-jini/*.xls
+/bigdata-jini/*.id
+/bigdata-jini/target
+/bigdata-jini/standalone
+/bigdata-jini/bigdata-jini.jar
+/bigdata-jini/.classpath
+/bigdata-jini/.project
+/bigdata-jini/counters*.xml
+/bigdata-jini/zookeeper
+/bigdata-jini/test-fed
+
+# /bigdata-jini/lib/
+/bigdata-jini/lib/rio-1.2.1.jar
+/bigdata-jini/lib/openrdf-model-1.2.1.jar
+/bigdata-jini/lib/bigdata.jar
+
+# /bigdata-jini/src/java/com/bigdata/service/jini/
+/bigdata-jini/src/java/com/bigdata/service/jini/SolutionSerializer.java
+
+# /bigdata-jini/src/test/com/bigdata/service/jini/
+/bigdata-jini/src/test/com/bigdata/service/jini/IteratorProxy.java
+/bigdata-jini/src/test/com/bigdata/service/jini/IteratorProxyState.java
+/bigdata-jini/src/test/com/bigdata/service/jini/TestPageServer.java
+/bigdata-jini/src/test/com/bigdata/service/jini/IteratorService.java
+
+# /bigdata-perf/bsbm/
+/bigdata-perf/bsbm/ant-build
+
+# /bigdata-perf/lubm/
+/bigdata-perf/lubm/ant-build
+/bigdata-perf/lubm/*result.txt
+/bigdata-perf/lubm/sample.query.sparql
+
+# /bigdata-perf/lubm/src/java/edu/lehigh/swat/bench/ubt/
+/bigdata-perf/lubm/src/java/edu/lehigh/swat/bench/ubt/answers (U1)
+
+# /bigdata-perf/lubm/src/java/edu/lehigh/swat/bench/ubt/bigdata/
+/bigdata-perf/lubm/src/java/edu/lehigh/swat/bench/ubt/bigdata/*eossys*
+/bigdata-perf/lubm/src/java/edu/lehigh/swat/bench/ubt/bigdata/notes.txt
+/bigdata-perf/lubm/src/java/edu/lehigh/swat/bench/ubt/bigdata/JDSTest.java
+
+# /bigdata-rdf/
+/bigdata-rdf/*.jnl
+/bigdata-rdf/perf.doc
+/bigdata-rdf/perf.txt
+/bigdata-rdf/README.txt
+/bigdata-rdf/data
+/bigdata-rdf/run.bat
+/bigdata-rdf/.settings
+/bigdata-rdf/perf.xls
+/bigdata-rdf/*.out
+/bigdata-rdf/*.jardesc
+/bigdata-rdf/testjar
+/bigdata-rdf/bin
+/bigdata-rdf/bigdata-rdf.jar
+/bigdata-rdf/ant-build
+/bigdata-rdf/*.seg
+/bigdata-rdf/TaskA
+/bigdata-rdf/TestMetrics-metrics.csv
+/bigdata-rdf/TestMetrics-metrics-compare256a.xls
+/bigdata-rdf/*.dump
+/bigdata-rdf/*.mdmp
+/bigdata-rdf/TestMetrics-metrics-smallDocuments-overflow20M.xls
+/bigdata-rdf/TestMetrics-metrics-documents-1partition-10k-OOM.csv
+/bigdata-rdf/TestMetrics-metrics-smallDocuments-noPartitions.csv
+/bigdata-rdf/smallDocuments
+/bigdata-rdf/test_loadFile_presortRioLoader
+/bigdata-rdf/TestMetrics-metrics*
+/bigdata-rdf/BBN
+/bigdata-rdf/Triple
+/bigdata-rdf/Store
+/bigdata-rdf/Study
+/bigdata-rdf/*.id
+/bigdata-rdf/test_*
+/bigdata-rdf/next-steps.doc
+/bigdata-rdf/target
+/bigdata-rdf/~*
+/bigdata-rdf/worklist
+/bigdata-rdf/TestMetrics
+/bigdata-rdf/segments
+/bigdata-rdf/journals
+/bigdata-rdf/standalone
+/bigdata-rdf/counters*.xml
+/bigdata-rdf/U10*
+/bigdata-rdf/test
+/bigdata-rdf/docs
+/bigdata-rdf/bigdata.jar
+/bigdata-rdf/bigdata-starter-kit.tgz
+/bigdata-rdf/.project
+/bigdata-rdf/.classpath
+/bigdata-rdf/docs.zip
+/bigdata-rdf/timegrid.xml
+/bigdata-rdf/timegrid.xhtml
+/bigdata-rdf/moveerr1.txt
+/bigdata-rdf/moveerr2.txt
+/bigdata-rdf/err1.txt
+/bigdata-rdf/U*MovesOk.txt
+/bigdata-rdf/U*Ok?.txt
+/bigdata-rdf/test*
+
+# /bigdata-rdf/LEGAL/
+/bigdata-rdf/LEGAL/piccolo-LICENSE.txt
+
+# /bigdata-rdf/lib/
+/bigdata-rdf/lib/piccolo-README.txt
+/bigdata-rdf/lib/Piccolo.jar
+
+# /bigdata-rdf/src/java/
+/bigdata-rdf/src/java/edu
+/bigdata-rdf/src/java/sesamewrapper
+
+# /bigdata-rdf/src/java/com/bigdata/rdf/load/
+/bigdata-rdf/src/java/com/bigdata/rdf/load/DumpUtility.java
+
+# /bigdata-rdf/src/java/com/bigdata/rdf/spo/
+/bigdata-rdf/src/java/com/bigdata/rdf/spo/FastRDFSIDValueCoder.java
+
+# /bigdata-rdf/src/java/org/openrdf/rio/
+/bigdata-rdf/src/java/org/openrdf/rio/helpers
+
+# /bigdata-rdf/src/test/
+/bigdata-rdf/src/test/edu
+
+# /bigdata-rdf/src/test/com/bigdata/rdf/
+/bigdata-rdf/src/test/com/bigdata/rdf/blip
+
+# /bigdata-rdf/src/test/com/bigdata/rdf/inf/
+/bigdata-rdf/src/test/com/bigdata/rdf/inf/alibaba_v41.rdf
+/bigdata-rdf/src/test/com/bigdata/rdf/inf/wordnet-20000620.rdfs
+/bigdata-rdf/src/test/com/bigdata/rdf/inf/wordnet_nouns-20010201.rdf
+/bigdata-rdf/src/test/com/bigdata/rdf/inf/notes.txt
+
+# /bigdata-rdf/src/test/com/bigdata/rdf/metrics/
+/bigdata-rdf/src/test/com/bigdata/rdf/metrics/Test*ReferenceLoad.java
+
+# /bigdata-rdf/src/test/com/bigdata/rdf/rules/
+/bigdata-rdf/src/test/com/bigdata/rdf/rules/alibaba_v41.rdf
+/bigdata-rdf/src/test/com/bigdata/rdf/rules/wordnet-20000620.rdfs
+/bigdata-rdf/src/test/com/bigdata/rdf/rules/wordnet_nouns-20010201.rdf
+/bigdata-rdf/src/test/com/bigdata/rdf/rules/notes.txt
+
+# /bigdata-sails/
+/bigdata-sails/bin
+/bigdata-sails/target
+/bigdata-sails/*.dump
+/bigdata-sails/*.mdmp
+/bigdata-sails/*.jnl
+/bigdata-sails/test.rdf
+/bigdata-sails/.classpath
+/bigdata-sails/.project
+/bigdata-sails/data
+/bigdata-sails/countersfinal.xml
+
+# /bigdata-sails/LEGAL/
+/bigdata-sails/LEGAL/piccolo-LICENSE.txt
+
+# /bigdata-sails/src/java/
+/bigdata-sails/src/java/edu
+/bigdata-sails/src/java/sesamewrapper
+
+# /bigdata-sails/src/java/com/bigdata/rdf/
+/bigdata-sails/src/java/com/bigdata/rdf/blip
+
+# /bigdata-sails/src/java/com/bigdata/rdf/sail/
+/bigdata-sails/src/java/com/bigdata/rdf/sail/SimpleRdfsRepository.java
+
+# /bigdata-sails/src/java/com/bigdata/rdf/sail/bench/
+/bigdata-sails/src/java/com/bigdata/rdf/sail/bench/ChangeFederationBranchingFactor.java
+
+# /bigdata-sails/src/resources/
+/bigdata-sails/src/resources/U1
+
+# /bigdata-sails/src/samples/com/bigdata/samples/
+/bigdata-sails/src/samples/com/bigdata/samples/baseball.stats.out.rdf.zip
+
+# /bigdata-sails/src/test/com/bigdata/rdf/sail/
+/bigdata-sails/src/test/com/bigdata/rdf/sail/old
+/bigdata-sails/src/test/com/bigdata/rdf/sail/Test.java
+/bigdata-sails/src/test/com/bigdata/rdf/sail/system.rdfs
+/bigdata-sails/src/test/com/bigdata/rdf/sail/test.rdf
+
+# /bigdata-sails/src/test/com/bigdata/rdf/sail/tck/
+/bigdata-sails/src/test/com/bigdata/rdf/sail/tck/DoNotDistribute_QueryTest.java
+/bigdata-sails/src/test/com/bigdata/rdf/sail/tck/data-2.ttl
+/bigdata-sails/src/test/com/bigdata/rdf/sail/tck/TestSparqlStuff.java
+
+# /bigdata-sails/src/test/com/bigdata/rdf/stress/
+/bigdata-sails/src/test/com/bigdata/rdf/stress/LoadClosureAndQueryExperiment-EOSSYS.xml
+/bigdata-sails/src/test/com/bigdata/rdf/stress/config.query.eossys
+
+# /dsi-utils/
+/dsi-utils/ant-build
+
+# /lgpl-utils/
+/lgpl-utils/ant-build
+
+# /src/resources/config/
+/src/resources/config/bigdataCluster-bbt.config
