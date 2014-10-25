@@ -477,9 +477,9 @@ ga('send', 'pageview');
     <fileset dir="${bigdata.dir}/bigdata-blueprints/lib">
         <include name="**/*.jar" />
     </fileset>
-   <fileset dir="${bigdata.dir}/bigdata-gom/lib">
+   <!-- <fileset dir="${bigdata.dir}/bigdata-gom/lib">
       <include name="**/*.jar" />
-   </fileset>
+   </fileset> -->
      </copy>
      <!-- Do NOT flatten the jini jars. We need the to preserve the -->
      <!-- lib, lib-dl, and lib-ext distinctions.                    -->
