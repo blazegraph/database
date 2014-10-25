@@ -65,9 +65,9 @@ See 'deploy-artifact' (binary artifact: REL.${version}.tgz).
         <fileset dir="${bigdata.dir}/bigdata-blueprints/lib">
             <include name="**/*.jar" />
         </fileset>
-      <fileset dir="${bigdata.dir}/bigdata-gom/lib">
+      <!-- <fileset dir="${bigdata.dir}/bigdata-gom/lib">
          <include name="**/*.jar" />
-      </fileset>
+      </fileset> -->
         <!--
         <fileset dir="${bigdata.dir}/ctc-striterator/lib">
             <include name="**/*.jar" />
