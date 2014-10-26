@@ -3007,6 +3007,29 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
              * (RWStore does not discard deferred deletes on reset)
              */
             m_deferredFreeOut.reset();
+            
+            /*
+             * Reset any storage stats
+             * FIXME: Change StorageStats internals to be able to efficiently commit/reset and avoid disk read
+             */
+            if (m_storageStatsAddr != 0) {
+                final long statsAddr = m_storageStatsAddr >> 16;
+                final int statsLen = ((int) m_storageStatsAddr) & 0xFFFF;
+                final byte[] stats = new byte[statsLen + 4]; // allow for checksum
+                getData(statsAddr, stats);
+                final DataInputStream instr = new DataInputStream(new ByteArrayInputStream(stats));
+                try {
+					m_storageStats = new StorageStats(instr);
+	                for (FixedAllocator fa: m_allocs) {
+	                    m_storageStats.register(fa);
+	                }
+				} catch (IOException e) {
+					throw new RuntimeException("Unable to reset storage stats", e);
+				}               
+            } else {
+                m_storageStats = new StorageStats(m_allocSizes);
+            }
+
         } catch (Exception e) {
             throw new IllegalStateException("Unable to reset the store", e);
         } finally {
@@ -3156,11 +3179,14 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 
         /** Reset pre-commit state to support reset/abort/rollback. */
         void reset() {
-            if (!m_allocationWriteLock.isHeldByCurrentThread())
+        	System.err.println("CommitState - reset");
+
+        	if (!m_allocationWriteLock.isHeldByCurrentThread())
                 throw new IllegalMonitorStateException();
             RWStore.this.m_storageStatsAddr = m_storageStatsAddr;
             RWStore.this.m_committedNextAllocation = m_lastCommittedNextAllocation;
             RWStore.this.m_metaBitsAddr = m_metaBitsAddr;
+            
         }
 
     }
