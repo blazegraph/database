@@ -3010,7 +3010,6 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
             
             /*
              * Reset any storage stats
-             * FIXME: Change StorageStats internals to be able to efficiently commit/reset and avoid disk read
              */
             if (m_storageStatsAddr != 0) {
                 m_storageStats.reset();             
@@ -3167,15 +3166,12 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 
         /** Reset pre-commit state to support reset/abort/rollback. */
         void reset() {
-        	System.err.println("CommitState - reset");
-
         	if (!m_allocationWriteLock.isHeldByCurrentThread())
                 throw new IllegalMonitorStateException();
             RWStore.this.m_storageStatsAddr = m_storageStatsAddr;
             RWStore.this.m_committedNextAllocation = m_lastCommittedNextAllocation;
             RWStore.this.m_metaBitsAddr = m_metaBitsAddr;
-            
-        }
+         }
 
     }
 
