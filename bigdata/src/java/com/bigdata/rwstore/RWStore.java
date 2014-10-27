@@ -3013,19 +3013,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
              * FIXME: Change StorageStats internals to be able to efficiently commit/reset and avoid disk read
              */
             if (m_storageStatsAddr != 0) {
-                final long statsAddr = m_storageStatsAddr >> 16;
-                final int statsLen = ((int) m_storageStatsAddr) & 0xFFFF;
-                final byte[] stats = new byte[statsLen + 4]; // allow for checksum
-                getData(statsAddr, stats);
-                final DataInputStream instr = new DataInputStream(new ByteArrayInputStream(stats));
-                try {
-					m_storageStats = new StorageStats(instr);
-	                for (FixedAllocator fa: m_allocs) {
-	                    m_storageStats.register(fa);
-	                }
-				} catch (IOException e) {
-					throw new RuntimeException("Unable to reset storage stats", e);
-				}               
+                m_storageStats.reset();             
             } else {
                 m_storageStats = new StorageStats(m_allocSizes);
             }
@@ -3440,6 +3428,10 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 
             fa.postCommit();
             
+        }
+
+        if (m_storageStats != null) {
+        	m_storageStats.commit();
         }
 
         m_commitList.clear();
