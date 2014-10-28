@@ -71,7 +71,8 @@ abstract public class AbstractLiteralIV<V extends BigdataLiteral, T>
      * Implement {@link IV#needsMaterialization()}. Materialization not required
      * to answer the {@link Literal} interface methods.
      */
-    public boolean needsMaterialization() {
+    @Override
+    final public boolean needsMaterialization() {
     	return false;
     }
     
