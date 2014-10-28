@@ -52,6 +52,7 @@ public class XSDBooleanIV<V extends BigdataLiteral> extends
     
     private final boolean value;
 
+    @Override
     public IV<V, Boolean> clone(final boolean clearCache) {
 
         final XSDBooleanIV<V> tmp = new XSDBooleanIV<V>(value);
@@ -74,12 +75,14 @@ public class XSDBooleanIV<V extends BigdataLiteral> extends
         
     }
 
+    @Override
     final public Boolean getInlineValue() {
 
         return value ? Boolean.TRUE : Boolean.FALSE;
 
     }
 
+    @Override
     @SuppressWarnings("unchecked")
     public V asValue(final LexiconRelation lex) {
 
@@ -121,10 +124,12 @@ public class XSDBooleanIV<V extends BigdataLiteral> extends
      * 
      * @see Boolean#hashCode()
      */
+    @Override
     public int hashCode() {
         return value ? Boolean.TRUE.hashCode() : Boolean.FALSE.hashCode();
     }
 
+    @Override
     public int byteLength() {
         return 1 + 1;
     }
@@ -137,6 +142,5 @@ public class XSDBooleanIV<V extends BigdataLiteral> extends
         return (v == value ? 0 : (value ? 1 : -1));
         
     }
-    
 
 }

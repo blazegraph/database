@@ -502,20 +502,8 @@ public class ChunkedMaterializationOp extends PipelineOp {
                 }
 
                 final BigdataValue value = terms.get(iv);
-
-                if (value == null && iv.needsMaterialization()) {
-
-                    throw new RuntimeException("Could not resolve: iv=" + iv);
-
-                }
-
-                /*
-                 * Replace the binding.
-                 * 
-                 * FIXME This probably needs to strip out the
-                 * BigdataSail#NULL_GRAPH since that should not become bound.
-                 */
-                ((IV) iv).setValue(value);
+                
+                conditionallySetIVCache(iv,value);
 
             }
             
@@ -546,23 +534,53 @@ public class ChunkedMaterializationOp extends PipelineOp {
 
                 final BigdataValue value = terms.get(iv);
 
-                if (value == null && iv.needsMaterialization()) {
-
-                    throw new RuntimeException("Could not resolve: iv=" + iv);
-
-                }
-
-                /*
-                 * Replace the binding.
-                 * 
-                 * FIXME This probably needs to strip out the
-                 * BigdataSail#NULL_GRAPH since that should not become bound.
-                 */
-                ((IV) iv).setValue(value);
+                conditionallySetIVCache(iv, value);
 
             }
+
         }
 
-    }
+	}
+
+    /**
+	 * If the {@link BigdataValue} is non-null, then set it on the
+	 * {@link IVCache} interface.
+	 * 
+	 * @param iv
+	 *            The {@link IV}
+	 * @param value
+	 *            The {@link BigdataValue} for that {@link IV} (from the
+	 *            dictionary).
+	 * 
+	 * @throws RuntimeException
+	 *             If the {@link BigdataValue} is null (could not be discovered
+	 *             in the dictionary) and the {@link IV} requires
+	 *             materialization ({@link IV#needsMaterialization() is
+	 *             <code>true</code>).
+	 * 
+	 * @see #1028 (xsd:boolean materialization issue)
+	 */
+	private static void conditionallySetIVCache(IV<?, ?> iv, BigdataValue value) {
+
+		if (value == null) {
+
+			if (iv.needsMaterialization()) {
+				// Not found in dictionary. This is an error.
+				throw new RuntimeException("Could not resolve: iv=" + iv);
+
+			} // else NOP - Value is not required.
+
+		} else {
+
+			/*
+			 * Value was found in the dictionary, so replace the binding.
+			 * 
+			 * FIXME This probably needs to strip out the BigdataSail#NULL_GRAPH
+			 * since that should not become bound.
+			 */
+			((IV) iv).setValue(value);
+		}
+
+	}
 
 }

@@ -367,12 +367,12 @@ public class IPv4AddrIV<V extends BigdataLiteral>
 //
 //    }
 
-    /**
-     * Does not need materialization to answer URI interface methods.
-     */
-	@Override
-	public boolean needsMaterialization() {
-		return false;
-	}
+//    /**
+//     * Does not need materialization to answer URI interface methods.
+//     */
+//	@Override
+//	public boolean needsMaterialization() {
+//		return false;
+//	}
 
 }
