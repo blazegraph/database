@@ -2482,22 +2482,28 @@ public class BigdataRDFContext extends BigdataBaseContext {
 
 	}
 	
-//	public void commitTx(final long tx) {
-//
-//	    if (getIndexManager() instanceof Journal) {
-//
-//            final ITransactionService txs = ((Journal) getIndexManager())
-//                    .getLocalTransactionManager().getTransactionService();
-//
-//            try {
-//                txs.commit(tx);
-//            } catch (IOException e) {
-//                // Note: Local operation. Will not throw IOException.
-//                throw new RuntimeException(e);
-//            }
-//
-//        }
-//
-//    }
+	/**
+	 * Commit a transaction obtained by {@link #newTx(long)}
+	 * 
+	 * @param tx
+	 *            The transaction identifier.
+	 */
+	public void commitTx(final long tx) {
+
+	    if (getIndexManager() instanceof Journal) {
+
+            final ITransactionService txs = ((Journal) getIndexManager())
+                    .getLocalTransactionManager().getTransactionService();
+
+            try {
+                txs.commit(tx);
+            } catch (IOException e) {
+                // Note: Local operation. Will not throw IOException.
+                throw new RuntimeException(e);
+            }
+
+        }
+
+    }
 	
 }
