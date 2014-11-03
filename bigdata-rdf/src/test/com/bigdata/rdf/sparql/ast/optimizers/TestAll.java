@@ -147,6 +147,19 @@ public class TestAll extends TestCase {
         suite.addTestSuite(TestASTFlattenJoinGroupsOptimizer.class);
         
         suite.addTestSuite(TestALPPinTrac773.class);
+        
+        /**
+		 * Optimizes SELECT COUNT(*) { triple-pattern } using the fast range
+		 * count mechanisms when that feature would produce exact results for
+		 * the KB instance.
+		 * 
+		 * @see <a href="http://trac.bigdata.com/ticket/1037" > Rewrite SELECT
+		 *      COUNT(...) (DISTINCT|REDUCED) {single-triple-pattern} as ESTCARD
+		 *      </a>
+		 */
+        suite.addTestSuite(TestASTFastRangeCountOptimizer.class);
+
+        suite.addTestSuite(TestASTDistinctTermScanOptimizer.class);
 
         return suite;
 
