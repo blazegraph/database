@@ -106,7 +106,7 @@ public class TestNanoSparqlServerWithProxyIndexManager<S extends IIndexManager>
 		
 	}
 	
-	private static Journal getTemporaryJournal(final boolean use_rwstore) {
+	static Journal getTemporaryJournal(final boolean use_rwstore) {
 
 		final Properties properties = new Properties();
 
@@ -221,7 +221,18 @@ public class TestNanoSparqlServerWithProxyIndexManager<S extends IIndexManager>
 	public static TestSuite suite(final IIndexManager indexManager,
 			final TestMode testMode) {
 
+		final boolean RWStoreMode = indexManager instanceof AbstractJournal
+				&& ((AbstractJournal) indexManager).getBufferStrategy() instanceof RWStrategy;
+
 		final ProxyTestSuite suite = createProxyTestSuite(indexManager,testMode);
+
+        if(RWStoreMode) {
+        	
+			// RWSTORE SPECIFIC TEST SUITE.
+			suite.addTestSuite(TestRWStoreTxBehaviors.class);
+        	
+        } else {
+
 
         /*
          * List any non-proxied tests (typically bootstrapping tests).
@@ -252,14 +263,6 @@ public class TestNanoSparqlServerWithProxyIndexManager<S extends IIndexManager>
         
         suite.addTestSuite(TestService794.class);
 
-		if (indexManager instanceof AbstractJournal
-				&& ((AbstractJournal) indexManager).getBufferStrategy() instanceof RWStrategy) {
-
-			// RWSTORE SPECIFIC TEST SUITE.
-			suite.addTestSuite(TestRWStoreTxBehaviors.class);
-        	
-        }
-
         // SPARQL UPDATE test suite.
         switch(testMode) {
         case triples:
@@ -280,6 +283,8 @@ public class TestNanoSparqlServerWithProxyIndexManager<S extends IIndexManager>
         // SPARQL 1.1 Federated Query.
         suite.addTestSuite(TestFederatedQuery.class);
 
+        }
+        
         return suite;
     
     }

@@ -344,14 +344,17 @@ public class QueryServlet extends BigdataRDFServlet {
         }
 
         /*
-         * Setup task to execute the request. The task is executed on a thread
-         * pool. This bounds the possible concurrency of query execution (as
-         * opposed to queries accepted for eventual execution).
-         * 
-         * Note: If the client closes the connection, then the response's
-         * InputStream will be closed and the task will terminate rather than
-         * running on in the background with a disconnected client. @see #1026	(SPARQL UPDATE with runtime errors causes problems with lexicon indices)
-         */
+		 * Setup task to execute the request. The task is executed on a thread
+		 * pool. This bounds the possible concurrency of query execution (as
+		 * opposed to queries accepted for eventual execution).
+		 * 
+		 * Note: If the client closes the connection, then the response's
+		 * InputStream will be closed and the task will terminate rather than
+		 * running on in the background with a disconnected client.
+		 * 
+		 * @see #1026 (SPARQL UPDATE with runtime errors causes problems with
+		 * lexicon indices)
+		 */
         final long tx = getBigdataRDFContext().newTx(timestamp);
         boolean ok = false;
         try {
@@ -402,6 +405,18 @@ public class QueryServlet extends BigdataRDFServlet {
 
             // Wait for the Future.
             ft.get();
+
+			/*
+			 * Commit the native tx wrapping the lexicon updates (which occur
+			 * during the parse of the SPARQL UPDATE request) as well as the
+			 * SPARQL UPDATE request execution.
+			 * 
+			 * @see #1026 (SPARQL UPDATE with runtime errors causes problems
+			 * with lexicon indices)
+			 * 
+			 * @see #1036 (Journal file growth reported with 1.3.3)
+			 */
+			getBigdataRDFContext().commitTx(tx);
 
             ok = true;
             
