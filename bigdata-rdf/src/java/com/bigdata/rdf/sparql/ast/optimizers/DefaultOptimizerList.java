@@ -38,6 +38,7 @@ import org.openrdf.query.algebra.evaluation.impl.SameTermFilterOptimizer;
 import com.bigdata.rdf.sparql.ast.FunctionRegistry;
 import com.bigdata.rdf.sparql.ast.eval.ASTSearchInSearchOptimizer;
 import com.bigdata.rdf.sparql.ast.eval.ASTSearchOptimizer;
+import com.bigdata.rdf.spo.DistinctTermAdvancer;
 
 /**
  * Pre-populated list of the default optimizers.
@@ -442,6 +443,28 @@ public class DefaultOptimizerList extends ASTOptimizerList {
          */
         add(new ASTFlattenJoinGroupsOptimizer());
 
+		/**
+		 * Optimizes SELECT COUNT(*) { triple-pattern } using the fast range
+		 * count mechanisms when that feature would produce exact results for
+		 * the KB instance.
+		 * 
+		 * @see <a href="http://trac.bigdata.com/ticket/1037" > Rewrite SELECT
+		 *      COUNT(...) (DISTINCT|REDUCED) {single-triple-pattern} as ESTCARD
+		 *      </a>
+		 */
+        add(new ASTFastRangeCountOptimizer());
+        
+        /**
+		 * Optimizes
+		 * <code>SELECT DISTINCT ?property WHERE { ?x ?property ?y . }</code>
+		 * and similar patterns using an O(N) algorithm, where N is the number
+		 * of distinct solutions.
+		 * 
+		 * @see <a href="http://trac.bigdata.com/ticket/1035" > DISTINCT
+		 *      PREDICATEs query is slow </a>
+		 */
+        add(new ASTDistinctTermScanOptimizer());
+        
         /*
          * Join Order Optimization
          */
