@@ -26,17 +26,15 @@ import java.net.URL;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-import org.apache.http.client.HttpClient;
-import org.apache.http.conn.ClientConnectionManager;
-import org.apache.http.impl.client.DefaultHttpClient;
-import org.apache.http.impl.client.DefaultRedirectStrategy;
 import org.apache.log4j.Logger;
+import org.eclipse.jetty.client.HttpClient;
 import org.eclipse.jetty.server.Server;
 
 import com.bigdata.BigdataStatics;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.webapp.ConfigParams;
 import com.bigdata.rdf.sail.webapp.NanoSparqlServer;
+import com.bigdata.util.StackInfoReport;
 import com.bigdata.util.config.NicUtil;
 
 public class BigdataSailNSSWrapper {
@@ -58,7 +56,7 @@ public class BigdataSailNSSWrapper {
      * the {@link RemoteRepository}. This is used when we tear down the
      * {@link RemoteRepository}.
      */
-    private ClientConnectionManager m_cm;
+    //private ClientConnectionManager m_cm;
     
     /**
      * Exposed to tests that do direct HTTP GET/POST operations.
@@ -68,7 +66,7 @@ public class BigdataSailNSSWrapper {
     /**
      * The client-API wrapper to the NSS.
      */
-    public RemoteRepositoryManager m_repo;
+    public JettyRemoteRepositoryManager m_repo;
 
     /**
      * The effective {@link NanoSparqlServer} http end point (including the
@@ -134,11 +132,10 @@ public class BigdataSailNSSWrapper {
 
 //        m_cm = httpClient.getConnectionManager();
         
-        m_cm = DefaultClientConnectionManagerFactory.getInstance()
-                .newInstance();
+//        m_cm = DefaultClientConnectionManagerFactory.getInstance()
+//                .newInstance();
 
-        final DefaultHttpClient httpClient = new DefaultHttpClient(m_cm);
-        m_httpClient = httpClient;
+        m_httpClient = new HttpClient();
         
         /*
          * Ensure that the client follows redirects using a standard policy.
@@ -147,9 +144,11 @@ public class BigdataSailNSSWrapper {
          * container may respond with a redirect (302) to the location of the
          * webapp when the client requests the root URL.
          */
-        httpClient.setRedirectStrategy(new DefaultRedirectStrategy());
-
-        m_repo = new RemoteRepositoryManager(m_serviceURL,
+        m_httpClient.setFollowRedirects(true);
+        
+        m_httpClient.start();
+        
+        m_repo = new JettyRemoteRepositoryManager(m_serviceURL,
                 m_httpClient,
                 sail.getDatabase().getIndexManager().getExecutorService());
 
@@ -168,11 +167,10 @@ public class BigdataSailNSSWrapper {
         m_rootURL = null;
         m_serviceURL = null;
         
-        if (m_cm != null) {
-            m_cm.shutdown();
-            m_cm = null;
-        }
-
+        log.warn("Stopping", new StackInfoReport("Stopping HTTPClient"));
+        
+        m_httpClient.stop();
+        
         m_httpClient = null;
         m_repo = null;
         

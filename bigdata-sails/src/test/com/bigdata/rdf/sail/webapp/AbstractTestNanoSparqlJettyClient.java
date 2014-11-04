@@ -43,10 +43,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.apache.http.client.HttpClient;
-import org.apache.http.conn.ClientConnectionManager;
-import org.apache.http.impl.client.DefaultHttpClient;
-import org.apache.http.impl.client.DefaultRedirectStrategy;
+import org.eclipse.jetty.client.HttpClient;
 import org.eclipse.jetty.server.Server;
 import org.openrdf.model.Graph;
 import org.openrdf.model.Literal;
@@ -84,13 +81,11 @@ import com.bigdata.journal.Journal;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSailRepository;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
-import com.bigdata.rdf.sail.webapp.client.DefaultClientConnectionManagerFactory;
 import com.bigdata.rdf.sail.webapp.client.IPreparedGraphQuery;
 import com.bigdata.rdf.sail.webapp.client.IPreparedTupleQuery;
-import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
-import com.bigdata.rdf.sail.webapp.client.RemoteRepository.AddOp;
-import com.bigdata.rdf.sail.webapp.client.RemoteRepository.RemoveOp;
-import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryManager;
+import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepository.AddOp;
+import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepository.RemoveOp;
+import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepositoryManager;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BD;
 import com.bigdata.rdf.store.LocalTripleStore;
@@ -102,7 +97,7 @@ import com.bigdata.util.config.NicUtil;
  *
  * @param <S>
  */
-public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> extends ProxyTestCase<S> {
+public abstract class AbstractTestNanoSparqlJettyClient<S extends IIndexManager> extends ProxyTestCase<S> {
 
     /**
      * The path used to resolve resources in this package when they are being
@@ -128,17 +123,17 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
      * the {@link RemoteRepository}. This is used when we tear down the
      * {@link RemoteRepository}.
      */
-	private ClientConnectionManager m_cm;
+	// private ClientConnectionManager m_cm;
 	
 	/**
-	 * Exposed to tests that do direct HTTP GET/POST operations.
+	 * A Jetty HttpClient exposed to tests that do direct HTTP GET/POST operations.
 	 */
     protected HttpClient m_httpClient = null;
 
     /**
      * The client-API wrapper to the NSS.
      */
-    protected RemoteRepositoryManager m_repo;
+    protected JettyRemoteRepositoryManager m_repo;
 
     /**
      * The effective {@link NanoSparqlServer} http end point (including the
@@ -162,11 +157,11 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
 //	 */
 //	final protected static String requestPath = "/sparql";
 
-	public AbstractTestNanoSparqlClient() {
+	public AbstractTestNanoSparqlJettyClient() {
 		
 	}
 
-	public AbstractTestNanoSparqlClient(final String name) {
+	public AbstractTestNanoSparqlJettyClient(final String name) {
 
 		super(name);
 
@@ -258,7 +253,8 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
 	    
 		super.setUp();
 
-		log.warn("Setting up test:" + getName());
+		if (log.isTraceEnabled())
+			log.trace("Setting up test:" + getName());
 		
 		final Properties properties = getProperties();
 
@@ -321,11 +317,12 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
 
 //        m_cm = httpClient.getConnectionManager();
         
-        m_cm = DefaultClientConnectionManagerFactory.getInstance()
-                .newInstance();
+//        m_cm = DefaultClientConnectionManagerFactory.getInstance()
+//                .newInstance();
 
-        final DefaultHttpClient httpClient = new DefaultHttpClient(m_cm);
-        m_httpClient = httpClient;
+        m_httpClient = new HttpClient();
+        
+        m_httpClient.start();
         
         /*
          * Ensure that the client follows redirects using a standard policy.
@@ -334,19 +331,20 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
          * container may respond with a redirect (302) to the location of the
          * webapp when the client requests the root URL.
          */
-        httpClient.setRedirectStrategy(new DefaultRedirectStrategy());
+        m_httpClient.setFollowRedirects(true);
 
-        m_repo = new RemoteRepositoryManager(m_serviceURL,
+        m_repo = new JettyRemoteRepositoryManager(m_serviceURL,
                 m_httpClient,
                 m_indexManager.getExecutorService());
 
+        System.err.println("Setup Active Threads: " + Thread.activeCount());
     }
 
     @Override
 	public void tearDown() throws Exception {
 
-//		if (log.isInfoEnabled())
-			log.warn("tearing down test: " + getName());
+		if (log.isTraceEnabled())
+			log.trace("tearing down test: " + getName());
 
 		if (m_fixture != null) {
 
@@ -371,10 +369,14 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
         m_rootURL = null;
 		m_serviceURL = null;
 		
-        if (m_cm != null) {
-            m_cm.shutdown();
-            m_cm = null;
-        }
+//        if (m_cm != null) {
+//            m_cm.shutdown();
+//            m_cm = null;
+//        }
+		
+		log.error("Connection Shutdown Check");
+		
+		m_httpClient.stop();
 
         m_httpClient = null;
         m_repo = null;
@@ -383,6 +385,11 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
 
         super.tearDown();
 
+        System.err.println("Teardown Active Threads: " + Thread.activeCount());
+        
+        if (Thread.activeCount() > 300) {
+        	System.err.println("WTF?");
+        }
 	}
 
     /**
@@ -769,59 +776,6 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
 	 */
     protected void doInsertWithBodyTest(final String method, final int ntriples,
             /*final String servlet,*/ final RDFFormat format) throws Exception {
-
-//		HttpURLConnection conn = null;
-//		try {
-//
-//			final URL url = new URL(m_serviceURL + servlet);
-//			conn = (HttpURLConnection) url.openConnection();
-//			conn.setRequestMethod(method);
-//			conn.setDoOutput(true);
-//			conn.setDoInput(true);
-//			conn.setUseCaches(false);
-//			conn.setReadTimeout(0);
-//			
-//            conn.setRequestProperty("Content-Type", format
-//                            .getDefaultMIMEType());
-//
-//            final byte[] data = genNTRIPLES(ntriples, format);
-//
-//            conn.setRequestProperty("Content-Length", Integer.toString(data
-//                    .length));
-//
-//			final OutputStream os = conn.getOutputStream();
-//			try {
-//			    os.write(data);
-//				os.flush();
-//			} finally {
-//				os.close();
-//			}
-//			// conn.connect();
-//
-//			final int rc = conn.getResponseCode();
-//
-//            if (log.isInfoEnabled()) {
-//                log.info("*** RESPONSE: " + rc + " for " + method);
-////                log.info("*** RESPONSE: " + getResponseBody(conn));
-//            }
-//
-//			if (rc < 200 || rc >= 300) {
-//
-//			    throw new IOException(conn.getResponseMessage());
-//			    
-//			}
-//
-//		} catch (Throwable t) {
-//			// clean up the connection resources
-//			if (conn != null)
-//				conn.disconnect();
-//			throw new RuntimeException(t);
-//		}
-//
-//        // Verify the mutation count.
-//        assertEquals(ntriples, getMutationResult(conn).mutationCount);
-        
-//        final RemoteRepository repo = new RemoteRepository(m_serviceURL);
         
         final byte[] data = genNTRIPLES(ntriples, format);
 //        final File file = File.createTempFile("bigdata-testnssclient", ".data");
@@ -1503,13 +1457,6 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
 
     }
 
-    /**
-     * This is created to stress the HttpClient to try and demonstrate a rare EOFException with the
-     * Apache HttpClient.  If we can create a semi-reliable stochastic failure we should be able to 
-     * use a similar test to demonstrate a more reliable Jetty HttpClient.
-     * <p>
-     * 
-     */
     protected void doStressDescribeTest(final String method, final RDFFormat format, final int tasks, final int threads, final int statements)
             throws Exception {
         
@@ -1614,6 +1561,8 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
         		
         	};
         	
+        	final int threadCount = Thread.activeCount();
+        	
         	final ExecutorService exec = Executors.newFixedThreadPool(threads);
         	for (int r = 0; r < tasks; r++) {
         		exec.submit(task);
@@ -1622,7 +1571,15 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
         	exec.awaitTermination(2000, TimeUnit.SECONDS);
         	// force shutdown
         	exec.shutdownNow();
+        	
+        	int loops = 20;
+        	while (Thread.activeCount() > threadCount && --loops > 0) {
+        		Thread.sleep(500);
+        		System.err.println("Extra threads: " + (Thread.activeCount() - threadCount));
+        	}
             
+    		System.err.println("Return with extra threads: " + (Thread.activeCount() - threadCount));
+    		
         	assertTrue(errorCount.get() == 0);
         }
 

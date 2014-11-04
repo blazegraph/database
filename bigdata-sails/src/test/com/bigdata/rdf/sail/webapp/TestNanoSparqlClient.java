@@ -88,7 +88,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
 	public static Test suite() {
 	
         return ProxySuiteHelper.suiteWhenStandalone(TestNanoSparqlClient.class,
-                "test.*DELETE.*", TestMode.quads, TestMode.sids,
+                "test.*.*", TestMode.quads, TestMode.sids,
                 TestMode.triples);
 	    
 	}
@@ -1968,13 +1968,17 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
 
     }
 
+	public void test976() throws Exception {
+		doStressDescribeTest("GET", RDFFormat.RDFXML, 10000 /** tasks **/, 100 /** threads **/, 500 /** statements **/);
+	}
+
 //    /**
 //     * Unit test for ACID UPDATE using PUT. This test is for the operation where
 //     * the request body is a multi-part MIME document conveying both the
 //     * statements to be removed and the statement to be inserted.
 //     */
 //    public void test_PUT_UPDATE_WITH_MULTI_PART_MIME() {
-//        fail("write test");
+//        fail("write test"); 
 //    }
 
 }

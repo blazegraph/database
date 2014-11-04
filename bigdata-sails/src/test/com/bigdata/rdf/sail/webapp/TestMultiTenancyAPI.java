@@ -24,6 +24,7 @@ import org.openrdf.query.TupleQueryResult;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.webapp.client.HttpException;
+import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepository;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
 import com.bigdata.rdf.vocab.decls.DCTermsVocabularyDecl;
 import com.bigdata.rdf.vocab.decls.VoidVocabularyDecl;
@@ -39,7 +40,7 @@ import com.bigdata.relation.RelationSchema;
  * correctly).
  */
 public class TestMultiTenancyAPI<S extends IIndexManager> extends
-        AbstractTestNanoSparqlClient<S> {
+        AbstractTestNanoSparqlJettyClient<S> {
 
     public TestMultiTenancyAPI() {
 
@@ -415,7 +416,7 @@ public class TestMultiTenancyAPI<S extends IIndexManager> extends
                 assertEquals(ns, p.getProperty(RelationSchema.NAMESPACE));
             }
 
-            final RemoteRepository tmp = m_repo.getRepositoryForNamespace(ns);
+            final JettyRemoteRepository tmp = m_repo.getRepositoryForNamespace(ns);
 
             {
 
