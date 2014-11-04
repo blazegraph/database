@@ -113,7 +113,7 @@ public class DeleteServlet extends BigdataRDFServlet {
      * operation would be broken by group commit since other tasks could have
      * updated the KB since the lastCommitTime and been checkpointed and hence
      * be visible to an unisolated operation without there being an intervening
-     * commit point.
+     * commit point. FIXME Review for #1036
      */
     private void doDeleteWithQuery(final HttpServletRequest req,
             final HttpServletResponse resp) throws IOException {

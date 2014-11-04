@@ -329,3 +329,6 @@
 
 # /src/resources/config/
 /src/resources/config/bigdataCluster-bbt.config
+
+# ignore all HA CI benchmark files.
+benchmark

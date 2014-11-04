@@ -113,7 +113,7 @@ public class UpdateServlet extends BigdataRDFServlet {
      * 
      * FIXME GROUP COMMIT: update with query has a different pattern and runs a
      * query that gets drained to discover what to delete. Can this be turned
-     * directly into a SPARQL UPDATE request? (DELETE WHERE; INSERT DATA).
+     * directly into a SPARQL UPDATE request? (DELETE WHERE; INSERT DATA). FIXME REVIEW FOR #1036.
      */
     private void doUpdateWithQuery(final HttpServletRequest req,
             final HttpServletResponse resp) throws IOException {
