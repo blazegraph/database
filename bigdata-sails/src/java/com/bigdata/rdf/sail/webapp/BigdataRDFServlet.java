@@ -186,14 +186,20 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
         }
         if (resp != null) {
             if (!resp.isCommitted()) {
-                if (InnerCause.isInnerCause(t,
-                        ConstraintViolationException.class)) {
-                    /*
-                     * A constraint violation is a bad request (the data
-                     * violates the rules) not a server error.
-                     */
-                    resp.setStatus(HTTP_BADREQUEST);
-                    resp.setContentType(MIME_TEXT_PLAIN);
+				if (InnerCause.isInnerCause(t, DatasetNotFoundException.class)) {
+					/*
+					 * The addressed KB does not exist.
+					 */
+					resp.setStatus(HttpServletResponse.SC_NOT_FOUND);
+					resp.setContentType(MIME_TEXT_PLAIN);
+				} else if (InnerCause.isInnerCause(t,
+						ConstraintViolationException.class)) {
+					/*
+					 * A constraint violation is a bad request (the data
+					 * violates the rules) not a server error.
+					 */
+					resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+					resp.setContentType(MIME_TEXT_PLAIN);
 				} else if (InnerCause.isInnerCause(t,
 						MalformedQueryException.class)) {
 					/*
@@ -203,11 +209,11 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
 					 * FIXME Write unit test for 400 response for bad client
 					 * request.
 					 */
-					resp.setStatus(HTTP_BADREQUEST);
+					resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
 					resp.setContentType(MIME_TEXT_PLAIN);
-                } else {
-                    // Internal server error.
-                    resp.setStatus(HTTP_INTERNALERROR);
+				} else {
+					// Internal server error.
+					resp.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
                     resp.setContentType(MIME_TEXT_PLAIN);
                 }
             }

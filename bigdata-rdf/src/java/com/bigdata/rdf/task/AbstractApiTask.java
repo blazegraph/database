@@ -217,13 +217,15 @@ abstract public class AbstractApiTask<T> implements IApiTask<T>, IReadOnly {
     }
 
     /**
-     * Return an UNISOLATED connection.
-     * 
-     * @return The UNISOLATED connection.
-     * 
-     * @throws SailException
-     * @throws RepositoryException
-     */
+	 * Return an UNISOLATED connection.
+	 * 
+	 * @return The UNISOLATED connection.
+	 * 
+	 * @throws SailException
+	 * @throws RepositoryException
+	 * @throws DatasetNotFoundException
+	 *             if the specified namespace does not exist.
+	 */
     protected BigdataSailRepositoryConnection getUnisolatedConnection()
             throws SailException, RepositoryException {
 
@@ -233,7 +235,8 @@ abstract public class AbstractApiTask<T> implements IApiTask<T>, IReadOnly {
 
         if (tripleStore == null) {
 
-            throw new RuntimeException("Not found: namespace=" + namespace);
+			throw new DatasetNotFoundException("Not found: namespace="
+					+ namespace);
 
         }
 
