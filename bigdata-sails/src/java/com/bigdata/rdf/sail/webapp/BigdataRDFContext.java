@@ -1497,7 +1497,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
 			final ASTContainer astContainer, final HttpServletRequest req,
 			final HttpServletResponse resp, final OutputStream os) {
 
-		return getUpdateTask(cxn, namespace, timestamp, baseURI, astContainer,
+		return new UpdateTask(cxn, namespace, timestamp, baseURI, astContainer,
 				req, resp, os);
 
 	}

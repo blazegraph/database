@@ -311,6 +311,7 @@ public class UpdateServlet extends BigdataRDFServlet {
 					// The read-only connection for the query.
 					BigdataSailRepositoryConnection roconn = null;
 					try {
+						
 						roconn = getQueryConnection();
 
 						// Use this format for the query results.
