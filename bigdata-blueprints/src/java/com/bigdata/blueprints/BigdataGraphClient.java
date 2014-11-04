@@ -24,6 +24,8 @@ package com.bigdata.blueprints;
 
 import com.bigdata.rdf.sail.remote.BigdataSailRemoteRepository;
 import com.bigdata.rdf.sail.remote.BigdataSailRemoteRepositoryConnection;
+import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepository;
+import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepositoryManager;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
 import com.tinkerpop.blueprints.Features;
 
@@ -58,11 +60,11 @@ public class BigdataGraphClient extends BigdataGraph {
         this(new BigdataSailRemoteRepository(bigdataEndpoint), factory);
     }
 	
-	public BigdataGraphClient(final RemoteRepository repo) {
+	public BigdataGraphClient(final JettyRemoteRepository repo) {
 		this(repo, BigdataRDFFactory.INSTANCE);
 	}
 	
-	public BigdataGraphClient(final RemoteRepository repo, 
+	public BigdataGraphClient(final JettyRemoteRepository repo, 
 			final BlueprintsValueFactory factory) {
 	    this(new BigdataSailRemoteRepository(repo), factory);
 	}

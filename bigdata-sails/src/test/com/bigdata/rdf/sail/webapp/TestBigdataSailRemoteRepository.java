@@ -35,7 +35,7 @@ import com.bigdata.rdf.sail.remote.BigdataSailRemoteRepository;
  * @param <S>
  */
 public class TestBigdataSailRemoteRepository<S extends IIndexManager> extends
-        AbstractTestNanoSparqlClient<S> {
+        AbstractTestNanoSparqlJettyClient<S> {
 
     public TestBigdataSailRemoteRepository() {
 

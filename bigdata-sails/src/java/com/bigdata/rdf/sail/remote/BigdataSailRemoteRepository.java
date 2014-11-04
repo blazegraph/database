@@ -28,15 +28,13 @@ import java.io.File;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-import org.apache.http.conn.ClientConnectionManager;
-import org.apache.http.impl.client.DefaultHttpClient;
-import org.apache.http.impl.client.DefaultRedirectStrategy;
+import org.eclipse.jetty.client.HttpClient;
 import org.openrdf.model.ValueFactory;
 import org.openrdf.repository.Repository;
 import org.openrdf.repository.RepositoryException;
 
 import com.bigdata.rdf.sail.webapp.client.DefaultClientConnectionManagerFactory;
-import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
+import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepository;
 
 /**
  * An implementation of Sesame's RepositoryConnection interface that wraps a
@@ -57,11 +55,11 @@ import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
  */
 public class BigdataSailRemoteRepository implements Repository {
 
-    private final ClientConnectionManager ccm;
-
     private final ExecutorService executor;
     
-    private final RemoteRepository nss;
+    private final JettyRemoteRepository nss;
+    
+    private final HttpClient httpClient;
 
     /**
      * Ctor that simply specifies an endpoint and lets this class manage the
@@ -93,19 +91,22 @@ public class BigdataSailRemoteRepository implements Repository {
 		
         this.executor = Executors.newCachedThreadPool();
 
-        this.ccm = DefaultClientConnectionManagerFactory.getInstance()
-                .newInstance();
-
-        final DefaultHttpClient httpClient = new DefaultHttpClient(ccm);
+        this.httpClient = new HttpClient();
 
         /*
          * Enable a standard http redirect policy. This allows references to
          * http://localhost:8080 to be redirected to
          * http://localhost:8080/bigdata.
          */
-        httpClient.setRedirectStrategy(new DefaultRedirectStrategy());
+        httpClient.setFollowRedirects(true);
+        
+        try {
+			httpClient.start();
+		} catch (Exception e) {
+			throw new RuntimeException(e);
+		}
 
-        this.nss = new RemoteRepository(sparqlEndpointURL, useLBS, httpClient,
+        this.nss = new JettyRemoteRepository(sparqlEndpointURL, useLBS, httpClient,
                 executor);
 
 	}
@@ -114,17 +115,17 @@ public class BigdataSailRemoteRepository implements Repository {
 	 * Ctor that allows the caller to manage the ClientConnectionManager for 
 	 * the HTTP client and the manage the ExecutorService. More flexible.  
 	 */
-	public BigdataSailRemoteRepository(final RemoteRepository nss) {
-		
-		this.ccm = null;
+	public BigdataSailRemoteRepository(final JettyRemoteRepository nss) {
 		
 		this.executor = null;
 		
 		this.nss = nss;
 		
+		this.httpClient = nss.getClient();
+		
 	}
 	
-	public RemoteRepository getRemoteRepository() {
+	public JettyRemoteRepository getRemoteRepository() {
 		
 		return nss;
 		
@@ -133,11 +134,14 @@ public class BigdataSailRemoteRepository implements Repository {
 	@Override
 	public void shutDown() throws RepositoryException {
 
-		if (ccm != null)
-			ccm.shutdown();
-		
 		if (executor != null)
 			executor.shutdownNow();
+		
+		try {
+			httpClient.stop();
+		} catch (Exception e) {
+			throw new RuntimeException(e);
+		}
 		
 	}
 
