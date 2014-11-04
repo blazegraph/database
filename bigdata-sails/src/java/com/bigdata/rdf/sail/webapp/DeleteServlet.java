@@ -37,6 +37,7 @@ import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
+import org.openrdf.query.MalformedQueryException;
 import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFHandlerException;
 import org.openrdf.rio.RDFParser;
@@ -117,121 +118,189 @@ public class DeleteServlet extends BigdataRDFServlet {
      */
     private void doDeleteWithQuery(final HttpServletRequest req,
             final HttpServletResponse resp) throws IOException {
-
-        final long begin = System.currentTimeMillis();
         
-        final String baseURI = req.getRequestURL().toString();
+		final String baseURI = req.getRequestURL().toString();
 
-        final String namespace = getNamespace(req);
+		final String namespace = getNamespace(req);
 
-        final String queryStr = req.getParameter("query");
+		final String queryStr = req.getParameter("query");
 
-        if (queryStr == null)
-            throw new UnsupportedOperationException();
+		if (queryStr == null)
+			throw new UnsupportedOperationException();
 
-        if (log.isInfoEnabled())
-            log.info("delete with query: " + queryStr);
+		if (log.isInfoEnabled())
+			log.info("delete with query: " + queryStr);
 
-        try {
+		try {
 
-            /*
-             * Note: pipe is drained by this thread to consume the query
-             * results, which are the statements to be deleted.
-             */
-            final PipedOutputStream os = new PipedOutputStream();
-            final InputStream is = newPipedInputStream(os);
+			submitApiTask(
+					new DeleteWithQueryTask(req, resp, namespace,
+							ITx.UNISOLATED, //
+							queryStr,//
+							baseURI//
+					)).get();
 
-                // Use this format for the query results.
-                final RDFFormat format = RDFFormat.NTRIPLES;
-                
-                final AbstractQueryTask queryTask = getBigdataRDFContext()
-                        .getQueryTask(namespace, ITx.READ_COMMITTED, queryStr,
-                                format.getDefaultMIMEType(),
-                                req, resp, os, false/*update*/);
+		} catch (Throwable t) {
 
-                if(queryTask == null) {
-                    // KB not found. Response already committed.
-                    return;
-                }
+			launderThrowable(t, resp, "UPDATE-WITH-QUERY" + ": queryStr="
+					+ queryStr + ", baseURI=" + baseURI);
 
-                switch (queryTask.queryType) {
-                case DESCRIBE:
-                case CONSTRUCT:
-                    break;
-                default:
-                    buildResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN,
-                            "Must be DESCRIBE or CONSTRUCT query.");
-                    return;
-                }
+		}
+		
+    }
 
-                final AtomicLong nmodified = new AtomicLong(0L);
+    private static class DeleteWithQueryTask extends AbstractRestApiTask<Void> {
 
-                BigdataSailRepositoryConnection conn = null;
-                boolean success = false;
-                try {
+    	private final String queryStr;
+        private final String baseURI;
 
-                    conn = getBigdataRDFContext().getUnisolatedConnection(
-                            namespace);
-
-                    final RDFParserFactory factory = RDFParserRegistry
-                            .getInstance().get(format);
-
-                    final RDFParser rdfParser = factory.getParser();
-
-                    rdfParser.setValueFactory(conn.getTripleStore()
-                            .getValueFactory());
-
-                    rdfParser.setVerifyData(false);
-
-                    rdfParser.setStopAtFirstError(true);
-
-                    rdfParser
-                            .setDatatypeHandling(RDFParser.DatatypeHandling.IGNORE);
-
-                    rdfParser.setRDFHandler(new RemoveStatementHandler(conn
-                            .getSailConnection(), nmodified));
-
-                    // Wrap as Future.
-                    final FutureTask<Void> ft = new FutureTask<Void>(queryTask);
-                    
-                    // Submit query for evaluation.
-                    getBigdataRDFContext().queryService.execute(ft);
-                    
-                    // Run parser : visited statements will be deleted.
-                    rdfParser.parse(is, baseURI);
-
-                    // Await the Future (of the Query)
-                    ft.get();
-                    
-                    // Commit the mutation.
-                    conn.commit();
-
-                    success = true;
-                    
-                    final long elapsed = System.currentTimeMillis() - begin;
-                    
-                    reportModifiedCount(resp, nmodified.get(), elapsed);
-
-                } finally {
-
-                    if (conn != null) {
-
-                        if (!success)
-                            conn.rollback();
-
-                        conn.close();
-
-                    }
-
-                }
-
-        } catch (Throwable t) {
-
-            throw BigdataRDFServlet.launderThrowable(t, resp, queryStr);
-
+        /**
+         * 
+         * @param namespace
+         *            The namespace of the target KB instance.
+         * @param timestamp
+         *            The timestamp used to obtain a mutable connection.
+         * @param baseURI
+         *            The base URI for the operation.
+         */
+        public DeleteWithQueryTask(final HttpServletRequest req,
+                final HttpServletResponse resp,
+                final String namespace, final long timestamp,
+                final String queryStr,//
+                final String baseURI
+                ) {
+            super(req, resp, namespace, timestamp);
+            this.queryStr = queryStr;
+            this.baseURI = baseURI;
+        }
+        
+        @Override
+        public boolean isReadOnly() {
+            return false;
         }
 
-    }
+        @Override
+        public Void call() throws Exception {
+
+            final long begin = System.currentTimeMillis();
+            
+            final AtomicLong nmodified = new AtomicLong(0L);
+
+			BigdataSailRepositoryConnection conn = null;
+			boolean success = false;
+			try {
+
+				conn = getUnisolatedConnection();
+
+				{
+
+					if (log.isInfoEnabled())
+						log.info("delete with query: " + queryStr);
+
+					final BigdataRDFContext context = BigdataServlet
+							.getBigdataRDFContext(req.getServletContext());
+
+					/*
+					 * Note: pipe is drained by this thread to consume the query
+					 * results, which are the statements to be deleted.
+					 */
+					final PipedOutputStream os = new PipedOutputStream();
+
+					// The read-only connection for the query.
+					BigdataSailRepositoryConnection roconn = null;
+					try {
+						
+						roconn = getQueryConnection();
+
+						// Use this format for the query results.
+						final RDFFormat format = RDFFormat.NTRIPLES;
+
+						final AbstractQueryTask queryTask = context
+								.getQueryTask(roconn, namespace,
+										ITx.READ_COMMITTED, queryStr,
+										format.getDefaultMIMEType(), req, resp,
+										os);
+
+						switch (queryTask.queryType) {
+						case DESCRIBE:
+						case CONSTRUCT:
+							break;
+						default:
+							throw new MalformedQueryException(
+									"Must be DESCRIBE or CONSTRUCT query");
+						}
+
+						final RDFParserFactory factory = RDFParserRegistry
+								.getInstance().get(format);
+
+						final RDFParser rdfParser = factory.getParser();
+
+						rdfParser.setValueFactory(conn.getTripleStore()
+								.getValueFactory());
+
+						rdfParser.setVerifyData(false);
+
+						rdfParser.setStopAtFirstError(true);
+
+						rdfParser
+								.setDatatypeHandling(RDFParser.DatatypeHandling.IGNORE);
+
+						rdfParser.setRDFHandler(new RemoveStatementHandler(conn
+								.getSailConnection(), nmodified));
+
+						// Wrap as Future.
+						final FutureTask<Void> ft = new FutureTask<Void>(
+								queryTask);
+
+						// Submit query for evaluation.
+						context.queryService.execute(ft);
+
+						// Reads on the statements produced by the query.
+						final InputStream is = newPipedInputStream(os);
+
+						// Run parser : visited statements will be deleted.
+						rdfParser.parse(is, baseURI);
+
+						// Await the Future (of the Query)
+						ft.get();
+
+					} finally {
+
+						if (roconn != null) {
+							// close the read-only connection for the query.
+							roconn.rollback();
+						}
+
+					}
+
+				}
+
+				conn.commit();
+
+				success = true;
+
+				final long elapsed = System.currentTimeMillis() - begin;
+
+				reportModifiedCount(nmodified.get(), elapsed);
+
+				return null;
+
+			} finally {
+
+				if (conn != null) {
+
+					if (!success)
+						conn.rollback();
+
+					conn.close();
+
+				}
+
+			}
+
+		}
+
+    } // class DeleteWithQueryTask
 
     @Override
     protected void doPost(final HttpServletRequest req,
