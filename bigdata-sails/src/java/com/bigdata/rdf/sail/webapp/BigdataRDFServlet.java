@@ -47,6 +47,7 @@ import org.openrdf.model.Graph;
 import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
 import org.openrdf.model.impl.URIImpl;
+import org.openrdf.query.MalformedQueryException;
 import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFHandlerException;
 import org.openrdf.rio.RDFWriter;
@@ -185,17 +186,34 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
         }
         if (resp != null) {
             if (!resp.isCommitted()) {
-                if (InnerCause.isInnerCause(t,
-                        ConstraintViolationException.class)) {
-                    /*
-                     * A constraint violation is a bad request (the data
-                     * violates the rules) not a server error.
-                     */
-                    resp.setStatus(HTTP_BADREQUEST);
-                    resp.setContentType(MIME_TEXT_PLAIN);
-                } else {
-                    // Internal server error.
-                    resp.setStatus(HTTP_INTERNALERROR);
+				if (InnerCause.isInnerCause(t, DatasetNotFoundException.class)) {
+					/*
+					 * The addressed KB does not exist.
+					 */
+					resp.setStatus(HttpServletResponse.SC_NOT_FOUND);
+					resp.setContentType(MIME_TEXT_PLAIN);
+				} else if (InnerCause.isInnerCause(t,
+						ConstraintViolationException.class)) {
+					/*
+					 * A constraint violation is a bad request (the data
+					 * violates the rules) not a server error.
+					 */
+					resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+					resp.setContentType(MIME_TEXT_PLAIN);
+				} else if (InnerCause.isInnerCause(t,
+						MalformedQueryException.class)) {
+					/*
+					 * Send back a BAD REQUEST (400) along with the text of the
+					 * syntax error message.
+					 * 
+					 * TODO Write unit test for 400 response for bad client
+					 * request.
+					 */
+					resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+					resp.setContentType(MIME_TEXT_PLAIN);
+				} else {
+					// Internal server error.
+					resp.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
                     resp.setContentType(MIME_TEXT_PLAIN);
                 }
             }
@@ -337,12 +355,12 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
     /**
      * Factory for the {@link PipedInputStream}.
      */
-    protected PipedInputStream newPipedInputStream(final PipedOutputStream os)
-            throws IOException {
+	final static protected PipedInputStream newPipedInputStream(
+			final PipedOutputStream os) throws IOException {
 
-        return new PipedInputStream(os);
+		return new PipedInputStream(os);
 
-    }
+	}
 
     /**
      * Report a mutation count and elapsed time back to the user agent.
