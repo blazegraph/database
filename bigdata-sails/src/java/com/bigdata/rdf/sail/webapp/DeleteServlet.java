@@ -209,15 +209,18 @@ public class DeleteServlet extends BigdataRDFServlet {
 					// The read-only connection for the query.
 					BigdataSailRepositoryConnection roconn = null;
 					try {
-						
-						roconn = getQueryConnection();
+
+						final long readOnlyTimestamp = ITx.READ_COMMITTED;
+
+						roconn = getQueryConnection(namespace,
+								readOnlyTimestamp);
 
 						// Use this format for the query results.
 						final RDFFormat format = RDFFormat.NTRIPLES;
 
 						final AbstractQueryTask queryTask = context
 								.getQueryTask(roconn, namespace,
-										ITx.READ_COMMITTED, queryStr,
+										readOnlyTimestamp, queryStr,
 										format.getDefaultMIMEType(), req, resp,
 										os);
 
