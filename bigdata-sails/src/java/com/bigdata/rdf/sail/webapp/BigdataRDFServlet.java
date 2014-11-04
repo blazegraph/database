@@ -206,7 +206,7 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
 					 * Send back a BAD REQUEST (400) along with the text of the
 					 * syntax error message.
 					 * 
-					 * FIXME Write unit test for 400 response for bad client
+					 * TODO Write unit test for 400 response for bad client
 					 * request.
 					 */
 					resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
