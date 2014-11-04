@@ -359,6 +359,7 @@ public class QueryServlet extends BigdataRDFServlet {
     }
 
 	private static class SparqlUpdateTask extends AbstractRestApiTask<Void> {
+		
 		private final String updateStr;
     	private final BigdataRDFContext context;
 
@@ -368,16 +369,6 @@ public class QueryServlet extends BigdataRDFServlet {
          *            The namespace of the target KB instance.
          * @param timestamp
          *            The timestamp used to obtain a mutable connection.
-         * @param baseURI
-         *            The base URI for the operation.
-         * @param defaultContextDelete
-         *            When removing statements, the context(s) for triples
-         *            without an explicit named graph when the KB instance is
-         *            operating in a quads mode.
-         * @param defaultContextInsert
-         *            When inserting statements, the context(s) for triples
-         *            without an explicit named graph when the KB instance is
-         *            operating in a quads mode.
          */
         public SparqlUpdateTask(//
         		final HttpServletRequest req,//
@@ -458,12 +449,20 @@ public class QueryServlet extends BigdataRDFServlet {
 					// Wait for the Future.
 					ft.get();
 
+	                success = true;
+	                
 				}
 
-				conn.commit();
+				/**
+				 * Note: The SPARQL UPDATE is already committed. This is done in
+				 * the UpdateTask class when we execute the following code
+				 * 
+				 * <pre>
+				 * this.commitTime.set(update.execute2());
+				 * </pre>
+				 */
+//				conn.commit();
 
-                success = true;
-                
                 return null;
                 
             } finally {

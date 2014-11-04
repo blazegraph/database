@@ -1146,6 +1146,7 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
         for (HAGlue service : services) {
             final HAGlue haGlue = service;
             assertCondition(new Runnable() {
+            	@Override
                 public void run() {
                     try {
                         assertEquals(expected, haGlue.getRootBlock(req)
