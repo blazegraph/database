@@ -312,14 +312,17 @@ public class UpdateServlet extends BigdataRDFServlet {
 					BigdataSailRepositoryConnection roconn = null;
 					try {
 						
-						roconn = getQueryConnection();
+						final long readOnlyTimestamp = ITx.READ_COMMITTED;
+
+						roconn = getQueryConnection(namespace,
+								readOnlyTimestamp);
 
 						// Use this format for the query results.
 						final RDFFormat deleteQueryFormat = RDFFormat.NTRIPLES;
 
 						final AbstractQueryTask queryTask = context
 								.getQueryTask(roconn, namespace,
-										ITx.READ_COMMITTED, queryStr,
+										readOnlyTimestamp, queryStr,
 										deleteQueryFormat.getDefaultMIMEType(),
 										req, resp, os);
 
