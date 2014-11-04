@@ -68,14 +68,14 @@ public class BlueprintsServlet extends BigdataRDFServlet {
     protected void doPost(final HttpServletRequest req,
             final HttpServletResponse resp) throws IOException {
 
-        if (getBigdataRDFContext().getTripleStore(getNamespace(req),
-                getTimestamp(req)) == null) {
-            /*
-             * There is no such triple/quad store instance.
-             */
-            buildResponse(resp, HTTP_NOTFOUND, MIME_TEXT_PLAIN);
-            return;
-        }
+//        if (getBigdataRDFContext().getTripleStore(getNamespace(req),
+//                getTimestamp(req)) == null) {
+//            /*
+//             * There is no such triple/quad store instance.
+//             */
+//            buildResponse(resp, HTTP_NOTFOUND, MIME_TEXT_PLAIN);
+//            return;
+//        }
         
         final String contentType = req.getContentType();
 

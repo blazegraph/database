@@ -1184,7 +1184,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
          * 
          * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
          *         Thompson</a>
-         */// FIXME Change this completely. All error handling and connections are handled at the top-level caller.
+         */
         private class SparqlRestApiTask extends AbstractRestApiTask<Void> {
 
             public SparqlRestApiTask(final HttpServletRequest req,
@@ -1287,21 +1287,21 @@ public class BigdataRDFContext extends BigdataBaseContext {
         @Override
         final public Void call() throws Exception {
             
-            final String queryOrUpdateStr = astContainer.getQueryString();
+//            final String queryOrUpdateStr = astContainer.getQueryString();
             
-            try {
+//            try {
                 
                 return AbstractApiTask.submitApiTask(getIndexManager(),
                         new SparqlRestApiTask(req, resp, namespace, timestamp))
                         .get();
 
-            } catch (Throwable t) {
-
-                // FIXME GROUP_COMMIT: check calling stack for existing launderThrowable.
-                throw BigdataRDFServlet.launderThrowable(t, resp,
-                        queryOrUpdateStr);
-
-            }
+//            } catch (Throwable t) {
+//
+//                // FIXME GROUP_COMMIT: check calling stack for existing launderThrowable.
+//                throw BigdataRDFServlet.launderThrowable(t, resp,
+//                        queryOrUpdateStr);
+//
+//            }
 
         } // call()
 
@@ -1520,10 +1520,6 @@ public class BigdataRDFContext extends BigdataBaseContext {
                 final OutputStream os) {
 
             super(cxn, namespace, timestamp, baseURI, astContainer,
-//                    null,//queryType
-//                    null,//format.getDefaultMIMEType()
-//                    null,//format.getCharset(), 
-//                    null,//format.getDefaultFileExtension(), 
                     req,//
                     resp,//
                     os//
