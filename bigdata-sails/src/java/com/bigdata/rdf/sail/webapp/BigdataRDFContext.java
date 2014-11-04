@@ -1957,37 +1957,34 @@ public class BigdataRDFContext extends BigdataBaseContext {
     }
 
     /**
-     * Return the task which will execute the SPARQL Query -or- SPARQL UPDATE.
-     * <p>
-     * Note: The {@link OutputStream} is passed in rather than the
-     * {@link HttpServletResponse} in order to permit operations such as
-     * "DELETE WITH QUERY" where this method is used in a context which writes
-     * onto an internal pipe rather than onto the {@link HttpServletResponse}.
-     * 
-     * @param namespace
-     *            The namespace associated with the {@link AbstractTripleStore}
-     *            view.
-     * @param timestamp
-     *            The timestamp associated with the {@link AbstractTripleStore}
-     *            view.
-     * @param queryStr
-     *            The query.
-     * @param acceptOverride
-     *            Override the Accept header (optional). This is used by UPDATE
-     *            and DELETE so they can control the {@link RDFFormat} of the
-     *            materialized query results.
-     * @param req
-     *            The request.
-     * @param os
-     *            Where to write the results.
-     * @param update
-     *            <code>true</code> iff this is a SPARQL UPDATE request.
-     * 
-     * @return The task -or- <code>null</code> if the named data set was not
-     *         found. When <code>null</code> is returned, the
-     *         {@link HttpServletResponse} will also have been committed.
-     * @throws IOException 
-     */
+	 * Return the task which will execute the SPARQL Query -or- SPARQL UPDATE.
+	 * <p>
+	 * Note: The {@link OutputStream} is passed in rather than the
+	 * {@link HttpServletResponse} in order to permit operations such as
+	 * "DELETE WITH QUERY" where this method is used in a context which writes
+	 * onto an internal pipe rather than onto the {@link HttpServletResponse}.
+	 * 
+	 * @param namespace
+	 *            The namespace associated with the {@link AbstractTripleStore}
+	 *            view.
+	 * @param timestamp
+	 *            The timestamp associated with the {@link AbstractTripleStore}
+	 *            view.
+	 * @param queryStr
+	 *            The query.
+	 * @param acceptOverride
+	 *            Override the Accept header (optional). This is used by UPDATE
+	 *            and DELETE so they can control the {@link RDFFormat} of the
+	 *            materialized query results.
+	 * @param req
+	 *            The request.
+	 * @param os
+	 *            Where to write the results.
+	 * 
+	 * @return The task.
+	 * 
+	 * @throws IOException
+	 */
     public AbstractQueryTask getQueryTask(//
     		final BigdataSailRepositoryConnection cxn,//
             final String namespace,//

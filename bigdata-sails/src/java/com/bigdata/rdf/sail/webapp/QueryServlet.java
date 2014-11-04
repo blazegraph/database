@@ -354,18 +354,6 @@ public class QueryServlet extends BigdataRDFServlet {
 
 		} catch (Throwable t) {
 
-			if (InnerCause.isInnerCause(t, MalformedQueryException.class)) {
-				/*
-				 * Send back a BAD REQUEST (400) along with the text of the
-				 * syntax error message. 
-				 * 
-				 * FIXME Write unit test for 400 response for bad client request.
-				 */
-				resp.sendError(HttpServletResponse.SC_BAD_REQUEST,
-						t.getLocalizedMessage());
-				return;
-			}
-
 			launderThrowable(t, resp, "SPARQL-UPDATE: updateStr=" + updateStr);
 
 		}
@@ -615,19 +603,6 @@ public class QueryServlet extends BigdataRDFServlet {
 
 		} catch (Throwable t) {
 
-			if (InnerCause.isInnerCause(t, MalformedQueryException.class)) {
-				/*
-				 * Send back a BAD REQUEST (400) along with the text of the
-				 * syntax error message.
-				 * 
-				 * FIXME Write unit test for 400 response for bad client
-				 * request.
-				 */
-				resp.sendError(HttpServletResponse.SC_BAD_REQUEST,
-						t.getLocalizedMessage());
-				return;
-			}
-
 			launderThrowable(t, resp, "SPARQL-QUERY: queryStr=" + queryStr);
 
 		}
@@ -641,21 +616,22 @@ public class QueryServlet extends BigdataRDFServlet {
      */
     private static class SparqlQueryTask extends AbstractRestApiTask<Void> {
 
-    	private final String queryStr;
-    	private final BigdataRDFContext context;
-    	
-        public SparqlQueryTask(final HttpServletRequest req,
-                final HttpServletResponse resp, final String namespace,
-                final long timestamp, final String queryStr, final BigdataRDFContext context) {
+		private final String queryStr;
+		private final BigdataRDFContext context;
 
-            super(req, resp, namespace, timestamp);
+		public SparqlQueryTask(final HttpServletRequest req,
+				final HttpServletResponse resp, final String namespace,
+				final long timestamp, final String queryStr,
+				final BigdataRDFContext context) {
 
-            if(queryStr==null)
-            	throw new IllegalArgumentException();
-            if(context ==null)
-            	throw new IllegalArgumentException();
-            
-            this.queryStr = queryStr;
+			super(req, resp, namespace, timestamp);
+
+			if (queryStr == null)
+				throw new IllegalArgumentException();
+			if (context == null)
+				throw new IllegalArgumentException();
+
+			this.queryStr = queryStr;
             this.context = context;
             
         }

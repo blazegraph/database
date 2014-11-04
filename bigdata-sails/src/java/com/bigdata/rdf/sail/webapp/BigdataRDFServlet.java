@@ -47,6 +47,7 @@ import org.openrdf.model.Graph;
 import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
 import org.openrdf.model.impl.URIImpl;
+import org.openrdf.query.MalformedQueryException;
 import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFHandlerException;
 import org.openrdf.rio.RDFWriter;
@@ -193,6 +194,17 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
                      */
                     resp.setStatus(HTTP_BADREQUEST);
                     resp.setContentType(MIME_TEXT_PLAIN);
+				} else if (InnerCause.isInnerCause(t,
+						MalformedQueryException.class)) {
+					/*
+					 * Send back a BAD REQUEST (400) along with the text of the
+					 * syntax error message.
+					 * 
+					 * FIXME Write unit test for 400 response for bad client
+					 * request.
+					 */
+					resp.setStatus(HTTP_BADREQUEST);
+					resp.setContentType(MIME_TEXT_PLAIN);
                 } else {
                     // Internal server error.
                     resp.setStatus(HTTP_INTERNALERROR);
@@ -337,12 +349,12 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
     /**
      * Factory for the {@link PipedInputStream}.
      */
-    protected PipedInputStream newPipedInputStream(final PipedOutputStream os)
-            throws IOException {
+	final static protected PipedInputStream newPipedInputStream(
+			final PipedOutputStream os) throws IOException {
 
-        return new PipedInputStream(os);
+		return new PipedInputStream(os);
 
-    }
+	}
 
     /**
      * Report a mutation count and elapsed time back to the user agent.
