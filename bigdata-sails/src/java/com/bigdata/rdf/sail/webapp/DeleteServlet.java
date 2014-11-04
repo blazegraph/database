@@ -114,7 +114,9 @@ public class DeleteServlet extends BigdataRDFServlet {
      * operation would be broken by group commit since other tasks could have
      * updated the KB since the lastCommitTime and been checkpointed and hence
      * be visible to an unisolated operation without there being an intervening
-     * commit point. FIXME Review for #1036
+     * commit point. [I think that this is resolved by taking the unisolated
+     * connection first and then taking the read-only lastCommitTime connection
+     * view, which is what the code now does.]
      */
     private void doDeleteWithQuery(final HttpServletRequest req,
             final HttpServletResponse resp) throws IOException {

@@ -1457,28 +1457,6 @@ public class BigdataRDFContext extends BigdataBaseContext {
 
             final BigdataSailGraphQuery query = (BigdataSailGraphQuery) setupQuery(cxn);
             
-            /*
-             * FIXME An error thrown here (such as if format is null and we do
-             * not check it) will cause the response to hang, at least for the
-             * test suite. Look into this further and make the error handling
-             * bullet proof!
-             * 
-             * This may be related to queryId2. That should be imposed on the
-             * IRunningQuery via QueryHints.QUERYID such that the QueryEngine
-             * assigns that UUID to the query. We can then correlate the queryId
-             * to the IRunningQuery, which is important for some of the status
-             * pages. This will also let us INTERRUPT the IRunningQuery if there
-             * is an error during evaluation, which might be necessary. For
-             * example, if the client dies while the query is running. Look at
-             * the old NSS code and see what it was doing and whether this was
-             * logic was lost of simply never implemented.
-             * 
-             * However, I do not see how that would explain the failure of the
-             * ft.get() method to return.
-             */
-//			if(true)
-//			    throw new RuntimeException();
-
             // Note: getQueryTask() verifies that format will be non-null.
             final RDFFormat format = RDFWriterRegistry.getInstance()
                     .getFileFormatForMIMEType(mimeType);
@@ -2059,7 +2037,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
             case CONSTRUCT:
                 /* Generate RDF/XML so we can apply XSLT transform.
                  * 
-                 * FIXME This should be sending back RDFs or using a lens.
+                 * TODO This should be sending back RDFs or using a lens.
                  */
                 acceptStr = RDFFormat.RDFXML.getDefaultMIMEType();
                 break;

@@ -103,19 +103,15 @@ public class UpdateServlet extends BigdataRDFServlet {
     }
 
     /**
-     * Delete all statements materialized by a DESCRIBE or CONSTRUCT query and
-     * then insert all statements in the request body.
-     * <p>
-     * Note: To avoid materializing the statements, this runs the query against
-     * the last commit time and uses a pipe to connect the query directly to the
-     * process deleting the statements. This is done while it is holding the
-     * unisolated connection which prevents concurrent modifications. Therefore
-     * the entire <code>SELECT + DELETE</code> operation is ACID.
-     * 
-     * FIXME GROUP COMMIT: update with query has a different pattern and runs a
-     * query that gets drained to discover what to delete. Can this be turned
-     * directly into a SPARQL UPDATE request? (DELETE WHERE; INSERT DATA). 
-     */
+	 * Delete all statements materialized by a DESCRIBE or CONSTRUCT query and
+	 * then insert all statements in the request body.
+	 * <p>
+	 * Note: To avoid materializing the statements, this runs the query against
+	 * the last commit time and uses a pipe to connect the query directly to the
+	 * process deleting the statements. This is done while it is holding the
+	 * unisolated connection which prevents concurrent modifications. Therefore
+	 * the entire <code>SELECT + DELETE</code> operation is ACID.
+	 */
     private void doUpdateWithQuery(final HttpServletRequest req,
             final HttpServletResponse resp) throws IOException {
 
