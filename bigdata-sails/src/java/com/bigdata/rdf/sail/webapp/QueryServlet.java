@@ -477,9 +477,9 @@ public class QueryServlet extends BigdataRDFServlet {
         @Override
         public Void call() throws Exception {
 
-            final long begin = System.currentTimeMillis();
-
-			final AtomicLong nmodified = new AtomicLong(0L);
+//            final long begin = System.currentTimeMillis();
+//
+//			final AtomicLong nmodified = new AtomicLong(0L);
 
 			BigdataSailRepositoryConnection conn = null;
 			boolean success = false;
@@ -545,9 +545,9 @@ public class QueryServlet extends BigdataRDFServlet {
 
                 success = true;
                 
-                final long elapsed = System.currentTimeMillis() - begin;
-
-                reportModifiedCount(nmodified.get(), elapsed);
+//                final long elapsed = System.currentTimeMillis() - begin;
+//
+//                reportModifiedCount(nmodified.get(), elapsed);
 
                 return null;
                 

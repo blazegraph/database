@@ -1282,7 +1282,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
                 }
             }
             
-        }
+        } // class SparqlRestApiTask
         
         @Override
         final public Void call() throws Exception {
