@@ -85,7 +85,13 @@ public class TestAll extends TestCase {
          * Note: The test suite can also be run against a federation using the
          * main() routine in TestNanoSparqlServerWithProxyIndexManager.
          */
-        
+
+		// RWStore specific unit tests.
+		suite.addTest(TestNanoSparqlServerWithProxyIndexManager.suite(
+				TestNanoSparqlServerWithProxyIndexManager
+						.getTemporaryJournal(true/* RWStore */),
+				TestMode.triples));
+
         suite.addTest(TestNanoSparqlServerWithProxyIndexManager.suite(TestMode.triples));
         
         suite.addTest(TestNanoSparqlServerWithProxyIndexManager.suite(TestMode.sids));
