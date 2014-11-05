@@ -37,9 +37,11 @@ import junit.framework.TestResult;
 import junit.framework.TestSuite;
 import junit.textui.ResultPrinter;
 
+import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.Journal;
+import com.bigdata.journal.RWStrategy;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.sail.BigdataSail;
@@ -99,14 +101,38 @@ public class TestNanoSparqlServerWithProxyIndexManager<S extends IIndexManager>
 	}
 
 	static Journal getTemporaryJournal() {
+	
+		return getTemporaryJournal(false/*use_rwstore*/);
+		
+	}
+	
+	static Journal getTemporaryJournal(final boolean use_rwstore) {
 
 		final Properties properties = new Properties();
 
-		properties.setProperty(com.bigdata.journal.Options.BUFFER_MODE,
-				BufferMode.Transient.toString());
+		if (use_rwstore) {
+			
+			// Use the RWStore for some specific test suites.
+			
+			properties.setProperty(com.bigdata.journal.Options.BUFFER_MODE,
+					BufferMode.DiskRW.toString());
+			
+			properties.setProperty(
+					com.bigdata.journal.Options.CREATE_TEMP_FILE, "true");
+			
+			properties.setProperty(com.bigdata.journal.Options.DELETE_ON_CLOSE,
+					"true");
 
-		properties.setProperty(com.bigdata.journal.Options.INITIAL_EXTENT, ""
-				+ (Bytes.megabyte32 * 1));
+		} else {
+
+			// Otherwise use a transient in-memory buffer.
+			
+			properties.setProperty(com.bigdata.journal.Options.BUFFER_MODE,
+					BufferMode.Transient.toString());
+			
+			properties.setProperty(com.bigdata.journal.Options.INITIAL_EXTENT,
+					"" + (Bytes.megabyte32 * 1));
+		}
 
 		return new Journal(properties);
 
@@ -160,7 +186,14 @@ public class TestNanoSparqlServerWithProxyIndexManager<S extends IIndexManager>
                     getTemporaryJournal(), TestMode.triples);
         }
     }
-    
+
+    public static class test_NSS_RWStore extends TestCase {
+        public static Test suite() {
+            return TestNanoSparqlServerWithProxyIndexManager.suite(
+                    getTemporaryJournal(true/*RWStore*/), TestMode.triples);
+        }
+    }
+
     /**
      * The {@link TestMode#quads} test suite.
      */
@@ -188,7 +221,18 @@ public class TestNanoSparqlServerWithProxyIndexManager<S extends IIndexManager>
 	public static TestSuite suite(final IIndexManager indexManager,
 			final TestMode testMode) {
 
+		final boolean RWStoreMode = indexManager instanceof AbstractJournal
+				&& ((AbstractJournal) indexManager).getBufferStrategy() instanceof RWStrategy;
+
 		final ProxyTestSuite suite = createProxyTestSuite(indexManager,testMode);
+
+        if(RWStoreMode) {
+        	
+			// RWSTORE SPECIFIC TEST SUITE.
+			suite.addTestSuite(TestRWStoreTxBehaviors.class);
+        	
+        } else {
+
 
         /*
          * List any non-proxied tests (typically bootstrapping tests).
@@ -218,7 +262,6 @@ public class TestNanoSparqlServerWithProxyIndexManager<S extends IIndexManager>
         suite.addTestSuite(TestCBD731.class);
         
         suite.addTestSuite(TestService794.class);
-        
 
         // SPARQL UPDATE test suite.
         switch(testMode) {
@@ -240,6 +283,8 @@ public class TestNanoSparqlServerWithProxyIndexManager<S extends IIndexManager>
         // SPARQL 1.1 Federated Query.
         suite.addTestSuite(TestFederatedQuery.class);
 
+        }
+        
         return suite;
     
     }
