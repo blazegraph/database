@@ -52,7 +52,7 @@ dependencies.
    <modelVersion>4.0.0</modelVersion>
    <groupId>com.bigdata</groupId>
    <artifactId>bigdata</artifactId>
-   <version>1.3.3-SNAPSHOT</version>
+   <version>1.3.4-SNAPSHOT</version>
    <packaging>pom</packaging>
    <name>bigdata(R)</name>
     <description>Bigdata(R) Maven Build</description>
