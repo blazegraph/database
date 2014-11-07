@@ -27,20 +27,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.optimizers;
 
-import org.openrdf.model.impl.URIImpl;
-import org.openrdf.query.algebra.StatementPattern.Scope;
-
-import com.bigdata.bop.IBindingSet;
-import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.sparql.ast.AbstractASTEvaluationTestCase;
-import com.bigdata.rdf.sparql.ast.ConstantNode;
-import com.bigdata.rdf.sparql.ast.IQueryNode;
-import com.bigdata.rdf.sparql.ast.JoinGroupNode;
-import com.bigdata.rdf.sparql.ast.ProjectionNode;
-import com.bigdata.rdf.sparql.ast.QueryRoot;
-import com.bigdata.rdf.sparql.ast.QueryType;
+import com.bigdata.rdf.sparql.ast.FunctionRegistry;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
-import com.bigdata.rdf.sparql.ast.UnionNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
 
 /**
@@ -57,8 +45,7 @@ import com.bigdata.rdf.sparql.ast.VarNode;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
-public class TestASTFastRangeCountOptimizer extends
-		AbstractASTEvaluationTestCase {
+public class TestASTFastRangeCountOptimizer extends AbstractOptimizerTestCase {
 
 	public TestASTFastRangeCountOptimizer() {
 		super();
@@ -68,90 +55,77 @@ public class TestASTFastRangeCountOptimizer extends
 		super(name);
 	}
 
+	@Override
+	IASTOptimizer newOptimizer() {
+
+		return new ASTOptimizerList(new ASTFastRangeCountOptimizer());
+		
+	}
+
 	/**
 	 * 
 	 * <pre>
-	 * SELECT COUNT(DISTINCT *) {?s ?p ?o}
+	 * SELECT (COUNT(*) as ?w) {?s ?p ?o}
 	 * </pre>
 	 */
 	public void test_fastRangeCountOptimizer_01() {
 
-        /*
-         * Note: DO NOT share structures in this test!!!!
-         */
-        final IBindingSet[] bsets = new IBindingSet[]{};
+    	new Helper(){{
 
-        @SuppressWarnings("rawtypes")
-        final IV p = makeIV(new URIImpl("http://example/p"));
+//    		originalAST
+//    		QueryType: SELECT
+//    		SELECT ( com.bigdata.rdf.sparql.ast.FunctionNode(VarNode(*))[ FunctionNode.scalarVals=null, FunctionNode.functionURI=http://www.w3.org/2006/sparql-functions#count, valueExpr=com.bigdata.bop.rdf.aggregate.COUNT(*)] AS VarNode(count) )
+//    		  JoinGroupNode {
+//    		    StatementPatternNode(VarNode(s), VarNode(p), VarNode(o)) [scope=DEFAULT_CONTEXTS]
+//    		  }
+				given = select(
+						projection(bind(
+								functionNode(
+										FunctionRegistry.COUNT.stringValue(),
+										new VarNode("*")), varNode(w))),
+						where(joinGroupNode(newStatementPatternNode(
+								new VarNode(s), new VarNode(p), new VarNode(o)))));
 
-        @SuppressWarnings("rawtypes")
-        final IV q = makeIV(new URIImpl("http://example/q"));
-        
-        // The source AST.
-        final QueryRoot given = new QueryRoot(QueryType.SELECT);
-        {
+				/**
+				 * FIXME My expectation is that we need to convert:
+				 * 
+				 * <pre>
+				 * SELECT (COUNT(*) as ?w) {?s ?p ?o}
+				 * </pre>
+				 * 
+				 * into
+				 * 
+				 * <pre>
+				 * SELECT ?w {(?s ?p ?o).fastRangeCount(?w)}
+				 * </pre>
+				 * 
+				 * which would mean that the triple pattern is directly
+				 * interpreted as binding ?w to the ESTCARD of the triple
+				 * pattern.
+				 * <p>
+				 * Then we need to modify the plan generation to output a
+				 * FastRangeCountOp that binds a named variable to the range
+				 * count.
+				 */
+				// the triple pattern.
+				final StatementPatternNode sp1 = newStatementPatternNode(
+						new VarNode(s), new VarNode(p), new VarNode(o));
+				// annotate with the name of the variable to become bound to the
+				// fast range count of that triple pattern.
+				sp1.setFastRangeCount(new VarNode(w));
+				
+				// the expected AST.
+				expected = select(projection(varNode(w)),
+						where(joinGroupNode(sp1)));
 
-            final ProjectionNode projection = new ProjectionNode();
-            given.setProjection(projection);
-            projection.addProjectionVar(new VarNode("*"));
-            
-            final JoinGroupNode whereClause = new JoinGroupNode();
-            given.setWhereClause(whereClause);
-
-            final UnionNode union = new UnionNode();
-            final JoinGroupNode joinGroup1 = new JoinGroupNode(
-                    new StatementPatternNode(new VarNode("s"),
-                            new ConstantNode(p), new VarNode("o"), null/* c */,
-                            Scope.DEFAULT_CONTEXTS));
-            final JoinGroupNode joinGroup2 = new JoinGroupNode(
-                    new StatementPatternNode(new VarNode("s"),
-                            new ConstantNode(q), new VarNode("o"), null/* c */,
-                            Scope.DEFAULT_CONTEXTS));
-            whereClause.addChild(union);
-            union.addChild(joinGroup1);
-            union.addChild(joinGroup2);
-
-        }
-
-        // The expected AST after the rewrite.
-        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
-        {
-            
-            final ProjectionNode projection = new ProjectionNode();
-            expected.setProjection(projection);
-            projection.addProjectionVar(new VarNode("s"));
-            projection.addProjectionVar(new VarNode("o"));
-
-            final JoinGroupNode whereClause = new JoinGroupNode();
-            expected.setWhereClause(whereClause);
-
-            final UnionNode union = new UnionNode();
-            final JoinGroupNode joinGroup1 = new JoinGroupNode(
-                    new StatementPatternNode(new VarNode("s"),
-                            new ConstantNode(p), new VarNode("o"), null/* c */,
-                            Scope.DEFAULT_CONTEXTS));
-            final JoinGroupNode joinGroup2 = new JoinGroupNode(
-                    new StatementPatternNode(new VarNode("s"),
-                            new ConstantNode(q), new VarNode("o"), null/* c */,
-                            Scope.DEFAULT_CONTEXTS));
-            whereClause.addChild(union);
-            union.addChild(joinGroup1);
-            union.addChild(joinGroup2);
-            
-        }
-
-        final IASTOptimizer rewriter = new ASTWildcardProjectionOptimizer();
-        
-        final IQueryNode actual = rewriter.optimize(null/* AST2BOpContext */,
-                given/* queryNode */, bsets);
-
-        assertSameAST(expected, actual);
-
+			}
+		}.test();
+    	
 		fail("write test");
     }
 
 	public void test_fastRangeCountOptimizer_xx() {
 		fail("more coverage of different cases");
 	}
-	
+
 }

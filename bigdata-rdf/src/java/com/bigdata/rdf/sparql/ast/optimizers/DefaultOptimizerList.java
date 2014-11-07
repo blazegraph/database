@@ -38,7 +38,6 @@ import org.openrdf.query.algebra.evaluation.impl.SameTermFilterOptimizer;
 import com.bigdata.rdf.sparql.ast.FunctionRegistry;
 import com.bigdata.rdf.sparql.ast.eval.ASTSearchInSearchOptimizer;
 import com.bigdata.rdf.sparql.ast.eval.ASTSearchOptimizer;
-import com.bigdata.rdf.spo.DistinctTermAdvancer;
 
 /**
  * Pre-populated list of the default optimizers.

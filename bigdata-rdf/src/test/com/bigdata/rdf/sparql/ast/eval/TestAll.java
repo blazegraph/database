@@ -173,7 +173,11 @@ public class TestAll extends TestCase {
 
         // test suite for a sub-select with an empty PROJECTION.
         suite.addTestSuite(TestTicket946.class);
-        
+
+        // SELECT COUNT(...) (DISTINCT|REDUCED) {single-triple-pattern}
+        // @see 1037 (fast-range-count optimizer)
+        suite.addTestSuite(TestFastRangeCountOptimizer.class);
+
         /*
          * Runtime Query Optimizer (RTO).
          */

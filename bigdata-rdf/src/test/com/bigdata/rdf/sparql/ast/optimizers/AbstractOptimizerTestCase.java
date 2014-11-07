@@ -56,8 +56,10 @@ import com.bigdata.rdf.sparql.ast.NamedSubqueryInclude;
 import com.bigdata.rdf.sparql.ast.NamedSubqueryRoot;
 import com.bigdata.rdf.sparql.ast.NotExistsNode;
 import com.bigdata.rdf.sparql.ast.PathNode;
-import com.bigdata.rdf.sparql.ast.ValueExpressionNode;
-import com.bigdata.rdf.sparql.ast.PathNode.*;
+import com.bigdata.rdf.sparql.ast.PathNode.PathAlternative;
+import com.bigdata.rdf.sparql.ast.PathNode.PathElt;
+import com.bigdata.rdf.sparql.ast.PathNode.PathMod;
+import com.bigdata.rdf.sparql.ast.PathNode.PathSequence;
 import com.bigdata.rdf.sparql.ast.ProjectionNode;
 import com.bigdata.rdf.sparql.ast.PropertyPathNode;
 import com.bigdata.rdf.sparql.ast.PropertyPathUnionNode;
@@ -68,13 +70,19 @@ import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.SubqueryRoot;
 import com.bigdata.rdf.sparql.ast.TermNode;
 import com.bigdata.rdf.sparql.ast.UnionNode;
+import com.bigdata.rdf.sparql.ast.ValueExpressionNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpUtility;
 import com.bigdata.rdf.sparql.ast.service.ServiceNode;
-import com.bigdata.rdf.spo.SPOKeyOrder;
 
-public abstract class AbstractOptimizerTestCase extends AbstractASTEvaluationTestCase {
+/**
+ * A helper class that can make it easier to write {@link IASTOptimizer} tests.
+ * 
+ * @author jeremycarroll
+ */
+public abstract class AbstractOptimizerTestCase extends
+		AbstractASTEvaluationTestCase {
 
 	public interface Annotations extends
 			com.bigdata.rdf.sparql.ast.GraphPatternGroup.Annotations,
@@ -147,6 +155,21 @@ public abstract class AbstractOptimizerTestCase extends AbstractASTEvaluationTes
 		}
 	};
 
+	protected AbstractOptimizerTestCase(final String name) {
+		super(name);
+	}
+
+	protected AbstractOptimizerTestCase() {
+		super();
+	}
+
+	/**
+	 * Return the {@link IASTOptimizer} to be evaluated by the {@link Helper}.
+	 * This may be an {@link ASTOptimizerList} if you need to chain multiple
+	 * optimizers together in order to evaluate their behavior.
+	 */
+    abstract IASTOptimizer newOptimizer() ;
+
 	/**
 	 * The purpose of this class is to make the tests look like the old
 	 * comments. The first example
@@ -154,105 +177,270 @@ public abstract class AbstractOptimizerTestCase extends AbstractASTEvaluationTes
 	 * the comments of
 	 * {@link TestASTStaticJoinOptimizer#test_simpleOptional01()} and
 	 * demonstrates that the comment is out of date.
-	 * 
+	 * <p>
 	 * NB: Given this goal, several Java naming conventions are ignored. e.g.
 	 * methods whose names are ALLCAPS or the same as ClassNames
-	 * 
+	 * <p>
 	 * Also, note that the intent is that this class be used in
 	 * anonymous subclasses with a single invocation of the {@link #test()} method,
 	 * and the two fields {@link #given} and {@link #expected} initialized
 	 * in the subclasses constructor (i.e. inside a second pair of braces).
-	 * 
+	 * <p> 
 	 * All of the protected members are wrappers around constructors,
 	 * to allow the initialization of these two fields, to have a style
 	 * much more like Prolog than Java.
 	 * 
 	 * @author jeremycarroll
-	 * 
 	 */
 	@SuppressWarnings("rawtypes")
 	public abstract class Helper {
 		protected QueryRoot given, expected;
+		
 		/**
 		 * Variables
 		 */
-		protected final String w = "w", x = "x", y = "y", z = "z";
+		protected final String w = "w", x = "x", y = "y", z = "z", s = "s",
+				p = "p", o = "o";
+		
 		/**
 		 * Constants ...
 		 */
 		protected final IV a = iv("a"), b = iv("b"), c = iv("c"), d = iv("d"),
 				e = iv("e"), f = iv("f"), g = iv("g"), h = iv("h");
+		
 		private VarNode rightVar;
 		private VarNode leftVar;
 		int varCount = 0;
+		
 		private GlobalAnnotations globals = new GlobalAnnotations(getName(), ITx.READ_COMMITTED);
 
-		private IV iv(String id) {
+		/**
+		 * Execute the test comparing the rewrite of the {@link #given} AST by
+		 * the {@link IASTOptimizer} with the {@link #expected} AST.
+		 */
+		public void test() {
+
+			final IASTOptimizer rewriter = newOptimizer();
+
+			final AST2BOpContext context = new AST2BOpContext(new ASTContainer(
+					given), store);
+
+			final IQueryNode actual = rewriter.optimize(context, given,
+					new IBindingSet[] {});
+
+			assertSameAST(expected, actual);
+			
+		}
+
+		private IV iv(final String id) {
+			
 			return makeIV(new URIImpl("http://example/" + id));
+
 		}
 
-		protected QueryRoot select(VarNode[] varNodes,
-				NamedSubqueryRoot namedSubQuery, JoinGroupNode where,
-				HelperFlag... flags) {
-			QueryRoot rslt = select(varNodes, where, flags);
+		/**
+		 * Create a top-level SELECT query.
+		 * 
+		 * @param varNodes
+		 *            The projected variables.
+		 * @param namedSubQuery
+		 *            A named subquery that is declared to that top-level query.
+		 * @param where
+		 *            The WHERE clause of the top-level query.
+		 * @param flags
+		 *            The flags to be applied to the resulting AST.
+		 */
+		protected QueryRoot select(final VarNode[] varNodes,
+				final NamedSubqueryRoot namedSubQuery,
+				final JoinGroupNode where, final HelperFlag... flags) {
+
+			final QueryRoot rslt = select(varNodes, where, flags);
+
 			rslt.getNamedSubqueriesNotNull().add(namedSubQuery);
+
 			return rslt;
+			
 		}
 
-		protected QueryRoot select(VarNode[] varNodes, JoinGroupNode where,
-				HelperFlag... flags) {
+		/**
+		 * 
+		 * @param varNodes
+		 *            The variables that will appear in the projection.
+		 * @param where
+		 *            The top-level WHERE clause.
+		 * @param flags
+		 *            Zero or more flags that are applied to the operations.
+		 *            
+		 * @return The {@link QueryRoot}.
+		 */
+		protected QueryRoot select(final VarNode[] varNodes,
+				final JoinGroupNode where, final HelperFlag... flags) {
 
-			QueryRoot select = new QueryRoot(QueryType.SELECT);
+//			// Create QueryRoot.
+//			final QueryRoot select = new QueryRoot(QueryType.SELECT);
+
+//			// Setup projection.
+//			final ProjectionNode projection = new ProjectionNode();
+//			for (VarNode varNode : varNodes)
+//				projection.addProjectionVar(varNode);
+
+			return select(projection(varNodes), where, flags);
+		
+//			// Set Projection and Where clause on QueryRoot.
+//			select.setProjection(projection);
+//			select.setWhereClause(where);
+//			
+//			// Apply helper flags.
+//			for (HelperFlag flag : flags)
+//				flag.apply(select);
+//			
+//			return select;
+			
+		}
+
+		/**
+		 * Return a PROJECTION node. 
+		 * 
+		 * @param varNodes
+		 *            The variables that will appear in the projection.
+		 */
+		protected ProjectionNode projection(final VarNode... varNodes) {
+
+			// Setup projection.
 			final ProjectionNode projection = new ProjectionNode();
 			for (VarNode varNode : varNodes)
 				projection.addProjectionVar(varNode);
 
-			select.setProjection(projection);
-			select.setWhereClause(where);
-			for (HelperFlag flag : flags)
-				flag.apply(select);
-			return select;
-		}
-
-		protected QueryRoot select(VarNode varNode,
-				NamedSubqueryRoot namedSubQuery, JoinGroupNode where,
-				HelperFlag... flags) {
-			return select(new VarNode[] { varNode }, namedSubQuery, where,
-					flags);
-		}
-
-		protected QueryRoot select(VarNode varNode, JoinGroupNode where,
-				HelperFlag... flags) {
-			return select(new VarNode[] { varNode }, where, flags);
+			return projection;
+			
 		}
 		
-		protected SubqueryRoot ask(VarNode varNode, JoinGroupNode where) {
+		/**
+		 * Return a PROJECTION node. 
+		 * 
+		 * @param assignmentNodes
+		 *            The BIND()s that will appear in the projection.
+		 */
+		protected ProjectionNode projection(final AssignmentNode... assignmentNodes) {
+
+			// Setup projection.
+			final ProjectionNode projection = new ProjectionNode();
+			for (AssignmentNode varNode : assignmentNodes)
+				projection.addProjectionExpression(varNode);
+
+			return projection;
+			
+		}
+		
+		/**
+		 * 
+		 * @param projection
+		 *            The projection.
+		 * @param where
+		 *            The top-level WHERE clause.
+		 * @param flags
+		 *            Zero or more flags that are applied to the operations.
+		 *            
+		 * @return The {@link QueryRoot}.
+		 */
+		protected QueryRoot select(final ProjectionNode projection,
+				final JoinGroupNode where, final HelperFlag... flags) {
+
+			assert projection != null;
+			
+			// Create QueryRoot.
+			final QueryRoot select = new QueryRoot(QueryType.SELECT);
+
+			// Set Projection and Where clause on QueryRoot.
+			select.setProjection(projection);
+			select.setWhereClause(where);
+			
+			// Apply helper flags.
+			for (HelperFlag flag : flags)
+				flag.apply(select);
+			
+			return select;
+			
+		}
+
+		protected QueryRoot select(final VarNode varNode,
+				final NamedSubqueryRoot namedSubQuery,
+				final JoinGroupNode where, final HelperFlag... flags) {
+		
+			return select(new VarNode[] { varNode }, namedSubQuery, where,
+					flags);
+
+		}
+
+		protected QueryRoot select(final VarNode varNode,
+				final JoinGroupNode where, final HelperFlag... flags) {
+
+			return select(new VarNode[] { varNode }, where, flags);
+			
+		}
+
+		/**
+		 * Return an ASK subquery.
+		 * 
+		 * @param varNode
+		 *            The "ASK" variable. See
+		 *            {@link SubqueryRoot.Annotations#ASK_VAR}.
+		 * @param where
+		 *            The WHERE clause.
+		 *            
+		 * @return the ASK subquery.
+		 */
+		protected SubqueryRoot ask(final VarNode varNode,
+				final JoinGroupNode where) {
 
 			final SubqueryRoot rslt = new SubqueryRoot(QueryType.ASK);
-            final ProjectionNode projection = new ProjectionNode();
+            
+			final ProjectionNode projection = new ProjectionNode();
             varNode.setAnonymous(true);
             rslt.setProjection(projection);
             projection.addProjectionExpression(new AssignmentNode(varNode, varNode));
+            
             rslt.setWhereClause(where);
+            
             rslt.setAskVar(toValueExpression(varNode));
             
 			return rslt;
+			
 		}
 
-		protected NamedSubqueryRoot namedSubQuery(String name, VarNode varNode,
-				JoinGroupNode where) {
+		/**
+		 * Return a named subquery.
+		 * 
+		 * @param name
+		 *            The name associated with the named subquery result.
+		 * @param varNode
+		 *            The projected variable.
+		 * @param where
+		 *            The where clause.
+		 *            
+		 * @return The named subquyery.
+		 */
+		protected NamedSubqueryRoot namedSubQuery(final String name,
+				final VarNode varNode, final JoinGroupNode where) {
+			
 			final NamedSubqueryRoot namedSubquery = new NamedSubqueryRoot(
 					QueryType.SELECT, name);
+
 			final ProjectionNode projection = new ProjectionNode();
 			namedSubquery.setProjection(projection);
 			projection.addProjectionExpression(new AssignmentNode(varNode,
 					new VarNode(varNode)));
+			
 			namedSubquery.setWhereClause(where);
+			
 			return namedSubquery;
+			
 		}
 
-		protected GroupMemberNodeBase namedSubQueryInclude(String name) {
+		protected GroupMemberNodeBase namedSubQueryInclude(final String name) {
+			
 			return new NamedSubqueryInclude(name);
+			
 		}
 		
 		protected VarNode leftVar() {
@@ -264,7 +452,7 @@ public abstract class AbstractOptimizerTestCase extends AbstractASTEvaluationTes
 			return rightVar;
 		}
 
-		private VarNode newAlppVar(String prefix,VarNode v) {
+		private VarNode newAlppVar(final String prefix, VarNode v) {
 			if (v != null) {
 				return v;
 			}
@@ -360,20 +548,26 @@ public abstract class AbstractOptimizerTestCase extends AbstractASTEvaluationTes
 		 * @param more
 		 * @return
 		 */
-		protected StatementPatternNode statementPatternNode(TermNode s,
-				TermNode p, TermNode o, Object ... more) {
-			StatementPatternNode rslt = newStatementPatternNode(s, p, o);
-			if (more.length>0) {
+		protected StatementPatternNode statementPatternNode(//
+				final TermNode s,
+				final TermNode p, 
+				final TermNode o, 
+				final Object ... more) {
+			
+			final StatementPatternNode rslt = newStatementPatternNode(s, p, o);
+
+			if (more.length > 0) {
 				int i = 0;
 				if (more[0] instanceof TermNode) {
-					rslt.setC((TermNode)more[0]);
+					rslt.setC((TermNode) more[0]);
 					i = 1;
 				}
-				for (;i<more.length;i++) {
+				for (; i < more.length; i++) {
 					if (more[i] instanceof Integer) {
-			            rslt.setProperty(Annotations.ESTIMATED_CARDINALITY, Long.valueOf((Integer)more[i]));
+						rslt.setProperty(Annotations.ESTIMATED_CARDINALITY,
+								Long.valueOf((Integer) more[i]));
 					} else {
-						HelperFlag flag = (HelperFlag)more[i];
+						final HelperFlag flag = (HelperFlag) more[i];
 						flag.apply(rslt);
 					}
 				}
@@ -418,57 +612,98 @@ public abstract class AbstractOptimizerTestCase extends AbstractASTEvaluationTes
 			return joinGroupNode((Object[]) statements);
 		}
 
-		public void test() {
-			final IASTOptimizer rewriter = newOptimizer();
-
-			final AST2BOpContext context = new AST2BOpContext(new ASTContainer(
-					given), store);
-
-			final IQueryNode actual = rewriter.optimize(context, given,
-					new IBindingSet[] {});
-
-			assertSameAST(expected, actual);
-		}
-
-		protected FunctionNode bound(VarNode varNode) {
-            FunctionNode rslt = new FunctionNode(FunctionRegistry.BOUND,
+		protected FunctionNode bound(final VarNode varNode) {
+			
+			final FunctionNode rslt = new FunctionNode(FunctionRegistry.BOUND,
             		null,
                     new ValueExpressionNode[] {
                      varNode
                     } );
+
 			rslt.setValueExpression(new IsBoundBOp(varNode.getValueExpression()));
-			return rslt;
-		}
-		protected FunctionNode knownUnbound(VarNode varNode) {
-            final VarNode vv = varNode("-unbound-var-"+varNode.getValueExpression().getName()+"-0");
-			FunctionNode rslt = new FunctionNode(FunctionRegistry.BOUND, null, vv);
-			rslt.setValueExpression(new IsBoundBOp(vv.getValueExpression()));
-			return rslt;
-		}
-
-		protected FilterNode filter(IValueExpressionNode f) {
-			return new FilterNode(f);
-		}
-
-		protected IValueExpressionNode functionNode(String uri, ValueExpressionNode ... args) {
-			return new FunctionNode(new URIImpl(uri), null, args);
-		}
-
-		protected ServiceNode service(TermNode serviceRef, GraphPatternGroup<IGroupMemberNode> groupNode) {
-			return new ServiceNode(serviceRef, groupNode);
-		}
-
-		protected AssignmentNode bind(IValueExpressionNode valueNode, VarNode varNode) {
-			return new AssignmentNode(varNode, valueNode);
-		}
-		
-		protected FunctionNode or(ValueExpressionNode v1, ValueExpressionNode v2) {
 			
-			FunctionNode rslt = FunctionNode.OR(v1, v2);
-			rslt.setValueExpression(new OrBOp(v1.getValueExpression(),v2.getValueExpression()));
 			return rslt;
+			
 		}
+
+		protected FunctionNode knownUnbound(final VarNode varNode) {
+            
+			final VarNode vv = varNode("-unbound-var-"+varNode.getValueExpression().getName()+"-0");
+			
+			final FunctionNode rslt = new FunctionNode(FunctionRegistry.BOUND, null, vv);
+			
+			rslt.setValueExpression(new IsBoundBOp(vv.getValueExpression()));
+
+			return rslt;
+			
+		}
+
+		protected FilterNode filter(final IValueExpressionNode f) {
+
+			return new FilterNode(f);
+
+		}
+
+		/**
+		 * Return a {@link FunctionNode}
+		 * 
+		 * @param uri
+		 *            the function URI. see {@link FunctionRegistry}
+		 * @param args
+		 *            the arguments to the function.
+		 * @return
+		 */
+		// * @param scalarValues
+		// * One or more scalar values that are passed to the function
+		protected IValueExpressionNode functionNode(//
+				final String uri,//
+				final ValueExpressionNode... args//
+				) {
+
+			return new FunctionNode(new URIImpl(uri), null, args);
+
+		}
+
+		protected ServiceNode service(//
+				final TermNode serviceRef,
+				final GraphPatternGroup<IGroupMemberNode> groupNode//
+				) {
+
+			return new ServiceNode(serviceRef, groupNode);
+
+		}
+
+		/**
+		 * <code>BIND(expression AS variable)</code>
+		 * 
+		 * @param valueNode
+		 *            The expression
+		 * @param varNode
+		 *            The variable.
+		 */
+		protected AssignmentNode bind(final IValueExpressionNode valueNode,
+				final VarNode varNode) {
+			
+			return new AssignmentNode(varNode, valueNode);
+			
+		}
+
+		/**
+		 * Logical OR of two value expressions.
+		 */
+		protected FunctionNode or(final ValueExpressionNode v1,
+				final ValueExpressionNode v2) {
+
+			final FunctionNode rslt = FunctionNode.OR(v1, v2);
+
+			rslt.setValueExpression(new OrBOp(//
+					v1.getValueExpression(), //
+					v2.getValueExpression()));
+
+			return rslt;
 		
+		}
+				
 		protected ExistsNode exists(VarNode v, GraphPatternGroup<IGroupMemberNode> jg) {
 			v.setAnonymous(true);
 			ExistsNode existsNode = new ExistsNode(v, jg);
@@ -499,23 +734,36 @@ public abstract class AbstractOptimizerTestCase extends AbstractASTEvaluationTes
 			}
 		}
 
-	public AbstractOptimizerTestCase(String name) {
-		super(name);
+	protected StatementPatternNode newStatementPatternNode(final TermNode s,
+			final TermNode p, final TermNode o) {
+
+		return newStatementPatternNode(s, p, o, -1, false);
+
 	}
 
-	public AbstractOptimizerTestCase() {
-		super();
+	protected StatementPatternNode newStatementPatternNode(final TermNode s,
+			final TermNode p, final TermNode o, final long cardinality) {
+
+		return newStatementPatternNode(s, p, o, cardinality, false);
+
 	}
 
-    protected StatementPatternNode newStatementPatternNode(final TermNode s, final TermNode p, final TermNode o) {
-        return newStatementPatternNode(s, p, o, -1, false);
-    }
-    protected StatementPatternNode newStatementPatternNode(
-            final TermNode s, final TermNode p, final TermNode o, 
-            final long cardinality) {
-        return newStatementPatternNode(s, p, o, cardinality, false);
-    }
-
+	/**
+	 * Return a new triple pattern.
+	 * 
+	 * @param s
+	 *            The subject.
+	 * @param p
+	 *            The predicate.
+	 * @param o
+	 *            The object.
+	 * @param cardinality
+	 *            The estimated cardinality -or- <code>-1</code> to NOT
+	 *            associate cardinality with the triple pattern.
+	 * @param optional
+	 *            <code>true</code> iff the triple pattern should be marked as a
+	 *            simple OPTIONAL.
+	 */
     protected StatementPatternNode newStatementPatternNode(
             final TermNode s, final TermNode p, final TermNode o, 
             final long cardinality, final boolean optional) {
@@ -523,7 +771,9 @@ public abstract class AbstractOptimizerTestCase extends AbstractASTEvaluationTes
         final StatementPatternNode sp = new StatementPatternNode(s, p, o);
         
         if (cardinality != -1) {
-            sp.setProperty(Annotations.ESTIMATED_CARDINALITY, cardinality);
+
+        	sp.setProperty(Annotations.ESTIMATED_CARDINALITY, cardinality);
+        
         }
         
         if (optional) {
@@ -536,5 +786,4 @@ public abstract class AbstractOptimizerTestCase extends AbstractASTEvaluationTes
         
     }
 
-	abstract IASTOptimizer newOptimizer() ;
 }
