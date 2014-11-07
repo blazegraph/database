@@ -1069,8 +1069,9 @@ function updateResultCountAndExecutionTime(count) {
    var sec = Math.floor(ms / 1000);
    ms = ms % 1000;
    var min = Math.floor(sec / 60);
-   min = min % 60;
+   sec = sec % 60;
    var hr = Math.floor(min / 60);
+   min = min % 60;
    var executionTime = '';
    if(hr > 0) {
       executionTime += hr + 'hr, ';
