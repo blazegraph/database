@@ -196,6 +196,16 @@ public class StatementPatternNode extends
 		 *      Reification Done Right</a>
 		 */
         String SID = "sid";
+
+		/**
+		 * An optional annotation whose value is a variable which will become
+		 * bound to the fast range count of the associated triple pattern.
+		 * 
+		 * @see <a href="http://trac.bigdata.com/ticket/1037" > SELECT
+		 *      COUNT(...) (DISTINCT|REDUCED) {single-triple-pattern} is slow.
+		 *      </a>
+		 */
+        String FAST_RANGE_COUNT = "fastRangeCount";
         
     }
     
@@ -394,9 +404,31 @@ public class StatementPatternNode extends
 		if (scope == null)
 			throw new IllegalArgumentException();
     	
-    		setProperty(Annotations.SCOPE, scope);
+		setProperty(Annotations.SCOPE, scope);
     	
     }
+
+	/**
+	 * Return the {@link VarNode} associated with the optional
+	 * {@link Annotations#FAST_RANGE_COUNT} property.
+	 * 
+	 * @return The {@link VarNode} -or- <code>null</code> if this triple pattern
+	 *         is not associated with that annotation.
+	 */
+	final public VarNode getFastRangeCount() {
+		
+		return (VarNode) getProperty(Annotations.FAST_RANGE_COUNT);
+		
+	}
+	
+	final public void setFastRangeCount(final VarNode var) {
+
+		if (var == null)
+			throw new IllegalArgumentException();
+
+		setProperty(Annotations.FAST_RANGE_COUNT, var);
+
+	}
     
     /**
      * {@inheritDoc}
