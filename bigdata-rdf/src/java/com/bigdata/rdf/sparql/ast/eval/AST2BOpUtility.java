@@ -510,7 +510,19 @@ public class AST2BOpUtility extends AST2BOpRTO {
         }
 
         if (projection != null) {
-         
+
+        	/**
+			 * The projection after the ORDER BY needs to preserve the ordering.
+			 * So does the chunked materialization operator. The code above
+			 * handles this for ORDER_BY + DISTINCT, but does not go far enough
+			 * to impose order preserving evaluation on the PROJECTION and
+			 * chunked materialization, both of which are downstream from the
+			 * ORDER_BY operator.
+			 * 
+			 * @see #1044 (PROJECTION after ORDER BY does not preserve order)
+			 */
+        	final boolean preserveOrder = orderBy != null;
+        	
             /*
              * Append operator to drop variables which are not projected by the
              * subquery.
@@ -524,16 +536,29 @@ public class AST2BOpUtility extends AST2BOpRTO {
              * to be dropped.)
              */
 
-            // The variables projected by the subquery.
-            final IVariable<?>[] projectedVars = projection.getProjectionVars();
+			{
+				// The variables projected by the subquery.
+				final IVariable<?>[] projectedVars = projection
+						.getProjectionVars();
 
-            left = applyQueryHints(new ProjectionOp(leftOrEmpty(left), //
-                    new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
-                    new NV(BOp.Annotations.EVALUATION_CONTEXT,
-                            BOpEvaluationContext.CONTROLLER),//
-                    new NV(PipelineOp.Annotations.SHARED_STATE,true),// live stats
-                    new NV(ProjectionOp.Annotations.SELECT, projectedVars)//
-            ), queryBase, ctx);
+				final List<NV> anns = new LinkedList<NV>();
+				anns.add(new NV(BOp.Annotations.BOP_ID, ctx.nextId()));
+				anns.add(new NV(BOp.Annotations.EVALUATION_CONTEXT, BOpEvaluationContext.CONTROLLER));
+				anns.add(new NV(PipelineOp.Annotations.SHARED_STATE, true));// live stats
+				anns.add(new NV(ProjectionOp.Annotations.SELECT, projectedVars));
+				if (preserveOrder) {
+					/**
+					 * @see #563 (ORDER BY + DISTINCT)
+					 * @see #1044 (PROJECTION after ORDER BY does not preserve
+					 *      order)
+					 */
+					anns.add(new NV(PipelineOp.Annotations.MAX_PARALLEL, 1));
+					anns.add(new NV(SliceOp.Annotations.REORDER_SOLUTIONS, false));
+				}
+				left = applyQueryHints(new ProjectionOp(leftOrEmpty(left),//
+						anns.toArray(new NV[anns.size()])//
+						), queryBase, ctx);
+			}
             
             if (materializeProjection) {
                 
@@ -566,15 +591,34 @@ public class AST2BOpUtility extends AST2BOpRTO {
                     final IVariable<?>[] vars = tmp.toArray(new IVariable[tmp
                             .size()]);
                     
-                    left = applyQueryHints(new ChunkedMaterializationOp(leftOrEmpty(left),
-                            new NV(ChunkedMaterializationOp.Annotations.VARS, vars),//
-                            new NV(ChunkedMaterializationOp.Annotations.RELATION_NAME, new String[] { ns }), //
-                            new NV(ChunkedMaterializationOp.Annotations.TIMESTAMP, timestamp), //
-                            new NV(ChunkedMaterializationOp.Annotations.MATERIALIZE_INLINE_IVS, true), //
-                            new NV(PipelineOp.Annotations.SHARED_STATE, !ctx.isCluster()),// live stats, but not on the cluster.
-                            new NV(BOp.Annotations.BOP_ID, ctx.nextId())//
-                            ), queryBase, ctx);
+    				final List<NV> anns = new LinkedList<NV>();
+    				anns.add(new NV(ChunkedMaterializationOp.Annotations.VARS, vars));
+    				anns.add(new NV(ChunkedMaterializationOp.Annotations.RELATION_NAME, new String[] { ns })); //
+    				anns.add(new NV(ChunkedMaterializationOp.Annotations.TIMESTAMP, timestamp)); //
+    				anns.add(new NV(ChunkedMaterializationOp.Annotations.MATERIALIZE_INLINE_IVS, true));
+    				anns.add(new NV(PipelineOp.Annotations.SHARED_STATE, !ctx.isCluster()));// live stats, but not on the cluster.
+    				anns.add(new NV(BOp.Annotations.BOP_ID, ctx.nextId()));
+    				if (preserveOrder) {
+    					/**
+    					 * @see #563 (ORDER BY + DISTINCT)
+    					 * @see #1044 (PROJECTION after ORDER BY does not preserve
+    					 *      order)
+    					 */
+    					anns.add(new NV(PipelineOp.Annotations.MAX_PARALLEL, 1));
+    					anns.add(new NV(SliceOp.Annotations.REORDER_SOLUTIONS, false));
+    				}
+    				left = applyQueryHints(new ChunkedMaterializationOp(leftOrEmpty(left),//
+    						anns.toArray(new NV[anns.size()])//
+    						), queryBase, ctx);
 
+//                    left = applyQueryHints(new ChunkedMaterializationOp(leftOrEmpty(left),
+//                            new NV(ChunkedMaterializationOp.Annotations.VARS, vars),//
+//                            new NV(ChunkedMaterializationOp.Annotations.RELATION_NAME, new String[] { ns }), //
+//                            new NV(ChunkedMaterializationOp.Annotations.TIMESTAMP, timestamp), //
+//                            new NV(ChunkedMaterializationOp.Annotations.MATERIALIZE_INLINE_IVS, true), //
+//                            new NV(PipelineOp.Annotations.SHARED_STATE, !ctx.isCluster()),// live stats, but not on the cluster.
+//                            new NV(BOp.Annotations.BOP_ID, ctx.nextId())//
+//                            ), queryBase, ctx);
 //                    left = (PipelineOp) new ChunkedMaterializationOp(
 //                            leftOrEmpty(left), vars, ns, timestamp)
 //                            .setProperty(BOp.Annotations.BOP_ID, ctx.nextId());
