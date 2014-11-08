@@ -10,7 +10,6 @@ import org.openrdf.model.URI;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.NV;
-import com.bigdata.bop.BOp.Annotations;
 
 /**
  * AST node for anything which is neither a constant nor a variable, including
