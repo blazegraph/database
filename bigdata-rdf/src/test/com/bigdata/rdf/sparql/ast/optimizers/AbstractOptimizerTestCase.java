@@ -588,14 +588,54 @@ public abstract class AbstractOptimizerTestCase extends
 			return rslt;
 		}
 
+		/**
+		 * Return a graph join group.
+		 * 
+		 * @param context
+		 *            The graph (named graph variable or IRI).
+		 * @param statements
+		 *            The children (including any optional {@link HelperFlag}s).
+		 *            
+		 * @return The group join group node.
+		 */
+		protected JoinGroupNode joinGroupNode(final TermNode context,
+				final Object... statements) {
 
-		protected JoinGroupNode joinGroupNode(TermNode context,Object... statements) {
-			JoinGroupNode rslt = joinGroupNode(statements);
+			final JoinGroupNode rslt = joinGroupNode(statements);
+
 			rslt.setContext(context);
+
 			return rslt;
+
 		}
-		protected JoinGroupNode joinGroupNode(Object... statements) {
+
+		/**
+		 * Wrap the arguments in a {@link JoinGroupNode} and apply any
+		 * inter-mixed {@link HelperFlag}s.
+		 * 
+		 * @param statements
+		 *            The arguments (group group members or {@link HelperFlag}s)
+		 * 
+		 * @return The {@link JoinGroupNode}.
+		 */
+		protected JoinGroupNode joinGroupNode(final Object... statements) {
+		
 			return initGraphPatternGroup(new JoinGroupNode(), statements);
+			
+		}
+
+		/**
+		 * Wrap the triple patterns in a WHERE clause (aka join group).
+		 * 
+		 * @param statements
+		 *            The triple patterns.
+		 *            
+		 * @return The {@link JoinGroupNode}
+		 */
+		protected JoinGroupNode where(final GroupMemberNodeBase... statements) {
+
+			return joinGroupNode((Object[]) statements);
+			
 		}
 
 		protected PropertyPathUnionNode propertyPathUnionNode(Object... statements) {
@@ -604,12 +644,9 @@ public abstract class AbstractOptimizerTestCase extends
 		}
 
 		protected UnionNode unionNode(Object... statements) {
+			
 			return initGraphPatternGroup(new UnionNode(), statements);
 
-		}
-
-		protected JoinGroupNode where(GroupMemberNodeBase... statements) {
-			return joinGroupNode((Object[]) statements);
 		}
 
 		protected FunctionNode bound(final VarNode varNode) {

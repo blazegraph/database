@@ -53,12 +53,14 @@ final public class Var<E> extends ImmutableBOp implements IVariable<E>,
     
     final private String name;
 
+    @Override
     final public boolean isVar() {
 
         return true;
 
     }
 
+    @Override
     final public boolean isConstant() {
 
         return false;
@@ -86,6 +88,7 @@ final public class Var<E> extends ImmutableBOp implements IVariable<E>,
      * part of the canonicalizing mapping). Because we override clone we do not
      * need to provide the deep copy constructor (it is never invoked).
      */
+    @Override
     final public Var<E> clone() {
 
         return this;
@@ -96,6 +99,7 @@ final public class Var<E> extends ImmutableBOp implements IVariable<E>,
      * @todo Why two versions of equals? This one is coming from
      *       IConstantOrVariable.
      */
+    @Override
     public final boolean equals(final IVariableOrConstant<E> o) {
 
         if (this == o)
@@ -111,6 +115,7 @@ final public class Var<E> extends ImmutableBOp implements IVariable<E>,
 
     }
 
+    @Override
     public final boolean equals(final Object o) {
 
         if (this == o)
@@ -126,18 +131,21 @@ final public class Var<E> extends ImmutableBOp implements IVariable<E>,
 
     }
 
+    @Override
     public final int hashCode() {
 
         return name.hashCode();
 
     }
 
+    @Override
     public String toString() {
 
         return name;
 
     }
 
+    @Override
 	public boolean isWildcard() {
 
 		return name.length() == 1 && name.charAt(0) == '*';
@@ -153,6 +161,7 @@ final public class Var<E> extends ImmutableBOp implements IVariable<E>,
     //            
     //        }
 
+    @Override
     public E get() {
 
         throw new UnsupportedOperationException();
@@ -171,6 +180,7 @@ final public class Var<E> extends ImmutableBOp implements IVariable<E>,
 
     }
     
+    @Override
     public String getName() {
 
         return name;
