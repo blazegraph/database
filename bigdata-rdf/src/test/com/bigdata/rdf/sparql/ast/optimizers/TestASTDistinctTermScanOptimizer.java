@@ -38,6 +38,9 @@ import com.bigdata.rdf.spo.DistinctTermAdvancer;
 /**
  * Test suite for {@link ASTDistinctTermScanOptimizer}.
  * 
+ * @see <a href="http://trac.bigdata.com/ticket/1035" > DISTINCT PREDICATEs
+ *      query is slow </a>
+ *      
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
 public class TestASTDistinctTermScanOptimizer extends AbstractOptimizerTestCase {
