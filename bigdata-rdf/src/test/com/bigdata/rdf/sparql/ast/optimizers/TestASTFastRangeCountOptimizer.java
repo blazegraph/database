@@ -27,10 +27,15 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.optimizers;
 
+import java.util.Properties;
+
+import junit.framework.Test;
+import junit.framework.TestSuite;
+
 import com.bigdata.rdf.sparql.ast.FunctionRegistry;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
-import com.bigdata.rdf.spo.DistinctTermAdvancer;
+import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
  * Test suite for {@link ASTFastRangeCountOptimizer}. This needs to handle a
@@ -63,80 +68,304 @@ public class TestASTFastRangeCountOptimizer extends AbstractOptimizerTestCase {
 		
 	}
 
-	/**
-	 * 
-	 * <pre>
-	 * SELECT (COUNT(*) as ?w) {?s ?p ?o}
-	 * </pre>
-	 * 
-	 * TODO Do a test where the inner triple pattern is OPTIONAL. This does not
-	 * effect anything and the fast range count will still be correct so the
-	 * rewrite SHOULD take place.
-	 */
-	public void test_fastRangeCountOptimizer_01() {
+    public static Test suite()
+    {
 
-    	new Helper(){{
+        final TestSuite suite = new TestSuite(ASTFastRangeCountOptimizer.class.getSimpleName());
 
-//    		originalAST
-//    		QueryType: SELECT
-//    		SELECT ( com.bigdata.rdf.sparql.ast.FunctionNode(VarNode(*))[ FunctionNode.scalarVals=null, FunctionNode.functionURI=http://www.w3.org/2006/sparql-functions#count, valueExpr=com.bigdata.bop.rdf.aggregate.COUNT(*)] AS VarNode(count) )
-//    		  JoinGroupNode {
-//    		    StatementPatternNode(VarNode(s), VarNode(p), VarNode(o)) [scope=DEFAULT_CONTEXTS]
-//    		  }
-				given = select(
-						projection(bind(
-								functionNode(
-										FunctionRegistry.COUNT.stringValue(),
-										new VarNode("*")), varNode(w))),
-						where(newStatementPatternNode(new VarNode(s),
-								new VarNode(p), new VarNode(o))));
+        suite.addTestSuite(TestQuadsModeAPs.class);
 
-				/**
-				 * We need to convert:
-				 * 
-				 * <pre>
-				 * SELECT (COUNT(*) as ?w) {?s ?p ?o}
-				 * </pre>
-				 * 
-				 * into
-				 * 
-				 * <pre>
-				 * SELECT ?w {?s ?p ?o}
-				 * </pre>
-				 * 
-				 * where the triple pattern has been marked with the
-				 * FAST-RANGE-COUNT:=?w annotation; and
-				 * 
-				 * where the ESTIMATED_CARDINALITY of the triple pattern has
-				 * been set to ONE (since we will not use a scan).
-				 * 
-				 * This means that the triple pattern will be directly
-				 * interpreted as binding ?w to the ESTCARD of the triple
-				 * pattern.
-				 */
-				// the triple pattern.
-				final StatementPatternNode sp1 = newStatementPatternNode(
-						new VarNode(s), new VarNode(p), new VarNode(o));
-				// annotate with the name of the variable to become bound to the
-				// fast range count of that triple pattern.
-				sp1.setFastRangeCount(new VarNode(w));
-				sp1.setProperty(Annotations.ESTIMATED_CARDINALITY, 1L);
-
-				// the expected AST.
-				expected = select(projection(varNode(w)), where(sp1));
-
-			}
-		}.test();
-    	
+        suite.addTestSuite(TestTriplesModeAPs.class);
+        
+        return suite;
     }
 
+    /**
+     * Quads mode specific test suite.
+     */
+	public static class TestQuadsModeAPs extends TestASTFastRangeCountOptimizer {
+
+		/**
+		 * 
+		 * <pre>
+		 * SELECT (COUNT(*) as ?w) {?s ?p ?o}
+		 * </pre>
+		 * 
+		 * TODO Do a test where the inner triple pattern is OPTIONAL. This does
+		 * not effect anything and the fast range count will still be correct so
+		 * the rewrite SHOULD take place.
+		 */
+		public void test_fastRangeCountOptimizer_quads_mode_01() {
+
+			new Helper() {
+				{
+
+					given = select(
+							projection(bind(
+									functionNode(
+											FunctionRegistry.COUNT
+													.stringValue(),
+											new VarNode("*")), varNode(w))),
+							where(newStatementPatternNode(new VarNode(s),
+									new VarNode(p), new VarNode(o))));
+
+					/**
+					 * We need to convert:
+					 * 
+					 * <pre>
+					 * SELECT (COUNT(*) as ?w) {?s ?p ?o}
+					 * </pre>
+					 * 
+					 * into
+					 * 
+					 * <pre>
+					 * SELECT ?w {?s ?p ?o}
+					 * </pre>
+					 * 
+					 * where the triple pattern has been marked with the
+					 * FAST-RANGE-COUNT:=?w annotation; and
+					 * 
+					 * where the ESTIMATED_CARDINALITY of the triple pattern has
+					 * been set to ONE (since we will not use a scan).
+					 * 
+					 * This means that the triple pattern will be directly
+					 * interpreted as binding ?w to the ESTCARD of the triple
+					 * pattern.
+					 */
+					// the triple pattern.
+					final StatementPatternNode sp1 = newStatementPatternNode(
+							new VarNode(s), new VarNode(p), new VarNode(o));
+					// annotate with the name of the variable to become bound to
+					// the
+					// fast range count of that triple pattern.
+					sp1.setFastRangeCount(new VarNode(w));
+					sp1.setProperty(Annotations.ESTIMATED_CARDINALITY, 1L);
+
+					// the expected AST.
+					expected = select(projection(varNode(w)), where(sp1));
+
+				}
+			}.test();
+
+		}
+
+		/**
+		 * Verify NO rewrite of the following for a quads-mode KB:
+		 * 
+		 * <pre>
+		 * SELECT (COUNT(?s ?p ?o) as ?w) {?s ?p ?o}
+		 * </pre>
+		 */
+		public void test_fastRangeCountOptimizer_quadsMode_correctRejection_1() {
+
+			new Helper() {
+				{
+
+					given = select(
+							projection(bind(
+									functionNode(
+											FunctionRegistry.COUNT
+													.stringValue(),
+											// expression list
+											new VarNode(s), new VarNode(p),
+											new VarNode(o)//
+									), varNode(w) // BIND(COUNT() as ?w)
+							)),
+							where(newStatementPatternNode(new VarNode(s),
+									new VarNode(p), new VarNode(o))));
+
+					// the expected AST.
+					expected = select(
+							projection(bind(
+									functionNode(
+											FunctionRegistry.COUNT
+													.stringValue(),
+											// expression list
+											new VarNode(s), new VarNode(p),
+											new VarNode(o)//
+									), varNode(w) // BIND(COUNT() as ?w)
+							)),
+							where(newStatementPatternNode(new VarNode(s),
+									new VarNode(p), new VarNode(o))));
+
+				}
+			}.test();
+
+		}
+
+//		/**
+//		 * TODO Do a test to make sure that this optimizer is disabled if the KB
+//		 * uses full read/write transactions AND the evaluation context is SPARQL
+//		 * UPDATE (vs SPARQL QUERY).
+//		 */
+//		public void test_fastRangeCountOptimizer_disabledForSPARQLUpdateAndRWTx() {
+//			fail("more coverage of different cases");
+//		}
+
+	} // class TestQuadsModeAPs
+
 	/**
-	 * TODO Do a test to make sure that this optimizer is disabled if the KB
-	 * uses full read/write transactions AND the evaluation context is SPARQL
-	 * UPDATE (vs SPARQL QUERY).
+	 * Triples mode test suite.
+	 * 
+	 * @author bryan
 	 */
-	public void test_fastRangeCountOptimizer_disabledForSPARQLUpdateAndRWTx() {
-		fail("more coverage of different cases");
-	}
+	static public class TestTriplesModeAPs extends TestASTFastRangeCountOptimizer {
+
+		public TestTriplesModeAPs() {
+			super();
+		}
+
+		public TestTriplesModeAPs(final String name) {
+			super(name);
+		}
+
+		@Override
+		public Properties getProperties() {
+
+			final Properties properties = new Properties(super.getProperties());
+
+			// turn off quads.
+			properties.setProperty(AbstractTripleStore.Options.QUADS, "false");
+
+			// turn on triples
+			properties.setProperty(AbstractTripleStore.Options.TRIPLES_MODE,
+					"true");
+
+			return properties;
+
+		}
+		
+		/**
+		 * Verify correct rewrite of
+		 * 
+		 * <pre>
+		 * SELECT (COUNT(?s ?p ?o) as ?w) {?s ?p ?o}
+		 * </pre>
+		 */
+		public void test_fastRangeCountOptimizer_triplesMode_explicitVarNames_01() {
+
+			new Helper() {
+				{
+
+					given = select(
+							projection(bind(
+									functionNode(
+											FunctionRegistry.COUNT
+													.stringValue(),
+											// expression list
+											new VarNode(s), new VarNode(p),
+											new VarNode(o)//
+									), varNode(w) // BIND(COUNT() as ?w)
+							)),
+							where(newStatementPatternNode(new VarNode(s),
+									new VarNode(p), new VarNode(o))));
+
+					/**
+					 * We need to convert:
+					 * 
+					 * <pre>
+					 * SELECT (COUNT(?s ?p ?o) as ?w) {?s ?p ?o}
+					 * </pre>
+					 * 
+					 * into
+					 * 
+					 * <pre>
+					 * SELECT ?w {?s ?p ?o}
+					 * </pre>
+					 * 
+					 * where the triple pattern has been marked with the
+					 * FAST-RANGE-COUNT:=?w annotation; and
+					 * 
+					 * where the ESTIMATED_CARDINALITY of the triple pattern has
+					 * been set to ONE (since we will not use a scan).
+					 * 
+					 * This means that the triple pattern will be directly
+					 * interpreted as binding ?w to the ESTCARD of the triple
+					 * pattern.
+					 */
+					// the triple pattern.
+					final StatementPatternNode sp1 = newStatementPatternNode(
+							new VarNode(s), new VarNode(p), new VarNode(o));
+					/*
+					 * annotate with the name of the variable to become bound to
+					 * the fast range count of that triple pattern.
+					 */
+					sp1.setFastRangeCount(new VarNode(w));
+					sp1.setProperty(Annotations.ESTIMATED_CARDINALITY, 1L);
+
+					// the expected AST.
+					expected = select(projection(varNode(w)), where(sp1));
+
+				}
+			}.test();
+
+		}
+
+		/**
+		 * Verify correct rewrite of
+		 * 
+		 * <pre>
+		 * SELECT (COUNT(?p ?p ?s) as ?w) {?s ?p ?o}
+		 * </pre>
+		 */
+		public void test_fastRangeCountOptimizer_triplesMode_explicitVarNames_02() {
+
+			new Helper() {
+				{
+
+					given = select(
+							projection(bind(
+									functionNode(
+											FunctionRegistry.COUNT
+													.stringValue(),
+											// expression list
+											new VarNode(o), new VarNode(p),
+											new VarNode(s)//
+									), varNode(w) // BIND(COUNT() as ?w)
+							)),
+							where(newStatementPatternNode(new VarNode(s),
+									new VarNode(p), new VarNode(o))));
+
+					/**
+					 * We need to convert:
+					 * 
+					 * <pre>
+					 * SELECT (COUNT(?s ?p ?o) as ?w) {?s ?p ?o}
+					 * </pre>
+					 * 
+					 * into
+					 * 
+					 * <pre>
+					 * SELECT ?w {?s ?p ?o}
+					 * </pre>
+					 * 
+					 * where the triple pattern has been marked with the
+					 * FAST-RANGE-COUNT:=?w annotation; and
+					 * 
+					 * where the ESTIMATED_CARDINALITY of the triple pattern has
+					 * been set to ONE (since we will not use a scan).
+					 * 
+					 * This means that the triple pattern will be directly
+					 * interpreted as binding ?w to the ESTCARD of the triple
+					 * pattern.
+					 */
+					// the triple pattern.
+					final StatementPatternNode sp1 = newStatementPatternNode(
+							new VarNode(s), new VarNode(p), new VarNode(o));
+					// annotate with the name of the variable to become bound to
+					// the
+					// fast range count of that triple pattern.
+					sp1.setFastRangeCount(new VarNode(w));
+					sp1.setProperty(Annotations.ESTIMATED_CARDINALITY, 1L);
+
+					// the expected AST.
+					expected = select(projection(varNode(w)), where(sp1));
+
+				}
+			}.test();
+
+		}
+
+	} // class TestTriplesModeAPs
 
 }

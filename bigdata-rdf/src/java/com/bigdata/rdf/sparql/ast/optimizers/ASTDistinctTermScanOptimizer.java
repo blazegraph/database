@@ -55,9 +55,17 @@ import com.bigdata.rdf.sparql.ast.service.ServiceNode;
 import com.bigdata.rdf.spo.DistinctTermAdvancer;
 
 /**
- * Optimizes <code>SELECT DISTINCT ?property WHERE { ?x ?property ?y . }</code>
+ * Optimizes
+ * <code>SELECT (DISTINCT|REDUCED) ?property WHERE { ?x ?property ?y . }</code>
  * and similar patterns using an O(N) algorithm, where N is the number of
  * distinct solutions.
+ * <p>
+ * The main advantage here is to turn an access path that is fully unbound into
+ * a distinct-term scan. If the access path would be evaluated as-bound with at
+ * least one variable bound, then the distinct term scan might not have any
+ * advantage over the pipeline join (and the semantics of DISTINCT would be
+ * violated with multiple as-bound evaluations of the distinct-term-scan without
+ * a hash index to impose the DISTINCT constraint).
  * 
  * TODO We are doing something very similar for <code>GRAPH ?g {}</code>. It
  * would be worth while to look at that code in the light of this optimizer.
@@ -99,7 +107,8 @@ public class ASTDistinctTermScanOptimizer implements IASTOptimizer {
                 for (NamedSubqueryRoot namedSubquery : list) {
 
 					// Rewrite the named sub-select
-					doSelectQuery(context, sa, namedSubquery);
+					doSelectQuery(context, sa, (QueryRoot) queryNode,
+							namedSubquery);
 
 				}
 
@@ -107,15 +116,15 @@ public class ASTDistinctTermScanOptimizer implements IASTOptimizer {
 
         }
         
-        // rewrite the top-level select
-		doSelectQuery(context, sa, (QueryRoot) queryNode);
+		// rewrite the top-level select
+		doSelectQuery(context, sa, (QueryRoot) queryNode, (QueryBase) queryNode);
 
-    	return queryNode;
-    	
+		return queryNode;
+
 	}
-   
+
 	private void doRecursiveRewrite(final AST2BOpContext context,
-			final StaticAnalysis sa,
+			final StaticAnalysis sa, final QueryRoot queryRoot,
 			final GraphPatternGroup<IGroupMemberNode> group) {
 
 		final int arity = group.arity();
@@ -127,17 +136,18 @@ public class ASTDistinctTermScanOptimizer implements IASTOptimizer {
 			if (child instanceof GraphPatternGroup<?>) {
 
 				// Recursion into groups.
-				doRecursiveRewrite(context, sa,
+				doRecursiveRewrite(context, sa, queryRoot,
 						((GraphPatternGroup<IGroupMemberNode>) child));
 
 			} else if (child instanceof SubqueryRoot) {
 
 				// Recursion into subqueries.
 				final SubqueryRoot subqueryRoot = (SubqueryRoot) child;
-				doRecursiveRewrite(context, sa, subqueryRoot.getWhereClause());
+				doRecursiveRewrite(context, sa, queryRoot,
+						subqueryRoot.getWhereClause());
 
 				// rewrite the sub-select
-				doSelectQuery(context, sa, (SubqueryBase) child);
+				doSelectQuery(context, sa, queryRoot, (SubqueryBase) child);
 
 			} else if (child instanceof ServiceNode) {
 
@@ -155,14 +165,18 @@ public class ASTDistinctTermScanOptimizer implements IASTOptimizer {
 	 * 
 	 * @param context
 	 * @param sa
+	 * @param queryRoot
+	 *            The top-level of the query.
 	 * @param queryBase
+	 *            Either a top-level query or a sub-query.
 	 */
-    private void doSelectQuery(final AST2BOpContext context,
-            final StaticAnalysis sa, final QueryBase queryBase) {
+	private void doSelectQuery(final AST2BOpContext context,
+			final StaticAnalysis sa, final QueryRoot queryRoot,
+			final QueryBase queryBase) {
 
-        // recursion first.
-        doRecursiveRewrite(context, sa, queryBase.getWhereClause());
-        
+		// recursion first.
+		doRecursiveRewrite(context, sa, queryRoot, queryBase.getWhereClause());
+
 		if (queryBase.getQueryType() != QueryType.SELECT) {
 			return;
 		}
@@ -182,7 +196,7 @@ public class ASTDistinctTermScanOptimizer implements IASTOptimizer {
 			 */
 			return;
 		}
-		
+
 		if (projection.isEmpty())
 			return;
 
@@ -197,9 +211,9 @@ public class ASTDistinctTermScanOptimizer implements IASTOptimizer {
 			 */
 			return;
 		}
-		
+
 		final IVariable<?> projectedVar = assignmentNode.getVar();
-		
+
 		/**
 		 * Looking for a single triple or quad pattern in the WHERE clause.
 		 */
@@ -240,21 +254,29 @@ public class ASTDistinctTermScanOptimizer implements IASTOptimizer {
 			return;
 		}
 
-		/*
-		 * TODO We can mark the SELECT as a named-subquery. This will cause it
-		 * to be lifted out to run it first. This could be advantageous if there
-		 * would otherwise be bindings entering into the distinct term scan.
-		 * This way it would run first (bottom-up).
-		 * 
-		 * FIXME [Make sure that we have a correctness test for the case of an
-		 * embedded sub-select where the DISTINCT semantics would otherwise
-		 * break.] In fact, we might be REQUIRED to use bottom-up evaluation in
-		 * order to have the semantics of DISTINCT/REDUCED across the SELECT if
-		 * this clause is appearing as a sub-SELECT. Otherwise the sub-SELECT
-		 * could be evaluated for multiple source bindings leading to multiple
-		 * applications of the distinct-term-scan and that would break the
-		 * DISTINCT/REDUCED semantics of the operator.
-		 */
+		if (queryBase instanceof SubqueryRoot) {
+
+			/*
+			 * The pattern is detected is a sub-select.
+			 * 
+			 * Mark the SELECT as "run-once". This will cause it to be lifted
+			 * out as a named subquery. This is how we enforce bottom-up
+			 * evaluation. In this case it is REQUIRED since the semantics of
+			 * DISTINCT / REDUCED would not be enforced across multiple as-bound
+			 * invocations of the rewritten sub-SELECT.
+			 * 
+			 * FIXME Make sure that we have a correctness test for the case of
+			 * an embedded sub-select where the DISTINCT semantics would
+			 * otherwise break. (We are REQUIRED to use bottom-up evaluation in
+			 * order to have the semantics of DISTINCT/REDUCED across the SELECT
+			 * if this clause is appearing as a sub-SELECT. Otherwise the
+			 * sub-SELECT could be evaluated for multiple source bindings
+			 * leading to multiple applications of the distinct-term-scan and
+			 * that would break the DISTINCT/REDUCED semantics of the operator.)
+			 */
+			((SubqueryRoot) queryBase).setRunOnce(true/* runOnce */);
+			
+		}
 
 		/*
 		 * Disable DISTINCT/REDUCED. The distinct-term-scan will automatically
@@ -262,7 +284,7 @@ public class ASTDistinctTermScanOptimizer implements IASTOptimizer {
 		 */
 		projection.setDistinct(false);
 		projection.setReduced(false);
-		
+
 		/*
 		 * Setup the distinct-term-scan annotation with the variables that will
 		 * be projected out of the SELECT.
@@ -271,13 +293,14 @@ public class ASTDistinctTermScanOptimizer implements IASTOptimizer {
 		new VarNode(projectedVar.getName()) //
 		};
 		sp.setDistinctTermScanVars(distinctTermScanVars);
-		
+
 		/**
-		 * Change the estimated cardinality.  
+		 * Change the estimated cardinality.
 		 * 
 		 * The new cardinality is:
+		 * 
 		 * <pre>
-		 * newCard = oldCard * distinctTermScanVars.length/sp.arity()
+		 * newCard = oldCard * distinctTermScanVars.length / sp.arity()
 		 * </pre>
 		 * 
 		 * where arity() is 3 for triples and 4 for quads.
@@ -291,10 +314,11 @@ public class ASTDistinctTermScanOptimizer implements IASTOptimizer {
 		}
 
 		final long newCard = (long) (((double) distinctTermScanVars.length) / sp
-				.arity());		
-		
+				.arity());
+
 		sp.setProperty(AST2BOpBase.Annotations.ESTIMATED_CARDINALITY, newCard);
 
 	}
 
 }
+

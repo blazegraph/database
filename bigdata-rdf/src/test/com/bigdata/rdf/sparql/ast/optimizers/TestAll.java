@@ -157,7 +157,7 @@ public class TestAll extends TestCase {
 		 *      COUNT(...) (DISTINCT|REDUCED) {single-triple-pattern} as ESTCARD
 		 *      </a>
 		 */
-        suite.addTestSuite(TestASTFastRangeCountOptimizer.class);
+        suite.addTest(TestASTFastRangeCountOptimizer.suite());
 
         suite.addTestSuite(TestASTDistinctTermScanOptimizer.class);
 

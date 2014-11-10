@@ -194,7 +194,16 @@ public abstract class AbstractOptimizerTestCase extends
 	 */
 	@SuppressWarnings("rawtypes")
 	public abstract class Helper {
-		protected QueryRoot given, expected;
+
+		/**
+		 * The given AST is the input to the {@link IASTOptimizer}.
+		 */
+		protected QueryRoot given;
+		
+		/**
+		 * The expected AST output from the {@link IASTOptimizer}.
+		 */
+		protected QueryRoot expected;
 		
 		/**
 		 * Variables
