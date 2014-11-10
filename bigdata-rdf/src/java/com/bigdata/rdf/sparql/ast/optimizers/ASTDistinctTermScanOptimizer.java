@@ -49,6 +49,7 @@ import com.bigdata.rdf.sparql.ast.StaticAnalysis;
 import com.bigdata.rdf.sparql.ast.SubqueryBase;
 import com.bigdata.rdf.sparql.ast.SubqueryRoot;
 import com.bigdata.rdf.sparql.ast.VarNode;
+import com.bigdata.rdf.sparql.ast.eval.AST2BOpBase;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.service.ServiceNode;
 import com.bigdata.rdf.spo.DistinctTermAdvancer;
@@ -219,60 +220,81 @@ public class ASTDistinctTermScanOptimizer implements IASTOptimizer {
 		// The single triple pattern.
 		final StatementPatternNode sp = (StatementPatternNode) whereClause
 				.get(0);
-		
+
 		final Set<IVariable<?>> producedBindings = sp.getProducedBindings();
-		
-		if(!producedBindings.contains(projectedVar)) {
+
+		if (!producedBindings.contains(projectedVar)) {
 			/*
 			 * The projected variable is not any of the variables used in the
 			 * triple pattern.
+			 * 
+			 * Note: This rewrite is only advantageous when a single variable is
+			 * bound by the triple pattern is projected out of the query (or
+			 * perhaps when 2 variables are bound by a quad pattern and
+			 * projected out of the query). The benefit of this rewrite is that
+			 * we can avoid binding the variables that are NOT projected out of
+			 * the query.
 			 * 
 			 * TODO Does this already handle named graph APs?
 			 */
 			return;
 		}
-		
+
 		/*
-		 * FIXME We need to look at the variables projected into and out of this
-		 * SELECT (if any) and those bound by the triple pattern. This rewrite
-		 * is only advantageous when a single variable is bound by the triple
-		 * pattern is projected out of the query (or perhaps when 2 variables
-		 * are bound by a quad pattern and projected out of the query). The
-		 * benefit of this rewrite is that we can avoid binding the variables
-		 * that are NOT projected out of the query.
-		 * 
-		 * At the same time, if the SELECT appears as a sub-SELECT and the
-		 * evaluation context would have already bound the projected variable(s)
-		 * then there is no point using the distinct term scan (unless we lift
-		 * it out into a named subquery).
-		 * 
 		 * TODO We can mark the SELECT as a named-subquery. This will cause it
 		 * to be lifted out to run it first. This could be advantageous if there
 		 * would otherwise be bindings entering into the distinct term scan.
+		 * This way it would run first (bottom-up).
+		 * 
+		 * FIXME [Make sure that we have a correctness test for the case of an
+		 * embedded sub-select where the DISTINCT semantics would otherwise
+		 * break.] In fact, we might be REQUIRED to use bottom-up evaluation in
+		 * order to have the semantics of DISTINCT/REDUCED across the SELECT if
+		 * this clause is appearing as a sub-SELECT. Otherwise the sub-SELECT
+		 * could be evaluated for multiple source bindings leading to multiple
+		 * applications of the distinct-term-scan and that would break the
+		 * DISTINCT/REDUCED semantics of the operator.
 		 */
 
-//		final VarNode theVar = assignmentNode.getVarNode();
-//
-//		// Mark the triple pattern with the FAST-RANGE-COUNT attribute.
-//		sp.setFastRangeCount(theVar);
-//
-//		/*
-//		 * Mark the triple pattern as having an ESTIMATED-CARDINALITY one ONE.
-//		 * 
-//		 * Note: We will compute the COUNT(*) for the triple pattern using two
-//		 * key probes. Therefore we set the estimated cost of computing that
-//		 * cardinality to the minimum.
-//		 */
-//		sp.setProperty(AST2BOpBase.Annotations.ESTIMATED_CARDINALITY, 1L);
-//		
-//		// Rewrite the projection as SELECT ?var.
-//		final ProjectionNode newProjection = new ProjectionNode();
-//		newProjection.addProjectionVar(theVar);
-//		queryBase.setProjection(newProjection);
+		/*
+		 * Disable DISTINCT/REDUCED. The distinct-term-scan will automatically
+		 * enforce this.
+		 */
+		projection.setDistinct(false);
+		projection.setReduced(false);
 		
-		// FIXME Finish this optimizer.
-		throw new UnsupportedOperationException();
+		/*
+		 * Setup the distinct-term-scan annotation with the variables that will
+		 * be projected out of the SELECT.
+		 */
+		final VarNode[] distinctTermScanVars = new VarNode[] { //
+		new VarNode(projectedVar.getName()) //
+		};
+		sp.setDistinctTermScanVars(distinctTermScanVars);
 		
+		/**
+		 * Change the estimated cardinality.  
+		 * 
+		 * The new cardinality is:
+		 * <pre>
+		 * newCard = oldCard * distinctTermScanVars.length/sp.arity()
+		 * </pre>
+		 * 
+		 * where arity() is 3 for triples and 4 for quads.
+		 */
+		final Long oldCard = (Long) sp
+				.getProperty(AST2BOpBase.Annotations.ESTIMATED_CARDINALITY);
+
+		if (oldCard == null) {
+			throw new AssertionError(
+					"Expecting estimated-cardinality to be bound: sp=" + sp);
+		}
+
+		final long newCard = (long) (((double) distinctTermScanVars.length) / sp
+				.arity());		
+		
+		sp.setProperty(AST2BOpBase.Annotations.ESTIMATED_CARDINALITY, newCard);
+
 	}
 
 }
